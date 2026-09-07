@@ -191,6 +191,7 @@ export function DayColumn({
       notes: null,
       videoPath: null,
       youtubeUrl: null,
+      tier: null,
       sets: setRow ? [mapSetRow(setRow)] : [],
     };
 

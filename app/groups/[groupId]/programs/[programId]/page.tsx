@@ -249,6 +249,18 @@ async function CoachProgramBuilder({
     .order("name");
   const movementPatterns = patternRows ?? [];
 
+  // An exercise's A/B/C class is read straight off wherever it sits in one
+  // of the coach's movement-pattern ladders — not a separate field to
+  // maintain, so it's automatically in sync with Exercise Library.
+  const { data: tierRows } = await supabase
+    .from("movement_pattern_exercises")
+    .select("exercise_name, tier, movement_patterns!inner ( created_by )")
+    .eq("movement_patterns.created_by", coachId);
+  const tierByName = new Map<string, "A" | "B" | "C" | null>();
+  for (const row of (tierRows ?? []) as any[]) {
+    if (!tierByName.has(row.exercise_name)) tierByName.set(row.exercise_name, row.tier);
+  }
+
   const days: BuilderDay[] = (workoutRows ?? []).map((w: any) => {
     const exerciseItems: BuilderExercise[] = (w.group_workout_exercises ?? []).map((ex: any) => {
       const media = mediaByName.get(ex.exercise_name);
@@ -262,6 +274,7 @@ async function CoachProgramBuilder({
         notes: ex.notes,
         videoPath: media?.videoPath ?? null,
         youtubeUrl: media?.youtubeUrl ?? null,
+        tier: tierByName.get(ex.exercise_name) ?? null,
         sets: (ex.group_workout_exercise_sets ?? [])
           .slice()
           .sort((a: any, b: any) => a.set_order - b.set_order)

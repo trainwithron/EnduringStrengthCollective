@@ -316,6 +316,7 @@ export function ExerciseBuilderCard({
       notes: exercise.notes,
       videoPath: exercise.videoPath,
       youtubeUrl: exercise.youtubeUrl,
+      tier: exercise.tier,
       sets: newSets,
     });
     setBusy(false);
@@ -349,6 +350,14 @@ export function ExerciseBuilderCard({
             <ChevronDown className="w-3.5 h-3.5" />
           </button>
         </div>
+        {exercise.tier && (
+          <span
+            className="w-6 h-6 shrink-0 flex items-center justify-center border border-rust text-rust font-display text-xs font-bold"
+            title={`Class ${exercise.tier} (from its movement pattern in Exercise Library)`}
+          >
+            {exercise.tier}
+          </span>
+        )}
         <div className="flex-1 min-w-0">
           <ExerciseNameInput
             value={collapsed ? exercise.exerciseName : nameDraft}

@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import type { BuilderDay } from "@/lib/types";
+import type { BuilderDay, BuilderExercise } from "@/lib/types";
 import { DayCard } from "./day-card";
 import { DuplicateWeekPanel } from "./duplicate-week-panel";
+import { BulkEditDayPanel } from "./bulk-edit-day-panel";
+import { TARGET_PROP, type TrackedField } from "@/lib/exercise-fields";
 import type { MovementPatternOption } from "../exercise-builder-card";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
@@ -95,6 +97,27 @@ export function WeekGrid({
   }
 
   const sortedDays = days.slice().sort((a, b) => a.dayIndex - b.dayIndex);
+  const weekExercises: BuilderExercise[] = days.flatMap((d) =>
+    d.items.filter((i): i is BuilderExercise => i.kind === "exercise")
+  );
+
+  function handleWeekBulkApplied(
+    updates: { exerciseId: string; field: TrackedField; value: string | number | null }[]
+  ) {
+    const byExercise = new Map(updates.map((u) => [u.exerciseId, u]));
+    onDaysChange(
+      days.map((day) => ({
+        ...day,
+        items: day.items.map((item) => {
+          if (item.kind !== "exercise") return item;
+          const update = byExercise.get(item.id);
+          if (!update) return item;
+          const prop = TARGET_PROP[update.field] as keyof BuilderExercise["sets"][number];
+          return { ...item, sets: item.sets.map((s) => ({ ...s, [prop]: update.value })) };
+        }),
+      }))
+    );
+  }
 
   return (
     <div className="border border-steel/20">
@@ -113,7 +136,7 @@ export function WeekGrid({
         )}
       </button>
 
-      <div className="px-5 pb-3">
+      <div className="px-5 pb-3 flex flex-wrap gap-2">
         <DuplicateWeekPanel
           programId={programId}
           groupId={groupId}
@@ -121,6 +144,11 @@ export function WeekGrid({
           sourceDays={days}
           existingWeekNumbers={existingWeekNumbers}
           onGenerated={onWeeksGenerated}
+        />
+        <BulkEditDayPanel
+          exercises={weekExercises}
+          onApplied={handleWeekBulkApplied}
+          label="Bulk edit week"
         />
       </div>
 

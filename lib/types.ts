@@ -79,6 +79,11 @@ export interface BuilderExercise {
   videoPath: string | null;
   youtubeUrl: string | null;
   sets: ExerciseSetTarget[];
+  // Read-only here — derived from wherever this exercise sits in one of
+  // the coach's movement-pattern ladders (Exercise Library), not a
+  // separately-editable field. Null if the exercise isn't linked to any
+  // tiered movement pattern.
+  tier: "A" | "B" | "C" | null;
 }
 
 export interface BuilderNote {

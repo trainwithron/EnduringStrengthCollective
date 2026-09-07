@@ -148,6 +148,7 @@ export function DayCard({
       notes: null,
       videoPath: null,
       youtubeUrl: null,
+      tier: null,
       sets: setRow ? [mapSetRow(setRow)] : [],
     };
 
@@ -198,14 +199,18 @@ export function DayCard({
   const itemCount = day.items.filter((i) => i.kind === "exercise").length;
   const dayExercises = day.items.filter((i): i is BuilderExercise => i.kind === "exercise");
 
-  function handleBulkApplied(field: TrackedField, value: string | number | null) {
-    const prop = TARGET_PROP[field] as keyof BuilderExercise["sets"][number];
+  function handleBulkApplied(
+    updates: { exerciseId: string; field: TrackedField; value: string | number | null }[]
+  ) {
+    const byExercise = new Map(updates.map((u) => [u.exerciseId, u]));
     onItemsChange(
-      day.items.map((item) =>
-        item.kind === "exercise"
-          ? { ...item, sets: item.sets.map((s) => ({ ...s, [prop]: value })) }
-          : item
-      )
+      day.items.map((item) => {
+        if (item.kind !== "exercise") return item;
+        const update = byExercise.get(item.id);
+        if (!update) return item;
+        const prop = TARGET_PROP[update.field] as keyof BuilderExercise["sets"][number];
+        return { ...item, sets: item.sets.map((s) => ({ ...s, [prop]: update.value })) };
+      })
     );
   }
 
@@ -264,7 +269,11 @@ export function DayCard({
         <>
           {dayExercises.length > 1 && (
             <div className="px-3 pt-3">
-              <BulkEditDayPanel exercises={dayExercises} onApplied={handleBulkApplied} />
+              <BulkEditDayPanel
+                exercises={dayExercises}
+                onApplied={handleBulkApplied}
+                label="Bulk edit day"
+              />
             </div>
           )}
 

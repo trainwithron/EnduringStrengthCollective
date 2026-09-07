@@ -43,6 +43,12 @@ export function DuplicateWeekPanel({
   const [linearRepCycle, setLinearRepCycle] = useState("");
   const [doubleWeightBumpPct, setDoubleWeightBumpPct] = useState("5");
   const [wave, setWave] = useState<UndulatingWaveStep[]>(DEFAULT_UNDULATING_WAVE);
+  const [classRepsEnabled, setClassRepsEnabled] = useState(false);
+  const [classRepCycles, setClassRepCycles] = useState<Record<"A" | "B" | "C", string>>({
+    A: "",
+    B: "",
+    C: "",
+  });
   const [generating, setGenerating] = useState(false);
 
   function updateWaveStep(index: number, patch: Partial<UndulatingWaveStep>) {
@@ -68,6 +74,7 @@ export function DuplicateWeekPanel({
       movementPatternId: string | null;
       trackedFields: TrackedField[];
       notes: string | null;
+      tier: "A" | "B" | "C" | null;
       setOrder: number;
       otherTargets: {
         rpe: number | null;
@@ -127,6 +134,22 @@ export function DuplicateWeekPanel({
             results = generateUndulatingProgression(source, { weeks: weekCount, wave });
           }
 
+          // Rep targets by class override reps only, regardless of which
+          // weight-progression model produced `results` — a coach can
+          // set week-by-week rep targets per A/B/C class independent of
+          // whether weight is climbing linearly, via double progression,
+          // or an undulating wave.
+          if (classRepsEnabled && item.tier) {
+            const cycleText = classRepCycles[item.tier];
+            const cycle = cycleText
+              .split(",")
+              .map((s) => parseInt(s.trim(), 10))
+              .filter((n) => Number.isFinite(n));
+            if (cycle.length > 0) {
+              results = results.map((r, i) => ({ ...r, reps: cycle[i % cycle.length] }));
+            }
+          }
+
           setTracks.push({
             dayIndex: day.dayIndex,
             dayTitle: day.title,
@@ -135,6 +158,7 @@ export function DuplicateWeekPanel({
             movementPatternId: item.movementPatternId,
             trackedFields: item.trackedFields,
             notes: item.notes,
+            tier: item.tier,
             setOrder: set.setOrder,
             otherTargets: {
               rpe: set.targetRpe,
@@ -246,6 +270,7 @@ export function DuplicateWeekPanel({
             notes: first.notes,
             videoPath: null,
             youtubeUrl: null,
+            tier: first.tier,
             sets: (setsData ?? []).map((s) => ({
               id: s.id,
               setOrder: s.set_order,
@@ -383,6 +408,37 @@ export function DuplicateWeekPanel({
           ))}
         </div>
       )}
+
+      <div className="pt-2 border-t border-steel/15 space-y-1.5">
+        <label className="flex items-center gap-2 font-body text-xs text-steel">
+          <input
+            type="checkbox"
+            checked={classRepsEnabled}
+            onChange={(e) => setClassRepsEnabled(e.target.checked)}
+            className="w-4 h-4"
+          />
+          Set rep targets by class (A/B/C) — overrides reps only, weight
+          still follows the model above
+        </label>
+        {classRepsEnabled && (
+          <div className="space-y-1.5 pl-6">
+            {(["A", "B", "C"] as const).map((tier) => (
+              <label key={tier} className="flex items-center gap-2">
+                <span className="font-body text-xs text-steel w-24">Class {tier} reps</span>
+                <input
+                  type="text"
+                  value={classRepCycles[tier]}
+                  onChange={(e) =>
+                    setClassRepCycles((prev) => ({ ...prev, [tier]: e.target.value }))
+                  }
+                  placeholder="e.g. 5, 8, 12"
+                  className="flex-1 h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
+                />
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
 
       <div className="flex gap-2 pt-2">
         <button
