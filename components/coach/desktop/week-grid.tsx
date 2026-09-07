@@ -46,7 +46,7 @@ export function WeekGrid({
   async function handleDeleteWeek() {
     if (
       !window.confirm(
-        `Delete all of Week ${weekNumber} (${days.length} ${days.length === 1 ? "day" : "days"})? This can't be undone.`
+        `Delete all of Week ${weekNumber} (${days.length} ${days.length === 1 ? "day" : "days"})? This can't be undone. Any client who already logged one of these workouts keeps that history — this only removes the templates.`
       )
     ) {
       return;
@@ -61,7 +61,7 @@ export function WeekGrid({
       .eq("week_number", weekNumber);
 
     if (error) {
-      setDeleteError("Can't delete — one or more days this week have already been logged.");
+      setDeleteError("Couldn't delete — try again.");
       setDeleting(false);
       return;
     }

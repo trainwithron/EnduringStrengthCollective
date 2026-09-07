@@ -180,7 +180,13 @@ export function DayCard({
   }
 
   async function handleDeleteDay() {
-    if (!window.confirm(`Delete "${day.title}"? This can't be undone.`)) return;
+    if (
+      !window.confirm(
+        `Delete "${day.title}"? This can't be undone. Any client who already logged this workout keeps that history — this only removes the template.`
+      )
+    ) {
+      return;
+    }
 
     setBusy(true);
     setError(null);
@@ -188,7 +194,7 @@ export function DayCard({
     const { error: deleteError } = await supabase.from("workouts").delete().eq("id", day.id);
 
     if (deleteError) {
-      setError("Can't delete — athletes have already logged this day.");
+      setError("Couldn't delete — try again.");
       setBusy(false);
       return;
     }
