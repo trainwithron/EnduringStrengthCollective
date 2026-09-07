@@ -130,6 +130,7 @@ export function ProgramBuilder({
         programId={programId}
         initialStartDate={initialStartDate}
         initialTrainingDays={initialTrainingDays}
+        initialVisibilityWindow="day"
         onChange={(nextStartDate, nextTrainingDays) => {
           setStartDate(nextStartDate);
           setTrainingDays(nextTrainingDays);

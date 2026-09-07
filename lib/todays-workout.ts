@@ -34,7 +34,7 @@ export async function getTodaysWorkoutId(
 
   const { data: program } = await supabase
     .from("programs")
-    .select("id, start_date, training_days")
+    .select("id, start_date, training_days, visibility_window")
     .eq("group_id", groupId)
     .eq("is_active", true)
     .maybeSingle();
@@ -71,7 +71,7 @@ export async function getTodaysWorkoutId(
       workouts
     );
     const scheduledDate = scheduledDateByDayId.get(next.id);
-    if (isLocked(scheduledDate, new Date())) {
+    if (isLocked(scheduledDate, new Date(), program.visibility_window)) {
       return { status: "locked", unlocksOn: scheduledDate! };
     }
   }

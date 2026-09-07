@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   LayoutGrid,
@@ -14,6 +14,16 @@ import {
   Users,
 } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
+import { createBrowserClient } from "@/lib/supabase/client";
+
+function NavBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span className="ml-auto h-5 min-w-[20px] px-1 rounded-full bg-rust text-graphite font-body text-[10px] font-bold flex items-center justify-center">
+      {count > 9 ? "9+" : count}
+    </span>
+  );
+}
 
 const SIDEBAR_WIDTH = 240;
 
@@ -40,6 +50,75 @@ export function CoachDesktopShell({
   const programmingActive =
     active === "programs" || active === "exercise-library" || active === "tools";
   const [programmingOpen, setProgrammingOpen] = useState(true);
+  const [feedUnread, setFeedUnread] = useState(0);
+  const [clientsUnread, setClientsUnread] = useState(0);
+
+  // "What's new" badges: how many posts / client check-ins happened since
+  // this coach last actually opened Team Feed / Clients for this group.
+  // Visiting the relevant page marks it seen going forward — a brand-new
+  // coach_view_state row seeds itself at "now" rather than flooding the
+  // very first load with every historical post as "unread."
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      const supabase = createBrowserClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      let { data: state } = await supabase
+        .from("coach_view_state")
+        .select("feed_seen_at, clients_seen_at")
+        .eq("coach_id", user.id)
+        .eq("group_id", groupId)
+        .maybeSingle();
+
+      const nowIso = new Date().toISOString();
+
+      if (!state) {
+        // First time this coach has ever loaded any desktop page for this
+        // group — seed both to "now" so nothing pre-existing floods in as
+        // "unread." A real badge only starts accumulating from here.
+        await supabase.from("coach_view_state").upsert(
+          { coach_id: user.id, group_id: groupId, feed_seen_at: nowIso, clients_seen_at: nowIso },
+          { onConflict: "coach_id,group_id" }
+        );
+        state = { feed_seen_at: nowIso, clients_seen_at: nowIso };
+      } else if (active === "feed" || active === "clients") {
+        const patch =
+          active === "feed" ? { feed_seen_at: nowIso } : { clients_seen_at: nowIso };
+        await supabase
+          .from("coach_view_state")
+          .update(patch)
+          .eq("coach_id", user.id)
+          .eq("group_id", groupId);
+        state = { ...state, ...patch };
+      }
+
+      if (active !== "feed") {
+        const { count } = await supabase
+          .from("posts")
+          .select("id", { count: "exact", head: true })
+          .eq("group_id", groupId)
+          .gt("created_at", state.feed_seen_at ?? "1970-01-01");
+        if (!cancelled) setFeedUnread(count ?? 0);
+      }
+
+      if (active !== "clients") {
+        const { data: logs } = await supabase
+          .from("workout_logs")
+          .select("athlete_id")
+          .eq("group_id", groupId)
+          .gt("created_at", state.clients_seen_at ?? "1970-01-01");
+        if (!cancelled) setClientsUnread(new Set((logs ?? []).map((l) => l.athlete_id)).size);
+      }
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [groupId, active]);
 
   const programmingItems: { key: Active; label: string; href: string; icon: typeof LayoutGrid }[] = [
     { key: "programs", label: "Programs", href: `/groups/${groupId}/programs`, icon: LayoutGrid },
@@ -81,6 +160,7 @@ export function CoachDesktopShell({
           >
             <Users className="w-4 h-4 shrink-0" strokeWidth={2.25} />
             Clients
+            <NavBadge count={clientsUnread} />
           </Link>
 
           <button
@@ -157,6 +237,7 @@ export function CoachDesktopShell({
           >
             <MessagesSquare className="w-4 h-4 shrink-0" strokeWidth={2.25} />
             Team Feed
+            <NavBadge count={feedUnread} />
           </Link>
         </nav>
 

@@ -39,14 +39,33 @@ export function isSameDay(a: Date, b: Date): boolean {
   );
 }
 
-// A workout is locked when its computed date hasn't arrived yet — a
-// pacing/UX control, not a security boundary (see plan notes on why this
-// is page-level, not RLS).
-export function isLocked(scheduledDate: Date | undefined, today: Date): boolean {
+export type VisibilityWindow = "day" | "week" | "month" | "full";
+
+// How many days beyond today each window opens up. "day" is the original
+// behavior (only today and earlier are unlocked) — kept as the default so
+// every existing call site behaves exactly as before unless a program
+// explicitly opts into a wider window.
+const WINDOW_DAYS: Record<VisibilityWindow, number> = {
+  day: 0,
+  week: 7,
+  month: 30,
+  full: Infinity,
+};
+
+// A workout is locked when its computed date is further out than the
+// program's visibility window allows — a pacing/UX control, not a
+// security boundary (see plan notes on why this is page-level, not RLS).
+export function isLocked(
+  scheduledDate: Date | undefined,
+  today: Date,
+  window: VisibilityWindow = "day"
+): boolean {
   if (!scheduledDate) return false;
+  if (window === "full") return false;
+  const cutoff = new Date(today);
+  cutoff.setHours(0, 0, 0, 0);
+  cutoff.setDate(cutoff.getDate() + WINDOW_DAYS[window]);
   const d = new Date(scheduledDate);
   d.setHours(0, 0, 0, 0);
-  const t = new Date(today);
-  t.setHours(0, 0, 0, 0);
-  return d.getTime() > t.getTime();
+  return d.getTime() > cutoff.getTime();
 }

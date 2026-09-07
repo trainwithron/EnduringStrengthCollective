@@ -6,7 +6,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import type { BuilderDay } from "@/lib/types";
 import { WeekGrid } from "./week-grid";
 import { ProgramScheduleSettings } from "../program-schedule-settings";
-import { computeScheduledDates } from "@/lib/program-schedule";
+import { computeScheduledDates, type VisibilityWindow } from "@/lib/program-schedule";
 import type { MovementPatternOption } from "../exercise-builder-card";
 
 export function ProgramBuilderDesktop({
@@ -19,6 +19,7 @@ export function ProgramBuilderDesktop({
   movementPatterns,
   initialStartDate,
   initialTrainingDays,
+  initialVisibilityWindow,
 }: {
   programId: string;
   groupId: string;
@@ -29,6 +30,7 @@ export function ProgramBuilderDesktop({
   movementPatterns: MovementPatternOption[];
   initialStartDate: string | null;
   initialTrainingDays: number[] | null;
+  initialVisibilityWindow: VisibilityWindow;
 }) {
   const [days, setDays] = useState<BuilderDay[]>(initialDays);
   const [startDate, setStartDate] = useState(initialStartDate);
@@ -124,6 +126,7 @@ export function ProgramBuilderDesktop({
           programId={programId}
           initialStartDate={initialStartDate}
           initialTrainingDays={initialTrainingDays}
+          initialVisibilityWindow={initialVisibilityWindow}
           onChange={(nextStartDate, nextTrainingDays) => {
             setStartDate(nextStartDate);
             setTrainingDays(nextTrainingDays);

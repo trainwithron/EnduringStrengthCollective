@@ -73,7 +73,7 @@ export default async function WorkoutOverviewPage({
 
     const { data: program } = await supabase
       .from("programs")
-      .select("start_date, training_days")
+      .select("start_date, training_days, visibility_window")
       .eq("id", data.workout.programId)
       .maybeSingle();
 
@@ -92,7 +92,7 @@ export default async function WorkoutOverviewPage({
       );
       const scheduledDate = scheduledDateByDayId.get(params.workoutId);
 
-      if (isLocked(scheduledDate, new Date())) {
+      if (isLocked(scheduledDate, new Date(), program.visibility_window)) {
         return (
           <main className="min-h-screen bg-graphite text-chalk font-body pb-24 flex items-center justify-center px-6">
             <p className="font-body text-steel text-center max-w-[40ch]">

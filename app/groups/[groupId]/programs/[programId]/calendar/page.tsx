@@ -56,7 +56,7 @@ export default async function ProgramCalendarPage({
 
   const { data: program } = await supabase
     .from("programs")
-    .select("id, name, start_date, training_days")
+    .select("id, name, start_date, training_days, visibility_window")
     .eq("id", params.programId)
     .eq("group_id", params.groupId)
     .single();
@@ -252,7 +252,10 @@ export default async function ProgramCalendarPage({
           const w = workoutByDateKey.get(dateKey(date));
           const isToday = isSameDay(date, today);
           const done = w ? loggedIds.has(w.id) : false;
-          const locked = membership.role === "athlete" && w ? isLocked(date, today) && !done : false;
+          const locked =
+            membership.role === "athlete" && w
+              ? isLocked(date, today, program.visibility_window) && !done
+              : false;
           const exerciseCount = w ? (w.group_workout_exercises?.[0]?.count ?? 0) : 0;
 
           const cellContent = (

@@ -2,6 +2,14 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import type { VisibilityWindow } from "@/lib/program-schedule";
+
+const VISIBILITY_OPTIONS: { value: VisibilityWindow; label: string }[] = [
+  { value: "day", label: "Day of" },
+  { value: "week", label: "Week of" },
+  { value: "month", label: "Month of" },
+  { value: "full", label: "Full program" },
+];
 
 const WEEKDAYS = [
   { value: 0, label: "Su" },
@@ -17,15 +25,20 @@ export function ProgramScheduleSettings({
   programId,
   initialStartDate,
   initialTrainingDays,
+  initialVisibilityWindow,
   onChange,
 }: {
   programId: string;
   initialStartDate: string | null;
   initialTrainingDays: number[] | null;
+  initialVisibilityWindow: VisibilityWindow;
   onChange: (startDate: string | null, trainingDays: number[] | null) => void;
 }) {
   const [startDate, setStartDate] = useState(initialStartDate ?? "");
   const [trainingDays, setTrainingDays] = useState<number[]>(initialTrainingDays ?? []);
+  const [visibilityWindow, setVisibilityWindow] = useState<VisibilityWindow>(
+    initialVisibilityWindow
+  );
   const [shiftDays, setShiftDays] = useState("7");
   const [saving, setSaving] = useState(false);
 
@@ -40,6 +53,14 @@ export function ProgramScheduleSettings({
       })
       .eq("id", programId);
     onChange(nextStartDate || null, nextTrainingDays.length > 0 ? nextTrainingDays : null);
+    setSaving(false);
+  }
+
+  async function handleVisibilityChange(next: VisibilityWindow) {
+    setVisibilityWindow(next);
+    setSaving(true);
+    const supabase = createBrowserClient();
+    await supabase.from("programs").update({ visibility_window: next }).eq("id", programId);
     setSaving(false);
   }
 
@@ -101,6 +122,24 @@ export function ProgramScheduleSettings({
           </button>
         ))}
       </div>
+
+      <label className="flex items-center gap-2">
+        <span className="font-body text-[11px] text-steel uppercase tracking-wide">
+          Unlock ahead
+        </span>
+        <select
+          value={visibilityWindow}
+          onChange={(e) => handleVisibilityChange(e.target.value as VisibilityWindow)}
+          disabled={saving}
+          className="h-8 px-2 bg-surface border border-steel/30 text-chalk font-body text-xs disabled:opacity-40"
+        >
+          {VISIBILITY_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      </label>
 
       <label className="flex items-center gap-2">
         <span className="font-body text-[11px] text-steel uppercase tracking-wide">

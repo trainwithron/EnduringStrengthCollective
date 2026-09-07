@@ -4,7 +4,13 @@ import { createServerClient } from "@/lib/supabase/server";
 import { ProgramBuilderDesktop } from "@/components/coach/desktop/program-builder-desktop";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { DEFAULT_TRACKED_FIELDS, mapSetRow } from "@/lib/exercise-fields";
-import { computeScheduledDates, formatShortDate, isSameDay, isLocked } from "@/lib/program-schedule";
+import {
+  computeScheduledDates,
+  formatShortDate,
+  isSameDay,
+  isLocked,
+  type VisibilityWindow,
+} from "@/lib/program-schedule";
 import { Lock } from "lucide-react";
 import type { BuilderDay, BuilderExercise, BuilderNote } from "@/lib/types";
 
@@ -41,7 +47,7 @@ export default async function ProgramDetailPage({
 
   const { data: program } = await supabase
     .from("programs")
-    .select("id, name, description, start_date, training_days")
+    .select("id, name, description, start_date, training_days, visibility_window")
     .eq("id", params.programId)
     .eq("group_id", params.groupId)
     .single();
@@ -69,6 +75,7 @@ export default async function ProgramDetailPage({
         coachId={user.id}
         startDate={program.start_date}
         trainingDays={program.training_days}
+        visibilityWindow={program.visibility_window}
       />
     );
   }
@@ -136,7 +143,7 @@ export default async function ProgramDetailPage({
                 const exerciseCount = w.group_workout_exercises?.[0]?.count ?? 0;
                 const scheduledDate = scheduledDateByDayId.get(w.id);
                 const isToday = scheduledDate ? isSameDay(scheduledDate, today) : false;
-                const locked = isLocked(scheduledDate, today);
+                const locked = isLocked(scheduledDate, today, program.visibility_window);
                 return (
                   <div key={w.id} className="py-3">
                     <div className="flex items-center justify-between">
@@ -189,6 +196,7 @@ async function CoachProgramBuilder({
   coachId,
   startDate,
   trainingDays,
+  visibilityWindow,
 }: {
   groupId: string;
   programId: string;
@@ -197,6 +205,7 @@ async function CoachProgramBuilder({
   coachId: string;
   startDate: string | null;
   trainingDays: number[] | null;
+  visibilityWindow: VisibilityWindow;
 }) {
   const supabase = createServerClient();
 
@@ -288,6 +297,7 @@ async function CoachProgramBuilder({
         movementPatterns={movementPatterns}
         initialStartDate={startDate}
         initialTrainingDays={trainingDays}
+        initialVisibilityWindow={visibilityWindow}
       />
     </CoachDesktopShell>
   );
