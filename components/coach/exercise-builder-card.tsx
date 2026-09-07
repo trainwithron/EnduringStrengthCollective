@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { ExerciseNameInput } from "./exercise-name-input";
 import { ExerciseMediaPicker } from "./exercise-media-picker";
@@ -32,20 +32,34 @@ function TargetCell({
   onCommit: (raw: string) => void;
 }) {
   const [draft, setDraft] = useState(value);
+
+  // Same set, same React key — so a value that changes out from under us
+  // (bulk edit, first-set auto-fill, a freshly generated week) would
+  // otherwise never be picked up, since useState's initializer only runs
+  // once on mount. Without this, the database is correct but the cell
+  // still shows its old value, which reads as "it didn't take."
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  function commit() {
+    if (draft !== value) onCommit(draft);
+  }
+
   return (
     <input
       type={kind === "number" ? "number" : "text"}
       inputMode={kind === "number" ? "decimal" : undefined}
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
-      onBlur={() => {
-        if (draft !== value) onCommit(draft);
-      }}
+      onBlur={commit}
       onKeyDown={(e) => {
-        // Enter commits immediately, same as tabbing away — without this,
-        // Enter does nothing (it doesn't blur the field on its own).
+        // Enter commits directly rather than only relying on blur firing
+        // — still blurs afterward so focus visibly moves on, but the
+        // write itself no longer depends on that round-trip succeeding.
         if (e.key === "Enter") {
           e.preventDefault();
+          commit();
           e.currentTarget.blur();
         }
       }}

@@ -76,6 +76,12 @@ export function BulkEditDayPanel({
           type={fieldDef(field).kind === "number" ? "number" : "text"}
           value={value}
           onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              handleApply();
+            }
+          }}
           placeholder="Value"
           className="w-24 h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
         />
