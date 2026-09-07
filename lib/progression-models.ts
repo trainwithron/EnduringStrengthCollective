@@ -83,7 +83,7 @@ export function generateDoubleProgression(
 
 export interface UndulatingWaveStep {
   weightPct: number; // relative to the source week's weight, e.g. 105 = 105%
-  repDelta: number; // added to the source week's reps
+  reps: number; // the actual rep target for this stage — typed in directly, no math
 }
 
 export interface UndulatingProgressionOptions {
@@ -92,9 +92,9 @@ export interface UndulatingProgressionOptions {
 }
 
 export const DEFAULT_UNDULATING_WAVE: UndulatingWaveStep[] = [
-  { weightPct: 105, repDelta: -2 }, // heavy
-  { weightPct: 100, repDelta: 0 }, // moderate
-  { weightPct: 90, repDelta: 3 }, // light
+  { weightPct: 105, reps: 5 }, // heavy
+  { weightPct: 100, reps: 8 }, // moderate
+  { weightPct: 90, reps: 12 }, // light
 ];
 
 export function generateUndulatingProgression(
@@ -105,8 +105,7 @@ export function generateUndulatingProgression(
   for (let i = 0; i < options.weeks; i++) {
     const step = options.wave[i % options.wave.length];
     const weight = source.weight != null ? roundToIncrement((source.weight * step.weightPct) / 100) : null;
-    const reps = source.reps != null ? Math.max(1, source.reps + step.repDelta) : null;
-    results.push({ weight, reps });
+    results.push({ weight, reps: step.reps });
   }
   return results;
 }

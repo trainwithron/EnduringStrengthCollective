@@ -372,11 +372,11 @@ export function DuplicateWeekPanel({
                 onChange={(e) => updateWaveStep(i, { weightPct: Number(e.target.value) })}
                 className="w-16 h-8 bg-graphite border border-steel/30 text-chalk px-1 font-body text-xs"
               />
-              <span className="font-body text-[11px] text-steel">Rep delta</span>
+              <span className="font-body text-[11px] text-steel">Reps</span>
               <input
                 type="number"
-                value={wave[i].repDelta}
-                onChange={(e) => updateWaveStep(i, { repDelta: Number(e.target.value) })}
+                value={wave[i].reps}
+                onChange={(e) => updateWaveStep(i, { reps: Number(e.target.value) })}
                 className="w-16 h-8 bg-graphite border border-steel/30 text-chalk px-1 font-body text-xs"
               />
             </div>

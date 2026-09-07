@@ -69,14 +69,14 @@ describe("generateUndulatingProgression", () => {
       { weeks: 6, wave: DEFAULT_UNDULATING_WAVE }
     );
     expect(result.map((r) => r.weight)).toEqual([210, 200, 180, 210, 200, 180]);
-    expect(result.map((r) => r.reps)).toEqual([8, 10, 13, 8, 10, 13]);
+    expect(result.map((r) => r.reps)).toEqual([5, 8, 12, 5, 8, 12]);
   });
 
-  it("never lets reps drop below 1 even with an aggressive negative delta", () => {
+  it("uses the reps typed in for each stage directly, ignoring the source reps entirely", () => {
     const result = generateUndulatingProgression(
-      { weight: 100, reps: 2, repMin: null, repMax: null },
-      { weeks: 1, wave: [{ weightPct: 100, repDelta: -5 }] }
+      { weight: 100, reps: 999, repMin: null, repMax: null },
+      { weeks: 1, wave: [{ weightPct: 100, reps: 6 }] }
     );
-    expect(result[0].reps).toBe(1);
+    expect(result[0].reps).toBe(6);
   });
 });

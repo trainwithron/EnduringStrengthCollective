@@ -41,6 +41,14 @@ function TargetCell({
       onBlur={() => {
         if (draft !== value) onCommit(draft);
       }}
+      onKeyDown={(e) => {
+        // Enter commits immediately, same as tabbing away — without this,
+        // Enter does nothing (it doesn't blur the field on its own).
+        if (e.key === "Enter") {
+          e.preventDefault();
+          e.currentTarget.blur();
+        }
+      }}
       className="w-12 h-9 bg-graphite border border-steel/30 text-chalk px-1 font-body text-xs text-center focus:outline-none focus:border-rust shrink-0"
     />
   );
@@ -189,6 +197,21 @@ export function ExerciseBuilderCard({
     onSetsChange(
       exercise.sets.map((s) => (s.id === setId ? { ...s, [TARGET_PROP[field]]: value } : s))
     );
+  }
+
+  // Filling in the first set's value for a field and moving on (Tab/Enter)
+  // fills every other set in that same row too — 3 sets of 5 shouldn't
+  // need typing "5" three times.
+  async function handleFirstSetCommit(setId: string, field: TrackedField, raw: string) {
+    const def = fieldDef(field);
+    const value = def.kind === "number" ? (raw.trim() === "" ? null : Number(raw)) : raw.trim() || null;
+    const otherSetIds = exercise.sets.filter((s) => s.id !== setId).map((s) => s.id);
+    const supabase = createBrowserClient();
+    await supabase
+      .from("group_workout_exercise_sets")
+      .update({ [TARGET_COLUMN[field]]: value })
+      .in("id", [setId, ...otherSetIds]);
+    onSetsChange(exercise.sets.map((s) => ({ ...s, [TARGET_PROP[field]]: value })));
   }
 
   async function handleAddField(field: TrackedField) {
@@ -388,6 +411,10 @@ export function ExerciseBuilderCard({
             <div className="space-y-1.5 min-w-fit">
               {orderTrackedFields(exercise.trackedFields).map((field) => {
                 const def = fieldDef(field);
+                const firstSetId =
+                  exercise.sets.length > 0
+                    ? exercise.sets.reduce((a, b) => (a.setOrder <= b.setOrder ? a : b)).id
+                    : null;
                 return (
                   <div key={field} className="flex items-center gap-1.5">
                     <span className="w-14 shrink-0 font-body text-[10px] text-steel uppercase tracking-wide">
@@ -398,7 +425,11 @@ export function ExerciseBuilderCard({
                         key={set.id}
                         value={targetValue(set, field)}
                         kind={def.kind}
-                        onCommit={(raw) => handleCellCommit(set.id, field, raw)}
+                        onCommit={(raw) =>
+                          set.id === firstSetId && exercise.sets.length > 1
+                            ? handleFirstSetCommit(set.id, field, raw)
+                            : handleCellCommit(set.id, field, raw)
+                        }
                       />
                     ))}
                     <button

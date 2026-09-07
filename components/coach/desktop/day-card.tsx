@@ -4,9 +4,16 @@ import { useState } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { BuilderDay, BuilderItem, BuilderExercise, BuilderNote } from "@/lib/types";
-import { DEFAULT_TRACKED_FIELDS, SET_ROW_SELECT, mapSetRow } from "@/lib/exercise-fields";
+import {
+  DEFAULT_TRACKED_FIELDS,
+  SET_ROW_SELECT,
+  mapSetRow,
+  TARGET_PROP,
+  type TrackedField,
+} from "@/lib/exercise-fields";
 import { ExerciseBuilderCard, type MovementPatternOption } from "../exercise-builder-card";
 import { TextNoteCard } from "../text-note-card";
+import { BulkEditDayPanel } from "./bulk-edit-day-panel";
 import { formatShortDate } from "@/lib/program-schedule";
 import { GripVertical, ChevronDown, ChevronUp } from "lucide-react";
 
@@ -189,6 +196,18 @@ export function DayCard({
   }
 
   const itemCount = day.items.filter((i) => i.kind === "exercise").length;
+  const dayExercises = day.items.filter((i): i is BuilderExercise => i.kind === "exercise");
+
+  function handleBulkApplied(field: TrackedField, value: string | number | null) {
+    const prop = TARGET_PROP[field] as keyof BuilderExercise["sets"][number];
+    onItemsChange(
+      day.items.map((item) =>
+        item.kind === "exercise"
+          ? { ...item, sets: item.sets.map((s) => ({ ...s, [prop]: value })) }
+          : item
+      )
+    );
+  }
 
   return (
     <div className="border border-steel/20 bg-surface/40 flex flex-col">
@@ -243,6 +262,12 @@ export function DayCard({
 
       {!collapsed && (
         <>
+          {dayExercises.length > 1 && (
+            <div className="px-3 pt-3">
+              <BulkEditDayPanel exercises={dayExercises} onApplied={handleBulkApplied} />
+            </div>
+          )}
+
           <div className="flex-1 p-3 space-y-3">
             {(() => {
               const sortedItems = day.items.slice().sort((a, b) => a.order - b.order);
