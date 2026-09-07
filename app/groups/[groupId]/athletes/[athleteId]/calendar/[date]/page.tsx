@@ -4,7 +4,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { AssignWorkoutForm, type WorkoutOption } from "@/components/coach/desktop/assign-workout-form";
 import { DailyMacrosForm } from "@/components/coach/desktop/daily-macros-form";
-import { HabitDayChecklist, type DueHabit } from "@/components/coach/desktop/habit-day-checklist";
+import { DayHabitsPanel } from "@/components/coach/desktop/day-habits-panel";
+import type { DueHabit } from "@/components/coach/desktop/habit-day-checklist";
 import { computeScheduledDates } from "@/lib/program-schedule";
 import { isHabitDueOn } from "@/lib/habits";
 
@@ -125,6 +126,14 @@ export default async function ClientCalendarDayPage({
     .eq("log_date", params.date)
     .maybeSingle();
 
+  const { data: latestWeightRow } = await supabase
+    .from("body_weight_logs")
+    .select("weight")
+    .eq("athlete_id", params.athleteId)
+    .order("logged_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
   const { data: habitRows } = await supabase
     .from("client_habits")
     .select("id, title, weekdays")
@@ -220,6 +229,7 @@ export default async function ClientCalendarDayPage({
               carbsG: macros?.carbs_g ?? null,
               fatG: macros?.fat_g ?? null,
             }}
+            latestBodyWeight={latestWeightRow?.weight ?? null}
           />
         </section>
 
@@ -227,7 +237,12 @@ export default async function ClientCalendarDayPage({
           <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
             Habits due
           </h2>
-          <HabitDayChecklist date={params.date} habits={dueHabits} />
+          <DayHabitsPanel
+            athleteId={params.athleteId}
+            groupId={params.groupId}
+            date={params.date}
+            dueHabits={dueHabits}
+          />
         </section>
       </div>
 

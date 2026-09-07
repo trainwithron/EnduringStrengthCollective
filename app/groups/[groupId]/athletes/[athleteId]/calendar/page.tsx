@@ -177,11 +177,11 @@ export default async function ClientCalendarPage({
   // Daily macro targets this month.
   const { data: macroRows } = await supabase
     .from("daily_macros")
-    .select("log_date, calories")
+    .select("log_date, calories, protein_g, carbs_g, fat_g")
     .eq("athlete_id", params.athleteId)
     .gte("log_date", rangeStart)
     .lte("log_date", rangeEnd);
-  const caloriesByDateKey = new Map((macroRows ?? []).map((m) => [m.log_date, m.calories]));
+  const macrosByDateKey = new Map((macroRows ?? []).map((m) => [m.log_date, m]));
 
   // The coach's own bookings this month, across every client — an overlay
   // so scheduling for this athlete doesn't happen blind to the coach's own
@@ -254,7 +254,7 @@ export default async function ClientCalendarPage({
               const override = assignmentByDateKey.get(key);
               const programWorkout = workoutByDateKey.get(key);
               const done = programWorkout ? loggedIds.has(programWorkout.id) : false;
-              const calories = caloriesByDateKey.get(key);
+              const macros = macrosByDateKey.get(key);
               const bookingCount = bookingCountByDateKey.get(key) ?? 0;
               const dueHabits = activeHabits.filter((h) => isHabitDueOn(h.weekdays, date));
 
@@ -293,13 +293,28 @@ export default async function ClientCalendarPage({
                       {programWorkout.title}
                     </span>
                   ) : null}
-                  {calories != null && (
-                    <span className="font-body text-[9px] text-steel">{calories} kcal</span>
-                  )}
-                  {dueHabits.length > 0 && (
+                  {macros?.calories != null && (
                     <span className="font-body text-[9px] text-steel">
-                      {dueHabits.filter((h) => completedHabitDates.has(`${h.id}:${key}`)).length}/
-                      {dueHabits.length} habits
+                      {macros.calories}cal
+                      {macros.protein_g != null && ` ${macros.protein_g}p`}
+                      {macros.carbs_g != null && ` ${macros.carbs_g}c`}
+                      {macros.fat_g != null && ` ${macros.fat_g}f`}
+                    </span>
+                  )}
+                  {dueHabits.slice(0, 2).map((h) => (
+                    <span
+                      key={h.id}
+                      className={`font-body text-[9px] leading-tight truncate ${
+                        completedHabitDates.has(`${h.id}:${key}`) ? "text-positive" : "text-steel"
+                      }`}
+                    >
+                      {completedHabitDates.has(`${h.id}:${key}`) ? "✓ " : "· "}
+                      {h.title}
+                    </span>
+                  ))}
+                  {dueHabits.length > 2 && (
+                    <span className="font-body text-[9px] text-steel">
+                      +{dueHabits.length - 2} more
                     </span>
                   )}
                 </Link>
@@ -310,6 +325,64 @@ export default async function ClientCalendarPage({
 
         <HabitManager athleteId={params.athleteId} groupId={params.groupId} initialHabits={habits} />
       </div>
+
+      {(macrosByDateKey.size > 0 || activeHabits.length > 0 || assignmentByDateKey.size > 0) && (
+        <section className="mt-8">
+          <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+            This month&apos;s assignments
+          </h2>
+          <div className="divide-y divide-steel/15">
+            {cells
+              .filter((d): d is Date => {
+                if (!d) return false;
+                const k = dateKey(d);
+                return (
+                  assignmentByDateKey.has(k) ||
+                  macrosByDateKey.has(k) ||
+                  activeHabits.some((h) => isHabitDueOn(h.weekdays, d))
+                );
+              })
+              .map((date) => {
+                const key = dateKey(date);
+                const override = assignmentByDateKey.get(key);
+                const programWorkout = workoutByDateKey.get(key);
+                const macros = macrosByDateKey.get(key);
+                const dueHabits = activeHabits.filter((h) => isHabitDueOn(h.weekdays, date));
+                return (
+                  <div key={key} className="py-2.5 flex items-start gap-4">
+                    <span className="font-body text-xs text-steel w-16 shrink-0 pt-0.5">
+                      {date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                    </span>
+                    <span className="font-body text-sm flex-1 min-w-0">
+                      {override?.title ?? programWorkout?.title ?? (
+                        <span className="text-steel">No workout</span>
+                      )}
+                    </span>
+                    <span className="font-body text-xs text-steel flex-1 min-w-0">
+                      {macros?.calories != null
+                        ? `${macros.calories} cal${macros.protein_g != null ? ` · ${macros.protein_g}p` : ""}${
+                            macros.carbs_g != null ? ` · ${macros.carbs_g}c` : ""
+                          }${macros.fat_g != null ? ` · ${macros.fat_g}f` : ""}`
+                        : "—"}
+                    </span>
+                    <span className="font-body text-xs text-steel flex-1 min-w-0">
+                      {dueHabits.length > 0
+                        ? dueHabits
+                            .map(
+                              (h) =>
+                                `${h.title}${
+                                  completedHabitDates.has(`${h.id}:${key}`) ? " ✓" : ""
+                                }`
+                            )
+                            .join(", ")
+                        : "—"}
+                    </span>
+                  </div>
+                );
+              })}
+          </div>
+        </section>
+      )}
     </CoachDesktopShell>
   );
 }
