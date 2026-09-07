@@ -108,6 +108,7 @@ export default async function FeedPage({
               isCoach={isCoach}
             />
             <FeedList
+              key={channel}
               groupId={params.groupId}
               initialPosts={shaped}
               viewerId={user?.id ?? null}
@@ -137,6 +138,7 @@ export default async function FeedPage({
       <ChannelTabs basePath={`/groups/${params.groupId}/feed`} active={channel} />
 
       <FeedList
+        key={channel}
         groupId={params.groupId}
         initialPosts={shaped}
         viewerId={user?.id ?? null}
