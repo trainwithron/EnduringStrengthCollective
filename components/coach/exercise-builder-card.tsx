@@ -87,6 +87,8 @@ export function ExerciseBuilderCard({
   const [addFieldOpen, setAddFieldOpen] = useState(false);
   const [notesDraft, setNotesDraft] = useState(exercise.notes ?? "");
   const [busy, setBusy] = useState(false);
+  const [repMinDraft, setRepMinDraft] = useState(exercise.sets[0]?.repMin?.toString() ?? "");
+  const [repMaxDraft, setRepMaxDraft] = useState(exercise.sets[0]?.repMax?.toString() ?? "");
 
   async function handleNameCommit(name: string) {
     const trimmed = name.trim();
@@ -122,6 +124,23 @@ export function ExerciseBuilderCard({
     const value = next.trim() || null;
     await supabase.from("group_workout_exercises").update({ notes: value }).eq("id", exercise.id);
     onUpdate({ notes: value });
+  }
+
+  // One shared rep range for every set on this exercise — Double
+  // Progression's "aim for 8-12" ceiling, not a per-set value. Applies to
+  // every existing set at once rather than requiring the coach to set it
+  // set-by-set.
+  async function persistRepRange(minRaw: string, maxRaw: string) {
+    const repMin = minRaw.trim() === "" ? null : Number(minRaw);
+    const repMax = maxRaw.trim() === "" ? null : Number(maxRaw);
+    const setIds = exercise.sets.map((s) => s.id);
+    if (setIds.length === 0) return;
+    const supabase = createBrowserClient();
+    await supabase
+      .from("group_workout_exercise_sets")
+      .update({ rep_min: repMin, rep_max: repMax })
+      .in("id", setIds);
+    onSetsChange(exercise.sets.map((s) => ({ ...s, repMin, repMax })));
   }
 
   async function handleAddSet() {
@@ -431,6 +450,28 @@ export function ExerciseBuilderCard({
 
           {showDetails && (
             <div className="mt-2 pt-2 border-t border-steel/15 space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="font-body text-[10px] text-steel uppercase tracking-wide shrink-0">
+                  Rep range (for Double Progression)
+                </span>
+                <input
+                  type="number"
+                  value={repMinDraft}
+                  onChange={(e) => setRepMinDraft(e.target.value)}
+                  onBlur={() => persistRepRange(repMinDraft, repMaxDraft)}
+                  placeholder="Min"
+                  className="w-14 h-8 bg-graphite border border-steel/30 text-chalk px-1 font-body text-xs text-center focus:outline-none focus:border-rust"
+                />
+                <span className="font-body text-xs text-steel">–</span>
+                <input
+                  type="number"
+                  value={repMaxDraft}
+                  onChange={(e) => setRepMaxDraft(e.target.value)}
+                  onBlur={() => persistRepRange(repMinDraft, repMaxDraft)}
+                  placeholder="Max"
+                  className="w-14 h-8 bg-graphite border border-steel/30 text-chalk px-1 font-body text-xs text-center focus:outline-none focus:border-rust"
+                />
+              </div>
               <textarea
                 value={notesDraft}
                 onChange={(e) => setNotesDraft(e.target.value)}

@@ -61,6 +61,11 @@ export interface ExerciseSetTarget {
   targetTimeSeconds: number | null;
   targetHeight: number | null;
   targetDistance: number | null;
+  // Optional structured rep range (distinct from the free-text targetReps
+  // above) — only used by Double Progression to know when a set has
+  // maxed out reps and should bump weight instead.
+  repMin: number | null;
+  repMax: number | null;
 }
 
 export interface BuilderExercise {

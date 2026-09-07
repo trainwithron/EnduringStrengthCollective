@@ -222,7 +222,7 @@ async function CoachProgramBuilder({
       id, title, week_number, day_index,
       group_workout_exercises (
         id, exercise_name, exercise_order, movement_pattern_id, tracked_fields, notes,
-        group_workout_exercise_sets ( id, set_order, target_reps, target_weight, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance )
+        group_workout_exercise_sets ( id, set_order, target_reps, target_weight, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance, rep_min, rep_max )
       ),
       workout_notes ( id, body, position )
     `

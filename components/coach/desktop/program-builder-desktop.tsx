@@ -150,10 +150,19 @@ export function ProgramBuilderDesktop({
             movementPatterns={movementPatterns}
             expanded={expandedWeeks.has(wn)}
             scheduledDateByDayId={scheduledDateByDayId}
+            existingWeekNumbers={weekNumbers}
             onToggle={() => toggleWeek(wn)}
             onDaysChange={(weekDays) =>
               setDays((prev) => [...prev.filter((d) => d.weekNumber !== wn), ...weekDays])
             }
+            onWeeksGenerated={(newDays) => {
+              setDays((prev) => [...prev, ...newDays]);
+              setExpandedWeeks((prev) => {
+                const next = new Set(prev);
+                newDays.forEach((d) => next.add(d.weekNumber));
+                return next;
+              });
+            }}
           />
         ))}
       </div>

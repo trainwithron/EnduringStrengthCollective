@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { BuilderDay } from "@/lib/types";
 import { DayCard } from "./day-card";
+import { DuplicateWeekPanel } from "./duplicate-week-panel";
 import type { MovementPatternOption } from "../exercise-builder-card";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
@@ -16,8 +17,10 @@ export function WeekGrid({
   movementPatterns,
   expanded,
   scheduledDateByDayId,
+  existingWeekNumbers,
   onToggle,
   onDaysChange,
+  onWeeksGenerated,
 }: {
   weekNumber: number;
   days: BuilderDay[];
@@ -27,8 +30,10 @@ export function WeekGrid({
   movementPatterns: MovementPatternOption[];
   expanded: boolean;
   scheduledDateByDayId?: Map<string, Date>;
+  existingWeekNumbers: number[];
   onToggle: () => void;
   onDaysChange: (days: BuilderDay[]) => void;
+  onWeeksGenerated: (newDays: BuilderDay[]) => void;
 }) {
   const [draggedDayId, setDraggedDayId] = useState<string | null>(null);
 
@@ -107,6 +112,17 @@ export function WeekGrid({
           <ChevronDown className="w-4 h-4 text-steel" />
         )}
       </button>
+
+      <div className="px-5 pb-3">
+        <DuplicateWeekPanel
+          programId={programId}
+          groupId={groupId}
+          sourceWeekNumber={weekNumber}
+          sourceDays={days}
+          existingWeekNumbers={existingWeekNumbers}
+          onGenerated={onWeeksGenerated}
+        />
+      </div>
 
       {expanded && (
         <div className="p-5 pt-0">

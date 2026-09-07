@@ -96,6 +96,8 @@ export function mapSetRow(row: {
   target_time_seconds: number | null;
   target_height: number | null;
   target_distance: number | null;
+  rep_min?: number | null;
+  rep_max?: number | null;
 }): ExerciseSetTarget {
   return {
     id: row.id,
@@ -108,8 +110,10 @@ export function mapSetRow(row: {
     targetTimeSeconds: row.target_time_seconds,
     targetHeight: row.target_height,
     targetDistance: row.target_distance,
+    repMin: row.rep_min ?? null,
+    repMax: row.rep_max ?? null,
   };
 }
 
 export const SET_ROW_SELECT =
-  "id, set_order, target_reps, target_weight, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance";
+  "id, set_order, target_reps, target_weight, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance, rep_min, rep_max";
