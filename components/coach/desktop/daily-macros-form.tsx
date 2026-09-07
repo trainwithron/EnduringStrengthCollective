@@ -3,11 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
-
-// Standard coaching rules of thumb — a starting point the coach can
-// always overwrite by hand afterward, not a locked formula.
-const PROTEIN_G_PER_LB = 1;
-const CARB_SPLIT = { high: { carb: 0.7, fat: 0.3 }, low: { carb: 0.3, fat: 0.7 } };
+import { PROTEIN_G_PER_LB, estimateProteinFromBodyWeight, fillCarbsAndFat as computeCarbsAndFat } from "@/lib/macros";
 
 export function DailyMacrosForm({
   athleteId,
@@ -33,18 +29,14 @@ export function DailyMacrosForm({
   function handleBodyWeightChange(value: string) {
     setBodyWeight(value);
     const w = Number(value);
-    if (w > 0) setProtein(Math.round(w * PROTEIN_G_PER_LB).toString());
+    if (w > 0) setProtein(estimateProteinFromBodyWeight(w).toString());
   }
 
   function fillCarbsAndFat(kind: "high" | "low") {
-    const cal = Number(calories);
-    const pro = Number(protein);
-    if (!cal || !pro) return;
-    const remaining = cal - pro * 4;
-    if (remaining <= 0) return;
-    const split = CARB_SPLIT[kind];
-    setCarbs(Math.round((remaining * split.carb) / 4).toString());
-    setFat(Math.round((remaining * split.fat) / 9).toString());
+    const result = computeCarbsAndFat(Number(calories), Number(protein), kind);
+    if (!result) return;
+    setCarbs(result.carbsG.toString());
+    setFat(result.fatG.toString());
   }
 
   async function handleSave() {
