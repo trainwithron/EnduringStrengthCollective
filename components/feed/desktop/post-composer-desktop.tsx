@@ -6,13 +6,6 @@ import { useRouter } from "next/navigation";
 import { Camera } from "lucide-react";
 import type { FeedChannel } from "@/lib/types";
 
-const CHANNEL_LABELS: Record<FeedChannel, string> = {
-  announcements: "Announcements",
-  form_checks: "Form Checks",
-  pr_board: "PR Board",
-  general: "General",
-};
-
 // Same posting logic as the mobile FAB+sheet composer
 // (components/feed/new-post-composer.tsx) — just an always-visible inline
 // box instead of a floating trigger + full-screen sheet, which reads as a
@@ -28,15 +21,16 @@ export function PostComposerDesktop({
 }) {
   const [body, setBody] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [channel, setChannel] = useState<FeedChannel>(
-    defaultChannel === "announcements" && !isCoach ? "general" : defaultChannel
-  );
   const [submitting, setSubmitting] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const router = useRouter();
-  const postableChannels: FeedChannel[] = isCoach
-    ? ["announcements", "form_checks", "pr_board", "general"]
-    : ["form_checks", "pr_board", "general"];
+
+  // A post always goes into whichever channel tab is currently open — no
+  // separate per-post picker. Announcements stays coach-only to post in;
+  // a non-coach viewing that tab just gets no composer (RLS is the real
+  // enforcement, this just avoids offering a control that would only fail).
+  const canPostHere = defaultChannel !== "announcements" || isCoach;
+  const channel = defaultChannel;
 
   async function handlePost() {
     if (!body.trim() && !file) return;
@@ -84,20 +78,10 @@ export function PostComposerDesktop({
     router.refresh();
   }
 
+  if (!canPostHere) return null;
+
   return (
     <div className="border border-steel/20 bg-surface/40 p-4 mb-6">
-      <select
-        value={channel}
-        onChange={(e) => setChannel(e.target.value as FeedChannel)}
-        className="h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs mb-3 focus:outline-none focus:border-rust"
-      >
-        {postableChannels.map((c) => (
-          <option key={c} value={c}>
-            {CHANNEL_LABELS[c]}
-          </option>
-        ))}
-      </select>
-
       <textarea
         value={body}
         onChange={(e) => setBody(e.target.value)}

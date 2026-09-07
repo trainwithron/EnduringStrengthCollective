@@ -6,13 +6,6 @@ import { useRouter } from "next/navigation";
 import { Camera, X } from "lucide-react";
 import type { FeedChannel } from "@/lib/types";
 
-const CHANNEL_LABELS: Record<FeedChannel, string> = {
-  announcements: "Announcements",
-  form_checks: "Form Checks",
-  pr_board: "PR Board",
-  general: "General",
-};
-
 export function NewPostComposer({
   groupId,
   raised,
@@ -27,15 +20,17 @@ export function NewPostComposer({
   const [open, setOpen] = useState(false);
   const [body, setBody] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [channel, setChannel] = useState<FeedChannel>(
-    defaultChannel === "announcements" && !isCoach ? "general" : defaultChannel
-  );
   const [submitting, setSubmitting] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const router = useRouter();
-  const postableChannels: FeedChannel[] = isCoach
-    ? ["announcements", "form_checks", "pr_board", "general"]
-    : ["form_checks", "pr_board", "general"];
+
+  // A post always goes into whichever channel is currently open — no
+  // separate per-post picker. Announcements stays coach-only to post in;
+  // a non-coach viewing that tab simply gets no composer at all (the
+  // real enforcement is still the RLS policy, this is just not offering
+  // a control that would only fail).
+  const canPostHere = defaultChannel !== "announcements" || isCoach;
+  const channel = defaultChannel;
 
   async function handlePost() {
     if (!body.trim() && !file) return;
@@ -84,6 +79,8 @@ export function NewPostComposer({
     router.refresh();
   }
 
+  if (!canPostHere) return null;
+
   if (!open) {
     return (
       <button
@@ -108,23 +105,6 @@ export function NewPostComposer({
             <X className="w-5 h-5" />
           </button>
         </div>
-
-        <label className="flex flex-col gap-1 mb-3">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">
-            Channel
-          </span>
-          <select
-            value={channel}
-            onChange={(e) => setChannel(e.target.value as FeedChannel)}
-            className="h-10 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
-          >
-            {postableChannels.map((c) => (
-              <option key={c} value={c}>
-                {CHANNEL_LABELS[c]}
-              </option>
-            ))}
-          </select>
-        </label>
 
         <textarea
           value={body}
