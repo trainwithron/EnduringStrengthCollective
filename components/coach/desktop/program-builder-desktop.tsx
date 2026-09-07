@@ -163,6 +163,14 @@ export function ProgramBuilderDesktop({
                 return next;
               });
             }}
+            onWeekDeleted={() => {
+              setDays((prev) => prev.filter((d) => d.weekNumber !== wn));
+              setExpandedWeeks((prev) => {
+                const next = new Set(prev);
+                next.delete(wn);
+                return next;
+              });
+            }}
           />
         ))}
       </div>

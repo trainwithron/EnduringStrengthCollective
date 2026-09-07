@@ -23,6 +23,7 @@ export function WeekGrid({
   onToggle,
   onDaysChange,
   onWeeksGenerated,
+  onWeekDeleted,
 }: {
   weekNumber: number;
   days: BuilderDay[];
@@ -36,8 +37,37 @@ export function WeekGrid({
   onToggle: () => void;
   onDaysChange: (days: BuilderDay[]) => void;
   onWeeksGenerated: (newDays: BuilderDay[]) => void;
+  onWeekDeleted: () => void;
 }) {
   const [draggedDayId, setDraggedDayId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function handleDeleteWeek() {
+    if (
+      !window.confirm(
+        `Delete all of Week ${weekNumber} (${days.length} ${days.length === 1 ? "day" : "days"})? This can't be undone.`
+      )
+    ) {
+      return;
+    }
+    setDeleting(true);
+    setDeleteError(null);
+    const supabase = createBrowserClient();
+    const { error } = await supabase
+      .from("workouts")
+      .delete()
+      .eq("program_id", programId)
+      .eq("week_number", weekNumber);
+
+    if (error) {
+      setDeleteError("Can't delete — one or more days this week have already been logged.");
+      setDeleting(false);
+      return;
+    }
+
+    onWeekDeleted();
+  }
 
   async function persistDayOrder(nextDays: BuilderDay[]) {
     const supabase = createBrowserClient();
@@ -121,20 +151,36 @@ export function WeekGrid({
 
   return (
     <div className="border border-steel/20">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="w-full flex items-center justify-between px-5 py-3 active:bg-surface/40 transition-colors"
-      >
-        <span className="font-display uppercase text-sm tracking-wide text-steel">
-          Week {weekNumber}
-        </span>
-        {expanded ? (
-          <ChevronUp className="w-4 h-4 text-steel" />
-        ) : (
-          <ChevronDown className="w-4 h-4 text-steel" />
-        )}
-      </button>
+      <div className="w-full flex items-center gap-2 px-5 py-3">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex-1 flex items-center justify-between active:bg-surface/40 transition-colors"
+        >
+          <span className="font-display uppercase text-sm tracking-wide text-steel">
+            Week {weekNumber}
+          </span>
+          {expanded ? (
+            <ChevronUp className="w-4 h-4 text-steel" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-steel" />
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={handleDeleteWeek}
+          disabled={deleting}
+          className="font-body text-xs text-steel active:text-rust transition-colors shrink-0 disabled:opacity-40"
+        >
+          Delete week
+        </button>
+      </div>
+
+      {deleteError && (
+        <p className="font-body text-xs text-rust px-5 pb-2" role="alert">
+          {deleteError}
+        </p>
+      )}
 
       <div className="px-5 pb-3 flex flex-wrap gap-2">
         <DuplicateWeekPanel
