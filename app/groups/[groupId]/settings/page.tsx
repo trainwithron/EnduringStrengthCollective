@@ -42,7 +42,13 @@ export default async function SettingsPage({
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
       <header className="px-5 pt-8 pb-6 border-b border-steel/20">
-        <h1 className="font-display font-bold text-4xl leading-none uppercase">
+        <Link
+          href={`/groups/${params.groupId}`}
+          className="font-body text-xs text-steel uppercase tracking-wide"
+        >
+          &larr; Back to group
+        </Link>
+        <h1 className="font-display font-bold text-4xl leading-none mt-3 uppercase">
           Settings
         </h1>
       </header>

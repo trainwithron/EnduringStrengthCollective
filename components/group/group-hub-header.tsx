@@ -1,4 +1,5 @@
 import { InviteAthleteButton } from "./invite-athlete-button";
+import { NotificationBell, type NotificationEntry } from "@/components/athlete/notification-bell";
 
 interface GroupHubHeaderProps {
   name: string;
@@ -7,6 +8,7 @@ interface GroupHubHeaderProps {
   isCoach: boolean;
   groupId: string;
   coachId?: string;
+  notifications?: NotificationEntry[];
 }
 
 export function GroupHubHeader({
@@ -16,12 +18,16 @@ export function GroupHubHeader({
   isCoach,
   groupId,
   coachId,
+  notifications,
 }: GroupHubHeaderProps) {
   return (
     <header className="px-5 pt-8 pb-6 border-b border-steel/20">
-      <p className="font-body text-xs tracking-wide text-steel">
-        {memberCount} {memberCount === 1 ? "member" : "members"}
-      </p>
+      <div className="flex items-start justify-between gap-3">
+        <p className="font-body text-xs tracking-wide text-steel">
+          {memberCount} {memberCount === 1 ? "member" : "members"}
+        </p>
+        {notifications && <NotificationBell initial={notifications} />}
+      </div>
       <h1 className="font-display font-bold text-4xl leading-none mt-1 uppercase">
         {name}
       </h1>

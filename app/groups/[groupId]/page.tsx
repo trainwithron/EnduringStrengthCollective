@@ -19,14 +19,16 @@ export default async function GroupHubPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  // These four only need params.groupId — none depends on another's
-  // result — so they fire as one round trip instead of four sequential
-  // ones. This is the athlete's landing page; every visit pays for this.
+  // These five only need params.groupId or the viewer's own id — none
+  // depends on another's result — so they fire as one round trip instead
+  // of five sequential ones. This is the athlete's landing page; every
+  // visit pays for this.
   const [
     { data: group, error: groupError },
     { data: memberships },
     { data: recentLogs },
     { data: programs },
+    { data: notificationRows },
   ] = await Promise.all([
     supabase.from("groups").select("id, name, description").eq("id", params.groupId).single(),
     // Roster with role + most recent completed workout timestamp.
@@ -59,6 +61,14 @@ export default async function GroupHubPage({
       .eq("is_active", true)
       .or(`athlete_id.is.null,athlete_id.eq.${user?.id ?? ""}`)
       .order("created_at", { ascending: false }),
+    user
+      ? supabase
+          .from("notifications")
+          .select("id, type, body, link_path, read_at, created_at")
+          .eq("profile_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(20)
+      : Promise.resolve({ data: [] }),
   ]);
 
   if (groupError || !group) {
@@ -180,6 +190,14 @@ export default async function GroupHubPage({
         isCoach={isCoach}
         groupId={params.groupId}
         coachId={user?.id}
+        notifications={(notificationRows ?? []).map((n: any) => ({
+          id: n.id,
+          type: n.type,
+          body: n.body,
+          linkPath: n.link_path,
+          createdAt: n.created_at,
+          readAt: n.read_at,
+        }))}
       />
 
       <section className="px-5 pt-6">
