@@ -303,6 +303,18 @@ export default async function CoachDayDetailPage({
 
   const backHref = `/groups/${params.groupId}/calendar`;
 
+  // Custom to-dos/events for this exact date — folded into this day's
+  // hour-by-hour view so a coach sees everything they've got going on
+  // (not just bookable slots) in one place, matching what the month/week
+  // grid already surfaces per-cell.
+  const { data: dayEventRows } = await supabase
+    .from("calendar_events")
+    .select("id, title, event_time")
+    .eq("coach_id", user.id)
+    .eq("event_date", params.date)
+    .neq("status", "dismissed")
+    .order("event_time", { ascending: true });
+
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="calendar">
       <div className="pb-6 border-b border-steel/20 mb-6">
@@ -324,6 +336,24 @@ export default async function CoachDayDetailPage({
           </p>
         )}
       </div>
+
+      {dayEventRows && dayEventRows.length > 0 && (
+        <div className="mb-6 max-w-lg">
+          <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+            To-dos &amp; events
+          </h2>
+          <div className="divide-y divide-steel/15">
+            {dayEventRows.map((e) => (
+              <div key={e.id} className="py-2 flex items-center justify-between">
+                <span className="font-body text-sm text-chalk">{e.title}</span>
+                {e.event_time && (
+                  <span className="font-body text-xs text-steel">{e.event_time.slice(0, 5)}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {slots.length === 0 ? (
         <p className="font-body text-sm text-steel py-2">No open hours on this day.</p>

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { createServerClient } from "@/lib/supabase/server";
 import { estimateOneRepMax } from "@/lib/one-rep-max";
+import { getVolumeEquivalence } from "@/lib/volume-equivalence";
 import { PrListToggle } from "@/components/share/pr-list-toggle";
 import { ShareWorkoutButton } from "@/components/share/share-workout-button";
 import { CustomizeSharePanel } from "@/components/share/customize-share-panel";
@@ -161,6 +162,9 @@ export default async function ShareWorkoutPage({
     data: { user },
   } = await supabase.auth.getUser();
 
+  const volumeEquivalence =
+    shared.totalVolume != null ? getVolumeEquivalence(shared.totalVolume) : null;
+
   const shareTitle =
     shared.prList.length > 0
       ? `${shared.athleteName} just hit a new PR! 🎉`
@@ -187,6 +191,11 @@ export default async function ShareWorkoutPage({
               <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">
                 lbs total volume &middot; {shared.totalSetsCompleted} sets
               </p>
+              {volumeEquivalence && (
+                <p className="font-body text-sm text-rust mt-2">
+                  That&apos;s the weight of {volumeEquivalence.label}
+                </p>
+              )}
             </>
           ) : (
             <p className="font-body text-sm text-steel uppercase tracking-wide">

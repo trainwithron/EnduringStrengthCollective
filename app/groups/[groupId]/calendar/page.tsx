@@ -9,6 +9,7 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { computeScheduledDates } from "@/lib/program-schedule";
+import { ScheduleClientPicker } from "@/components/coach/schedule-client-picker";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
@@ -50,7 +51,14 @@ export default async function CoachCalendarPage({
   searchParams,
 }: {
   params: { groupId: string };
-  searchParams: { month?: string; client?: string; view?: string; week?: string; reschedule?: string };
+  searchParams: {
+    month?: string;
+    client?: string;
+    view?: string;
+    week?: string;
+    reschedule?: string;
+    scheduleFor?: string;
+  };
 }) {
   const supabase = createServerClient();
   const {
@@ -73,6 +81,105 @@ export default async function CoachCalendarPage({
   // a business. The same coach in a plain browser tab still gets the
   // full desktop calendar below.
   const showMobileView = !isCoach || prefersAthleteStyleView();
+
+  // A coach picking a client to schedule (mobile) — completely independent
+  // of any program state, so it's handled before the self-training
+  // redirect logic below ever runs (that logic would otherwise bounce a
+  // coach with their own active program straight past this).
+  if (showMobileView && isCoach) {
+    const { data: clientMemberships } = await supabase
+      .from("group_memberships")
+      .select("profile_id, profiles ( full_name )")
+      .eq("group_id", params.groupId)
+      .eq("role", "athlete");
+
+    const clientIds = (clientMemberships ?? []).map((m: any) => m.profile_id);
+    const { data: creditRows } = await supabase
+      .from("session_credits")
+      .select("athlete_id, balance")
+      .eq("group_id", params.groupId)
+      .in("athlete_id", clientIds.length > 0 ? clientIds : [""]);
+    const balanceByAthlete = new Map((creditRows ?? []).map((r) => [r.athlete_id, r.balance]));
+
+    const scheduleClients = (clientMemberships ?? [])
+      .map((m: any) => ({
+        id: m.profile_id,
+        fullName: m.profiles?.full_name ?? "Unknown",
+        balance: balanceByAthlete.get(m.profile_id) ?? 0,
+      }))
+      .sort((a, b) => a.fullName.localeCompare(b.fullName));
+
+    if (searchParams.scheduleFor) {
+      const selected = scheduleClients.find((c) => c.id === searchParams.scheduleFor);
+      if (!selected) {
+        return (
+          <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
+            <ScheduleClientPicker groupId={params.groupId} clients={scheduleClients} />
+            <p className="font-body text-sm text-steel px-5 pt-6">Client not found.</p>
+            <BottomTabBar groupId={params.groupId} activeOverride="calendar" />
+          </main>
+        );
+      }
+
+      const today = new Date();
+      const year = today.getFullYear();
+      const monthIndex = today.getMonth();
+      const firstOfMonth = new Date(year, monthIndex, 1);
+      const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+      const leadingBlanks = firstOfMonth.getDay();
+      const cells: (Date | null)[] = [
+        ...Array.from({ length: leadingBlanks }, () => null),
+        ...Array.from({ length: daysInMonth }, (_, i) => new Date(year, monthIndex, i + 1)),
+      ];
+
+      function isSameDayLocal(a: Date, b: Date): boolean {
+        return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+      }
+
+      return (
+        <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
+          <ScheduleClientPicker groupId={params.groupId} clients={scheduleClients} selectedId={selected.id} />
+          <div className="px-5 pt-4">
+            <p className="font-body text-sm text-chalk">
+              {selected.fullName} —{" "}
+              <span className="text-steel">
+                {selected.balance} {selected.balance === 1 ? "credit" : "credits"} left
+              </span>
+            </p>
+            <p className="font-body text-xs text-steel mt-1">Tap a date to see and book open sessions.</p>
+          </div>
+          <div className="grid grid-cols-7 gap-px bg-steel/15 mt-4 mx-5 border border-steel/15">
+            {WEEKDAY_LABELS.map((label) => (
+              <div
+                key={label}
+                className="bg-graphite text-center font-body text-[10px] text-steel uppercase tracking-wide py-1.5"
+              >
+                {label}
+              </div>
+            ))}
+            {cells.map((date, i) => {
+              if (!date) return <div key={i} className="bg-graphite min-h-[56px]" />;
+              const isToday = isSameDayLocal(date, today);
+              return (
+                <Link
+                  key={i}
+                  href={`/groups/${params.groupId}/calendar/${dateKey(date)}?client=${selected.id}`}
+                  className={`bg-graphite min-h-[56px] p-1.5 flex flex-col ${
+                    isToday ? "ring-1 ring-inset ring-rust" : ""
+                  }`}
+                >
+                  <span className={`font-body text-[10px] ${isToday ? "text-rust font-bold" : "text-steel"}`}>
+                    {date.getDate()}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+          <BottomTabBar groupId={params.groupId} activeOverride="calendar" />
+        </main>
+      );
+    }
+  }
 
   if (showMobileView) {
     // A personal program assigned to this athlete wins over the group's
@@ -208,8 +315,34 @@ export default async function CoachCalendarPage({
       );
     }
 
+    let scheduleClientsForCoach: { id: string; fullName: string; balance: number }[] = [];
+    if (isCoach) {
+      const { data: cm } = await supabase
+        .from("group_memberships")
+        .select("profile_id, profiles ( full_name )")
+        .eq("group_id", params.groupId)
+        .eq("role", "athlete");
+      const ids = (cm ?? []).map((m: any) => m.profile_id);
+      const { data: cr } = await supabase
+        .from("session_credits")
+        .select("athlete_id, balance")
+        .eq("group_id", params.groupId)
+        .in("athlete_id", ids.length > 0 ? ids : [""]);
+      const balances = new Map((cr ?? []).map((r) => [r.athlete_id, r.balance]));
+      scheduleClientsForCoach = (cm ?? [])
+        .map((m: any) => ({
+          id: m.profile_id,
+          fullName: m.profiles?.full_name ?? "Unknown",
+          balance: balances.get(m.profile_id) ?? 0,
+        }))
+        .sort((a, b) => a.fullName.localeCompare(b.fullName));
+    }
+
     return (
       <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
+        {isCoach && (
+          <ScheduleClientPicker groupId={params.groupId} clients={scheduleClientsForCoach} />
+        )}
         <header className="px-5 pt-8 pb-6 border-b border-steel/20">
           <h1 className="font-display font-bold text-4xl leading-none uppercase">Calendar</h1>
           <p className="font-body text-sm text-steel mt-2">
