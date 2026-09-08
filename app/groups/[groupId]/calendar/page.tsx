@@ -8,6 +8,7 @@ import { CalendarClientList } from "@/components/coach/desktop/calendar-client-l
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
+import { computeScheduledDates } from "@/lib/program-schedule";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
@@ -81,7 +82,7 @@ export default async function CoachCalendarPage({
     // more than one row.
     const { data: personalProgram } = await supabase
       .from("programs")
-      .select("id")
+      .select("id, start_date, training_days")
       .eq("group_id", params.groupId)
       .eq("athlete_id", user.id)
       .eq("is_active", true)
@@ -91,24 +92,26 @@ export default async function CoachCalendarPage({
       ? { data: null }
       : await supabase
           .from("programs")
-          .select("id")
+          .select("id, start_date, training_days")
           .eq("group_id", params.groupId)
           .is("athlete_id", null)
           .eq("is_active", true)
           .maybeSingle();
 
     const program = personalProgram ?? sharedProgram;
+    const programHasSchedule = !!(program?.start_date && program.training_days?.length);
 
-    if (program) {
+    if (program && programHasSchedule) {
       const suffix = searchParams.reschedule ? `?reschedule=${searchParams.reschedule}` : "";
       redirect(`/groups/${params.groupId}/programs/${program.id}/calendar${suffix}`);
     }
 
-    // No active program — the calendar itself should still always be
-    // reachable, so this renders a real month/week grid (bookings only,
-    // no workouts plotted) rather than a dead end. A client can browse
-    // and book a session with their coach here regardless of whether
-    // anything's been assigned.
+    // No active program, or one exists but has no schedule set yet —
+    // either way the calendar itself should still always be reachable, so
+    // this renders a real month/week grid (bookings only, no workouts
+    // plotted) rather than bouncing into that program's own calendar page
+    // and dead-ending there. A client can still browse and book a session
+    // with their coach here regardless of whether anything's assigned.
     const { data: coachMembership } = await supabase
       .from("group_memberships")
       .select("profile_id")
@@ -210,8 +213,9 @@ export default async function CoachCalendarPage({
         <header className="px-5 pt-8 pb-6 border-b border-steel/20">
           <h1 className="font-display font-bold text-4xl leading-none uppercase">Calendar</h1>
           <p className="font-body text-sm text-steel mt-2">
-            No program assigned yet — you&apos;ll see your training schedule
-            here once your coach assigns one.
+            {program
+              ? "Your program doesn't have a start date set yet — ask your coach, and your training schedule will show up here."
+              : "No program assigned yet — you'll see your training schedule here once your coach assigns one."}
           </p>
           {coachMembership && (
             <p className="font-body text-xs text-steel mt-3">
@@ -479,6 +483,80 @@ export default async function CoachCalendarPage({
     }))
     .sort((a, b) => a.fullName.localeCompare(b.fullName));
 
+  // Every active program in this group — shared and every client's
+  // personal one — overlaid onto this same calendar so there's no
+  // separate "view this program as a calendar" page to hunt down. A
+  // program with no start_date/training_days set contributes nothing to
+  // the grid but still surfaces below as something that needs attention.
+  const { data: activePrograms } = await supabase
+    .from("programs")
+    .select("id, name, athlete_id, start_date, training_days")
+    .eq("group_id", params.groupId)
+    .eq("is_active", true);
+
+  const athleteNameById = new Map(clients.map((c) => [c.profileId, c.fullName]));
+  const workoutsByDateKey = new Map<string, { title: string; athleteName: string | null }[]>();
+  const programsMissingSchedule: { id: string; name: string; athleteName: string | null }[] = [];
+  const programsWithNoWorkouts: { id: string; name: string; athleteName: string | null }[] = [];
+
+  for (const p of activePrograms ?? []) {
+    const athleteName = p.athlete_id ? athleteNameById.get(p.athlete_id) ?? null : null;
+    const { data: programWorkouts } = await supabase
+      .from("workouts")
+      .select("id, title, week_number, day_index")
+      .eq("program_id", p.id)
+      .order("week_number", { ascending: true })
+      .order("day_index", { ascending: true });
+
+    if ((programWorkouts ?? []).length === 0) {
+      programsWithNoWorkouts.push({ id: p.id, name: p.name, athleteName });
+      continue;
+    }
+
+    if (!p.start_date || !p.training_days || p.training_days.length === 0) {
+      programsMissingSchedule.push({ id: p.id, name: p.name, athleteName });
+      continue;
+    }
+
+    const scheduledDateByDayId = computeScheduledDates(p.start_date, p.training_days, programWorkouts!);
+    for (const w of programWorkouts!) {
+      const d = scheduledDateByDayId.get(w.id);
+      if (!d) continue;
+      const k = dateKey(d);
+      if (!workoutsByDateKey.has(k)) workoutsByDateKey.set(k, []);
+      workoutsByDateKey.get(k)!.push({ title: w.title, athleteName });
+    }
+  }
+
+  // Clients with no active program covering them at all (no shared active
+  // program in this group, and no personal one either).
+  const hasSharedActiveProgram = (activePrograms ?? []).some((p) => !p.athlete_id);
+  const athleteIdsWithPersonalProgram = new Set(
+    (activePrograms ?? []).filter((p) => p.athlete_id).map((p) => p.athlete_id)
+  );
+  const clientsWithNoProgram = hasSharedActiveProgram
+    ? []
+    : clients.filter((c) => !athleteIdsWithPersonalProgram.has(c.profileId));
+
+  // Clients quiet 7+ days (or never logged) — same "needs attention" idea
+  // already used on the Clients page, surfaced here too since this is the
+  // coach's daily planning view.
+  const { data: recentLogRows } = await supabase
+    .from("workout_logs")
+    .select("athlete_id, created_at")
+    .eq("group_id", params.groupId)
+    .order("created_at", { ascending: false });
+  const lastLogByAthlete = new Map<string, string>();
+  for (const log of recentLogRows ?? []) {
+    if (!lastLogByAthlete.has(log.athlete_id)) lastLogByAthlete.set(log.athlete_id, log.created_at);
+  }
+  const quietClients = clients.filter((c) => {
+    const last = lastLogByAthlete.get(c.profileId);
+    if (!last) return true;
+    const daysSince = (Date.now() - new Date(last).getTime()) / (1000 * 60 * 60 * 24);
+    return daysSince >= 7;
+  });
+
   const { data: windowRows } = await supabase
     .from("coach_availability_windows")
     .select("id, weekday, start_time, end_time, slot_duration_minutes")
@@ -531,8 +609,9 @@ export default async function CoachCalendarPage({
       <div className="pb-6 border-b border-steel/20 mb-6">
         <h1 className="font-display font-bold text-3xl uppercase leading-none">Calendar</h1>
         <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
-          Your booked 1-on-1 sessions across every client this month — set
-          your recurring hours on the Availability tab below.
+          Every client&apos;s scheduled workouts and booked 1-on-1 sessions,
+          overlaid on one calendar — set your recurring hours on the
+          Availability tab below.
         </p>
       </div>
 
@@ -584,6 +663,7 @@ export default async function CoachCalendarPage({
                 today={today}
                 bookingsByDateKey={bookingsByDateKey}
                 eventsByDateKey={eventsByDateKey}
+                workoutsByDateKey={workoutsByDateKey}
                 availabilityWindows={availabilityWindows}
                 cellMinHeightPx={80}
                 showAllBookings={false}
@@ -611,6 +691,7 @@ export default async function CoachCalendarPage({
                 today={today}
                 bookingsByDateKey={bookingsByDateKey}
                 eventsByDateKey={eventsByDateKey}
+                workoutsByDateKey={workoutsByDateKey}
                 availabilityWindows={availabilityWindows}
                 cellMinHeightPx={300}
                 showAllBookings
@@ -620,6 +701,57 @@ export default async function CoachCalendarPage({
         </div>
 
         <div>
+          {(programsMissingSchedule.length > 0 ||
+            programsWithNoWorkouts.length > 0 ||
+            clientsWithNoProgram.length > 0 ||
+            quietClients.length > 0) && (
+            <div className="mb-6 border border-rust/30 bg-rust/5 p-3">
+              <h2 className="font-display uppercase text-sm tracking-wide text-rust mb-2">
+                Needs attention
+              </h2>
+              <div className="space-y-1.5">
+                {programsWithNoWorkouts.map((p) => (
+                  <Link
+                    key={`empty-${p.id}`}
+                    href={`/groups/${params.groupId}/programs/${p.id}`}
+                    className="block font-body text-xs text-chalk active:text-rust"
+                  >
+                    &ldquo;{p.name}&rdquo;{p.athleteName ? ` (${p.athleteName})` : ""} has no
+                    workouts built yet
+                  </Link>
+                ))}
+                {programsMissingSchedule.map((p) => (
+                  <Link
+                    key={`sched-${p.id}`}
+                    href={`/groups/${params.groupId}/programs/${p.id}`}
+                    className="block font-body text-xs text-chalk active:text-rust"
+                  >
+                    &ldquo;{p.name}&rdquo;{p.athleteName ? ` (${p.athleteName})` : ""} needs a
+                    start date to show on the calendar
+                  </Link>
+                ))}
+                {clientsWithNoProgram.map((c) => (
+                  <Link
+                    key={`noprog-${c.profileId}`}
+                    href={`/groups/${params.groupId}/athletes/${c.profileId}`}
+                    className="block font-body text-xs text-chalk active:text-rust"
+                  >
+                    {c.fullName} has no program assigned
+                  </Link>
+                ))}
+                {quietClients.map((c) => (
+                  <Link
+                    key={`quiet-${c.profileId}`}
+                    href={`/groups/${params.groupId}/athletes/${c.profileId}`}
+                    className="block font-body text-xs text-chalk active:text-rust"
+                  >
+                    {c.fullName} hasn&apos;t logged a workout in 7+ days
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
           <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
             Clients
           </h2>

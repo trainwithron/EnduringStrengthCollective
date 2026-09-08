@@ -31,6 +31,7 @@ export function CalendarGrid({
   today,
   bookingsByDateKey,
   eventsByDateKey,
+  workoutsByDateKey,
   availabilityWindows,
   cellMinHeightPx,
   showAllBookings,
@@ -42,6 +43,11 @@ export function CalendarGrid({
   today: Date;
   bookingsByDateKey: Map<string, { time: string; name: string }[]>;
   eventsByDateKey: Map<string, CalendarEventEntry[]>;
+  // Every program's computed workout for this date, across the whole
+  // group — the overlay that makes this the coach's one real calendar
+  // instead of a separate per-program view. athleteName is null for the
+  // group's shared program.
+  workoutsByDateKey?: Map<string, { title: string; athleteName: string | null }[]>;
   availabilityWindows: AvailabilityWindow[];
   cellMinHeightPx: number;
   // Month cells truncate to a handful of items to stay compact; week
@@ -126,6 +132,7 @@ export function CalendarGrid({
         const isToday = key === todayKey;
         const bookings = bookingsByDateKey.get(key) ?? [];
         const events = eventsByDateKey.get(key) ?? [];
+        const workouts = workoutsByDateKey?.get(key) ?? [];
         const isAdding = addingFor === key;
         const isDropTarget = dropTarget?.key === key;
         const bookingsShown = showAllBookings ? bookings : bookings.slice(0, 3);
@@ -164,6 +171,13 @@ export function CalendarGrid({
                 <Plus className="w-3 h-3" />
               </button>
             </div>
+
+            {workouts.map((w, idx) => (
+              <span key={`w-${idx}`} className="font-body text-[9px] text-positive leading-tight truncate">
+                {w.athleteName ? `${w.athleteName}: ` : ""}
+                {w.title}
+              </span>
+            ))}
 
             {bookingsShown.map((b, idx) => (
               <span key={`b-${idx}`} className="font-body text-[9px] text-chalk leading-tight">
