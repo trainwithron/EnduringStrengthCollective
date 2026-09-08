@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createServerClient } from "@/lib/supabase/server";
 import { SessionLogger } from "@/components/logging/session-logger";
 import { DEFAULT_TRACKED_FIELDS } from "@/lib/exercise-fields";
@@ -22,7 +23,7 @@ export default async function SessionPage({
 
   const { data: session } = await supabase
     .from("athlete_sessions")
-    .select("id, status, athlete_id, group_id, logged_by_coach, workouts ( title )")
+    .select("id, status, athlete_id, group_id, logged_by_coach, workout_id, workouts ( title )")
     .eq("id", params.sessionId)
     .single();
 
@@ -174,10 +175,31 @@ export default async function SessionPage({
 
   const isOwnSession = session.athlete_id === user.id;
 
+  // A completed session that generated a shareable card can always be
+  // revisited — not just right after finishing — so the athlete can grab
+  // the link again later instead of it only being reachable the one time
+  // it flashed by right after completion.
+  let sharePostId: string | null = null;
+  if (session.status === "completed") {
+    const { data: workoutLog } = await supabase
+      .from("workout_logs")
+      .select("id, posts ( id )")
+      .eq("session_id", params.sessionId)
+      .maybeSingle();
+    sharePostId = (workoutLog?.posts as any)?.id ?? null;
+  }
+
+  const backHref = session.workout_id
+    ? `/groups/${session.group_id}/workouts/${session.workout_id}`
+    : `/groups/${session.group_id}`;
+
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-32">
       <header className="px-5 pt-8 pb-6 border-b border-steel/20">
-        <div className="flex items-center justify-between">
+        <Link href={backHref} className="font-body text-xs text-steel uppercase tracking-wide">
+          &larr; Back
+        </Link>
+        <div className="flex items-center justify-between mt-3">
           <p className="font-body text-xs text-steel uppercase tracking-wide">
             {session.status === "completed" ? "Completed" : "In progress"}
           </p>
@@ -186,6 +208,14 @@ export default async function SessionPage({
         <h1 className="font-display font-bold text-3xl leading-none mt-1 uppercase">
           {(session as any).workouts?.title ?? "Workout"}
         </h1>
+        {sharePostId && (
+          <Link
+            href={`/share/${sharePostId}`}
+            className="inline-block mt-3 font-body text-xs text-rust"
+          >
+            View share card &rarr;
+          </Link>
+        )}
       </header>
 
       <SessionLogger

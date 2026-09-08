@@ -13,6 +13,8 @@ export function ExerciseCard({
   onSetChange,
   onSetAdded,
   onRenamed,
+  onDelete,
+  deleting,
 }: {
   exercise: SessionExerciseEntry;
   lastTime?: { weight: number; reps: number };
@@ -21,6 +23,8 @@ export function ExerciseCard({
   onSetChange: (setId: string, patch: Partial<SetLogEntry>) => void;
   onSetAdded: (set: SetLogEntry) => void;
   onRenamed: (name: string) => void;
+  onDelete?: () => void;
+  deleting?: boolean;
 }) {
   const [swapping, setSwapping] = useState(false);
   const [nameDraft, setNameDraft] = useState(exercise.exerciseName);
@@ -132,16 +136,28 @@ export function ExerciseCard({
               )}
             </h3>
             {!readOnly && (
-              <button
-                type="button"
-                onClick={() => {
-                  setNameDraft(exercise.exerciseName);
-                  setSwapping(true);
-                }}
-                className="font-body text-xs text-steel shrink-0"
-              >
-                Swap Exercise
-              </button>
+              <div className="flex items-center gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNameDraft(exercise.exerciseName);
+                    setSwapping(true);
+                  }}
+                  className="font-body text-xs text-steel"
+                >
+                  Swap Exercise
+                </button>
+                {exercise.isAdded && onDelete && (
+                  <button
+                    type="button"
+                    onClick={onDelete}
+                    disabled={deleting}
+                    className="font-body text-xs text-rust disabled:opacity-40"
+                  >
+                    {deleting ? "Removing…" : "Remove"}
+                  </button>
+                )}
+              </div>
             )}
           </>
         )}

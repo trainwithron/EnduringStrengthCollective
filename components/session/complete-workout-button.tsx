@@ -16,7 +16,16 @@ export function CompleteWorkoutButton({
   raised?: boolean;
 }) {
   const [submitting, setSubmitting] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const router = useRouter();
+
+  function handleTap() {
+    if (!allSetsResolved) {
+      setConfirming(true);
+      return;
+    }
+    handleComplete();
+  }
 
   async function handleComplete() {
     setSubmitting(true);
@@ -173,17 +182,44 @@ export function CompleteWorkoutButton({
         raised ? "bottom-16" : "bottom-0"
       } left-0 right-0 bg-graphite border-t border-steel/20 px-5 py-4`}
     >
+      {confirming && (
+        <div className="mb-3 p-3 border border-rust/40 bg-surface/60">
+          <p className="font-body text-sm text-chalk">
+            This workout isn&apos;t fully filled in — finish it anyway?
+          </p>
+          <div className="flex items-center gap-3 mt-3">
+            <button
+              type="button"
+              onClick={() => {
+                setConfirming(false);
+                handleComplete();
+              }}
+              disabled={submitting}
+              className="h-10 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
+            >
+              {submitting ? "Finishing…" : "Finish workout"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              disabled={submitting}
+              className="h-10 px-4 border border-steel/30 text-steel font-body text-sm"
+            >
+              Keep going
+            </button>
+          </div>
+          <p className="font-body text-[11px] text-steel mt-2">
+            Everything you&apos;ve already entered is saved either way.
+          </p>
+        </div>
+      )}
       <button
         type="button"
-        onClick={handleComplete}
+        onClick={handleTap}
         disabled={disabled || submitting}
         className="w-full h-14 bg-rust text-graphite font-display uppercase text-lg font-bold disabled:opacity-40 active:bg-rust/80 transition-colors"
       >
-        {submitting
-          ? "Finishing…"
-          : allSetsResolved
-          ? "Complete workout"
-          : "Finish remaining sets to complete"}
+        {submitting ? "Finishing…" : "Complete workout"}
       </button>
     </div>
   );

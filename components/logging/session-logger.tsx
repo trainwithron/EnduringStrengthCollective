@@ -25,6 +25,14 @@ export function SessionLogger({
   const [addingExercise, setAddingExercise] = useState(false);
   const [newExerciseName, setNewExerciseName] = useState("");
   const [addExerciseBusy, setAddExerciseBusy] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // A client can bolt on extras mid-session (machine's free, feeling
+  // ambitious) but shouldn't be able to turn "log today's workout" into
+  // an unbounded list — 8 self-added exercises is a generous ceiling that
+  // still stops runaway growth.
+  const addedCount = exercises.filter((e) => e.isAdded).length;
+  const MAX_ADDED_EXERCISES = 8;
 
   const allSetsResolved = useMemo(
     () =>
@@ -62,9 +70,21 @@ export function SessionLogger({
     updateExercise(exerciseId, (ex) => ({ ...ex, exerciseName: name, isSwapped: true }));
   }
 
+  async function handleDeleteExercise(exerciseId: string) {
+    if (deletingId) return;
+    setDeletingId(exerciseId);
+    try {
+      const supabase = createBrowserClient();
+      await supabase.from("session_exercises").delete().eq("id", exerciseId);
+      setExercises((prev) => prev.filter((e) => e.id !== exerciseId));
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
   async function handleAddExercise() {
     const name = newExerciseName.trim();
-    if (!name || addExerciseBusy) return;
+    if (!name || addExerciseBusy || addedCount >= MAX_ADDED_EXERCISES) return;
     setAddExerciseBusy(true);
     try {
       const supabase = createBrowserClient();
@@ -136,13 +156,19 @@ export function SessionLogger({
             onSetChange={(setId, patch) => handleSetChange(exercise.id, setId, patch)}
             onSetAdded={(set) => handleSetAdded(exercise.id, set)}
             onRenamed={(name) => handleRenamed(exercise.id, name)}
+            onDelete={() => handleDeleteExercise(exercise.id)}
+            deleting={deletingId === exercise.id}
           />
         ))}
       </div>
 
       {!isCompleted && (
         <div className="mt-6 pb-4">
-          {addingExercise ? (
+          {addedCount >= MAX_ADDED_EXERCISES ? (
+            <p className="font-body text-xs text-steel">
+              You&apos;ve added the max of {MAX_ADDED_EXERCISES} extra exercises for this workout.
+            </p>
+          ) : addingExercise ? (
             <div className="flex items-center gap-2">
               <input
                 type="text"
@@ -177,7 +203,7 @@ export function SessionLogger({
         <CompleteWorkoutButton
           sessionId={sessionId}
           allSetsResolved={allSetsResolved}
-          disabled={!allSetsResolved}
+          disabled={false}
           raised={raised}
         />
       )}
