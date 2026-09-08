@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { generateSlotsForDate, formatSlotTime } from "@/lib/booking-slots";
+import { getBlockedRangesForDate } from "@/lib/availability-exceptions";
 import { BookSlotButton } from "@/components/athlete/book-slot-button";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { RescheduleSlotButton } from "@/components/athlete/reschedule-slot-button";
@@ -180,7 +181,8 @@ export default async function DayDetailPage({
       slotDurationMinutes: w.slot_duration_minutes,
     }));
 
-    slots = generateSlotsForDate(date, windows);
+    const blockedRanges = await getBlockedRangesForDate(supabase, coachMembership.profile_id, date);
+    slots = generateSlotsForDate(date, windows, blockedRanges);
 
     const { data: bookingRows } = await supabase
       .from("bookings")

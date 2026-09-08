@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { AvailabilityManagerDesktop } from "@/components/coach/desktop/availability-manager-desktop";
 import { CancellationPolicyControl } from "@/components/coach/desktop/cancellation-policy-control";
+import { AvailabilityExceptionsManager } from "@/components/coach/desktop/availability-exceptions-manager";
 
 export default async function AvailabilityPage({
   params,
@@ -62,6 +63,23 @@ export default async function AvailabilityPage({
     .eq("coach_id", user.id)
     .maybeSingle();
 
+  const { data: exceptionRows } = await supabase
+    .from("coach_availability_exceptions")
+    .select("id, kind, label, start_at, end_at, weekday, start_time, end_time")
+    .eq("coach_id", user.id)
+    .order("created_at", { ascending: false });
+
+  const exceptions = (exceptionRows ?? []).map((e) => ({
+    id: e.id,
+    kind: e.kind as "one_off" | "recurring",
+    label: e.label,
+    startAt: e.start_at,
+    endAt: e.end_at,
+    weekday: e.weekday,
+    startTime: e.start_time,
+    endTime: e.end_time,
+  }));
+
   return (
     <CoachDesktopShell
       groupId={params.groupId}
@@ -80,6 +98,8 @@ export default async function AvailabilityPage({
         coachId={user.id}
         initialHours={policyRow?.cancellation_window_hours ?? 24}
       />
+
+      <AvailabilityExceptionsManager coachId={user.id} initialExceptions={exceptions} />
 
       <AvailabilityManagerDesktop coachId={user.id} initialWindows={windows} />
     </CoachDesktopShell>

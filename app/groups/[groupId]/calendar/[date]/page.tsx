@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { generateSlotsForDate, formatSlotTime } from "@/lib/booking-slots";
+import { getBlockedRangesForDate } from "@/lib/availability-exceptions";
 import { AssignSlotButton } from "@/components/coach/desktop/assign-slot-button";
 import { BookSlotButton } from "@/components/athlete/book-slot-button";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
@@ -83,7 +84,8 @@ export default async function CoachDayDetailPage({
         slotDurationMinutes: w.slot_duration_minutes,
       }));
 
-      slots = generateSlotsForDate(date, windows);
+      const blockedRanges = await getBlockedRangesForDate(supabase, coachMembership.profile_id, date);
+      slots = generateSlotsForDate(date, windows, blockedRanges);
 
       const { data: bookingRows } = await supabase
         .from("bookings")
@@ -254,7 +256,8 @@ export default async function CoachDayDetailPage({
     slotDurationMinutes: w.slot_duration_minutes,
   }));
 
-  const slots = generateSlotsForDate(date, windows);
+  const blockedRanges = await getBlockedRangesForDate(supabase, user.id, date);
+  const slots = generateSlotsForDate(date, windows, blockedRanges);
 
   const { data: bookingRows } = await supabase
     .from("bookings")

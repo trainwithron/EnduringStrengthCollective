@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { generateSlotsForDate, formatSlotTime, type AvailabilityWindow } from "@/lib/booking-slots";
+import { generateSlotsForDate, formatSlotTime, resolveBlockedRangesForDate, type AvailabilityWindow } from "@/lib/booking-slots";
 import type { DraggedClient } from "./draggable-client-name";
 import type { CalendarEventEntry } from "./calendar-grid";
 
@@ -18,6 +18,7 @@ export function ExpandedDayScheduler({
   bookings,
   events,
   availabilityWindows,
+  blockedRanges,
   onAssigned,
   onCancel,
 }: {
@@ -27,6 +28,14 @@ export function ExpandedDayScheduler({
   bookings: { time: string; name: string }[];
   events: CalendarEventEntry[];
   availabilityWindows: AvailabilityWindow[];
+  blockedRanges?: {
+    kind: "one_off" | "recurring";
+    startAt: string | null;
+    endAt: string | null;
+    weekday: number | null;
+    startTime: string | null;
+    endTime: string | null;
+  }[];
   onAssigned: () => void;
   onCancel: () => void;
 }) {
@@ -36,7 +45,8 @@ export function ExpandedDayScheduler({
 
   const daySlots = generateSlotsForDate(
     date,
-    availabilityWindows.filter((w) => w.weekday === date.getDay())
+    availabilityWindows.filter((w) => w.weekday === date.getDay()),
+    resolveBlockedRangesForDate(date, blockedRanges ?? [])
   );
 
   const dateLabel = date.toLocaleDateString("en-US", {

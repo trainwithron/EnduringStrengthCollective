@@ -33,6 +33,7 @@ export function CalendarGrid({
   eventsByDateKey,
   workoutsByDateKey,
   availabilityWindows,
+  blockedRanges,
   cellMinHeightPx,
   showAllBookings,
 }: {
@@ -49,6 +50,14 @@ export function CalendarGrid({
   // group's shared program.
   workoutsByDateKey?: Map<string, { title: string; athleteName: string | null }[]>;
   availabilityWindows: AvailabilityWindow[];
+  blockedRanges?: {
+    kind: "one_off" | "recurring";
+    startAt: string | null;
+    endAt: string | null;
+    weekday: number | null;
+    startTime: string | null;
+    endTime: string | null;
+  }[];
   cellMinHeightPx: number;
   // Month cells truncate to a handful of items to stay compact; week
   // cells have room to show everything.
@@ -267,6 +276,7 @@ export function CalendarGrid({
           bookings={bookingsByDateKey.get(dropTarget.key) ?? []}
           events={eventsByDateKey.get(dropTarget.key) ?? []}
           availabilityWindows={availabilityWindows}
+          blockedRanges={blockedRanges}
           onAssigned={() => {
             setDropTarget(null);
             router.refresh();

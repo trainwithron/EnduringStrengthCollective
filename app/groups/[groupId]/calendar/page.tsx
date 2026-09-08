@@ -572,6 +572,19 @@ export default async function CoachCalendarPage({
     slotDurationMinutes: w.slot_duration_minutes,
   }));
 
+  const { data: exceptionRows } = await supabase
+    .from("coach_availability_exceptions")
+    .select("kind, start_at, end_at, weekday, start_time, end_time")
+    .eq("coach_id", user.id);
+  const blockedRanges = (exceptionRows ?? []).map((e) => ({
+    kind: e.kind as "one_off" | "recurring",
+    startAt: e.start_at,
+    endAt: e.end_at,
+    weekday: e.weekday,
+    startTime: e.start_time,
+    endTime: e.end_time,
+  }));
+
   const selectedClientId = searchParams.client;
 
   const cells: (Date | null)[] = [
@@ -664,6 +677,7 @@ export default async function CoachCalendarPage({
                 bookingsByDateKey={bookingsByDateKey}
                 eventsByDateKey={eventsByDateKey}
                 workoutsByDateKey={workoutsByDateKey}
+                blockedRanges={blockedRanges}
                 availabilityWindows={availabilityWindows}
                 cellMinHeightPx={80}
                 showAllBookings={false}
@@ -692,6 +706,7 @@ export default async function CoachCalendarPage({
                 bookingsByDateKey={bookingsByDateKey}
                 eventsByDateKey={eventsByDateKey}
                 workoutsByDateKey={workoutsByDateKey}
+                blockedRanges={blockedRanges}
                 availabilityWindows={availabilityWindows}
                 cellMinHeightPx={300}
                 showAllBookings
