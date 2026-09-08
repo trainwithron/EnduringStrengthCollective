@@ -13,6 +13,13 @@ export interface DuplicateProgramOptions {
   // Personal copies get a readable suffix; plain duplicates keep the
   // exact source name (the coach can rename either afterward).
   clientName?: string;
+  // Overrides the copied start_date so the new copy's schedule is
+  // correctly anchored from the moment it's actually assigned, rather
+  // than inheriting whatever date the source program happened to start
+  // on (which is very often already in the past by the time a program
+  // gets duplicated for a new client). training_days/visibility_window
+  // still copy forward as-is — only the anchor date changes.
+  startDate?: string;
 }
 
 // Deep-copies a whole program — every week/day, exercise, set, and note —
@@ -26,7 +33,7 @@ export interface DuplicateProgramOptions {
 // at a group in another org.
 export async function duplicateProgram(
   supabase: SupabaseClient,
-  { sourceProgramId, destinationGroupId, createdBy, athleteId, clientName }: DuplicateProgramOptions
+  { sourceProgramId, destinationGroupId, createdBy, athleteId, clientName, startDate }: DuplicateProgramOptions
 ): Promise<{ programId: string } | { error: string }> {
   const { data: sourceProgram } = await supabase
     .from("programs")
@@ -56,7 +63,7 @@ export async function duplicateProgram(
       created_by: createdBy,
       athlete_id: athleteId ?? null,
       is_active: true,
-      start_date: sourceProgram.start_date,
+      start_date: startDate ?? sourceProgram.start_date,
       training_days: sourceProgram.training_days,
       visibility_window: sourceProgram.visibility_window,
     })

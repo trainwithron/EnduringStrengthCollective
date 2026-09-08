@@ -38,29 +38,31 @@ export function RosterList({
         </div>
       )}
 
-      <div className="pt-6">
-        <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
-          Roster
-        </h2>
-        {athletes.length === 0 ? (
-          <p className="font-body text-sm text-steel py-6">
-            No athletes yet. Send an invite to get the first one training.
-          </p>
-        ) : (
-          <div className="divide-y divide-steel/15">
-            {athletes.map((m) => (
-              <RosterRow
-                key={m.profileId}
-                member={m}
-                groupId={groupId}
-                viewerIsCoach={viewerIsCoach}
-                isViewer={m.profileId === viewerId}
-                isOnlyCoach={isOnlyCoach}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+      {viewerIsCoach && (
+        <div className="pt-6">
+          <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+            Roster
+          </h2>
+          {athletes.length === 0 ? (
+            <p className="font-body text-sm text-steel py-6">
+              No athletes yet. Send an invite to get the first one training.
+            </p>
+          ) : (
+            <div className="divide-y divide-steel/15">
+              {athletes.map((m) => (
+                <RosterRow
+                  key={m.profileId}
+                  member={m}
+                  groupId={groupId}
+                  viewerIsCoach={viewerIsCoach}
+                  isViewer={m.profileId === viewerId}
+                  isOnlyCoach={isOnlyCoach}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }

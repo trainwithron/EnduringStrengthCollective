@@ -2,9 +2,20 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 
-export function CancelBookingButton({ bookingId }: { bookingId: string }) {
+export function CancelBookingButton({
+  bookingId,
+  rescheduleHref,
+}: {
+  bookingId: string;
+  // When provided, links to the same day-detail page in "move this
+  // booking" mode (?reschedule=<bookingId>) so the athlete can pick a new
+  // open slot instead of cancelling outright. Omitted from contexts where
+  // there's no natural page to reschedule from.
+  rescheduleHref?: string;
+}) {
   const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
 
@@ -24,13 +35,23 @@ export function CancelBookingButton({ bookingId }: { bookingId: string }) {
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleCancel}
-      disabled={submitting}
-      className="h-8 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
-    >
-      {submitting ? "Cancelling…" : "Booked ✓ Cancel"}
-    </button>
+    <div className="flex items-center gap-2">
+      {rescheduleHref && (
+        <Link
+          href={rescheduleHref}
+          className="h-8 px-3 flex items-center border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors"
+        >
+          Reschedule
+        </Link>
+      )}
+      <button
+        type="button"
+        onClick={handleCancel}
+        disabled={submitting}
+        className="h-8 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
+      >
+        {submitting ? "Cancelling…" : "Booked ✓ Cancel"}
+      </button>
+    </div>
   );
 }

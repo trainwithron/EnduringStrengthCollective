@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { AvailabilityManagerDesktop } from "@/components/coach/desktop/availability-manager-desktop";
+import { CancellationPolicyControl } from "@/components/coach/desktop/cancellation-policy-control";
 
 export default async function AvailabilityPage({
   params,
@@ -55,6 +56,12 @@ export default async function AvailabilityPage({
     slotDurationMinutes: w.slot_duration_minutes,
   }));
 
+  const { data: policyRow } = await supabase
+    .from("coach_booking_policies")
+    .select("cancellation_window_hours")
+    .eq("coach_id", user.id)
+    .maybeSingle();
+
   return (
     <CoachDesktopShell
       groupId={params.groupId}
@@ -68,6 +75,11 @@ export default async function AvailabilityPage({
           coach — set once here, applies everywhere.
         </p>
       </div>
+
+      <CancellationPolicyControl
+        coachId={user.id}
+        initialHours={policyRow?.cancellation_window_hours ?? 24}
+      />
 
       <AvailabilityManagerDesktop coachId={user.id} initialWindows={windows} />
     </CoachDesktopShell>

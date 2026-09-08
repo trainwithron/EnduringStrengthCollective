@@ -40,7 +40,7 @@ export default async function ProgramCalendarPage({
   searchParams,
 }: {
   params: { groupId: string; programId: string };
-  searchParams: { month?: string; view?: string; week?: string };
+  searchParams: { month?: string; view?: string; week?: string; reschedule?: string };
 }) {
   const supabase = createServerClient();
   const {
@@ -156,6 +156,7 @@ export default async function ProgramCalendarPage({
 
   let hasAvailability = false;
   let upcomingBookings: { id: string; start_at: string }[] = [];
+  let creditBalance = 0;
 
   if (coachMembership) {
     const { count } = await supabase
@@ -175,6 +176,16 @@ export default async function ProgramCalendarPage({
         .order("start_at", { ascending: true });
       upcomingBookings = bookingRows ?? [];
     }
+  }
+
+  if (membership.role === "athlete") {
+    const { data: creditsRow } = await supabase
+      .from("session_credits")
+      .select("balance")
+      .eq("athlete_id", user.id)
+      .eq("group_id", params.groupId)
+      .maybeSingle();
+    creditBalance = creditsRow?.balance ?? 0;
   }
 
   const today = new Date();
@@ -197,14 +208,19 @@ export default async function ProgramCalendarPage({
     ...Array.from({ length: daysInMonth }, (_, i) => new Date(year, monthIndex, i + 1)),
   ];
 
+  // Carried through every nav/day-cell link on this page so browsing to a
+  // different month/week/day while rescheduling a booking doesn't drop
+  // out of "pick a new time" mode.
+  const rescheduleSuffix = searchParams.reschedule ? `&reschedule=${searchParams.reschedule}` : "";
+
   const prevMonth = new Date(year, monthIndex - 1, 1);
   const nextMonth = new Date(year, monthIndex + 1, 1);
   const prevHref = `${backHref}/calendar?month=${prevMonth.getFullYear()}-${String(
     prevMonth.getMonth() + 1
-  ).padStart(2, "0")}`;
+  ).padStart(2, "0")}${rescheduleSuffix}`;
   const nextHref = `${backHref}/calendar?month=${nextMonth.getFullYear()}-${String(
     nextMonth.getMonth() + 1
-  ).padStart(2, "0")}`;
+  ).padStart(2, "0")}${rescheduleSuffix}`;
 
   // Week view is keyed off its own anchor date, independent of the month
   // grid's year/monthIndex — a visible week routinely spans a month
@@ -223,10 +239,10 @@ export default async function ProgramCalendarPage({
   prevWeek.setDate(weekStart.getDate() - 7);
   const nextWeek = new Date(weekStart);
   nextWeek.setDate(weekStart.getDate() + 7);
-  const prevWeekHref = `${backHref}/calendar?view=week&week=${dateKey(prevWeek)}`;
-  const nextWeekHref = `${backHref}/calendar?view=week&week=${dateKey(nextWeek)}`;
-  const monthViewHref = `${backHref}/calendar?month=${year}-${String(monthIndex + 1).padStart(2, "0")}`;
-  const weekViewHref = `${backHref}/calendar?view=week&week=${dateKey(weekStart)}`;
+  const prevWeekHref = `${backHref}/calendar?view=week&week=${dateKey(prevWeek)}${rescheduleSuffix}`;
+  const nextWeekHref = `${backHref}/calendar?view=week&week=${dateKey(nextWeek)}${rescheduleSuffix}`;
+  const monthViewHref = `${backHref}/calendar?month=${year}-${String(monthIndex + 1).padStart(2, "0")}${rescheduleSuffix}`;
+  const weekViewHref = `${backHref}/calendar?view=week&week=${dateKey(weekStart)}${rescheduleSuffix}`;
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
@@ -237,6 +253,11 @@ export default async function ProgramCalendarPage({
         <h1 className="font-display font-bold text-4xl leading-none mt-3 uppercase">
           {program.name}
         </h1>
+        {membership.role === "athlete" && coachMembership && (
+          <p className="font-body text-xs text-steel mt-3">
+            Session credits available: <span className="text-chalk font-medium">{creditBalance}</span>
+          </p>
+        )}
       </header>
 
       {upcomingBookings.length > 0 && (
@@ -258,7 +279,10 @@ export default async function ProgramCalendarPage({
                     &middot;{" "}
                     {start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
                   </span>
-                  <CancelBookingButton bookingId={b.id} />
+                  <CancelBookingButton
+                    bookingId={b.id}
+                    rescheduleHref={`${backHref}/calendar/${dateKey(start)}?reschedule=${b.id}`}
+                  />
                 </div>
               );
             })}
@@ -369,7 +393,7 @@ export default async function ProgramCalendarPage({
                 return (
                   <Link
                     key={i}
-                    href={`${backHref}/calendar/${dateKey(date)}`}
+                    href={`${backHref}/calendar/${dateKey(date)}${rescheduleSuffix ? `?${rescheduleSuffix.slice(1)}` : ""}`}
                     className={cellClass}
                   >
                     {cellContent}

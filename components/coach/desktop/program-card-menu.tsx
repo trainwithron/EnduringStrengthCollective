@@ -22,7 +22,11 @@ interface GroupOption {
   name: string;
 }
 
-type View = "menu" | "assign" | "duplicate-org" | "duplicate-group";
+type View = "menu" | "assign" | "assign-self" | "duplicate-org" | "duplicate-group";
+
+function todayDateString(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 export function ProgramCardMenu({
   programId,
@@ -43,6 +47,7 @@ export function ProgramCardMenu({
   const [orgGroups, setOrgGroups] = useState<GroupOption[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [assignStartDate, setAssignStartDate] = useState(todayDateString());
 
   // Rendered through a portal (see the return below) instead of a plain
   // absolutely-positioned child — every program card wraps its content in
@@ -153,6 +158,35 @@ export function ProgramCardMenu({
       createdBy: user.id,
       athleteId: client.id,
       clientName: client.fullName,
+      startDate: assignStartDate || undefined,
+    });
+
+    setBusy(false);
+    if ("error" in result) {
+      setError(result.error);
+      return;
+    }
+    router.push(`/groups/${groupId}/programs/${result.programId}`);
+  }
+
+  async function handleAssignToSelf() {
+    setBusy(true);
+    setError(null);
+    const supabase = createBrowserClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setBusy(false);
+      return;
+    }
+
+    const result = await duplicateProgram(supabase, {
+      sourceProgramId: programId,
+      destinationGroupId: groupId,
+      createdBy: user.id,
+      athleteId: user.id,
+      startDate: assignStartDate || undefined,
     });
 
     setBusy(false);
@@ -281,12 +315,23 @@ export function ProgramCardMenu({
               <button
                 type="button"
                 onClick={() => {
+                  setAssignStartDate(todayDateString());
                   setView("assign");
                   loadClients();
                 }}
                 className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50"
               >
                 Assign to Client
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAssignStartDate(todayDateString());
+                  setView("assign-self");
+                }}
+                className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50"
+              >
+                Assign to Myself
               </button>
               <button
                 type="button"
@@ -322,6 +367,17 @@ export function ProgramCardMenu({
               <p className="font-body text-[11px] text-steel uppercase tracking-wide px-3 pt-2.5 pb-1.5">
                 Assign to which client?
               </p>
+              <div className="px-3 pb-2">
+                <label className="font-body text-[11px] text-steel">
+                  Start date
+                  <input
+                    type="date"
+                    value={assignStartDate}
+                    onChange={(e) => setAssignStartDate(e.target.value)}
+                    className="w-full h-8 mt-1 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"
+                  />
+                </label>
+              </div>
               <div className="max-h-72 overflow-y-auto">
                 {clients === null && (
                   <p className="font-body text-xs text-steel px-3 py-2.5">Loading…</p>
@@ -341,6 +397,31 @@ export function ProgramCardMenu({
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {view === "assign-self" && (
+            <div className="p-3">
+              <p className="font-body text-[11px] text-steel uppercase tracking-wide pb-1.5">
+                Assign to yourself
+              </p>
+              <label className="font-body text-[11px] text-steel">
+                Start date
+                <input
+                  type="date"
+                  value={assignStartDate}
+                  onChange={(e) => setAssignStartDate(e.target.value)}
+                  className="w-full h-8 mt-1 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"
+                />
+              </label>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={handleAssignToSelf}
+                className="w-full h-8 mt-2.5 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
+              >
+                {busy ? "Assigning…" : "Assign & open"}
+              </button>
             </div>
           )}
 

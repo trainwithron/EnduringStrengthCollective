@@ -1,9 +1,9 @@
-import Link from "next/link";
 import { createServerClient } from "@/lib/supabase/server";
 import { GroupHubHeader } from "@/components/group/group-hub-header";
 import { RosterList } from "@/components/group/roster-list";
 import { WeightLogWidget } from "@/components/athlete/weight-log-widget";
 import { TodayWidget } from "@/components/athlete/today-widget";
+import { ProgramCardList } from "@/components/athlete/program-card-list";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { isHabitDueOn } from "@/lib/habits";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
@@ -46,16 +46,18 @@ export default async function GroupHubPage({
       .select("athlete_id, created_at")
       .eq("group_id", params.groupId)
       .order("created_at", { ascending: false }),
-    // Shared programs plus this viewer's own personal one — never a
-    // different client's personal program (RLS already blocks that at
-    // the database level; this filter keeps the query's own intent
-    // explicit rather than relying on RLS alone to silently drop rows).
+    // Only programs actually assigned to this athlete right now — the
+    // group's shared active program plus this viewer's own personal one
+    // if active, never a different client's personal program (RLS
+    // already blocks that at the database level; this filter keeps the
+    // query's own intent explicit) and never an inactive/retired program
+    // that isn't actually something to train from today.
     supabase
       .from("programs")
-      .select("id, name, is_active")
+      .select("id, name, cover_image_path, workouts(count)")
       .eq("group_id", params.groupId)
+      .eq("is_active", true)
       .or(`athlete_id.is.null,athlete_id.eq.${user?.id ?? ""}`)
-      .order("is_active", { ascending: false })
       .order("created_at", { ascending: false }),
   ]);
 
@@ -180,32 +182,24 @@ export default async function GroupHubPage({
         coachId={user?.id}
       />
 
-      {programs && programs.length > 0 && (
-        <section className="px-5 pt-6">
-          <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
-            Programs
-          </h2>
-          <div className="divide-y divide-steel/15">
-            {programs.map((p) => (
-              <Link
-                key={p.id}
-                href={`/groups/${params.groupId}/programs/${p.id}`}
-                className="flex items-center justify-between py-3 min-h-[44px] active:bg-surface/60 -mx-1 px-1 transition-colors"
-              >
-                <span className="font-body font-medium text-[15px]">
-                  {p.name}
-                  {!p.is_active && (
-                    <span className="font-body text-[11px] text-steel ml-2 align-middle">
-                      inactive
-                    </span>
-                  )}
-                </span>
-                <span className="font-body text-xs text-rust">Open &rarr;</span>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
+      <section className="px-5 pt-6">
+        <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+          Programs
+        </h2>
+        {programs && programs.length > 0 ? (
+          <ProgramCardList
+            groupId={params.groupId}
+            programs={programs.map((p: any) => ({
+              id: p.id,
+              name: p.name,
+              workoutCount: p.workouts?.[0]?.count ?? 0,
+              coverImagePath: p.cover_image_path ?? null,
+            }))}
+          />
+        ) : (
+          <p className="font-body text-sm text-steel py-2">No programs assigned.</p>
+        )}
+      </section>
 
       {showMobileView && user && (
         <section className="px-5 pt-6 space-y-4">
