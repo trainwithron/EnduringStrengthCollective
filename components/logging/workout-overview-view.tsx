@@ -1,20 +1,9 @@
 import Link from "next/link";
 import { StartWorkoutButton } from "@/components/logging/start-workout-button";
+import { PreStartExerciseRow } from "@/components/logging/pre-start-exercise-row";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
-import {
-  TARGET_PROP,
-  fieldDef,
-  orderTrackedFields,
-  type TrackedField,
-} from "@/lib/exercise-fields";
 import { renderNoteBody } from "@/lib/text-note-format";
-import type { ExerciseSetTarget } from "@/lib/types";
 import type { WorkoutOverviewData } from "@/lib/workout-overview-data";
-
-function targetDisplay(set: ExerciseSetTarget, field: TrackedField): string {
-  const v = set[TARGET_PROP[field] as keyof ExerciseSetTarget];
-  return v === null || v === undefined ? "—" : String(v);
-}
 
 // Shared between the athlete's own workout overview and the coach's
 // "log for a client" equivalent. `backHref` and `loggingForName` are the
@@ -75,75 +64,17 @@ export function WorkoutOverviewView({
           Prescribed
         </h2>
         <div className="divide-y divide-steel/15">
-          {exercises.map((ex) => {
-            const goal = goalByExerciseId.get(ex.id);
-            const videoUrl = videoUrlByExerciseId.get(ex.id);
-            return (
-              <div key={ex.id} className="py-3">
-                <p className="font-body font-medium text-[15px]">
-                  {ex.exerciseName}
-                  {ex.isOverridden && (
-                    <span className="font-body text-[11px] text-steel ml-2 align-middle">
-                      customized for you
-                    </span>
-                  )}
-                </p>
-                {ex.notes && <p className="font-body text-xs text-steel mt-0.5">{ex.notes}</p>}
-                {lastTimeByExercise[ex.exerciseName] && (
-                  <p className="font-body text-xs text-steel mt-0.5">
-                    Last time: {lastTimeByExercise[ex.exerciseName].weight} &times;{" "}
-                    {lastTimeByExercise[ex.exerciseName].reps}
-                  </p>
-                )}
-
-                {(videoUrl || ex.youtubeUrl) && (
-                  <div className="mt-2">
-                    {videoUrl && (
-                      <video src={videoUrl} controls className="w-full max-w-[240px] bg-graphite" />
-                    )}
-                    {ex.youtubeUrl && (
-                      <a
-                        href={ex.youtubeUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-body text-xs text-rust inline-block mt-1"
-                      >
-                        Watch demo &rarr;
-                      </a>
-                    )}
-                  </div>
-                )}
-
-                <div className="overflow-x-auto mt-2">
-                  <div className="space-y-1 min-w-fit">
-                    {orderTrackedFields(ex.trackedFields).map((field) => (
-                      <div key={field} className="flex items-center gap-1.5">
-                        <span className="w-14 shrink-0 font-body text-[10px] text-steel uppercase tracking-wide">
-                          {fieldDef(field).label}
-                        </span>
-                        {ex.sets.map((s: ExerciseSetTarget) => (
-                          <span
-                            key={s.id}
-                            className="w-12 h-7 flex items-center justify-center bg-surface/60 font-body text-xs text-chalk shrink-0"
-                          >
-                            {targetDisplay(s, field)}
-                          </span>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {goal && (goal.weight != null || goal.reps != null) && (
-                  <p className="font-body text-xs text-rust mt-1.5">
-                    Goal: {goal.weight != null ? `${goal.weight} lbs` : ""}
-                    {goal.weight != null && goal.reps != null ? " × " : ""}
-                    {goal.reps != null ? `${goal.reps} reps` : ""}
-                  </p>
-                )}
-              </div>
-            );
-          })}
+          {exercises.map((ex) => (
+            <PreStartExerciseRow
+              key={ex.id}
+              exercise={ex}
+              athleteId={athleteId}
+              groupId={groupId}
+              videoUrl={videoUrlByExerciseId.get(ex.id) ?? ex.youtubeUrl ?? undefined}
+              lastTime={lastTimeByExercise[ex.exerciseName]}
+              goal={goalByExerciseId.get(ex.id)}
+            />
+          ))}
         </div>
       </section>
 

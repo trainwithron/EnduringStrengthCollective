@@ -13,6 +13,11 @@ export interface WorkoutOverviewExercise {
   videoPath: string | null;
   youtubeUrl: string | null;
   sets: ExerciseSetTarget[];
+  // The coach's own approved alternatives for this exercise's movement
+  // pattern (excluding itself) — the only options a pre-start swap is
+  // allowed to offer, so the athlete stays on-program instead of picking
+  // anything at all.
+  ladder: string[];
 }
 
 export interface WorkoutOverviewData {
@@ -121,9 +126,31 @@ export async function getWorkoutOverviewData(
     templateExercises.map((ex: any) => [ex.id, ex.exercise_name])
   );
 
+  // The coach's approved ladder of alternatives per movement pattern —
+  // same source the mid-session swap already uses, just resolved here so
+  // a pre-start swap can offer the identical "only approved exercises"
+  // set before the athlete ever begins.
+  const patternIds = Array.from(
+    new Set(templateExercises.map((ex: any) => ex.movement_pattern_id).filter(Boolean))
+  );
+  const ladderByPattern = new Map<string, string[]>();
+  if (patternIds.length > 0) {
+    const { data: ladderRows } = await supabase
+      .from("movement_pattern_exercises")
+      .select("movement_pattern_id, exercise_name, difficulty_rank")
+      .in("movement_pattern_id", patternIds)
+      .order("difficulty_rank", { ascending: true });
+    for (const row of ladderRows ?? []) {
+      const list = ladderByPattern.get(row.movement_pattern_id) ?? [];
+      list.push(row.exercise_name);
+      ladderByPattern.set(row.movement_pattern_id, list);
+    }
+  }
+
   const exercises: WorkoutOverviewExercise[] = templateExercises.map((ex: any) => {
     const resolvedName = overrideNameBySlot.get(ex.id) ?? ex.exercise_name;
     const media = mediaByName.get(resolvedName);
+    const fullLadder = ex.movement_pattern_id ? ladderByPattern.get(ex.movement_pattern_id) ?? [] : [];
     return {
       id: ex.id,
       exerciseOrder: ex.exercise_order,
@@ -138,6 +165,7 @@ export async function getWorkoutOverviewData(
         .slice()
         .sort((a: any, b: any) => a.set_order - b.set_order)
         .map(mapSetRow),
+      ladder: fullLadder.filter((name) => name !== resolvedName),
     };
   });
 
