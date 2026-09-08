@@ -32,12 +32,31 @@ export async function getTodaysWorkoutId(
     return { status: "ready", workoutId: override.workout_id };
   }
 
-  const { data: program } = await supabase
+  // A personal program assigned to this specific athlete always wins over
+  // the group's shared one — same precedence as the workout_assignments
+  // override above, one level up. Two separate queries (not one filtered
+  // by `athlete_id = X or athlete_id is null`) since both could otherwise
+  // be simultaneously "active" — one shared, one personal — and
+  // .maybeSingle() would error on more than one row.
+  const { data: personalProgram } = await supabase
     .from("programs")
     .select("id, start_date, training_days, visibility_window")
     .eq("group_id", groupId)
+    .eq("athlete_id", athleteId)
     .eq("is_active", true)
     .maybeSingle();
+
+  const { data: sharedProgram } = personalProgram
+    ? { data: null }
+    : await supabase
+        .from("programs")
+        .select("id, start_date, training_days, visibility_window")
+        .eq("group_id", groupId)
+        .is("athlete_id", null)
+        .eq("is_active", true)
+        .maybeSingle();
+
+  const program = personalProgram ?? sharedProgram;
 
   if (!program) return { status: "no-program" };
 

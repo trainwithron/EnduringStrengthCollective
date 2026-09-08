@@ -4,8 +4,12 @@ import { createServerClient } from "@/lib/supabase/server";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { FeedBroadcastSettings } from "@/components/athlete/feed-broadcast-settings";
+import { EditDisplayName } from "@/components/athlete/edit-display-name";
 import { PushNotificationToggle } from "@/components/athlete/push-notification-toggle";
 import { WearablePlaceholder } from "@/components/athlete/wearable-placeholder";
+import { BuyCreditsButton } from "@/components/athlete/buy-credits-button";
+import { SubscribeButton } from "@/components/athlete/subscribe-button";
+import { ManageBillingLink } from "@/components/athlete/manage-billing-link";
 
 export default async function SettingsPage({
   params,
@@ -21,11 +25,20 @@ export default async function SettingsPage({
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, avatar_url, feed_broadcast_level")
-    .eq("id", user.id)
-    .single();
+  const [{ data: profile }, { data: membership }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("full_name, avatar_url, feed_broadcast_level")
+      .eq("id", user.id)
+      .single(),
+    supabase
+      .from("group_memberships")
+      .select("role")
+      .eq("group_id", params.groupId)
+      .eq("profile_id", user.id)
+      .maybeSingle(),
+  ]);
+  const isCoach = membership?.role === "coach";
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
@@ -37,11 +50,9 @@ export default async function SettingsPage({
 
       <section className="px-5 pt-6 flex items-center gap-3">
         <Avatar name={profile?.full_name ?? "?"} url={profile?.avatar_url ?? null} />
-        <div>
-          <p className="font-body font-medium text-[15px]">
-            {profile?.full_name ?? "—"}
-          </p>
-          <p className="font-body text-xs text-steel">{user.email}</p>
+        <div className="flex-1">
+          <EditDisplayName initialName={profile?.full_name ?? ""} />
+          <p className="font-body text-xs text-steel mt-0.5">{user.email}</p>
         </div>
       </section>
 
@@ -63,6 +74,18 @@ export default async function SettingsPage({
             }
           />
         </div>
+        {!isCoach && (
+          <div className="pb-4 border-b border-steel/20 pt-4">
+            <p className="font-body text-sm mb-3">Billing</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <BuyCreditsButton groupId={params.groupId} />
+              <SubscribeButton groupId={params.groupId} />
+            </div>
+            <div className="mt-3">
+              <ManageBillingLink />
+            </div>
+          </div>
+        )}
         <div className="border-t border-steel/20 pt-4">
           <Link
             href={`/groups/${params.groupId}/tools/one-rep-max`}
@@ -95,6 +118,19 @@ export default async function SettingsPage({
             Leaderboard
           </Link>
         </div>
+        {isCoach && (
+          <div className="border-t border-steel/20 pt-4 mt-4">
+            <Link
+              href={`/groups/${params.groupId}/dashboard`}
+              className="font-body text-sm text-rust"
+            >
+              Coach Dashboard &rarr;
+            </Link>
+            <p className="font-body text-xs text-steel mt-1">
+              Programs, clients, business tools — the full site.
+            </p>
+          </div>
+        )}
         <div className="border-t border-steel/20 pt-4 mt-4">
           <SignOutButton />
         </div>

@@ -5,6 +5,7 @@ import { generateSlotsForDate, formatSlotTime } from "@/lib/booking-slots";
 import { BookSlotButton } from "@/components/athlete/book-slot-button";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
+import { BuyCreditsButton } from "@/components/athlete/buy-credits-button";
 
 export default async function DayDetailPage({
   params,
@@ -117,9 +118,16 @@ export default async function DayDetailPage({
           {date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
         </h1>
         {membership.role === "athlete" && coachMembership && (
-          <p className="font-body text-xs text-steel mt-3">
-            Session credits available: {creditBalance}
-          </p>
+          <div className="mt-3">
+            <p className="font-body text-xs text-steel">
+              Session credits available: {creditBalance}
+            </p>
+            {creditBalance <= 0 && (
+              <div className="mt-2">
+                <BuyCreditsButton groupId={params.groupId} />
+              </div>
+            )}
+          </div>
         )}
       </header>
 
@@ -154,7 +162,7 @@ export default async function DayDetailPage({
                     </span>
                   ) : booking ? (
                     isMine ? (
-                      <CancelBookingButton bookingId={booking.id} groupId={params.groupId} />
+                      <CancelBookingButton bookingId={booking.id} />
                     ) : (
                       <span className="font-body text-xs text-steel">Booked</span>
                     )

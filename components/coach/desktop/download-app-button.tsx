@@ -12,7 +12,13 @@ import { Smartphone, X, Copy, Check } from "lucide-react";
 // and once they're logged in there, they automatically land on the same
 // athlete-style mobile experience as any client, per the PWA-detection
 // routing already built.
-export function DownloadAppButton() {
+export function DownloadAppButton({
+  collapsed = false,
+  variant = "sidebar",
+}: {
+  collapsed?: boolean;
+  variant?: "sidebar" | "topbar";
+}) {
   const [open, setOpen] = useState(false);
   const [origin, setOrigin] = useState("");
   const [copied, setCopied] = useState(false);
@@ -33,14 +39,34 @@ export function DownloadAppButton() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="w-full flex items-center gap-3 px-5 h-11 font-body text-sm text-steel active:text-chalk transition-colors"
-      >
-        <Smartphone className="w-4 h-4 shrink-0" strokeWidth={2.25} />
-        Download App
-      </button>
+      {variant === "topbar" ? (
+        // Pinned in the persistent top bar — this exists specifically
+        // because the sidebar entry below is easy to miss on a phone (it's
+        // the last item in a long scrollable list, and the one-time
+        // install banner dismisses itself and doesn't come back). This
+        // one never moves and never goes away.
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          title="Get the app on your phone"
+          aria-label="Get the app on your phone"
+          className="w-9 h-9 flex items-center justify-center text-steel active:text-rust transition-colors shrink-0"
+        >
+          <Smartphone className="w-[18px] h-[18px]" strokeWidth={2.25} />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          title={collapsed ? "Download App" : undefined}
+          className={`w-full flex items-center gap-3 h-11 font-body text-sm text-steel active:text-chalk transition-colors ${
+            collapsed ? "justify-center px-2" : "px-5"
+          }`}
+        >
+          <Smartphone className="w-4 h-4 shrink-0" strokeWidth={2.25} />
+          {!collapsed && "Download App"}
+        </button>
+      )}
 
       {open && (
         <div className="fixed inset-0 z-50 bg-graphite/80 flex items-center justify-center px-6">

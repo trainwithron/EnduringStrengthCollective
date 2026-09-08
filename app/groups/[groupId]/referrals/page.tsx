@@ -8,7 +8,7 @@ import {
   type ReferralPartner,
 } from "@/components/coach/desktop/referral-directory-manager";
 import { ReferralDirectoryList } from "@/components/athlete/referral-directory-list";
-import { isPwaStandalone } from "@/lib/pwa-server";
+import { prefersAthleteStyleView } from "@/lib/pwa-server";
 
 export default async function ReferralsPage({
   params,
@@ -40,7 +40,7 @@ export default async function ReferralsPage({
   }
 
   const isCoach = membership.role === "coach";
-  const showMobileView = !isCoach || isPwaStandalone();
+  const showMobileView = !isCoach || prefersAthleteStyleView();
 
   // Athletes see their coach's directory; a coach manages their own —
   // either way this resolves to the same coach_id (referral partners are

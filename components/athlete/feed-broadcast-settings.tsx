@@ -31,16 +31,28 @@ const OPTIONS: { value: BroadcastLevel; label: string; description: string }[] =
 export function FeedBroadcastSettings({ initialLevel }: { initialLevel: BroadcastLevel }) {
   const [level, setLevel] = useState<BroadcastLevel>(initialLevel);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleChange(value: BroadcastLevel) {
+    const previous = level;
     setLevel(value);
     setSaving(true);
+    setError(null);
     const supabase = createBrowserClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (user) {
-      await supabase.from("profiles").update({ feed_broadcast_level: value }).eq("id", user.id);
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ feed_broadcast_level: value })
+        .eq("id", user.id);
+      // The selected radio already visually updated — without this, a
+      // failed save would look identical to a successful one.
+      if (updateError) {
+        setLevel(previous);
+        setError("Couldn't save — check your connection and try again.");
+      }
     }
     setSaving(false);
   }
@@ -51,6 +63,11 @@ export function FeedBroadcastSettings({ initialLevel }: { initialLevel: Broadcas
       <p className="font-body text-xs text-steel mb-3">
         {saving ? "Saving…" : "Applies the next time you complete a workout."}
       </p>
+      {error && (
+        <p className="font-body text-xs text-rust mb-3" role="alert">
+          {error}
+        </p>
+      )}
       <div className="space-y-2">
         {OPTIONS.map((opt) => (
           <label

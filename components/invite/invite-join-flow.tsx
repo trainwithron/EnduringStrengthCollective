@@ -7,12 +7,14 @@ import { createBrowserClient } from "@/lib/supabase/client";
 type Mode = "signup" | "login";
 type Phase = "checking" | "guest" | "authed" | "awaiting-confirmation";
 
-// A signup stashes {email, name} here so the name survives the round trip to
-// the confirmation email and back (profiles can't be created until there's a
-// confirmed session). Keyed by invite code only, so it must be validated
-// against the resuming session's email before use — otherwise an abandoned
-// signup attempt (e.g. a rate-limited email) can leak its name onto a
-// completely different account that later signs in on the same browser.
+// Legacy fallback only — the name now travels via Supabase's own user
+// metadata (set at signUp time below), which survives the email-confirmation
+// round trip even when the link is opened in a different browser/device than
+// the one the signup form was filled out on. localStorage doesn't: it's
+// scoped to the browser that set it, so a confirmation link opened elsewhere
+// (very common — mail apps open links in the system default browser) used to
+// silently lose the typed name and fall back to an email-derived one. Kept
+// here only in case an in-flight signup from before this fix resumes.
 function readPendingName(code: string, email: string | null | undefined): string | null {
   const raw = window.localStorage.getItem(`invite_pending_signup_${code}`);
   if (!raw) return null;
@@ -33,7 +35,8 @@ async function ensureProfile(
   supabase: ReturnType<typeof createBrowserClient>,
   userId: string,
   email: string | null | undefined,
-  code: string
+  code: string,
+  metadataName?: string | null
 ) {
   const { data: profile } = await supabase
     .from("profiles")
@@ -42,7 +45,7 @@ async function ensureProfile(
     .maybeSingle();
 
   if (!profile) {
-    const name = readPendingName(code, email) || email?.split("@")[0] || "New member";
+    const name = metadataName || readPendingName(code, email) || email?.split("@")[0] || "New member";
     await supabase.from("profiles").insert({ id: userId, full_name: name });
     window.localStorage.removeItem(`invite_pending_signup_${code}`);
   }
@@ -94,7 +97,7 @@ export function InviteJoinFlow({
         return;
       }
 
-      await ensureProfile(supabase, user.id, user.email, code);
+      await ensureProfile(supabase, user.id, user.email, code, user.user_metadata?.full_name ?? null);
       setPhase("authed");
     }
 
@@ -154,6 +157,11 @@ export function InviteJoinFlow({
         email,
         password,
         options: {
+          // Stored on the auth user itself, so it's available regardless of
+          // which browser/device completes the email confirmation — unlike
+          // the localStorage stash above, which only the originating browser
+          // can read back.
+          data: { full_name: trimmedName },
           emailRedirectTo: `${window.location.origin}/invite/${code}`,
         },
       });
@@ -203,7 +211,7 @@ export function InviteJoinFlow({
       return;
     }
 
-    await ensureProfile(supabase, data.user.id, data.user.email, code);
+    await ensureProfile(supabase, data.user.id, data.user.email, code, data.user.user_metadata?.full_name ?? null);
     setAuthedEmail(data.user.email ?? null);
     setPhase("authed");
     setSubmitting(false);

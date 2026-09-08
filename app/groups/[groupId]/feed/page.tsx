@@ -6,7 +6,7 @@ import { PostComposerDesktop } from "@/components/feed/desktop/post-composer-des
 import { ChannelTabs } from "@/components/feed/channel-tabs";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
-import { isPwaStandalone } from "@/lib/pwa-server";
+import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import type { FeedChannel, FeedPost } from "@/lib/types";
 
 const VALID_CHANNELS: FeedChannel[] = ["announcements", "form_checks", "pr_board", "general"];
@@ -34,7 +34,7 @@ export default async function FeedPage({
   // A coach opening the installed home-screen app gets the same mobile
   // feed an athlete gets, so they can post/react/comment naturally
   // instead of the desktop composer built for running a business.
-  const showMobileView = !isCoach || isPwaStandalone();
+  const showMobileView = !isCoach || prefersAthleteStyleView();
 
   const channel: FeedChannel = VALID_CHANNELS.includes(searchParams.channel as FeedChannel)
     ? (searchParams.channel as FeedChannel)

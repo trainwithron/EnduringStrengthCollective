@@ -1,4 +1,4 @@
-import { getProgressionGoal } from "@/lib/progressions";
+import { getProgressionGoalsBatch } from "@/lib/progressions";
 import { DEFAULT_TRACKED_FIELDS, mapSetRow, type TrackedField } from "@/lib/exercise-fields";
 import type { ExerciseSetTarget } from "@/lib/types";
 
@@ -33,10 +33,17 @@ export async function getWorkoutOverviewData(
   supabase: any,
   { groupId, workoutId, athleteId }: { groupId: string; workoutId: string; athleteId: string }
 ): Promise<WorkoutOverviewData | null> {
-  const { data: workout } = await supabase
-    .from("workouts")
-    .select(
-      `
+  // The workout template, this athlete's existing session (if any), and the
+  // group's coach are all independent lookups — none needs another's
+  // result — so they fire as one round trip instead of three sequential
+  // ones. This is the athlete's most-visited page; every query removed
+  // from the critical path here is felt on every workout open.
+  const [{ data: workout }, { data: existingSessionRow }, { data: coachMembership }] =
+    await Promise.all([
+      supabase
+        .from("workouts")
+        .select(
+          `
       id, title, notes, program_id,
       group_workout_exercises (
         id, exercise_name, exercise_order, movement_pattern_id, tracked_fields, notes,
@@ -44,60 +51,64 @@ export async function getWorkoutOverviewData(
       ),
       workout_notes ( id, body, position )
     `
-    )
-    .eq("id", workoutId)
-    .eq("group_id", groupId)
-    .single();
+        )
+        .eq("id", workoutId)
+        .eq("group_id", groupId)
+        .single(),
+      supabase
+        .from("athlete_sessions")
+        .select("id, status")
+        .eq("workout_id", workoutId)
+        .eq("athlete_id", athleteId)
+        .maybeSingle(),
+      supabase
+        .from("group_memberships")
+        .select("profile_id")
+        .eq("group_id", groupId)
+        .eq("role", "coach")
+        .limit(1)
+        .maybeSingle(),
+    ]);
 
   if (!workout) return null;
-
-  const { data: existingSessionRow } = await supabase
-    .from("athlete_sessions")
-    .select("id, status")
-    .eq("workout_id", workoutId)
-    .eq("athlete_id", athleteId)
-    .maybeSingle();
 
   const templateExercises = (workout.group_workout_exercises ?? [])
     .slice()
     .sort((a: any, b: any) => a.exercise_order - b.exercise_order);
 
+  // Per-client overrides (keyed by this workout's slot ids) and the coach's
+  // exercise-media library (keyed by coach id) are independent of each
+  // other — both fire together instead of one after the other.
+  const slotIds = templateExercises.map((ex: any) => ex.id);
+
+  const [overridesResult, libraryResult] = await Promise.all([
+    slotIds.length > 0
+      ? supabase
+          .from("athlete_exercise_overrides")
+          .select("group_workout_exercise_id, exercise_name")
+          .eq("athlete_id", athleteId)
+          .in("group_workout_exercise_id", slotIds)
+      : Promise.resolve({ data: [] }),
+    coachMembership
+      ? supabase
+          .from("exercise_library")
+          .select("name, video_path, youtube_url")
+          .eq("created_by", coachMembership.profile_id)
+      : Promise.resolve({ data: [] }),
+  ]);
+
   // Per-client overrides are a name-swap only — same set/rep scheme as the
   // template, different exercise (e.g. a ladder regression for one client).
-  const slotIds = templateExercises.map((ex: any) => ex.id);
   const overrideNameBySlot = new Map<string, string>();
-
-  if (slotIds.length > 0) {
-    const { data: overrides } = await supabase
-      .from("athlete_exercise_overrides")
-      .select("group_workout_exercise_id, exercise_name")
-      .eq("athlete_id", athleteId)
-      .in("group_workout_exercise_id", slotIds);
-
-    for (const o of overrides ?? []) {
-      overrideNameBySlot.set(o.group_workout_exercise_id, o.exercise_name);
-    }
+  for (const o of overridesResult.data ?? []) {
+    overrideNameBySlot.set(o.group_workout_exercise_id, o.exercise_name);
   }
 
   // Exercise video/YouTube is attached on the coach's shared exercise
   // library, keyed by name.
-  const { data: coachMembership } = await supabase
-    .from("group_memberships")
-    .select("profile_id")
-    .eq("group_id", groupId)
-    .eq("role", "coach")
-    .limit(1)
-    .maybeSingle();
-
   const mediaByName = new Map<string, { videoPath: string | null; youtubeUrl: string | null }>();
-  if (coachMembership) {
-    const { data: libraryRows } = await supabase
-      .from("exercise_library")
-      .select("name, video_path, youtube_url")
-      .eq("created_by", coachMembership.profile_id);
-    for (const row of libraryRows ?? []) {
-      mediaByName.set(row.name, { videoPath: row.video_path, youtubeUrl: row.youtube_url });
-    }
+  for (const row of libraryResult.data ?? []) {
+    mediaByName.set(row.name, { videoPath: row.video_path, youtubeUrl: row.youtube_url });
   }
 
   // Progression rules are keyed by the coach's original template exercise
@@ -130,66 +141,72 @@ export async function getWorkoutOverviewData(
     };
   });
 
-  // "Last time" — most recent completed set per exercise name, from any
-  // other completed session this athlete has logged.
+  // "Last time" (prior sets), exercise-video signed URLs, and progression
+  // goals are all independent of each other — each only needs `exercises`,
+  // already resolved above — so all three fire together instead of as
+  // three sequential phases.
   const exerciseNames = exercises.map((ex) => ex.exerciseName);
-  const lastTimeByExercise: Record<string, { weight: number; reps: number }> = {};
+  const videoUrlByExerciseId = new Map<string, string>();
 
-  if (exerciseNames.length > 0) {
-    const { data: priorSets } = await supabase
-      .from("set_logs")
-      .select(
-        `
+  const [priorSetsResult, , goalsBatch] = await Promise.all([
+    exerciseNames.length > 0
+      ? supabase
+          .from("set_logs")
+          .select(
+            `
         weight, reps, completed_at,
         session_exercises!inner (
           exercise_name,
           athlete_sessions!inner ( athlete_id )
         )
       `
-      )
-      .in("session_exercises.exercise_name", exerciseNames)
-      .eq("session_exercises.athlete_sessions.athlete_id", athleteId)
-      .eq("status", "completed")
-      .order("completed_at", { ascending: false });
+          )
+          .in("session_exercises.exercise_name", exerciseNames)
+          .eq("session_exercises.athlete_sessions.athlete_id", athleteId)
+          .eq("status", "completed")
+          .order("completed_at", { ascending: false })
+      : Promise.resolve({ data: [] }),
 
-    for (const row of (priorSets ?? []) as any[]) {
-      const name = row.session_exercises.exercise_name;
-      if (!(name in lastTimeByExercise) && row.weight != null && row.reps != null) {
-        lastTimeByExercise[name] = { weight: row.weight, reps: row.reps };
-      }
+    // Video signed URLs mutate videoUrlByExerciseId directly rather than
+    // returning a value — the destructured hole above just lets this run
+    // concurrently with the other two without awaiting it separately.
+    (async () => {
+      await Promise.all(
+        exercises.map(async (ex) => {
+          if (!ex.videoPath) return;
+          const { data } = await supabase.storage
+            .from("exercise-media")
+            .createSignedUrl(ex.videoPath, 3600);
+          if (data?.signedUrl) videoUrlByExerciseId.set(ex.id, data.signedUrl);
+        })
+      );
+    })(),
+
+    // Progression goals only matter for starting a fresh session — an
+    // existing session already has its own set_logs.
+    existingSessionRow
+      ? Promise.resolve(new Map<string, { weight: number | null; reps: number | null }>())
+      : getProgressionGoalsBatch(supabase, {
+          programId: workout.program_id,
+          athleteId,
+          currentWorkoutId: workoutId,
+          exercises: exercises.map((ex) => ({
+            slotId: ex.id,
+            exerciseName: templateNameById.get(ex.id) ?? ex.exerciseName,
+            loggedExerciseName: ex.exerciseName,
+          })),
+        }),
+  ]);
+
+  const lastTimeByExercise: Record<string, { weight: number; reps: number }> = {};
+  for (const row of (priorSetsResult.data ?? []) as any[]) {
+    const name = row.session_exercises.exercise_name;
+    if (!(name in lastTimeByExercise) && row.weight != null && row.reps != null) {
+      lastTimeByExercise[name] = { weight: row.weight, reps: row.reps };
     }
   }
 
-  const videoUrlByExerciseId = new Map<string, string>();
-  await Promise.all(
-    exercises.map(async (ex) => {
-      if (!ex.videoPath) return;
-      const { data } = await supabase.storage
-        .from("exercise-media")
-        .createSignedUrl(ex.videoPath, 3600);
-      if (data?.signedUrl) videoUrlByExerciseId.set(ex.id, data.signedUrl);
-    })
-  );
-
-  // Progression goals only matter for starting a fresh session — an
-  // existing session already has its own set_logs.
-  const goalByExerciseId = new Map<string, { weight: number | null; reps: number | null }>();
-  if (!existingSessionRow) {
-    await Promise.all(
-      exercises.map(async (ex) => {
-        const goal = await getProgressionGoal(supabase, {
-          programId: workout.program_id,
-          exerciseName: templateNameById.get(ex.id) ?? ex.exerciseName,
-          loggedExerciseName: ex.exerciseName,
-          athleteId,
-          currentWorkoutId: workoutId,
-        });
-        if (goal && (goal.weight != null || goal.reps != null)) {
-          goalByExerciseId.set(ex.id, goal);
-        }
-      })
-    );
-  }
+  const goalByExerciseId = goalsBatch;
 
   const dayNotes = (workout.workout_notes ?? [])
     .slice()

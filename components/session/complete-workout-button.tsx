@@ -38,22 +38,29 @@ export function CompleteWorkoutButton({
       (completedAt.getTime() - new Date(session.started_at).getTime()) / 1000
     );
 
-    await supabase
-      .from("athlete_sessions")
-      .update({
-        status: "completed",
-        completed_at: completedAt.toISOString(),
-        duration_seconds: durationSeconds,
-      })
-      .eq("id", sessionId);
-
-    // Pull this session's completed sets, joined to exercise name.
-    const { data: currentSets } = await supabase
-      .from("set_logs")
-      .select(
-        "weight, reps, status, session_exercises!inner ( session_id, exercise_name )"
-      )
-      .eq("session_exercises.session_id", sessionId);
+    // Marking the session completed, pulling its sets, and reading the
+    // athlete's broadcast preference are all independent of each other —
+    // the broadcast level in particular was previously fetched dead last,
+    // right before the redirect, even though nothing before it needs the
+    // result. Firing all three together shortens the single most
+    // emotionally important wait in the app (finishing a workout).
+    const [, { data: currentSets }, { data: athleteProfile }] = await Promise.all([
+      supabase
+        .from("athlete_sessions")
+        .update({
+          status: "completed",
+          completed_at: completedAt.toISOString(),
+          duration_seconds: durationSeconds,
+        })
+        .eq("id", sessionId),
+      // Pull this session's completed sets, joined to exercise name.
+      supabase
+        .from("set_logs")
+        .select("weight, reps, status, session_exercises!inner ( session_id, exercise_name )")
+        .eq("session_exercises.session_id", sessionId),
+      supabase.from("profiles").select("feed_broadcast_level").eq("id", session.athlete_id).maybeSingle(),
+    ]);
+    const broadcastLevel = athleteProfile?.feed_broadcast_level ?? "full";
 
     const completedLogs = (currentSets ?? []).filter((s) => s.status === "completed");
     const totalVolume = completedLogs.reduce(
@@ -127,16 +134,10 @@ export function CompleteWorkoutButton({
       .select("id")
       .single();
 
-    // The athlete's own broadcast preference — captured onto the post
-    // itself (not just read live) so the card renders consistently even
+    // The athlete's own broadcast preference (fetched above, in parallel
+    // with the session update and set pull) is captured onto the post
+    // itself — not just read live — so the card renders consistently even
     // if they change this setting later.
-    const { data: athleteProfile } = await supabase
-      .from("profiles")
-      .select("feed_broadcast_level")
-      .eq("id", session.athlete_id)
-      .maybeSingle();
-    const broadcastLevel = athleteProfile?.feed_broadcast_level ?? "full";
-
     const shouldPost =
       broadcastLevel !== "private" && !(broadcastLevel === "prs_only" && newPrs.length === 0);
     // A "checkin only" post never reveals PR content, so it never belongs

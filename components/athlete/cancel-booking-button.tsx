@@ -4,13 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 
-export function CancelBookingButton({
-  bookingId,
-  groupId,
-}: {
-  bookingId: string;
-  groupId: string;
-}) {
+export function CancelBookingButton({ bookingId }: { bookingId: string }) {
   const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
 
@@ -18,23 +12,13 @@ export function CancelBookingButton({
     setSubmitting(true);
     const supabase = createBrowserClient();
 
-    const { data: booking } = await supabase
-      .from("bookings")
-      .select("athlete_id")
-      .eq("id", bookingId)
-      .single();
-
-    await supabase.from("bookings").update({ status: "cancelled" }).eq("id", bookingId);
-
-    if (booking) {
-      // Atomic DB-side increment — see book-slot-button.tsx for why this
-      // isn't a read-then-write anymore.
-      await supabase.rpc("adjust_session_credits", {
-        p_athlete_id: booking.athlete_id,
-        p_group_id: groupId,
-        p_delta: 1,
-      });
-    }
+    // One atomic, self-verifying RPC — checks server-side that a real
+    // 'confirmed' booking belonging to this athlete (or their coach)
+    // actually exists before flipping it to cancelled and refunding a
+    // credit, rather than two separate client-driven steps (which used
+    // to let adjust_session_credits be called with a bare +1 and no real
+    // cancellation behind it at all).
+    await supabase.rpc("cancel_booking_and_refund_credit", { p_booking_id: bookingId });
 
     router.refresh();
   }

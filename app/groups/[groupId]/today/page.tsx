@@ -18,6 +18,14 @@ export default async function TodayPage({
     redirect("/login");
   }
 
+  const { data: membership } = await supabase
+    .from("group_memberships")
+    .select("role")
+    .eq("group_id", params.groupId)
+    .eq("profile_id", user.id)
+    .maybeSingle();
+  const isCoach = membership?.role === "coach";
+
   const result = await getTodaysWorkoutId(supabase, {
     groupId: params.groupId,
     athleteId: user.id,
@@ -30,6 +38,8 @@ export default async function TodayPage({
   const message =
     result.status === "locked"
       ? `Your next workout unlocks on ${formatShortDate(result.unlocksOn)}.`
+      : isCoach
+      ? "No active program in this group yet, or you've completed every workout in it — set one up from the Coach Dashboard."
       : "No program assigned yet, or you've completed every workout in it. Check with your coach.";
 
   return (

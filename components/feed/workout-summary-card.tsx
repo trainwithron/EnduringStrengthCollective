@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { FeedPost } from "@/lib/types";
 import { ReactionButton } from "./reaction-button";
 import { CommentPreview } from "./comment-preview";
+import { InlineCommentSection } from "./inline-comment-section";
 import { CoachLoggedBadge } from "@/components/coach-logged-badge";
 import { ShareWorkoutButton } from "@/components/share/share-workout-button";
 import { PinPostButton } from "./pin-post-button";
@@ -19,6 +20,7 @@ export function WorkoutSummaryCard({
   isCoach: boolean;
 }) {
   const [celebrate, setCelebrate] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
   const broadcastLevel = post.workoutSummary?.broadcastLevel ?? "full";
   // A "check-in only" post never reveals PR content, even when one
   // genuinely happened — the whole point is the lightweight badge.
@@ -113,8 +115,15 @@ export function WorkoutSummaryCard({
           initialReacted={post.viewerHasReacted}
           viewerId={viewerId}
         />
-        <CommentPreview postId={post.id} commentCount={post.commentCount} />
+        <CommentPreview
+          commentCount={post.commentCount}
+          open={commentsOpen}
+          onToggle={() => setCommentsOpen((o) => !o)}
+        />
       </div>
+      {commentsOpen && (
+        <InlineCommentSection postId={post.id} viewerId={viewerId} isCoach={isCoach} />
+      )}
     </article>
   );
 }

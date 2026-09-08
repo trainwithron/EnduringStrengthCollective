@@ -151,7 +151,7 @@ export default async function CoachDayDetailPage({
                     <span className="font-body text-xs text-steel">
                       Booked — {(booking.profiles as any)?.full_name ?? "Client"}
                     </span>
-                    <CancelBookingButton bookingId={booking.id} groupId={params.groupId} />
+                    <CancelBookingButton bookingId={booking.id} />
                   </div>
                 ) : selectedClient ? (
                   selectedClient.balance > 0 ? (

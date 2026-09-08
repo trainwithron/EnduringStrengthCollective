@@ -170,6 +170,9 @@ export function DuplicateWeekPanel({
     }
 
     const supabase = createBrowserClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     const generatedDays: BuilderDay[] = [];
 
     for (let offset = 0; offset < weekCount; offset++) {
@@ -192,9 +195,19 @@ export function DuplicateWeekPanel({
         const items: BuilderItem[] = [];
 
         for (const note of dayNoteTracks.filter((n) => n.dayIndex === day.dayIndex)) {
+          // group_id and created_by are NOT NULL with no default — omitting
+          // them (as this insert used to) fails silently here since the
+          // result is only used via an `if (noteRow)` check, quietly
+          // dropping every note a duplicated week was supposed to carry.
           const { data: noteRow } = await supabase
             .from("workout_notes")
-            .insert({ workout_id: workoutRow.id, body: note.body, position: note.itemOrder })
+            .insert({
+              workout_id: workoutRow.id,
+              group_id: groupId,
+              body: note.body,
+              position: note.itemOrder,
+              created_by: user?.id,
+            })
             .select("id, body, position")
             .single();
           if (noteRow) {

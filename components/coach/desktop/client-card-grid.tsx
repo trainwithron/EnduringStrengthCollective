@@ -76,6 +76,16 @@ export function ClientCardGrid({
     setSize(readCardSize(STORAGE_KEY));
   }, []);
 
+  // useState(members) only seeds from the prop on first mount — a newly
+  // added client (Add Client, an invite redeemed, etc.) updates the
+  // server data and this component's own `members` prop via
+  // router.refresh(), but without this, the already-mounted grid keeps
+  // showing its original snapshot until a full page reload. Same class
+  // of bug as FeedList's stale-channel fix earlier this session.
+  useEffect(() => {
+    setRows(members);
+  }, [members]);
+
   function handleSizeChange(next: CardSize) {
     setSize(next);
     writeCardSize(STORAGE_KEY, next);

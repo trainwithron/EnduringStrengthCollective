@@ -13,6 +13,7 @@ import {
   type Phase,
   type MacroTargets,
   type GeneratedMeal,
+  type MealOption,
   type Recipe,
 } from "@/lib/meal-engine";
 import { fetchCustomRecipes } from "@/lib/custom-recipes";
@@ -104,6 +105,11 @@ export function MealPlanGenerator({
   const [flexTreatText, setFlexTreatText] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // "Suggest with AI" — one extra option per meal slot from the AI meal
+  // planner, additive alongside the deterministic engine's own options.
+  const [aiSuggesting, setAiSuggesting] = useState<Record<string, boolean>>({});
+  const [aiError, setAiError] = useState<Record<string, string | null>>({});
 
   // Per-meal-slot "assign this recipe to specific days this week" picker
   // — independent of the full-day Save button below.
@@ -388,6 +394,51 @@ export function MealPlanGenerator({
     router.refresh();
   }
 
+  async function handleAiSuggest(meal: GeneratedMeal) {
+    if (aiSuggesting[meal.spec.id]) return;
+    setAiSuggesting((prev) => ({ ...prev, [meal.spec.id]: true }));
+    setAiError((prev) => ({ ...prev, [meal.spec.id]: null }));
+
+    try {
+      const res = await fetch("/api/ai/generate-meal-plan", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          mealSlot: meal.spec.slot,
+          proteinTarget: meal.spec.proteinTarget,
+          carbsTarget: meal.spec.carbsTarget,
+          fatTarget: meal.spec.fatTarget,
+          archetype,
+          dietaryRestrictions,
+          favoriteFoods,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Couldn't get an AI suggestion.");
+
+      const newOption: MealOption = {
+        recipeId: `ai-${Date.now()}`,
+        recipeName: data.recipeName,
+        ingredients: data.ingredients,
+        isAi: true,
+      };
+      setMealsByView((prev) => {
+        const updated = prev[dayView].map((m) =>
+          m.spec.id === meal.spec.id ? { ...m, options: [...m.options, newOption] } : m
+        );
+        return { ...prev, [dayView]: updated };
+      });
+      setSelections((prev) => ({ ...prev, [meal.spec.id]: meal.options.length }));
+    } catch (err) {
+      setAiError((prev) => ({
+        ...prev,
+        [meal.spec.id]: err instanceof Error ? err.message : "Couldn't get an AI suggestion.",
+      }));
+    } finally {
+      setAiSuggesting((prev) => ({ ...prev, [meal.spec.id]: false }));
+    }
+  }
+
   const macros = activeMacros();
   const meals = mealsByView[dayView];
 
@@ -660,19 +711,52 @@ export function MealPlanGenerator({
                         <div className="flex items-center gap-2 mb-1.5">
                           <input type="radio" checked={idx === selIdx} readOnly className="w-4 h-4" />
                           <span className="font-body text-sm font-medium flex-1">{opt.recipeName}</span>
+                          {opt.isAi && (
+                            <span className="font-body text-[9px] uppercase tracking-wide text-rust border border-rust/40 px-1.5 py-0.5">
+                              AI
+                            </span>
+                          )}
                           <RecipeVoteFavorite recipeId={opt.recipeId} />
                         </div>
                         <ul className="space-y-0.5 pl-6">
-                          {opt.ingredients.map((ing, i) => (
-                            // Ingredient lines carry <strong> tags from the
-                            // recipe database itself (fixed, coach-owned
-                            // content, not user input) — same as the source
-                            // tool's rendering.
-                            <li key={i} className="font-body text-xs text-steel" dangerouslySetInnerHTML={{ __html: `• ${ing}` }} />
-                          ))}
+                          {opt.isAi
+                            ? opt.ingredients.map((ing, i) => (
+                                // AI-generated text, not the fixed recipe database —
+                                // rendered as plain text, never dangerouslySetInnerHTML.
+                                <li key={i} className="font-body text-xs text-steel">
+                                  • {ing}
+                                </li>
+                              ))
+                            : opt.ingredients.map((ing, i) => (
+                                // Ingredient lines carry <strong> tags from the
+                                // recipe database itself (fixed, coach-owned
+                                // content, not user input) — same as the source
+                                // tool's rendering.
+                                <li
+                                  key={i}
+                                  className="font-body text-xs text-steel"
+                                  dangerouslySetInnerHTML={{ __html: `• ${ing}` }}
+                                />
+                              ))}
                         </ul>
                       </label>
                     ))}
+                  </div>
+
+                  <div className="mt-2 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleAiSuggest(meal)}
+                      disabled={aiSuggesting[meal.spec.id]}
+                      className="h-7 px-3 font-body text-[11px] border border-rust/40 text-rust disabled:opacity-40"
+                    >
+                      {aiSuggesting[meal.spec.id] ? "Asking AI…" : "Suggest with AI"}
+                    </button>
+                    {aiError[meal.spec.id] && (
+                      <p className="font-body text-[10px] text-rust" role="alert">
+                        {aiError[meal.spec.id]}
+                      </p>
+                    )}
                   </div>
 
                   <div className="mt-2.5 pt-2.5 border-t border-steel/10">

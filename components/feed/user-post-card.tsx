@@ -1,6 +1,8 @@
+import { useState } from "react";
 import type { FeedPost } from "@/lib/types";
 import { ReactionButton } from "./reaction-button";
 import { CommentPreview } from "./comment-preview";
+import { InlineCommentSection } from "./inline-comment-section";
 import { PinPostButton } from "./pin-post-button";
 import { Pin } from "lucide-react";
 
@@ -13,6 +15,7 @@ export function UserPostCard({
   viewerId: string | null;
   isCoach: boolean;
 }) {
+  const [commentsOpen, setCommentsOpen] = useState(false);
   const initials = post.author.fullName
     .split(" ")
     .map((p) => p[0])
@@ -75,8 +78,15 @@ export function UserPostCard({
           initialReacted={post.viewerHasReacted}
           viewerId={viewerId}
         />
-        <CommentPreview postId={post.id} commentCount={post.commentCount} />
+        <CommentPreview
+          commentCount={post.commentCount}
+          open={commentsOpen}
+          onToggle={() => setCommentsOpen((o) => !o)}
+        />
       </div>
+      {commentsOpen && (
+        <InlineCommentSection postId={post.id} viewerId={viewerId} isCoach={isCoach} />
+      )}
     </article>
   );
 }

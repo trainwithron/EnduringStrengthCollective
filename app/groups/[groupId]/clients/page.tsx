@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ClientCardGrid } from "@/components/coach/desktop/client-card-grid";
 import { InviteAthleteButton } from "@/components/group/invite-athlete-button";
+import { AddClientButton } from "@/components/coach/desktop/add-client-button";
 import type { RosterMember } from "@/lib/types";
 
 export default async function ClientsPage({
@@ -99,7 +100,10 @@ export default async function ClientsPage({
             {athletes.length} {athletes.length === 1 ? "client" : "clients"}
           </p>
         </div>
-        <InviteAthleteButton groupId={params.groupId} createdBy={user.id} />
+        <div className="flex items-center gap-3">
+          <AddClientButton groupId={params.groupId} />
+          <InviteAthleteButton groupId={params.groupId} createdBy={user.id} />
+        </div>
       </div>
 
       {coaches.length > 0 && (

@@ -5,7 +5,7 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ChallengeCreator } from "@/components/coach/desktop/challenge-creator";
 import { estimatedRevenueCents, formatCents } from "@/lib/challenges";
-import { isPwaStandalone } from "@/lib/pwa-server";
+import { prefersAthleteStyleView } from "@/lib/pwa-server";
 
 export default async function ChallengesPage({
   params,
@@ -37,7 +37,7 @@ export default async function ChallengesPage({
   }
 
   const isCoach = membership.role === "coach";
-  const showMobileView = !isCoach || isPwaStandalone();
+  const showMobileView = !isCoach || prefersAthleteStyleView();
 
   if (isCoach && !showMobileView) {
     const { data: group } = await supabase
@@ -173,7 +173,7 @@ export default async function ChallengesPage({
         )}
       </section>
 
-      <BottomTabBar groupId={params.groupId} activeOverride="feed" />
+      <BottomTabBar groupId={params.groupId} activeOverride="settings" />
     </main>
   );
 }

@@ -6,7 +6,7 @@ import { CalendarPageTabs } from "@/components/coach/desktop/calendar-page-tabs"
 import { CalendarGrid, type CalendarEventEntry } from "@/components/coach/desktop/calendar-grid";
 import { CalendarClientList } from "@/components/coach/desktop/calendar-client-list";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
-import { isPwaStandalone } from "@/lib/pwa-server";
+import { prefersAthleteStyleView } from "@/lib/pwa-server";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
@@ -70,15 +70,33 @@ export default async function CoachCalendarPage({
   // doesn't need the full booking/scheduling dashboard built for running
   // a business. The same coach in a plain browser tab still gets the
   // full desktop calendar below.
-  const showMobileView = !isCoach || isPwaStandalone();
+  const showMobileView = !isCoach || prefersAthleteStyleView();
 
   if (showMobileView) {
-    const { data: program } = await supabase
+    // A personal program assigned to this athlete wins over the group's
+    // shared one — same precedence as lib/todays-workout.ts. Two queries,
+    // not one `athlete_id = X or athlete_id is null` filter, since both
+    // could be simultaneously active and .maybeSingle() would error on
+    // more than one row.
+    const { data: personalProgram } = await supabase
       .from("programs")
       .select("id")
       .eq("group_id", params.groupId)
+      .eq("athlete_id", user.id)
       .eq("is_active", true)
       .maybeSingle();
+
+    const { data: sharedProgram } = personalProgram
+      ? { data: null }
+      : await supabase
+          .from("programs")
+          .select("id")
+          .eq("group_id", params.groupId)
+          .is("athlete_id", null)
+          .eq("is_active", true)
+          .maybeSingle();
+
+    const program = personalProgram ?? sharedProgram;
 
     if (program) {
       redirect(`/groups/${params.groupId}/programs/${program.id}/calendar`);

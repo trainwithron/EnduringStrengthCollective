@@ -1146,6 +1146,9 @@ export interface MealOption {
   recipeId: string;
   recipeName: string;
   ingredients: string[]; // HTML strings, same as the source (bold tags around quantities)
+  // Set on AI-generated suggestions only. Their ingredients are plain text,
+  // not HTML — callers must render them without dangerouslySetInnerHTML.
+  isAi?: boolean;
 }
 
 export interface GeneratedMeal {

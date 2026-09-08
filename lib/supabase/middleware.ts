@@ -39,7 +39,13 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/login") ||
     pathname.startsWith("/invite/") ||
     pathname.startsWith("/pr/") ||
-    pathname.startsWith("/share/");
+    pathname.startsWith("/share/") ||
+    // An invite email's link establishes a real session client-side, from
+    // the URL fragment — the initial server-rendered request has no
+    // session cookie yet, same gotcha already hit once for /pr/ and
+    // /share/.
+    pathname.startsWith("/set-password") ||
+    pathname.startsWith("/forgot-password");
 
   if (!user && !isPublicPath) {
     const redirectUrl = new URL("/login", request.url);

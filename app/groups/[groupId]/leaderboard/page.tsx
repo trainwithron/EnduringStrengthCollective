@@ -4,7 +4,7 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { GroupLeaderboardTabs } from "@/components/leaderboard/group-leaderboard-tabs";
 import { rankLeaderboard, type LeaderboardEntry } from "@/lib/leaderboard";
-import { isPwaStandalone } from "@/lib/pwa-server";
+import { prefersAthleteStyleView } from "@/lib/pwa-server";
 
 export default async function GroupLeaderboardPage({
   params,
@@ -35,7 +35,7 @@ export default async function GroupLeaderboardPage({
     );
   }
   const isCoach = membership.role === "coach";
-  const showMobileView = !isCoach || isPwaStandalone();
+  const showMobileView = !isCoach || prefersAthleteStyleView();
 
   // This group's logged activity only — each group's leaderboard is
   // entirely its own, scoped by group_id like everything else here.
@@ -111,7 +111,7 @@ export default async function GroupLeaderboardPage({
           viewerId={user.id}
         />
       </section>
-      <BottomTabBar groupId={params.groupId} activeOverride="feed" />
+      <BottomTabBar groupId={params.groupId} activeOverride="settings" />
     </main>
   );
 }

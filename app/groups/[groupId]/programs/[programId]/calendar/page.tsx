@@ -4,6 +4,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { computeScheduledDates, isSameDay, isLocked } from "@/lib/program-schedule";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
+import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { Lock } from "lucide-react";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
@@ -21,12 +22,25 @@ function monthLabel(year: number, monthIndex: number): string {
   });
 }
 
+function weekLabel(weekStart: Date, weekEnd: Date): string {
+  const startStr = weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const endStr = weekEnd.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  return `${startStr} – ${endStr}`;
+}
+
+function parseDateParam(value: string | undefined, fallback: Date): Date {
+  if (value && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return new Date(`${value}T00:00:00`);
+  }
+  return fallback;
+}
+
 export default async function ProgramCalendarPage({
   params,
   searchParams,
 }: {
   params: { groupId: string; programId: string };
-  searchParams: { month?: string };
+  searchParams: { month?: string; view?: string; week?: string };
 }) {
   const supabase = createServerClient();
   const {
@@ -53,6 +67,11 @@ export default async function ProgramCalendarPage({
       </main>
     );
   }
+
+  // A coach on a phone tracks their own completions here too, same as an
+  // athlete — booking (which is a client booking *with* their coach)
+  // stays athlete-only below, that part genuinely doesn't apply to them.
+  const showMobileView = membership.role === "athlete" || prefersAthleteStyleView();
 
   const { data: program } = await supabase
     .from("programs")
@@ -87,7 +106,7 @@ export default async function ProgramCalendarPage({
         <p className="font-body text-sm text-steel px-5 py-6 max-w-[50ch]">
           Set a start date and training days on this program to see it as a calendar.
         </p>
-        {membership.role === "athlete" && (
+        {showMobileView && (
           <BottomTabBar groupId={params.groupId} activeOverride="calendar" />
         )}
       </main>
@@ -108,7 +127,7 @@ export default async function ProgramCalendarPage({
   );
 
   let loggedIds = new Set<string>();
-  if (membership.role === "athlete") {
+  if (showMobileView) {
     const { data: logs } = await supabase
       .from("workout_logs")
       .select("workout_id")
@@ -159,6 +178,7 @@ export default async function ProgramCalendarPage({
   }
 
   const today = new Date();
+  const view = searchParams.view === "week" ? "week" : "month";
   const monthParam = searchParams.month; // "YYYY-MM"
   let year = today.getFullYear();
   let monthIndex = today.getMonth();
@@ -185,6 +205,28 @@ export default async function ProgramCalendarPage({
   const nextHref = `${backHref}/calendar?month=${nextMonth.getFullYear()}-${String(
     nextMonth.getMonth() + 1
   ).padStart(2, "0")}`;
+
+  // Week view is keyed off its own anchor date, independent of the month
+  // grid's year/monthIndex — a visible week routinely spans a month
+  // boundary, so it gets its own date range rather than reusing the
+  // month's.
+  const weekAnchor = parseDateParam(searchParams.week, today);
+  const weekStart = new Date(weekAnchor);
+  weekStart.setDate(weekAnchor.getDate() - weekAnchor.getDay());
+  weekStart.setHours(0, 0, 0, 0);
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekStart);
+    d.setDate(weekStart.getDate() + i);
+    return d;
+  });
+  const prevWeek = new Date(weekStart);
+  prevWeek.setDate(weekStart.getDate() - 7);
+  const nextWeek = new Date(weekStart);
+  nextWeek.setDate(weekStart.getDate() + 7);
+  const prevWeekHref = `${backHref}/calendar?view=week&week=${dateKey(prevWeek)}`;
+  const nextWeekHref = `${backHref}/calendar?view=week&week=${dateKey(nextWeek)}`;
+  const monthViewHref = `${backHref}/calendar?month=${year}-${String(monthIndex + 1).padStart(2, "0")}`;
+  const weekViewHref = `${backHref}/calendar?view=week&week=${dateKey(weekStart)}`;
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
@@ -216,7 +258,7 @@ export default async function ProgramCalendarPage({
                     &middot;{" "}
                     {start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
                   </span>
-                  <CancelBookingButton bookingId={b.id} groupId={params.groupId} />
+                  <CancelBookingButton bookingId={b.id} />
                 </div>
               );
             })}
@@ -224,106 +266,214 @@ export default async function ProgramCalendarPage({
         </section>
       )}
 
-      <div className="flex items-center justify-between px-5 pt-6">
-        <Link href={prevHref} className="font-body text-xs text-rust uppercase tracking-wide">
-          &larr; Prev
+      <div className="flex items-center gap-1 px-5 pt-6">
+        <Link
+          href={monthViewHref}
+          className={`h-8 px-3 flex items-center font-body text-xs border ${
+            view === "month"
+              ? "bg-rust text-graphite border-rust"
+              : "border-steel/30 text-steel active:border-rust active:text-rust"
+          }`}
+        >
+          Month
         </Link>
-        <h2 className="font-display uppercase text-sm tracking-wide text-steel">
-          {monthLabel(year, monthIndex)}
-        </h2>
-        <Link href={nextHref} className="font-body text-xs text-rust uppercase tracking-wide">
-          Next &rarr;
+        <Link
+          href={weekViewHref}
+          className={`h-8 px-3 flex items-center font-body text-xs border ${
+            view === "week"
+              ? "bg-rust text-graphite border-rust"
+              : "border-steel/30 text-steel active:border-rust active:text-rust"
+          }`}
+        >
+          Week
         </Link>
       </div>
 
-      <div className="grid grid-cols-7 gap-px bg-steel/15 mt-4 mx-5 border border-steel/15">
-        {WEEKDAY_LABELS.map((label) => (
-          <div
-            key={label}
-            className="bg-graphite text-center font-body text-[10px] text-steel uppercase tracking-wide py-1.5"
-          >
-            {label}
+      {view === "month" ? (
+        <>
+          <div className="flex items-center justify-between px-5 pt-4">
+            <Link href={prevHref} className="font-body text-xs text-rust uppercase tracking-wide">
+              &larr; Prev
+            </Link>
+            <h2 className="font-display uppercase text-sm tracking-wide text-steel">
+              {monthLabel(year, monthIndex)}
+            </h2>
+            <Link href={nextHref} className="font-body text-xs text-rust uppercase tracking-wide">
+              Next &rarr;
+            </Link>
           </div>
-        ))}
 
-        {cells.map((date, i) => {
-          if (!date) return <div key={i} className="bg-graphite min-h-[64px]" />;
-
-          const w = workoutByDateKey.get(dateKey(date));
-          const isToday = isSameDay(date, today);
-          const done = w ? loggedIds.has(w.id) : false;
-          const locked =
-            membership.role === "athlete" && w
-              ? isLocked(date, today, program.visibility_window) && !done
-              : false;
-          const exerciseCount = w ? (w.group_workout_exercises?.[0]?.count ?? 0) : 0;
-
-          const cellContent = (
-            <>
-              <span
-                className={`font-body text-[10px] ${
-                  isToday ? "text-rust font-bold" : "text-steel"
-                }`}
+          <div className="grid grid-cols-7 gap-px bg-steel/15 mt-4 mx-5 border border-steel/15">
+            {WEEKDAY_LABELS.map((label) => (
+              <div
+                key={label}
+                className="bg-graphite text-center font-body text-[10px] text-steel uppercase tracking-wide py-1.5"
               >
-                {date.getDate()}
-              </span>
-              {w && (
-                <span
-                  className={`font-body text-[10px] leading-tight mt-0.5 ${
-                    locked ? "text-steel flex items-center gap-0.5" : "text-chalk"
-                  }`}
-                >
-                  {locked && <Lock className="w-2.5 h-2.5 shrink-0" />}
-                  {w.title}
-                </span>
-              )}
-              {w && done && (
-                <span className="font-body text-[9px] text-positive mt-0.5">Done</span>
-              )}
-            </>
-          );
+                {label}
+              </div>
+            ))}
 
-          const cellClass = `bg-graphite min-h-[64px] p-1.5 flex flex-col ${
-            isToday ? "ring-1 ring-inset ring-rust" : ""
-          }`;
+            {cells.map((date, i) => {
+              if (!date) return <div key={i} className="bg-graphite min-h-[64px]" />;
 
-          if (w && !locked) {
-            return (
-              <Link
-                key={i}
-                href={`/groups/${params.groupId}/workouts/${w.id}`}
-                className={cellClass}
-              >
-                {cellContent}
-              </Link>
-            );
-          }
+              const w = workoutByDateKey.get(dateKey(date));
+              const isToday = isSameDay(date, today);
+              const done = w ? loggedIds.has(w.id) : false;
+              const locked =
+                membership.role === "athlete" && w
+                  ? isLocked(date, today, program.visibility_window) && !done
+                  : false;
 
-          if (!w && hasAvailability) {
-            return (
-              <Link
-                key={i}
-                href={`${backHref}/calendar/${dateKey(date)}`}
-                className={cellClass}
-              >
-                {cellContent}
-              </Link>
-            );
-          }
+              const cellContent = (
+                <>
+                  <span
+                    className={`font-body text-[10px] ${
+                      isToday ? "text-rust font-bold" : "text-steel"
+                    }`}
+                  >
+                    {date.getDate()}
+                  </span>
+                  {w && (
+                    <span
+                      className={`font-body text-[10px] leading-tight mt-0.5 ${
+                        locked ? "text-steel flex items-center gap-0.5" : "text-chalk"
+                      }`}
+                    >
+                      {locked && <Lock className="w-2.5 h-2.5 shrink-0" />}
+                      {w.title}
+                    </span>
+                  )}
+                  {w && done && (
+                    <span className="font-body text-[9px] text-positive mt-0.5">Done</span>
+                  )}
+                </>
+              );
 
-          return (
-            <div key={i} className={cellClass}>
-              {cellContent}
-            </div>
-          );
-        })}
-      </div>
+              const cellClass = `bg-graphite min-h-[64px] p-1.5 flex flex-col ${
+                isToday ? "ring-1 ring-inset ring-rust" : ""
+              }`;
+
+              if (w && !locked) {
+                return (
+                  <Link
+                    key={i}
+                    href={`/groups/${params.groupId}/workouts/${w.id}`}
+                    className={cellClass}
+                  >
+                    {cellContent}
+                  </Link>
+                );
+              }
+
+              if (!w && hasAvailability) {
+                return (
+                  <Link
+                    key={i}
+                    href={`${backHref}/calendar/${dateKey(date)}`}
+                    className={cellClass}
+                  >
+                    {cellContent}
+                  </Link>
+                );
+              }
+
+              return (
+                <div key={i} className={cellClass}>
+                  {cellContent}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="flex items-center justify-between px-5 pt-4">
+            <Link href={prevWeekHref} className="font-body text-xs text-rust uppercase tracking-wide">
+              &larr; Prev
+            </Link>
+            <h2 className="font-display uppercase text-sm tracking-wide text-steel">
+              {weekLabel(weekStart, weekDays[6])}
+            </h2>
+            <Link href={nextWeekHref} className="font-body text-xs text-rust uppercase tracking-wide">
+              Next &rarr;
+            </Link>
+          </div>
+
+          {/* A week fits far better as a vertical day list on a phone than
+              squeezed into seven narrow grid columns — same data, no
+              horizontal cramping. */}
+          <div className="mt-4 mx-5 divide-y divide-steel/15 border-y border-steel/15">
+            {weekDays.map((date, i) => {
+              const w = workoutByDateKey.get(dateKey(date));
+              const isToday = isSameDay(date, today);
+              const done = w ? loggedIds.has(w.id) : false;
+              const locked =
+                membership.role === "athlete" && w
+                  ? isLocked(date, today, program.visibility_window) && !done
+                  : false;
+              const exerciseCount = w ? (w.group_workout_exercises?.[0]?.count ?? 0) : 0;
+
+              const rowInner = (
+                <>
+                  <div className={`w-11 shrink-0 text-center ${isToday ? "text-rust" : "text-steel"}`}>
+                    <p className="font-body text-[10px] uppercase tracking-wide">{WEEKDAY_LABELS[i]}</p>
+                    <p className="font-display font-bold text-lg leading-none">{date.getDate()}</p>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    {w ? (
+                      <>
+                        <p className="font-body text-sm font-medium flex items-center gap-1.5">
+                          {locked && <Lock className="w-3 h-3 shrink-0 text-steel" />}
+                          {w.title}
+                        </p>
+                        <p className="font-body text-xs text-steel mt-0.5">
+                          {done ? (
+                            <span className="text-positive">Done</span>
+                          ) : locked ? (
+                            "Locked"
+                          ) : (
+                            `${exerciseCount} ${exerciseCount === 1 ? "exercise" : "exercises"}`
+                          )}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="font-body text-xs text-steel">Rest day</p>
+                    )}
+                  </div>
+                </>
+              );
+
+              const rowClass = `flex items-center gap-3 py-3 ${isToday ? "bg-surface/40" : ""}`;
+
+              if (w && !locked) {
+                return (
+                  <Link key={i} href={`/groups/${params.groupId}/workouts/${w.id}`} className={rowClass}>
+                    {rowInner}
+                  </Link>
+                );
+              }
+              if (!w && hasAvailability) {
+                return (
+                  <Link key={i} href={`${backHref}/calendar/${dateKey(date)}`} className={rowClass}>
+                    {rowInner}
+                  </Link>
+                );
+              }
+              return (
+                <div key={i} className={rowClass}>
+                  {rowInner}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {workouts?.length === 0 && (
         <p className="font-body text-sm text-steel px-5 pt-6">No workouts assigned yet.</p>
       )}
 
-      {membership.role === "athlete" && (
+      {showMobileView && (
         <BottomTabBar groupId={params.groupId} activeOverride="calendar" />
       )}
     </main>

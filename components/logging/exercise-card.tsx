@@ -25,6 +25,7 @@ export function ExerciseCard({
   const [swapping, setSwapping] = useState(false);
   const [nameDraft, setNameDraft] = useState(exercise.exerciseName);
   const [swapBusy, setSwapBusy] = useState(false);
+  const [swapError, setSwapError] = useState<string | null>(null);
   // Guards handleAddSet against a real race: it computes set_order off the
   // `exercise.sets` closure, stale until the parent re-renders with the new
   // array. A fast double-tap on "+ set" mid-workout would otherwise insert
@@ -38,15 +39,23 @@ export function ExerciseCard({
       return;
     }
     setSwapBusy(true);
+    setSwapError(null);
     const supabase = createBrowserClient();
-    await supabase
+    const { error } = await supabase
       .from("session_exercises")
       .update({ exercise_name: name, is_swapped: true })
       .eq("id", exercise.id);
 
+    setSwapBusy(false);
+    // Only reflect the swap in the UI once it's actually saved — otherwise
+    // a failed write would show the new exercise name while the database
+    // still has the old one, with no way to tell the two apart.
+    if (error) {
+      setSwapError("Couldn't swap — check your connection and try again.");
+      return;
+    }
     onRenamed(name);
     setSwapping(false);
-    setSwapBusy(false);
   }
 
   async function handleAddSet() {
@@ -87,21 +96,30 @@ export function ExerciseCard({
     <div>
       <div className="flex items-center justify-between gap-3 mb-1">
         {swapping ? (
-          <div className="flex-1 flex items-center gap-2">
-            <input
-              type="text"
-              autoFocus
-              value={nameDraft}
-              onChange={(e) => setNameDraft(e.target.value)}
-              className="flex-1 h-9 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust"
-            />
-            <button
-              type="button"
-              onClick={() => applySwap(nameDraft.trim())}
-              className="font-body text-xs text-rust"
-            >
-              Save
-            </button>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                autoFocus
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                disabled={swapBusy}
+                className="flex-1 h-9 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust disabled:opacity-60"
+              />
+              <button
+                type="button"
+                onClick={() => applySwap(nameDraft.trim())}
+                disabled={swapBusy}
+                className="font-body text-xs text-rust disabled:opacity-40"
+              >
+                {swapBusy ? "Saving…" : "Save"}
+              </button>
+            </div>
+            {swapError && (
+              <p className="font-body text-xs text-rust mt-1" role="alert">
+                {swapError}
+              </p>
+            )}
           </div>
         ) : (
           <>

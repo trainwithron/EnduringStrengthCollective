@@ -4,7 +4,12 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { detectColumns, parseImportRows, groupIntoWeeks } from "@/lib/workout-import-parser";
+import {
+  detectColumns,
+  parseImportRows,
+  groupIntoWeeks,
+  type ParsedImportRow,
+} from "@/lib/workout-import-parser";
 import {
   matchExercise,
   normalizeName,
@@ -14,6 +19,20 @@ import {
 import { DEFAULT_TRACKED_FIELDS, type TrackedField } from "@/lib/exercise-fields";
 
 type Status = "idle" | "working" | "done" | "error";
+
+// Strips the "data:image/jpeg;base64," prefix FileReader adds — Claude's
+// API wants the raw base64 payload with the media type sent separately.
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.slice(result.indexOf(",") + 1));
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
 
 interface FuzzyMatch {
   rawName: string;
@@ -95,6 +114,14 @@ export function ImportWizard({
       return;
     }
 
+    await commitParsedRows(parsed, file.name.replace(/\.(csv|xlsx|xls)$/i, ""), `Imported from ${file.name}`);
+  }
+
+  // Shared by the spreadsheet path above and the AI photo/PDF path below —
+  // once either one has produced ParsedImportRow[], everything downstream
+  // (fuzzy exercise matching, library growth, program/workout creation) is
+  // identical regardless of where the rows came from.
+  async function commitParsedRows(parsed: ParsedImportRow[], programName: string, description: string) {
     setStatusLabel("Matching exercises…");
 
     const library = [...initialLibrary];
@@ -166,14 +193,13 @@ export function ImportWizard({
 
     setStatusLabel("Creating program…");
 
-    const programName = file.name.replace(/\.(csv|xlsx|xls)$/i, "");
     const { data: programRow, error: programError } = await supabase
       .from("programs")
       .insert({
         group_id: groupId,
         created_by: coachId,
         name: programName || "Imported Program",
-        description: `Imported from ${file.name}`,
+        description,
         is_active: false,
       })
       .select("id")
@@ -247,6 +273,41 @@ export function ImportWizard({
     setStatus("done");
     processingRef.current = false;
     router.refresh();
+  }
+
+  async function handleAiPhotoUpload(file: File) {
+    if (processingRef.current) return;
+    processingRef.current = true;
+    setStatus("working");
+    setError(null);
+    setStatusLabel("Reading the photo with AI…");
+
+    try {
+      const base64 = await fileToBase64(file);
+      const res = await fetch("/api/ai/parse-workout", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ imageBase64: base64, mediaType: file.type }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setStatus("error");
+        setError(data.error ?? "Couldn't read that image — try again.");
+        processingRef.current = false;
+        return;
+      }
+
+      await commitParsedRows(
+        data.rows,
+        file.name.replace(/\.\w+$/, ""),
+        `Imported from a photo (AI) — ${file.name}`
+      );
+    } catch (err) {
+      setStatus("error");
+      setError(err instanceof Error ? err.message : "Couldn't read that image — try again.");
+      processingRef.current = false;
+    }
   }
 
   if (status === "done" && summary && doneHref) {
@@ -331,6 +392,25 @@ export function ImportWizard({
             {error}
           </p>
         )}
+      </div>
+
+      <div className="border border-steel/20 bg-surface/40 p-6">
+        <p className="font-body text-sm text-steel mb-4">
+          Or upload a photo or screenshot of a program — from another app, a spreadsheet, or a
+          handwritten sheet — and AI will read it into the same review pipeline as above. Convert a
+          PDF page to an image first (a screenshot works fine).
+        </p>
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif"
+          disabled={status === "working"}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (file) handleAiPhotoUpload(file);
+          }}
+          className="font-body text-sm text-chalk disabled:opacity-40"
+        />
       </div>
     </div>
   );

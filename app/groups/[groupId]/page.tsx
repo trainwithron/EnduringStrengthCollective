@@ -6,7 +6,7 @@ import { WeightLogWidget } from "@/components/athlete/weight-log-widget";
 import { TodayWidget } from "@/components/athlete/today-widget";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { isHabitDueOn } from "@/lib/habits";
-import { isPwaStandalone } from "@/lib/pwa-server";
+import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import type { RosterMember } from "@/lib/types";
 
 export default async function GroupHubPage({
@@ -19,11 +19,45 @@ export default async function GroupHubPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: group, error: groupError } = await supabase
-    .from("groups")
-    .select("id, name, description")
-    .eq("id", params.groupId)
-    .single();
+  // These four only need params.groupId — none depends on another's
+  // result — so they fire as one round trip instead of four sequential
+  // ones. This is the athlete's landing page; every visit pays for this.
+  const [
+    { data: group, error: groupError },
+    { data: memberships },
+    { data: recentLogs },
+    { data: programs },
+  ] = await Promise.all([
+    supabase.from("groups").select("id, name, description").eq("id", params.groupId).single(),
+    // Roster with role + most recent completed workout timestamp.
+    supabase
+      .from("group_memberships")
+      .select(
+        `
+      role,
+      profiles ( id, full_name, avatar_url ),
+      profile_id,
+      client_tier
+    `
+      )
+      .eq("group_id", params.groupId),
+    supabase
+      .from("workout_logs")
+      .select("athlete_id, created_at")
+      .eq("group_id", params.groupId)
+      .order("created_at", { ascending: false }),
+    // Shared programs plus this viewer's own personal one — never a
+    // different client's personal program (RLS already blocks that at
+    // the database level; this filter keeps the query's own intent
+    // explicit rather than relying on RLS alone to silently drop rows).
+    supabase
+      .from("programs")
+      .select("id, name, is_active")
+      .eq("group_id", params.groupId)
+      .or(`athlete_id.is.null,athlete_id.eq.${user?.id ?? ""}`)
+      .order("is_active", { ascending: false })
+      .order("created_at", { ascending: false }),
+  ]);
 
   if (groupError || !group) {
     return (
@@ -34,25 +68,6 @@ export default async function GroupHubPage({
       </main>
     );
   }
-
-  // Roster with role + most recent completed workout timestamp.
-  const { data: memberships } = await supabase
-    .from("group_memberships")
-    .select(
-      `
-      role,
-      profiles ( id, full_name, avatar_url ),
-      profile_id,
-      client_tier
-    `
-    )
-    .eq("group_id", params.groupId);
-
-  const { data: recentLogs } = await supabase
-    .from("workout_logs")
-    .select("athlete_id, created_at")
-    .eq("group_id", params.groupId)
-    .order("created_at", { ascending: false });
 
   const lastLogByAthlete = new Map<string, string>();
   for (const log of recentLogs ?? []) {
@@ -76,19 +91,13 @@ export default async function GroupHubPage({
     return a.fullName.localeCompare(b.fullName);
   });
 
-  const { data: programs } = await supabase
-    .from("programs")
-    .select("id, name, is_active")
-    .eq("group_id", params.groupId)
-    .order("is_active", { ascending: false })
-    .order("created_at", { ascending: false });
-
   const isCoach = roster.some((m) => m.profileId === user?.id && m.role === "coach");
-  // A coach opening the installed home-screen app sees the same mobile
-  // experience an athlete gets — logging their own training doesn't need
-  // the desktop coaching tools. The same coach in a plain browser tab
-  // (isPwaStandalone false) still gets the desktop shell everywhere else.
-  const showMobileView = !isCoach || isPwaStandalone();
+  // A coach on a phone — installed app or just a browser tab — sees the
+  // same lightweight experience an athlete gets: logging their own
+  // training doesn't need the dense desktop coaching tools. The same
+  // coach at an actual desktop still gets the full shell (linked back to
+  // from Settings).
+  const showMobileView = !isCoach || prefersAthleteStyleView();
 
   let weightLogs: { id: string; loggedDate: string; weight: number }[] = [];
   let todayMacros: { calories: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null } | null = null;
@@ -99,44 +108,50 @@ export default async function GroupHubPage({
   const macrosEnabled = viewerTier !== "group";
 
   if (showMobileView && user) {
-    const { data: weightRows } = await supabase
-      .from("body_weight_logs")
-      .select("id, logged_date, weight")
-      .eq("athlete_id", user.id)
-      .eq("group_id", params.groupId)
-      .order("logged_date", { ascending: false })
-      .limit(7);
+    // weightLogs, macros, and this athlete's habit definitions are all
+    // independent of each other — only the habit *completion* lookup
+    // right after needs to wait (it needs the due habits' ids first).
+    const [{ data: weightRows }, macroResult, { data: habitRows }] = await Promise.all([
+      supabase
+        .from("body_weight_logs")
+        .select("id, logged_date, weight")
+        .eq("athlete_id", user.id)
+        .eq("group_id", params.groupId)
+        .order("logged_date", { ascending: false })
+        .limit(7),
+      // Group-tier clients don't get macro programming — skip the fetch
+      // entirely rather than fetch-and-hide, same as the coach-side pages.
+      macrosEnabled
+        ? supabase
+            .from("daily_macros")
+            .select("calories, protein_g, carbs_g, fat_g")
+            .eq("athlete_id", user.id)
+            .eq("log_date", todayKey)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      supabase
+        .from("client_habits")
+        .select("id, title, weekdays")
+        .eq("athlete_id", user.id)
+        .eq("group_id", params.groupId)
+        .eq("active", true),
+    ]);
+
     weightLogs = (weightRows ?? []).map((w) => ({
       id: w.id,
       loggedDate: w.logged_date,
       weight: w.weight,
     }));
 
-    // Group-tier clients don't get macro programming — skip the fetch
-    // entirely rather than fetch-and-hide, same as the coach-side pages.
-    if (macrosEnabled) {
-      const { data: macroRow } = await supabase
-        .from("daily_macros")
-        .select("calories, protein_g, carbs_g, fat_g")
-        .eq("athlete_id", user.id)
-        .eq("log_date", todayKey)
-        .maybeSingle();
-      if (macroRow) {
-        todayMacros = {
-          calories: macroRow.calories,
-          proteinG: macroRow.protein_g,
-          carbsG: macroRow.carbs_g,
-          fatG: macroRow.fat_g,
-        };
-      }
+    if (macroResult.data) {
+      todayMacros = {
+        calories: macroResult.data.calories,
+        proteinG: macroResult.data.protein_g,
+        carbsG: macroResult.data.carbs_g,
+        fatG: macroResult.data.fat_g,
+      };
     }
 
-    const { data: habitRows } = await supabase
-      .from("client_habits")
-      .select("id, title, weekdays")
-      .eq("athlete_id", user.id)
-      .eq("group_id", params.groupId)
-      .eq("active", true);
     const dueHabitDefs = (habitRows ?? []).filter((h) => isHabitDueOn(h.weekdays, new Date()));
 
     const { data: habitLogRows } = await supabase

@@ -43,13 +43,16 @@ export function NewProgramForm({
       return;
     }
 
-    // Only one program is ever "active" per group — a new program defaults
-    // to active (its own column default), so every other program in the
-    // group needs to step down in the same action.
+    // Only one *shared* program is ever active per group — a new program
+    // defaults to active (its own column default), so every other shared
+    // program in the group needs to step down in the same action. Scoped
+    // to athlete_id is null so creating a new shared program can never
+    // deactivate a client's personal assigned program by accident.
     await supabase
       .from("programs")
       .update({ is_active: false })
       .eq("group_id", groupId)
+      .is("athlete_id", null)
       .neq("id", program.id);
 
     // The program page itself is the inline builder now — "+ Add Week"

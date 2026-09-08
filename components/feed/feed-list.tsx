@@ -127,6 +127,18 @@ export function FeedList({
           );
         }
       )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "comments" },
+        (payload) => {
+          const postId = (payload.old as any).post_id;
+          setPosts((prev) =>
+            prev.map((p) =>
+              p.id === postId ? { ...p, commentCount: Math.max(0, p.commentCount - 1) } : p
+            )
+          );
+        }
+      )
       .subscribe();
 
     return () => {

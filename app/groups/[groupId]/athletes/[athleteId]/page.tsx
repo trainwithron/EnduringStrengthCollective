@@ -68,14 +68,27 @@ export default async function AthleteProfilePage({
     .eq("id", params.groupId)
     .single();
 
-  const { data: activeProgram } = await supabase
+  // This client's own personal program wins over the group's shared one —
+  // same precedence as lib/todays-workout.ts.
+  const { data: personalProgram } = await supabase
     .from("programs")
     .select("id, name")
     .eq("group_id", params.groupId)
+    .eq("athlete_id", params.athleteId)
     .eq("is_active", true)
-    .order("created_at", { ascending: false })
-    .limit(1)
     .maybeSingle();
+
+  const { data: sharedProgram } = personalProgram
+    ? { data: null }
+    : await supabase
+        .from("programs")
+        .select("id, name")
+        .eq("group_id", params.groupId)
+        .is("athlete_id", null)
+        .eq("is_active", true)
+        .maybeSingle();
+
+  const activeProgram = personalProgram ?? sharedProgram;
 
   // Stats (total count, volume, PRs) need every logged workout to stay
   // accurate — the displayed history below is capped separately so the

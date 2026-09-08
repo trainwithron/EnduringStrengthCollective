@@ -6,6 +6,7 @@ import { LayoutGrid, ImagePlus } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { ProgramActiveToggle } from "@/components/coach/program-active-toggle";
 import { CardSizeToggle } from "@/components/coach/desktop/card-size-toggle";
+import { ProgramCardMenu } from "@/components/coach/desktop/program-card-menu";
 import { readCardSize, writeCardSize, type CardSize } from "@/lib/card-size";
 
 export interface ProgramCardData {
@@ -14,6 +15,8 @@ export interface ProgramCardData {
   isActive: boolean;
   workoutCount: number;
   coverImagePath: string | null;
+  athleteId: string | null;
+  athleteName: string | null;
 }
 
 const GRID_CLASS: Record<CardSize, string> = {
@@ -56,16 +59,43 @@ export function ProgramCardGrid({
     );
   }
 
+  const sharedPrograms = programs.filter((p) => !p.athleteId);
+  const clientPrograms = programs.filter((p) => p.athleteId);
+
   return (
     <div>
       <div className="flex justify-end mb-3">
         <CardSizeToggle size={size} onChange={handleSizeChange} />
       </div>
-      <div className={`grid ${GRID_CLASS[size]}`}>
-        {programs.map((p) => (
-          <ProgramCard key={p.id} groupId={groupId} program={p} size={size} />
-        ))}
-      </div>
+
+      <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+        Shared Programs
+      </h2>
+      {sharedPrograms.length === 0 ? (
+        <p className="font-body text-xs text-steel mb-6">No shared programs yet.</p>
+      ) : (
+        <div className={`grid ${GRID_CLASS[size]} mb-6`}>
+          {sharedPrograms.map((p) => (
+            <ProgramCard key={p.id} groupId={groupId} program={p} size={size} />
+          ))}
+        </div>
+      )}
+
+      <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+        Client Programs
+      </h2>
+      {clientPrograms.length === 0 ? (
+        <p className="font-body text-xs text-steel">
+          No individually-assigned programs yet — use a shared program&apos;s
+          ⋮ menu to assign it to a client.
+        </p>
+      ) : (
+        <div className={`grid ${GRID_CLASS[size]}`}>
+          {clientPrograms.map((p) => (
+            <ProgramCard key={p.id} groupId={groupId} program={p} size={size} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -156,12 +186,20 @@ function ProgramCard({
       </div>
 
       <div className="p-3 flex flex-col gap-2 flex-1">
-        <Link href={`/groups/${groupId}/programs/${program.id}`} className="min-w-0">
-          <p className={`font-body font-medium ${titleSize} text-chalk truncate`}>{program.name}</p>
-          <p className="font-body text-xs text-steel mt-0.5">
-            {program.workoutCount} {program.workoutCount === 1 ? "workout" : "workouts"}
-          </p>
-        </Link>
+        <div className="flex items-start justify-between gap-2">
+          <Link href={`/groups/${groupId}/programs/${program.id}`} className="min-w-0 flex-1">
+            <p className={`font-body font-medium ${titleSize} text-chalk truncate`}>{program.name}</p>
+            <p className="font-body text-xs text-steel mt-0.5">
+              {program.workoutCount} {program.workoutCount === 1 ? "workout" : "workouts"}
+            </p>
+            {program.athleteName && (
+              <p className="font-body text-[11px] text-rust mt-0.5 truncate">
+                {program.athleteName}&apos;s program
+              </p>
+            )}
+          </Link>
+          <ProgramCardMenu programId={program.id} programName={program.name} groupId={groupId} />
+        </div>
         <div className="mt-auto flex items-center justify-between pt-2 border-t border-steel/15">
           <ProgramActiveToggle programId={program.id} groupId={groupId} isActive={program.isActive} />
           <Link href={`/groups/${groupId}/programs/${program.id}`} className="font-body text-xs text-rust">

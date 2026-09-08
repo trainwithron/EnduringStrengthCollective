@@ -27,16 +27,26 @@ export function TodayWidget({
   habits: TodayHabit[];
 }) {
   const [state, setState] = useState(habits);
+  const [error, setError] = useState<string | null>(null);
 
   async function toggle(habitId: string, current: boolean) {
+    setError(null);
     setState((prev) => prev.map((h) => (h.id === habitId ? { ...h, completed: !current } : h)));
     const supabase = createBrowserClient();
-    await supabase
+    const { error: upsertError } = await supabase
       .from("habit_logs")
       .upsert(
         { habit_id: habitId, log_date: todayDate, completed_at: !current ? new Date().toISOString() : null },
         { onConflict: "habit_id,log_date" }
       );
+
+    // The checkbox already flipped optimistically — if the write actually
+    // failed, flip it back rather than leaving the UI showing a completion
+    // that was never saved.
+    if (upsertError) {
+      setState((prev) => prev.map((h) => (h.id === habitId ? { ...h, completed: current } : h)));
+      setError("Couldn't save — check your connection and try again.");
+    }
   }
 
   const hasMacros = macros && (macros.calories != null || macros.proteinG != null);
@@ -65,6 +75,12 @@ export function TodayWidget({
             <p className="font-body text-[10px] text-steel uppercase mt-1">Fat</p>
           </div>
         </div>
+      )}
+
+      {error && (
+        <p className="font-body text-xs text-rust mb-2" role="alert">
+          {error}
+        </p>
       )}
 
       {state.length > 0 && (

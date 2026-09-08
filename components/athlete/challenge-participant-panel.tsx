@@ -36,6 +36,7 @@ export function ChallengeParticipantPanel({
   const [joining, setJoining] = useState(false);
   const [completed, setCompleted] = useState(new Set(completedHabitIdsToday));
   const [uploading, setUploading] = useState<"before" | "after" | null>(null);
+  const [habitError, setHabitError] = useState<string | null>(null);
 
   async function handleJoin() {
     setJoining(true);
@@ -56,38 +57,50 @@ export function ChallengeParticipantPanel({
   }
 
   async function toggleHabit(habitId: string) {
+    setHabitError(null);
     const supabase = createBrowserClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return;
 
+    // Optimistic, like the identical habit-checkbox on the Home tab
+    // (TodayWidget) — no full-page refresh for a single checkbox tap, and
+    // the toggle reverts if the write actually failed.
     const isDone = completed.has(habitId);
-    if (isDone) {
-      await supabase
-        .from("challenge_habit_logs")
-        .delete()
-        .eq("challenge_habit_id", habitId)
-        .eq("profile_id", user.id)
-        .eq("log_date", todayKey);
+    setCompleted((prev) => {
+      const next = new Set(prev);
+      if (isDone) next.delete(habitId);
+      else next.add(habitId);
+      return next;
+    });
+
+    const { error } = isDone
+      ? await supabase
+          .from("challenge_habit_logs")
+          .delete()
+          .eq("challenge_habit_id", habitId)
+          .eq("profile_id", user.id)
+          .eq("log_date", todayKey)
+      : await supabase.from("challenge_habit_logs").upsert(
+          {
+            challenge_habit_id: habitId,
+            profile_id: user.id,
+            log_date: todayKey,
+            completed_at: new Date().toISOString(),
+          },
+          { onConflict: "challenge_habit_id,profile_id,log_date" }
+        );
+
+    if (error) {
       setCompleted((prev) => {
         const next = new Set(prev);
-        next.delete(habitId);
+        if (isDone) next.add(habitId);
+        else next.delete(habitId);
         return next;
       });
-    } else {
-      await supabase.from("challenge_habit_logs").upsert(
-        {
-          challenge_habit_id: habitId,
-          profile_id: user.id,
-          log_date: todayKey,
-          completed_at: new Date().toISOString(),
-        },
-        { onConflict: "challenge_habit_id,profile_id,log_date" }
-      );
-      setCompleted((prev) => new Set(prev).add(habitId));
+      setHabitError("Couldn't save — check your connection and try again.");
     }
-    router.refresh();
   }
 
   async function handlePhoto(kind: "before" | "after", file: File) {
@@ -142,6 +155,11 @@ export function ChallengeParticipantPanel({
         <h3 className="font-body text-xs text-steel uppercase tracking-wide mb-2">
           Today&apos;s habits
         </h3>
+        {habitError && (
+          <p className="font-body text-xs text-rust mb-2" role="alert">
+            {habitError}
+          </p>
+        )}
         <div className="space-y-2">
           {habits.map((h) => (
             <label key={h.id} className="flex items-center gap-2 cursor-pointer">

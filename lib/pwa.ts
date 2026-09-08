@@ -10,6 +10,14 @@ export function isStandaloneDisplay(): boolean {
   );
 }
 
+// A real phone browser tab, not just the installed app — mirrors
+// lib/pwa-server.ts's isMobileUserAgent for the one place (login redirect)
+// that decides where to send a coach before any server render happens.
+export function isMobileUserAgent(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent);
+}
+
 export const PWA_STANDALONE_COOKIE = "pwa_standalone";
 
 // Re-evaluated on every page load (see PwaContextCookie) so the same

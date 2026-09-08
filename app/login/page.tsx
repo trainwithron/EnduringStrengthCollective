@@ -1,9 +1,10 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { isStandaloneDisplay } from "@/lib/pwa";
+import { isStandaloneDisplay, isMobileUserAgent } from "@/lib/pwa";
 
 export default function LoginPage() {
   return (
@@ -48,11 +49,11 @@ function LoginForm() {
     }
 
     // No group-picker screen exists yet — send the athlete/coach straight to
-    // their first group rather than a dead-end home page. Coaches on a
-    // real computer (or a plain mobile browser tab) go to the desktop
-    // shell (Clients); athletes, and a coach opening the installed
-    // home-screen app on their phone, land on the mobile group hub
-    // instead — logging your own training doesn't need the desktop tools.
+    // their first group rather than a dead-end home page. A coach at an
+    // actual computer goes to the desktop shell (Clients); athletes, and a
+    // coach on a phone — installed app or just a browser tab — land on the
+    // mobile group hub instead. Logging your own training doesn't need the
+    // desktop tools, and that's most coaches' first-ever open of this app.
     const { data: membership } = await supabase
       .from("group_memberships")
       .select("group_id, role")
@@ -61,7 +62,8 @@ function LoginForm() {
       .single();
 
     if (membership) {
-      const wantsMobileHome = membership.role !== "coach" || isStandaloneDisplay();
+      const wantsMobileHome =
+        membership.role !== "coach" || isStandaloneDisplay() || isMobileUserAgent();
       const destination = wantsMobileHome
         ? `/groups/${membership.group_id}`
         : `/groups/${membership.group_id}/clients`;
@@ -127,6 +129,12 @@ function LoginForm() {
             {submitting ? "Signing in…" : "Sign in"}
           </button>
         </form>
+
+        <p className="font-body text-sm text-steel text-center mt-4">
+          <Link href="/forgot-password" className="text-rust">
+            Forgot password?
+          </Link>
+        </p>
       </div>
     </main>
   );

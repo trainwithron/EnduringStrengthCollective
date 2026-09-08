@@ -98,69 +98,111 @@ export function resolveProgressionTarget({
   }
 }
 
-// Looks up the progression rule for this exercise (if any), works out which
-// occurrence `currentWorkoutId` is within the program, pulls the athlete's
-// own logged performance at the reference/previous occurrences, and resolves
-// a goal. Returns null when there's no rule — callers fall back to whatever
-// they already show (e.g. the "Last time" hint).
-export async function getProgressionGoal(
+// Batched sibling of getProgressionGoal below — resolves every exercise
+// slot in a workout in 3 total queries instead of up to 3 per exercise.
+// A workout page with 8 exercises previously fired ~24 sequential-per-
+// branch queries just to compute progression goals; this fires 3 total,
+// regardless of exercise count. Produces byte-identical results to calling
+// getProgressionGoal once per exercise — same rule lookup, same
+// occurrence-index math, same "best (highest-weight) completed set per
+// workout" resolution, just fetched in bulk and joined in memory.
+export async function getProgressionGoalsBatch(
   supabase: any,
   {
     programId,
-    exerciseName,
-    loggedExerciseName,
     athleteId,
     currentWorkoutId,
+    exercises,
   }: {
     programId: string;
-    // The coach's original template name — this is what the progression
-    // rule and the occurrence list are keyed by, regardless of any
-    // per-client override on this slot.
-    exerciseName: string;
-    // What actually got logged for this athlete (session_exercises.exercise_name)
-    // — the override name when one's in effect, otherwise the same as
-    // exerciseName. Defaults to exerciseName for any caller that doesn't
-    // distinguish the two.
-    loggedExerciseName?: string;
     athleteId: string;
     currentWorkoutId: string;
+    exercises: { slotId: string; exerciseName: string; loggedExerciseName?: string }[];
   }
-): Promise<ProgressionTarget | null> {
-  const { data: rule } = await supabase
+): Promise<Map<string, ProgressionTarget>> {
+  const result = new Map<string, ProgressionTarget>();
+  if (exercises.length === 0) return result;
+
+  const templateNames = Array.from(new Set(exercises.map((e) => e.exerciseName)));
+
+  const { data: rules } = await supabase
     .from("exercise_progressions")
-    .select("model, config")
+    .select("exercise_name, model, config")
     .eq("program_id", programId)
-    .eq("exercise_name", exerciseName)
-    .maybeSingle();
+    .in("exercise_name", templateNames);
 
-  if (!rule) return null;
+  const ruleByName = new Map<string, { model: ProgressionModel; config: ProgressionConfig }>(
+    (rules ?? []).map((r: any) => [r.exercise_name, { model: r.model, config: r.config }])
+  );
 
-  const performanceName = loggedExerciseName ?? exerciseName;
+  const namesWithRules = exercises.filter((e) => ruleByName.has(e.exerciseName));
+  if (namesWithRules.length === 0) return result;
+
+  const uniqueNamesWithRules = Array.from(new Set(namesWithRules.map((e) => e.exerciseName)));
 
   const { data: occurrenceRows } = await supabase
     .from("group_workout_exercises")
-    .select("workout_id, workouts!inner ( id, week_number, day_index, program_id )")
-    .eq("exercise_name", exerciseName)
+    .select("exercise_name, workout_id, workouts!inner ( id, week_number, day_index, program_id )")
+    .in("exercise_name", uniqueNamesWithRules)
     .eq("workouts.program_id", programId);
 
-  const occurrences = (occurrenceRows ?? [])
-    .map((r: any) => ({
-      workoutId: r.workout_id as string,
-      weekNumber: r.workouts.week_number as number,
-      dayIndex: r.workouts.day_index as number,
-    }))
-    .sort((a: any, b: any) => a.weekNumber - b.weekNumber || a.dayIndex - b.dayIndex);
+  const occurrencesByName = new Map<
+    string,
+    { workoutId: string; weekNumber: number; dayIndex: number }[]
+  >();
+  for (const row of (occurrenceRows ?? []) as any[]) {
+    const list = occurrencesByName.get(row.exercise_name) ?? [];
+    list.push({
+      workoutId: row.workout_id,
+      weekNumber: row.workouts.week_number,
+      dayIndex: row.workouts.day_index,
+    });
+    occurrencesByName.set(row.exercise_name, list);
+  }
+  for (const list of occurrencesByName.values()) {
+    list.sort((a, b) => a.weekNumber - b.weekNumber || a.dayIndex - b.dayIndex);
+  }
 
-  const occurrenceIndex = occurrences.findIndex((o: any) => o.workoutId === currentWorkoutId) + 1;
-  if (occurrenceIndex <= 1) return null;
+  interface Resolved {
+    slotId: string;
+    performanceName: string;
+    model: ProgressionModel;
+    config: ProgressionConfig;
+    occurrenceIndex: number;
+    referenceWorkoutId?: string;
+    previousWorkoutId?: string;
+  }
+  const resolved: Resolved[] = [];
+  const allNeededWorkoutIds = new Set<string>();
+  const allNeededNames = new Set<string>();
 
-  const referenceWorkoutId = occurrences[0]?.workoutId;
-  const previousWorkoutId = occurrences[occurrenceIndex - 2]?.workoutId;
-  const neededWorkoutIds = Array.from(
-    new Set([referenceWorkoutId, previousWorkoutId].filter(Boolean))
-  );
+  for (const ex of namesWithRules) {
+    const rule = ruleByName.get(ex.exerciseName)!;
+    const occurrences = occurrencesByName.get(ex.exerciseName) ?? [];
+    const occurrenceIndex = occurrences.findIndex((o) => o.workoutId === currentWorkoutId) + 1;
+    if (occurrenceIndex <= 1) continue;
 
-  if (neededWorkoutIds.length === 0) return null;
+    const referenceWorkoutId = occurrences[0]?.workoutId;
+    const previousWorkoutId = occurrences[occurrenceIndex - 2]?.workoutId;
+    if (!referenceWorkoutId && !previousWorkoutId) continue;
+
+    const performanceName = ex.loggedExerciseName ?? ex.exerciseName;
+    if (referenceWorkoutId) allNeededWorkoutIds.add(referenceWorkoutId);
+    if (previousWorkoutId) allNeededWorkoutIds.add(previousWorkoutId);
+    allNeededNames.add(performanceName);
+
+    resolved.push({
+      slotId: ex.slotId,
+      performanceName,
+      model: rule.model,
+      config: rule.config,
+      occurrenceIndex,
+      referenceWorkoutId,
+      previousWorkoutId,
+    });
+  }
+
+  if (resolved.length === 0 || allNeededWorkoutIds.size === 0) return result;
 
   const { data: priorSets } = await supabase
     .from("set_logs")
@@ -173,28 +215,50 @@ export async function getProgressionGoal(
       )
     `
     )
-    .eq("session_exercises.exercise_name", performanceName)
+    .in("session_exercises.exercise_name", Array.from(allNeededNames))
     .eq("session_exercises.athlete_sessions.athlete_id", athleteId)
-    .in("session_exercises.athlete_sessions.workout_id", neededWorkoutIds)
+    .in("session_exercises.athlete_sessions.workout_id", Array.from(allNeededWorkoutIds))
     .eq("status", "completed");
 
-  const bestByWorkout: Record<string, LoggedPerformance> = {};
+  // Best (highest-weight) completed log per (exercise name, workout) pair —
+  // scoped by the compound key so different exercises' logs never mix.
+  const bestByNameAndWorkout = new Map<string, LoggedPerformance>();
   for (const row of (priorSets ?? []) as any[]) {
+    const name = row.session_exercises.exercise_name as string;
     const workoutId = row.session_exercises.athlete_sessions.workout_id as string;
+    const key = `${name}::${workoutId}`;
     const weight = row.weight ?? 0;
-    if (!bestByWorkout[workoutId] || weight > bestByWorkout[workoutId].weight) {
-      bestByWorkout[workoutId] = { weight, reps: row.reps ?? 0 };
+    const existing = bestByNameAndWorkout.get(key);
+    if (!existing || weight > existing.weight) {
+      bestByNameAndWorkout.set(key, { weight, reps: row.reps ?? 0 });
     }
   }
 
-  const referenceLog = referenceWorkoutId ? bestByWorkout[referenceWorkoutId] ?? null : null;
-  const previousOccurrenceLog = previousWorkoutId ? bestByWorkout[previousWorkoutId] ?? null : null;
+  for (const r of resolved) {
+    const referenceLog = r.referenceWorkoutId
+      ? bestByNameAndWorkout.get(`${r.performanceName}::${r.referenceWorkoutId}`) ?? null
+      : null;
+    const previousOccurrenceLog = r.previousWorkoutId
+      ? bestByNameAndWorkout.get(`${r.performanceName}::${r.previousWorkoutId}`) ?? null
+      : null;
 
-  return resolveProgressionTarget({
-    model: rule.model,
-    config: rule.config,
-    occurrenceIndex,
-    referenceLog,
-    previousOccurrenceLog,
-  });
+    const target = resolveProgressionTarget({
+      model: r.model,
+      config: r.config,
+      occurrenceIndex: r.occurrenceIndex,
+      referenceLog,
+      previousOccurrenceLog,
+    });
+    if (target.weight != null || target.reps != null) {
+      result.set(r.slotId, target);
+    }
+  }
+
+  return result;
 }
+
+// The single-exercise version of the lookup above was superseded by
+// getProgressionGoalsBatch (same math, batched across every exercise in a
+// workout instead of one query-set per exercise) once its only caller
+// (getWorkoutOverviewData) switched over — removed rather than left as
+// unused dead code.
