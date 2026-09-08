@@ -4,6 +4,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { estimateOneRepMax } from "@/lib/one-rep-max";
 import { PrListToggle } from "@/components/share/pr-list-toggle";
 import { ShareWorkoutButton } from "@/components/share/share-workout-button";
+import { CustomizeSharePanel } from "@/components/share/customize-share-panel";
 
 // Deliberately public — no auth check. Every completed workout gets a
 // shareable card now, not just PRs, so a client can post it (and tag the
@@ -16,7 +17,7 @@ async function getSharedWorkout(postId: string) {
     .from("posts")
     .select(
       `
-      id, post_type, created_at, group_id, broadcast_level,
+      id, post_type, created_at, group_id, broadcast_level, author_id, shared_exercise_names,
       profiles!posts_author_id_fkey ( full_name ),
       workout_logs ( session_id, new_prs, total_volume, total_sets_completed )
     `
@@ -60,15 +61,27 @@ async function getSharedWorkout(postId: string) {
     }
   }
 
+  // The 5 highest-weight sets of the session — always computed (even in
+  // prs_only mode) so the athlete has real candidates to choose from in
+  // the customize panel, though only "full" mode ever actually displays
+  // any of them publicly.
+  const top5Candidates = Array.from(bestByExercise.entries())
+    .map(([name, best]) => ({ name, ...best }))
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, 5);
+
   // "prs_only" shows only the PR list, never total volume/sets/top lifts —
   // that's the "keeping the rest private" half of that mode's whole point.
+  // Once the athlete has explicitly chosen which lifts to show (a real,
+  // possibly-empty array), that choice always wins; only a genuinely
+  // unset (null) selection falls back to the old default of "top 3 by
+  // weight" — keeps every pre-existing shared card rendering unchanged.
   const topLifts =
-    broadcastLevel === "full"
-      ? Array.from(bestByExercise.entries())
-          .map(([name, best]) => ({ name, ...best }))
-          .sort((a, b) => b.weight - a.weight)
-          .slice(0, 3)
-      : [];
+    broadcastLevel !== "full"
+      ? []
+      : post.shared_exercise_names
+      ? top5Candidates.filter((l) => post.shared_exercise_names!.includes(l.name))
+      : top5Candidates.slice(0, 3);
 
   const prList = newPrs
     .map((name) => {
@@ -84,6 +97,7 @@ async function getSharedWorkout(postId: string) {
     .filter((x): x is NonNullable<typeof x> => x !== null);
 
   return {
+    authorId: post.author_id as string,
     groupId: post.group_id,
     athleteName: (post.profiles as any)?.full_name ?? "An athlete",
     groupName: group?.name ?? "The Enduring Strength Collective",
@@ -91,6 +105,8 @@ async function getSharedWorkout(postId: string) {
     totalVolume: broadcastLevel === "full" ? workoutLog.total_volume ?? 0 : null,
     totalSetsCompleted: broadcastLevel === "full" ? workoutLog.total_sets_completed ?? 0 : null,
     topLifts,
+    top5Candidates,
+    selectedNames: post.shared_exercise_names ?? top5Candidates.slice(0, 3).map((l) => l.name),
     prList,
     createdAt: post.created_at,
   };
@@ -210,6 +226,14 @@ export default async function ShareWorkoutPage({
         <div className="mt-6">
           <ShareWorkoutButton postId={params.postId} title={shareTitle} size="large" />
         </div>
+
+        {user?.id === shared.authorId && shared.broadcastLevel === "full" && (
+          <CustomizeSharePanel
+            postId={params.postId}
+            candidates={shared.top5Candidates}
+            initialSelected={shared.selectedNames}
+          />
+        )}
 
         <p className="font-body text-xs text-steel mt-6 pt-4 border-t border-steel/20">
           Trained with <span className="text-rust">{shared.groupName}</span>

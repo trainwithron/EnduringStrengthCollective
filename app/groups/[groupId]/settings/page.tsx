@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { SignOutButton } from "@/components/group/sign-out-button";
-import { FeedBroadcastSettings } from "@/components/athlete/feed-broadcast-settings";
 import { EditDisplayName } from "@/components/athlete/edit-display-name";
 import { PushNotificationToggle } from "@/components/athlete/push-notification-toggle";
 import { WearablePlaceholder } from "@/components/athlete/wearable-placeholder";
@@ -28,7 +27,7 @@ export default async function SettingsPage({
   const [{ data: profile }, { data: membership }] = await Promise.all([
     supabase
       .from("profiles")
-      .select("full_name, avatar_url, feed_broadcast_level")
+      .select("full_name, avatar_url")
       .eq("id", user.id)
       .single(),
     supabase
@@ -62,17 +61,6 @@ export default async function SettingsPage({
         </div>
         <div className="pb-4 border-b border-steel/20 pt-4">
           <WearablePlaceholder />
-        </div>
-        <div className="pb-4 border-b border-steel/20 pt-4">
-          <FeedBroadcastSettings
-            initialLevel={
-              (profile?.feed_broadcast_level as
-                | "full"
-                | "prs_only"
-                | "checkin_only"
-                | "private") ?? "full"
-            }
-          />
         </div>
         {!isCoach && (
           <div className="pb-4 border-b border-steel/20 pt-4">

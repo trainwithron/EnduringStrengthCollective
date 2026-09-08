@@ -140,7 +140,7 @@ export function ExerciseCard({
                 }}
                 className="font-body text-xs text-steel shrink-0"
               >
-                Swap
+                Swap Exercise
               </button>
             )}
           </>

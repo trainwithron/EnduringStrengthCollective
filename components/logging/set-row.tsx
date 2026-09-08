@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { SetLogEntry } from "@/lib/types";
 import { ACTUAL_COLUMN, ACTUAL_PROP, fieldDef, orderTrackedFields, type TrackedField } from "@/lib/exercise-fields";
@@ -100,17 +100,46 @@ export function SetRow({
     }
   }
 
-  async function toggleComplete() {
-    if (readOnly) return;
-    const nextStatus = set.status === "completed" ? "pending" : "completed";
-    await persist({ status: nextStatus });
-  }
-
   const isComplete = set.status === "completed";
   const isSkipped = set.status === "skipped";
   const extraFields = orderTrackedFields(trackedFields).filter(
     (f) => f !== "reps" && f !== "weight"
   );
+
+  // No more manual "mark complete" checkbox — a set is considered done
+  // once every field this exercise actually tracks has a value, and
+  // reverts back to pending if one gets cleared out again. Runs off the
+  // merged `set` prop (not local input state) so it reacts correctly
+  // whichever field's blur was the one that just completed it, including
+  // the "extra" fields ActualCell persists on its own.
+  useEffect(() => {
+    if (readOnly || set.status === "skipped") return;
+    const requiredProps = orderTrackedFields(trackedFields).map(
+      (f) => ACTUAL_PROP[f] as keyof SetLogEntry
+    );
+    const allFilled =
+      requiredProps.length > 0 &&
+      requiredProps.every((prop) => {
+        const v = set[prop];
+        return v !== null && v !== undefined && v !== ("" as unknown);
+      });
+    if (allFilled && set.status !== "completed") {
+      persist({ status: "completed" });
+    } else if (!allFilled && set.status === "completed") {
+      persist({ status: "pending" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    set.weight,
+    set.reps,
+    set.rpe,
+    set.rir,
+    set.tempo,
+    set.timeSeconds,
+    set.height,
+    set.distance,
+    set.status,
+  ]);
 
   return (
     <div className="flex items-center gap-2 flex-wrap">
@@ -148,21 +177,18 @@ export function SetRow({
         <ActualCell key={field} set={set} field={field} readOnly={readOnly} onChange={onChange} />
       ))}
 
-      <button
-        type="button"
-        onClick={toggleComplete}
-        disabled={readOnly || saving}
-        aria-label={isComplete ? "Mark set incomplete" : "Mark set complete"}
-        className={`ml-auto w-10 h-10 flex items-center justify-center border shrink-0 transition-colors ${
+      <span
+        aria-label={isComplete ? "Set complete" : isSkipped ? "Set skipped" : "Set pending"}
+        className={`ml-auto w-10 h-10 flex items-center justify-center border shrink-0 ${
           isComplete
             ? "bg-moss border-moss text-graphite"
             : isSkipped
             ? "border-steel/30 text-steel/50"
-            : "border-steel/30 text-steel active:border-rust active:text-rust"
+            : "border-steel/30 text-steel/30"
         }`}
       >
         <Check className="w-4 h-4" strokeWidth={3} />
-      </button>
+      </span>
     </div>
   );
 }

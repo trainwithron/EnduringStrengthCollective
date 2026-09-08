@@ -4,6 +4,7 @@ import { FeedList } from "@/components/feed/feed-list";
 import { NewPostComposer } from "@/components/feed/new-post-composer";
 import { PostComposerDesktop } from "@/components/feed/desktop/post-composer-desktop";
 import { ChannelTabs } from "@/components/feed/channel-tabs";
+import { FeedSettingsButton } from "@/components/feed/feed-settings-button";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
@@ -39,6 +40,12 @@ export default async function FeedPage({
   const channel: FeedChannel = VALID_CHANNELS.includes(searchParams.channel as FeedChannel)
     ? (searchParams.channel as FeedChannel)
     : "general";
+
+  const { data: viewerProfile } = user
+    ? await supabase.from("profiles").select("feed_broadcast_level").eq("id", user.id).maybeSingle()
+    : { data: null };
+  const feedBroadcastLevel =
+    (viewerProfile?.feed_broadcast_level as "full" | "prs_only" | "checkin_only" | "private") ?? "full";
 
   const { data: posts } = await supabase
     .from("posts")
@@ -136,9 +143,12 @@ export default async function FeedPage({
         >
           &larr; Back to group
         </Link>
-        <h1 className="font-display font-bold text-3xl uppercase leading-none mt-3">
-          Team feed
-        </h1>
+        <div className="flex items-center justify-between mt-3">
+          <h1 className="font-display font-bold text-3xl uppercase leading-none">
+            Team feed
+          </h1>
+          <FeedSettingsButton initialLevel={feedBroadcastLevel} />
+        </div>
       </header>
 
       <ChannelTabs basePath={`/groups/${params.groupId}/feed`} active={channel} />
