@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
-import { ClientTable } from "@/components/coach/desktop/client-table";
+import { ClientCardGrid } from "@/components/coach/desktop/client-card-grid";
 import { InviteAthleteButton } from "@/components/group/invite-athlete-button";
 import type { RosterMember } from "@/lib/types";
 
@@ -44,7 +44,7 @@ export default async function ClientsPage({
 
   const { data: memberships } = await supabase
     .from("group_memberships")
-    .select("role, profiles ( id, full_name, avatar_url ), profile_id")
+    .select("role, profiles ( id, full_name, avatar_url ), profile_id, client_tier")
     .eq("group_id", params.groupId);
 
   const { data: recentLogs } = await supabase
@@ -66,6 +66,7 @@ export default async function ClientsPage({
     avatarUrl: m.profiles?.avatar_url ?? null,
     role: m.role,
     lastWorkoutAt: lastLogByAthlete.get(m.profile_id) ?? null,
+    clientTier: m.client_tier ?? null,
   }));
 
   roster.sort((a, b) => {
@@ -132,7 +133,7 @@ export default async function ClientsPage({
         </div>
       )}
 
-      <ClientTable
+      <ClientCardGrid
         groupId={params.groupId}
         members={athletes}
         creditsByAthleteId={creditsByAthleteId}

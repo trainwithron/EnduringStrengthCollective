@@ -127,8 +127,24 @@ export function CompleteWorkoutButton({
       .select("id")
       .single();
 
+    // The athlete's own broadcast preference — captured onto the post
+    // itself (not just read live) so the card renders consistently even
+    // if they change this setting later.
+    const { data: athleteProfile } = await supabase
+      .from("profiles")
+      .select("feed_broadcast_level")
+      .eq("id", session.athlete_id)
+      .maybeSingle();
+    const broadcastLevel = athleteProfile?.feed_broadcast_level ?? "full";
+
+    const shouldPost =
+      broadcastLevel !== "private" && !(broadcastLevel === "prs_only" && newPrs.length === 0);
+    // A "checkin only" post never reveals PR content, so it never belongs
+    // in the PR Board channel even when a PR genuinely happened.
+    const channel = broadcastLevel !== "checkin_only" && newPrs.length > 0 ? "pr_board" : "general";
+
     let postId: string | null = null;
-    if (workoutLog) {
+    if (workoutLog && shouldPost) {
       const { data: post } = await supabase
         .from("posts")
         .insert({
@@ -136,7 +152,8 @@ export function CompleteWorkoutButton({
           author_id: session.athlete_id,
           post_type: "workout_summary",
           workout_log_id: workoutLog.id,
-          channel: newPrs.length > 0 ? "pr_board" : "general",
+          channel,
+          broadcast_level: broadcastLevel === "private" ? "full" : broadcastLevel,
         })
         .select("id")
         .single();

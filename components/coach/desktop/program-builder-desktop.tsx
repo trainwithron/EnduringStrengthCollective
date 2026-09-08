@@ -35,6 +35,12 @@ export function ProgramBuilderDesktop({
   const [days, setDays] = useState<BuilderDay[]>(initialDays);
   const [startDate, setStartDate] = useState(initialStartDate);
   const [trainingDays, setTrainingDays] = useState(initialTrainingDays);
+  // Guards handleAddWeek against a real race: it computes the next week
+  // number off the `days` closure, stale until this component re-renders
+  // with the new array. A fast double-click on "+ Add Week" would
+  // otherwise insert two weeks with the same week_number (found and fixed
+  // for the analogous per-set bug tonight).
+  const [addWeekBusy, setAddWeekBusy] = useState(false);
 
   const scheduledDateByDayId = useMemo(() => {
     if (!startDate || !trainingDays || trainingDays.length === 0) return new Map<string, Date>();
@@ -62,35 +68,41 @@ export function ProgramBuilderDesktop({
   }
 
   async function handleAddWeek() {
-    const weekNumbers = Array.from(new Set(days.map((d) => d.weekNumber)));
-    const nextWeek = weekNumbers.length > 0 ? Math.max(...weekNumbers) + 1 : 1;
+    if (addWeekBusy) return;
+    setAddWeekBusy(true);
+    try {
+      const weekNumbers = Array.from(new Set(days.map((d) => d.weekNumber)));
+      const nextWeek = weekNumbers.length > 0 ? Math.max(...weekNumbers) + 1 : 1;
 
-    const supabase = createBrowserClient();
-    const { data: newRow } = await supabase
-      .from("workouts")
-      .insert({
-        program_id: programId,
-        group_id: groupId,
-        title: "Day 1",
-        week_number: nextWeek,
-        day_index: 1,
-      })
-      .select("id, title, week_number, day_index")
-      .single();
+      const supabase = createBrowserClient();
+      const { data: newRow } = await supabase
+        .from("workouts")
+        .insert({
+          program_id: programId,
+          group_id: groupId,
+          title: "Day 1",
+          week_number: nextWeek,
+          day_index: 1,
+        })
+        .select("id, title, week_number, day_index")
+        .single();
 
-    if (!newRow) return;
+      if (!newRow) return;
 
-    setDays((prev) => [
-      ...prev,
-      {
-        id: newRow.id,
-        title: newRow.title,
-        weekNumber: newRow.week_number,
-        dayIndex: newRow.day_index,
-        items: [],
-      },
-    ]);
-    setExpandedWeeks((prev) => new Set(prev).add(nextWeek));
+      setDays((prev) => [
+        ...prev,
+        {
+          id: newRow.id,
+          title: newRow.title,
+          weekNumber: newRow.week_number,
+          dayIndex: newRow.day_index,
+          items: [],
+        },
+      ]);
+      setExpandedWeeks((prev) => new Set(prev).add(nextWeek));
+    } finally {
+      setAddWeekBusy(false);
+    }
   }
 
   const weekNumbers = Array.from(new Set(days.map((d) => d.weekNumber))).sort((a, b) => a - b);
@@ -179,7 +191,8 @@ export function ProgramBuilderDesktop({
         <button
           type="button"
           onClick={handleAddWeek}
-          className="w-full h-11 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors"
+          disabled={addWeekBusy}
+          className="w-full h-11 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors disabled:opacity-40"
         >
           + Add Week {nextWeekNumber}
         </button>

@@ -16,7 +16,7 @@ async function getSharedWorkout(postId: string) {
     .from("posts")
     .select(
       `
-      id, post_type, created_at, group_id,
+      id, post_type, created_at, group_id, broadcast_level,
       profiles!posts_author_id_fkey ( full_name ),
       workout_logs ( session_id, new_prs, total_volume, total_sets_completed )
     `
@@ -34,12 +34,16 @@ async function getSharedWorkout(postId: string) {
     .eq("id", post.group_id)
     .maybeSingle();
 
-  const newPrs: string[] = workoutLog.new_prs ?? [];
+  const broadcastLevel: "full" | "prs_only" | "checkin_only" = post.broadcast_level ?? "full";
+  // A check-in-only post never reveals PR content, even when one
+  // genuinely happened — that's the whole point of choosing it.
+  const newPrs: string[] = broadcastLevel === "checkin_only" ? [] : workoutLog.new_prs ?? [];
 
   // Best completed set per exercise, from the session behind this post —
-  // powers both "top lifts" and the PR list's estimated 1RM.
+  // powers both "top lifts" and the PR list's estimated 1RM. Only needed
+  // at all when this post is allowed to show that level of detail.
   const bestByExercise = new Map<string, { weight: number; reps: number }>();
-  if (workoutLog.session_id) {
+  if (workoutLog.session_id && broadcastLevel !== "checkin_only") {
     const { data: sets } = await supabase
       .from("set_logs")
       .select("weight, reps, status, session_exercises!inner ( session_id, exercise_name )")
@@ -56,10 +60,15 @@ async function getSharedWorkout(postId: string) {
     }
   }
 
-  const topLifts = Array.from(bestByExercise.entries())
-    .map(([name, best]) => ({ name, ...best }))
-    .sort((a, b) => b.weight - a.weight)
-    .slice(0, 3);
+  // "prs_only" shows only the PR list, never total volume/sets/top lifts —
+  // that's the "keeping the rest private" half of that mode's whole point.
+  const topLifts =
+    broadcastLevel === "full"
+      ? Array.from(bestByExercise.entries())
+          .map(([name, best]) => ({ name, ...best }))
+          .sort((a, b) => b.weight - a.weight)
+          .slice(0, 3)
+      : [];
 
   const prList = newPrs
     .map((name) => {
@@ -78,8 +87,9 @@ async function getSharedWorkout(postId: string) {
     groupId: post.group_id,
     athleteName: (post.profiles as any)?.full_name ?? "An athlete",
     groupName: group?.name ?? "The Enduring Strength Collective",
-    totalVolume: workoutLog.total_volume ?? 0,
-    totalSetsCompleted: workoutLog.total_sets_completed ?? 0,
+    broadcastLevel,
+    totalVolume: broadcastLevel === "full" ? workoutLog.total_volume ?? 0 : null,
+    totalSetsCompleted: broadcastLevel === "full" ? workoutLog.total_sets_completed ?? 0 : null,
     topLifts,
     prList,
     createdAt: post.created_at,
@@ -98,7 +108,10 @@ export async function generateMetadata({
     shared.prList.length > 0
       ? `${shared.athleteName} just hit a new PR! 🎉`
       : `${shared.athleteName} just finished a workout! 💪`;
-  const description = `${Math.round(shared.totalVolume).toLocaleString()} lbs total volume — training with ${shared.groupName}.`;
+  const description =
+    shared.totalVolume != null
+      ? `${Math.round(shared.totalVolume).toLocaleString()} lbs total volume — training with ${shared.groupName}.`
+      : `Training with ${shared.groupName}.`;
 
   return {
     title,
@@ -150,12 +163,20 @@ export default async function ShareWorkoutPage({
         <p className="font-body text-lg mt-2">{shared.athleteName}</p>
 
         <div className="mt-8 pb-6 border-b border-steel/20">
-          <p className="font-display text-5xl leading-none">
-            {Math.round(shared.totalVolume).toLocaleString()}
-          </p>
-          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">
-            lbs total volume &middot; {shared.totalSetsCompleted} sets
-          </p>
+          {shared.totalVolume != null ? (
+            <>
+              <p className="font-display text-5xl leading-none">
+                {Math.round(shared.totalVolume).toLocaleString()}
+              </p>
+              <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">
+                lbs total volume &middot; {shared.totalSetsCompleted} sets
+              </p>
+            </>
+          ) : (
+            <p className="font-body text-sm text-steel uppercase tracking-wide">
+              {shared.prList.length > 0 ? "New personal record" : "Checked in"}
+            </p>
+          )}
         </div>
 
         {shared.topLifts.length > 0 && (

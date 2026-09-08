@@ -39,7 +39,7 @@ export function FeedList({
             .from("posts")
             .select(
               `
-              id, post_type, channel, pinned_at, body, media_url, media_type, created_at,
+              id, post_type, channel, pinned_at, body, media_url, media_type, created_at, broadcast_level,
               profiles!posts_author_id_fkey ( id, full_name, avatar_url ),
               workout_logs ( total_volume, total_sets_completed, new_prs, logged_by_coach ),
               reactions ( profile_id ),
@@ -52,6 +52,7 @@ export function FeedList({
           if (data) {
             const shaped: FeedPost = {
               id: data.id,
+              groupId,
               postType: data.post_type,
               channel: data.channel,
               pinnedAt: data.pinned_at,
@@ -70,6 +71,7 @@ export function FeedList({
                     totalSetsCompleted: (data.workout_logs as any).total_sets_completed,
                     newPrs: (data.workout_logs as any).new_prs ?? [],
                     loggedByCoach: (data.workout_logs as any).logged_by_coach ?? false,
+                    broadcastLevel: (data as any).broadcast_level ?? "full",
                   }
                 : null,
               reactionCount: (data.reactions ?? []).length,

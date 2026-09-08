@@ -25,6 +25,12 @@ export function ExerciseCard({
   const [swapping, setSwapping] = useState(false);
   const [nameDraft, setNameDraft] = useState(exercise.exerciseName);
   const [swapBusy, setSwapBusy] = useState(false);
+  // Guards handleAddSet against a real race: it computes set_order off the
+  // `exercise.sets` closure, stale until the parent re-renders with the new
+  // array. A fast double-tap on "+ set" mid-workout would otherwise insert
+  // two set_logs rows with the same set_order (found and fixed for the
+  // coach-builder equivalent of this same bug tonight).
+  const [addSetBusy, setAddSetBusy] = useState(false);
 
   async function applySwap(name: string) {
     if (!name || name === exercise.exerciseName) {
@@ -44,30 +50,36 @@ export function ExerciseCard({
   }
 
   async function handleAddSet() {
-    const supabase = createBrowserClient();
-    const nextOrder =
-      exercise.sets.length > 0 ? Math.max(...exercise.sets.map((s) => s.setOrder)) + 1 : 0;
+    if (addSetBusy) return;
+    setAddSetBusy(true);
+    try {
+      const supabase = createBrowserClient();
+      const nextOrder =
+        exercise.sets.length > 0 ? Math.max(...exercise.sets.map((s) => s.setOrder)) + 1 : 0;
 
-    const { data: set } = await supabase
-      .from("set_logs")
-      .insert({ session_exercise_id: exercise.id, set_order: nextOrder })
-      .select("id, set_order, weight, reps, rpe, rir, tempo, time_seconds, height, distance, status")
-      .single();
+      const { data: set } = await supabase
+        .from("set_logs")
+        .insert({ session_exercise_id: exercise.id, set_order: nextOrder })
+        .select("id, set_order, weight, reps, rpe, rir, tempo, time_seconds, height, distance, status")
+        .single();
 
-    if (set) {
-      onSetAdded({
-        id: set.id,
-        setOrder: set.set_order,
-        weight: set.weight,
-        reps: set.reps,
-        rpe: set.rpe,
-        rir: set.rir,
-        tempo: set.tempo,
-        timeSeconds: set.time_seconds,
-        height: set.height,
-        distance: set.distance,
-        status: set.status,
-      });
+      if (set) {
+        onSetAdded({
+          id: set.id,
+          setOrder: set.set_order,
+          weight: set.weight,
+          reps: set.reps,
+          rpe: set.rpe,
+          rir: set.rir,
+          tempo: set.tempo,
+          timeSeconds: set.time_seconds,
+          height: set.height,
+          distance: set.distance,
+          status: set.status,
+        });
+      }
+    } finally {
+      setAddSetBusy(false);
     }
   }
 
@@ -182,7 +194,8 @@ export function ExerciseCard({
         <button
           type="button"
           onClick={handleAddSet}
-          className="mt-2 font-body text-xs text-steel active:text-rust transition-colors"
+          disabled={addSetBusy}
+          className="mt-2 font-body text-xs text-steel active:text-rust transition-colors disabled:opacity-40"
         >
           + Add set
         </button>

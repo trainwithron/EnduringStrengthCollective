@@ -27,21 +27,13 @@ export function CancelBookingButton({
     await supabase.from("bookings").update({ status: "cancelled" }).eq("id", bookingId);
 
     if (booking) {
-      const { data: creditsRow } = await supabase
-        .from("session_credits")
-        .select("balance")
-        .eq("athlete_id", booking.athlete_id)
-        .eq("group_id", groupId)
-        .maybeSingle();
-
-      // Plain update — same reasoning as the booking flow: the row always
-      // exists by now (it was decremented when this booking was made), and
-      // an athlete cancelling their own booking has no INSERT policy.
-      await supabase
-        .from("session_credits")
-        .update({ balance: (creditsRow?.balance ?? 0) + 1 })
-        .eq("athlete_id", booking.athlete_id)
-        .eq("group_id", groupId);
+      // Atomic DB-side increment — see book-slot-button.tsx for why this
+      // isn't a read-then-write anymore.
+      await supabase.rpc("adjust_session_credits", {
+        p_athlete_id: booking.athlete_id,
+        p_group_id: groupId,
+        p_delta: 1,
+      });
     }
 
     router.refresh();

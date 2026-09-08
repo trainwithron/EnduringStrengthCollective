@@ -100,6 +100,16 @@ export async function getWorkoutOverviewData(
     }
   }
 
+  // Progression rules are keyed by the coach's original template exercise
+  // name (exercise_progressions.exercise_name), never by a per-client
+  // override — an override only swaps what's *displayed and logged* for
+  // one athlete, it doesn't move the exercise to a different progression
+  // rule. Keep the template name around per slot so the goal lookup below
+  // uses it instead of the resolved/overridden name.
+  const templateNameById = new Map<string, string>(
+    templateExercises.map((ex: any) => [ex.id, ex.exercise_name])
+  );
+
   const exercises: WorkoutOverviewExercise[] = templateExercises.map((ex: any) => {
     const resolvedName = overrideNameBySlot.get(ex.id) ?? ex.exercise_name;
     const media = mediaByName.get(resolvedName);
@@ -169,7 +179,8 @@ export async function getWorkoutOverviewData(
       exercises.map(async (ex) => {
         const goal = await getProgressionGoal(supabase, {
           programId: workout.program_id,
-          exerciseName: ex.exerciseName,
+          exerciseName: templateNameById.get(ex.id) ?? ex.exerciseName,
+          loggedExerciseName: ex.exerciseName,
           athleteId,
           currentWorkoutId: workoutId,
         });

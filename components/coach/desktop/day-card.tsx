@@ -9,6 +9,7 @@ import {
   SET_ROW_SELECT,
   mapSetRow,
   TARGET_PROP,
+  formatCondensedSets,
   type TrackedField,
 } from "@/lib/exercise-fields";
 import { ExerciseBuilderCard, type MovementPatternOption } from "../exercise-builder-card";
@@ -23,6 +24,7 @@ export function DayCard({
   groupId,
   exerciseLibrary,
   movementPatterns,
+  condensed = false,
   onUpdate,
   onItemsChange,
   onDeleted,
@@ -32,6 +34,11 @@ export function DayCard({
   groupId: string;
   exerciseLibrary: string[];
   movementPatterns: MovementPatternOption[];
+  // Week-level "Collapse days" toggle — shows each exercise as one
+  // condensed line (name + sets×reps) instead of the full editable grid.
+  // Distinct from the day's own header chevron below, which hides the
+  // exercise list entirely.
+  condensed?: boolean;
   onUpdate: (patch: Partial<Pick<BuilderDay, "title">>) => void;
   onItemsChange: (items: BuilderItem[]) => void;
   onDeleted: () => void;
@@ -44,6 +51,12 @@ export function DayCard({
   // instead of shrinking to a vertical strip (that was built specifically
   // for cramped mobile horizontal scrolling).
   const [collapsed, setCollapsed] = useState(false);
+  // Guards handleAddExercise/handleAddNote against a real race: both
+  // compute the next order off the `day.items` closure, stale until the
+  // parent re-renders with the new array. A fast double-click on
+  // "+ Exercise"/"+ Note" would otherwise insert two rows at the same
+  // order (found and fixed for the analogous per-set bug tonight).
+  const [addItemBusy, setAddItemBusy] = useState(false);
 
   async function persistTitle(next: string) {
     const trimmed = next.trim() || "Untitled day";
@@ -116,67 +129,79 @@ export function DayCard({
   }
 
   async function handleAddExercise() {
-    const supabase = createBrowserClient();
-    const nextOrder = day.items.length > 0 ? Math.max(...day.items.map((i) => i.order)) + 1 : 0;
+    if (addItemBusy) return;
+    setAddItemBusy(true);
+    try {
+      const supabase = createBrowserClient();
+      const nextOrder = day.items.length > 0 ? Math.max(...day.items.map((i) => i.order)) + 1 : 0;
 
-    const { data: newRow } = await supabase
-      .from("group_workout_exercises")
-      .insert({
-        workout_id: day.id,
-        group_id: groupId,
-        exercise_name: "",
-        exercise_order: nextOrder,
-      })
-      .select("id, tracked_fields")
-      .single();
+      const { data: newRow } = await supabase
+        .from("group_workout_exercises")
+        .insert({
+          workout_id: day.id,
+          group_id: groupId,
+          exercise_name: "",
+          exercise_order: nextOrder,
+        })
+        .select("id, tracked_fields")
+        .single();
 
-    if (!newRow) return;
+      if (!newRow) return;
 
-    const { data: setRow } = await supabase
-      .from("group_workout_exercise_sets")
-      .insert({ group_workout_exercise_id: newRow.id, set_order: 0 })
-      .select(SET_ROW_SELECT)
-      .single();
+      const { data: setRow } = await supabase
+        .from("group_workout_exercise_sets")
+        .insert({ group_workout_exercise_id: newRow.id, set_order: 0 })
+        .select(SET_ROW_SELECT)
+        .single();
 
-    const newExercise: BuilderExercise = {
-      kind: "exercise",
-      id: newRow.id,
-      order: nextOrder,
-      exerciseName: "",
-      movementPatternId: null,
-      trackedFields: newRow.tracked_fields ?? DEFAULT_TRACKED_FIELDS,
-      notes: null,
-      videoPath: null,
-      youtubeUrl: null,
-      tier: null,
-      sets: setRow ? [mapSetRow(setRow)] : [],
-    };
+      const newExercise: BuilderExercise = {
+        kind: "exercise",
+        id: newRow.id,
+        order: nextOrder,
+        exerciseName: "",
+        movementPatternId: null,
+        trackedFields: newRow.tracked_fields ?? DEFAULT_TRACKED_FIELDS,
+        notes: null,
+        videoPath: null,
+        youtubeUrl: null,
+        tier: null,
+        sets: setRow ? [mapSetRow(setRow)] : [],
+      };
 
-    onItemsChange([...day.items, newExercise]);
+      onItemsChange([...day.items, newExercise]);
+    } finally {
+      setAddItemBusy(false);
+    }
   }
 
   async function handleAddNote() {
-    const supabase = createBrowserClient();
-    const nextOrder = day.items.length > 0 ? Math.max(...day.items.map((i) => i.order)) + 1 : 0;
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) return;
+    if (addItemBusy) return;
+    setAddItemBusy(true);
+    try {
+      const supabase = createBrowserClient();
+      const nextOrder = day.items.length > 0 ? Math.max(...day.items.map((i) => i.order)) + 1 : 0;
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return;
 
-    const { data: newRow } = await supabase
-      .from("workout_notes")
-      .insert({
-        workout_id: day.id,
-        group_id: groupId,
-        body: "",
-        position: nextOrder,
-        created_by: userData.user.id,
-      })
-      .select("id")
-      .single();
+      const { data: newRow } = await supabase
+        .from("workout_notes")
+        .insert({
+          workout_id: day.id,
+          group_id: groupId,
+          body: "",
+          position: nextOrder,
+          created_by: userData.user.id,
+        })
+        .select("id")
+        .single();
 
-    if (!newRow) return;
+      if (!newRow) return;
 
-    const newNote: BuilderNote = { kind: "note", id: newRow.id, order: nextOrder, body: "" };
-    onItemsChange([...day.items, newNote]);
+      const newNote: BuilderNote = { kind: "note", id: newRow.id, order: nextOrder, body: "" };
+      onItemsChange([...day.items, newNote]);
+    } finally {
+      setAddItemBusy(false);
+    }
   }
 
   async function handleDeleteDay() {
@@ -271,7 +296,40 @@ export function DayCard({
         </p>
       )}
 
-      {!collapsed && (
+      {!collapsed && condensed && (
+        <div className="flex-1 p-3">
+          {(() => {
+            const sortedItems = day.items.slice().sort((a, b) => a.order - b.order);
+            if (sortedItems.length === 0) {
+              return <p className="font-body text-xs text-steel py-1">No exercises yet.</p>;
+            }
+            return (
+              <div className="divide-y divide-steel/15">
+                {sortedItems.map((item) =>
+                  item.kind === "exercise" ? (
+                    <div key={item.id} className="py-2 flex items-center justify-between gap-2">
+                      <span className="font-body text-sm truncate">
+                        {item.exerciseName || "Untitled exercise"}
+                      </span>
+                      <span className="font-body text-xs text-steel shrink-0">
+                        {formatCondensedSets(item.sets, item.trackedFields)}
+                      </span>
+                    </div>
+                  ) : (
+                    <div key={item.id} className="py-2">
+                      <span className="font-body text-xs text-steel italic truncate block">
+                        {item.body || "Note"}
+                      </span>
+                    </div>
+                  )
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {!collapsed && !condensed && (
         <>
           {dayExercises.length > 1 && (
             <div className="px-3 pt-3">
@@ -340,14 +398,16 @@ export function DayCard({
             <button
               type="button"
               onClick={handleAddExercise}
-              className="flex-1 h-9 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors"
+              disabled={addItemBusy}
+              className="flex-1 h-9 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
             >
               + Exercise
             </button>
             <button
               type="button"
               onClick={handleAddNote}
-              className="h-9 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors"
+              disabled={addItemBusy}
+              className="h-9 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
             >
               + Note
             </button>

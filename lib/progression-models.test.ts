@@ -63,19 +63,19 @@ describe("generateDoubleProgression", () => {
 });
 
 describe("generateUndulatingProgression", () => {
-  it("applies the default heavy/moderate/light wave and repeats it", () => {
+  it("applies the default heavy/moderate/light wave and repeats it, leaving weight unchanged", () => {
     const result = generateUndulatingProgression(
       { weight: 200, reps: 10, repMin: null, repMax: null },
       { weeks: 6, wave: DEFAULT_UNDULATING_WAVE }
     );
-    expect(result.map((r) => r.weight)).toEqual([210, 200, 180, 210, 200, 180]);
+    expect(result.every((r) => r.weight === 200)).toBe(true);
     expect(result.map((r) => r.reps)).toEqual([5, 8, 12, 5, 8, 12]);
   });
 
   it("uses the reps typed in for each stage directly, ignoring the source reps entirely", () => {
     const result = generateUndulatingProgression(
       { weight: 100, reps: 999, repMin: null, repMax: null },
-      { weeks: 1, wave: [{ weightPct: 100, reps: 6 }] }
+      { weeks: 1, wave: [{ reps: 6 }] }
     );
     expect(result[0].reps).toBe(6);
   });

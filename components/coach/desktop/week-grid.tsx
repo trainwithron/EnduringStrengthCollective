@@ -42,6 +42,13 @@ export function WeekGrid({
   const [draggedDayId, setDraggedDayId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [daysCondensed, setDaysCondensed] = useState(false);
+  // Guards handleAddDay against a real race: it computes day_index off the
+  // `days` closure, stale until the parent re-renders with the new array.
+  // A fast double-click on "+ Day" would otherwise insert two workouts
+  // with the same day_index (found and fixed for the analogous per-set
+  // bug tonight).
+  const [addDayBusy, setAddDayBusy] = useState(false);
 
   async function handleDeleteWeek() {
     if (
@@ -97,33 +104,39 @@ export function WeekGrid({
   }
 
   async function handleAddDay() {
-    const supabase = createBrowserClient();
-    const nextDayIndex = days.length > 0 ? Math.max(...days.map((d) => d.dayIndex)) + 1 : 1;
+    if (addDayBusy) return;
+    setAddDayBusy(true);
+    try {
+      const supabase = createBrowserClient();
+      const nextDayIndex = days.length > 0 ? Math.max(...days.map((d) => d.dayIndex)) + 1 : 1;
 
-    const { data: newRow } = await supabase
-      .from("workouts")
-      .insert({
-        program_id: programId,
-        group_id: groupId,
-        title: `Day ${nextDayIndex}`,
-        week_number: weekNumber,
-        day_index: nextDayIndex,
-      })
-      .select("id, title, week_number, day_index")
-      .single();
+      const { data: newRow } = await supabase
+        .from("workouts")
+        .insert({
+          program_id: programId,
+          group_id: groupId,
+          title: `Day ${nextDayIndex}`,
+          week_number: weekNumber,
+          day_index: nextDayIndex,
+        })
+        .select("id, title, week_number, day_index")
+        .single();
 
-    if (!newRow) return;
+      if (!newRow) return;
 
-    onDaysChange([
-      ...days,
-      {
-        id: newRow.id,
-        title: newRow.title,
-        weekNumber: newRow.week_number,
-        dayIndex: newRow.day_index,
-        items: [],
-      },
-    ]);
+      onDaysChange([
+        ...days,
+        {
+          id: newRow.id,
+          title: newRow.title,
+          weekNumber: newRow.week_number,
+          dayIndex: newRow.day_index,
+          items: [],
+        },
+      ]);
+    } finally {
+      setAddDayBusy(false);
+    }
   }
 
   const sortedDays = days.slice().sort((a, b) => a.dayIndex - b.dayIndex);
@@ -168,6 +181,13 @@ export function WeekGrid({
         </button>
         <button
           type="button"
+          onClick={() => setDaysCondensed((v) => !v)}
+          className="font-body text-xs text-steel active:text-rust transition-colors shrink-0"
+        >
+          {daysCondensed ? "Expand days" : "Collapse days"}
+        </button>
+        <button
+          type="button"
           onClick={handleDeleteWeek}
           disabled={deleting}
           className="font-body text-xs text-steel active:text-rust transition-colors shrink-0 disabled:opacity-40"
@@ -200,7 +220,10 @@ export function WeekGrid({
 
       {expanded && (
         <div className="p-5 pt-0">
-          <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(300px,1fr))]">
+          {/* A week is always one horizontal row — extra days scroll
+              left/right instead of wrapping to a second line, so the
+              whole week reads as a single level regardless of day count. */}
+          <div className="flex gap-4 overflow-x-auto pb-2">
             {sortedDays.map((day) => (
               <div
                 key={day.id}
@@ -209,7 +232,7 @@ export function WeekGrid({
                 onDragEnd={() => setDraggedDayId(null)}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => handleDrop(day.id)}
-                className={draggedDayId === day.id ? "opacity-50" : ""}
+                className={`w-[320px] shrink-0 ${draggedDayId === day.id ? "opacity-50" : ""}`}
               >
                 <DayCard
                   day={day}
@@ -217,6 +240,7 @@ export function WeekGrid({
                   groupId={groupId}
                   exerciseLibrary={exerciseLibrary}
                   movementPatterns={movementPatterns}
+                  condensed={daysCondensed}
                   onUpdate={(patch) =>
                     onDaysChange(days.map((d) => (d.id === day.id ? { ...d, ...patch } : d)))
                   }
@@ -231,7 +255,8 @@ export function WeekGrid({
             <button
               type="button"
               onClick={handleAddDay}
-              className="min-h-[120px] border border-dashed border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors"
+              disabled={addDayBusy}
+              className="w-[320px] shrink-0 min-h-[120px] border border-dashed border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors disabled:opacity-40"
             >
               + Day
             </button>

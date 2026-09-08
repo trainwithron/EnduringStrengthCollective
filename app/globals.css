@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&family=Oswald:wght@500;700&family=Bebas+Neue&family=Anton&family=Roboto:wght@400;500;600&family=Work+Sans:wght@400;500;600&family=Nunito+Sans:wght@400;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -11,9 +11,19 @@
   --chalk: #EDE8E0;
   --steel: #8A8578;
   --moss: #6B8F71;
+  --font-display: "Barlow Condensed";
+  --font-body: "Inter";
 }
 
 body {
   background-color: var(--graphite);
   color: var(--chalk);
+}
+
+/* Coach desktop branding: a coach's chosen button shape reshapes the
+   filled rust CTA buttons (Save, Generate, Add, etc.) wherever they
+   appear inside the desktop shell — scoped by this class so nothing
+   outside the coach dashboard (the athlete mobile app) is affected. */
+.coach-branded-shell .bg-rust.text-graphite {
+  border-radius: var(--btn-radius, 0px);
 }

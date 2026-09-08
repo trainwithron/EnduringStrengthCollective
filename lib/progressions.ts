@@ -108,9 +108,23 @@ export async function getProgressionGoal(
   {
     programId,
     exerciseName,
+    loggedExerciseName,
     athleteId,
     currentWorkoutId,
-  }: { programId: string; exerciseName: string; athleteId: string; currentWorkoutId: string }
+  }: {
+    programId: string;
+    // The coach's original template name — this is what the progression
+    // rule and the occurrence list are keyed by, regardless of any
+    // per-client override on this slot.
+    exerciseName: string;
+    // What actually got logged for this athlete (session_exercises.exercise_name)
+    // — the override name when one's in effect, otherwise the same as
+    // exerciseName. Defaults to exerciseName for any caller that doesn't
+    // distinguish the two.
+    loggedExerciseName?: string;
+    athleteId: string;
+    currentWorkoutId: string;
+  }
 ): Promise<ProgressionTarget | null> {
   const { data: rule } = await supabase
     .from("exercise_progressions")
@@ -120,6 +134,8 @@ export async function getProgressionGoal(
     .maybeSingle();
 
   if (!rule) return null;
+
+  const performanceName = loggedExerciseName ?? exerciseName;
 
   const { data: occurrenceRows } = await supabase
     .from("group_workout_exercises")
@@ -157,7 +173,7 @@ export async function getProgressionGoal(
       )
     `
     )
-    .eq("session_exercises.exercise_name", exerciseName)
+    .eq("session_exercises.exercise_name", performanceName)
     .eq("session_exercises.athlete_sessions.athlete_id", athleteId)
     .in("session_exercises.athlete_sessions.workout_id", neededWorkoutIds)
     .eq("status", "completed");

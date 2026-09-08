@@ -24,6 +24,7 @@ export function SessionLogger({
   const [exercises, setExercises] = useState(initialExercises);
   const [addingExercise, setAddingExercise] = useState(false);
   const [newExerciseName, setNewExerciseName] = useState("");
+  const [addExerciseBusy, setAddExerciseBusy] = useState(false);
 
   const allSetsResolved = useMemo(
     () =>
@@ -63,59 +64,63 @@ export function SessionLogger({
 
   async function handleAddExercise() {
     const name = newExerciseName.trim();
-    if (!name) return;
+    if (!name || addExerciseBusy) return;
+    setAddExerciseBusy(true);
+    try {
+      const supabase = createBrowserClient();
+      const nextOrder =
+        exercises.length > 0 ? Math.max(...exercises.map((e) => e.exerciseOrder)) + 1 : 0;
 
-    const supabase = createBrowserClient();
-    const nextOrder =
-      exercises.length > 0 ? Math.max(...exercises.map((e) => e.exerciseOrder)) + 1 : 0;
+      const { data: sessionExercise } = await supabase
+        .from("session_exercises")
+        .insert({
+          session_id: sessionId,
+          exercise_name: name,
+          exercise_order: nextOrder,
+          is_added: true,
+        })
+        .select("id, exercise_name, exercise_order, is_swapped, is_added, tracked_fields")
+        .single();
 
-    const { data: sessionExercise } = await supabase
-      .from("session_exercises")
-      .insert({
-        session_id: sessionId,
-        exercise_name: name,
-        exercise_order: nextOrder,
-        is_added: true,
-      })
-      .select("id, exercise_name, exercise_order, is_swapped, is_added, tracked_fields")
-      .single();
+      if (!sessionExercise) return;
 
-    if (!sessionExercise) return;
+      const { data: sets } = await supabase
+        .from("set_logs")
+        .insert({ session_exercise_id: sessionExercise.id, set_order: 0 })
+        .select("id, set_order, weight, reps, rpe, rir, tempo, time_seconds, height, distance, status");
 
-    const { data: sets } = await supabase
-      .from("set_logs")
-      .insert({ session_exercise_id: sessionExercise.id, set_order: 0 })
-      .select("id, set_order, weight, reps, rpe, rir, tempo, time_seconds, height, distance, status");
-
-    setExercises((prev) => [
-      ...prev,
-      {
-        id: sessionExercise.id,
-        exerciseName: sessionExercise.exercise_name,
-        exerciseOrder: sessionExercise.exercise_order,
-        isSwapped: sessionExercise.is_swapped,
-        isAdded: sessionExercise.is_added,
-        trackedFields: sessionExercise.tracked_fields,
-        videoUrl: null,
-        youtubeUrl: null,
-        notes: null,
-        sets: (sets ?? []).map((s: any) => ({
-          id: s.id,
-          setOrder: s.set_order,
-          weight: s.weight,
-          reps: s.reps,
-          rpe: s.rpe,
-          rir: s.rir,
-          tempo: s.tempo,
-          timeSeconds: s.time_seconds,
-          height: s.height,
-          distance: s.distance,
-          status: s.status,
-        })),
-      },
-    ]);
-    setNewExerciseName("");
-    setAddingExercise(false);
+      setExercises((prev) => [
+        ...prev,
+        {
+          id: sessionExercise.id,
+          exerciseName: sessionExercise.exercise_name,
+          exerciseOrder: sessionExercise.exercise_order,
+          isSwapped: sessionExercise.is_swapped,
+          isAdded: sessionExercise.is_added,
+          trackedFields: sessionExercise.tracked_fields,
+          videoUrl: null,
+          youtubeUrl: null,
+          notes: null,
+          sets: (sets ?? []).map((s: any) => ({
+            id: s.id,
+            setOrder: s.set_order,
+            weight: s.weight,
+            reps: s.reps,
+            rpe: s.rpe,
+            rir: s.rir,
+            tempo: s.tempo,
+            timeSeconds: s.time_seconds,
+            height: s.height,
+            distance: s.distance,
+            status: s.status,
+          })),
+        },
+      ]);
+      setNewExerciseName("");
+      setAddingExercise(false);
+    } finally {
+      setAddExerciseBusy(false);
+    }
   }
 
   return (
@@ -150,7 +155,8 @@ export function SessionLogger({
               <button
                 type="button"
                 onClick={handleAddExercise}
-                className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium"
+                disabled={addExerciseBusy}
+                className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
               >
                 Add
               </button>

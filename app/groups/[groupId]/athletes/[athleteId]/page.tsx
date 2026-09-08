@@ -5,7 +5,9 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { AthleteNotesEditor } from "@/components/coach/athlete-notes-editor";
 import { SessionCreditsControl } from "@/components/coach/session-credits-control";
 import { CoachLoggedBadge } from "@/components/coach-logged-badge";
+import { NutritionTools } from "@/components/coach/desktop/nutrition-tools";
 import { isHabitDueOn } from "@/lib/habits";
+import { computeWeeklyWeightTrend } from "@/lib/weight-trend";
 
 export default async function AthleteProfilePage({
   params,
@@ -40,7 +42,7 @@ export default async function AthleteProfilePage({
 
   const { data: athleteMembership } = await supabase
     .from("group_memberships")
-    .select("joined_at, profiles ( id, full_name, avatar_url )")
+    .select("joined_at, client_tier, profiles ( id, full_name, avatar_url )")
     .eq("group_id", params.groupId)
     .eq("profile_id", params.athleteId)
     .maybeSingle();
@@ -56,6 +58,9 @@ export default async function AthleteProfilePage({
   }
 
   const profile = athleteMembership.profiles as any;
+  // Same gate used everywhere else this tier's feature set is hidden —
+  // group-tier clients don't get macro/meal-plan programming at all.
+  const macrosEnabled = athleteMembership.client_tier !== "group";
 
   const { data: group } = await supabase
     .from("groups")
@@ -178,6 +183,20 @@ export default async function AthleteProfilePage({
     .order("logged_date", { ascending: false })
     .limit(20);
 
+  const weightTrend = computeWeeklyWeightTrend(
+    (weightLogs ?? []).map((w) => ({ loggedDate: w.logged_date, weight: w.weight })),
+    todayKey
+  );
+
+  const { data: existingPlan } = macrosEnabled
+    ? await supabase
+        .from("meal_plans")
+        .select("archetype, meal_count, include_snack, carb_cycling, rationale, macros, meals")
+        .eq("athlete_id", params.athleteId)
+        .eq("log_date", todayKey)
+        .maybeSingle()
+    : { data: null };
+
   const initials = (profile?.full_name ?? "?")
     .split(" ")
     .map((p: string) => p[0])
@@ -236,6 +255,12 @@ export default async function AthleteProfilePage({
             className="inline-flex items-center h-9 font-body text-xs text-rust border border-rust px-3"
           >
             Calendar
+          </Link>
+          <Link
+            href={`/groups/${params.groupId}/calendar?client=${params.athleteId}`}
+            className="inline-flex items-center h-9 font-body text-xs text-graphite bg-rust px-3 font-medium"
+          >
+            Schedule session
           </Link>
         </div>
       </div>
@@ -401,6 +426,22 @@ export default async function AthleteProfilePage({
           )}
         </section>
       </div>
+
+      {macrosEnabled && (
+        <section className="border-t border-steel/20 pt-6 mt-8 max-w-3xl">
+          <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
+            Nutrition
+          </h2>
+          <NutritionTools
+            athleteId={params.athleteId}
+            groupId={params.groupId}
+            date={todayKey}
+            latestBodyWeight={weightLogs?.[0]?.weight ?? null}
+            weightTrend={weightTrend}
+            existingPlan={existingPlan ?? null}
+          />
+        </section>
+      )}
     </CoachDesktopShell>
   );
 }

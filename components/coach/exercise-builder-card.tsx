@@ -111,6 +111,14 @@ export function ExerciseBuilderCard({
   const [busy, setBusy] = useState(false);
   const [repMinDraft, setRepMinDraft] = useState(exercise.sets[0]?.repMin?.toString() ?? "");
   const [repMaxDraft, setRepMaxDraft] = useState(exercise.sets[0]?.repMax?.toString() ?? "");
+  // Guards handleAddSet/handleRemoveSet against a real race: both compute
+  // their target set_order/row off the `exercise.sets` closure, which is
+  // stale until the parent re-renders with the updated array. Two clicks
+  // in quick succession (a fast double-click is normal, not exotic) would
+  // otherwise both read the same stale length and insert two rows with the
+  // same set_order — a silent duplicate invisible in the UI (found live
+  // while QA-testing this exact flow: 3 visible sets, 4 rows in the DB).
+  const [setsBusy, setSetsBusy] = useState(false);
 
   async function handleNameCommit(name: string) {
     const trimmed = name.trim();
@@ -166,38 +174,49 @@ export function ExerciseBuilderCard({
   }
 
   async function handleAddSet() {
-    const supabase = createBrowserClient();
-    const nextOrder = exercise.sets.length > 0 ? Math.max(...exercise.sets.map((s) => s.setOrder)) + 1 : 0;
-    const last = exercise.sets[exercise.sets.length - 1];
+    if (setsBusy) return;
+    setSetsBusy(true);
+    try {
+      const supabase = createBrowserClient();
+      const nextOrder = exercise.sets.length > 0 ? Math.max(...exercise.sets.map((s) => s.setOrder)) + 1 : 0;
+      const last = exercise.sets[exercise.sets.length - 1];
 
-    const { data } = await supabase
-      .from("group_workout_exercise_sets")
-      .insert({
-        group_workout_exercise_id: exercise.id,
-        set_order: nextOrder,
-        target_reps: last?.targetReps ?? null,
-        target_weight: last?.targetWeight ?? null,
-        target_rpe: last?.targetRpe ?? null,
-        target_rir: last?.targetRir ?? null,
-        target_tempo: last?.targetTempo ?? null,
-        target_time_seconds: last?.targetTimeSeconds ?? null,
-        target_height: last?.targetHeight ?? null,
-        target_distance: last?.targetDistance ?? null,
-      })
-      .select(SET_ROW_SELECT)
-      .single();
+      const { data } = await supabase
+        .from("group_workout_exercise_sets")
+        .insert({
+          group_workout_exercise_id: exercise.id,
+          set_order: nextOrder,
+          target_reps: last?.targetReps ?? null,
+          target_weight: last?.targetWeight ?? null,
+          target_rpe: last?.targetRpe ?? null,
+          target_rir: last?.targetRir ?? null,
+          target_tempo: last?.targetTempo ?? null,
+          target_time_seconds: last?.targetTimeSeconds ?? null,
+          target_height: last?.targetHeight ?? null,
+          target_distance: last?.targetDistance ?? null,
+        })
+        .select(SET_ROW_SELECT)
+        .single();
 
-    if (data) {
-      onSetsChange([...exercise.sets, mapSetRow(data)]);
+      if (data) {
+        onSetsChange([...exercise.sets, mapSetRow(data)]);
+      }
+    } finally {
+      setSetsBusy(false);
     }
   }
 
   async function handleRemoveSet() {
-    if (exercise.sets.length <= 1) return;
-    const last = exercise.sets[exercise.sets.length - 1];
-    const supabase = createBrowserClient();
-    await supabase.from("group_workout_exercise_sets").delete().eq("id", last.id);
-    onSetsChange(exercise.sets.slice(0, -1));
+    if (exercise.sets.length <= 1 || setsBusy) return;
+    setSetsBusy(true);
+    try {
+      const last = exercise.sets[exercise.sets.length - 1];
+      const supabase = createBrowserClient();
+      await supabase.from("group_workout_exercise_sets").delete().eq("id", last.id);
+      onSetsChange(exercise.sets.slice(0, -1));
+    } finally {
+      setSetsBusy(false);
+    }
   }
 
   async function handleCellCommit(setId: string, field: TrackedField, raw: string) {
@@ -415,7 +434,7 @@ export function ExerciseBuilderCard({
             <button
               type="button"
               onClick={handleRemoveSet}
-              disabled={exercise.sets.length <= 1}
+              disabled={exercise.sets.length <= 1 || setsBusy}
               className="w-7 h-7 flex items-center justify-center border border-steel/30 text-steel disabled:opacity-30"
             >
               −
@@ -424,7 +443,8 @@ export function ExerciseBuilderCard({
             <button
               type="button"
               onClick={handleAddSet}
-              className="w-7 h-7 flex items-center justify-center border border-steel/30 text-steel active:border-rust active:text-rust"
+              disabled={setsBusy}
+              className="w-7 h-7 flex items-center justify-center border border-steel/30 text-steel active:border-rust active:text-rust disabled:opacity-30"
             >
               +
             </button>

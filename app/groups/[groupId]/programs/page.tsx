@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
-import { ProgramActiveToggle } from "@/components/coach/program-active-toggle";
+import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
+import { ProgramCardGrid, type ProgramCardData } from "@/components/coach/desktop/program-card-grid";
 
 export default async function ProgramsListPage({
   params,
@@ -34,32 +35,43 @@ export default async function ProgramsListPage({
     );
   }
 
+  const { data: group } = await supabase
+    .from("groups")
+    .select("name")
+    .eq("id", params.groupId)
+    .single();
+
   const { data: programs } = await supabase
     .from("programs")
-    .select("id, name, description, is_active, workouts(count)")
+    .select("id, name, is_active, cover_image_path, workouts(count)")
     .eq("group_id", params.groupId)
     .order("is_active", { ascending: false })
     .order("created_at", { ascending: false });
 
-  return (
-    <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
-      <header className="px-5 pt-8 pb-6 border-b border-steel/20">
-        <Link
-          href={`/groups/${params.groupId}`}
-          className="font-body text-xs text-steel uppercase tracking-wide"
-        >
-          &larr; Back to group
-        </Link>
-        <h1 className="font-display font-bold text-4xl leading-none mt-3 uppercase">
-          Program Builder
-        </h1>
-      </header>
+  const cards: ProgramCardData[] = (programs ?? []).map((p: any) => ({
+    id: p.id,
+    name: p.name,
+    isActive: p.is_active,
+    workoutCount: p.workouts?.[0]?.count ?? 0,
+    coverImagePath: p.cover_image_path ?? null,
+  }));
 
-      <section className="px-5 pt-6">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="font-display uppercase text-sm tracking-wide text-steel">
-            Programs
-          </h2>
+  return (
+    <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="programs">
+      <div className="pb-6 border-b border-steel/20 mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display font-bold text-3xl uppercase leading-none">Programs</h1>
+          <p className="font-body text-sm text-steel mt-2">
+            {cards.length} {cards.length === 1 ? "program" : "programs"}
+          </p>
+        </div>
+        <div className="flex items-center gap-4 shrink-0 pt-1">
+          <Link
+            href={`/groups/${params.groupId}/programs/import`}
+            className="font-body text-xs text-rust"
+          >
+            Import from file
+          </Link>
           <Link
             href={`/groups/${params.groupId}/programs/new`}
             className="font-body text-xs text-rust"
@@ -67,45 +79,9 @@ export default async function ProgramsListPage({
             + New program
           </Link>
         </div>
+      </div>
 
-        {!programs || programs.length === 0 ? (
-          <p className="font-body text-sm text-steel py-6">
-            No programs yet. Create one to start assigning workouts.
-          </p>
-        ) : (
-          <div className="divide-y divide-steel/15">
-            {programs.map((p: any) => {
-              const workoutCount = p.workouts?.[0]?.count ?? 0;
-              return (
-                <div key={p.id} className="flex items-center justify-between py-3 min-h-[56px] -mx-1 px-1">
-                  <Link
-                    href={`/groups/${params.groupId}/programs/${p.id}`}
-                    className="min-w-0 flex-1 active:opacity-70 transition-opacity"
-                  >
-                    <p className="font-body font-medium text-[15px] truncate">{p.name}</p>
-                    <p className="font-body text-xs text-steel mt-0.5">
-                      {workoutCount} {workoutCount === 1 ? "workout" : "workouts"}
-                    </p>
-                  </Link>
-                  <div className="flex items-center gap-4 shrink-0">
-                    <ProgramActiveToggle
-                      programId={p.id}
-                      groupId={params.groupId}
-                      isActive={p.is_active}
-                    />
-                    <Link
-                      href={`/groups/${params.groupId}/programs/${p.id}`}
-                      className="font-body text-xs text-rust"
-                    >
-                      Open &rarr;
-                    </Link>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </section>
-    </main>
+      <ProgramCardGrid groupId={params.groupId} programs={cards} />
+    </CoachDesktopShell>
   );
 }

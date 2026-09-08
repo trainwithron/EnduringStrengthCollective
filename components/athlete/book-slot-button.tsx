@@ -44,22 +44,15 @@ export function BookSlotButton({
       return;
     }
 
-    const { data: creditsRow } = await supabase
-      .from("session_credits")
-      .select("balance")
-      .eq("athlete_id", athleteId)
-      .eq("group_id", groupId)
-      .maybeSingle();
-
-    // A plain update, not upsert — the row always exists by the time a
-    // booking happens (the "Book" button only shows once a balance row
-    // with credits > 0 was already fetched), and upsert would need an
-    // INSERT policy the athlete doesn't have, even on the conflict path.
-    await supabase
-      .from("session_credits")
-      .update({ balance: Math.max(0, (creditsRow?.balance ?? 0) - 1) })
-      .eq("athlete_id", athleteId)
-      .eq("group_id", groupId);
+    // An atomic DB-side decrement (via a security-definer RPC) instead of
+    // read-balance-then-write — two tabs booking two different slots off
+    // the same starting balance could otherwise both succeed and leave
+    // the athlete with two bookings for one credit.
+    await supabase.rpc("adjust_session_credits", {
+      p_athlete_id: athleteId,
+      p_group_id: groupId,
+      p_delta: -1,
+    });
 
     router.refresh();
   }

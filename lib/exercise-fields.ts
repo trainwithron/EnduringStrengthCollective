@@ -115,5 +115,33 @@ export function mapSetRow(row: {
   };
 }
 
+// A one-line summary for an exercise's sets when a day is shown in
+// condensed form — "3×8", "3×30s", or just "3 sets" if the primary
+// tracked field has nothing set yet. Assumes uniform sets (same
+// convention the progression generators already use); only the first
+// set's value is shown even if later sets happen to differ.
+export function formatCondensedSets(
+  sets: { targetReps: string | null; targetTimeSeconds: number | null; targetDistance: number | null; targetHeight: number | null }[],
+  trackedFields: TrackedField[]
+): string {
+  const setCount = sets.length;
+  const first = sets[0];
+  if (!first) return `${setCount} sets`;
+
+  if (trackedFields.includes("reps") && first.targetReps) {
+    return `${setCount}×${first.targetReps}`;
+  }
+  if (trackedFields.includes("time") && first.targetTimeSeconds != null) {
+    return `${setCount}×${first.targetTimeSeconds}s`;
+  }
+  if (trackedFields.includes("distance") && first.targetDistance != null) {
+    return `${setCount}×${first.targetDistance}`;
+  }
+  if (trackedFields.includes("height") && first.targetHeight != null) {
+    return `${setCount}×${first.targetHeight}`;
+  }
+  return `${setCount} sets`;
+}
+
 export const SET_ROW_SELECT =
   "id, set_order, target_reps, target_weight, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance, rep_min, rep_max";

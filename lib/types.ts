@@ -2,12 +2,19 @@ import type { TrackedField } from "./exercise-fields";
 
 export type MemberRole = "coach" | "athlete";
 
+// One-on-one / online get the full feature set; "group" (low-ticket,
+// large-group clients) gets a reduced set — no macro programming, since
+// that's not part of what they're paying for. Null = not yet classified,
+// treated the same as full-featured until a coach sets it.
+export type ClientTier = "one_on_one" | "online" | "group" | null;
+
 export interface RosterMember {
   profileId: string;
   fullName: string;
   avatarUrl: string | null;
   role: MemberRole;
   lastWorkoutAt: string | null; // ISO timestamp, null = never logged
+  clientTier: ClientTier;
 }
 
 export interface GroupSummary {
@@ -107,6 +114,7 @@ export type FeedChannel = "announcements" | "form_checks" | "pr_board" | "genera
 
 export interface FeedPost {
   id: string;
+  groupId: string;
   postType: "user_post" | "workout_summary";
   channel: FeedChannel;
   pinnedAt: string | null;
@@ -120,6 +128,7 @@ export interface FeedPost {
     totalSetsCompleted: number | null;
     newPrs: string[];
     loggedByCoach: boolean;
+    broadcastLevel: "full" | "prs_only" | "checkin_only";
   } | null;
   reactionCount: number;
   viewerHasReacted: boolean;

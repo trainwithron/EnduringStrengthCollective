@@ -67,49 +67,60 @@ export function StartWorkoutButton({
     }
 
     // Copy the template into the athlete's own mutable rows — later
-    // swaps/additions here never touch group_workout_exercises.
-    for (const ex of exercises) {
-      const { data: sessionExercise } = await supabase
-        .from("session_exercises")
-        .insert({
+    // swaps/additions here never touch group_workout_exercises. Batched
+    // into two bulk inserts (one for every exercise, one for every set)
+    // instead of two round trips per exercise — a 6-exercise workout was
+    // previously 12 sequential requests blocking "Starting…" the whole time.
+    const { data: insertedExercises } = await supabase
+      .from("session_exercises")
+      .insert(
+        exercises.map((ex) => ({
           session_id: session.id,
           group_workout_exercise_id: ex.id,
           exercise_name: ex.exerciseName,
           exercise_order: ex.exerciseOrder,
           movement_pattern_id: ex.movementPatternId ?? null,
           tracked_fields: ex.trackedFields,
-        })
-        .select("id")
-        .single();
+        }))
+      )
+      .select("id, group_workout_exercise_id");
 
-      if (sessionExercise) {
-        const sets =
-          ex.sets.length > 0
-            ? ex.sets.map((target) => ({
-                session_exercise_id: sessionExercise.id,
-                set_order: target.setOrder,
-                // Per-set targets win; fall back to the progression rule's
-                // computed goal (same as before per-set targets existed)
-                // whenever the coach left that field blank for this set.
-                weight: target.targetWeight ?? ex.goalWeight ?? null,
-                reps: parseRepsTarget(target.targetReps) ?? ex.goalReps ?? null,
-                rpe: target.targetRpe,
-                rir: target.targetRir,
-                tempo: target.targetTempo,
-                time_seconds: target.targetTimeSeconds,
-                height: target.targetHeight,
-                distance: target.targetDistance,
-              }))
-            : [
-                {
-                  session_exercise_id: sessionExercise.id,
-                  set_order: 0,
-                  weight: ex.goalWeight ?? null,
-                  reps: ex.goalReps ?? null,
-                },
-              ];
-        await supabase.from("set_logs").insert(sets);
-      }
+    const sessionExerciseIdByTemplateId = new Map(
+      (insertedExercises ?? []).map((r) => [r.group_workout_exercise_id, r.id])
+    );
+
+    const allSets = exercises.flatMap((ex) => {
+      const sessionExerciseId = sessionExerciseIdByTemplateId.get(ex.id);
+      if (!sessionExerciseId) return [];
+
+      return ex.sets.length > 0
+        ? ex.sets.map((target) => ({
+            session_exercise_id: sessionExerciseId,
+            set_order: target.setOrder,
+            // Per-set targets win; fall back to the progression rule's
+            // computed goal (same as before per-set targets existed)
+            // whenever the coach left that field blank for this set.
+            weight: target.targetWeight ?? ex.goalWeight ?? null,
+            reps: parseRepsTarget(target.targetReps) ?? ex.goalReps ?? null,
+            rpe: target.targetRpe,
+            rir: target.targetRir,
+            tempo: target.targetTempo,
+            time_seconds: target.targetTimeSeconds,
+            height: target.targetHeight,
+            distance: target.targetDistance,
+          }))
+        : [
+            {
+              session_exercise_id: sessionExerciseId,
+              set_order: 0,
+              weight: ex.goalWeight ?? null,
+              reps: ex.goalReps ?? null,
+            },
+          ];
+    });
+
+    if (allSets.length > 0) {
+      await supabase.from("set_logs").insert(allSets);
     }
 
     router.push(`/sessions/${session.id}`);

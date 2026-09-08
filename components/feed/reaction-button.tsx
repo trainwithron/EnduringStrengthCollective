@@ -5,11 +5,13 @@ import { createBrowserClient } from "@/lib/supabase/client";
 
 export function ReactionButton({
   postId,
+  groupId,
   initialCount,
   initialReacted,
   viewerId,
 }: {
   postId: string;
+  groupId: string;
   initialCount: number;
   initialReacted: boolean;
   viewerId: string | null;
@@ -31,7 +33,7 @@ export function ReactionButton({
     if (nextReacted) {
       const { error } = await supabase
         .from("reactions")
-        .insert({ post_id: postId, profile_id: viewerId, reaction_type: "fist_bump" });
+        .insert({ post_id: postId, group_id: groupId, profile_id: viewerId, reaction_type: "fist_bump" });
       if (error) {
         setReacted(false);
         setCount((c) => Math.max(0, c - 1));

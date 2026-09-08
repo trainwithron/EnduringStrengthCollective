@@ -6,6 +6,7 @@ import { WeightLogWidget } from "@/components/athlete/weight-log-widget";
 import { TodayWidget } from "@/components/athlete/today-widget";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { isHabitDueOn } from "@/lib/habits";
+import { isPwaStandalone } from "@/lib/pwa-server";
 import type { RosterMember } from "@/lib/types";
 
 export default async function GroupHubPage({
@@ -41,7 +42,8 @@ export default async function GroupHubPage({
       `
       role,
       profiles ( id, full_name, avatar_url ),
-      profile_id
+      profile_id,
+      client_tier
     `
     )
     .eq("group_id", params.groupId);
@@ -59,12 +61,13 @@ export default async function GroupHubPage({
     }
   }
 
-  const roster: RosterMember[] = (memberships ?? []).map((m) => ({
+  const roster: RosterMember[] = (memberships ?? []).map((m: any) => ({
     profileId: m.profile_id,
     fullName: (m.profiles as any)?.full_name ?? "Unknown",
     avatarUrl: (m.profiles as any)?.avatar_url ?? null,
     role: m.role,
     lastWorkoutAt: lastLogByAthlete.get(m.profile_id) ?? null,
+    clientTier: m.client_tier ?? null,
   }));
 
   // Coaches first, then athletes, alphabetical within each group.
@@ -81,13 +84,21 @@ export default async function GroupHubPage({
     .order("created_at", { ascending: false });
 
   const isCoach = roster.some((m) => m.profileId === user?.id && m.role === "coach");
+  // A coach opening the installed home-screen app sees the same mobile
+  // experience an athlete gets — logging their own training doesn't need
+  // the desktop coaching tools. The same coach in a plain browser tab
+  // (isPwaStandalone false) still gets the desktop shell everywhere else.
+  const showMobileView = !isCoach || isPwaStandalone();
 
   let weightLogs: { id: string; loggedDate: string; weight: number }[] = [];
   let todayMacros: { calories: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null } | null = null;
   let todayHabits: { id: string; title: string; completed: boolean }[] = [];
   const todayKey = new Date().toISOString().slice(0, 10);
 
-  if (!isCoach && user) {
+  const viewerTier = roster.find((m) => m.profileId === user?.id)?.clientTier ?? null;
+  const macrosEnabled = viewerTier !== "group";
+
+  if (showMobileView && user) {
     const { data: weightRows } = await supabase
       .from("body_weight_logs")
       .select("id, logged_date, weight")
@@ -101,19 +112,23 @@ export default async function GroupHubPage({
       weight: w.weight,
     }));
 
-    const { data: macroRow } = await supabase
-      .from("daily_macros")
-      .select("calories, protein_g, carbs_g, fat_g")
-      .eq("athlete_id", user.id)
-      .eq("log_date", todayKey)
-      .maybeSingle();
-    if (macroRow) {
-      todayMacros = {
-        calories: macroRow.calories,
-        proteinG: macroRow.protein_g,
-        carbsG: macroRow.carbs_g,
-        fatG: macroRow.fat_g,
-      };
+    // Group-tier clients don't get macro programming — skip the fetch
+    // entirely rather than fetch-and-hide, same as the coach-side pages.
+    if (macrosEnabled) {
+      const { data: macroRow } = await supabase
+        .from("daily_macros")
+        .select("calories, protein_g, carbs_g, fat_g")
+        .eq("athlete_id", user.id)
+        .eq("log_date", todayKey)
+        .maybeSingle();
+      if (macroRow) {
+        todayMacros = {
+          calories: macroRow.calories,
+          proteinG: macroRow.protein_g,
+          carbsG: macroRow.carbs_g,
+          fatG: macroRow.fat_g,
+        };
+      }
     }
 
     const { data: habitRows } = await supabase
@@ -177,7 +192,7 @@ export default async function GroupHubPage({
         </section>
       )}
 
-      {!isCoach && user && (
+      {showMobileView && user && (
         <section className="px-5 pt-6 space-y-4">
           <TodayWidget todayDate={todayKey} macros={todayMacros} habits={todayHabits} />
           <WeightLogWidget
@@ -195,7 +210,7 @@ export default async function GroupHubPage({
         viewerIsCoach={isCoach}
       />
 
-      {!isCoach && <BottomTabBar groupId={params.groupId} />}
+      {showMobileView && <BottomTabBar groupId={params.groupId} />}
     </main>
   );
 }

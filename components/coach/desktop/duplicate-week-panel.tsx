@@ -40,7 +40,6 @@ export function DuplicateWeekPanel({
   const [model, setModel] = useState<Model>("linear");
   const [weeks, setWeeks] = useState("3");
   const [linearWeightPct, setLinearWeightPct] = useState("2.5");
-  const [linearRepCycle, setLinearRepCycle] = useState("");
   const [doubleWeightBumpPct, setDoubleWeightBumpPct] = useState("5");
   const [wave, setWave] = useState<UndulatingWaveStep[]>(DEFAULT_UNDULATING_WAVE);
   const [classRepsEnabled, setClassRepsEnabled] = useState(false);
@@ -116,14 +115,9 @@ export function DuplicateWeekPanel({
 
           let results: ProgressionResultWeek[];
           if (model === "linear") {
-            const repCycle = linearRepCycle
-              .split(",")
-              .map((s) => parseInt(s.trim(), 10))
-              .filter((n) => Number.isFinite(n));
             results = generateLinearProgression(source, {
               weeks: weekCount,
               weightPctIncreasePerWeek: Number(linearWeightPct) || 0,
-              repCycle: repCycle.length > 0 ? repCycle : undefined,
             });
           } else if (model === "double") {
             results = generateDoubleProgression(source, {
@@ -357,16 +351,6 @@ export function DuplicateWeekPanel({
               className="w-20 h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
             />
           </label>
-          <label className="flex items-center gap-2">
-            <span className="font-body text-xs text-steel w-40">Rep cycle (optional)</span>
-            <input
-              type="text"
-              value={linearRepCycle}
-              onChange={(e) => setLinearRepCycle(e.target.value)}
-              placeholder="e.g. 5, 8, 12"
-              className="flex-1 h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
-            />
-          </label>
         </div>
       )}
 
@@ -390,13 +374,6 @@ export function DuplicateWeekPanel({
           {["Heavy", "Moderate", "Light"].map((label, i) => (
             <div key={label} className="flex items-center gap-2">
               <span className="font-body text-xs text-steel w-20">{label}</span>
-              <span className="font-body text-[11px] text-steel">Weight %</span>
-              <input
-                type="number"
-                value={wave[i].weightPct}
-                onChange={(e) => updateWaveStep(i, { weightPct: Number(e.target.value) })}
-                className="w-16 h-8 bg-graphite border border-steel/30 text-chalk px-1 font-body text-xs"
-              />
               <span className="font-body text-[11px] text-steel">Reps</span>
               <input
                 type="number"

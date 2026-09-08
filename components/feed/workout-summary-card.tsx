@@ -19,7 +19,11 @@ export function WorkoutSummaryCard({
   isCoach: boolean;
 }) {
   const [celebrate, setCelebrate] = useState(false);
-  const hasPrs = (post.workoutSummary?.newPrs.length ?? 0) > 0;
+  const broadcastLevel = post.workoutSummary?.broadcastLevel ?? "full";
+  // A "check-in only" post never reveals PR content, even when one
+  // genuinely happened — the whole point is the lightweight badge.
+  const hasPrs = broadcastLevel !== "checkin_only" && (post.workoutSummary?.newPrs.length ?? 0) > 0;
+  const showStats = broadcastLevel === "full";
 
   useEffect(() => {
     if (hasPrs) {
@@ -68,15 +72,21 @@ export function WorkoutSummaryCard({
         </div>
 
         <div className="flex items-end justify-between">
-          <div>
-            <p className="font-display text-3xl leading-none">
-              {Math.round(volume).toLocaleString()}
-              <span className="font-body text-sm text-steel ml-1">lbs volume</span>
+          {showStats ? (
+            <div>
+              <p className="font-display text-3xl leading-none">
+                {Math.round(volume).toLocaleString()}
+                <span className="font-body text-sm text-steel ml-1">lbs volume</span>
+              </p>
+              <p className="font-body text-xs text-steel mt-1">
+                {post.workoutSummary?.totalSetsCompleted ?? 0} sets completed
+              </p>
+            </div>
+          ) : (
+            <p className="font-body text-sm text-steel">
+              {hasPrs ? "New personal record set" : "Checked in"}
             </p>
-            <p className="font-body text-xs text-steel mt-1">
-              {post.workoutSummary?.totalSetsCompleted ?? 0} sets completed
-            </p>
-          </div>
+          )}
           <ShareWorkoutButton
             postId={post.id}
             title={`${post.author.fullName} just finished a workout! 💪`}
@@ -98,6 +108,7 @@ export function WorkoutSummaryCard({
       <div className="flex items-center gap-4 mt-3">
         <ReactionButton
           postId={post.id}
+          groupId={post.groupId}
           initialCount={post.reactionCount}
           initialReacted={post.viewerHasReacted}
           viewerId={viewerId}

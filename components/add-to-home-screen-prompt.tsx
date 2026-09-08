@@ -2,21 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
+import { isStandaloneDisplay } from "@/lib/pwa";
 
 const DISMISSED_KEY = "esc-a2hs-dismissed";
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-}
-
-function isStandalone() {
-  if (typeof window === "undefined") return false;
-  return (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    // iOS Safari's own flag — not covered by the standard media query.
-    (window.navigator as any).standalone === true
-  );
 }
 
 // Shows a "put this on your home screen" banner so clients find the app
@@ -37,7 +29,7 @@ export function AddToHomeScreenPrompt() {
       // localStorage unavailable — just proceed, worst case the banner
       // can't be dismissed permanently this session.
     }
-    if (isStandalone()) return;
+    if (isStandaloneDisplay()) return;
 
     const isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
     setPlatform(isIos ? "ios" : "other");

@@ -3,6 +3,7 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { isStandaloneDisplay } from "@/lib/pwa";
 
 export default function LoginPage() {
   return (
@@ -47,9 +48,11 @@ function LoginForm() {
     }
 
     // No group-picker screen exists yet — send the athlete/coach straight to
-    // their first group rather than a dead-end home page. Coaches go to the
-    // new desktop shell (Clients); athletes keep the mobile group hub, since
-    // that's still their Home tab.
+    // their first group rather than a dead-end home page. Coaches on a
+    // real computer (or a plain mobile browser tab) go to the desktop
+    // shell (Clients); athletes, and a coach opening the installed
+    // home-screen app on their phone, land on the mobile group hub
+    // instead — logging your own training doesn't need the desktop tools.
     const { data: membership } = await supabase
       .from("group_memberships")
       .select("group_id, role")
@@ -58,10 +61,10 @@ function LoginForm() {
       .single();
 
     if (membership) {
-      const destination =
-        membership.role === "coach"
-          ? `/groups/${membership.group_id}/clients`
-          : `/groups/${membership.group_id}`;
+      const wantsMobileHome = membership.role !== "coach" || isStandaloneDisplay();
+      const destination = wantsMobileHome
+        ? `/groups/${membership.group_id}`
+        : `/groups/${membership.group_id}/clients`;
       router.push(destination);
     } else {
       router.push("/");

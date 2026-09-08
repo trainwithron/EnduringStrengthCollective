@@ -70,6 +70,7 @@ export function UserPostCard({
       <div className="flex items-center gap-4">
         <ReactionButton
           postId={post.id}
+          groupId={post.groupId}
           initialCount={post.reactionCount}
           initialReacted={post.viewerHasReacted}
           viewerId={viewerId}

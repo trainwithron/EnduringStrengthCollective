@@ -40,7 +40,7 @@ export default async function ClientCalendarDayPage({
 
   const { data: athleteMembership } = await supabase
     .from("group_memberships")
-    .select("profiles ( full_name )")
+    .select("profiles ( full_name ), client_tier")
     .eq("group_id", params.groupId)
     .eq("profile_id", params.athleteId)
     .maybeSingle();
@@ -54,6 +54,10 @@ export default async function ClientCalendarDayPage({
   }
 
   const athleteName = (athleteMembership.profiles as any)?.full_name ?? "Client";
+  // Macro programming isn't part of what a low-ticket group client pays
+  // for — the feature is hidden entirely for that tier rather than shown
+  // and blocked.
+  const macrosEnabled = athleteMembership.client_tier !== "group";
 
   const { data: group } = await supabase
     .from("groups")
@@ -219,18 +223,25 @@ export default async function ClientCalendarDayPage({
           <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
             Daily macros
           </h2>
-          <DailyMacrosForm
-            athleteId={params.athleteId}
-            groupId={params.groupId}
-            date={params.date}
-            initial={{
-              calories: macros?.calories ?? null,
-              proteinG: macros?.protein_g ?? null,
-              carbsG: macros?.carbs_g ?? null,
-              fatG: macros?.fat_g ?? null,
-            }}
-            latestBodyWeight={latestWeightRow?.weight ?? null}
-          />
+          {macrosEnabled ? (
+            <DailyMacrosForm
+              athleteId={params.athleteId}
+              groupId={params.groupId}
+              date={params.date}
+              initial={{
+                calories: macros?.calories ?? null,
+                proteinG: macros?.protein_g ?? null,
+                carbsG: macros?.carbs_g ?? null,
+                fatG: macros?.fat_g ?? null,
+              }}
+              latestBodyWeight={latestWeightRow?.weight ?? null}
+            />
+          ) : (
+            <p className="font-body text-xs text-steel">
+              Not included for this client&apos;s tier (Group). Change their tier from the Clients
+              page to enable macro programming.
+            </p>
+          )}
         </section>
 
         <section className="border border-steel/20 p-4">

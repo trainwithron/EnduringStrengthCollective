@@ -3,6 +3,9 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { SignOutButton } from "@/components/group/sign-out-button";
+import { FeedBroadcastSettings } from "@/components/athlete/feed-broadcast-settings";
+import { PushNotificationToggle } from "@/components/athlete/push-notification-toggle";
+import { WearablePlaceholder } from "@/components/athlete/wearable-placeholder";
 
 export default async function SettingsPage({
   params,
@@ -20,7 +23,7 @@ export default async function SettingsPage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, avatar_url")
+    .select("full_name, avatar_url, feed_broadcast_level")
     .eq("id", user.id)
     .single();
 
@@ -43,12 +46,53 @@ export default async function SettingsPage({
       </section>
 
       <section className="px-5 pt-8">
+        <div className="pb-4 border-b border-steel/20">
+          <PushNotificationToggle />
+        </div>
+        <div className="pb-4 border-b border-steel/20 pt-4">
+          <WearablePlaceholder />
+        </div>
+        <div className="pb-4 border-b border-steel/20 pt-4">
+          <FeedBroadcastSettings
+            initialLevel={
+              (profile?.feed_broadcast_level as
+                | "full"
+                | "prs_only"
+                | "checkin_only"
+                | "private") ?? "full"
+            }
+          />
+        </div>
         <div className="border-t border-steel/20 pt-4">
           <Link
             href={`/groups/${params.groupId}/tools/one-rep-max`}
             className="font-body text-sm text-rust"
           >
             1RM Calculator
+          </Link>
+        </div>
+        <div className="border-t border-steel/20 pt-4 mt-4">
+          <Link
+            href={`/groups/${params.groupId}/tools/macro-calculator`}
+            className="font-body text-sm text-rust"
+          >
+            Macro Calculator
+          </Link>
+        </div>
+        <div className="border-t border-steel/20 pt-4 mt-4">
+          <Link
+            href={`/groups/${params.groupId}/referrals`}
+            className="font-body text-sm text-rust"
+          >
+            Referral Directory
+          </Link>
+        </div>
+        <div className="border-t border-steel/20 pt-4 mt-4">
+          <Link
+            href={`/groups/${params.groupId}/leaderboard`}
+            className="font-body text-sm text-rust"
+          >
+            Leaderboard
           </Link>
         </div>
         <div className="border-t border-steel/20 pt-4 mt-4">

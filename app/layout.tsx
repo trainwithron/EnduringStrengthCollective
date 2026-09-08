@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AddToHomeScreenPrompt } from "@/components/add-to-home-screen-prompt";
+import { PwaContextCookie } from "@/components/pwa-context-cookie";
 
 export const metadata: Metadata = {
   title: "The Enduring Strength Collective",
@@ -29,6 +30,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="font-body bg-graphite text-chalk min-h-screen">
+        <PwaContextCookie />
         <AddToHomeScreenPrompt />
         {children}
       </body>

@@ -5,16 +5,25 @@ import Link from "next/link";
 import {
   LayoutGrid,
   Dumbbell,
-  Calculator,
   ChevronDown,
   ChevronRight,
-  CalendarClock,
   CalendarDays,
   MessagesSquare,
   Users,
+  LayoutDashboard,
+  Palette,
+  TrendingUp,
+  HeartHandshake,
+  Flag,
+  Trophy,
+  Split,
+  ChefHat,
+  Smartphone,
 } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
+import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { BUTTON_SHAPE_RADIUS, type ButtonShape, type DisplayFont, type BodyFont } from "@/lib/theme";
 
 function NavBadge({ count }: { count: number }) {
   if (count <= 0) return null;
@@ -28,13 +37,21 @@ function NavBadge({ count }: { count: number }) {
 const SIDEBAR_WIDTH = 240;
 
 type Active =
+  | "dashboard"
   | "programs"
   | "exercise-library"
+  | "recipes"
   | "tools"
   | "availability"
   | "calendar"
   | "feed"
-  | "clients";
+  | "clients"
+  | "branding"
+  | "business"
+  | "referrals"
+  | "challenges"
+  | "leaderboard"
+  | "revenue-splits";
 
 export function CoachDesktopShell({
   groupId,
@@ -48,10 +65,62 @@ export function CoachDesktopShell({
   children: React.ReactNode;
 }) {
   const programmingActive =
-    active === "programs" || active === "exercise-library" || active === "tools";
+    active === "programs" || active === "exercise-library" || active === "recipes";
   const [programmingOpen, setProgrammingOpen] = useState(true);
+  const businessActive =
+    active === "business" || active === "branding" || active === "revenue-splits";
+  const [businessOpen, setBusinessOpen] = useState(true);
   const [feedUnread, setFeedUnread] = useState(0);
   const [clientsUnread, setClientsUnread] = useState(0);
+  const [branding, setBranding] = useState<{
+    buttonShape: ButtonShape;
+    accentColor: string;
+    backgroundColor: string;
+    textColor: string;
+    fontDisplay: DisplayFont;
+    fontBody: BodyFont;
+  } | null>(null);
+
+  // Organization-wide desktop branding (button shape, colors, fonts) —
+  // every coach in the same organization shares one visual identity.
+  // Applied as CSS custom properties on this shell's own root element,
+  // so it never touches the athlete mobile app, which never renders
+  // inside this component.
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      const supabase = createBrowserClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: membership } = await supabase
+        .from("organization_memberships")
+        .select("organization_id")
+        .eq("profile_id", user.id)
+        .limit(1)
+        .maybeSingle();
+      if (!membership) return;
+      const { data } = await supabase
+        .from("organizations")
+        .select("button_shape, accent_color, background_color, text_color, font_display, font_body")
+        .eq("id", membership.organization_id)
+        .maybeSingle();
+      if (cancelled) return;
+      setBranding({
+        buttonShape: (data?.button_shape as ButtonShape) ?? "sharp",
+        accentColor: data?.accent_color ?? "#C4622D",
+        backgroundColor: data?.background_color ?? "#1C1B1A",
+        textColor: data?.text_color ?? "#EDE8E0",
+        fontDisplay: (data?.font_display as DisplayFont) ?? "Barlow Condensed",
+        fontBody: (data?.font_body as BodyFont) ?? "Inter",
+      });
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // "What's new" badges: how many posts / client check-ins happened since
   // this coach last actually opened Team Feed / Clients for this group.
@@ -128,16 +197,36 @@ export function CoachDesktopShell({
       href: `/groups/${groupId}/exercise-library`,
       icon: Dumbbell,
     },
+    { key: "recipes", label: "Recipe Hub", href: `/groups/${groupId}/recipes`, icon: ChefHat },
+  ];
+
+  const businessItems: { key: Active; label: string; href: string; icon: typeof TrendingUp }[] = [
+    { key: "business", label: "Overview", href: `/groups/${groupId}/business`, icon: TrendingUp },
+    { key: "branding", label: "Organization", href: `/groups/${groupId}/branding`, icon: Palette },
     {
-      key: "tools",
-      label: "1RM Calculator",
-      href: `/groups/${groupId}/tools/one-rep-max`,
-      icon: Calculator,
+      key: "revenue-splits",
+      label: "Revenue Splits",
+      href: `/groups/${groupId}/revenue-splits`,
+      icon: Split,
     },
   ];
 
+  const brandingStyle = branding
+    ? ({
+        "--rust": branding.accentColor,
+        "--graphite": branding.backgroundColor,
+        "--chalk": branding.textColor,
+        "--font-display": `"${branding.fontDisplay}"`,
+        "--font-body": `"${branding.fontBody}"`,
+        "--btn-radius": BUTTON_SHAPE_RADIUS[branding.buttonShape],
+      } as React.CSSProperties)
+    : undefined;
+
   return (
-    <div className="min-h-screen bg-graphite text-chalk font-body flex">
+    <div
+      className="coach-branded-shell min-h-screen bg-graphite text-chalk font-body flex"
+      style={brandingStyle}
+    >
       <aside
         className="shrink-0 border-r border-steel/20 flex flex-col"
         style={{ width: SIDEBAR_WIDTH }}
@@ -150,6 +239,58 @@ export function CoachDesktopShell({
         </div>
 
         <nav className="flex-1 py-3">
+          <Link
+            href={`/groups/${groupId}/dashboard`}
+            className={`flex items-center gap-3 px-5 h-11 font-body text-sm transition-colors ${
+              active === "dashboard"
+                ? "text-rust bg-rust/10 border-r-2 border-rust"
+                : "text-steel active:text-chalk"
+            }`}
+          >
+            <LayoutDashboard className="w-4 h-4 shrink-0" strokeWidth={2.25} />
+            Dashboard
+          </Link>
+
+          <button
+            type="button"
+            onClick={() => setBusinessOpen((v) => !v)}
+            className={`w-full flex items-center gap-3 px-5 h-11 font-body text-sm transition-colors ${
+              businessActive && !businessOpen
+                ? "text-rust bg-rust/10 border-r-2 border-rust"
+                : "text-steel active:text-chalk"
+            }`}
+          >
+            {businessOpen ? (
+              <ChevronDown className="w-4 h-4 shrink-0" strokeWidth={2.25} />
+            ) : (
+              <ChevronRight className="w-4 h-4 shrink-0" strokeWidth={2.25} />
+            )}
+            Business
+          </button>
+
+          {businessOpen && (
+            <div>
+              {businessItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = active === item.key;
+                return (
+                  <Link
+                    key={item.key}
+                    href={item.href}
+                    className={`flex items-center gap-3 pl-11 pr-5 h-10 font-body text-sm transition-colors ${
+                      isActive
+                        ? "text-rust bg-rust/10 border-r-2 border-rust"
+                        : "text-steel active:text-chalk"
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5 shrink-0" strokeWidth={2.25} />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+
           <Link
             href={`/groups/${groupId}/clients`}
             className={`flex items-center gap-3 px-5 h-11 font-body text-sm transition-colors ${
@@ -204,18 +345,6 @@ export function CoachDesktopShell({
           )}
 
           <Link
-            href={`/groups/${groupId}/availability`}
-            className={`flex items-center gap-3 px-5 h-11 font-body text-sm transition-colors ${
-              active === "availability"
-                ? "text-rust bg-rust/10 border-r-2 border-rust"
-                : "text-steel active:text-chalk"
-            }`}
-          >
-            <CalendarClock className="w-4 h-4 shrink-0" strokeWidth={2.25} />
-            Availability
-          </Link>
-
-          <Link
             href={`/groups/${groupId}/calendar`}
             className={`flex items-center gap-3 px-5 h-11 font-body text-sm transition-colors ${
               active === "calendar"
@@ -239,9 +368,48 @@ export function CoachDesktopShell({
             Team Feed
             <NavBadge count={feedUnread} />
           </Link>
+
+          <Link
+            href={`/groups/${groupId}/leaderboard`}
+            className={`flex items-center gap-3 px-5 h-11 font-body text-sm transition-colors ${
+              active === "leaderboard"
+                ? "text-rust bg-rust/10 border-r-2 border-rust"
+                : "text-steel active:text-chalk"
+            }`}
+          >
+            <Trophy className="w-4 h-4 shrink-0" strokeWidth={2.25} />
+            Leaderboard
+          </Link>
+
+          <Link
+            href={`/groups/${groupId}/challenges`}
+            className={`flex items-center gap-3 px-5 h-11 font-body text-sm transition-colors ${
+              active === "challenges"
+                ? "text-rust bg-rust/10 border-r-2 border-rust"
+                : "text-steel active:text-chalk"
+            }`}
+          >
+            <Flag className="w-4 h-4 shrink-0" strokeWidth={2.25} />
+            Challenges
+          </Link>
+
+          <Link
+            href={`/groups/${groupId}/referrals`}
+            className={`flex items-center gap-3 px-5 h-11 font-body text-sm transition-colors ${
+              active === "referrals"
+                ? "text-rust bg-rust/10 border-r-2 border-rust"
+                : "text-steel active:text-chalk"
+            }`}
+          >
+            <HeartHandshake className="w-4 h-4 shrink-0" strokeWidth={2.25} />
+            Referrals
+          </Link>
         </nav>
 
-        <div className="px-5 py-4 border-t border-steel/20">
+        <div className="border-t border-steel/20 py-2">
+          <DownloadAppButton />
+        </div>
+        <div className="px-5 py-4 border-t border-steel/20 space-y-3">
           <SignOutButton />
         </div>
       </aside>

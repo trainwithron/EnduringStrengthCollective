@@ -9,16 +9,23 @@ export default {
   theme: {
     extend: {
       colors: {
-        graphite: "#1C1B1A",
+        // rust/graphite reference CSS custom properties (defaulted in
+        // globals.css's :root) so the coach desktop shell can override
+        // them locally per-coach for branding, without touching every
+        // component that uses bg-rust/text-graphite/etc.
+        graphite: "var(--graphite)",
         surface: "#262422",
-        rust: "#C4622D",
-        chalk: "#EDE8E0",
+        rust: "var(--rust)",
+        chalk: "var(--chalk)",
         steel: "#8A8578",
         moss: "#6B8F71",
       },
       fontFamily: {
-        display: ["Barlow Condensed", "sans-serif"],
-        body: ["Inter", "sans-serif"],
+        // Same var()-reference trick as the colors above — lets the
+        // coach desktop shell swap fonts per-coach without editing
+        // every component that uses font-display/font-body.
+        display: ["var(--font-display)", "sans-serif"],
+        body: ["var(--font-body)", "sans-serif"],
       },
     },
   },

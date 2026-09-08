@@ -16,16 +16,17 @@ export function SessionCreditsControl({
   const [saving, setSaving] = useState(false);
 
   async function adjust(delta: number) {
-    const next = Math.max(0, balance + delta);
-    setBalance(next);
     setSaving(true);
     const supabase = createBrowserClient();
-    await supabase
-      .from("session_credits")
-      .upsert(
-        { athlete_id: athleteId, group_id: groupId, balance: next },
-        { onConflict: "athlete_id,group_id" }
-      );
+    // An atomic DB-side increment rather than read-then-write — closes the
+    // same race the booking flow had (two edits landing off the same
+    // stale starting balance).
+    const { data: newBalance } = await supabase.rpc("adjust_session_credits", {
+      p_athlete_id: athleteId,
+      p_group_id: groupId,
+      p_delta: delta,
+    });
+    if (typeof newBalance === "number") setBalance(newBalance);
     setSaving(false);
   }
 

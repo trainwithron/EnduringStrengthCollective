@@ -4,7 +4,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { HabitManager, type ClientHabit } from "@/components/coach/desktop/habit-manager";
 import { computeScheduledDates } from "@/lib/program-schedule";
-import { isHabitDueOn } from "@/lib/habits";
+import { isHabitDueOn, habitFrequencyLabel } from "@/lib/habits";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
@@ -54,7 +54,7 @@ export default async function ClientCalendarPage({
 
   const { data: athleteMembership } = await supabase
     .from("group_memberships")
-    .select("profiles ( full_name )")
+    .select("profiles ( full_name ), client_tier")
     .eq("group_id", params.groupId)
     .eq("profile_id", params.athleteId)
     .maybeSingle();
@@ -68,6 +68,10 @@ export default async function ClientCalendarPage({
   }
 
   const athleteName = (athleteMembership.profiles as any)?.full_name ?? "Client";
+  // Macro programming isn't part of what a low-ticket group client pays
+  // for — same gate as the day-detail page, applied here too so it's
+  // never surfaced anywhere on this client's calendar.
+  const macrosEnabled = athleteMembership.client_tier !== "group";
 
   const { data: group } = await supabase
     .from("groups")
@@ -163,6 +167,10 @@ export default async function ClientCalendarPage({
     active: h.active,
   }));
   const activeHabits = habits.filter((h) => h.active);
+  // A habit due literally every day adds nothing by repeating on every
+  // single cell/row — surface those once, up front, instead.
+  const dailyHabits = activeHabits.filter((h) => h.weekdays.length === 7);
+  const variableHabits = activeHabits.filter((h) => h.weekdays.length !== 7);
 
   const { data: habitLogRows } = await supabase
     .from("habit_logs")
@@ -174,14 +182,29 @@ export default async function ClientCalendarPage({
     (habitLogRows ?? []).filter((l) => l.completed_at).map((l) => `${l.habit_id}:${l.log_date}`)
   );
 
-  // Daily macro targets this month.
-  const { data: macroRows } = await supabase
-    .from("daily_macros")
-    .select("log_date, calories, protein_g, carbs_g, fat_g")
-    .eq("athlete_id", params.athleteId)
-    .gte("log_date", rangeStart)
-    .lte("log_date", rangeEnd);
+  // Daily macro targets this month — never fetched for a group-tier
+  // client, so there's nothing to accidentally render for them below.
+  const { data: macroRows } = macrosEnabled
+    ? await supabase
+        .from("daily_macros")
+        .select("log_date, calories, protein_g, carbs_g, fat_g")
+        .eq("athlete_id", params.athleteId)
+        .gte("log_date", rangeStart)
+        .lte("log_date", rangeEnd)
+    : { data: [] };
   const macrosByDateKey = new Map((macroRows ?? []).map((m) => [m.log_date, m]));
+
+  // Saved meal plans this month — never fetched for a group-tier client,
+  // same gate as daily macros above.
+  const { data: mealPlanRows } = macrosEnabled
+    ? await supabase
+        .from("meal_plans")
+        .select("log_date, meal_count, include_snack")
+        .eq("athlete_id", params.athleteId)
+        .gte("log_date", rangeStart)
+        .lte("log_date", rangeEnd)
+    : { data: [] };
+  const mealPlanByDateKey = new Map((mealPlanRows ?? []).map((m) => [m.log_date, m]));
 
   // The coach's own bookings this month, across every client — an overlay
   // so scheduling for this athlete doesn't happen blind to the coach's own
@@ -222,6 +245,12 @@ export default async function ClientCalendarPage({
         {athleteName}&apos;s Calendar
       </h1>
 
+      {dailyHabits.length > 0 && (
+        <p className="font-body text-xs text-steel mb-4">
+          Daily habits: {dailyHabits.map((h) => h.title).join(", ")}
+        </p>
+      )}
+
       <div className="grid grid-cols-[1fr_280px] gap-8 items-start">
         <div>
           <div className="flex items-center justify-between mb-3">
@@ -255,8 +284,9 @@ export default async function ClientCalendarPage({
               const programWorkout = workoutByDateKey.get(key);
               const done = programWorkout ? loggedIds.has(programWorkout.id) : false;
               const macros = macrosByDateKey.get(key);
+              const mealPlan = mealPlanByDateKey.get(key);
               const bookingCount = bookingCountByDateKey.get(key) ?? 0;
-              const dueHabits = activeHabits.filter((h) => isHabitDueOn(h.weekdays, date));
+              const dueHabits = variableHabits.filter((h) => isHabitDueOn(h.weekdays, date));
 
               return (
                 <Link
@@ -274,11 +304,18 @@ export default async function ClientCalendarPage({
                     >
                       {date.getDate()}
                     </span>
-                    {bookingCount > 0 && (
-                      <span className="font-body text-[9px] text-steel">
-                        📅 {bookingCount}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1.5">
+                      {mealPlan && (
+                        <span className="font-body text-[9px] text-steel" title={`${mealPlan.meal_count} meals${mealPlan.include_snack ? " + snack" : ""}`}>
+                          🍽
+                        </span>
+                      )}
+                      {bookingCount > 0 && (
+                        <span className="font-body text-[9px] text-steel">
+                          📅 {bookingCount}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   {override ? (
                     <span className="font-body text-[10px] leading-tight text-rust">
@@ -326,7 +363,7 @@ export default async function ClientCalendarPage({
         <HabitManager athleteId={params.athleteId} groupId={params.groupId} initialHabits={habits} />
       </div>
 
-      {(macrosByDateKey.size > 0 || activeHabits.length > 0 || assignmentByDateKey.size > 0) && (
+      {(macrosByDateKey.size > 0 || activeHabits.length > 0 || assignmentByDateKey.size > 0 || mealPlanByDateKey.size > 0) && (
         <section className="mt-8">
           <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
             This month&apos;s assignments
@@ -339,7 +376,8 @@ export default async function ClientCalendarPage({
                 return (
                   assignmentByDateKey.has(k) ||
                   macrosByDateKey.has(k) ||
-                  activeHabits.some((h) => isHabitDueOn(h.weekdays, d))
+                  mealPlanByDateKey.has(k) ||
+                  variableHabits.some((h) => isHabitDueOn(h.weekdays, d))
                 );
               })
               .map((date) => {
@@ -347,7 +385,8 @@ export default async function ClientCalendarPage({
                 const override = assignmentByDateKey.get(key);
                 const programWorkout = workoutByDateKey.get(key);
                 const macros = macrosByDateKey.get(key);
-                const dueHabits = activeHabits.filter((h) => isHabitDueOn(h.weekdays, date));
+                const mealPlan = mealPlanByDateKey.get(key);
+                const dueHabits = variableHabits.filter((h) => isHabitDueOn(h.weekdays, date));
                 return (
                   <div key={key} className="py-2.5 flex items-start gap-4">
                     <span className="font-body text-xs text-steel w-16 shrink-0 pt-0.5">
@@ -363,6 +402,11 @@ export default async function ClientCalendarPage({
                         ? `${macros.calories} cal${macros.protein_g != null ? ` · ${macros.protein_g}p` : ""}${
                             macros.carbs_g != null ? ` · ${macros.carbs_g}c` : ""
                           }${macros.fat_g != null ? ` · ${macros.fat_g}f` : ""}`
+                        : "—"}
+                    </span>
+                    <span className="font-body text-xs text-steel flex-1 min-w-0">
+                      {mealPlan
+                        ? `🍽 ${mealPlan.meal_count} meals${mealPlan.include_snack ? " + snack" : ""}`
                         : "—"}
                     </span>
                     <span className="font-body text-xs text-steel flex-1 min-w-0">

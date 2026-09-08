@@ -4,7 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { Trash2 } from "lucide-react";
-import { AddHabitForm, WEEKDAYS } from "./add-habit-form";
+import { AddHabitForm } from "./add-habit-form";
+import { habitFrequencyLabel } from "@/lib/habits";
 
 export interface ClientHabit {
   id: string;
@@ -49,11 +50,7 @@ export function HabitManager({
             <div key={h.id} className="py-2 flex items-center justify-between gap-2">
               <div>
                 <p className="font-body text-sm">{h.title}</p>
-                <p className="font-body text-[11px] text-steel">
-                  {WEEKDAYS.filter((w) => h.weekdays.includes(w.value))
-                    .map((w) => w.label)
-                    .join(" ")}
-                </p>
+                <p className="font-body text-[11px] text-steel">{habitFrequencyLabel(h.weekdays)}</p>
               </div>
               <button
                 type="button"

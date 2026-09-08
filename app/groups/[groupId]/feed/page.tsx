@@ -6,6 +6,7 @@ import { PostComposerDesktop } from "@/components/feed/desktop/post-composer-des
 import { ChannelTabs } from "@/components/feed/channel-tabs";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
+import { isPwaStandalone } from "@/lib/pwa-server";
 import type { FeedChannel, FeedPost } from "@/lib/types";
 
 const VALID_CHANNELS: FeedChannel[] = ["announcements", "form_checks", "pr_board", "general"];
@@ -29,8 +30,11 @@ export default async function FeedPage({
     .eq("profile_id", user?.id ?? "")
     .maybeSingle();
 
-  const isAthlete = membership?.role === "athlete";
   const isCoach = membership?.role === "coach";
+  // A coach opening the installed home-screen app gets the same mobile
+  // feed an athlete gets, so they can post/react/comment naturally
+  // instead of the desktop composer built for running a business.
+  const showMobileView = !isCoach || isPwaStandalone();
 
   const channel: FeedChannel = VALID_CHANNELS.includes(searchParams.channel as FeedChannel)
     ? (searchParams.channel as FeedChannel)
@@ -40,7 +44,7 @@ export default async function FeedPage({
     .from("posts")
     .select(
       `
-      id, post_type, channel, pinned_at, body, media_url, media_type, created_at,
+      id, post_type, channel, pinned_at, body, media_url, media_type, created_at, broadcast_level,
       profiles!posts_author_id_fkey ( id, full_name, avatar_url ),
       workout_logs ( total_volume, total_sets_completed, new_prs, logged_by_coach ),
       reactions ( profile_id ),
@@ -55,6 +59,7 @@ export default async function FeedPage({
 
   const shaped: FeedPost[] = (posts ?? []).map((p: any) => ({
     id: p.id,
+    groupId: params.groupId,
     postType: p.post_type,
     channel: p.channel,
     pinnedAt: p.pinned_at,
@@ -73,6 +78,7 @@ export default async function FeedPage({
           totalSetsCompleted: p.workout_logs.total_sets_completed,
           newPrs: p.workout_logs.new_prs ?? [],
           loggedByCoach: p.workout_logs.logged_by_coach ?? false,
+          broadcastLevel: p.broadcast_level ?? "full",
         }
       : null,
     reactionCount: p.reactions?.length ?? 0,
@@ -82,7 +88,7 @@ export default async function FeedPage({
     commentCount: p.comments?.length ?? 0,
   }));
 
-  if (isCoach) {
+  if (isCoach && !showMobileView) {
     const { data: group } = await supabase
       .from("groups")
       .select("name")
@@ -147,12 +153,12 @@ export default async function FeedPage({
       />
       <NewPostComposer
         groupId={params.groupId}
-        raised={isAthlete}
+        raised={showMobileView}
         defaultChannel={channel}
         isCoach={isCoach}
       />
 
-      {isAthlete && <BottomTabBar groupId={params.groupId} activeOverride="feed" />}
+      {showMobileView && <BottomTabBar groupId={params.groupId} activeOverride="feed" />}
     </main>
   );
 }
