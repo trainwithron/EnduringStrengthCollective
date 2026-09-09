@@ -63,8 +63,9 @@ export default async function ImportProgramPage(
           Import a program
         </h1>
         <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
-          Upload a spreadsheet export from another platform — the program is built and ready
-          automatically, no review step in between.
+          Upload a spreadsheet export from another platform — exercises are matched against your
+          library automatically. You&apos;ll only be stopped to double-check anything that was
+          guessed rather than matched exactly; everything else builds straight through.
         </p>
       </div>
 
