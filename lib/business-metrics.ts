@@ -43,6 +43,46 @@ export function computeEngagement(
   };
 }
 
+// Real, Stripe-sourced figures — additive to the estimated functions
+// above, not a replacement. A coach with no packages set up yet still
+// sees the manual-rate estimate; these take over once real purchases/
+// subscriptions exist (see app/groups/[groupId]/business/page.tsx).
+
+export interface RealIncomeEvent {
+  amountCents: number;
+  createdAtDateKey: string; // "YYYY-MM-DD"
+}
+
+export function computeRealIncomeThisMonth(events: RealIncomeEvent[], monthKey: string): number {
+  // monthKey is "YYYY-MM" — a plain prefix match on the date key.
+  const cents = events
+    .filter((e) => e.createdAtDateKey.startsWith(monthKey))
+    .reduce((sum, e) => sum + e.amountCents, 0);
+  return cents / 100;
+}
+
+export interface ActiveSubscription {
+  priceCents: number | null;
+  status: "active" | "past_due" | "canceled" | "incomplete";
+}
+
+export function computeRealMRR(subs: ActiveSubscription[]): number {
+  const cents = subs
+    .filter((s) => s.status === "active")
+    .reduce((sum, s) => sum + (s.priceCents ?? 0), 0);
+  return cents / 100;
+}
+
+export interface PayingClient {
+  athleteId: string;
+  hasActivePurchaseOrSub: boolean;
+}
+
+export function computeActivePayingClients(clients: PayingClient[]): number {
+  const uniqueIds = new Set(clients.filter((c) => c.hasActivePurchaseOrSub).map((c) => c.athleteId));
+  return uniqueIds.size;
+}
+
 export interface GrowthBucket {
   monthLabel: string; // "Jan 2026"
   count: number;

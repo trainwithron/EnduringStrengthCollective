@@ -10,7 +10,6 @@ import { BookSlotButton } from "@/components/athlete/book-slot-button";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { RescheduleSlotButton } from "@/components/athlete/reschedule-slot-button";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
-import { BuyCreditsButton } from "@/components/athlete/buy-credits-button";
 import { DayHourGrid } from "@/components/coach/desktop/day-hour-grid";
 
 export default async function CoachDayDetailPage(
@@ -155,7 +154,12 @@ export default async function CoachDayDetailPage(
               </p>
               {creditBalance <= 0 && !reschedulingBooking && (
                 <div className="mt-2">
-                  <BuyCreditsButton groupId={params.groupId} />
+                  <Link
+                    href={`/groups/${params.groupId}/settings`}
+                    className="inline-flex items-center h-9 px-3.5 bg-rust text-graphite font-body text-xs font-medium"
+                  >
+                    Buy more sessions
+                  </Link>
                 </div>
               )}
             </div>

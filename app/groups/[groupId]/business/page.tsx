@@ -6,6 +6,9 @@ import {
   computeEstimatedMRR,
   computeEngagement,
   computeMonthlyGrowth,
+  computeRealIncomeThisMonth,
+  computeRealMRR,
+  computeActivePayingClients,
 } from "@/lib/business-metrics";
 
 function dateKey(d: Date): string {
@@ -123,6 +126,50 @@ export default async function BusinessDashboardPage(
     .eq("coach_id", user.id);
   const totalProShopClicks = (proShopRows ?? []).reduce((sum, r) => sum + (r.click_count ?? 0), 0);
 
+  // Real, Stripe-sourced figures — additive to the manual-rate estimate
+  // below, not a replacement. A coach with no packages configured yet
+  // simply gets 0 here and keeps seeing the estimate as their only signal.
+  const safeGroupIds = groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"];
+  const monthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+
+  const { data: purchaseRows } = await supabase
+    .from("credit_purchases")
+    .select("athlete_id, amount_cents, created_at")
+    .in("group_id", safeGroupIds);
+
+  const { data: subscriptionRows } = await supabase
+    .from("membership_subscriptions")
+    .select("athlete_id, price_cents, status")
+    .in("group_id", safeGroupIds);
+
+  const realIncomeThisMonth = computeRealIncomeThisMonth(
+    (purchaseRows ?? []).map((p) => ({
+      amountCents: p.amount_cents,
+      createdAtDateKey: dateKey(new Date(p.created_at)),
+    })),
+    monthKey
+  );
+  const realMRR = computeRealMRR(
+    (subscriptionRows ?? []).map((s) => ({
+      priceCents: s.price_cents,
+      status: s.status as "active" | "past_due" | "canceled" | "incomplete",
+    }))
+  );
+
+  const athleteIdsWithPurchase = new Set((purchaseRows ?? []).map((p) => p.athlete_id));
+  const athleteIdsWithActiveSub = new Set(
+    (subscriptionRows ?? []).filter((s) => s.status === "active").map((s) => s.athlete_id)
+  );
+  const creditBalanceByAthlete = new Map((creditRows ?? []).map((r) => [r.athlete_id, r.balance ?? 0]));
+  const payingClientsCount = computeActivePayingClients(
+    [...uniqueAthleteIds].map((athleteId) => ({
+      athleteId,
+      hasActivePurchaseOrSub:
+        athleteIdsWithActiveSub.has(athleteId) ||
+        (athleteIdsWithPurchase.has(athleteId) && (creditBalanceByAthlete.get(athleteId) ?? 0) > 0),
+    }))
+  );
+
   const estimatedMRR = computeEstimatedMRR(clients.map((c) => ({ monthlyRate: c.monthlyRate })));
   const engagement = computeEngagement(
     [...uniqueAthleteIds].map((id) => ({ lastActiveDateKey: lastActiveByAthlete.get(id) ?? null })),
@@ -146,25 +193,41 @@ export default async function BusinessDashboardPage(
       <div className="pb-6 border-b border-steel/20 mb-6">
         <h1 className="font-display font-bold text-3xl uppercase leading-none">Business</h1>
         <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
-          A snapshot across every group you coach. Revenue here is estimated from the rates you set
-          below — no payment processor is connected yet.
+          A snapshot across every group you coach.{" "}
+          {realMRR > 0 || realIncomeThisMonth > 0
+            ? "Income and MRR below are real, from your connected packages."
+            : "Set up packages to see real income and MRR here — until then, the manual rate estimate below is your only signal."}
         </p>
       </div>
 
-      <div className="grid grid-cols-6 gap-4 mb-8">
+      <div className="grid grid-cols-4 gap-4 mb-8">
+        <div className="border border-steel/20 p-4">
+          <p className="font-display text-3xl leading-none">${realIncomeThisMonth.toLocaleString()}</p>
+          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Income this month</p>
+          <p className="font-body text-[11px] text-steel mt-0.5">Real, from purchased packages</p>
+        </div>
+        <div className="border border-steel/20 p-4">
+          <p className="font-display text-3xl leading-none">
+            ${(realMRR > 0 ? realMRR : estimatedMRR).toLocaleString()}
+          </p>
+          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">
+            {realMRR > 0 ? "MRR" : "Estimated MRR"}
+          </p>
+          <p className="font-body text-[11px] text-steel mt-0.5">
+            {realMRR > 0 ? "From active subscriptions" : "From rates set below"}
+          </p>
+        </div>
         <div className="border border-steel/20 p-4">
           <p className="font-display text-3xl leading-none">{uniqueAthleteIds.size}</p>
-          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Active clients</p>
+          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Roster size</p>
           {newThisMonth > 0 && (
             <p className="font-body text-[11px] text-positive mt-0.5">+{newThisMonth} this month</p>
           )}
         </div>
         <div className="border border-steel/20 p-4">
-          <p className="font-display text-3xl leading-none">
-            ${estimatedMRR.toLocaleString()}
-          </p>
-          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Estimated MRR</p>
-          <p className="font-body text-[11px] text-steel mt-0.5">From rates set below</p>
+          <p className="font-display text-3xl leading-none">{payingClientsCount}</p>
+          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Paying clients</p>
+          <p className="font-body text-[11px] text-steel mt-0.5">Active subscription or unused credits</p>
         </div>
         <div className="border border-steel/20 p-4">
           <p className="font-display text-3xl leading-none">{totalOutstandingCredits}</p>

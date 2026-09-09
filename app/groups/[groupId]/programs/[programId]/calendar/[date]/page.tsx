@@ -8,7 +8,6 @@ import { BookSlotButton } from "@/components/athlete/book-slot-button";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { RescheduleSlotButton } from "@/components/athlete/reschedule-slot-button";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
-import { BuyCreditsButton } from "@/components/athlete/buy-credits-button";
 import { TodayWidget } from "@/components/athlete/today-widget";
 import { DayMealsView } from "@/components/athlete/day-meals-view";
 import { computeScheduledDates } from "@/lib/program-schedule";
@@ -262,7 +261,12 @@ export default async function DayDetailPage(
             </p>
             {creditBalance <= 0 && !reschedulingBooking && (
               <div className="mt-2">
-                <BuyCreditsButton groupId={params.groupId} />
+                <Link
+                  href={`/groups/${params.groupId}/settings`}
+                  className="inline-flex items-center h-9 px-3.5 bg-rust text-graphite font-body text-xs font-medium"
+                >
+                  Buy more sessions
+                </Link>
               </div>
             )}
           </div>

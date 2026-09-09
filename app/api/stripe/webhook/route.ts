@@ -37,6 +37,7 @@ export async function POST(request: Request) {
         const session = event.data.object as Stripe.Checkout.Session;
         const athleteId = session.metadata?.athlete_id;
         const groupId = session.metadata?.group_id;
+        const coachPackageId = session.metadata?.coach_package_id ?? null;
         if (!athleteId || !groupId) break;
 
         if (session.mode === "payment") {
@@ -51,6 +52,7 @@ export async function POST(request: Request) {
             stripe_checkout_session_id: session.id,
             athlete_id: athleteId,
             group_id: groupId,
+            coach_package_id: coachPackageId,
             credits_purchased: credits,
             amount_cents: session.amount_total ?? 0,
           });
@@ -74,11 +76,62 @@ export async function POST(request: Request) {
               group_id: groupId,
               stripe_subscription_id: session.subscription,
               status: "active",
+              coach_package_id: coachPackageId,
+              price_cents: session.amount_total ?? null,
               updated_at: new Date().toISOString(),
             },
             { onConflict: "athlete_id,group_id" }
           );
         }
+        break;
+      }
+
+      // A subscription-type package needs sessions_granted credits added
+      // every billing cycle, not just once at signup — the status-only
+      // tracking above never grants recurring credits on its own.
+      // Invoices don't inherit subscription metadata automatically, so
+      // the subscription itself has to be fetched to read it.
+      case "invoice.paid": {
+        const invoice = event.data.object as Stripe.Invoice;
+        // Newer Stripe API versions moved the subscription reference off
+        // the invoice itself onto parent.subscription_details.subscription
+        // (same class of API-version drift already noted for
+        // current_period_end elsewhere in this file).
+        const subscriptionRef = invoice.parent?.subscription_details?.subscription;
+        const subscriptionId = typeof subscriptionRef === "string" ? subscriptionRef : subscriptionRef?.id;
+        if (!subscriptionId) break;
+
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+        const athleteId = subscription.metadata?.athlete_id;
+        const groupId = subscription.metadata?.group_id;
+        const coachPackageId = subscription.metadata?.coach_package_id ?? null;
+        if (!athleteId || !groupId || !coachPackageId) break;
+
+        const { data: pkg } = await supabase
+          .from("coach_packages")
+          .select("sessions_granted")
+          .eq("id", coachPackageId)
+          .maybeSingle();
+        if (!pkg) break;
+
+        const { error: grantError } = await supabase.from("subscription_credit_grants").insert({
+          stripe_event_id: event.id,
+          athlete_id: athleteId,
+          group_id: groupId,
+          coach_package_id: coachPackageId,
+          credits_granted: pkg.sessions_granted,
+        });
+        if (grantError) {
+          if (grantError.code === "23505") break; // already processed this event
+          throw grantError;
+        }
+
+        const { error: rpcError } = await supabase.rpc("adjust_session_credits", {
+          p_athlete_id: athleteId,
+          p_group_id: groupId,
+          p_delta: pkg.sessions_granted,
+        });
+        if (rpcError) throw rpcError;
         break;
       }
 

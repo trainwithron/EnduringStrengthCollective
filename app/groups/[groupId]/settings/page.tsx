@@ -6,8 +6,7 @@ import { SignOutButton } from "@/components/group/sign-out-button";
 import { EditDisplayName } from "@/components/athlete/edit-display-name";
 import { PushNotificationToggle } from "@/components/athlete/push-notification-toggle";
 import { WearablePlaceholder } from "@/components/athlete/wearable-placeholder";
-import { BuyCreditsButton } from "@/components/athlete/buy-credits-button";
-import { SubscribeButton } from "@/components/athlete/subscribe-button";
+import { PackagePicker, type PackageOption } from "@/components/athlete/package-picker";
 import { ManageBillingLink } from "@/components/athlete/manage-billing-link";
 
 export default async function SettingsPage(
@@ -48,6 +47,24 @@ export default async function SettingsPage(
   ]);
   const isCoach = membership?.role === "coach";
 
+  let packages: PackageOption[] = [];
+  if (!isCoach) {
+    const { data: packageRows } = await supabase
+      .from("coach_packages")
+      .select("id, name, sessions_per_week, billing_type, sessions_granted, rate_cents")
+      .eq("group_id", params.groupId)
+      .eq("is_active", true)
+      .order("sessions_per_week", { ascending: true });
+    packages = (packageRows ?? []).map((p) => ({
+      id: p.id,
+      name: p.name,
+      sessionsPerWeek: p.sessions_per_week,
+      billingType: p.billing_type as "subscription" | "one_time",
+      sessionsGranted: p.sessions_granted,
+      rateCents: p.rate_cents,
+    }));
+  }
+
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
       <header className="px-5 pt-8 pb-6 border-b border-steel/20">
@@ -85,10 +102,7 @@ export default async function SettingsPage(
         {!isCoach && (
           <div className="pb-4 border-b border-steel/20 pt-4">
             <p className="font-body text-sm mb-3">Billing</p>
-            <div className="flex flex-wrap items-center gap-3">
-              <BuyCreditsButton groupId={params.groupId} />
-              <SubscribeButton groupId={params.groupId} />
-            </div>
+            <PackagePicker packages={packages} />
             <div className="mt-3">
               <ManageBillingLink />
             </div>

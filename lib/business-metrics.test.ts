@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { computeEstimatedMRR, computeEngagement, computeMonthlyGrowth } from "./business-metrics";
+import {
+  computeEstimatedMRR,
+  computeEngagement,
+  computeMonthlyGrowth,
+  computeRealIncomeThisMonth,
+  computeRealMRR,
+  computeActivePayingClients,
+} from "./business-metrics";
 
 describe("computeEstimatedMRR", () => {
   it("sums only clients with a rate set, ignoring nulls", () => {
@@ -46,6 +53,56 @@ describe("computeEngagement", () => {
   it("returns 0% for an empty roster rather than dividing by zero", () => {
     const result = computeEngagement([], "2026-09-07", 14);
     expect(result.pct).toBe(0);
+  });
+});
+
+describe("computeRealIncomeThisMonth", () => {
+  it("sums only events dated within the given month", () => {
+    const total = computeRealIncomeThisMonth(
+      [
+        { amountCents: 10000, createdAtDateKey: "2026-09-05" },
+        { amountCents: 5000, createdAtDateKey: "2026-09-20" },
+        { amountCents: 9999, createdAtDateKey: "2026-08-31" },
+      ],
+      "2026-09"
+    );
+    expect(total).toBe(150);
+  });
+
+  it("returns 0 for no events this month", () => {
+    expect(computeRealIncomeThisMonth([], "2026-09")).toBe(0);
+  });
+});
+
+describe("computeRealMRR", () => {
+  it("sums only active subscriptions, ignoring past_due/canceled/incomplete", () => {
+    const mrr = computeRealMRR([
+      { priceCents: 9500, status: "active" },
+      { priceCents: 12000, status: "active" },
+      { priceCents: 8000, status: "past_due" },
+      { priceCents: 7000, status: "canceled" },
+    ]);
+    expect(mrr).toBe(215);
+  });
+
+  it("treats a null priceCents as 0 rather than throwing", () => {
+    expect(computeRealMRR([{ priceCents: null, status: "active" }])).toBe(0);
+  });
+});
+
+describe("computeActivePayingClients", () => {
+  it("counts unique athletes with an active purchase or subscription", () => {
+    const count = computeActivePayingClients([
+      { athleteId: "a", hasActivePurchaseOrSub: true },
+      { athleteId: "a", hasActivePurchaseOrSub: true }, // duplicate row, still one client
+      { athleteId: "b", hasActivePurchaseOrSub: false },
+      { athleteId: "c", hasActivePurchaseOrSub: true },
+    ]);
+    expect(count).toBe(2);
+  });
+
+  it("returns 0 when nobody has paid", () => {
+    expect(computeActivePayingClients([{ athleteId: "a", hasActivePurchaseOrSub: false }])).toBe(0);
   });
 });
 

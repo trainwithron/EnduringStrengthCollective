@@ -23,6 +23,7 @@ import {
   Menu,
   X,
   Building2,
+  Layers,
 } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
@@ -61,6 +62,7 @@ type Active =
   | "clients"
   | "branding"
   | "business"
+  | "packages"
   | "resources"
   | "challenges"
   | "team";
@@ -258,6 +260,7 @@ export function CoachDesktopShell({
       icon: TrendingUp,
       items: [
         { key: "business", label: "Overview", href: `/groups/${groupId}/business`, icon: TrendingUp },
+        { key: "packages", label: "Packages", href: `/groups/${groupId}/business/packages`, icon: Layers },
         { key: "branding", label: "Organization", href: `/groups/${groupId}/branding`, icon: Palette },
       ],
     },
