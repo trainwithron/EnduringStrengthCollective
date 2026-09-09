@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Dumbbell, MessagesSquare, Settings, Calendar } from "lucide-react";
+import { createBrowserClient } from "@/lib/supabase/client";
 
 type TabKey = "home" | "workout" | "feed" | "calendar" | "settings";
 
@@ -18,6 +19,33 @@ export function BottomTabBar({
   activeOverride?: TabKey;
 }) {
   const pathname = usePathname();
+
+  // A 1-on-1 client (group_memberships.client_tier = 'one_on_one') has no
+  // team to see or be seen by — Team Feed (and everything social that
+  // hangs off it) is hidden for them, reusing the tier field that already
+  // exists rather than needing a personal group per client.
+  const [hideFeed, setHideFeed] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      const supabase = createBrowserClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("group_memberships")
+        .select("client_tier")
+        .eq("group_id", groupId)
+        .eq("profile_id", user.id)
+        .maybeSingle();
+      if (!cancelled) setHideFeed(data?.client_tier === "one_on_one");
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [groupId]);
 
   // Every one of these destinations is server-rendered on demand, so a tap
   // costs a round trip before the new route commits and `pathname` updates.
@@ -47,7 +75,9 @@ export function BottomTabBar({
   const tabs: { key: TabKey; label: string; href: string; icon: typeof Home }[] = [
     { key: "home", label: "Home", href: `/groups/${groupId}`, icon: Home },
     { key: "workout", label: "Workout", href: `/groups/${groupId}/today`, icon: Dumbbell },
-    { key: "feed", label: "Feed", href: `/groups/${groupId}/feed`, icon: MessagesSquare },
+    ...(hideFeed
+      ? []
+      : [{ key: "feed" as const, label: "Feed", href: `/groups/${groupId}/feed`, icon: MessagesSquare }]),
     { key: "calendar", label: "Calendar", href: `/groups/${groupId}/calendar`, icon: Calendar },
     { key: "settings", label: "Settings", href: `/groups/${groupId}/settings`, icon: Settings },
   ];

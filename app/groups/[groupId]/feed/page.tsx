@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { FeedList } from "@/components/feed/feed-list";
 import { NewPostComposer } from "@/components/feed/new-post-composer";
@@ -29,10 +30,17 @@ export default async function FeedPage(
 
   const { data: membership } = await supabase
     .from("group_memberships")
-    .select("role")
+    .select("role, client_tier")
     .eq("group_id", params.groupId)
     .eq("profile_id", user?.id ?? "")
     .maybeSingle();
+
+  // A 1-on-1 client has no team feed to see — server-side backstop for
+  // the same rule the bottom tab bar already hides the link for, in case
+  // someone lands here directly.
+  if (membership?.role === "athlete" && membership.client_tier === "one_on_one") {
+    redirect(`/groups/${params.groupId}`);
+  }
 
   const isCoach = membership?.role === "coach";
   // A coach opening the installed home-screen app gets the same mobile
