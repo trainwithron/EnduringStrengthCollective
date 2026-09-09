@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { Trash2 } from "lucide-react";
 import { renderWithMentions } from "./mention-text";
+import { notifyPush } from "@/lib/push-notify";
 
 interface CommentRow {
   id: string;
@@ -155,9 +156,11 @@ export function InlineCommentSection({
       if (!user) return;
 
       // group_id is required by the schema; look it up from the post.
+      // author_id is only needed for the push notification below, not
+      // the insert itself.
       const { data: post } = await supabase
         .from("posts")
-        .select("group_id")
+        .select("group_id, author_id")
         .eq("id", postId)
         .single();
 
@@ -179,6 +182,36 @@ export function InlineCommentSection({
       if (insertError) {
         setError("Couldn't post — check your connection and try again.");
         return;
+      }
+
+      // Push notifications for whoever this comment actually concerns —
+      // mirrors the same recipients/text the notify_on_comment and
+      // notify_on_mention DB triggers already compute (migrations
+      // 0073/0093) for the in-app bell, since a trigger can't also fire
+      // the push itself. Never notifies the same person twice even if
+      // they qualify more than one way (e.g. replying to your own
+      // comment on someone else's post).
+      const { data: viewerProfile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .maybeSingle();
+      const commenterName = viewerProfile?.full_name ?? "Someone";
+      const feedUrl = `/groups/${post.group_id}/feed`;
+      const notified = new Set<string>([user.id]);
+      if (post.author_id && !notified.has(post.author_id)) {
+        notifyPush(post.author_id, "New comment", `${commenterName} commented on your post`, feedUrl);
+        notified.add(post.author_id);
+      }
+      if (replyTarget && !notified.has(replyTarget.author_id)) {
+        notifyPush(replyTarget.author_id, "New reply", `${commenterName} replied to your comment`, feedUrl);
+        notified.add(replyTarget.author_id);
+      }
+      for (const id of confirmedMentionIds) {
+        if (!notified.has(id)) {
+          notifyPush(id, "You were mentioned", `${commenterName} mentioned you in a comment`, feedUrl);
+          notified.add(id);
+        }
       }
 
       setBody("");

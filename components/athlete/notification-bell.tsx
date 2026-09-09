@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -26,10 +26,50 @@ function timeAgo(iso: string): string {
   return `${days}d ago`;
 }
 
-export function NotificationBell({ initial }: { initial: NotificationEntry[] }) {
+export function NotificationBell({
+  initial,
+  viewerId,
+}: {
+  initial: NotificationEntry[];
+  viewerId: string;
+}) {
   const [items, setItems] = useState(initial);
   const [open, setOpen] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    // This was a one-shot server fetch with no live update at all — a
+    // mention or reply landing while the app was open never touched the
+    // badge count until a full reload. Real-time INSERT only (an update
+    // is always this same viewer marking their own row read, already
+    // reflected optimistically by markRead below).
+    const supabase = createBrowserClient();
+    const channel = supabase
+      .channel(`notifications:${viewerId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications", filter: `profile_id=eq.${viewerId}` },
+        (payload) => {
+          const n = payload.new as any;
+          setItems((prev) => [
+            {
+              id: n.id,
+              type: n.type,
+              body: n.body,
+              linkPath: n.link_path,
+              createdAt: n.created_at,
+              readAt: n.read_at,
+            },
+            ...prev,
+          ]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [viewerId]);
 
   const unreadCount = items.filter((n) => !n.readAt).length;
 

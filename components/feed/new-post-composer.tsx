@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Camera, X } from "lucide-react";
 import type { FeedChannel } from "@/lib/types";
 import { useMentionAutocomplete } from "@/lib/use-mention-autocomplete";
+import { notifyPush } from "@/lib/push-notify";
 
 export function NewPostComposer({
   groupId,
@@ -79,6 +80,7 @@ export function NewPostComposer({
     }
 
     const trimmedBody = body.trim() || null;
+    const mentionedIds = trimmedBody ? getConfirmedMentionIds(trimmedBody) : [];
     const { error: insertError } = await supabase.from("posts").insert({
       group_id: groupId,
       author_id: user.id,
@@ -87,13 +89,29 @@ export function NewPostComposer({
       body: trimmedBody,
       media_url: mediaUrl,
       media_type: mediaType,
-      mentioned_profile_ids: trimmedBody ? getConfirmedMentionIds(trimmedBody) : [],
+      mentioned_profile_ids: mentionedIds,
     });
 
     setSubmitting(false);
     if (insertError) {
       setError("Couldn't post — try again.");
       return;
+    }
+
+    if (mentionedIds.length > 0) {
+      // Mirrors notify_on_post_mention (migration 0093) — a trigger
+      // can't also fire the push itself, so the composer does it right
+      // after the insert it already knows succeeded.
+      const { data: viewerProfile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .maybeSingle();
+      const authorName = viewerProfile?.full_name ?? "Someone";
+      const feedUrl = `/groups/${groupId}/feed`;
+      for (const id of mentionedIds) {
+        if (id !== user.id) notifyPush(id, "You were mentioned", `${authorName} mentioned you in a post`, feedUrl);
+      }
     }
 
     setBody("");

@@ -212,6 +212,7 @@ export default async function GroupHubPage(
         isCoach={isCoach}
         groupId={params.groupId}
         coachId={user?.id}
+        viewerId={user?.id}
         logoUrl={orgTheme.logoUrl}
         notifications={(notificationRows ?? []).map((n: any) => ({
           id: n.id,

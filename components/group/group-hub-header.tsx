@@ -8,6 +8,7 @@ interface GroupHubHeaderProps {
   isCoach: boolean;
   groupId: string;
   coachId?: string;
+  viewerId?: string;
   notifications?: NotificationEntry[];
   logoUrl?: string | null;
 }
@@ -19,6 +20,7 @@ export function GroupHubHeader({
   isCoach,
   groupId,
   coachId,
+  viewerId,
   notifications,
   logoUrl,
 }: GroupHubHeaderProps) {
@@ -28,7 +30,7 @@ export function GroupHubHeader({
         <p className="font-body text-xs tracking-wide text-steel">
           {memberCount} {memberCount === 1 ? "member" : "members"}
         </p>
-        {notifications && <NotificationBell initial={notifications} />}
+        {notifications && viewerId && <NotificationBell initial={notifications} viewerId={viewerId} />}
       </div>
       {logoUrl && (
         // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL, not a local asset Next can optimize.
