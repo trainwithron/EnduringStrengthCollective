@@ -62,39 +62,25 @@ export async function createOrganization(
   const baseSlug = slugify(name) || "organization";
   const slug = `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`;
 
-  const { data: org, error: orgError } = await supabase
-    .from("organizations")
-    .insert({
-      slug,
-      name,
-      owner_id: ownerId,
-      button_shape: theme.buttonShape,
-      accent_color: theme.accentColor,
-      background_color: theme.backgroundColor,
-      text_color: theme.textColor,
-      font_display: theme.fontDisplay,
-      font_body: theme.fontBody,
+  // A single atomic RPC (migration 0096) instead of 4 sequential inserts —
+  // a mid-sequence failure used to leave an orphan organization (or a
+  // group with no coach) committed with no way to roll it back.
+  const { data, error } = await supabase
+    .rpc("create_organization_with_group", {
+      p_name: name,
+      p_slug: slug,
+      p_starter_group_name: starterGroupName,
+      p_owner_id: ownerId,
+      p_button_shape: theme.buttonShape,
+      p_accent_color: theme.accentColor,
+      p_background_color: theme.backgroundColor,
+      p_text_color: theme.textColor,
+      p_font_display: theme.fontDisplay,
+      p_font_body: theme.fontBody,
     })
-    .select("id")
     .single();
-  if (orgError || !org) throw new Error(orgError?.message ?? "Couldn't create the organization.");
+  if (error || !data) throw new Error(error?.message ?? "Couldn't create the organization.");
 
-  const { error: membershipError } = await supabase
-    .from("organization_memberships")
-    .insert({ organization_id: org.id, profile_id: ownerId, role: "owner" });
-  if (membershipError) throw new Error(membershipError.message);
-
-  const { data: group, error: groupError } = await supabase
-    .from("groups")
-    .insert({ name: starterGroupName, organization_id: org.id, created_by: ownerId })
-    .select("id")
-    .single();
-  if (groupError || !group) throw new Error(groupError?.message ?? "Couldn't create the starter group.");
-
-  const { error: groupMembershipError } = await supabase
-    .from("group_memberships")
-    .insert({ group_id: group.id, profile_id: ownerId, role: "coach" });
-  if (groupMembershipError) throw new Error(groupMembershipError.message);
-
-  return { organizationId: org.id, groupId: group.id };
+  const result = data as { organization_id: string; group_id: string };
+  return { organizationId: result.organization_id, groupId: result.group_id };
 }
