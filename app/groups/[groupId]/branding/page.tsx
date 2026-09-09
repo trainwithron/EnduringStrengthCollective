@@ -4,6 +4,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { BrandingForm } from "@/components/coach/desktop/branding-form";
 import { InviteCoachForm } from "@/components/coach/desktop/invite-coach-form";
+import { TransferOwnershipButton } from "@/components/coach/desktop/transfer-ownership-button";
 import type { ButtonShape, DisplayFont, BodyFont } from "@/lib/theme";
 
 type OrgTab = "team" | "branding";
@@ -148,8 +149,16 @@ export default async function BrandingPage(
           </div>
 
           {isOwnerOrAdmin && (
-            <div className="mb-8">
+            <div className="mb-8 flex flex-wrap items-start gap-4">
               <InviteCoachForm groupId={params.groupId} />
+              {isOwner && (
+                <TransferOwnershipButton
+                  organizationId={orgMembership.organization_id}
+                  candidates={members
+                    .filter((m) => m.profileId !== user.id)
+                    .map((m) => ({ profileId: m.profileId, fullName: m.fullName }))}
+                />
+              )}
             </div>
           )}
 
