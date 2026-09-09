@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { PROTEIN_G_PER_LB, estimateProteinFromBodyWeight, fillCarbsAndFat as computeCarbsAndFat } from "@/lib/macros";
+import { notifyPush } from "@/lib/push-notify";
 
 export function DailyMacrosForm({
   athleteId,
@@ -73,6 +74,13 @@ export function DailyMacrosForm({
     if (saveError) {
       setError("Couldn't save — try again.");
       return;
+    }
+    if (athleteId !== user.id) {
+      // Mirrors notify_on_macros_assigned (migration 0071) — same body
+      // text and link_path the DB trigger already wrote to the in-app
+      // notification row for this same upsert.
+      const label = new Date(`${date}T00:00:00`).toLocaleDateString("en-US", { month: "short", day: "2-digit" });
+      notifyPush(athleteId, "New macro targets", `Your coach set new macro targets for ${label}`, `/groups/${groupId}`);
     }
     setHasSavedEntry(true);
     router.refresh();

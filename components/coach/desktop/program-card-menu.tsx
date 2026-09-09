@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { duplicateProgram } from "@/lib/program-duplication";
+import { notifyPush } from "@/lib/push-notify";
 import { MoreVertical } from "lucide-react";
 
 const MENU_WIDTH = 256; // matches w-64 below
@@ -166,6 +167,18 @@ export function ProgramCardMenu({
       setError(result.error);
       return;
     }
+    // Mirrors notify_on_program_assigned (migration 0071) — the DB
+    // trigger already writes the in-app notification row for this same
+    // insert; a trigger can't also fire the push itself, so this fires
+    // it right after the duplication it already knows succeeded. Uses
+    // the same suffixed name (lib/program-duplication.ts) the trigger
+    // itself reads off the new row, not the source program's plain name.
+    notifyPush(
+      client.id,
+      "New program",
+      `Your coach assigned you a new program: ${programName} — ${client.fullName}`,
+      `/groups/${groupId}/programs/${result.programId}`
+    );
     router.push(`/groups/${groupId}/programs/${result.programId}`);
   }
 
