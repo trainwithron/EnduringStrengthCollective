@@ -38,6 +38,19 @@ export interface SetLogEntry {
   height: number | null;
   distance: number | null;
   status: SetLogStatus;
+  // The prescribed value for each "extra" field (RPE, RIR, tempo, etc.),
+  // shown only as a placeholder hint during logging — never pre-filled
+  // into the real column, so a set never silently counts as "done" just
+  // because a target existed. Weight/reps aren't included here since
+  // those already pre-fill for real (a coach/athlete types a genuine
+  // weight regardless of plan, so there's no meaningful "leave it
+  // unsubmitted" state for them the way there is for RPE/RIR/etc.).
+  targetRpe?: number | null;
+  targetRir?: number | null;
+  targetTempo?: string | null;
+  targetTimeSeconds?: number | null;
+  targetHeight?: number | null;
+  targetDistance?: number | null;
 }
 
 export interface SessionExerciseEntry {

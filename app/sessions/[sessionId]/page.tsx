@@ -42,13 +42,43 @@ export default async function SessionPage(
     .from("session_exercises")
     .select(
       `
-      id, exercise_name, exercise_order, is_swapped, is_added, movement_pattern_id, tracked_fields,
+      id, exercise_name, exercise_order, is_swapped, is_added, movement_pattern_id, tracked_fields, group_workout_exercise_id,
       group_workout_exercises ( notes ),
       set_logs ( id, set_order, weight, reps, rpe, rir, tempo, time_seconds, height, distance, status )
     `
     )
     .eq("session_id", params.sessionId)
     .order("exercise_order", { ascending: true });
+
+  // Prescribed values for the "extra" fields (RPE, RIR, tempo, etc.) —
+  // shown as a placeholder hint during logging, never pre-committed into
+  // set_logs itself (see start-workout-button.tsx). Keyed by
+  // (group_workout_exercise_id, set_order) since that's the only stable
+  // link back to the template once a session has its own copy of the sets.
+  const templateExerciseIds = (sessionExercises ?? [])
+    .map((se: any) => se.group_workout_exercise_id)
+    .filter((id: string | null): id is string => id != null);
+
+  const targetsByExerciseAndOrder = new Map<
+    string,
+    { rpe: number | null; rir: number | null; tempo: string | null; timeSeconds: number | null; height: number | null; distance: number | null }
+  >();
+  if (templateExerciseIds.length > 0) {
+    const { data: templateSets } = await supabase
+      .from("group_workout_exercise_sets")
+      .select("group_workout_exercise_id, set_order, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance")
+      .in("group_workout_exercise_id", templateExerciseIds);
+    for (const t of templateSets ?? []) {
+      targetsByExerciseAndOrder.set(`${t.group_workout_exercise_id}:${t.set_order}`, {
+        rpe: t.target_rpe,
+        rir: t.target_rir,
+        tempo: t.target_tempo,
+        timeSeconds: t.target_time_seconds,
+        height: t.target_height,
+        distance: t.target_distance,
+      });
+    }
+  }
 
   // Exercise video/YouTube is attached on the coach's shared exercise
   // library, keyed by name — same lookup as the workout overview page.
@@ -95,19 +125,30 @@ export default async function SessionPage(
         sets: (se.set_logs ?? [])
           .slice()
           .sort((a: any, b: any) => a.set_order - b.set_order)
-          .map((sl: any) => ({
-            id: sl.id,
-            setOrder: sl.set_order,
-            weight: sl.weight,
-            reps: sl.reps,
-            rpe: sl.rpe,
-            rir: sl.rir,
-            tempo: sl.tempo,
-            timeSeconds: sl.time_seconds,
-            height: sl.height,
-            distance: sl.distance,
-            status: sl.status,
-          })),
+          .map((sl: any) => {
+            const target = se.group_workout_exercise_id
+              ? targetsByExerciseAndOrder.get(`${se.group_workout_exercise_id}:${sl.set_order}`)
+              : undefined;
+            return {
+              id: sl.id,
+              setOrder: sl.set_order,
+              weight: sl.weight,
+              reps: sl.reps,
+              rpe: sl.rpe,
+              rir: sl.rir,
+              tempo: sl.tempo,
+              timeSeconds: sl.time_seconds,
+              height: sl.height,
+              distance: sl.distance,
+              status: sl.status,
+              targetRpe: target?.rpe ?? null,
+              targetRir: target?.rir ?? null,
+              targetTempo: target?.tempo ?? null,
+              targetTimeSeconds: target?.timeSeconds ?? null,
+              targetHeight: target?.height ?? null,
+              targetDistance: target?.distance ?? null,
+            };
+          }),
       };
     })
   );

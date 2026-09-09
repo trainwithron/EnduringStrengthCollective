@@ -102,12 +102,13 @@ export function StartWorkoutButton({
             // whenever the coach left that field blank for this set.
             weight: target.targetWeight ?? ex.goalWeight ?? null,
             reps: parseRepsTarget(target.targetReps) ?? ex.goalReps ?? null,
-            rpe: target.targetRpe,
-            rir: target.targetRir,
-            tempo: target.targetTempo,
-            time_seconds: target.targetTimeSeconds,
-            height: target.targetHeight,
-            distance: target.targetDistance,
+            // RPE/RIR/tempo/time/height/distance start genuinely blank —
+            // a prescribed value here is a *target*, shown as a hint in
+            // the logging UI (set-row.tsx reads it back via the session
+            // page's target_* join), not pre-committed as if it were
+            // already reported. Weight/reps are the exception: a coach
+            // types a real number regardless of the plan, so pre-filling
+            // those isn't the same "did this happen or not" ambiguity.
           }))
         : [
             {

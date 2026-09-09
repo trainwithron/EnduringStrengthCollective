@@ -11,6 +11,15 @@ import { Check } from "lucide-react";
 // weight/reps inputs below, kept in its own component so each field commits
 // independently (a shared handler across fields caused a real bug earlier:
 // tabbing between fields fired a premature save with the next field blank).
+const TARGET_PROP: Partial<Record<TrackedField, keyof SetLogEntry>> = {
+  rpe: "targetRpe",
+  rir: "targetRir",
+  tempo: "targetTempo",
+  time: "targetTimeSeconds",
+  height: "targetHeight",
+  distance: "targetDistance",
+};
+
 function ActualCell({
   set,
   field,
@@ -27,6 +36,14 @@ function ActualCell({
   const [draft, setDraft] = useState(initial === null || initial === undefined ? "" : String(initial));
   const def = fieldDef(field);
 
+  // The prescribed value (if the coach set one) shows as a placeholder
+  // only — never pre-filled into the real value, so leaving it untouched
+  // genuinely leaves this field unsubmitted rather than silently
+  // reporting the plan as if it were what actually happened.
+  const targetKey = TARGET_PROP[field];
+  const target = targetKey ? set[targetKey] : null;
+  const placeholder = target !== null && target !== undefined ? `${target} (target)` : def.label;
+
   async function handleBlur() {
     const value = draft.trim() === "" ? null : def.kind === "number" ? Number(draft) : draft.trim();
     if (value === initial) return;
@@ -39,7 +56,7 @@ function ActualCell({
     <input
       type={def.kind === "number" ? "number" : "text"}
       inputMode={def.kind === "number" ? "decimal" : undefined}
-      placeholder={def.label}
+      placeholder={placeholder}
       value={draft}
       disabled={readOnly}
       onChange={(e) => setDraft(e.target.value)}
