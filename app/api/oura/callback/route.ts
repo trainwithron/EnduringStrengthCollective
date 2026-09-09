@@ -72,8 +72,12 @@ export async function GET(request: Request) {
     response.cookies.delete("oura_oauth_state");
     return response;
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    settingsUrl.searchParams.set("oura_error", `Couldn't connect Oura: ${message}`);
+    // The real error (which can include raw response text from Oura's own
+    // API) is logged server-side only — it must never end up in a redirect
+    // URL, where it would sit in browser history and any referrer header
+    // for as long as that history entry exists.
+    console.error("Oura OAuth callback failed:", err);
+    settingsUrl.searchParams.set("oura_error", "Couldn't connect Oura — please try again.");
     return NextResponse.redirect(settingsUrl);
   }
 }
