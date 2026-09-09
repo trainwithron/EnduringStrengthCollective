@@ -1,0 +1,62 @@
+-- Indexes every unindexed foreign key in the public schema (flagged by
+-- the performance advisor) — an unindexed FK forces a sequential scan on
+-- the referencing table for every cascade check, join, and RLS policy
+-- that filters by it. Skips auth.* and storage.* (Supabase-managed
+-- internals, not this app's schema).
+create index if not exists groups_created_by_idx on public.groups (created_by);
+create index if not exists groups_organization_id_idx on public.groups (organization_id);
+create index if not exists group_memberships_position_id_idx on public.group_memberships (position_id);
+create index if not exists programs_athlete_id_idx on public.programs (athlete_id);
+create index if not exists programs_created_by_idx on public.programs (created_by);
+create index if not exists workouts_athlete_id_idx on public.workouts (athlete_id);
+create index if not exists group_workout_exercises_athlete_id_idx on public.group_workout_exercises (athlete_id);
+create index if not exists group_workout_exercises_movement_pattern_id_idx on public.group_workout_exercises (movement_pattern_id);
+create index if not exists session_exercises_group_workout_exercise_id_idx on public.session_exercises (group_workout_exercise_id);
+create index if not exists session_exercises_movement_pattern_id_idx on public.session_exercises (movement_pattern_id);
+create index if not exists workout_logs_session_id_idx on public.workout_logs (session_id);
+create index if not exists workout_logs_workout_id_idx on public.workout_logs (workout_id);
+create index if not exists posts_workout_log_id_idx on public.posts (workout_log_id);
+create index if not exists comments_author_id_idx on public.comments (author_id);
+create index if not exists comments_group_id_idx on public.comments (group_id);
+create index if not exists reactions_group_id_idx on public.reactions (group_id);
+create index if not exists reactions_profile_id_idx on public.reactions (profile_id);
+create index if not exists group_invites_created_by_idx on public.group_invites (created_by);
+create index if not exists exercise_progressions_created_by_idx on public.exercise_progressions (created_by);
+create index if not exists exercise_progressions_group_id_idx on public.exercise_progressions (group_id);
+create index if not exists athlete_exercise_overrides_created_by_idx on public.athlete_exercise_overrides (created_by);
+create index if not exists athlete_exercise_overrides_group_id_idx on public.athlete_exercise_overrides (group_id);
+create index if not exists workout_notes_athlete_id_idx on public.workout_notes (athlete_id);
+create index if not exists workout_notes_created_by_idx on public.workout_notes (created_by);
+create index if not exists workout_notes_group_id_idx on public.workout_notes (group_id);
+create index if not exists athlete_notes_created_by_idx on public.athlete_notes (created_by);
+create index if not exists athlete_notes_group_id_idx on public.athlete_notes (group_id);
+create index if not exists body_weight_logs_group_id_idx on public.body_weight_logs (group_id);
+create index if not exists coach_availability_windows_coach_id_idx on public.coach_availability_windows (coach_id);
+create index if not exists session_credits_group_id_idx on public.session_credits (group_id);
+create index if not exists bookings_athlete_id_idx on public.bookings (athlete_id);
+create index if not exists bookings_group_id_idx on public.bookings (group_id);
+create index if not exists client_habits_athlete_id_idx on public.client_habits (athlete_id);
+create index if not exists client_habits_created_by_idx on public.client_habits (created_by);
+create index if not exists client_habits_group_id_idx on public.client_habits (group_id);
+create index if not exists daily_macros_created_by_idx on public.daily_macros (created_by);
+create index if not exists daily_macros_group_id_idx on public.daily_macros (group_id);
+create index if not exists workout_assignments_created_by_idx on public.workout_assignments (created_by);
+create index if not exists workout_assignments_group_id_idx on public.workout_assignments (group_id);
+create index if not exists workout_assignments_workout_id_idx on public.workout_assignments (workout_id);
+create index if not exists coach_view_state_group_id_idx on public.coach_view_state (group_id);
+create index if not exists calendar_events_linked_athlete_id_idx on public.calendar_events (linked_athlete_id);
+create index if not exists calendar_events_linked_group_id_idx on public.calendar_events (linked_group_id);
+create index if not exists meal_plans_created_by_idx on public.meal_plans (created_by);
+create index if not exists meal_plans_group_id_idx on public.meal_plans (group_id);
+create index if not exists referral_partners_coach_id_idx on public.referral_partners (coach_id);
+create index if not exists organizations_owner_id_idx on public.organizations (owner_id);
+create index if not exists organization_memberships_profile_id_idx on public.organization_memberships (profile_id);
+create index if not exists challenges_coach_id_idx on public.challenges (coach_id);
+create index if not exists challenge_habits_challenge_id_idx on public.challenge_habits (challenge_id);
+create index if not exists challenge_participants_profile_id_idx on public.challenge_participants (profile_id);
+create index if not exists challenge_habit_logs_profile_id_idx on public.challenge_habit_logs (profile_id);
+create index if not exists credit_purchases_athlete_id_idx on public.credit_purchases (athlete_id);
+create index if not exists credit_purchases_group_id_idx on public.credit_purchases (group_id);
+create index if not exists membership_subscriptions_group_id_idx on public.membership_subscriptions (group_id);
+create index if not exists notifications_group_id_idx on public.notifications (group_id);
+create index if not exists coach_availability_exceptions_coach_id_idx on public.coach_availability_exceptions (coach_id);
