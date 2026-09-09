@@ -39,7 +39,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { groupId, name, sessionsPerWeek, billingType, sessionsGranted, rateCents } = body;
+  const { groupId, name, sessionsPerWeek, billingType, sessionsGranted, rateCents, isPublic } = body;
 
   if (
     !groupId ||
@@ -63,7 +63,10 @@ export async function POST(request: Request) {
 
   // Insert first (without Stripe ids) to get a stable id before creating
   // the Stripe objects — avoids an orphaned Stripe Product/Price if the
-  // DB insert itself fails.
+  // DB insert itself fails. Defaults to private (is_public: false) —
+  // matches the coach's own primary workflow (custom pricing assigned
+  // per client) as the safer failure mode; a coach opts a package into
+  // being an open menu explicitly.
   const { data: pkg, error: insertError } = await serviceRole
     .from("coach_packages")
     .insert({
@@ -74,6 +77,7 @@ export async function POST(request: Request) {
       billing_type: billingType,
       sessions_granted: sessionsGranted,
       rate_cents: rateCents,
+      is_public: isPublic === true,
     })
     .select("id")
     .single();
@@ -113,12 +117,8 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  if (!isStripeConfigured()) {
-    return NextResponse.json({ error: "Payments aren't configured yet." }, { status: 503 });
-  }
-
   const body = await request.json();
-  const { packageId, groupId, name, sessionsPerWeek, billingType, sessionsGranted, rateCents, isActive } = body;
+  const { packageId, groupId, name, sessionsPerWeek, billingType, sessionsGranted, rateCents, isActive, isPublic } = body;
   if (!packageId || !groupId) {
     return NextResponse.json({ error: "Missing packageId or groupId." }, { status: 400 });
   }
@@ -149,11 +149,23 @@ export async function PATCH(request: Request) {
   if (rateCents != null) updates.rate_cents = rateCents;
   if (billingType != null) updates.billing_type = billingType;
   if (isActive != null) updates.is_active = isActive;
+  if (isPublic != null) updates.is_public = isPublic;
+
+  // Stripe is only actually touched for a price/name-affecting change or
+  // a deactivation that archives a Price — a pure isPublic/isActive-true
+  // toggle never needs it, so those keep working even with no
+  // STRIPE_SECRET_KEY configured (unlike POST, which always needs Stripe
+  // since every package needs a real Price to be sellable at all).
+  const needsStripe =
+    priceAffectingChange || (name != null && existing.stripe_product_id) || (isActive === false && existing.stripe_price_id);
+  if (needsStripe && !isStripeConfigured()) {
+    return NextResponse.json({ error: "Payments aren't configured yet." }, { status: 503 });
+  }
 
   try {
-    const stripe = getStripeClient();
+    const stripe = needsStripe ? getStripeClient() : null;
 
-    if (priceAffectingChange && existing.stripe_product_id) {
+    if (stripe && priceAffectingChange && existing.stripe_product_id) {
       // Prices are immutable — archive the old one and mint a fresh
       // Product+Price rather than trying to mutate an amount in place.
       // Existing purchasers/subscribers keep referencing the old Price
@@ -178,11 +190,11 @@ export async function PATCH(request: Request) {
       });
       updates.stripe_product_id = product.id;
       updates.stripe_price_id = price.id;
-    } else if (name != null && existing.stripe_product_id) {
+    } else if (stripe && name != null && existing.stripe_product_id) {
       await stripe.products.update(existing.stripe_product_id, { name: name.trim() });
     }
 
-    if (isActive === false && existing.stripe_price_id && !priceAffectingChange) {
+    if (stripe && isActive === false && existing.stripe_price_id && !priceAffectingChange) {
       await stripe.prices.update(existing.stripe_price_id, { active: false });
     }
 

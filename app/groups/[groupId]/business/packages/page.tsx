@@ -39,7 +39,7 @@ export default async function PackagesPage(
 
   const { data: packageRows } = await supabase
     .from("coach_packages")
-    .select("id, name, sessions_per_week, billing_type, sessions_granted, rate_cents, is_active")
+    .select("id, name, sessions_per_week, billing_type, sessions_granted, rate_cents, is_active, is_public")
     .eq("coach_id", user.id)
     .eq("group_id", params.groupId)
     .order("sessions_per_week", { ascending: true });
@@ -50,6 +50,7 @@ export default async function PackagesPage(
     sessionsPerWeek: p.sessions_per_week,
     billingType: p.billing_type as "subscription" | "one_time",
     sessionsGranted: p.sessions_granted,
+    isPublic: p.is_public,
     rateCents: p.rate_cents,
     isActive: p.is_active,
   }));

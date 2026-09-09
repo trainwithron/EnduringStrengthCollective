@@ -11,6 +11,7 @@ export interface CoachPackageRow {
   sessionsGranted: number;
   rateCents: number;
   isActive: boolean;
+  isPublic: boolean;
 }
 
 function formatDollars(cents: number): string {
@@ -30,6 +31,7 @@ export function PackageManager({
   const [billingType, setBillingType] = useState<"subscription" | "one_time">("subscription");
   const [sessionsGranted, setSessionsGranted] = useState("12");
   const [ratePerSession, setRatePerSession] = useState("95");
+  const [isPublic, setIsPublic] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -58,6 +60,7 @@ export function PackageManager({
           billingType,
           sessionsGranted: Number(sessionsGranted),
           rateCents,
+          isPublic,
         }),
       });
       const data = await res.json();
@@ -74,14 +77,32 @@ export function PackageManager({
             sessionsGranted: Number(sessionsGranted),
             rateCents,
             isActive: true,
+            isPublic,
           },
         ].sort((a, b) => a.sessionsPerWeek - b.sessionsPerWeek || a.billingType.localeCompare(b.billingType))
       );
       setName("");
+      setIsPublic(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't create the package.");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleTogglePublic(pkg: CoachPackageRow) {
+    setBusyId(pkg.id);
+    try {
+      const res = await fetch("/api/coach/packages", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ packageId: pkg.id, groupId, isPublic: !pkg.isPublic }),
+      });
+      if (res.ok) {
+        setPackages((prev) => prev.map((p) => (p.id === pkg.id ? { ...p, isPublic: !pkg.isPublic } : p)));
+      }
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -121,6 +142,7 @@ export function PackageManager({
                 <th className="text-left font-body text-xs text-steel uppercase tracking-wide font-medium py-2">Billing</th>
                 <th className="text-left font-body text-xs text-steel uppercase tracking-wide font-medium py-2">Rate</th>
                 <th className="text-left font-body text-xs text-steel uppercase tracking-wide font-medium py-2">Total</th>
+                <th className="text-left font-body text-xs text-steel uppercase tracking-wide font-medium py-2">Visibility</th>
                 <th className="py-2" />
               </tr>
             </thead>
@@ -136,6 +158,23 @@ export function PackageManager({
                   <td className="py-3 font-body text-sm text-steel">
                     {formatDollars(p.rateCents * p.sessionsGranted)}
                     {p.billingType === "subscription" ? "/mo" : ""}
+                  </td>
+                  <td className="py-3">
+                    <button
+                      type="button"
+                      onClick={() => handleTogglePublic(p)}
+                      disabled={busyId === p.id}
+                      className={`font-body text-xs uppercase tracking-wide disabled:opacity-40 ${
+                        p.isPublic ? "text-positive" : "text-steel"
+                      }`}
+                      title={
+                        p.isPublic
+                          ? "Visible to every client — click to make private"
+                          : "Only visible to clients you assign it to — click to publish"
+                      }
+                    >
+                      {p.isPublic ? "Published" : "Private"}
+                    </button>
                   </td>
                   <td className="py-3 text-right">
                     <button
@@ -224,6 +263,17 @@ export function PackageManager({
             {billingType === "subscription" ? "/month" : " total"}
           </p>
         )}
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={isPublic}
+            onChange={(e) => setIsPublic(e.target.checked)}
+            className="accent-rust"
+          />
+          <span className="font-body text-[11px] text-steel">
+            Publish to all clients — leave unchecked to assign privately per client
+          </span>
+        </label>
         <button
           type="button"
           onClick={handleAdd}

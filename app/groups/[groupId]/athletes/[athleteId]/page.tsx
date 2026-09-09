@@ -4,6 +4,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { AthleteNotesEditor } from "@/components/coach/athlete-notes-editor";
 import { SessionCreditsControl } from "@/components/coach/session-credits-control";
+import { PackageAssignmentControl } from "@/components/coach/package-assignment-control";
 import { PrivateFromOrgToggle } from "@/components/coach/private-from-org-toggle";
 import { CoachLoggedBadge } from "@/components/coach-logged-badge";
 import { NutritionTools } from "@/components/coach/desktop/nutrition-tools";
@@ -140,6 +141,23 @@ export default async function AthleteProfilePage(
     .eq("athlete_id", params.athleteId)
     .eq("group_id", params.groupId)
     .maybeSingle();
+
+  // Published packages need no assignment — every client already sees
+  // them — so only private ones are relevant to assign from this page.
+  const { data: privatePackageRows } = await supabase
+    .from("coach_packages")
+    .select("id, name, sessions_per_week, rate_cents, sessions_granted")
+    .eq("group_id", params.groupId)
+    .eq("is_active", true)
+    .eq("is_public", false)
+    .order("sessions_per_week", { ascending: true });
+
+  const { data: assignmentRows } = await supabase
+    .from("package_assignments")
+    .select("coach_package_id")
+    .eq("athlete_id", params.athleteId)
+    .in("coach_package_id", (privatePackageRows ?? []).map((p) => p.id));
+  const assignedPackageIds = (assignmentRows ?? []).map((a) => a.coach_package_id);
 
   // Last-7-days habit compliance — the one piece of this that's actually
   // measurable today. Macro targets are coach-set but nothing logs what
@@ -452,6 +470,20 @@ export default async function AthleteProfilePage(
               athleteId={params.athleteId}
               groupId={params.groupId}
               initialBalance={creditsRow?.balance ?? 0}
+            />
+          </section>
+
+          <section>
+            <PackageAssignmentControl
+              athleteId={params.athleteId}
+              privatePackages={(privatePackageRows ?? []).map((p) => ({
+                id: p.id,
+                name: p.name,
+                sessionsPerWeek: p.sessions_per_week,
+                rateCents: p.rate_cents,
+                sessionsGranted: p.sessions_granted,
+              }))}
+              initialAssignedIds={assignedPackageIds}
             />
           </section>
 

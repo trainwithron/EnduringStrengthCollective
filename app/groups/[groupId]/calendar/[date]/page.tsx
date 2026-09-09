@@ -11,6 +11,8 @@ import { CancelBookingButton } from "@/components/athlete/cancel-booking-button"
 import { RescheduleSlotButton } from "@/components/athlete/reschedule-slot-button";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { DayHourGrid } from "@/components/coach/desktop/day-hour-grid";
+import { CalendarPurchasePrompt } from "@/components/athlete/calendar-purchase-prompt";
+import type { PackageOption } from "@/components/athlete/package-picker";
 
 export default async function CoachDayDetailPage(
   props: {
@@ -70,6 +72,8 @@ export default async function CoachDayDetailPage(
     let slots: { start: Date; durationMinutes: number }[] = [];
     let bookingsForDay: any[] = [];
     let creditBalance = 0;
+    let activeSubscription: { currentPeriodEnd: string | null } | null = null;
+    let availablePackages: PackageOption[] = [];
 
     if (coachMembership) {
       const { data: coachProfile } = await supabase
@@ -119,6 +123,30 @@ export default async function CoachDayDetailPage(
         .eq("group_id", params.groupId)
         .maybeSingle();
       creditBalance = creditsRow?.balance ?? 0;
+
+      const { data: subscriptionRow } = await supabase
+        .from("membership_subscriptions")
+        .select("current_period_end")
+        .eq("athlete_id", user.id)
+        .eq("group_id", params.groupId)
+        .eq("status", "active")
+        .maybeSingle();
+      activeSubscription = subscriptionRow ? { currentPeriodEnd: subscriptionRow.current_period_end } : null;
+
+      const { data: packageRows } = await supabase
+        .from("coach_packages")
+        .select("id, name, sessions_per_week, billing_type, sessions_granted, rate_cents")
+        .eq("group_id", params.groupId)
+        .eq("is_active", true)
+        .order("sessions_per_week", { ascending: true });
+      availablePackages = (packageRows ?? []).map((p) => ({
+        id: p.id,
+        name: p.name,
+        sessionsPerWeek: p.sessions_per_week,
+        billingType: p.billing_type as "subscription" | "one_time",
+        sessionsGranted: p.sessions_granted,
+        rateCents: p.rate_cents,
+      }));
     }
 
     const bookingByTime = new Map(
@@ -154,12 +182,7 @@ export default async function CoachDayDetailPage(
               </p>
               {creditBalance <= 0 && !reschedulingBooking && (
                 <div className="mt-2">
-                  <Link
-                    href={`/groups/${params.groupId}/settings`}
-                    className="inline-flex items-center h-9 px-3.5 bg-rust text-graphite font-body text-xs font-medium"
-                  >
-                    Buy more sessions
-                  </Link>
+                  <CalendarPurchasePrompt activeSubscription={activeSubscription} packages={availablePackages} />
                 </div>
               )}
             </div>
