@@ -260,6 +260,34 @@ export default async function AthleteProfilePage(
     .order("log_date", { ascending: true });
   const calorieTrend = (calorieRows ?? []).map((r) => ({ date: r.log_date, value: r.calories as number }));
 
+  const thirtyDaysAgoKey = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().slice(0, 10);
+  })();
+
+  const { data: ouraConnection } = await supabase
+    .from("wearable_connections")
+    .select("id")
+    .eq("profile_id", params.athleteId)
+    .eq("provider", "oura")
+    .maybeSingle();
+
+  const { data: wearableMetrics } = ouraConnection
+    ? await supabase
+        .from("wearable_daily_metrics")
+        .select("metric_date, metric_type, value")
+        .eq("connection_id", ouraConnection.id)
+        .gte("metric_date", thirtyDaysAgoKey)
+    : { data: null };
+
+  const stepsTrend = (wearableMetrics ?? [])
+    .filter((m) => m.metric_type === "steps")
+    .map((m) => ({ date: m.metric_date, value: m.value }));
+  const sleepScoreTrend = (wearableMetrics ?? [])
+    .filter((m) => m.metric_type === "sleep_score")
+    .map((m) => ({ date: m.metric_date, value: m.value }));
+
   const { data: existingPlan } = macrosEnabled
     ? await supabase
         .from("meal_plans")
@@ -473,6 +501,26 @@ export default async function AthleteProfilePage(
               <p className="font-body text-sm text-steel py-2">No weight logged yet.</p>
             )}
           </section>
+
+          {ouraConnection && (
+            <section>
+              <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+                Sleep &amp; Steps
+              </h2>
+              <div className="space-y-4 pb-2">
+                <div>
+                  <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Steps</p>
+                  <TrendChart points={stepsTrend} emptyLabel="No steps synced yet." />
+                </div>
+                <div>
+                  <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
+                    Sleep score
+                  </p>
+                  <TrendChart points={sleepScoreTrend} emptyLabel="No sleep data synced yet." />
+                </div>
+              </div>
+            </section>
+          )}
         </div>
 
         <div>

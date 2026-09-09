@@ -1,16 +1,38 @@
-// Placeholder only, per explicit instruction — wearable sync isn't
-// happening yet. This just shows the intended providers as disabled
-// "coming soon" rows so the shape of the feature is visible in the UI;
-// wearable_connections exists in the schema for when this becomes real.
-const PROVIDERS = ["Garmin", "Apple Health", "Google Health"];
+import { OuraConnection } from "@/components/athlete/oura-connection";
 
-export function WearablePlaceholder() {
+// Oura is the first real connection (real OAuth + daily sync, see
+// app/api/oura/); the rest stay as disabled "coming soon" rows until
+// their own provider work lands — see the wearables scoping memory for
+// why each is still just a placeholder (Garmin/Google Health need
+// partner approval or app-verification lead time; Apple Health has no
+// server API at all without a companion iOS app).
+const COMING_SOON_PROVIDERS = ["Garmin", "Apple Health", "Google Health"];
+
+export function WearablePlaceholder({
+  groupId,
+  ouraConnected,
+  ouraStatus,
+  ouraError,
+}: {
+  groupId: string;
+  ouraConnected: boolean;
+  ouraStatus: "active" | "revoked" | "error" | null;
+  ouraError: string | null;
+}) {
   return (
     <div>
       <p className="font-body text-sm mb-1">Wearables</p>
-      <p className="font-body text-xs text-steel mb-3">Coming soon — not connected yet.</p>
+      <p className="font-body text-xs text-steel mb-3">
+        Connect a device to see sleep and step trends on your profile.
+      </p>
       <div className="space-y-1.5">
-        {PROVIDERS.map((p) => (
+        <OuraConnection
+          groupId={groupId}
+          connected={ouraConnected}
+          status={ouraStatus}
+          initialError={ouraError}
+        />
+        {COMING_SOON_PROVIDERS.map((p) => (
           <div
             key={p}
             className="flex items-center justify-between h-10 px-3 border border-steel/15 opacity-50"

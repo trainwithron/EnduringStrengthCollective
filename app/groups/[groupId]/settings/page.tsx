@@ -13,9 +13,11 @@ import { ManageBillingLink } from "@/components/athlete/manage-billing-link";
 export default async function SettingsPage(
   props: {
     params: Promise<{ groupId: string }>;
+    searchParams: Promise<{ oura_error?: string }>;
   }
 ) {
   const params = await props.params;
+  const searchParams = await props.searchParams;
   const supabase = createServerClient();
   const {
     data: { user },
@@ -25,7 +27,7 @@ export default async function SettingsPage(
     redirect("/login");
   }
 
-  const [{ data: profile }, { data: membership }] = await Promise.all([
+  const [{ data: profile }, { data: membership }, { data: ouraConnection }] = await Promise.all([
     supabase
       .from("profiles")
       .select("full_name, avatar_url")
@@ -36,6 +38,12 @@ export default async function SettingsPage(
       .select("role")
       .eq("group_id", params.groupId)
       .eq("profile_id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("wearable_connections")
+      .select("status")
+      .eq("profile_id", user.id)
+      .eq("provider", "oura")
       .maybeSingle(),
   ]);
   const isCoach = membership?.role === "coach";
@@ -67,7 +75,12 @@ export default async function SettingsPage(
           <PushNotificationToggle />
         </div>
         <div className="pb-4 border-b border-steel/20 pt-4">
-          <WearablePlaceholder />
+          <WearablePlaceholder
+            groupId={params.groupId}
+            ouraConnected={!!ouraConnection}
+            ouraStatus={(ouraConnection?.status as "active" | "revoked" | "error" | undefined) ?? null}
+            ouraError={searchParams.oura_error ?? null}
+          />
         </div>
         {!isCoach && (
           <div className="pb-4 border-b border-steel/20 pt-4">
