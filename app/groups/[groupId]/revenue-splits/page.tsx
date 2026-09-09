@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { RevenueSplitEditor } from "@/components/coach/desktop/revenue-split-editor";
+import { InviteCoachForm } from "@/components/coach/desktop/invite-coach-form";
 import type { CoachShare } from "@/lib/revenue-splits";
 
 export default async function RevenueSplitsPage(
@@ -114,16 +115,20 @@ export default async function RevenueSplitsPage(
 
   const totalRevenueCents = monthlyRateCents + challengeRevenueCents;
   const isOwner = orgMembership.role === "owner";
+  const isOwnerOrAdmin = orgMembership.role === "owner" || orgMembership.role === "admin";
 
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="revenue-splits">
-      <div className="pb-6 border-b border-steel/20 mb-6">
-        <h1 className="font-display font-bold text-3xl uppercase leading-none">Revenue Splits</h1>
-        <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
-          How estimated revenue would divide between the platform and each coach in your
-          organization. Built to plug straight into Stripe Connect transfers later — no payment
-          processor is connected yet.
-        </p>
+      <div className="pb-6 border-b border-steel/20 mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display font-bold text-3xl uppercase leading-none">Revenue Splits</h1>
+          <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
+            How estimated revenue would divide between the platform and each coach in your
+            organization. Built to plug straight into Stripe Connect transfers later — no payment
+            processor is connected yet.
+          </p>
+        </div>
+        {isOwnerOrAdmin && <InviteCoachForm groupId={params.groupId} />}
       </div>
       <RevenueSplitEditor
         organizationId={orgMembership.organization_id}

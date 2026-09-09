@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { getWeekDates, getDatesForWeekdays, mergeMealIntoPlan, type MealEntryPayload } from "./meal-plan-assignment";
+import {
+  getWeekDates,
+  getDatesForWeekdays,
+  mergeMealIntoPlan,
+  mealRecipeChoices,
+  type MealEntryPayload,
+} from "./meal-plan-assignment";
 
 describe("getWeekDates", () => {
   it("returns the Sun..Sat week containing the anchor date", () => {
@@ -115,5 +121,65 @@ describe("mergeMealIntoPlan", () => {
     const result = mergeMealIntoPlan(existing, "rest", chickenRice, fallback);
     expect(result.meals.train).toEqual([chickenRice]);
     expect(result.meals.rest[0].recipeName).toBe("Chicken Breast & Jasmine Rice Bowl");
+  });
+
+  it("stores multiple recipe choices for one meal slot at once", () => {
+    const breakfastChoices: MealEntryPayload = {
+      mealId: "1",
+      title: "Breakfast",
+      proteinTarget: 30,
+      carbsTarget: 40,
+      fatTarget: 15,
+      recipes: [
+        { recipeId: "eggs_scramble", recipeName: "Pasture Eggs & Sourdough Scramble", ingredients: ["Eggs: 3"] },
+        { recipeId: "yogurt_rice", recipeName: "Greek Yogurt & Cream of Rice", ingredients: ["Greek Yogurt: 200g"] },
+      ],
+    };
+    const result = mergeMealIntoPlan(null, "daily", breakfastChoices, fallback);
+    expect(result.meals.daily[0].recipes).toHaveLength(2);
+  });
+});
+
+describe("mealRecipeChoices", () => {
+  it("returns the recipes array directly when present", () => {
+    const entry: MealEntryPayload = {
+      mealId: "1",
+      title: "Breakfast",
+      proteinTarget: 30,
+      carbsTarget: 40,
+      fatTarget: 15,
+      recipes: [
+        { recipeId: "a", recipeName: "Option A", ingredients: [] },
+        { recipeId: "b", recipeName: "Option B", ingredients: [] },
+      ],
+    };
+    expect(mealRecipeChoices(entry)).toHaveLength(2);
+  });
+
+  it("falls back to the legacy singular fields when recipes is absent", () => {
+    const entry: MealEntryPayload = {
+      mealId: "1",
+      title: "Breakfast",
+      proteinTarget: 30,
+      carbsTarget: 40,
+      fatTarget: 15,
+      recipeId: "l_oatmeal",
+      recipeName: "Oatmeal",
+      ingredients: ["Oats: 60g"],
+    };
+    expect(mealRecipeChoices(entry)).toEqual([
+      { recipeId: "l_oatmeal", recipeName: "Oatmeal", ingredients: ["Oats: 60g"] },
+    ]);
+  });
+
+  it("returns an empty list when neither shape has anything", () => {
+    const entry: MealEntryPayload = {
+      mealId: "1",
+      title: "Breakfast",
+      proteinTarget: 30,
+      carbsTarget: 40,
+      fatTarget: 15,
+    };
+    expect(mealRecipeChoices(entry)).toEqual([]);
   });
 });

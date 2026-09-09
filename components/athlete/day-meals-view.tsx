@@ -1,4 +1,4 @@
-import type { MealEntryPayload, MealPlanBucket } from "@/lib/meal-plan-assignment";
+import { mealRecipeChoices, type MealEntryPayload, type MealPlanBucket } from "@/lib/meal-plan-assignment";
 
 const BUCKET_LABELS: Record<MealPlanBucket, string> = {
   daily: "Meals",
@@ -31,16 +31,26 @@ export function DayMealsView({
               </p>
             )}
             <div className="divide-y divide-steel/15">
-              {meals[bucket].map((m) => (
-                <div key={m.mealId} className="py-2">
-                  <p className="font-body text-sm font-medium">
-                    {m.recipeName ?? m.title}
-                  </p>
-                  <p className="font-body text-xs text-steel mt-0.5">
-                    {m.proteinTarget}p / {m.carbsTarget}c / {m.fatTarget}f
-                  </p>
-                </div>
-              ))}
+              {meals[bucket].map((m) => {
+                const choices = mealRecipeChoices(m);
+                return (
+                  <div key={m.mealId} className="py-2">
+                    <p className="font-body text-xs text-steel uppercase tracking-wide">{m.title}</p>
+                    {choices.length > 0 ? (
+                      choices.map((choice, i) => (
+                        <p key={i} className="font-body text-sm font-medium mt-0.5">
+                          {choice.recipeName ?? m.title}
+                        </p>
+                      ))
+                    ) : (
+                      <p className="font-body text-sm font-medium mt-0.5">{m.title}</p>
+                    )}
+                    <p className="font-body text-xs text-steel mt-0.5">
+                      {m.proteinTarget}p / {m.carbsTarget}c / {m.fatTarget}f
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         ))}

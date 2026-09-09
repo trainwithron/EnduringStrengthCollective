@@ -22,6 +22,7 @@ import {
   mergeMealIntoPlan,
   type MealEntryPayload,
   type MealPlanRow,
+  type MealRecipeChoice,
 } from "@/lib/meal-plan-assignment";
 import type { WeeklyWeightTrend } from "@/lib/weight-trend";
 import { RecipeVoteFavorite } from "./recipe-vote-favorite";
@@ -101,7 +102,10 @@ export function MealPlanGenerator({
   const [restMacros, setRestMacros] = useState<MacroTargets | null>(null);
   const [dayView, setDayView] = useState<DayView>("daily");
   const [mealsByView, setMealsByView] = useState<Record<DayView, GeneratedMeal[]>>({ daily: [], train: [], rest: [] });
-  const [selections, setSelections] = useState<Record<string, number>>({});
+  // Which option indices are checked per meal slot — a slot can have
+  // several recipes selected at once (e.g. two breakfast options a
+  // client can alternate between), not just one.
+  const [selections, setSelections] = useState<Record<string, number[]>>({});
   const [flexTreatText, setFlexTreatText] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -273,17 +277,22 @@ export function MealPlanGenerator({
 
     const buildMealsPayload = (meals: GeneratedMeal[]) =>
       meals.map((m) => {
-        const selIdx = selections[m.spec.id] ?? 0;
-        const chosen = m.options[selIdx] ?? m.options[0];
+        const selIdxs = selections[m.spec.id]?.length ? selections[m.spec.id] : [0];
+        const recipes: MealRecipeChoice[] = selIdxs
+          .map((idx) => m.options[idx])
+          .filter((opt): opt is NonNullable<typeof opt> => !!opt)
+          .map((opt) => ({
+            recipeId: opt.recipeId ?? null,
+            recipeName: opt.recipeName ?? null,
+            ingredients: opt.ingredients ?? [],
+          }));
         return {
           mealId: m.spec.id,
           title: m.spec.title,
           proteinTarget: m.spec.proteinTarget,
           carbsTarget: m.spec.carbsTarget,
           fatTarget: m.spec.fatTarget,
-          recipeId: chosen?.recipeId ?? null,
-          recipeName: chosen?.recipeName ?? null,
-          ingredients: chosen?.ingredients ?? [],
+          recipes,
         };
       });
 
@@ -323,10 +332,18 @@ export function MealPlanGenerator({
     });
   }
 
-  async function handleAssignDays(meal: GeneratedMeal, selIdx: number) {
+  async function handleAssignDays(meal: GeneratedMeal) {
     const weekdays = dayPicker[meal.spec.id] ?? [];
-    const chosen = meal.options[selIdx] ?? meal.options[0];
-    if (weekdays.length === 0 || !chosen) return;
+    const selIdxs = selections[meal.spec.id]?.length ? selections[meal.spec.id] : [0];
+    const chosenRecipes: MealRecipeChoice[] = selIdxs
+      .map((idx) => meal.options[idx])
+      .filter((opt): opt is NonNullable<typeof opt> => !!opt)
+      .map((opt) => ({
+        recipeId: opt.recipeId ?? null,
+        recipeName: opt.recipeName ?? null,
+        ingredients: opt.ingredients ?? [],
+      }));
+    if (weekdays.length === 0 || chosenRecipes.length === 0) return;
 
     setAssigning(meal.spec.id);
     const supabase = createBrowserClient();
@@ -354,9 +371,7 @@ export function MealPlanGenerator({
       proteinTarget: meal.spec.proteinTarget,
       carbsTarget: meal.spec.carbsTarget,
       fatTarget: meal.spec.fatTarget,
-      recipeId: chosen.recipeId,
-      recipeName: chosen.recipeName,
-      ingredients: chosen.ingredients,
+      recipes: chosenRecipes,
     };
     const fallbackMacros = isCycling ? { train: trainMacros, rest: restMacros } : { daily: dailyMacros };
 
@@ -388,7 +403,9 @@ export function MealPlanGenerator({
     setAssigning(null);
     setAssignedMsg((prev) => ({
       ...prev,
-      [meal.spec.id]: `Assigned "${chosen.recipeName}" to ${weekdays.map((w) => WEEKDAY_LABELS[w]).join(", ")}`,
+      [meal.spec.id]: `Assigned ${chosenRecipes.map((r) => `"${r.recipeName}"`).join(", ")} to ${weekdays
+        .map((w) => WEEKDAY_LABELS[w])
+        .join(", ")}`,
     }));
     setDayPicker((prev) => ({ ...prev, [meal.spec.id]: [] }));
     router.refresh();
@@ -428,7 +445,10 @@ export function MealPlanGenerator({
         );
         return { ...prev, [dayView]: updated };
       });
-      setSelections((prev) => ({ ...prev, [meal.spec.id]: meal.options.length }));
+      setSelections((prev) => ({
+        ...prev,
+        [meal.spec.id]: [...(prev[meal.spec.id] ?? []), meal.options.length],
+      }));
     } catch (err) {
       setAiError((prev) => ({
         ...prev,
@@ -690,7 +710,7 @@ export function MealPlanGenerator({
 
           <div className="space-y-3">
             {meals.map((meal) => {
-              const selIdx = selections[meal.spec.id] ?? 0;
+              const selIdxs = selections[meal.spec.id] ?? [];
               return (
                 <div key={meal.spec.id} className="border border-steel/20 p-3">
                   <div className="flex items-center justify-between mb-2">
@@ -700,16 +720,26 @@ export function MealPlanGenerator({
                     </span>
                   </div>
                   <div className="space-y-2">
-                    {meal.options.map((opt, idx) => (
+                    {meal.options.map((opt, idx) => {
+                      const checked = selIdxs.includes(idx);
+                      return (
                       <label
                         key={opt.recipeId}
                         className={`block border p-2.5 cursor-pointer ${
-                          idx === selIdx ? "border-positive bg-positive/5" : "border-steel/20 opacity-60"
+                          checked ? "border-positive bg-positive/5" : "border-steel/20 opacity-60"
                         }`}
-                        onClick={() => setSelections((prev) => ({ ...prev, [meal.spec.id]: idx }))}
+                        onClick={() =>
+                          setSelections((prev) => {
+                            const current = prev[meal.spec.id] ?? [];
+                            const next = current.includes(idx)
+                              ? current.filter((i) => i !== idx)
+                              : [...current, idx];
+                            return { ...prev, [meal.spec.id]: next };
+                          })
+                        }
                       >
                         <div className="flex items-center gap-2 mb-1.5">
-                          <input type="radio" checked={idx === selIdx} readOnly className="w-4 h-4" />
+                          <input type="checkbox" checked={checked} readOnly className="w-4 h-4" />
                           <span className="font-body text-sm font-medium flex-1">{opt.recipeName}</span>
                           {opt.isAi && (
                             <span className="font-body text-[9px] uppercase tracking-wide text-rust border border-rust/40 px-1.5 py-0.5">
@@ -740,7 +770,8 @@ export function MealPlanGenerator({
                               ))}
                         </ul>
                       </label>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   <div className="mt-2 flex items-center gap-2">
@@ -781,7 +812,7 @@ export function MealPlanGenerator({
                       })}
                       <button
                         type="button"
-                        onClick={() => handleAssignDays(meal, selIdx)}
+                        onClick={() => handleAssignDays(meal)}
                         disabled={assigning === meal.spec.id || (dayPicker[meal.spec.id] ?? []).length === 0}
                         className="h-7 px-3 font-body text-[10px] bg-positive text-graphite disabled:opacity-40"
                       >

@@ -4,15 +4,46 @@
 // time. Pure date math + JSON-merge logic, kept independent of Supabase
 // so it's directly testable.
 
+export interface MealRecipeChoice {
+  recipeId: string | null;
+  recipeName: string | null;
+  ingredients: string[];
+}
+
 export interface MealEntryPayload {
   mealId: string;
   title: string;
   proteinTarget: number;
   carbsTarget: number;
   fatTarget: number;
-  recipeId: string | null;
-  recipeName: string | null;
-  ingredients: string[];
+  // One meal slot (e.g. "Breakfast") can now hold several recipe choices
+  // at once — a client picks whichever one they actually make that day,
+  // instead of the coach being forced to pick exactly one option per
+  // slot. `recipeId`/`recipeName`/`ingredients` stay as optional legacy
+  // fields so a plan saved before this existed still reads correctly
+  // (treated as a single-item `recipes` list) without needing a data
+  // migration.
+  recipes?: MealRecipeChoice[];
+  recipeId?: string | null;
+  recipeName?: string | null;
+  ingredients?: string[];
+}
+
+// Normalizes either shape (new `recipes` array, or the old singular
+// recipeId/recipeName/ingredients fields) into one list — the one place
+// every reader should go through instead of re-deriving this fallback.
+export function mealRecipeChoices(entry: MealEntryPayload): MealRecipeChoice[] {
+  if (entry.recipes && entry.recipes.length > 0) return entry.recipes;
+  if (entry.recipeName || entry.recipeId) {
+    return [
+      {
+        recipeId: entry.recipeId ?? null,
+        recipeName: entry.recipeName ?? null,
+        ingredients: entry.ingredients ?? [],
+      },
+    ];
+  }
+  return [];
 }
 
 export type MealPlanBucket = "daily" | "train" | "rest";
