@@ -6,11 +6,12 @@ import { GroupLeaderboardTabs } from "@/components/leaderboard/group-leaderboard
 import { rankLeaderboard, type LeaderboardEntry } from "@/lib/leaderboard";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 
-export default async function GroupLeaderboardPage({
-  params,
-}: {
-  params: { groupId: string };
-}) {
+export default async function GroupLeaderboardPage(
+  props: {
+    params: Promise<{ groupId: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

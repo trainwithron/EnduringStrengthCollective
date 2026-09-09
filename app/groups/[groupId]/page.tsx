@@ -9,11 +9,12 @@ import { isHabitDueOn } from "@/lib/habits";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import type { RosterMember } from "@/lib/types";
 
-export default async function GroupHubPage({
-  params,
-}: {
-  params: { groupId: string };
-}) {
+export default async function GroupHubPage(
+  props: {
+    params: Promise<{ groupId: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

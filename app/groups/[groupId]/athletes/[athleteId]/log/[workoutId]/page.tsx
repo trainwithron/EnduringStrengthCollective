@@ -3,11 +3,12 @@ import { createServerClient } from "@/lib/supabase/server";
 import { getWorkoutOverviewData } from "@/lib/workout-overview-data";
 import { WorkoutOverviewView } from "@/components/logging/workout-overview-view";
 
-export default async function LogWorkoutForClientPage({
-  params,
-}: {
-  params: { groupId: string; athleteId: string; workoutId: string };
-}) {
+export default async function LogWorkoutForClientPage(
+  props: {
+    params: Promise<{ groupId: string; athleteId: string; workoutId: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

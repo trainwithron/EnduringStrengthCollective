@@ -43,11 +43,12 @@ function timeAgo(iso: string): string {
   return `${days}d ago`;
 }
 
-export default async function CoachDashboardPage({
-  params,
-}: {
-  params: { groupId: string };
-}) {
+export default async function CoachDashboardPage(
+  props: {
+    params: Promise<{ groupId: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

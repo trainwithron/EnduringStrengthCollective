@@ -10,11 +10,12 @@ import { BuyCreditsButton } from "@/components/athlete/buy-credits-button";
 import { SubscribeButton } from "@/components/athlete/subscribe-button";
 import { ManageBillingLink } from "@/components/athlete/manage-billing-link";
 
-export default async function SettingsPage({
-  params,
-}: {
-  params: { groupId: string };
-}) {
+export default async function SettingsPage(
+  props: {
+    params: Promise<{ groupId: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

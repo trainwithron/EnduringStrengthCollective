@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 
-export default function BillingCanceledPage({ params }: { params: { groupId: string } }) {
+export default async function BillingCanceledPage(props: { params: Promise<{ groupId: string }> }) {
+  const params = await props.params;
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24 flex flex-col items-center justify-center px-6 text-center">
       <h1 className="font-display font-bold text-3xl uppercase">Checkout canceled</h1>

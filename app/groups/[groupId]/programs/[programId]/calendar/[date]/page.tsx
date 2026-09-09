@@ -13,13 +13,14 @@ import { DayMealsView } from "@/components/athlete/day-meals-view";
 import { computeScheduledDates } from "@/lib/program-schedule";
 import { isHabitDueOn } from "@/lib/habits";
 
-export default async function DayDetailPage({
-  params,
-  searchParams,
-}: {
-  params: { groupId: string; programId: string; date: string };
-  searchParams: { reschedule?: string };
-}) {
+export default async function DayDetailPage(
+  props: {
+    params: Promise<{ groupId: string; programId: string; date: string }>;
+    searchParams: Promise<{ reschedule?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

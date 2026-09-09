@@ -1,11 +1,12 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { InviteJoinFlow } from "@/components/invite/invite-join-flow";
 
-export default async function InvitePage({
-  params,
-}: {
-  params: { code: string };
-}) {
+export default async function InvitePage(
+  props: {
+    params: Promise<{ code: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
 
   const { data, error } = await supabase

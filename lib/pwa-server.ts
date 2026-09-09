@@ -1,4 +1,4 @@
-import { cookies, headers } from "next/headers";
+import { cookies, headers, type UnsafeUnwrappedCookies, type UnsafeUnwrappedHeaders } from "next/headers";
 import { PWA_STANDALONE_COOKIE } from "./pwa";
 
 // Server-side read of the cookie PwaContextCookie writes client-side.
@@ -7,7 +7,7 @@ import { PWA_STANDALONE_COOKIE } from "./pwa";
 // very same phone gets false, since the cookie is re-written fresh on
 // every load.
 export function isPwaStandalone(): boolean {
-  return cookies().get(PWA_STANDALONE_COOKIE)?.value === "1";
+  return (cookies() as unknown as UnsafeUnwrappedCookies).get(PWA_STANDALONE_COOKIE)?.value === "1";
 }
 
 // A real phone browser tab, not just the installed app — coaches
@@ -16,7 +16,7 @@ export function isPwaStandalone(): boolean {
 // impression. Matches the same platforms AddToHomeScreenPrompt already
 // distinguishes client-side (iOS/Android), server-side.
 function isMobileUserAgent(): boolean {
-  const ua = headers().get("user-agent") ?? "";
+  const ua = (headers() as unknown as UnsafeUnwrappedHeaders).get("user-agent") ?? "";
   return /android|iphone|ipad|ipod|mobile/i.test(ua);
 }
 

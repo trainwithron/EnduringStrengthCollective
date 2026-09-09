@@ -14,11 +14,12 @@ import {
 import { Lock } from "lucide-react";
 import type { BuilderDay, BuilderExercise, BuilderNote } from "@/lib/types";
 
-export default async function ProgramDetailPage({
-  params,
-}: {
-  params: { groupId: string; programId: string };
-}) {
+export default async function ProgramDetailPage(
+  props: {
+    params: Promise<{ groupId: string; programId: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

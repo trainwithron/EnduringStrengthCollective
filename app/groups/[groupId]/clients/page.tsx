@@ -6,11 +6,12 @@ import { InviteAthleteButton } from "@/components/group/invite-athlete-button";
 import { AddClientButton } from "@/components/coach/desktop/add-client-button";
 import type { RosterMember } from "@/lib/types";
 
-export default async function ClientsPage({
-  params,
-}: {
-  params: { groupId: string };
-}) {
+export default async function ClientsPage(
+  props: {
+    params: Promise<{ groupId: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

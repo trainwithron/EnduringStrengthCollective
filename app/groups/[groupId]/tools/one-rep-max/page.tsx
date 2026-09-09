@@ -5,11 +5,12 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { OneRepMaxCalculator } from "@/components/tools/one-rep-max-calculator";
 
-export default async function OneRepMaxPage({
-  params,
-}: {
-  params: { groupId: string };
-}) {
+export default async function OneRepMaxPage(
+  props: {
+    params: Promise<{ groupId: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

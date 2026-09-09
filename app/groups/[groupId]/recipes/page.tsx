@@ -3,11 +3,12 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { RecipeHubManager, type RecipeRow } from "@/components/coach/desktop/recipe-hub-manager";
 
-export default async function RecipeHubPage({
-  params,
-}: {
-  params: { groupId: string };
-}) {
+export default async function RecipeHubPage(
+  props: {
+    params: Promise<{ groupId: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

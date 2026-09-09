@@ -5,11 +5,12 @@ import { WorkoutOverviewView } from "@/components/logging/workout-overview-view"
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { computeScheduledDates, formatShortDate, isLocked } from "@/lib/program-schedule";
 
-export default async function WorkoutOverviewPage({
-  params,
-}: {
-  params: { groupId: string; workoutId: string };
-}) {
+export default async function WorkoutOverviewPage(
+  props: {
+    params: Promise<{ groupId: string; workoutId: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

@@ -6,11 +6,12 @@ import { createServerClient } from "@/lib/supabase/server";
 // client's behalf — same week-grouped "Log →" list the athlete themselves
 // would see, scoped to the group's one active program (only one can be
 // active per group, so there's nothing to pick between).
-export default async function LogForClientPage({
-  params,
-}: {
-  params: { groupId: string; athleteId: string };
-}) {
+export default async function LogForClientPage(
+  props: {
+    params: Promise<{ groupId: string; athleteId: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

@@ -5,11 +5,12 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ImportWizard } from "@/components/coach/desktop/import-wizard";
 import { GeminiImportGuide } from "@/components/coach/desktop/gemini-import-guide";
 
-export default async function ImportProgramPage({
-  params,
-}: {
-  params: { groupId: string };
-}) {
+export default async function ImportProgramPage(
+  props: {
+    params: Promise<{ groupId: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

@@ -9,11 +9,12 @@ import { NutritionTools } from "@/components/coach/desktop/nutrition-tools";
 import { isHabitDueOn } from "@/lib/habits";
 import { computeWeeklyWeightTrend } from "@/lib/weight-trend";
 
-export default async function AthleteProfilePage({
-  params,
-}: {
-  params: { groupId: string; athleteId: string };
-}) {
+export default async function AthleteProfilePage(
+  props: {
+    params: Promise<{ groupId: string; athleteId: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

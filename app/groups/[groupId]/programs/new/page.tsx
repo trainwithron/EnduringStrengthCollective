@@ -3,11 +3,12 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { NewProgramForm } from "@/components/coach/new-program-form";
 
-export default async function NewProgramPage({
-  params,
-}: {
-  params: { groupId: string };
-}) {
+export default async function NewProgramPage(
+  props: {
+    params: Promise<{ groupId: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

@@ -17,7 +17,8 @@ function randomCode(length = 10) {
 // paying for it in the feed's initial load. Authenticated + a normal
 // group-member RLS read (not the anon path /share uses), so this only
 // ever returns something for someone who could already see the post.
-export async function GET(request: Request, { params }: { params: { postId: string } }) {
+export async function GET(request: Request, props: { params: Promise<{ postId: string }> }) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

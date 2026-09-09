@@ -7,11 +7,12 @@ import { CoachLoggedBadge } from "@/components/coach-logged-badge";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import type { SessionExerciseEntry } from "@/lib/types";
 
-export default async function SessionPage({
-  params,
-}: {
-  params: { sessionId: string };
-}) {
+export default async function SessionPage(
+  props: {
+    params: Promise<{ sessionId: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

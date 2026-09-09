@@ -46,20 +46,21 @@ function formatTimeString(time: string): string {
   return `${hour12}:${String(m).padStart(2, "0")} ${period}`;
 }
 
-export default async function CoachCalendarPage({
-  params,
-  searchParams,
-}: {
-  params: { groupId: string };
-  searchParams: {
-    month?: string;
-    client?: string;
-    view?: string;
-    week?: string;
-    reschedule?: string;
-    scheduleFor?: string;
-  };
-}) {
+export default async function CoachCalendarPage(
+  props: {
+    params: Promise<{ groupId: string }>;
+    searchParams: Promise<{
+      month?: string;
+      client?: string;
+      view?: string;
+      week?: string;
+      reschedule?: string;
+      scheduleFor?: string;
+    }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

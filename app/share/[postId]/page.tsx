@@ -12,11 +12,12 @@ import { CustomizeSharePanel } from "@/components/share/customize-share-panel";
 // gym) right after finishing. RLS on the anon role is scoped narrowly to
 // workout_summary posts only — see migration 0028_public_share_any_workout.
 
-export async function generateMetadata({
-  params,
-}: {
-  params: { postId: string };
-}): Promise<Metadata> {
+export async function generateMetadata(
+  props: {
+    params: Promise<{ postId: string }>;
+  }
+): Promise<Metadata> {
+  const params = await props.params;
   const shared = await getSharedWorkout(params.postId);
   if (!shared) return { title: "Workout not found" };
 
@@ -36,11 +37,12 @@ export async function generateMetadata({
   };
 }
 
-export default async function ShareWorkoutPage({
-  params,
-}: {
-  params: { postId: string };
-}) {
+export default async function ShareWorkoutPage(
+  props: {
+    params: Promise<{ postId: string }>;
+  }
+) {
+  const params = await props.params;
   const shared = await getSharedWorkout(params.postId);
 
   if (!shared) {

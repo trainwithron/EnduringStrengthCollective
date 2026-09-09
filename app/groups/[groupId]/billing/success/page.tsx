@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 
-export default function BillingSuccessPage({
-  params,
-  searchParams,
-}: {
-  params: { groupId: string };
-  searchParams: { kind?: string };
-}) {
+export default async function BillingSuccessPage(
+  props: {
+    params: Promise<{ groupId: string }>;
+    searchParams: Promise<{ kind?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const isSubscription = searchParams.kind === "subscription";
 
   return (

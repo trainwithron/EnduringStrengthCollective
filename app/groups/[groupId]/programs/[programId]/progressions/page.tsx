@@ -3,11 +3,12 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { ProgressionRow } from "@/components/coach/progression-row";
 
-export default async function ProgressionsPage({
-  params,
-}: {
-  params: { groupId: string; programId: string };
-}) {
+export default async function ProgressionsPage(
+  props: {
+    params: Promise<{ groupId: string; programId: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

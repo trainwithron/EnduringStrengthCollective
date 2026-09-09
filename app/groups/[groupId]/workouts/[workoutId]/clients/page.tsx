@@ -4,13 +4,14 @@ import { createServerClient } from "@/lib/supabase/server";
 import { ClientPicker } from "@/components/coach/client-picker";
 import { ClientSlotRow } from "@/components/coach/client-slot-row";
 
-export default async function WorkoutClientsPage({
-  params,
-  searchParams,
-}: {
-  params: { groupId: string; workoutId: string };
-  searchParams: { athlete?: string };
-}) {
+export default async function WorkoutClientsPage(
+  props: {
+    params: Promise<{ groupId: string; workoutId: string }>;
+    searchParams: Promise<{ athlete?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

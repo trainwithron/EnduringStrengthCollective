@@ -5,11 +5,12 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { RevenueSplitEditor } from "@/components/coach/desktop/revenue-split-editor";
 import type { CoachShare } from "@/lib/revenue-splits";
 
-export default async function RevenueSplitsPage({
-  params,
-}: {
-  params: { groupId: string };
-}) {
+export default async function RevenueSplitsPage(
+  props: {
+    params: Promise<{ groupId: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

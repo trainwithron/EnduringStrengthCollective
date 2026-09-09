@@ -11,13 +11,14 @@ import { RescheduleSlotButton } from "@/components/athlete/reschedule-slot-butto
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { BuyCreditsButton } from "@/components/athlete/buy-credits-button";
 
-export default async function CoachDayDetailPage({
-  params,
-  searchParams,
-}: {
-  params: { groupId: string; date: string };
-  searchParams: { client?: string; reschedule?: string };
-}) {
+export default async function CoachDayDetailPage(
+  props: {
+    params: Promise<{ groupId: string; date: string }>;
+    searchParams: Promise<{ client?: string; reschedule?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

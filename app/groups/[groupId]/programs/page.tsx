@@ -4,11 +4,12 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ProgramCardGrid, type ProgramCardData } from "@/components/coach/desktop/program-card-grid";
 
-export default async function ProgramsListPage({
-  params,
-}: {
-  params: { groupId: string };
-}) {
+export default async function ProgramsListPage(
+  props: {
+    params: Promise<{ groupId: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

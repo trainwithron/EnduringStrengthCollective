@@ -21,13 +21,14 @@ function monthLabel(year: number, monthIndex: number): string {
   });
 }
 
-export default async function ClientCalendarPage({
-  params,
-  searchParams,
-}: {
-  params: { groupId: string; athleteId: string };
-  searchParams: { month?: string };
-}) {
+export default async function ClientCalendarPage(
+  props: {
+    params: Promise<{ groupId: string; athleteId: string }>;
+    searchParams: Promise<{ month?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

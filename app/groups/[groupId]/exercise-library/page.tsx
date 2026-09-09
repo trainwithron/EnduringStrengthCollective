@@ -3,11 +3,12 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ExerciseLibraryTabs } from "@/components/coach/exercise-library-tabs";
 
-export default async function ExerciseLibraryPage({
-  params,
-}: {
-  params: { groupId: string };
-}) {
+export default async function ExerciseLibraryPage(
+  props: {
+    params: Promise<{ groupId: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

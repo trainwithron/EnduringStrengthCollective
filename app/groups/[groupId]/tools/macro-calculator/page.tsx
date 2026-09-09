@@ -5,11 +5,12 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { MacroCalculator } from "@/components/tools/macro-calculator";
 
-export default async function MacroCalculatorPage({
-  params,
-}: {
-  params: { groupId: string };
-}) {
+export default async function MacroCalculatorPage(
+  props: {
+    params: Promise<{ groupId: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

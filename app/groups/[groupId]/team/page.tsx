@@ -7,7 +7,8 @@ import {
   type TeamPlayer,
 } from "@/components/coach/desktop/team-depth-chart";
 
-export default async function TeamPage({ params }: { params: { groupId: string } }) {
+export default async function TeamPage(props: { params: Promise<{ groupId: string }> }) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

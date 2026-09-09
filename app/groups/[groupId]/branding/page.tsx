@@ -4,11 +4,12 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { BrandingForm } from "@/components/coach/desktop/branding-form";
 import type { ButtonShape, DisplayFont, BodyFont } from "@/lib/theme";
 
-export default async function BrandingPage({
-  params,
-}: {
-  params: { groupId: string };
-}) {
+export default async function BrandingPage(
+  props: {
+    params: Promise<{ groupId: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

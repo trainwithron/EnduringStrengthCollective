@@ -3,35 +3,41 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.45.4",
-    "eslint-config-next": "^14.2.35",
+    "eslint-config-next": "15.5.25",
     "html-to-image": "^1.11.13",
     "lucide-react": "^0.446.0",
-    "next": "^14.2.35",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "next": "15.5.25",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "stripe": "^22.6.1",
     "web-push": "^3.6.7",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/node": "^20.16.10",
-    "@types/react": "^18.3.10",
-    "@types/react-dom": "^18.3.0",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
     "@types/web-push": "^3.6.4",
     "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.47",
+    "eslint": "^9.39.5",
+    "postcss": "^8.5.28",
     "tailwindcss": "^3.4.13",
     "typescript": "^5.6.2",
-    "vitest": "^3.2.7"
+    "vitest": "^4.1.11"
+  },
+  "overrides": {
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "postcss": "^8.5.28"
   }
 }

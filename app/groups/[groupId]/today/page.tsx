@@ -4,11 +4,12 @@ import { getTodaysWorkoutId } from "@/lib/todays-workout";
 import { formatShortDate } from "@/lib/program-schedule";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 
-export default async function TodayPage({
-  params,
-}: {
-  params: { groupId: string };
-}) {
+export default async function TodayPage(
+  props: {
+    params: Promise<{ groupId: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

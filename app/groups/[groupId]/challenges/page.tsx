@@ -7,11 +7,12 @@ import { ChallengeCreator } from "@/components/coach/desktop/challenge-creator";
 import { estimatedRevenueCents, formatCents } from "@/lib/challenges";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 
-export default async function ChallengesPage({
-  params,
-}: {
-  params: { groupId: string };
-}) {
+export default async function ChallengesPage(
+  props: {
+    params: Promise<{ groupId: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

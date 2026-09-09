@@ -17,11 +17,12 @@ function dateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export default async function ChallengeDetailPage({
-  params,
-}: {
-  params: { groupId: string; challengeId: string };
-}) {
+export default async function ChallengeDetailPage(
+  props: {
+    params: Promise<{ groupId: string; challengeId: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

@@ -10,11 +10,12 @@ import {
 import { ReferralDirectoryList } from "@/components/athlete/referral-directory-list";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 
-export default async function ReferralsPage({
-  params,
-}: {
-  params: { groupId: string };
-}) {
+export default async function ReferralsPage(
+  props: {
+    params: Promise<{ groupId: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

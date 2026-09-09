@@ -35,13 +35,14 @@ function parseDateParam(value: string | undefined, fallback: Date): Date {
   return fallback;
 }
 
-export default async function ProgramCalendarPage({
-  params,
-  searchParams,
-}: {
-  params: { groupId: string; programId: string };
-  searchParams: { month?: string; view?: string; week?: string; reschedule?: string };
-}) {
+export default async function ProgramCalendarPage(
+  props: {
+    params: Promise<{ groupId: string; programId: string }>;
+    searchParams: Promise<{ month?: string; view?: string; week?: string; reschedule?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

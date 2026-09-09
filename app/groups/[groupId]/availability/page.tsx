@@ -5,11 +5,12 @@ import { AvailabilityManagerDesktop } from "@/components/coach/desktop/availabil
 import { CancellationPolicyControl } from "@/components/coach/desktop/cancellation-policy-control";
 import { AvailabilityExceptionsManager } from "@/components/coach/desktop/availability-exceptions-manager";
 
-export default async function AvailabilityPage({
-  params,
-}: {
-  params: { groupId: string };
-}) {
+export default async function AvailabilityPage(
+  props: {
+    params: Promise<{ groupId: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

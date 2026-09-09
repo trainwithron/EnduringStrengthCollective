@@ -20,11 +20,12 @@ const TIER_LABELS: Record<string, string> = {
   group: "Group",
 };
 
-export default async function BusinessDashboardPage({
-  params,
-}: {
-  params: { groupId: string };
-}) {
+export default async function BusinessDashboardPage(
+  props: {
+    params: Promise<{ groupId: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

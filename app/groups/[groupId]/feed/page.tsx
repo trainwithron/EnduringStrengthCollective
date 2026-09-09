@@ -12,13 +12,14 @@ import type { FeedChannel, FeedPost } from "@/lib/types";
 
 const VALID_CHANNELS: FeedChannel[] = ["announcements", "form_checks", "pr_board", "general"];
 
-export default async function FeedPage({
-  params,
-  searchParams,
-}: {
-  params: { groupId: string };
-  searchParams: { channel?: string };
-}) {
+export default async function FeedPage(
+  props: {
+    params: Promise<{ groupId: string }>;
+    searchParams: Promise<{ channel?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },

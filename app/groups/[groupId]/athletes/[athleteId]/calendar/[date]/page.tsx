@@ -9,11 +9,12 @@ import type { DueHabit } from "@/components/coach/desktop/habit-day-checklist";
 import { computeScheduledDates } from "@/lib/program-schedule";
 import { isHabitDueOn } from "@/lib/habits";
 
-export default async function ClientCalendarDayPage({
-  params,
-}: {
-  params: { groupId: string; athleteId: string; date: string };
-}) {
+export default async function ClientCalendarDayPage(
+  props: {
+    params: Promise<{ groupId: string; athleteId: string; date: string }>;
+  }
+) {
+  const params = await props.params;
   const supabase = createServerClient();
   const {
     data: { user },
