@@ -20,10 +20,10 @@ body {
   color: var(--chalk);
 }
 
-/* Coach desktop branding: a coach's chosen button shape reshapes the
-   filled rust CTA buttons (Save, Generate, Add, etc.) wherever they
-   appear inside the desktop shell — scoped by this class so nothing
-   outside the coach dashboard (the athlete mobile app) is affected. */
-.coach-branded-shell .bg-rust.text-graphite {
+/* Organization branding: the org's chosen button shape reshapes every
+   filled rust CTA button (Save, Generate, Add, etc.) app-wide — coach
+   desktop and the athlete mobile app share one identity, set once at
+   the root in app/layout.tsx. */
+.bg-rust.text-graphite {
   border-radius: var(--btn-radius, 0px);
 }

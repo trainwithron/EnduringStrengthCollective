@@ -23,13 +23,13 @@ import {
   ClipboardList,
   Menu,
   X,
+  Building2,
 } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
 import { GroupSwitcher } from "@/components/coach/desktop/group-switcher";
 import { ViewAsClientButton } from "@/components/coach/desktop/view-as-client-button";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { BUTTON_SHAPE_RADIUS, type ButtonShape, type DisplayFont, type BodyFont } from "@/lib/theme";
 
 function NavBadge({ count, collapsed }: { count: number; collapsed?: boolean }) {
   if (count <= 0) return null;
@@ -106,14 +106,31 @@ export function CoachDesktopShell({
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [feedUnread, setFeedUnread] = useState(0);
   const [clientsUnread, setClientsUnread] = useState(0);
-  const [branding, setBranding] = useState<{
-    buttonShape: ButtonShape;
-    accentColor: string;
-    backgroundColor: string;
-    textColor: string;
-    fontDisplay: DisplayFont;
-    fontBody: BodyFont;
-  } | null>(null);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
+
+  // Platform-admin-only "Organizations" link — visible only to the one
+  // account flagged profiles.is_platform_admin, so an ordinary coach never
+  // sees this at all.
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      const supabase = createBrowserClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("profiles")
+        .select("is_platform_admin")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (!cancelled) setIsPlatformAdmin(data?.is_platform_admin ?? false);
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Collapse state persists across visits — a coach who prefers the icon
   // rail shouldn't have to re-collapse it every page load.
@@ -137,46 +154,10 @@ export function CoachDesktopShell({
     });
   }
 
-  // Organization-wide desktop branding (button shape, colors, fonts) —
-  // every coach in the same organization shares one visual identity.
-  // Applied as CSS custom properties on this shell's own root element,
-  // so it never touches the athlete mobile app, which never renders
-  // inside this component.
-  useEffect(() => {
-    let cancelled = false;
-    async function run() {
-      const supabase = createBrowserClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: membership } = await supabase
-        .from("organization_memberships")
-        .select("organization_id")
-        .eq("profile_id", user.id)
-        .limit(1)
-        .maybeSingle();
-      if (!membership) return;
-      const { data } = await supabase
-        .from("organizations")
-        .select("button_shape, accent_color, background_color, text_color, font_display, font_body")
-        .eq("id", membership.organization_id)
-        .maybeSingle();
-      if (cancelled) return;
-      setBranding({
-        buttonShape: (data?.button_shape as ButtonShape) ?? "sharp",
-        accentColor: data?.accent_color ?? "#C4622D",
-        backgroundColor: data?.background_color ?? "#1C1B1A",
-        textColor: data?.text_color ?? "#EDE8E0",
-        fontDisplay: (data?.font_display as DisplayFont) ?? "Barlow Condensed",
-        fontBody: (data?.font_body as BodyFont) ?? "Inter",
-      });
-    }
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // Organization branding (button shape, colors, fonts, logo) is now
+  // applied once at the app root (app/layout.tsx) as CSS custom
+  // properties, so it reaches this shell and the athlete mobile app
+  // alike — nothing shell-specific to fetch or apply here anymore.
 
   // "What's new" badges: how many posts / client check-ins happened since
   // this coach last actually opened Team Feed / Clients for this group.
@@ -282,17 +263,6 @@ export function CoachDesktopShell({
 
   const groupHasActiveChild = (group: NavGroup) => group.items.some((i) => i.key === active);
 
-  const brandingStyle = branding
-    ? ({
-        "--rust": branding.accentColor,
-        "--graphite": branding.backgroundColor,
-        "--chalk": branding.textColor,
-        "--font-display": `"${branding.fontDisplay}"`,
-        "--font-body": `"${branding.fontBody}"`,
-        "--btn-radius": BUTTON_SHAPE_RADIUS[branding.buttonShape],
-      } as React.CSSProperties)
-    : undefined;
-
   function renderLeaf(item: NavLeaf, { indented = false }: { indented?: boolean } = {}) {
     const isActive = active === item.key;
     const Icon = item.icon;
@@ -371,6 +341,20 @@ export function CoachDesktopShell({
     <>
       <GroupSwitcher groupId={groupId} groupName={groupName} collapsed={collapsed} />
       <nav className="flex-1 py-3 overflow-y-auto">{renderNav()}</nav>
+      {isPlatformAdmin && (
+        <div className={`border-t border-steel/20 py-2 ${collapsed ? "px-2" : "px-5"}`}>
+          <Link
+            href="/admin/organizations"
+            title="Organizations"
+            className={`flex items-center gap-2 font-body text-xs text-steel active:text-chalk ${
+              collapsed ? "justify-center" : ""
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5 shrink-0" strokeWidth={2.25} />
+            {!collapsed && "Organizations"}
+          </Link>
+        </div>
+      )}
       <div className="border-t border-steel/20 py-2">
         <DownloadAppButton collapsed={collapsed} />
       </div>
@@ -381,7 +365,7 @@ export function CoachDesktopShell({
   );
 
   return (
-    <div className="coach-branded-shell min-h-screen bg-graphite text-chalk font-body" style={brandingStyle}>
+    <div className="min-h-screen bg-graphite text-chalk font-body">
       {/* Persistent top bar — always visible regardless of sidebar state,
           on every viewport. Houses the mobile nav toggle and the "View as
           Client" jump, since both need to stay reachable without scrolling

@@ -60,7 +60,7 @@ export default async function BrandingPage(
   const { data: org } = await supabase
     .from("organizations")
     .select(
-      "id, slug, name, owner_id, created_at, button_shape, accent_color, background_color, text_color, font_display, font_body"
+      "id, slug, name, owner_id, created_at, button_shape, accent_color, background_color, text_color, font_display, font_body, logo_url, app_icon_url"
     )
     .eq("id", orgMembership.organization_id)
     .maybeSingle();
@@ -127,6 +127,8 @@ export default async function BrandingPage(
           initialTextColor={org?.text_color ?? "#EDE8E0"}
           initialFontDisplay={(org?.font_display as DisplayFont) ?? "Barlow Condensed"}
           initialFontBody={(org?.font_body as BodyFont) ?? "Inter"}
+          initialLogoUrl={org?.logo_url ?? null}
+          initialAppIconUrl={org?.app_icon_url ?? null}
         />
       ) : (
         <p className="font-body text-sm text-steel">

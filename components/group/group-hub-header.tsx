@@ -9,6 +9,7 @@ interface GroupHubHeaderProps {
   groupId: string;
   coachId?: string;
   notifications?: NotificationEntry[];
+  logoUrl?: string | null;
 }
 
 export function GroupHubHeader({
@@ -19,6 +20,7 @@ export function GroupHubHeader({
   groupId,
   coachId,
   notifications,
+  logoUrl,
 }: GroupHubHeaderProps) {
   return (
     <header className="px-5 pt-8 pb-6 border-b border-steel/20">
@@ -28,6 +30,10 @@ export function GroupHubHeader({
         </p>
         {notifications && <NotificationBell initial={notifications} />}
       </div>
+      {logoUrl && (
+        // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL, not a local asset Next can optimize.
+        <img src={logoUrl} alt="" className="h-10 max-w-[160px] object-contain mt-3" />
+      )}
       <h1 className="font-display font-bold text-4xl leading-none mt-1 uppercase">
         {name}
       </h1>

@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AddToHomeScreenPrompt } from "@/components/add-to-home-screen-prompt";
 import { PwaContextCookie } from "@/components/pwa-context-cookie";
+import { getViewerOrgTheme } from "@/lib/org-theme-server";
+import { orgThemeToCssVars } from "@/lib/theme";
 
 export const metadata: Metadata = {
   title: "The Enduring Strength Collective",
@@ -22,13 +24,26 @@ export const viewport: Viewport = {
   themeColor: "#1C1B1A",
 };
 
-export default function RootLayout({
+// Organization branding (colors, fonts, button shape, logo/icon) is
+// resolved once here and applied as CSS custom properties on <html> —
+// every surface in the app (coach desktop shell AND the athlete mobile
+// app) reads the same --rust/--graphite/--chalk/--font-* variables via
+// tailwind.config.ts, so theming the whole app is just setting them at
+// the root instead of duplicating this per shell.
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const theme = await getViewerOrgTheme();
+  const cssVars = orgThemeToCssVars(theme);
+
   return (
-    <html lang="en">
+    <html lang="en" style={cssVars}>
+      <head>
+        {theme.appIconUrl && <link rel="apple-touch-icon" href={theme.appIconUrl} />}
+        {theme.appIconUrl && <link rel="icon" href={theme.appIconUrl} />}
+      </head>
       <body className="font-body bg-graphite text-chalk min-h-screen">
         <PwaContextCookie />
         <AddToHomeScreenPrompt />

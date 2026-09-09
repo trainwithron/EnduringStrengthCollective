@@ -11,8 +11,28 @@ import {
   type DisplayFont,
   type BodyFont,
 } from "@/lib/theme";
+import { OrgImageUpload } from "./org-image-upload";
 
 const SHAPES: ButtonShape[] = ["sharp", "rounded", "pill"];
+
+function Section({
+  title,
+  defaultOpen = false,
+  children,
+}: {
+  title: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="border border-steel/20" open={defaultOpen}>
+      <summary className="font-display uppercase text-sm tracking-wide px-4 py-3 cursor-pointer select-none">
+        {title}
+      </summary>
+      <div className="px-4 pb-4 pt-1 border-t border-steel/20">{children}</div>
+    </details>
+  );
+}
 
 export function BrandingForm({
   organizationId,
@@ -22,6 +42,8 @@ export function BrandingForm({
   initialTextColor,
   initialFontDisplay,
   initialFontBody,
+  initialLogoUrl,
+  initialAppIconUrl,
 }: {
   organizationId: string;
   initialButtonShape: ButtonShape;
@@ -30,6 +52,8 @@ export function BrandingForm({
   initialTextColor: string;
   initialFontDisplay: DisplayFont;
   initialFontBody: BodyFont;
+  initialLogoUrl: string | null;
+  initialAppIconUrl: string | null;
 }) {
   const [buttonShape, setButtonShape] = useState<ButtonShape>(initialButtonShape);
   const [accentColor, setAccentColor] = useState(initialAccentColor);
@@ -95,123 +119,149 @@ export function BrandingForm({
   }
 
   return (
-    <div className="max-w-lg space-y-6">
-      <div>
-        <span className="font-body text-xs text-steel uppercase tracking-wide">Button shape</span>
-        <div className="flex gap-2 mt-2">
-          {SHAPES.map((shape) => (
-            <button
-              key={shape}
-              type="button"
-              onClick={() => handleShapeChange(shape)}
-              className={`h-10 px-4 font-body text-sm border flex-1 ${
-                buttonShape === shape
-                  ? "border-rust text-chalk bg-surface"
-                  : "border-steel/30 text-steel"
-              }`}
-              style={{ borderRadius: BUTTON_SHAPE_RADIUS[shape] }}
-            >
-              {BUTTON_SHAPE_LABELS[shape]}
-            </button>
-          ))}
+    <div className="max-w-lg space-y-3">
+      <Section title="Logo & app icon" defaultOpen>
+        <div className="space-y-4">
+          <OrgImageUpload
+            organizationId={organizationId}
+            column="logo_url"
+            label="Logo"
+            helpText="Shown in in-app headers. Any aspect ratio works."
+            initialUrl={initialLogoUrl}
+            previewClassName="w-24 h-14"
+          />
+          <OrgImageUpload
+            organizationId={organizationId}
+            column="app_icon_url"
+            label="App icon"
+            helpText="Becomes the home-screen icon when a client adds the app. Use a square image."
+            initialUrl={initialAppIconUrl}
+            previewClassName="w-14 h-14"
+          />
         </div>
-      </div>
+      </Section>
 
-      <div className="grid grid-cols-3 gap-4">
-        <label className="flex flex-col gap-1">
-          <span className="font-body text-xs text-steel uppercase tracking-wide">
-            Button / accent color
-          </span>
-          <div className="flex items-center gap-2">
-            <input
-              type="color"
-              value={accentColor}
-              onChange={(e) => handleAccentChange(e.target.value)}
-              className="h-10 w-12 bg-surface border border-steel/30 cursor-pointer"
-            />
-            <input
-              type="text"
-              value={accentColor}
-              onChange={(e) => handleAccentChange(e.target.value)}
-              className="h-10 flex-1 min-w-0 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm"
-            />
-          </div>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="font-body text-xs text-steel uppercase tracking-wide">
-            Background color
-          </span>
-          <div className="flex items-center gap-2">
-            <input
-              type="color"
-              value={backgroundColor}
-              onChange={(e) => handleBackgroundChange(e.target.value)}
-              className="h-10 w-12 bg-surface border border-steel/30 cursor-pointer"
-            />
-            <input
-              type="text"
-              value={backgroundColor}
-              onChange={(e) => handleBackgroundChange(e.target.value)}
-              className="h-10 flex-1 min-w-0 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm"
-            />
-          </div>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="font-body text-xs text-steel uppercase tracking-wide">Text color</span>
-          <div className="flex items-center gap-2">
-            <input
-              type="color"
-              value={textColor}
-              onChange={(e) => handleTextColorChange(e.target.value)}
-              className="h-10 w-12 bg-surface border border-steel/30 cursor-pointer"
-            />
-            <input
-              type="text"
-              value={textColor}
-              onChange={(e) => handleTextColorChange(e.target.value)}
-              className="h-10 flex-1 min-w-0 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm"
-            />
-          </div>
-        </label>
-      </div>
+      <Section title="Colors">
+        <div className="grid grid-cols-3 gap-4">
+          <label className="flex flex-col gap-1">
+            <span className="font-body text-xs text-steel uppercase tracking-wide">
+              Button / accent color
+            </span>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={accentColor}
+                onChange={(e) => handleAccentChange(e.target.value)}
+                className="h-10 w-12 bg-surface border border-steel/30 cursor-pointer"
+              />
+              <input
+                type="text"
+                value={accentColor}
+                onChange={(e) => handleAccentChange(e.target.value)}
+                className="h-10 flex-1 min-w-0 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm"
+              />
+            </div>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="font-body text-xs text-steel uppercase tracking-wide">
+              Background color
+            </span>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={backgroundColor}
+                onChange={(e) => handleBackgroundChange(e.target.value)}
+                className="h-10 w-12 bg-surface border border-steel/30 cursor-pointer"
+              />
+              <input
+                type="text"
+                value={backgroundColor}
+                onChange={(e) => handleBackgroundChange(e.target.value)}
+                className="h-10 flex-1 min-w-0 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm"
+              />
+            </div>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="font-body text-xs text-steel uppercase tracking-wide">Text color</span>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={textColor}
+                onChange={(e) => handleTextColorChange(e.target.value)}
+                className="h-10 w-12 bg-surface border border-steel/30 cursor-pointer"
+              />
+              <input
+                type="text"
+                value={textColor}
+                onChange={(e) => handleTextColorChange(e.target.value)}
+                className="h-10 flex-1 min-w-0 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm"
+              />
+            </div>
+          </label>
+        </div>
+      </Section>
 
-      <div className="grid grid-cols-2 gap-4">
-        <label className="flex flex-col gap-1">
-          <span className="font-body text-xs text-steel uppercase tracking-wide">
-            Heading font
-          </span>
-          <select
-            value={fontDisplay}
-            onChange={(e) => handleFontDisplayChange(e.target.value as DisplayFont)}
-            className="h-10 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm"
-          >
-            {DISPLAY_FONT_OPTIONS.map((font) => (
-              <option key={font} value={font}>
-                {font}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="font-body text-xs text-steel uppercase tracking-wide">Body font</span>
-          <select
-            value={fontBody}
-            onChange={(e) => handleFontBodyChange(e.target.value as BodyFont)}
-            className="h-10 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm"
-          >
-            {BODY_FONT_OPTIONS.map((font) => (
-              <option key={font} value={font}>
-                {font}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <Section title="Typography & buttons">
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <label className="flex flex-col gap-1">
+              <span className="font-body text-xs text-steel uppercase tracking-wide">
+                Heading font
+              </span>
+              <select
+                value={fontDisplay}
+                onChange={(e) => handleFontDisplayChange(e.target.value as DisplayFont)}
+                className="h-10 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm"
+              >
+                {DISPLAY_FONT_OPTIONS.map((font) => (
+                  <option key={font} value={font}>
+                    {font}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="font-body text-xs text-steel uppercase tracking-wide">Body font</span>
+              <select
+                value={fontBody}
+                onChange={(e) => handleFontBodyChange(e.target.value as BodyFont)}
+                className="h-10 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm"
+              >
+                {BODY_FONT_OPTIONS.map((font) => (
+                  <option key={font} value={font}>
+                    {font}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
 
-      <div>
-        <span className="font-body text-xs text-steel uppercase tracking-wide">Preview</span>
+          <div>
+            <span className="font-body text-xs text-steel uppercase tracking-wide">Button shape</span>
+            <div className="flex gap-2 mt-2">
+              {SHAPES.map((shape) => (
+                <button
+                  key={shape}
+                  type="button"
+                  onClick={() => handleShapeChange(shape)}
+                  className={`h-10 px-4 font-body text-sm border flex-1 ${
+                    buttonShape === shape
+                      ? "border-rust text-chalk bg-surface"
+                      : "border-steel/30 text-steel"
+                  }`}
+                  style={{ borderRadius: BUTTON_SHAPE_RADIUS[shape] }}
+                >
+                  {BUTTON_SHAPE_LABELS[shape]}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      <Section title="Preview">
         <div
-          className="mt-2 p-6 border border-steel/20 flex flex-col items-center justify-center gap-3"
+          className="p-6 border border-steel/20 flex flex-col items-center justify-center gap-3"
           style={{ backgroundColor }}
         >
           <p
@@ -236,24 +286,24 @@ export function BrandingForm({
             Save changes
           </button>
         </div>
-      </div>
+      </Section>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 pt-1">
         <button
           type="button"
           onClick={handleApplyNow}
           className="h-10 px-4 bg-rust text-graphite font-body text-sm font-medium"
         >
-          Apply to dashboard now
+          Apply now
         </button>
         <span className="font-body text-xs text-steel">
-          {saving ? "Saving…" : saved ? "Saved — applies to every coach in your organization." : ""}
+          {saving ? "Saving…" : saved ? "Saved — applies everywhere in your organization." : ""}
         </span>
       </div>
 
       <p className="font-body text-xs text-steel max-w-[60ch]">
-        This changes the desktop dashboard for every coach in your organization — the mobile app
-        your clients use is unaffected.
+        This changes the look of the whole app for your organization — the coach desktop dashboard
+        and the mobile app your clients use both share this identity.
       </p>
     </div>
   );

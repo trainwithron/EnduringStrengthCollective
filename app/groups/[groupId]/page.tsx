@@ -7,6 +7,7 @@ import { ProgramCardList } from "@/components/athlete/program-card-list";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { isHabitDueOn } from "@/lib/habits";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
+import { getViewerOrgTheme } from "@/lib/org-theme-server";
 import type { RosterMember } from "@/lib/types";
 
 export default async function GroupHubPage(
@@ -182,6 +183,8 @@ export default async function GroupHubPage(
     }));
   }
 
+  const orgTheme = await getViewerOrgTheme();
+
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
       <GroupHubHeader
@@ -191,6 +194,7 @@ export default async function GroupHubPage(
         isCoach={isCoach}
         groupId={params.groupId}
         coachId={user?.id}
+        logoUrl={orgTheme.logoUrl}
         notifications={(notificationRows ?? []).map((n: any) => ({
           id: n.id,
           type: n.type,
