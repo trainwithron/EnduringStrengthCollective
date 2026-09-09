@@ -8,6 +8,11 @@ export interface MealRecipeChoice {
   recipeId: string | null;
   recipeName: string | null;
   ingredients: string[];
+  // Set for AI-generated suggestions — their ingredients are plain text,
+  // not HTML, same distinction lib/meal-engine.ts's MealOption already
+  // makes. Preserved through the save so a later renderer (the athlete's
+  // day view) knows which rendering rule applies without guessing.
+  isAi?: boolean;
 }
 
 export interface MealEntryPayload {

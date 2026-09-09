@@ -285,6 +285,7 @@ export function MealPlanGenerator({
             recipeId: opt.recipeId ?? null,
             recipeName: opt.recipeName ?? null,
             ingredients: opt.ingredients ?? [],
+            isAi: opt.isAi,
           }));
         return {
           mealId: m.spec.id,
@@ -342,6 +343,7 @@ export function MealPlanGenerator({
         recipeId: opt.recipeId ?? null,
         recipeName: opt.recipeName ?? null,
         ingredients: opt.ingredients ?? [],
+        isAi: opt.isAi,
       }));
     if (weekdays.length === 0 || chosenRecipes.length === 0) return;
 
