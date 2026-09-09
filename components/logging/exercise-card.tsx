@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
+import { TRACKED_FIELD_DEFS, ACTUAL_COLUMN, ACTUAL_PROP, fieldDef, type TrackedField } from "@/lib/exercise-fields";
 import { SetRow } from "./set-row";
 
 export function ExerciseCard({
@@ -13,6 +14,7 @@ export function ExerciseCard({
   onSetChange,
   onSetAdded,
   onRenamed,
+  onTrackedFieldsChange,
   onDelete,
   deleting,
 }: {
@@ -23,6 +25,7 @@ export function ExerciseCard({
   onSetChange: (setId: string, patch: Partial<SetLogEntry>) => void;
   onSetAdded: (set: SetLogEntry) => void;
   onRenamed: (name: string) => void;
+  onTrackedFieldsChange: (fields: TrackedField[]) => void;
   onDelete?: () => void;
   deleting?: boolean;
 }) {
@@ -36,6 +39,8 @@ export function ExerciseCard({
   // two set_logs rows with the same set_order (found and fixed for the
   // coach-builder equivalent of this same bug tonight).
   const [addSetBusy, setAddSetBusy] = useState(false);
+  const [fieldsOpen, setFieldsOpen] = useState(false);
+  const [fieldsBusy, setFieldsBusy] = useState(false);
 
   async function applySwap(name: string) {
     if (!name || name === exercise.exerciseName) {
@@ -95,6 +100,53 @@ export function ExerciseCard({
       setAddSetBusy(false);
     }
   }
+
+  // Which metrics this exercise actually tracks is a per-session-instance
+  // choice, not fixed by the program template — a coach standing there
+  // in person needs to add "distance" for a sprint drill someone swapped
+  // in, or drop RPE for an exercise it never made sense for, without
+  // leaving the log screen to go edit the program builder.
+  async function handleAddField(field: TrackedField) {
+    if (fieldsBusy) return;
+    setFieldsBusy(true);
+    try {
+      const nextFields = [...exercise.trackedFields, field];
+      const supabase = createBrowserClient();
+      await supabase.from("session_exercises").update({ tracked_fields: nextFields }).eq("id", exercise.id);
+      onTrackedFieldsChange(nextFields);
+      setFieldsOpen(false);
+    } finally {
+      setFieldsBusy(false);
+    }
+  }
+
+  async function handleRemoveField(field: TrackedField) {
+    if (fieldsBusy) return;
+    setFieldsBusy(true);
+    try {
+      const nextFields = exercise.trackedFields.filter((f) => f !== field);
+      const supabase = createBrowserClient();
+      await supabase.from("session_exercises").update({ tracked_fields: nextFields }).eq("id", exercise.id);
+      const setIds = exercise.sets.map((s) => s.id);
+      if (setIds.length > 0) {
+        await supabase
+          .from("set_logs")
+          .update({ [ACTUAL_COLUMN[field]]: null })
+          .in("id", setIds);
+      }
+      onTrackedFieldsChange(nextFields);
+      const prop = ACTUAL_PROP[field] as keyof SetLogEntry;
+      for (const set of exercise.sets) {
+        onSetChange(set.id, { [prop]: null } as Partial<SetLogEntry>);
+      }
+    } finally {
+      setFieldsBusy(false);
+    }
+  }
+
+  const untrackedFields = TRACKED_FIELD_DEFS.map((f) => f.key).filter(
+    (k) => !exercise.trackedFields.includes(k)
+  );
 
   return (
     <div>
@@ -209,6 +261,52 @@ export function ExerciseCard({
         <p className="font-body text-xs text-steel mb-2">
           Last time: {lastTime.weight} &times; {lastTime.reps}
         </p>
+      )}
+
+      {!readOnly && (
+        <div className="relative mb-2">
+          <button
+            type="button"
+            onClick={() => setFieldsOpen((v) => !v)}
+            className="font-body text-xs text-steel active:text-rust transition-colors"
+          >
+            Edit metrics
+          </button>
+          {fieldsOpen && (
+            <div className="absolute z-10 left-0 mt-1 bg-surface border border-steel/30 p-2 w-56">
+              {exercise.trackedFields.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-1.5">
+                  {exercise.trackedFields.map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => handleRemoveField(f)}
+                      disabled={fieldsBusy}
+                      className="h-7 px-2 border border-rust/40 text-rust font-body text-xs disabled:opacity-40"
+                    >
+                      {fieldDef(f).label} &times;
+                    </button>
+                  ))}
+                </div>
+              )}
+              {untrackedFields.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {untrackedFields.map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => handleAddField(f)}
+                      disabled={fieldsBusy}
+                      className="h-7 px-2 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust disabled:opacity-40"
+                    >
+                      + {fieldDef(f).label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       <div className="space-y-2">

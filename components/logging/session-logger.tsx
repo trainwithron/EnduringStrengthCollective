@@ -70,6 +70,10 @@ export function SessionLogger({
     updateExercise(exerciseId, (ex) => ({ ...ex, exerciseName: name, isSwapped: true }));
   }
 
+  function handleTrackedFieldsChange(exerciseId: string, fields: SessionExerciseEntry["trackedFields"]) {
+    updateExercise(exerciseId, (ex) => ({ ...ex, trackedFields: fields }));
+  }
+
   async function handleDeleteExercise(exerciseId: string) {
     if (deletingId) return;
     setDeletingId(exerciseId);
@@ -156,6 +160,7 @@ export function SessionLogger({
             onSetChange={(setId, patch) => handleSetChange(exercise.id, setId, patch)}
             onSetAdded={(set) => handleSetAdded(exercise.id, set)}
             onRenamed={(name) => handleRenamed(exercise.id, name)}
+            onTrackedFieldsChange={(fields) => handleTrackedFieldsChange(exercise.id, fields)}
             onDelete={() => handleDeleteExercise(exercise.id)}
             deleting={deletingId === exercise.id}
           />
