@@ -360,7 +360,7 @@ export const RECIPE_DATABASE: Recipe[] = [
       const wholeEggs = 3;
       const proFromEggs = wholeEggs * FOOD_DENSITY.whole_egg.protein;
       const fatFromEggsFixed = wholeEggs * FOOD_DENSITY.whole_egg.fat;
-      const beefGrams = Math.round(Math.max(0, p - proFromEggs) / FOOD_DENSITY.ground_beef_85_15.protein);
+      const beefGrams = Math.max(20, Math.round(Math.max(0, p - proFromEggs) / FOOD_DENSITY.ground_beef_85_15.protein));
       const fatFromBeef = Math.round(beefGrams * FOOD_DENSITY.ground_beef_85_15.fat);
       const f = 0; // fat target is inherent-only for this recipe, matching source
       const addedButter = Math.max(0, f - fatFromEggsFixed - fatFromBeef);
@@ -818,7 +818,7 @@ export const RECIPE_DATABASE: Recipe[] = [
       const cheeseGrams = Math.max(30, Math.min(120, Math.round(p / FOOD_DENSITY.cheese_cheddar.protein)));
       const proFromCheese = Math.round(cheeseGrams * FOOD_DENSITY.cheese_cheddar.protein);
       const fatFromCheese = Math.round(cheeseGrams * FOOD_DENSITY.cheese_cheddar.fat);
-      const nutsGrams = Math.round(Math.max(0, f - fatFromCheese) / FOOD_DENSITY.nuts_almonds.fat);
+      const nutsGrams = Math.max(20, Math.round(Math.max(0, f - fatFromCheese) / FOOD_DENSITY.nuts_almonds.fat));
       const proRem = Math.max(0, p - proFromCheese);
       const nutButterProG = Math.round(nutsGrams * FOOD_DENSITY.nuts_almonds.protein);
       const collagenGrams = Math.max(0, Math.round((proRem - nutButterProG) / FOOD_DENSITY.collagen_peptides.protein));
@@ -957,7 +957,14 @@ export function computeCheckIn(input: CheckInInput): CheckInResult {
         rationale = `Weight loss stalled (${pctChange.toFixed(2)}%), but recovery/strength is depressed. Applied a conservative 4% drop to preserve training output.`;
       } else {
         newAvgCals = Math.round(currC * 0.92);
-        rationale = `Weight loss stalled (${pctChange.toFixed(2)}% change). Scaled calories down 8% (~${currC - newAvgCals} kcal) to restart fat loss.`;
+        // The exact kcal figure is filled in after the macro split below —
+        // the macro-gram rounding (and the carb/fat floor clamps for a
+        // low-calorie target) can shift the *actual* displayed target
+        // (dailyBaseline.calories) away from this pre-split newAvgCals, so
+        // the number quoted here needs to be the real final one, not this
+        // intermediate value, or the rationale can describe a drop that
+        // doesn't match what the client is actually shown.
+        rationale = `Weight loss stalled (${pctChange.toFixed(2)}% change). Scaled calories down 8% (~{{DELTA_KCAL}} kcal) to restart fat loss.`;
       }
     } else if (pctChange < -1.5 || deltaW < -2.0) {
       newAvgCals = Math.round(currC * 1.05);
@@ -1019,9 +1026,15 @@ export function computeCheckIn(input: CheckInInput): CheckInResult {
     resolvedBaseCals = pro * 4 + baseCarb * 4 + baseFat * 9;
   }
 
+  // dailyBaseline.calories (resolvedBaseCals) — not the pre-macro-split
+  // newAvgCals — is the actual number a coach/client sees as "the
+  // target," so that's what newAvgCalories and any kcal figure quoted in
+  // the rationale must agree with, not the intermediate value.
+  rationale = rationale.replace("{{DELTA_KCAL}}", String(Math.abs(currC - resolvedBaseCals)));
+
   return {
     archetype,
-    newAvgCalories: newAvgCals,
+    newAvgCalories: resolvedBaseCals,
     rationale,
     dailyBaseline: { calories: resolvedBaseCals, protein: pro, carbs: baseCarb, fats: baseFat },
     consecutiveSurplusSpikes,

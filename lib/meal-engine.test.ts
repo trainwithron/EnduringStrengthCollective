@@ -33,8 +33,38 @@ describe("computeCheckIn", () => {
       rateSatiety: 4,
       dietaryRestrictions: "",
     });
-    expect(result.newAvgCalories).toBe(2200);
+    // newAvgCalories must always agree with dailyBaseline.calories — the
+    // actual number a coach/client is shown as "the target." Macro-gram
+    // rounding (see the dedicated test below for the floor-clamp case)
+    // means this isn't always the exact pre-rounding intermediate value.
+    expect(result.newAvgCalories).toBe(result.dailyBaseline.calories);
+    expect(result.newAvgCalories).toBeCloseTo(2200, -1);
     expect(result.rationale).toContain("adherence");
+  });
+
+  it("keeps newAvgCalories in sync with dailyBaseline.calories even when the carb/fat floor clamps push the real target above the intermediate one", () => {
+    // A low enough target that the Math.max(50, ...) carb floor and
+    // Math.max(45, ...) fat floor both kick in — previously the rationale
+    // and newAvgCalories would still describe the pre-clamp number
+    // (900 kcal) while the client's actual macro targets resolved to a
+    // meaningfully higher real total.
+    const result = computeCheckIn({
+      phase: "fat_loss",
+      currentWeight: 100,
+      previousWeight: 100,
+      currentCalories: 900,
+      adherenceDays: 2, // under 5 -> "held steady" branch, newAvgCals = currC exactly
+      rateStrength: 4,
+      rateRecovery: 4,
+      rateDigestion: 5,
+      rateSatiety: 4,
+      dietaryRestrictions: "",
+    });
+    expect(result.dailyBaseline.protein).toBe(100);
+    expect(result.dailyBaseline.fats).toBe(45); // clamped up from the raw ~25g
+    expect(result.dailyBaseline.carbs).toBe(50); // clamped up from the raw ~24g
+    expect(result.dailyBaseline.calories).toBe(1005); // 400 + 200 + 405, not 900
+    expect(result.newAvgCalories).toBe(result.dailyBaseline.calories);
   });
 
   it("drops calories 8% on a stalled fat-loss week with good recovery", () => {
@@ -83,7 +113,8 @@ describe("computeCheckIn", () => {
       dietaryRestrictions: "",
       consecutiveSurplusSpikes: 0,
     });
-    expect(first.newAvgCalories).toBe(2800);
+    expect(first.newAvgCalories).toBe(first.dailyBaseline.calories);
+    expect(first.newAvgCalories).toBeCloseTo(2800, -1);
     expect(first.consecutiveSurplusSpikes).toBe(1);
 
     const second = computeCheckIn({
@@ -99,7 +130,8 @@ describe("computeCheckIn", () => {
       dietaryRestrictions: "",
       consecutiveSurplusSpikes: first.consecutiveSurplusSpikes,
     });
-    expect(second.newAvgCalories).toBe(2675);
+    expect(second.newAvgCalories).toBe(second.dailyBaseline.calories);
+    expect(second.newAvgCalories).toBeCloseTo(2675, -1);
     expect(second.consecutiveSurplusSpikes).toBe(0);
   });
 
