@@ -99,26 +99,10 @@ export default async function SettingsPage(
         </div>
         <div className="border-t border-steel/20 pt-4 mt-4">
           <Link
-            href={`/groups/${params.groupId}/referrals`}
+            href={`/groups/${params.groupId}/resources`}
             className="font-body text-sm text-rust"
           >
-            Referral Directory
-          </Link>
-        </div>
-        <div className="border-t border-steel/20 pt-4 mt-4">
-          <Link
-            href={`/groups/${params.groupId}/pro-shop`}
-            className="font-body text-sm text-rust"
-          >
-            Pro Shop
-          </Link>
-        </div>
-        <div className="border-t border-steel/20 pt-4 mt-4">
-          <Link
-            href={`/groups/${params.groupId}/leaderboard`}
-            className="font-body text-sm text-rust"
-          >
-            Leaderboard
+            Resources
           </Link>
         </div>
         {isCoach && (

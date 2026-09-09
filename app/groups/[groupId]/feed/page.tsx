@@ -7,6 +7,8 @@ import { ChannelTabs } from "@/components/feed/channel-tabs";
 import { FeedSettingsButton } from "@/components/feed/feed-settings-button";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
+import { GroupLeaderboardTabs } from "@/components/leaderboard/group-leaderboard-tabs";
+import { getGroupLeaderboardRankings } from "@/lib/leaderboard-data";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import type { FeedChannel, FeedPost } from "@/lib/types";
 
@@ -96,6 +98,22 @@ export default async function FeedPage(
     commentCount: p.comments?.length ?? 0,
   }));
 
+  // Leaderboard now lives at the top of General instead of its own nav
+  // tab — every post is a reminder it's there, per the ask ("every time
+  // anything gets posted, everyone can see the leaderboard").
+  const leaderboard = channel === "general" ? await getGroupLeaderboardRankings(supabase, params.groupId) : null;
+  const leaderboardCard = leaderboard && (
+    <div className="border border-steel/20 p-4 mb-4">
+      <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">Leaderboard</h2>
+      <GroupLeaderboardTabs
+        workouts={leaderboard.workoutsRanking}
+        volume={leaderboard.volumeRanking}
+        prs={leaderboard.prsRanking}
+        viewerId={user?.id ?? null}
+      />
+    </div>
+  );
+
   if (isCoach && !showMobileView) {
     const { data: group } = await supabase
       .from("groups")
@@ -116,6 +134,7 @@ export default async function FeedPage(
         <div className="max-w-[640px]">
           <ChannelTabs basePath={`/groups/${params.groupId}/feed`} active={channel} />
           <div className="pt-6">
+            {leaderboardCard}
             <PostComposerDesktop
               groupId={params.groupId}
               defaultChannel={channel}
@@ -153,6 +172,8 @@ export default async function FeedPage(
       </header>
 
       <ChannelTabs basePath={`/groups/${params.groupId}/feed`} active={channel} />
+
+      {leaderboardCard && <div className="px-5">{leaderboardCard}</div>}
 
       <FeedList
         key={channel}

@@ -17,14 +17,12 @@ import {
   TrendingUp,
   HeartHandshake,
   Flag,
-  Trophy,
-  Split,
   ChefHat,
+  Salad,
   ClipboardList,
   Menu,
   X,
   Building2,
-  ShoppingBag,
 } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
@@ -55,6 +53,7 @@ type Active =
   | "programs"
   | "exercise-library"
   | "recipes"
+  | "nutrition"
   | "tools"
   | "availability"
   | "calendar"
@@ -62,12 +61,9 @@ type Active =
   | "clients"
   | "branding"
   | "business"
-  | "referrals"
+  | "resources"
   | "challenges"
-  | "leaderboard"
-  | "team"
-  | "revenue-splits"
-  | "pro-shop";
+  | "team";
 
 interface NavLeaf {
   key: Active;
@@ -242,7 +238,6 @@ export function CoachDesktopShell({
       items: [
         { key: "business", label: "Overview", href: `/groups/${groupId}/business`, icon: TrendingUp },
         { key: "branding", label: "Organization", href: `/groups/${groupId}/branding`, icon: Palette },
-        { key: "revenue-splits", label: "Revenue Splits", href: `/groups/${groupId}/revenue-splits`, icon: Split },
       ],
     },
     { key: "clients", label: "Clients", href: `/groups/${groupId}/clients`, icon: Users, badge: clientsUnread },
@@ -253,15 +248,20 @@ export function CoachDesktopShell({
       items: [
         { key: "programs", label: "Programs", href: `/groups/${groupId}/programs`, icon: LayoutGrid },
         { key: "exercise-library", label: "Exercise Library", href: `/groups/${groupId}/exercise-library`, icon: Dumbbell },
+      ],
+    },
+    {
+      label: "Nutrition",
+      icon: ChefHat,
+      items: [
         { key: "recipes", label: "Recipe Hub", href: `/groups/${groupId}/recipes`, icon: ChefHat },
+        { key: "nutrition", label: "Meal Plans", href: `/groups/${groupId}/nutrition`, icon: Salad },
       ],
     },
     { key: "calendar", label: "Calendar", href: `/groups/${groupId}/calendar`, icon: CalendarDays },
     { key: "feed", label: "Team Feed", href: `/groups/${groupId}/feed`, icon: MessagesSquare, badge: feedUnread },
-    { key: "leaderboard", label: "Leaderboard", href: `/groups/${groupId}/leaderboard`, icon: Trophy },
     { key: "challenges", label: "Challenges", href: `/groups/${groupId}/challenges`, icon: Flag },
-    { key: "referrals", label: "Referrals", href: `/groups/${groupId}/referrals`, icon: HeartHandshake },
-    { key: "pro-shop", label: "Pro Shop", href: `/groups/${groupId}/pro-shop`, icon: ShoppingBag },
+    { key: "resources", label: "Resources", href: `/groups/${groupId}/resources`, icon: HeartHandshake },
   ];
 
   const groupHasActiveChild = (group: NavGroup) => group.items.some((i) => i.key === active);

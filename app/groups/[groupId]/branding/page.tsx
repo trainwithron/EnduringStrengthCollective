@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
@@ -5,12 +6,17 @@ import { BrandingForm } from "@/components/coach/desktop/branding-form";
 import { InviteCoachForm } from "@/components/coach/desktop/invite-coach-form";
 import type { ButtonShape, DisplayFont, BodyFont } from "@/lib/theme";
 
+type OrgTab = "team" | "branding";
+
 export default async function BrandingPage(
   props: {
     params: Promise<{ groupId: string }>;
+    searchParams: Promise<{ tab?: string }>;
   }
 ) {
   const params = await props.params;
+  const searchParams = await props.searchParams;
+  const tab: OrgTab = searchParams.tab === "branding" ? "branding" : "team";
   const supabase = createServerClient();
   const {
     data: { user },
@@ -80,6 +86,7 @@ export default async function BrandingPage(
 
   const isOwner = orgMembership.role === "owner";
   const isOwnerOrAdmin = orgMembership.role === "owner" || orgMembership.role === "admin";
+  const basePath = `/groups/${params.groupId}/branding`;
 
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="branding">
@@ -93,40 +100,66 @@ export default async function BrandingPage(
         </p>
       </div>
 
-      <div className="border border-steel/20 p-4 mb-8 grid grid-cols-2 gap-6">
-        <div>
-          <p className="font-body text-[11px] text-steel uppercase tracking-wide mb-1">
-            Organization
-          </p>
-          <p className="font-body text-sm">{org?.name}</p>
-          <p className="font-body text-xs text-steel mt-0.5">/{org?.slug}</p>
-          <p className="font-body text-xs text-steel mt-2">
-            Created {org?.created_at ? new Date(org.created_at).toLocaleDateString() : "—"}
-          </p>
-        </div>
-        <div>
-          <p className="font-body text-[11px] text-steel uppercase tracking-wide mb-1">Members</p>
-          <div className="space-y-1">
-            {members.map((m) => (
-              <p key={m.profileId} className="font-body text-sm flex items-center justify-between">
-                <span>{m.fullName}</span>
-                <span className="text-steel text-xs uppercase tracking-wide">{m.role}</span>
-              </p>
-            ))}
-          </div>
-        </div>
+      <div className="flex gap-2 mb-6">
+        <Link
+          href={`${basePath}?tab=team`}
+          className={`h-9 px-4 flex items-center font-body text-sm border ${
+            tab === "team" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
+          }`}
+        >
+          Team
+        </Link>
+        <Link
+          href={`${basePath}?tab=branding`}
+          className={`h-9 px-4 flex items-center font-body text-sm border ${
+            tab === "branding" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
+          }`}
+        >
+          Branding
+        </Link>
       </div>
 
-      {isOwnerOrAdmin && (
-        <div className="mb-8">
-          <InviteCoachForm groupId={params.groupId} />
-        </div>
-      )}
+      {tab === "team" ? (
+        <div>
+          <div className="border border-steel/20 p-4 mb-8 grid grid-cols-2 gap-6">
+            <div>
+              <p className="font-body text-[11px] text-steel uppercase tracking-wide mb-1">
+                Organization
+              </p>
+              <p className="font-body text-sm">{org?.name}</p>
+              <p className="font-body text-xs text-steel mt-0.5">/{org?.slug}</p>
+              <p className="font-body text-xs text-steel mt-2">
+                Created {org?.created_at ? new Date(org.created_at).toLocaleDateString() : "—"}
+              </p>
+            </div>
+            <div>
+              <p className="font-body text-[11px] text-steel uppercase tracking-wide mb-1">
+                Coaches
+              </p>
+              <div className="space-y-1">
+                {members.map((m) => (
+                  <p key={m.profileId} className="font-body text-sm flex items-center justify-between">
+                    <span>{m.fullName}</span>
+                    <span className="text-steel text-xs uppercase tracking-wide">{m.role}</span>
+                  </p>
+                ))}
+              </div>
+            </div>
+          </div>
 
-      <h2 className="font-display uppercase text-lg tracking-wide mb-3 border-t border-steel/20 pt-6">
-        Branding
-      </h2>
-      {isOwner ? (
+          {isOwnerOrAdmin && (
+            <div className="mb-8">
+              <InviteCoachForm groupId={params.groupId} />
+            </div>
+          )}
+
+          <p className="font-body text-xs text-steel">
+            <Link href={`/groups/${params.groupId}/revenue-splits`} className="text-rust">
+              View Revenue Splits →
+            </Link>
+          </p>
+        </div>
+      ) : isOwner ? (
         <BrandingForm
           organizationId={orgMembership.organization_id}
           initialButtonShape={(org?.button_shape as ButtonShape) ?? "sharp"}
