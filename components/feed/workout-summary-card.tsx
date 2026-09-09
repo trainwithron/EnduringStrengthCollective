@@ -9,6 +9,7 @@ import { CoachLoggedBadge } from "@/components/coach-logged-badge";
 import { ShareWorkoutButton } from "@/components/share/share-workout-button";
 import { WorkoutCardExpanded } from "./workout-card-expanded";
 import { PinPostButton } from "./pin-post-button";
+import { DeletePostButton } from "./delete-post-button";
 import { Dumbbell, Pin } from "lucide-react";
 
 export function WorkoutSummaryCard({
@@ -61,8 +62,9 @@ export function WorkoutSummaryCard({
           </span>
         )}
         {isCoach && (
-          <div className="shrink-0">
+          <div className="shrink-0 flex items-center gap-3">
             <PinPostButton postId={post.id} pinned={!!post.pinnedAt} />
+            <DeletePostButton postId={post.id} />
           </div>
         )}
       </div>
