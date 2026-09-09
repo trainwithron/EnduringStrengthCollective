@@ -31,7 +31,7 @@ interface ActivityItem {
 }
 
 type TimelineEntry =
-  | { kind: "post"; createdAt: string; post: FeedPost; groupName: string }
+  | { kind: "post"; createdAt: string; post: FeedPost; groupName: string; sessionId: string | null }
   | { kind: "text"; createdAt: string; item: ActivityItem };
 
 function timeAgo(iso: string): string {
@@ -117,7 +117,7 @@ export default async function CoachDashboardPage(
         `
         id, post_type, channel, pinned_at, body, media_url, media_type, created_at, group_id, broadcast_level,
         profiles!posts_author_id_fkey ( id, full_name, avatar_url ),
-        workout_logs ( total_volume, total_sets_completed, new_prs, logged_by_coach ),
+        workout_logs ( session_id, total_volume, total_sets_completed, new_prs, logged_by_coach ),
         reactions ( profile_id ),
         comments ( id )
       `
@@ -161,6 +161,7 @@ export default async function CoachDashboardPage(
         createdAt: p.created_at,
         post,
         groupName: groupNameById.get(p.group_id) ?? "Group",
+        sessionId: p.workout_logs?.session_id ?? null,
       });
     }
 
@@ -494,6 +495,14 @@ export default async function CoachDashboardPage(
                   {entry.groupName}
                 </span>
                 <WorkoutSummaryCard post={entry.post} viewerId={user.id} isCoach />
+                {entry.sessionId && (
+                  <Link
+                    href={`/sessions/${entry.sessionId}`}
+                    className="block px-5 pb-3 -mt-2 font-body text-xs text-rust"
+                  >
+                    View full session log (every set, rep, weight &amp; note) &rarr;
+                  </Link>
+                )}
               </div>
             ) : (
               <div key={entry.item.id} className="py-3 px-5 flex items-start gap-3">

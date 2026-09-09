@@ -4,6 +4,18 @@ import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
+// This project has no generated Supabase Database type, so a fresh RPC's
+// result falls back to an untyped shape — spelled out explicitly here
+// since the code below reads several fields off it.
+interface CompleteWorkoutResult {
+  workout_log_id: string;
+  athlete_id: string;
+  group_id: string;
+  total_volume: number;
+  total_sets_completed: number;
+  new_prs: string[];
+}
+
 export function CompleteWorkoutButton({
   sessionId,
   allSetsResolved,
@@ -17,6 +29,7 @@ export function CompleteWorkoutButton({
 }) {
   const [submitting, setSubmitting] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   function handleTap() {
@@ -29,122 +42,32 @@ export function CompleteWorkoutButton({
 
   async function handleComplete() {
     setSubmitting(true);
+    setError(null);
     const supabase = createBrowserClient();
 
-    const { data: session } = await supabase
-      .from("athlete_sessions")
-      .select("id, group_id, athlete_id, workout_id, started_at, logged_by_coach")
-      .eq("id", sessionId)
-      .single();
+    // All the real work — marking the session completed and computing
+    // volume/sets/PRs from the actual set_logs rows — happens server-side
+    // in this one atomic RPC now, so there's nothing for a modified
+    // request to fabricate: the numbers are never client-supplied.
+    const { data: result, error: completeError } = (await supabase
+      .rpc("complete_workout_session", { p_session_id: sessionId })
+      .single()) as { data: CompleteWorkoutResult | null; error: { message: string } | null };
 
-    if (!session) {
+    if (completeError || !result) {
+      setError("Couldn't complete this workout — try again.");
       setSubmitting(false);
       return;
     }
 
-    const completedAt = new Date();
-    const durationSeconds = Math.round(
-      (completedAt.getTime() - new Date(session.started_at).getTime()) / 1000
-    );
-
-    // Marking the session completed, pulling its sets, and reading the
-    // athlete's broadcast preference are all independent of each other —
-    // the broadcast level in particular was previously fetched dead last,
-    // right before the redirect, even though nothing before it needs the
-    // result. Firing all three together shortens the single most
-    // emotionally important wait in the app (finishing a workout).
-    const [, { data: currentSets }, { data: athleteProfile }] = await Promise.all([
-      supabase
-        .from("athlete_sessions")
-        .update({
-          status: "completed",
-          completed_at: completedAt.toISOString(),
-          duration_seconds: durationSeconds,
-        })
-        .eq("id", sessionId),
-      // Pull this session's completed sets, joined to exercise name.
-      supabase
-        .from("set_logs")
-        .select("weight, reps, status, session_exercises!inner ( session_id, exercise_name )")
-        .eq("session_exercises.session_id", sessionId),
-      supabase.from("profiles").select("feed_broadcast_level").eq("id", session.athlete_id).maybeSingle(),
-    ]);
+    const { data: athleteProfile } = await supabase
+      .from("profiles")
+      .select("feed_broadcast_level")
+      .eq("id", result.athlete_id)
+      .maybeSingle();
     const broadcastLevel = athleteProfile?.feed_broadcast_level ?? "full";
+    const newPrs = result.new_prs ?? [];
 
-    const completedLogs = (currentSets ?? []).filter((s) => s.status === "completed");
-    const totalVolume = completedLogs.reduce(
-      (sum, s) => sum + (s.weight ?? 0) * (s.reps ?? 0),
-      0
-    );
-    const totalSetsCompleted = completedLogs.length;
-
-    // This session's best weight per exercise name.
-    const sessionBestByExercise = new Map<string, number>();
-    for (const log of completedLogs) {
-      const name = (log as any).session_exercises.exercise_name;
-      const weight = log.weight ?? 0;
-      if (!sessionBestByExercise.has(name) || weight > sessionBestByExercise.get(name)!) {
-        sessionBestByExercise.set(name, weight);
-      }
-    }
-
-    const exerciseNames = Array.from(sessionBestByExercise.keys());
-    let newPrs: string[] = [];
-
-    if (exerciseNames.length > 0) {
-      // All-time best weight per exercise name, from every OTHER completed session.
-      const { data: priorSets } = await supabase
-        .from("set_logs")
-        .select(
-          `
-          weight, status,
-          session_exercises!inner (
-            exercise_name, session_id,
-            athlete_sessions!inner ( athlete_id )
-          )
-        `
-        )
-        .in("session_exercises.exercise_name", exerciseNames)
-        .eq("session_exercises.athlete_sessions.athlete_id", session.athlete_id)
-        .neq("session_exercises.session_id", sessionId)
-        .eq("status", "completed");
-
-      const priorBestByExercise = new Map<string, number>();
-      for (const row of priorSets ?? []) {
-        const name = (row as any).session_exercises.exercise_name;
-        const weight = row.weight ?? 0;
-        if (!priorBestByExercise.has(name) || weight > priorBestByExercise.get(name)!) {
-          priorBestByExercise.set(name, weight);
-        }
-      }
-
-      newPrs = exerciseNames.filter((name) => {
-        const sessionBest = sessionBestByExercise.get(name)!;
-        const priorBest = priorBestByExercise.get(name);
-        // No prior history at all = first-time lift, not a "PR" in the exciting sense.
-        // Only counts if there IS a prior best and it's been beaten.
-        return priorBest !== undefined && sessionBest > priorBest;
-      });
-    }
-
-    const { data: workoutLog } = await supabase
-      .from("workout_logs")
-      .insert({
-        session_id: sessionId,
-        athlete_id: session.athlete_id,
-        group_id: session.group_id,
-        workout_id: session.workout_id,
-        total_duration_seconds: durationSeconds,
-        total_volume: totalVolume,
-        total_sets_completed: totalSetsCompleted,
-        new_prs: newPrs,
-        logged_by_coach: session.logged_by_coach,
-      })
-      .select("id")
-      .single();
-
-    // The athlete's own broadcast preference (fetched above, in parallel
-    // with the session update and set pull) is captured onto the post
+    // The athlete's own broadcast preference is captured onto the post
     // itself — not just read live — so the card renders consistently even
     // if they change this setting later.
     const shouldPost =
@@ -154,14 +77,14 @@ export function CompleteWorkoutButton({
     const channel = broadcastLevel !== "checkin_only" && newPrs.length > 0 ? "pr_board" : "general";
 
     let postId: string | null = null;
-    if (workoutLog && shouldPost) {
+    if (shouldPost) {
       const { data: post } = await supabase
         .from("posts")
         .insert({
-          group_id: session.group_id,
-          author_id: session.athlete_id,
+          group_id: result.group_id,
+          author_id: result.athlete_id,
           post_type: "workout_summary",
-          workout_log_id: workoutLog.id,
+          workout_log_id: result.workout_log_id,
           channel,
           broadcast_level: broadcastLevel === "private" ? "full" : broadcastLevel,
         })
@@ -173,7 +96,7 @@ export function CompleteWorkoutButton({
     // Every completed workout gets a celebratory, shareable card instead of
     // silently landing back on the group hub — that's the actual feedback
     // moment a client (or a coach logging in-person) gets after finishing.
-    router.push(postId ? `/share/${postId}` : `/groups/${session.group_id}`);
+    router.push(postId ? `/share/${postId}` : `/groups/${result.group_id}`);
   }
 
   return (
@@ -212,6 +135,11 @@ export function CompleteWorkoutButton({
             Everything you&apos;ve already entered is saved either way.
           </p>
         </div>
+      )}
+      {error && (
+        <p className="font-body text-xs text-rust mb-2 text-center" role="alert">
+          {error}
+        </p>
       )}
       <button
         type="button"
