@@ -4,11 +4,16 @@ import { RosterList } from "@/components/group/roster-list";
 import { WeightLogWidget } from "@/components/athlete/weight-log-widget";
 import { TodayWidget } from "@/components/athlete/today-widget";
 import { ProgramCardList } from "@/components/athlete/program-card-list";
+import { WeekAtAGlance, type WeekDayEntry } from "@/components/athlete/week-at-a-glance";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { isHabitDueOn } from "@/lib/habits";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { getViewerOrgTheme } from "@/lib/org-theme-server";
+import { computeScheduledDates, isLocked } from "@/lib/program-schedule";
+import { getWeekRange, isWithinRange } from "@/lib/week-range";
 import type { RosterMember } from "@/lib/types";
+
+const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default async function GroupHubPage(
   props: {
@@ -116,6 +121,7 @@ export default async function GroupHubPage(
   let weightLogs: { id: string; loggedDate: string; weight: number }[] = [];
   let todayMacros: { calories: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null } | null = null;
   let todayHabits: { id: string; title: string; completed: boolean }[] = [];
+  let weekDays: WeekDayEntry[] = [];
   const todayKey = new Date().toISOString().slice(0, 10);
 
   const viewerTier = roster.find((m) => m.profileId === user?.id)?.clientTier ?? null;
@@ -181,6 +187,8 @@ export default async function GroupHubPage(
       title: h.title,
       completed: completedIds.has(h.id),
     }));
+
+    weekDays = await computeThisWeek(supabase, { groupId: params.groupId, athleteId: user.id });
   }
 
   const orgTheme = await getViewerOrgTheme();
@@ -226,6 +234,7 @@ export default async function GroupHubPage(
 
       {showMobileView && user && (
         <section className="px-5 pt-6 space-y-4">
+          {weekDays.length > 0 && <WeekAtAGlance groupId={params.groupId} days={weekDays} />}
           <TodayWidget todayDate={todayKey} macros={todayMacros} habits={todayHabits} />
           <WeightLogWidget
             athleteId={user.id}
@@ -245,4 +254,94 @@ export default async function GroupHubPage(
       {showMobileView && <BottomTabBar groupId={params.groupId} />}
     </main>
   );
+}
+
+// Resolves this calendar week's training days for the athlete's active
+// program (same personal-over-shared precedence as getTodaysWorkoutId)
+// into the shape WeekAtAGlance needs. A day still renders when locked —
+// showing the week's shape (a workout exists Wednesday) without its
+// content is the deliberate choice here, not an oversight: it's the same
+// lock-icon-only pattern already used for the athlete's program list, and
+// it's what keeps "you can see the plan exists" from turning into "you
+// can see and copy the plan's actual content" before it's unlocked.
+async function computeThisWeek(
+  supabase: Awaited<ReturnType<typeof createServerClient>>,
+  { groupId, athleteId }: { groupId: string; athleteId: string }
+): Promise<WeekDayEntry[]> {
+  const { data: personalProgram } = await supabase
+    .from("programs")
+    .select("id, start_date, training_days, visibility_window")
+    .eq("group_id", groupId)
+    .eq("athlete_id", athleteId)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  const { data: sharedProgram } = personalProgram
+    ? { data: null }
+    : await supabase
+        .from("programs")
+        .select("id, start_date, training_days, visibility_window")
+        .eq("group_id", groupId)
+        .is("athlete_id", null)
+        .eq("is_active", true)
+        .maybeSingle();
+
+  const program = personalProgram ?? sharedProgram;
+  if (!program || !program.start_date || !program.training_days?.length) return [];
+
+  const { data: workouts } = await supabase
+    .from("workouts")
+    .select("id, title")
+    .eq("program_id", program.id)
+    .order("week_number", { ascending: true })
+    .order("day_index", { ascending: true });
+
+  if (!workouts || workouts.length === 0) return [];
+
+  const scheduledDateByDayId = computeScheduledDates(
+    program.start_date,
+    program.training_days,
+    workouts
+  );
+
+  const today = new Date();
+  const { start, end } = getWeekRange(today);
+  const thisWeek = workouts
+    .map((w) => ({ ...w, date: scheduledDateByDayId.get(w.id) }))
+    .filter(
+      (w): w is typeof w & { date: Date } =>
+        !!w.date && isWithinRange(w.date, start, end)
+    )
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  if (thisWeek.length === 0) return [];
+
+  const { data: logs } = await supabase
+    .from("workout_logs")
+    .select("workout_id")
+    .eq("athlete_id", athleteId)
+    .in(
+      "workout_id",
+      thisWeek.map((w) => w.id)
+    );
+  const loggedIds = new Set((logs ?? []).map((l) => l.workout_id));
+
+  return thisWeek.map((w) => {
+    const dateKey = `${w.date.getFullYear()}-${String(w.date.getMonth() + 1).padStart(2, "0")}-${String(
+      w.date.getDate()
+    ).padStart(2, "0")}`;
+    const status: WeekDayEntry["status"] = loggedIds.has(w.id)
+      ? "done"
+      : isLocked(w.date, today, program.visibility_window)
+        ? "locked"
+        : "open";
+    return {
+      workoutId: w.id,
+      title: w.title,
+      date: dateKey,
+      weekday: WEEKDAY_SHORT[w.date.getDay()],
+      status,
+      isToday: dateKey === new Date().toISOString().slice(0, 10),
+    };
+  });
 }
