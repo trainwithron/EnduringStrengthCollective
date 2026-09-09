@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
+import { getTodaysWorkoutId } from "@/lib/todays-workout";
 
 // Coach-only: the entry point for logging an in-person session on a
-// client's behalf — same week-grouped "Log →" list the athlete themselves
-// would see, scoped to the group's one active program (only one can be
-// active per group, so there's nothing to pick between).
+// client's behalf. Jumps straight to today's due workout when there is
+// one — the overwhelmingly common case for an in-person session — instead
+// of always making the coach scroll a full week-grouped list and pick.
+// That list still renders as a fallback (and to log an ad-hoc/makeup day)
+// when there's no clean "today's workout" to jump to.
 export default async function LogForClientPage(
   props: {
     params: Promise<{ groupId: string; athleteId: string }>;
@@ -36,6 +39,14 @@ export default async function LogForClientPage(
         </p>
       </main>
     );
+  }
+
+  const todays = await getTodaysWorkoutId(supabase, {
+    groupId: params.groupId,
+    athleteId: params.athleteId,
+  });
+  if (todays.status === "ready") {
+    redirect(`/groups/${params.groupId}/athletes/${params.athleteId}/log/${todays.workoutId}`);
   }
 
   const { data: athleteProfile } = await supabase
@@ -93,6 +104,16 @@ export default async function LogForClientPage(
         <h1 className="font-display font-bold text-4xl leading-none mt-3 uppercase">
           {activeProgram.name}
         </h1>
+        {todays.status === "done" && (
+          <p className="font-body text-xs text-steel mt-3">
+            Every scheduled workout is already logged — pick one below for an extra or makeup session.
+          </p>
+        )}
+        {todays.status === "locked" && (
+          <p className="font-body text-xs text-steel mt-3">
+            Their next workout isn&apos;t due yet — pick one below to log anyway.
+          </p>
+        )}
       </header>
 
       <section className="px-5 pt-6">
