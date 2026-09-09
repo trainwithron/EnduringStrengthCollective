@@ -5,6 +5,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { Camera, X } from "lucide-react";
 import type { FeedChannel } from "@/lib/types";
+import { useMentionAutocomplete } from "@/lib/use-mention-autocomplete";
 
 export function NewPostComposer({
   groupId,
@@ -23,6 +24,8 @@ export function NewPostComposer({
   const [submitting, setSubmitting] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const { mentionQuery, setMentionQuery, mentionMatches, detectMentionQuery, applyMention } =
+    useMentionAutocomplete(groupId);
 
   // A post always goes into whichever channel is currently open — no
   // separate per-post picker. Announcements stays coach-only to post in;
@@ -108,11 +111,28 @@ export function NewPostComposer({
 
         <textarea
           value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder="Share a form check, a win, or a shoutout"
+          onChange={(e) => {
+            setBody(e.target.value);
+            setMentionQuery(detectMentionQuery(e.target.value));
+          }}
+          placeholder="Share a form check, a win, or a shoutout — @ to tag someone"
           rows={3}
           className="w-full bg-graphite border border-steel/30 text-chalk px-3 py-2 font-body focus:outline-none focus:border-rust resize-none"
         />
+        {mentionQuery !== null && mentionMatches.length > 0 && (
+          <div className="border border-rust/40 bg-graphite max-h-40 overflow-y-auto -mt-px">
+            {mentionMatches.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => setBody(applyMention(body, m))}
+                className="w-full text-left px-3 py-2 font-body text-sm text-chalk hover:bg-surface"
+              >
+                @{m.fullName}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div className="flex items-center gap-2 mt-3">
           <button

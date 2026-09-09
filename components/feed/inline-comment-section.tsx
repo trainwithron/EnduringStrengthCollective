@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { Trash2 } from "lucide-react";
+import { renderWithMentions } from "./mention-text";
 
 interface CommentRow {
   id: string;
@@ -280,29 +281,6 @@ export function InlineCommentSection({
       </div>
     </div>
   );
-}
-
-// Light-touch highlighting — matches "@First Last" / "@First" without
-// needing this render path to know the actual member list. Good enough
-// for visual emphasis; the real notification (who actually gets pinged)
-// is resolved server-side against real member names, not this regex.
-const MENTION_PATTERN = /@[A-Z][a-zA-Z'-]*(?:\s[A-Z][a-zA-Z'-]*)?/g;
-
-function renderWithMentions(body: string) {
-  const parts = body.split(MENTION_PATTERN);
-  const matches = body.match(MENTION_PATTERN) ?? [];
-  const out: ReactNode[] = [];
-  parts.forEach((part, i) => {
-    out.push(part);
-    if (matches[i]) {
-      out.push(
-        <span key={i} className="text-rust font-medium">
-          {matches[i]}
-        </span>
-      );
-    }
-  });
-  return out;
 }
 
 function CommentLine({

@@ -4,6 +4,7 @@ import { ReactionButton } from "./reaction-button";
 import { CommentPreview } from "./comment-preview";
 import { InlineCommentSection } from "./inline-comment-section";
 import { PinPostButton } from "./pin-post-button";
+import { renderWithMentions } from "./mention-text";
 import { Pin } from "lucide-react";
 
 export function UserPostCard({
@@ -60,7 +61,9 @@ export function UserPostCard({
         )}
       </div>
 
-      {post.body && <p className="font-body text-[15px] mb-3">{post.body}</p>}
+      {post.body && (
+        <p className="font-body text-[15px] mb-3">{renderWithMentions(post.body)}</p>
+      )}
 
       {post.mediaUrl && post.mediaType === "image" && (
         // eslint-disable-next-line @next/next/no-img-element

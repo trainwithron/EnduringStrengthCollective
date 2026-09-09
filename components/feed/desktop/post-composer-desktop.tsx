@@ -5,6 +5,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { Camera } from "lucide-react";
 import type { FeedChannel } from "@/lib/types";
+import { useMentionAutocomplete } from "@/lib/use-mention-autocomplete";
 
 // Same posting logic as the mobile FAB+sheet composer
 // (components/feed/new-post-composer.tsx) — just an always-visible inline
@@ -24,6 +25,8 @@ export function PostComposerDesktop({
   const [submitting, setSubmitting] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const { mentionQuery, setMentionQuery, mentionMatches, detectMentionQuery, applyMention } =
+    useMentionAutocomplete(groupId);
 
   // A post always goes into whichever channel tab is currently open — no
   // separate per-post picker. Announcements stays coach-only to post in;
@@ -84,11 +87,28 @@ export function PostComposerDesktop({
     <div className="border border-steel/20 bg-surface/40 p-4 mb-6">
       <textarea
         value={body}
-        onChange={(e) => setBody(e.target.value)}
-        placeholder="Share a form check, a win, or a shoutout"
+        onChange={(e) => {
+          setBody(e.target.value);
+          setMentionQuery(detectMentionQuery(e.target.value));
+        }}
+        placeholder="Share a form check, a win, or a shoutout — @ to tag someone"
         rows={3}
         className="w-full bg-graphite border border-steel/30 text-chalk px-3 py-2 font-body text-sm focus:outline-none focus:border-rust resize-none"
       />
+      {mentionQuery !== null && mentionMatches.length > 0 && (
+        <div className="border border-rust/40 bg-graphite max-h-40 overflow-y-auto -mt-px">
+          {mentionMatches.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => setBody(applyMention(body, m))}
+              className="w-full text-left px-3 py-2 font-body text-sm text-chalk hover:bg-surface/60"
+            >
+              @{m.fullName}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="flex items-center justify-between mt-3">
         <button
