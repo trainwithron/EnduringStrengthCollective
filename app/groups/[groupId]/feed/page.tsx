@@ -9,7 +9,7 @@ import { FeedSettingsButton } from "@/components/feed/feed-settings-button";
 import { ClearChannelButton } from "@/components/feed/clear-channel-button";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
-import { GroupLeaderboardTabs } from "@/components/leaderboard/group-leaderboard-tabs";
+import { LiveGroupLeaderboard } from "@/components/leaderboard/live-group-leaderboard";
 import { getGroupLeaderboardRankings } from "@/lib/leaderboard-data";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import type { FeedChannel, FeedPost } from "@/lib/types";
@@ -114,10 +114,9 @@ export default async function FeedPage(
   const leaderboardCard = leaderboard && (
     <div className="border border-steel/20 p-4 mb-4">
       <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">Leaderboard</h2>
-      <GroupLeaderboardTabs
-        workouts={leaderboard.workoutsRanking}
-        volume={leaderboard.volumeRanking}
-        prs={leaderboard.prsRanking}
+      <LiveGroupLeaderboard
+        groupId={params.groupId}
+        initialRankings={leaderboard}
         viewerId={user?.id ?? null}
       />
     </div>
