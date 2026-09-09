@@ -4,6 +4,7 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { AvailabilityManagerDesktop } from "@/components/coach/desktop/availability-manager-desktop";
 import { CancellationPolicyControl } from "@/components/coach/desktop/cancellation-policy-control";
 import { AvailabilityExceptionsManager } from "@/components/coach/desktop/availability-exceptions-manager";
+import { DiscoveryCallsPanel, type DiscoveryCallRow } from "@/components/coach/desktop/discovery-calls-panel";
 
 export default async function AvailabilityPage(
   props: {
@@ -70,6 +71,23 @@ export default async function AvailabilityPage(
     .eq("coach_id", user.id)
     .order("created_at", { ascending: false });
 
+  const { data: discoveryCallRows } = await supabase
+    .from("discovery_bookings")
+    .select("id, start_at, prospect_name, prospect_email, prospect_phone, message")
+    .eq("coach_id", user.id)
+    .eq("status", "confirmed")
+    .gte("start_at", new Date().toISOString())
+    .order("start_at", { ascending: true });
+
+  const discoveryCalls: DiscoveryCallRow[] = (discoveryCallRows ?? []).map((c) => ({
+    id: c.id,
+    startAt: c.start_at,
+    prospectName: c.prospect_name,
+    prospectEmail: c.prospect_email,
+    prospectPhone: c.prospect_phone,
+    message: c.message,
+  }));
+
   const exceptions = (exceptionRows ?? []).map((e) => ({
     id: e.id,
     kind: e.kind as "one_off" | "recurring",
@@ -103,6 +121,8 @@ export default async function AvailabilityPage(
       <AvailabilityExceptionsManager coachId={user.id} initialExceptions={exceptions} />
 
       <AvailabilityManagerDesktop coachId={user.id} initialWindows={windows} />
+
+      <DiscoveryCallsPanel coachId={user.id} initialCalls={discoveryCalls} />
     </CoachDesktopShell>
   );
 }

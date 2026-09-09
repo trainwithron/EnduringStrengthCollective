@@ -42,6 +42,8 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/invite/") ||
     pathname.startsWith("/pr/") ||
     pathname.startsWith("/share/") ||
+    pathname.startsWith("/book/") ||
+    pathname.startsWith("/api/discovery-availability/") ||
     // An invite email's link establishes a real session client-side, from
     // the URL fragment — the initial server-rendered request has no
     // session cookie yet, same gotcha already hit once for /pr/ and
