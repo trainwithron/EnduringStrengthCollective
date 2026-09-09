@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { Trash2 } from "lucide-react";
 
@@ -16,6 +16,11 @@ interface CommentRow {
 // Renders inline, directly under the post it belongs to — Facebook-style,
 // not a full-screen takeover — so which post you're commenting on is
 // never ambiguous: it's the one right above the box.
+interface MentionCandidate {
+  id: string;
+  fullName: string;
+}
+
 export function InlineCommentSection({
   postId,
   viewerId,
@@ -31,6 +36,8 @@ export function InlineCommentSection({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [members, setMembers] = useState<MentionCandidate[]>([]);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -42,6 +49,26 @@ export function InlineCommentSection({
       .eq("post_id", postId)
       .order("created_at", { ascending: true })
       .then(({ data }) => setComments((data as any) ?? []));
+
+    // Mention candidates — every member of this post's group, fetched
+    // once so typing "@" doesn't need a round trip per keystroke.
+    supabase
+      .from("posts")
+      .select("group_id")
+      .eq("id", postId)
+      .single()
+      .then(async ({ data: post }) => {
+        if (!post) return;
+        const { data: rows } = await supabase
+          .from("group_memberships")
+          .select("profile_id, profiles ( full_name )")
+          .eq("group_id", post.group_id);
+        setMembers(
+          (rows ?? [])
+            .map((r: any) => ({ id: r.profile_id, fullName: r.profiles?.full_name ?? "" }))
+            .filter((m) => m.fullName)
+        );
+      });
 
     const channel = supabase
       .channel(`comments:${postId}`)
@@ -74,6 +101,40 @@ export function InlineCommentSection({
       supabase.removeChannel(channel);
     };
   }, [postId]);
+
+  // Tracks whatever's typed after the last "@" (as long as it has no
+  // space yet) as the active mention search — a single-line input, so
+  // "the last @ with no space after it" is an unambiguous stand-in for
+  // "the word currently being typed."
+  function handleBodyChange(value: string) {
+    setBody(value);
+    const at = value.lastIndexOf("@");
+    if (at === -1) {
+      setMentionQuery(null);
+      return;
+    }
+    const afterAt = value.slice(at + 1);
+    if (afterAt.includes(" ")) {
+      setMentionQuery(null);
+      return;
+    }
+    setMentionQuery(afterAt);
+  }
+
+  const mentionMatches =
+    mentionQuery !== null
+      ? members
+          .filter((m) => m.fullName.toLowerCase().includes(mentionQuery.toLowerCase()))
+          .slice(0, 6)
+      : [];
+
+  function applyMention(member: MentionCandidate) {
+    const at = body.lastIndexOf("@");
+    const newBody = `${body.slice(0, at)}@${member.fullName} `;
+    setBody(newBody);
+    setMentionQuery(null);
+    inputRef.current?.focus();
+  }
 
   async function handleSend() {
     if (!body.trim() || sending) return;
@@ -181,14 +242,28 @@ export function InlineCommentSection({
           {error}
         </p>
       )}
+      {mentionQuery !== null && mentionMatches.length > 0 && (
+        <div className="border border-rust/40 bg-surface max-h-40 overflow-y-auto">
+          {mentionMatches.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => applyMention(m)}
+              className="w-full text-left px-3 py-2 font-body text-sm text-chalk hover:bg-graphite/50"
+            >
+              @{m.fullName}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <input
           ref={inputRef}
           type="text"
           value={body}
-          onChange={(e) => setBody(e.target.value)}
+          onChange={(e) => handleBodyChange(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") handleSend();
+            if (e.key === "Enter" && mentionQuery === null) handleSend();
           }}
           placeholder={replyTarget ? `Reply to ${replyTarget.profiles.full_name}` : "Add a comment"}
           disabled={sending}
@@ -207,6 +282,29 @@ export function InlineCommentSection({
   );
 }
 
+// Light-touch highlighting — matches "@First Last" / "@First" without
+// needing this render path to know the actual member list. Good enough
+// for visual emphasis; the real notification (who actually gets pinged)
+// is resolved server-side against real member names, not this regex.
+const MENTION_PATTERN = /@[A-Z][a-zA-Z'-]*(?:\s[A-Z][a-zA-Z'-]*)?/g;
+
+function renderWithMentions(body: string) {
+  const parts = body.split(MENTION_PATTERN);
+  const matches = body.match(MENTION_PATTERN) ?? [];
+  const out: ReactNode[] = [];
+  parts.forEach((part, i) => {
+    out.push(part);
+    if (matches[i]) {
+      out.push(
+        <span key={i} className="text-rust font-medium">
+          {matches[i]}
+        </span>
+      );
+    }
+  });
+  return out;
+}
+
 function CommentLine({
   comment,
   onReply,
@@ -222,7 +320,7 @@ function CommentLine({
     <div>
       <p className="font-body text-sm">
         <span className="font-medium">{comment.profiles.full_name}</span>{" "}
-        <span className="text-chalk">{comment.body}</span>
+        <span className="text-chalk">{renderWithMentions(comment.body)}</span>
       </p>
       <div className="flex items-center gap-3 mt-0.5">
         <button onClick={onReply} className="font-body text-xs text-steel">

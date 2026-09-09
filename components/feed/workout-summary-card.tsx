@@ -7,6 +7,7 @@ import { CommentPreview } from "./comment-preview";
 import { InlineCommentSection } from "./inline-comment-section";
 import { CoachLoggedBadge } from "@/components/coach-logged-badge";
 import { ShareWorkoutButton } from "@/components/share/share-workout-button";
+import { WorkoutCardExpanded } from "./workout-card-expanded";
 import { PinPostButton } from "./pin-post-button";
 import { Dumbbell, Pin } from "lucide-react";
 
@@ -21,6 +22,7 @@ export function WorkoutSummaryCard({
 }) {
   const [celebrate, setCelebrate] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const broadcastLevel = post.workoutSummary?.broadcastLevel ?? "full";
   // A "check-in only" post never reveals PR content, even when one
   // genuinely happened — the whole point is the lightweight badge.
@@ -65,11 +67,19 @@ export function WorkoutSummaryCard({
         )}
       </div>
 
-      <div className="border border-steel/20 p-4 bg-surface/40">
+      <div
+        className="border border-steel/20 p-4 bg-surface/40 cursor-pointer"
+        onClick={() => setExpanded((v) => !v)}
+        role="button"
+        tabIndex={0}
+      >
         <div className="flex items-center gap-2 text-rust mb-2">
           <Dumbbell className="w-4 h-4" />
           <span className="font-display uppercase text-sm tracking-wide">
             Workout complete
+          </span>
+          <span className="font-body text-[11px] text-steel ml-auto">
+            {expanded ? "Tap to collapse ▲" : "Tap to expand ▼"}
           </span>
         </div>
 
@@ -89,10 +99,12 @@ export function WorkoutSummaryCard({
               {hasPrs ? "New personal record set" : "Checked in"}
             </p>
           )}
-          <ShareWorkoutButton
-            postId={post.id}
-            title={`${post.author.fullName} just finished a workout! 💪`}
-          />
+          <div onClick={(e) => e.stopPropagation()}>
+            <ShareWorkoutButton
+              postId={post.id}
+              title={`${post.author.fullName} just finished a workout! 💪`}
+            />
+          </div>
         </div>
 
         {hasPrs && (
@@ -103,6 +115,12 @@ export function WorkoutSummaryCard({
             <p className="font-body text-sm">
               {post.workoutSummary!.newPrs.join(", ")}
             </p>
+          </div>
+        )}
+
+        {expanded && (
+          <div onClick={(e) => e.stopPropagation()}>
+            <WorkoutCardExpanded postId={post.id} />
           </div>
         )}
       </div>

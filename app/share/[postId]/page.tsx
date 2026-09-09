@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createServerClient } from "@/lib/supabase/server";
-import { estimateOneRepMax } from "@/lib/one-rep-max";
 import { getVolumeEquivalence } from "@/lib/volume-equivalence";
+import { getSharedWorkout } from "@/lib/shared-workout";
 import { PrListToggle } from "@/components/share/pr-list-toggle";
 import { ShareWorkoutButton } from "@/components/share/share-workout-button";
 import { CustomizeSharePanel } from "@/components/share/customize-share-panel";
@@ -11,107 +11,6 @@ import { CustomizeSharePanel } from "@/components/share/customize-share-panel";
 // shareable card now, not just PRs, so a client can post it (and tag the
 // gym) right after finishing. RLS on the anon role is scoped narrowly to
 // workout_summary posts only — see migration 0028_public_share_any_workout.
-async function getSharedWorkout(postId: string) {
-  const supabase = createServerClient();
-
-  const { data: post } = await supabase
-    .from("posts")
-    .select(
-      `
-      id, post_type, created_at, group_id, broadcast_level, author_id, shared_exercise_names,
-      profiles!posts_author_id_fkey ( full_name ),
-      workout_logs ( session_id, new_prs, total_volume, total_sets_completed )
-    `
-    )
-    .eq("id", postId)
-    .eq("post_type", "workout_summary")
-    .maybeSingle();
-
-  const workoutLog = post?.workout_logs as any;
-  if (!post || !workoutLog) return null;
-
-  const { data: group } = await supabase
-    .from("groups")
-    .select("name")
-    .eq("id", post.group_id)
-    .maybeSingle();
-
-  const broadcastLevel: "full" | "prs_only" | "checkin_only" = post.broadcast_level ?? "full";
-  // A check-in-only post never reveals PR content, even when one
-  // genuinely happened — that's the whole point of choosing it.
-  const newPrs: string[] = broadcastLevel === "checkin_only" ? [] : workoutLog.new_prs ?? [];
-
-  // Best completed set per exercise, from the session behind this post —
-  // powers both "top lifts" and the PR list's estimated 1RM. Only needed
-  // at all when this post is allowed to show that level of detail.
-  const bestByExercise = new Map<string, { weight: number; reps: number }>();
-  if (workoutLog.session_id && broadcastLevel !== "checkin_only") {
-    const { data: sets } = await supabase
-      .from("set_logs")
-      .select("weight, reps, status, session_exercises!inner ( session_id, exercise_name )")
-      .eq("session_exercises.session_id", workoutLog.session_id)
-      .eq("status", "completed");
-
-    for (const row of (sets ?? []) as any[]) {
-      const name = row.session_exercises.exercise_name;
-      const weight = row.weight ?? 0;
-      const existing = bestByExercise.get(name);
-      if (!existing || weight > existing.weight) {
-        bestByExercise.set(name, { weight, reps: row.reps ?? 1 });
-      }
-    }
-  }
-
-  // The 5 highest-weight sets of the session — always computed (even in
-  // prs_only mode) so the athlete has real candidates to choose from in
-  // the customize panel, though only "full" mode ever actually displays
-  // any of them publicly.
-  const top5Candidates = Array.from(bestByExercise.entries())
-    .map(([name, best]) => ({ name, ...best }))
-    .sort((a, b) => b.weight - a.weight)
-    .slice(0, 5);
-
-  // "prs_only" shows only the PR list, never total volume/sets/top lifts —
-  // that's the "keeping the rest private" half of that mode's whole point.
-  // Once the athlete has explicitly chosen which lifts to show (a real,
-  // possibly-empty array), that choice always wins; only a genuinely
-  // unset (null) selection falls back to the old default of "top 3 by
-  // weight" — keeps every pre-existing shared card rendering unchanged.
-  const topLifts =
-    broadcastLevel !== "full"
-      ? []
-      : post.shared_exercise_names
-      ? top5Candidates.filter((l) => post.shared_exercise_names!.includes(l.name))
-      : top5Candidates.slice(0, 3);
-
-  const prList = newPrs
-    .map((name) => {
-      const best = bestByExercise.get(name);
-      if (!best) return null;
-      return {
-        name,
-        weight: best.weight,
-        reps: best.reps,
-        oneRepMax: estimateOneRepMax(best.weight, best.reps),
-      };
-    })
-    .filter((x): x is NonNullable<typeof x> => x !== null);
-
-  return {
-    authorId: post.author_id as string,
-    groupId: post.group_id,
-    athleteName: (post.profiles as any)?.full_name ?? "An athlete",
-    groupName: group?.name ?? "The Enduring Strength Collective",
-    broadcastLevel,
-    totalVolume: broadcastLevel === "full" ? workoutLog.total_volume ?? 0 : null,
-    totalSetsCompleted: broadcastLevel === "full" ? workoutLog.total_sets_completed ?? 0 : null,
-    topLifts,
-    top5Candidates,
-    selectedNames: post.shared_exercise_names ?? top5Candidates.slice(0, 3).map((l) => l.name),
-    prList,
-    createdAt: post.created_at,
-  };
-}
 
 export async function generateMetadata({
   params,
