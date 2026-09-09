@@ -35,6 +35,8 @@ export function GroupSwitcher({
   const [filterQuery, setFilterQuery] = useState("");
   const [editingTagFor, setEditingTagFor] = useState<string | null>(null);
   const [tagDraft, setTagDraft] = useState("");
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState(groupName);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -88,6 +90,19 @@ export function GroupSwitcher({
       cancelled = true;
     };
   }, []);
+
+  async function persistName(name: string) {
+    const trimmed = name.trim();
+    setEditingName(false);
+    if (!trimmed || trimmed === groupName) {
+      setNameDraft(groupName);
+      return;
+    }
+    const supabase = createBrowserClient();
+    await supabase.from("groups").update({ name: trimmed }).eq("id", groupId);
+    setGroups((prev) => (prev ? prev.map((g) => (g.id === groupId ? { ...g, name: trimmed } : g)) : prev));
+    router.refresh();
+  }
 
   async function persistTag(targetGroupId: string, tag: string) {
     const supabase = createBrowserClient();
@@ -218,9 +233,40 @@ export function GroupSwitcher({
       );
     }
     return (
-      <div className="px-5 pt-6 pb-5 border-b border-steel/20">
+      <div className="px-5 pt-6 pb-5 border-b border-steel/20 group">
         <p className="font-body text-[11px] text-steel uppercase tracking-wide">Coaching</p>
-        <h1 className="font-display font-bold text-lg uppercase leading-tight mt-1">{groupName}</h1>
+        {editingName ? (
+          <input
+            type="text"
+            autoFocus
+            value={nameDraft}
+            onChange={(e) => setNameDraft(e.target.value)}
+            onBlur={() => persistName(nameDraft)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+              if (e.key === "Escape") {
+                setNameDraft(groupName);
+                setEditingName(false);
+              }
+            }}
+            className="w-full h-8 mt-1 bg-graphite border border-steel/30 text-chalk px-2 font-display font-bold text-lg uppercase focus:outline-none focus:border-rust"
+          />
+        ) : (
+          <div className="flex items-center gap-1.5 mt-1">
+            <h1 className="font-display font-bold text-lg uppercase leading-tight">{groupName}</h1>
+            <button
+              type="button"
+              onClick={() => {
+                setNameDraft(groupName);
+                setEditingName(true);
+              }}
+              className="opacity-0 group-hover:opacity-100 text-steel active:text-rust shrink-0"
+              aria-label="Rename group"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -276,16 +322,43 @@ export function GroupSwitcher({
   }
 
   return (
-    <div className="px-5 pt-6 pb-5 border-b border-steel/20 relative" ref={containerRef}>
+    <div className="px-5 pt-6 pb-5 border-b border-steel/20 relative group" ref={containerRef}>
       <p className="font-body text-[11px] text-steel uppercase tracking-wide">Coaching</p>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 mt-1 text-left"
-      >
-        <h1 className="font-display font-bold text-lg uppercase leading-tight">{groupName}</h1>
-        <ChevronDown className={`w-4 h-4 text-steel shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
+      {editingName ? (
+        <input
+          type="text"
+          autoFocus
+          value={nameDraft}
+          onChange={(e) => setNameDraft(e.target.value)}
+          onBlur={() => persistName(nameDraft)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            if (e.key === "Escape") {
+              setNameDraft(groupName);
+              setEditingName(false);
+            }
+          }}
+          className="w-full h-8 mt-1 bg-graphite border border-steel/30 text-chalk px-2 font-display font-bold text-lg uppercase focus:outline-none focus:border-rust"
+        />
+      ) : (
+        <div className="flex items-center gap-1.5 mt-1">
+          <button type="button" onClick={() => setOpen((o) => !o)} className="flex items-center gap-1.5 text-left min-w-0">
+            <h1 className="font-display font-bold text-lg uppercase leading-tight truncate">{groupName}</h1>
+            <ChevronDown className={`w-4 h-4 text-steel shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setNameDraft(groupName);
+              setEditingName(true);
+            }}
+            className="opacity-0 group-hover:opacity-100 text-steel active:text-rust shrink-0"
+            aria-label="Rename group"
+          >
+            <Pencil className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {open && (
         <div className="absolute left-5 right-5 top-full mt-1 bg-surface border border-steel/30 z-20 shadow-lg">
