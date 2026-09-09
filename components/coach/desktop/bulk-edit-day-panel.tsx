@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { BuilderExercise } from "@/lib/types";
 import { TARGET_COLUMN, fieldDef, type TrackedField } from "@/lib/exercise-fields";
+import { flashSaved, flashSaveError } from "@/lib/save-toast";
 
 type Mode = "all" | "class";
 
@@ -39,16 +40,21 @@ export function BulkEditDayPanel({
     setApplying(true);
     const supabase = createBrowserClient();
     const updates: { exerciseId: string; field: TrackedField; value: string | number | null }[] = [];
+    let anyFailed = false;
 
     if (mode === "all") {
       const parsed = parse(value);
       const setIds = exercises.flatMap((e) => e.sets.map((s) => s.id));
       if (setIds.length > 0) {
-        await supabase
+        const { error } = await supabase
           .from("group_workout_exercise_sets")
           .update({ [TARGET_COLUMN[field]]: parsed })
           .in("id", setIds);
-        for (const e of exercises) updates.push({ exerciseId: e.id, field, value: parsed });
+        if (error) {
+          anyFailed = true;
+        } else {
+          for (const e of exercises) updates.push({ exerciseId: e.id, field, value: parsed });
+        }
       }
     } else {
       for (const tier of ["A", "B", "C"] as const) {
@@ -58,10 +64,14 @@ export function BulkEditDayPanel({
         const tierExercises = exercises.filter((e) => e.tier === tier);
         const setIds = tierExercises.flatMap((e) => e.sets.map((s) => s.id));
         if (setIds.length === 0) continue;
-        await supabase
+        const { error } = await supabase
           .from("group_workout_exercise_sets")
           .update({ [TARGET_COLUMN[field]]: parsed })
           .in("id", setIds);
+        if (error) {
+          anyFailed = true;
+          continue;
+        }
         for (const e of tierExercises) updates.push({ exerciseId: e.id, field, value: parsed });
       }
     }
@@ -71,6 +81,12 @@ export function BulkEditDayPanel({
     setOpen(false);
     setValue("");
     setClassValues({ A: "", B: "", C: "" });
+
+    if (anyFailed) {
+      flashSaveError("Some values didn't save — check the affected exercises.");
+    } else if (updates.length > 0) {
+      flashSaved();
+    }
   }
 
   if (exercises.length === 0) return null;

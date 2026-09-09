@@ -9,7 +9,7 @@ import { BulkEditDayPanel } from "./bulk-edit-day-panel";
 import { TARGET_PROP, type TrackedField } from "@/lib/exercise-fields";
 import type { MovementPatternOption } from "../exercise-builder-card";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { flashSaved } from "@/lib/save-toast";
+import { flashSaved, flashSaveError } from "@/lib/save-toast";
 
 export function WeekGrid({
   weekNumber,
@@ -79,9 +79,13 @@ export function WeekGrid({
 
   async function persistDayOrder(nextDays: BuilderDay[]) {
     const supabase = createBrowserClient();
-    await Promise.all(
+    const results = await Promise.all(
       nextDays.map((d, i) => supabase.from("workouts").update({ day_index: i + 1 }).eq("id", d.id))
     );
+    if (results.some((r) => r.error)) {
+      flashSaveError("Couldn't save the new day order — reload to check.");
+      return;
+    }
     flashSaved();
   }
 
@@ -112,7 +116,7 @@ export function WeekGrid({
       const supabase = createBrowserClient();
       const nextDayIndex = days.length > 0 ? Math.max(...days.map((d) => d.dayIndex)) + 1 : 1;
 
-      const { data: newRow } = await supabase
+      const { data: newRow, error: insertError } = await supabase
         .from("workouts")
         .insert({
           program_id: programId,
@@ -124,7 +128,10 @@ export function WeekGrid({
         .select("id, title, week_number, day_index")
         .single();
 
-      if (!newRow) return;
+      if (insertError || !newRow) {
+        flashSaveError("Couldn't add that day — try again.");
+        return;
+      }
 
       onDaysChange([
         ...days,

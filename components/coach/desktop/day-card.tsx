@@ -17,7 +17,7 @@ import { TextNoteCard } from "../text-note-card";
 import { BulkEditDayPanel } from "./bulk-edit-day-panel";
 import { formatShortDate } from "@/lib/program-schedule";
 import { GripVertical, ChevronDown, ChevronUp } from "lucide-react";
-import { flashSaved } from "@/lib/save-toast";
+import { flashSaved, flashSaveError } from "@/lib/save-toast";
 
 export function DayCard({
   day,
@@ -80,13 +80,17 @@ export function DayCard({
 
   async function persistOrder(items: BuilderItem[]) {
     const supabase = createBrowserClient();
-    await Promise.all(
+    const results = await Promise.all(
       items.map((item, i) =>
         item.kind === "exercise"
           ? supabase.from("group_workout_exercises").update({ exercise_order: i }).eq("id", item.id)
           : supabase.from("workout_notes").update({ position: i }).eq("id", item.id)
       )
     );
+    if (results.some((r) => r.error)) {
+      flashSaveError("Couldn't save the new order — reload to check.");
+      return;
+    }
     flashSaved();
   }
 
@@ -138,7 +142,7 @@ export function DayCard({
       const supabase = createBrowserClient();
       const nextOrder = day.items.length > 0 ? Math.max(...day.items.map((i) => i.order)) + 1 : 0;
 
-      const { data: newRow } = await supabase
+      const { data: newRow, error: insertError } = await supabase
         .from("group_workout_exercises")
         .insert({
           workout_id: day.id,
@@ -149,13 +153,20 @@ export function DayCard({
         .select("id, tracked_fields")
         .single();
 
-      if (!newRow) return;
+      if (insertError || !newRow) {
+        flashSaveError("Couldn't add that exercise — try again.");
+        return;
+      }
 
-      const { data: setRow } = await supabase
+      const { data: setRow, error: setInsertError } = await supabase
         .from("group_workout_exercise_sets")
         .insert({ group_workout_exercise_id: newRow.id, set_order: 0 })
         .select(SET_ROW_SELECT)
         .single();
+
+      if (setInsertError) {
+        flashSaveError("Exercise added, but its first set didn't save — try adding one manually.");
+      }
 
       const newExercise: BuilderExercise = {
         kind: "exercise",
@@ -172,7 +183,7 @@ export function DayCard({
       };
 
       onItemsChange([...day.items, newExercise]);
-      flashSaved();
+      if (!setInsertError) flashSaved();
     } finally {
       setAddItemBusy(false);
     }
@@ -187,7 +198,7 @@ export function DayCard({
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) return;
 
-      const { data: newRow } = await supabase
+      const { data: newRow, error: insertError } = await supabase
         .from("workout_notes")
         .insert({
           workout_id: day.id,
@@ -199,7 +210,10 @@ export function DayCard({
         .select("id")
         .single();
 
-      if (!newRow) return;
+      if (insertError || !newRow) {
+        flashSaveError("Couldn't add that note — try again.");
+        return;
+      }
 
       const newNote: BuilderNote = { kind: "note", id: newRow.id, order: nextOrder, body: "" };
       onItemsChange([...day.items, newNote]);

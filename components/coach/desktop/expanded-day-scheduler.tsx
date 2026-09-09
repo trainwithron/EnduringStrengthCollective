@@ -42,6 +42,7 @@ export function ExpandedDayScheduler({
   const [balance, setBalance] = useState(client.balance);
   const [adjustingCredits, setAdjustingCredits] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  const [assignError, setAssignError] = useState<string | null>(null);
 
   const daySlots = generateSlotsForDate(
     date,
@@ -69,6 +70,7 @@ export function ExpandedDayScheduler({
 
   async function handleAssignSlot(start: Date, durationMinutes: number) {
     setAssigning(true);
+    setAssignError(null);
     const supabase = createBrowserClient();
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) {
@@ -77,23 +79,26 @@ export function ExpandedDayScheduler({
     }
     const endAt = new Date(start.getTime() + durationMinutes * 60000);
 
-    const { error: insertError } = await supabase.from("bookings").insert({
-      coach_id: userData.user.id,
-      athlete_id: client.athleteId,
-      group_id: groupId,
-      start_at: start.toISOString(),
-      end_at: endAt.toISOString(),
+    // Same atomic book_session RPC every booking path uses now — real
+    // overlap guard beyond the exact-start_at unique index, in one
+    // transaction with the credit spend.
+    const { error: bookError } = await supabase.rpc("book_session", {
+      p_coach_id: userData.user.id,
+      p_athlete_id: client.athleteId,
+      p_group_id: groupId,
+      p_start_at: start.toISOString(),
+      p_end_at: endAt.toISOString(),
     });
 
-    if (!insertError) {
-      await supabase.rpc("adjust_session_credits", {
-        p_athlete_id: client.athleteId,
-        p_group_id: groupId,
-        p_delta: -1,
-      });
-    }
-
     setAssigning(false);
+    if (bookError) {
+      setAssignError(
+        bookError.message.includes("just taken")
+          ? "That slot was just taken."
+          : "Couldn't assign that slot."
+      );
+      return;
+    }
     onAssigned();
   }
 
@@ -199,6 +204,9 @@ export function ExpandedDayScheduler({
           <h3 className="font-body text-xs text-steel uppercase tracking-wide mb-2">
             Open time slots
           </h3>
+          {assignError && (
+            <p className="font-body text-xs text-rust mb-2">{assignError}</p>
+          )}
           {balance <= 0 ? (
             <p className="font-body text-sm text-rust">
               No sessions remaining — add a credit above to book.

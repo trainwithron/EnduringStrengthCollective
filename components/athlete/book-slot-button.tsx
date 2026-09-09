@@ -26,33 +26,30 @@ export function BookSlotButton({
     setError(null);
     const supabase = createBrowserClient();
 
-    // The partial unique index on (coach_id, start_at) is the real guard
-    // against double-booking a slot two clients raced for — this insert
-    // simply fails if someone else just took it.
-    const { error: insertError } = await supabase.from("bookings").insert({
-      coach_id: coachId,
-      athlete_id: athleteId,
-      group_id: groupId,
-      start_at: startAt,
-      end_at: endAt,
+    // One atomic, security-definer RPC: checks a credit actually exists,
+    // checks for any overlapping confirmed booking (not just an exact
+    // start_at collision), inserts, then spends the credit — all in one
+    // transaction, so nothing between the check and the write can race.
+    const { error: bookError } = await supabase.rpc("book_session", {
+      p_coach_id: coachId,
+      p_athlete_id: athleteId,
+      p_group_id: groupId,
+      p_start_at: startAt,
+      p_end_at: endAt,
     });
 
-    if (insertError) {
-      setError("That slot was just taken. Try another.");
+    if (bookError) {
+      setError(
+        bookError.message.includes("no session credits")
+          ? "No sessions remaining — contact your coach."
+          : bookError.message.includes("just taken")
+            ? "That slot was just taken. Try another."
+            : "Couldn't book that slot."
+      );
       setSubmitting(false);
       router.refresh();
       return;
     }
-
-    // An atomic DB-side decrement (via a security-definer RPC) instead of
-    // read-balance-then-write — two tabs booking two different slots off
-    // the same starting balance could otherwise both succeed and leave
-    // the athlete with two bookings for one credit.
-    await supabase.rpc("adjust_session_credits", {
-      p_athlete_id: athleteId,
-      p_group_id: groupId,
-      p_delta: -1,
-    });
 
     router.refresh();
   }

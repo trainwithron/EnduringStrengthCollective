@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { VisibilityWindow } from "@/lib/program-schedule";
+import { flashSaved, flashSaveError } from "@/lib/save-toast";
 
 const VISIBILITY_OPTIONS: { value: VisibilityWindow; label: string }[] = [
   { value: "day", label: "Day of" },
@@ -45,23 +46,38 @@ export function ProgramScheduleSettings({
   async function persist(nextStartDate: string, nextTrainingDays: number[]) {
     setSaving(true);
     const supabase = createBrowserClient();
-    await supabase
+    const { error } = await supabase
       .from("programs")
       .update({
         start_date: nextStartDate || null,
         training_days: nextTrainingDays.length > 0 ? nextTrainingDays : null,
       })
       .eq("id", programId);
-    onChange(nextStartDate || null, nextTrainingDays.length > 0 ? nextTrainingDays : null);
     setSaving(false);
+    if (error) {
+      flashSaveError("Couldn't save the schedule — try again.");
+      return;
+    }
+    onChange(nextStartDate || null, nextTrainingDays.length > 0 ? nextTrainingDays : null);
+    flashSaved();
   }
 
   async function handleVisibilityChange(next: VisibilityWindow) {
+    const previous = visibilityWindow;
     setVisibilityWindow(next);
     setSaving(true);
     const supabase = createBrowserClient();
-    await supabase.from("programs").update({ visibility_window: next }).eq("id", programId);
+    const { error } = await supabase
+      .from("programs")
+      .update({ visibility_window: next })
+      .eq("id", programId);
     setSaving(false);
+    if (error) {
+      setVisibilityWindow(previous);
+      flashSaveError("Couldn't save that setting — try again.");
+      return;
+    }
+    flashSaved();
   }
 
   function toggleDay(day: number) {

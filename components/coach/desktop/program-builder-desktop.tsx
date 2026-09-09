@@ -10,7 +10,7 @@ import { computeScheduledDates, type VisibilityWindow } from "@/lib/program-sche
 import type { MovementPatternOption } from "../exercise-builder-card";
 import { ProgramCardMenu } from "./program-card-menu";
 import { SaveToast } from "./save-toast";
-import { flashSaved } from "@/lib/save-toast";
+import { flashSaved, flashSaveError } from "@/lib/save-toast";
 
 export function ProgramBuilderDesktop({
   programId,
@@ -78,7 +78,7 @@ export function ProgramBuilderDesktop({
       const nextWeek = weekNumbers.length > 0 ? Math.max(...weekNumbers) + 1 : 1;
 
       const supabase = createBrowserClient();
-      const { data: newRow } = await supabase
+      const { data: newRow, error: insertError } = await supabase
         .from("workouts")
         .insert({
           program_id: programId,
@@ -90,7 +90,10 @@ export function ProgramBuilderDesktop({
         .select("id, title, week_number, day_index")
         .single();
 
-      if (!newRow) return;
+      if (insertError || !newRow) {
+        flashSaveError("Couldn't add that week — try again.");
+        return;
+      }
 
       setDays((prev) => [
         ...prev,

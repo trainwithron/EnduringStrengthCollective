@@ -13,7 +13,6 @@ interface SharedWorkoutData {
   topLifts: { name: string; weight: number; reps: number }[];
   prList: { name: string; weight: number; reps: number; oneRepMax: number }[];
   createdAt: string;
-  joinUrl: string | null;
 }
 
 export function WorkoutCardExpanded({ postId }: { postId: string }) {
@@ -144,12 +143,6 @@ export function WorkoutCardExpanded({ postId }: { postId: string }) {
             year: "numeric",
           })}
         </p>
-
-        {data.joinUrl && (
-          <p className="font-body text-xs text-rust mt-4 pt-3 border-t border-steel/20 break-all">
-            Join {data.groupName}: {data.joinUrl.replace(/^https?:\/\//, "")}
-          </p>
-        )}
       </div>
 
       <button

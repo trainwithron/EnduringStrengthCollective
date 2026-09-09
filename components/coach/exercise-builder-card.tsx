@@ -16,7 +16,7 @@ import {
   type TrackedField,
 } from "@/lib/exercise-fields";
 import { ChevronDown, ChevronUp, Copy, GripVertical, Trash2 } from "lucide-react";
-import { flashSaved } from "@/lib/save-toast";
+import { flashSaved, flashSaveError } from "@/lib/save-toast";
 
 export interface MovementPatternOption {
   id: string;
@@ -125,7 +125,14 @@ export function ExerciseBuilderCard({
     const trimmed = name.trim();
     if (!trimmed || trimmed === exercise.exerciseName) return;
     const supabase = createBrowserClient();
-    await supabase.from("group_workout_exercises").update({ exercise_name: trimmed }).eq("id", exercise.id);
+    const { error: updateError } = await supabase
+      .from("group_workout_exercises")
+      .update({ exercise_name: trimmed })
+      .eq("id", exercise.id);
+    if (updateError) {
+      flashSaveError("Couldn't rename that exercise — try again.");
+      return;
+    }
     onUpdate({ exerciseName: trimmed });
     flashSaved();
 
@@ -143,7 +150,14 @@ export function ExerciseBuilderCard({
   async function handleMovementPatternChange(value: string) {
     const patternId = value || null;
     const supabase = createBrowserClient();
-    await supabase.from("group_workout_exercises").update({ movement_pattern_id: patternId }).eq("id", exercise.id);
+    const { error } = await supabase
+      .from("group_workout_exercises")
+      .update({ movement_pattern_id: patternId })
+      .eq("id", exercise.id);
+    if (error) {
+      flashSaveError("Couldn't save the movement pattern — try again.");
+      return;
+    }
     onUpdate({ movementPatternId: patternId });
     flashSaved();
   }
@@ -155,7 +169,14 @@ export function ExerciseBuilderCard({
   async function persistNotes(next: string) {
     const supabase = createBrowserClient();
     const value = next.trim() || null;
-    await supabase.from("group_workout_exercises").update({ notes: value }).eq("id", exercise.id);
+    const { error } = await supabase
+      .from("group_workout_exercises")
+      .update({ notes: value })
+      .eq("id", exercise.id);
+    if (error) {
+      flashSaveError("Couldn't save that note — try again.");
+      return;
+    }
     onUpdate({ notes: value });
     flashSaved();
   }
@@ -170,10 +191,14 @@ export function ExerciseBuilderCard({
     const setIds = exercise.sets.map((s) => s.id);
     if (setIds.length === 0) return;
     const supabase = createBrowserClient();
-    await supabase
+    const { error } = await supabase
       .from("group_workout_exercise_sets")
       .update({ rep_min: repMin, rep_max: repMax })
       .in("id", setIds);
+    if (error) {
+      flashSaveError("Couldn't save the rep range — try again.");
+      return;
+    }
     onSetsChange(exercise.sets.map((s) => ({ ...s, repMin, repMax })));
     flashSaved();
   }
@@ -186,7 +211,7 @@ export function ExerciseBuilderCard({
       const nextOrder = exercise.sets.length > 0 ? Math.max(...exercise.sets.map((s) => s.setOrder)) + 1 : 0;
       const last = exercise.sets[exercise.sets.length - 1];
 
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("group_workout_exercise_sets")
         .insert({
           group_workout_exercise_id: exercise.id,
@@ -203,10 +228,12 @@ export function ExerciseBuilderCard({
         .select(SET_ROW_SELECT)
         .single();
 
-      if (data) {
-        onSetsChange([...exercise.sets, mapSetRow(data)]);
-        flashSaved();
+      if (error || !data) {
+        flashSaveError("Couldn't add that set — try again.");
+        return;
       }
+      onSetsChange([...exercise.sets, mapSetRow(data)]);
+      flashSaved();
     } finally {
       setSetsBusy(false);
     }
@@ -218,7 +245,11 @@ export function ExerciseBuilderCard({
     try {
       const last = exercise.sets[exercise.sets.length - 1];
       const supabase = createBrowserClient();
-      await supabase.from("group_workout_exercise_sets").delete().eq("id", last.id);
+      const { error } = await supabase.from("group_workout_exercise_sets").delete().eq("id", last.id);
+      if (error) {
+        flashSaveError("Couldn't remove that set — try again.");
+        return;
+      }
       onSetsChange(exercise.sets.slice(0, -1));
       flashSaved();
     } finally {
@@ -230,10 +261,14 @@ export function ExerciseBuilderCard({
     const def = fieldDef(field);
     const value = def.kind === "number" ? (raw.trim() === "" ? null : Number(raw)) : raw.trim() || null;
     const supabase = createBrowserClient();
-    await supabase
+    const { error } = await supabase
       .from("group_workout_exercise_sets")
       .update({ [TARGET_COLUMN[field]]: value })
       .eq("id", setId);
+    if (error) {
+      flashSaveError("Couldn't save that value — try again.");
+      return;
+    }
     onSetsChange(
       exercise.sets.map((s) => (s.id === setId ? { ...s, [TARGET_PROP[field]]: value } : s))
     );
@@ -248,10 +283,14 @@ export function ExerciseBuilderCard({
     const value = def.kind === "number" ? (raw.trim() === "" ? null : Number(raw)) : raw.trim() || null;
     const otherSetIds = exercise.sets.filter((s) => s.id !== setId).map((s) => s.id);
     const supabase = createBrowserClient();
-    await supabase
+    const { error } = await supabase
       .from("group_workout_exercise_sets")
       .update({ [TARGET_COLUMN[field]]: value })
       .in("id", [setId, ...otherSetIds]);
+    if (error) {
+      flashSaveError("Couldn't save that value across all sets — try again.");
+      return;
+    }
     onSetsChange(exercise.sets.map((s) => ({ ...s, [TARGET_PROP[field]]: value })));
     flashSaved();
   }
@@ -259,7 +298,14 @@ export function ExerciseBuilderCard({
   async function handleAddField(field: TrackedField) {
     const nextFields = orderTrackedFields([...exercise.trackedFields, field]);
     const supabase = createBrowserClient();
-    await supabase.from("group_workout_exercises").update({ tracked_fields: nextFields }).eq("id", exercise.id);
+    const { error } = await supabase
+      .from("group_workout_exercises")
+      .update({ tracked_fields: nextFields })
+      .eq("id", exercise.id);
+    if (error) {
+      flashSaveError("Couldn't add that field — try again.");
+      return;
+    }
     onUpdate({ trackedFields: nextFields });
     setAddFieldOpen(false);
     flashSaved();
@@ -268,17 +314,30 @@ export function ExerciseBuilderCard({
   async function handleRemoveField(field: TrackedField) {
     const nextFields = exercise.trackedFields.filter((f) => f !== field);
     const supabase = createBrowserClient();
-    await supabase.from("group_workout_exercises").update({ tracked_fields: nextFields }).eq("id", exercise.id);
+    const { error: fieldsError } = await supabase
+      .from("group_workout_exercises")
+      .update({ tracked_fields: nextFields })
+      .eq("id", exercise.id);
+    if (fieldsError) {
+      flashSaveError("Couldn't stop tracking that field — try again.");
+      return;
+    }
     const setIds = exercise.sets.map((s) => s.id);
+    let clearFailed = false;
     if (setIds.length > 0) {
-      await supabase
+      const { error: clearError } = await supabase
         .from("group_workout_exercise_sets")
         .update({ [TARGET_COLUMN[field]]: null })
         .in("id", setIds);
+      clearFailed = !!clearError;
     }
     onUpdate({ trackedFields: nextFields });
     onSetsChange(exercise.sets.map((s) => ({ ...s, [TARGET_PROP[field]]: null })));
-    flashSaved();
+    if (clearFailed) {
+      flashSaveError("Field removed, but couldn't clear its saved values.");
+    } else {
+      flashSaved();
+    }
   }
 
   async function handleDelete() {
@@ -288,14 +347,19 @@ export function ExerciseBuilderCard({
     }
     setBusy(true);
     const supabase = createBrowserClient();
-    await supabase.from("group_workout_exercises").delete().eq("id", exercise.id);
+    const { error } = await supabase.from("group_workout_exercises").delete().eq("id", exercise.id);
+    if (error) {
+      flashSaveError("Couldn't delete that exercise — try again.");
+      setBusy(false);
+      return;
+    }
     onDeleted();
   }
 
   async function handleDuplicate() {
     setBusy(true);
     const supabase = createBrowserClient();
-    const { data: newRow } = await supabase
+    const { data: newRow, error: insertError } = await supabase
       .from("group_workout_exercises")
       .insert({
         workout_id: workoutId,
@@ -309,14 +373,16 @@ export function ExerciseBuilderCard({
       .select("id")
       .single();
 
-    if (!newRow) {
+    if (insertError || !newRow) {
+      flashSaveError("Couldn't duplicate that exercise — try again.");
       setBusy(false);
       return;
     }
 
     let newSets: ExerciseSetTarget[] = [];
+    let setsFailed = false;
     if (exercise.sets.length > 0) {
-      const { data: setsData } = await supabase
+      const { data: setsData, error: setsError } = await supabase
         .from("group_workout_exercise_sets")
         .insert(
           exercise.sets.map((s) => ({
@@ -334,6 +400,11 @@ export function ExerciseBuilderCard({
         )
         .select(SET_ROW_SELECT);
       newSets = (setsData ?? []).map(mapSetRow);
+      setsFailed = !!setsError;
+    }
+
+    if (setsFailed) {
+      flashSaveError("Exercise duplicated, but its sets didn't copy — check the new copy.");
     }
 
     onDuplicated({

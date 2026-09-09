@@ -12,6 +12,7 @@ import {
   type ProgressionResultWeek,
   type UndulatingWaveStep,
 } from "@/lib/progression-models";
+import { flashSaved, flashSaveError } from "@/lib/save-toast";
 
 type Model = "linear" | "double" | "undulating";
 
@@ -174,12 +175,13 @@ export function DuplicateWeekPanel({
       data: { user },
     } = await supabase.auth.getUser();
     const generatedDays: BuilderDay[] = [];
+    let anyFailed = false;
 
     for (let offset = 0; offset < weekCount; offset++) {
       const weekNumber = startingWeek + offset;
 
       for (const day of sortedDays) {
-        const { data: workoutRow } = await supabase
+        const { data: workoutRow, error: workoutError } = await supabase
           .from("workouts")
           .insert({
             program_id: programId,
@@ -190,7 +192,10 @@ export function DuplicateWeekPanel({
           })
           .select("id, title, week_number, day_index")
           .single();
-        if (!workoutRow) continue;
+        if (workoutError || !workoutRow) {
+          anyFailed = true;
+          continue;
+        }
 
         const items: BuilderItem[] = [];
 
@@ -199,7 +204,7 @@ export function DuplicateWeekPanel({
           // them (as this insert used to) fails silently here since the
           // result is only used via an `if (noteRow)` check, quietly
           // dropping every note a duplicated week was supposed to carry.
-          const { data: noteRow } = await supabase
+          const { data: noteRow, error: noteError } = await supabase
             .from("workout_notes")
             .insert({
               workout_id: workoutRow.id,
@@ -212,6 +217,8 @@ export function DuplicateWeekPanel({
             .single();
           if (noteRow) {
             items.push({ kind: "note", id: noteRow.id, order: noteRow.position, body: noteRow.body });
+          } else if (noteError) {
+            anyFailed = true;
           }
         }
 
@@ -224,7 +231,7 @@ export function DuplicateWeekPanel({
           const tracksForExercise = tracksForDay.filter((t) => t.itemOrder === itemOrder);
           const first = tracksForExercise[0];
 
-          const { data: exerciseRow } = await supabase
+          const { data: exerciseRow, error: exerciseError } = await supabase
             .from("group_workout_exercises")
             .insert({
               workout_id: workoutRow.id,
@@ -237,7 +244,10 @@ export function DuplicateWeekPanel({
             })
             .select("id")
             .single();
-          if (!exerciseRow) continue;
+          if (exerciseError || !exerciseRow) {
+            anyFailed = true;
+            continue;
+          }
 
           const setsPayload = tracksForExercise
             .slice()
@@ -260,12 +270,13 @@ export function DuplicateWeekPanel({
               };
             });
 
-          const { data: setsData } = await supabase
+          const { data: setsData, error: setsError } = await supabase
             .from("group_workout_exercise_sets")
             .insert(setsPayload)
             .select(
               "id, set_order, target_reps, target_weight, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance, rep_min, rep_max"
             );
+          if (setsError) anyFailed = true;
 
           items.push({
             kind: "exercise",
@@ -308,6 +319,15 @@ export function DuplicateWeekPanel({
     onGenerated(generatedDays);
     setGenerating(false);
     setOpen(false);
+    if (anyFailed) {
+      flashSaveError(
+        generatedDays.length > 0
+          ? "Some of the generated weeks didn't save fully — check them before relying on them."
+          : "Couldn't generate those weeks — try again."
+      );
+    } else {
+      flashSaved();
+    }
   }
 
   if (!open) {

@@ -26,30 +26,27 @@ export function AssignSlotButton({
     setError(null);
     const supabase = createBrowserClient();
 
-    // Same partial unique index on (coach_id, start_at) guards against
-    // double-booking here as it does on the athlete's own self-book flow.
-    const { error: insertError } = await supabase.from("bookings").insert({
-      coach_id: coachId,
-      athlete_id: athleteId,
-      group_id: groupId,
-      start_at: startAt,
-      end_at: endAt,
+    // Same atomic RPC book-slot-button.tsx uses. A coach assigning a
+    // session doesn't need the client to already have a credit (they can
+    // assign a courtesy session), but still gets the real overlap guard.
+    const { error: bookError } = await supabase.rpc("book_session", {
+      p_coach_id: coachId,
+      p_athlete_id: athleteId,
+      p_group_id: groupId,
+      p_start_at: startAt,
+      p_end_at: endAt,
     });
 
-    if (insertError) {
-      setError("That slot was just taken. Try another.");
+    if (bookError) {
+      setError(
+        bookError.message.includes("just taken")
+          ? "That slot was just taken. Try another."
+          : "Couldn't assign that slot."
+      );
       setSubmitting(false);
       router.refresh();
       return;
     }
-
-    // Atomic DB-side decrement — see book-slot-button.tsx for why this
-    // isn't a read-then-write anymore.
-    await supabase.rpc("adjust_session_credits", {
-      p_athlete_id: athleteId,
-      p_group_id: groupId,
-      p_delta: -1,
-    });
 
     router.refresh();
   }
