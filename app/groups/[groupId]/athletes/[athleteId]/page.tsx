@@ -4,6 +4,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { AthleteNotesEditor } from "@/components/coach/athlete-notes-editor";
 import { SessionCreditsControl } from "@/components/coach/session-credits-control";
+import { PrivateFromOrgToggle } from "@/components/coach/private-from-org-toggle";
 import { CoachLoggedBadge } from "@/components/coach-logged-badge";
 import { NutritionTools } from "@/components/coach/desktop/nutrition-tools";
 import { isHabitDueOn } from "@/lib/habits";
@@ -43,7 +44,7 @@ export default async function AthleteProfilePage(
 
   const { data: athleteMembership } = await supabase
     .from("group_memberships")
-    .select("joined_at, client_tier, profiles ( id, full_name, avatar_url )")
+    .select("joined_at, client_tier, private_from_org, profiles ( id, full_name, avatar_url )")
     .eq("group_id", params.groupId)
     .eq("profile_id", params.athleteId)
     .maybeSingle();
@@ -366,6 +367,14 @@ export default async function AthleteProfilePage(
               athleteId={params.athleteId}
               groupId={params.groupId}
               initialBalance={creditsRow?.balance ?? 0}
+            />
+          </section>
+
+          <section>
+            <PrivateFromOrgToggle
+              athleteId={params.athleteId}
+              groupId={params.groupId}
+              initialValue={athleteMembership.private_from_org ?? false}
             />
           </section>
 
