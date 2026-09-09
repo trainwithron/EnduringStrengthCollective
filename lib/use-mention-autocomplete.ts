@@ -15,6 +15,12 @@ export interface MentionCandidate {
 export function useMentionAutocomplete(groupId: string | null) {
   const [members, setMembers] = useState<MentionCandidate[]>([]);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  // Every member actually picked from the dropdown this compose session —
+  // the real fix for the old fuzzy-text-matching false positives (e.g. a
+  // shorter name that's a text-prefix of a longer one): a mention now
+  // only ever comes from a real, disambiguated selection, never re-derived
+  // by scanning the finished text for "@Name" substrings.
+  const [selectedMentions, setSelectedMentions] = useState<MentionCandidate[]>([]);
 
   useEffect(() => {
     if (!groupId) return;
@@ -48,8 +54,30 @@ export function useMentionAutocomplete(groupId: string | null) {
   function applyMention(currentValue: string, member: MentionCandidate): string {
     const at = currentValue.lastIndexOf("@");
     setMentionQuery(null);
+    setSelectedMentions((prev) => (prev.some((m) => m.id === member.id) ? prev : [...prev, member]));
     return `${currentValue.slice(0, at)}@${member.fullName} `;
   }
 
-  return { mentionQuery, setMentionQuery, mentionMatches, detectMentionQuery, applyMention };
+  // Call with the final body right before submitting. A selected mention
+  // whose "@Name" text was since edited/deleted out of the body is
+  // dropped — this is only a safety net for that edit case, not a second
+  // round of fuzzy matching: every id here already came from a real
+  // dropdown selection, this just confirms it's still actually present.
+  function getConfirmedMentionIds(finalBody: string): string[] {
+    return selectedMentions.filter((m) => finalBody.includes(m.fullName)).map((m) => m.id);
+  }
+
+  function resetMentions() {
+    setSelectedMentions([]);
+  }
+
+  return {
+    mentionQuery,
+    setMentionQuery,
+    mentionMatches,
+    detectMentionQuery,
+    applyMention,
+    getConfirmedMentionIds,
+    resetMentions,
+  };
 }

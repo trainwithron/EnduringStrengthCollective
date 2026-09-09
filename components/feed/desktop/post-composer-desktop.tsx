@@ -23,10 +23,18 @@ export function PostComposerDesktop({
   const [body, setBody] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const router = useRouter();
-  const { mentionQuery, setMentionQuery, mentionMatches, detectMentionQuery, applyMention } =
-    useMentionAutocomplete(groupId);
+  const {
+    mentionQuery,
+    setMentionQuery,
+    mentionMatches,
+    detectMentionQuery,
+    applyMention,
+    getConfirmedMentionIds,
+    resetMentions,
+  } = useMentionAutocomplete(groupId);
 
   // A post always goes into whichever channel tab is currently open — no
   // separate per-post picker. Announcements stays coach-only to post in;
@@ -38,6 +46,7 @@ export function PostComposerDesktop({
   async function handlePost() {
     if (!body.trim() && !file) return;
     setSubmitting(true);
+    setError(null);
     const supabase = createBrowserClient();
     const {
       data: { user },
@@ -56,28 +65,40 @@ export function PostComposerDesktop({
         .from("post-media")
         .upload(path, file);
 
-      if (!uploadError) {
-        const { data: signed } = await supabase.storage
-          .from("post-media")
-          .createSignedUrl(path, 60 * 60 * 24 * 365);
-        mediaUrl = signed?.signedUrl ?? null;
-        mediaType = file.type.startsWith("video") ? "video" : "image";
+      if (uploadError) {
+        setError("Couldn't upload that file — try again.");
+        setSubmitting(false);
+        return;
       }
+
+      const { data: signed } = await supabase.storage
+        .from("post-media")
+        .createSignedUrl(path, 60 * 60 * 24 * 365);
+      mediaUrl = signed?.signedUrl ?? null;
+      mediaType = file.type.startsWith("video") ? "video" : "image";
     }
 
-    await supabase.from("posts").insert({
+    const trimmedBody = body.trim() || null;
+    const { error: insertError } = await supabase.from("posts").insert({
       group_id: groupId,
       author_id: user.id,
       post_type: "user_post",
       channel,
-      body: body.trim() || null,
+      body: trimmedBody,
       media_url: mediaUrl,
       media_type: mediaType,
+      mentioned_profile_ids: trimmedBody ? getConfirmedMentionIds(trimmedBody) : [],
     });
+
+    setSubmitting(false);
+    if (insertError) {
+      setError("Couldn't post — try again.");
+      return;
+    }
 
     setBody("");
     setFile(null);
-    setSubmitting(false);
+    resetMentions();
     router.refresh();
   }
 
@@ -108,6 +129,12 @@ export function PostComposerDesktop({
             </button>
           ))}
         </div>
+      )}
+
+      {error && (
+        <p className="font-body text-xs text-rust mt-2" role="alert">
+          {error}
+        </p>
       )}
 
       <div className="flex items-center justify-between mt-3">

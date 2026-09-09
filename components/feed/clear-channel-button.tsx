@@ -33,18 +33,45 @@ export function ClearChannelButton({ groupId, channel }: { groupId: string; chan
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
-      const { data: membership } = await supabase
-        .from("organization_memberships")
+
+      // A real per-group coach can already clear via the RLS grant below
+      // regardless of org role.
+      const { data: coachMembership } = await supabase
+        .from("group_memberships")
         .select("role")
+        .eq("group_id", groupId)
         .eq("profile_id", user.id)
         .maybeSingle();
-      if (!cancelled) setCanClear(membership?.role === "owner" || membership?.role === "admin");
+      if (coachMembership?.role === "coach") {
+        if (!cancelled) setCanClear(true);
+        return;
+      }
+
+      // Owner/admin of the specific organization that owns *this* group —
+      // not "owner/admin of any organization," which would have shown the
+      // button to someone with no real authority over this group at all.
+      const { data: group } = await supabase
+        .from("groups")
+        .select("organization_id")
+        .eq("id", groupId)
+        .maybeSingle();
+      if (!group?.organization_id) return;
+
+      const { data: orgMembership } = await supabase
+        .from("organization_memberships")
+        .select("role")
+        .eq("organization_id", group.organization_id)
+        .eq("profile_id", user.id)
+        .maybeSingle();
+      if (!cancelled) {
+        setCanClear(orgMembership?.role === "owner" || orgMembership?.role === "admin");
+      }
     }
     run();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [groupId]);
 
   async function handleClear() {
     setClearing(true);

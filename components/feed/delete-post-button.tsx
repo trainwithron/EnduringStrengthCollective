@@ -12,12 +12,19 @@ export function DeletePostButton({ postId }: { postId: string }) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleDelete() {
     setDeleting(true);
+    setError(null);
     const supabase = createBrowserClient();
-    await supabase.from("posts").delete().eq("id", postId);
+    const { error: deleteError } = await supabase.from("posts").delete().eq("id", postId);
     setDeleting(false);
+    if (deleteError) {
+      setError("Couldn't delete — try again.");
+      return;
+    }
+    setConfirming(false);
     router.refresh();
   }
 
@@ -40,6 +47,11 @@ export function DeletePostButton({ postId }: { postId: string }) {
         >
           Cancel
         </button>
+        {error && (
+          <span className="font-body text-xs text-rust" role="alert">
+            {error}
+          </span>
+        )}
       </span>
     );
   }

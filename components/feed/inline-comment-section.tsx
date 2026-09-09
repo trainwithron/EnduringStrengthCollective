@@ -39,6 +39,10 @@ export function InlineCommentSection({
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [members, setMembers] = useState<MentionCandidate[]>([]);
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  // Members actually picked from the autocomplete dropdown this compose
+  // session — see lib/use-mention-autocomplete.ts's comment for why this
+  // replaces re-deriving "who was mentioned" from fuzzy text matching.
+  const [selectedMentions, setSelectedMentions] = useState<MentionCandidate[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -134,6 +138,7 @@ export function InlineCommentSection({
     const newBody = `${body.slice(0, at)}@${member.fullName} `;
     setBody(newBody);
     setMentionQuery(null);
+    setSelectedMentions((prev) => (prev.some((m) => m.id === member.id) ? prev : [...prev, member]));
     inputRef.current?.focus();
   }
 
@@ -158,12 +163,17 @@ export function InlineCommentSection({
 
       if (!post) return;
 
+      const confirmedMentionIds = selectedMentions
+        .filter((m) => trimmedBody.includes(m.fullName))
+        .map((m) => m.id);
+
       const { error: insertError } = await supabase.from("comments").insert({
         post_id: postId,
         group_id: post.group_id,
         author_id: user.id,
         parent_comment_id: replyTo,
         body: trimmedBody,
+        mentioned_profile_ids: confirmedMentionIds,
       });
 
       if (insertError) {
@@ -173,6 +183,7 @@ export function InlineCommentSection({
 
       setBody("");
       setReplyTo(null);
+      setSelectedMentions([]);
     } finally {
       setSending(false);
     }
