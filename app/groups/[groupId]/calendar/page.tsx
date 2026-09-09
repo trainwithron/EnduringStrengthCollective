@@ -10,6 +10,7 @@ import { CancelBookingButton } from "@/components/athlete/cancel-booking-button"
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { computeScheduledDates } from "@/lib/program-schedule";
 import { ScheduleClientPicker } from "@/components/coach/schedule-client-picker";
+import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
@@ -691,6 +692,13 @@ export default async function CoachCalendarPage(
     return daysSince >= 7;
   });
 
+  const { data: coachProfile } = await supabase
+    .from("profiles")
+    .select("timezone")
+    .eq("id", user.id)
+    .maybeSingle();
+  const timezone = coachProfile?.timezone ?? DEFAULT_COACH_TIMEZONE;
+
   const { data: windowRows } = await supabase
     .from("coach_availability_windows")
     .select("id, weekday, start_time, end_time, slot_duration_minutes")
@@ -813,6 +821,7 @@ export default async function CoachCalendarPage(
                 workoutsByDateKey={workoutsByDateKey}
                 blockedRanges={blockedRanges}
                 availabilityWindows={availabilityWindows}
+                timezone={timezone}
                 cellMinHeightPx={80}
                 showAllBookings={false}
               />
@@ -842,6 +851,7 @@ export default async function CoachCalendarPage(
                 workoutsByDateKey={workoutsByDateKey}
                 blockedRanges={blockedRanges}
                 availabilityWindows={availabilityWindows}
+                timezone={timezone}
                 cellMinHeightPx={300}
                 showAllBookings
               />

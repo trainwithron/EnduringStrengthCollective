@@ -1,4 +1,5 @@
 import { resolveBlockedRangesForDate, type BlockedRange } from "@/lib/booking-slots";
+import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 
 // Fetches a coach's saved exceptions (one-off blocks + recurring blocks)
 // and resolves them into concrete blocked ranges for one specific date —
@@ -7,7 +8,8 @@ import { resolveBlockedRangesForDate, type BlockedRange } from "@/lib/booking-sl
 export async function getBlockedRangesForDate(
   supabase: any,
   coachId: string,
-  date: Date
+  date: Date,
+  timezone: string = DEFAULT_COACH_TIMEZONE
 ): Promise<BlockedRange[]> {
   const { data } = await supabase
     .from("coach_availability_exceptions")
@@ -23,6 +25,7 @@ export async function getBlockedRangesForDate(
       weekday: e.weekday,
       startTime: e.start_time,
       endTime: e.end_time,
-    }))
+    })),
+    timezone
   );
 }

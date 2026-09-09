@@ -22,6 +22,18 @@ function parseReps(text: string | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+// A rep target that isn't a plain integer — "8-12", "AMRAP", "5+" — can't
+// be meaningfully run through the numeric progression math (parseReps
+// used to silently truncate "8-12" down to 8, discarding the range). For
+// anything that doesn't round-trip as a plain integer, the target_reps
+// text is carried forward unchanged onto every generated week instead of
+// being computed — the same "leave it alone" behavior already used when
+// no reps are set at all, just applied to non-numeric text too.
+function isPlainInteger(text: string | null): boolean {
+  if (!text) return false;
+  return /^-?\d+$/.test(text.trim()) && Number.isFinite(parseInt(text, 10));
+}
+
 export function DuplicateWeekPanel({
   programId,
   groupId,
@@ -89,6 +101,11 @@ export function DuplicateWeekPanel({
       // coach can chain another duplication off these new weeks later.
       repRange: { min: number | null; max: number | null };
       results: ProgressionResultWeek[];
+      // Set when the source reps text wasn't a plain integer (a range
+      // like "8-12", "AMRAP", "5+") and wasn't overridden by a class rep
+      // cycle — the write step uses this raw text instead of the model's
+      // (meaningless, truncated) numeric result for every generated week.
+      preserveRepsText: string | null;
     }
 
     const sortedDays = sourceDays.slice().sort((a, b) => a.dayIndex - b.dayIndex);
@@ -134,6 +151,7 @@ export function DuplicateWeekPanel({
           // set week-by-week rep targets per A/B/C class independent of
           // whether weight is climbing linearly, via double progression,
           // or an undulating wave.
+          let repsOverriddenByClass = false;
           if (classRepsEnabled && item.tier) {
             const cycleText = classRepCycles[item.tier];
             const cycle = cycleText
@@ -142,6 +160,7 @@ export function DuplicateWeekPanel({
               .filter((n) => Number.isFinite(n));
             if (cycle.length > 0) {
               results = results.map((r, i) => ({ ...r, reps: cycle[i % cycle.length] }));
+              repsOverriddenByClass = true;
             }
           }
 
@@ -165,6 +184,10 @@ export function DuplicateWeekPanel({
             },
             repRange: { min: set.repMin, max: set.repMax },
             results,
+            preserveRepsText:
+              !repsOverriddenByClass && set.targetReps && !isPlainInteger(set.targetReps)
+                ? set.targetReps
+                : null,
           });
         }
       }
@@ -257,7 +280,8 @@ export function DuplicateWeekPanel({
               return {
                 group_workout_exercise_id: exerciseRow.id,
                 set_order: track.setOrder,
-                target_reps: result.reps != null ? String(result.reps) : null,
+                target_reps:
+                  track.preserveRepsText ?? (result.reps != null ? String(result.reps) : null),
                 target_weight: result.weight,
                 target_rpe: track.otherTargets.rpe,
                 target_rir: track.otherTargets.rir,

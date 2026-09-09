@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { generateSlotsForDate, formatSlotTime } from "@/lib/booking-slots";
 import { getBlockedRangesForDate } from "@/lib/availability-exceptions";
+import { zonedTimeToUtc, DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { BookSlotButton } from "@/components/athlete/book-slot-button";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { RescheduleSlotButton } from "@/components/athlete/reschedule-slot-button";
@@ -66,8 +67,6 @@ export default async function DayDetailPage(
     .maybeSingle();
 
   const date = new Date(`${params.date}T00:00:00`);
-  const dayEnd = new Date(date);
-  dayEnd.setDate(dayEnd.getDate() + 1);
 
   // Everything actually assigned to this athlete for this specific date —
   // an explicit workout override always wins over the program's computed
@@ -170,6 +169,13 @@ export default async function DayDetailPage(
   let creditBalance = 0;
 
   if (coachMembership) {
+    const { data: coachProfile } = await supabase
+      .from("profiles")
+      .select("timezone")
+      .eq("id", coachMembership.profile_id)
+      .maybeSingle();
+    const timezone = coachProfile?.timezone ?? DEFAULT_COACH_TIMEZONE;
+
     const { data: windowRows } = await supabase
       .from("coach_availability_windows")
       .select("weekday, start_time, end_time, slot_duration_minutes")
@@ -182,16 +188,27 @@ export default async function DayDetailPage(
       slotDurationMinutes: w.slot_duration_minutes,
     }));
 
-    const blockedRanges = await getBlockedRangesForDate(supabase, coachMembership.profile_id, date);
-    slots = generateSlotsForDate(date, windows, blockedRanges);
+    const blockedRanges = await getBlockedRangesForDate(
+      supabase,
+      coachMembership.profile_id,
+      date,
+      timezone
+    );
+    slots = generateSlotsForDate(date, windows, blockedRanges, timezone);
+
+    // Bounded in the coach's own zone, not naive UTC midnight — a late-
+    // evening booking in a zone well behind UTC can otherwise fall on the
+    // "wrong" UTC calendar day and get missed by this filter.
+    const zonedDayStart = zonedTimeToUtc(params.date, "00:00", timezone);
+    const zonedDayEnd = new Date(zonedDayStart.getTime() + 24 * 60 * 60 * 1000);
 
     const { data: bookingRows } = await supabase
       .from("bookings")
       .select("id, start_at, athlete_id, profiles!bookings_athlete_id_fkey ( full_name )")
       .eq("coach_id", coachMembership.profile_id)
       .eq("status", "confirmed")
-      .gte("start_at", date.toISOString())
-      .lt("start_at", dayEnd.toISOString());
+      .gte("start_at", zonedDayStart.toISOString())
+      .lt("start_at", zonedDayEnd.toISOString());
 
     bookingsForDay = bookingRows ?? [];
 

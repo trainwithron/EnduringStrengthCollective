@@ -4,6 +4,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { generateSlotsForDate, formatSlotTime } from "@/lib/booking-slots";
 import { getBlockedRangesForDate } from "@/lib/availability-exceptions";
+import { zonedTimeToUtc, DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { AssignSlotButton } from "@/components/coach/desktop/assign-slot-button";
 import { BookSlotButton } from "@/components/athlete/book-slot-button";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
@@ -66,14 +67,19 @@ export default async function CoachDayDetailPage(
       .maybeSingle();
 
     const date = new Date(`${params.date}T00:00:00`);
-    const dayEnd = new Date(date);
-    dayEnd.setDate(dayEnd.getDate() + 1);
 
     let slots: { start: Date; durationMinutes: number }[] = [];
     let bookingsForDay: any[] = [];
     let creditBalance = 0;
 
     if (coachMembership) {
+      const { data: coachProfile } = await supabase
+        .from("profiles")
+        .select("timezone")
+        .eq("id", coachMembership.profile_id)
+        .maybeSingle();
+      const timezone = coachProfile?.timezone ?? DEFAULT_COACH_TIMEZONE;
+
       const { data: windowRows } = await supabase
         .from("coach_availability_windows")
         .select("weekday, start_time, end_time, slot_duration_minutes")
@@ -86,16 +92,24 @@ export default async function CoachDayDetailPage(
         slotDurationMinutes: w.slot_duration_minutes,
       }));
 
-      const blockedRanges = await getBlockedRangesForDate(supabase, coachMembership.profile_id, date);
-      slots = generateSlotsForDate(date, windows, blockedRanges);
+      const blockedRanges = await getBlockedRangesForDate(
+        supabase,
+        coachMembership.profile_id,
+        date,
+        timezone
+      );
+      slots = generateSlotsForDate(date, windows, blockedRanges, timezone);
+
+      const zonedDayStart = zonedTimeToUtc(params.date, "00:00", timezone);
+      const zonedDayEnd = new Date(zonedDayStart.getTime() + 24 * 60 * 60 * 1000);
 
       const { data: bookingRows } = await supabase
         .from("bookings")
         .select("id, start_at, athlete_id, profiles!bookings_athlete_id_fkey ( full_name )")
         .eq("coach_id", coachMembership.profile_id)
         .eq("status", "confirmed")
-        .gte("start_at", date.toISOString())
-        .lt("start_at", dayEnd.toISOString());
+        .gte("start_at", zonedDayStart.toISOString())
+        .lt("start_at", zonedDayEnd.toISOString());
 
       bookingsForDay = bookingRows ?? [];
 
@@ -243,8 +257,13 @@ export default async function CoachDayDetailPage(
     .single();
 
   const date = new Date(`${params.date}T00:00:00`);
-  const dayEnd = new Date(date);
-  dayEnd.setDate(dayEnd.getDate() + 1);
+
+  const { data: viewerProfile } = await supabase
+    .from("profiles")
+    .select("timezone")
+    .eq("id", user.id)
+    .maybeSingle();
+  const timezone = viewerProfile?.timezone ?? DEFAULT_COACH_TIMEZONE;
 
   const { data: windowRows } = await supabase
     .from("coach_availability_windows")
@@ -258,16 +277,19 @@ export default async function CoachDayDetailPage(
     slotDurationMinutes: w.slot_duration_minutes,
   }));
 
-  const blockedRanges = await getBlockedRangesForDate(supabase, user.id, date);
-  const slots = generateSlotsForDate(date, windows, blockedRanges);
+  const blockedRanges = await getBlockedRangesForDate(supabase, user.id, date, timezone);
+  const slots = generateSlotsForDate(date, windows, blockedRanges, timezone);
+
+  const zonedDayStart = zonedTimeToUtc(params.date, "00:00", timezone);
+  const zonedDayEnd = new Date(zonedDayStart.getTime() + 24 * 60 * 60 * 1000);
 
   const { data: bookingRows } = await supabase
     .from("bookings")
     .select("id, start_at, end_at, athlete_id, profiles!bookings_athlete_id_fkey ( full_name )")
     .eq("coach_id", user.id)
     .eq("status", "confirmed")
-    .gte("start_at", date.toISOString())
-    .lt("start_at", dayEnd.toISOString());
+    .gte("start_at", zonedDayStart.toISOString())
+    .lt("start_at", zonedDayEnd.toISOString());
 
   const bookingByTime = new Map(
     (bookingRows ?? []).map((b) => [new Date(b.start_at).getTime(), b as any])

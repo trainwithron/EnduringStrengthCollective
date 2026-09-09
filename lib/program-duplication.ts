@@ -84,6 +84,28 @@ export async function duplicateProgram(
     : deactivateQuery.is("athlete_id", null);
   await deactivateQuery;
 
+  // Progression rules (linear/wave/double_progression, keyed by exercise
+  // name) previously never carried over — a duplicated or per-client-
+  // assigned program silently lost whatever auto-progression the coach
+  // had configured, even though every set/rep/weight target copied fine.
+  const { data: sourceProgressions } = await supabase
+    .from("exercise_progressions")
+    .select("exercise_name, model, config")
+    .eq("program_id", sourceProgramId);
+
+  if (sourceProgressions && sourceProgressions.length > 0) {
+    await supabase.from("exercise_progressions").insert(
+      sourceProgressions.map((p) => ({
+        program_id: newProgram.id,
+        group_id: destinationGroupId,
+        exercise_name: p.exercise_name,
+        model: p.model,
+        config: p.config,
+        created_by: createdBy,
+      }))
+    );
+  }
+
   const { data: sourceWorkouts } = await supabase
     .from("workouts")
     .select(

@@ -13,6 +13,15 @@ export interface NeedsAttentionItem {
   alreadyOnCalendar: boolean; // true when auto-add mode already placed it
 }
 
+function clientFacingNotifyBody(triggerKey: NeedsAttentionItem["triggerKey"]): string {
+  switch (triggerKey) {
+    case "program_ending":
+      return "Your current program wraps up soon — check in with your coach about what's next.";
+    case "macros_missing":
+      return "Your coach hasn't set your nutrition targets for next week yet — reach out if you need them sooner.";
+  }
+}
+
 export function NeedsAttentionPanel({
   coachId,
   items,
@@ -60,7 +69,12 @@ export function NeedsAttentionPanel({
         body: JSON.stringify({
           profileId: item.athleteId,
           title: "A note from your coach",
-          body: item.title,
+          // item.title is written for the coach's own dashboard (third
+          // person, "Robyn's program ends in 3 days — assign their next
+          // one") — sending it verbatim used to go straight to the
+          // client it's describing. A client-facing message instead,
+          // keyed off the same trigger.
+          body: clientFacingNotifyBody(item.triggerKey),
         }),
       });
       const data = await res.json();

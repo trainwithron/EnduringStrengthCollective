@@ -5,6 +5,7 @@ import { AvailabilityManagerDesktop } from "@/components/coach/desktop/availabil
 import { CancellationPolicyControl } from "@/components/coach/desktop/cancellation-policy-control";
 import { AvailabilityExceptionsManager } from "@/components/coach/desktop/availability-exceptions-manager";
 import { DiscoveryCallsPanel, type DiscoveryCallRow } from "@/components/coach/desktop/discovery-calls-panel";
+import { TimezoneControl } from "@/components/coach/desktop/timezone-control";
 
 export default async function AvailabilityPage(
   props: {
@@ -43,6 +44,12 @@ export default async function AvailabilityPage(
     .select("name")
     .eq("id", params.groupId)
     .single();
+
+  const { data: coachProfile } = await supabase
+    .from("profiles")
+    .select("timezone")
+    .eq("id", user.id)
+    .maybeSingle();
 
   const { data: windowRows } = await supabase
     .from("coach_availability_windows")
@@ -112,6 +119,8 @@ export default async function AvailabilityPage(
           coach — set once here, applies everywhere.
         </p>
       </div>
+
+      <TimezoneControl initialTimezone={coachProfile?.timezone ?? null} />
 
       <CancellationPolicyControl
         coachId={user.id}

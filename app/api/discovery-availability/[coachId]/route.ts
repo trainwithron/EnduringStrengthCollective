@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { generateSlotsForDate, resolveBlockedRangesForDate } from "@/lib/booking-slots";
+import { zonedTimeToUtc, DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 
 // Public, unauthenticated endpoint powering the /book/[coachId] prospect
 // self-booking page — a stranger has no session to read
@@ -23,13 +24,15 @@ export async function GET(request: Request, props: { params: Promise<{ coachId: 
 
   const { data: coach } = await supabase
     .from("profiles")
-    .select("id, full_name")
+    .select("id, full_name, timezone")
     .eq("id", params.coachId)
     .maybeSingle();
 
   if (!coach) {
     return NextResponse.json({ error: "Coach not found" }, { status: 404 });
   }
+
+  const timezone = coach.timezone ?? DEFAULT_COACH_TIMEZONE;
 
   const { data: windowRows } = await supabase
     .from("coach_availability_windows")
@@ -59,17 +62,20 @@ export async function GET(request: Request, props: { params: Promise<{ coachId: 
       weekday: e.weekday,
       startTime: e.start_time,
       endTime: e.end_time,
-    }))
+    })),
+    timezone
   );
-  const candidateSlots = generateSlotsForDate(targetDate, windows, blockedRanges);
+  const candidateSlots = generateSlotsForDate(targetDate, windows, blockedRanges, timezone);
 
   // Subtract whatever's already taken — both real client sessions and
   // other prospects' discovery calls — same overlap rule the booking
   // RPCs themselves enforce server-side; this is just the read-side
   // mirror of it so the page doesn't offer a slot that would fail anyway.
-  const dayStart = new Date(targetDate);
-  const dayEnd = new Date(targetDate);
-  dayEnd.setDate(dayEnd.getDate() + 1);
+  // Bounded in the coach's own zone, not naive UTC midnight — a booking
+  // late in the evening in a zone well behind UTC can otherwise fall on
+  // the "wrong" UTC calendar day and get missed by this filter.
+  const dayStart = zonedTimeToUtc(date, "00:00", timezone);
+  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
 
   const [{ data: existingBookings }, { data: existingDiscoveryBookings }] = await Promise.all([
     supabase

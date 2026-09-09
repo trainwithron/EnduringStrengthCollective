@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { Plus, X } from "lucide-react";
 import type { AvailabilityWindow } from "@/lib/booking-slots";
+import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { CLIENT_DRAG_MIME, type DraggedClient } from "./draggable-client-name";
 import { ExpandedDayScheduler } from "./expanded-day-scheduler";
 
@@ -36,6 +37,7 @@ export function CalendarGrid({
   blockedRanges,
   cellMinHeightPx,
   showAllBookings,
+  timezone = DEFAULT_COACH_TIMEZONE,
 }: {
   groupId: string;
   selectedClientId?: string;
@@ -62,6 +64,10 @@ export function CalendarGrid({
   // Month cells truncate to a handful of items to stay compact; week
   // cells have room to show everything.
   showAllBookings: boolean;
+  // The coach's own IANA zone — start_time/end_time on availabilityWindows
+  // are their local wall-clock hours, and the day-scheduler this grid
+  // opens needs the same zone to compute real, correct slot instants.
+  timezone?: string;
 }) {
   const router = useRouter();
   const [addingFor, setAddingFor] = useState<string | null>(null);
@@ -277,6 +283,7 @@ export function CalendarGrid({
           events={eventsByDateKey.get(dropTarget.key) ?? []}
           availabilityWindows={availabilityWindows}
           blockedRanges={blockedRanges}
+          timezone={timezone}
           onAssigned={() => {
             setDropTarget(null);
             router.refresh();
