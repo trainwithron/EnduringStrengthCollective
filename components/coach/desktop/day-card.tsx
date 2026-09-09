@@ -17,6 +17,7 @@ import { TextNoteCard } from "../text-note-card";
 import { BulkEditDayPanel } from "./bulk-edit-day-panel";
 import { formatShortDate } from "@/lib/program-schedule";
 import { GripVertical, ChevronDown, ChevronUp } from "lucide-react";
+import { flashSaved } from "@/lib/save-toast";
 
 export function DayCard({
   day,
@@ -74,6 +75,7 @@ export function DayCard({
     }
 
     onUpdate({ title: trimmed });
+    flashSaved();
   }
 
   async function persistOrder(items: BuilderItem[]) {
@@ -85,6 +87,7 @@ export function DayCard({
           : supabase.from("workout_notes").update({ position: i }).eq("id", item.id)
       )
     );
+    flashSaved();
   }
 
   function handleDrop(targetId: string) {
@@ -169,6 +172,7 @@ export function DayCard({
       };
 
       onItemsChange([...day.items, newExercise]);
+      flashSaved();
     } finally {
       setAddItemBusy(false);
     }
@@ -199,6 +203,7 @@ export function DayCard({
 
       const newNote: BuilderNote = { kind: "note", id: newRow.id, order: nextOrder, body: "" };
       onItemsChange([...day.items, newNote]);
+      flashSaved();
     } finally {
       setAddItemBusy(false);
     }

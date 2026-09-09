@@ -9,6 +9,7 @@ import { BulkEditDayPanel } from "./bulk-edit-day-panel";
 import { TARGET_PROP, type TrackedField } from "@/lib/exercise-fields";
 import type { MovementPatternOption } from "../exercise-builder-card";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { flashSaved } from "@/lib/save-toast";
 
 export function WeekGrid({
   weekNumber,
@@ -81,6 +82,7 @@ export function WeekGrid({
     await Promise.all(
       nextDays.map((d, i) => supabase.from("workouts").update({ day_index: i + 1 }).eq("id", d.id))
     );
+    flashSaved();
   }
 
   function handleDrop(targetId: string) {
@@ -134,6 +136,7 @@ export function WeekGrid({
           items: [],
         },
       ]);
+      flashSaved();
     } finally {
       setAddDayBusy(false);
     }

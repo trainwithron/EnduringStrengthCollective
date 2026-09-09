@@ -8,6 +8,9 @@ import { WeekGrid } from "./week-grid";
 import { ProgramScheduleSettings } from "../program-schedule-settings";
 import { computeScheduledDates, type VisibilityWindow } from "@/lib/program-schedule";
 import type { MovementPatternOption } from "../exercise-builder-card";
+import { ProgramCardMenu } from "./program-card-menu";
+import { SaveToast } from "./save-toast";
+import { flashSaved } from "@/lib/save-toast";
 
 export function ProgramBuilderDesktop({
   programId,
@@ -100,6 +103,7 @@ export function ProgramBuilderDesktop({
         },
       ]);
       setExpandedWeeks((prev) => new Set(prev).add(nextWeek));
+      flashSaved();
     } finally {
       setAddWeekBusy(false);
     }
@@ -110,8 +114,12 @@ export function ProgramBuilderDesktop({
 
   return (
     <div>
+      <SaveToast />
       <div className="pb-6 border-b border-steel/20 mb-6">
-        <h1 className="font-display font-bold text-3xl uppercase leading-none">{programName}</h1>
+        <div className="flex items-start justify-between gap-3">
+          <h1 className="font-display font-bold text-3xl uppercase leading-none">{programName}</h1>
+          <ProgramCardMenu programId={programId} programName={programName} groupId={groupId} />
+        </div>
         {programDescription && (
           <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">{programDescription}</p>
         )}

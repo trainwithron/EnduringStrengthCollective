@@ -16,6 +16,7 @@ import {
   type TrackedField,
 } from "@/lib/exercise-fields";
 import { ChevronDown, ChevronUp, Copy, GripVertical, Trash2 } from "lucide-react";
+import { flashSaved } from "@/lib/save-toast";
 
 export interface MovementPatternOption {
   id: string;
@@ -126,6 +127,7 @@ export function ExerciseBuilderCard({
     const supabase = createBrowserClient();
     await supabase.from("group_workout_exercises").update({ exercise_name: trimmed }).eq("id", exercise.id);
     onUpdate({ exerciseName: trimmed });
+    flashSaved();
 
     const { data: userData } = await supabase.auth.getUser();
     if (userData.user) {
@@ -143,6 +145,7 @@ export function ExerciseBuilderCard({
     const supabase = createBrowserClient();
     await supabase.from("group_workout_exercises").update({ movement_pattern_id: patternId }).eq("id", exercise.id);
     onUpdate({ movementPatternId: patternId });
+    flashSaved();
   }
 
   function handleMediaChange(patch: { videoPath?: string | null; youtubeUrl?: string | null }) {
@@ -154,6 +157,7 @@ export function ExerciseBuilderCard({
     const value = next.trim() || null;
     await supabase.from("group_workout_exercises").update({ notes: value }).eq("id", exercise.id);
     onUpdate({ notes: value });
+    flashSaved();
   }
 
   // One shared rep range for every set on this exercise — Double
@@ -171,6 +175,7 @@ export function ExerciseBuilderCard({
       .update({ rep_min: repMin, rep_max: repMax })
       .in("id", setIds);
     onSetsChange(exercise.sets.map((s) => ({ ...s, repMin, repMax })));
+    flashSaved();
   }
 
   async function handleAddSet() {
@@ -200,6 +205,7 @@ export function ExerciseBuilderCard({
 
       if (data) {
         onSetsChange([...exercise.sets, mapSetRow(data)]);
+        flashSaved();
       }
     } finally {
       setSetsBusy(false);
@@ -214,6 +220,7 @@ export function ExerciseBuilderCard({
       const supabase = createBrowserClient();
       await supabase.from("group_workout_exercise_sets").delete().eq("id", last.id);
       onSetsChange(exercise.sets.slice(0, -1));
+      flashSaved();
     } finally {
       setSetsBusy(false);
     }
@@ -230,6 +237,7 @@ export function ExerciseBuilderCard({
     onSetsChange(
       exercise.sets.map((s) => (s.id === setId ? { ...s, [TARGET_PROP[field]]: value } : s))
     );
+    flashSaved();
   }
 
   // Filling in the first set's value for a field and moving on (Tab/Enter)
@@ -245,6 +253,7 @@ export function ExerciseBuilderCard({
       .update({ [TARGET_COLUMN[field]]: value })
       .in("id", [setId, ...otherSetIds]);
     onSetsChange(exercise.sets.map((s) => ({ ...s, [TARGET_PROP[field]]: value })));
+    flashSaved();
   }
 
   async function handleAddField(field: TrackedField) {
@@ -253,6 +262,7 @@ export function ExerciseBuilderCard({
     await supabase.from("group_workout_exercises").update({ tracked_fields: nextFields }).eq("id", exercise.id);
     onUpdate({ trackedFields: nextFields });
     setAddFieldOpen(false);
+    flashSaved();
   }
 
   async function handleRemoveField(field: TrackedField) {
@@ -268,6 +278,7 @@ export function ExerciseBuilderCard({
     }
     onUpdate({ trackedFields: nextFields });
     onSetsChange(exercise.sets.map((s) => ({ ...s, [TARGET_PROP[field]]: null })));
+    flashSaved();
   }
 
   async function handleDelete() {
