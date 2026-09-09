@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { BuilderDay, BuilderItem, BuilderExercise, BuilderNote } from "@/lib/types";
@@ -12,6 +12,7 @@ import {
   formatCondensedSets,
   type TrackedField,
 } from "@/lib/exercise-fields";
+import { parseQuickEntry } from "@/lib/quick-entry";
 import { ExerciseBuilderCard, type MovementPatternOption } from "../exercise-builder-card";
 import { TextNoteCard } from "../text-note-card";
 import { BulkEditDayPanel } from "./bulk-edit-day-panel";
@@ -58,6 +59,13 @@ export function DayCard({
   // "+ Exercise"/"+ Note" would otherwise insert two rows at the same
   // order (found and fixed for the analogous per-set bug tonight).
   const [addItemBusy, setAddItemBusy] = useState(false);
+  // Keyboard-only shorthand for building out a day fast — "Bench 3x5 @7",
+  // Enter, and it's added as a real exercise with real sets; the input
+  // stays focused so the coach can immediately type the next one without
+  // ever reaching for the mouse.
+  const [quickEntryDraft, setQuickEntryDraft] = useState("");
+  const [quickEntryError, setQuickEntryError] = useState<string | null>(null);
+  const quickEntryRef = useRef<HTMLInputElement>(null);
 
   async function persistTitle(next: string) {
     const trimmed = next.trim() || "Untitled day";
@@ -223,6 +231,76 @@ export function DayCard({
     }
   }
 
+  async function handleQuickAdd() {
+    const parsed = parseQuickEntry(quickEntryDraft);
+    if (!parsed) {
+      setQuickEntryError('Try "Exercise 3x8" or "Exercise 3x8 @7"');
+      return;
+    }
+    if (addItemBusy) return;
+    setAddItemBusy(true);
+    setQuickEntryError(null);
+    try {
+      const supabase = createBrowserClient();
+      const nextOrder = day.items.length > 0 ? Math.max(...day.items.map((i) => i.order)) + 1 : 0;
+
+      const { data: newRow, error: insertError } = await supabase
+        .from("group_workout_exercises")
+        .insert({
+          workout_id: day.id,
+          group_id: groupId,
+          exercise_name: parsed.exerciseName,
+          exercise_order: nextOrder,
+        })
+        .select("id, tracked_fields")
+        .single();
+
+      if (insertError || !newRow) {
+        flashSaveError("Couldn't add that exercise — try again.");
+        return;
+      }
+
+      const setsPayload = Array.from({ length: parsed.sets }, (_, i) => ({
+        group_workout_exercise_id: newRow.id,
+        set_order: i,
+        target_reps: parsed.reps,
+        target_rpe: parsed.rpe,
+      }));
+
+      const { data: setsData, error: setsError } = await supabase
+        .from("group_workout_exercise_sets")
+        .insert(setsPayload)
+        .select(SET_ROW_SELECT);
+
+      if (setsError) {
+        flashSaveError("Exercise added, but its sets didn't save — try adding them manually.");
+      }
+
+      const newExercise: BuilderExercise = {
+        kind: "exercise",
+        id: newRow.id,
+        order: nextOrder,
+        exerciseName: parsed.exerciseName,
+        movementPatternId: null,
+        trackedFields: newRow.tracked_fields ?? DEFAULT_TRACKED_FIELDS,
+        notes: null,
+        videoPath: null,
+        youtubeUrl: null,
+        tier: null,
+        sets: (setsData ?? []).map(mapSetRow),
+      };
+
+      onItemsChange([...day.items, newExercise]);
+      setQuickEntryDraft("");
+      if (!setsError) flashSaved();
+    } finally {
+      setAddItemBusy(false);
+      // Refocus so a coach can immediately type the next exercise — the
+      // entire point of this being keyboard-only.
+      quickEntryRef.current?.focus();
+    }
+  }
+
   async function handleDeleteDay() {
     if (
       !window.confirm(
@@ -313,6 +391,32 @@ export function DayCard({
         <p className="font-body text-xs text-rust px-4 pt-2" role="alert">
           {error}
         </p>
+      )}
+
+      {!collapsed && (
+        <div className="px-3 pt-3">
+          <input
+            ref={quickEntryRef}
+            type="text"
+            value={quickEntryDraft}
+            onChange={(e) => {
+              setQuickEntryDraft(e.target.value);
+              if (quickEntryError) setQuickEntryError(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                handleQuickAdd();
+              }
+            }}
+            disabled={addItemBusy}
+            placeholder='Quick add — "Bench 3x5 @7", Enter'
+            className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust disabled:opacity-50"
+          />
+          {quickEntryError && (
+            <p className="font-body text-[11px] text-rust mt-1">{quickEntryError}</p>
+          )}
+        </div>
       )}
 
       {!collapsed && condensed && (

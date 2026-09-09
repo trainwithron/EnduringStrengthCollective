@@ -63,14 +63,12 @@ export default async function ProgramsListPage(
 
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="programs">
-      <div className="pb-6 border-b border-steel/20 mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="font-display font-bold text-3xl uppercase leading-none">Programs</h1>
-          <p className="font-body text-sm text-steel mt-2">
-            {cards.length} {cards.length === 1 ? "program" : "programs"}
-          </p>
-        </div>
-        <div className="flex items-center gap-4 shrink-0 pt-1">
+      <div className="pb-6 border-b border-steel/20 mb-6">
+        <h1 className="font-display font-bold text-3xl uppercase leading-none">Programs</h1>
+        <p className="font-body text-sm text-steel mt-2">
+          {cards.length} {cards.length === 1 ? "program" : "programs"}
+        </p>
+        <div className="flex items-center gap-4 mt-4">
           <Link
             href={`/groups/${params.groupId}/programs/import`}
             className="font-body text-xs text-rust"
