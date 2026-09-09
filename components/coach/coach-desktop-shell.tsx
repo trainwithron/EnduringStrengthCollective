@@ -105,6 +105,27 @@ export function CoachDesktopShell({
   const [feedUnread, setFeedUnread] = useState(0);
   const [clientsUnread, setClientsUnread] = useState(0);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
+  const [teamMode, setTeamMode] = useState(false);
+
+  // Team (position groups/depth chart) is an opt-in feature for coaches
+  // running an actual team sport — most individual-training coaches never
+  // want it in their nav. Hidden until the group's own team_mode flag is
+  // turned on (from the Team page's own "Enable" button); a small
+  // "Enable Team Sports" link takes its place in the nav until then, so
+  // it's still discoverable without permanently cluttering everyone else's
+  // sidebar.
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      const supabase = createBrowserClient();
+      const { data } = await supabase.from("groups").select("team_mode").eq("id", groupId).maybeSingle();
+      if (!cancelled) setTeamMode(data?.team_mode ?? false);
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [groupId]);
 
   // Platform-admin-only "Organizations" link — visible only to the one
   // account flagged profiles.is_platform_admin, so an ordinary coach never
@@ -241,7 +262,9 @@ export function CoachDesktopShell({
       ],
     },
     { key: "clients", label: "Clients", href: `/groups/${groupId}/clients`, icon: Users, badge: clientsUnread },
-    { key: "team", label: "Team", href: `/groups/${groupId}/team`, icon: ClipboardList },
+    ...(teamMode
+      ? [{ key: "team" as const, label: "Team", href: `/groups/${groupId}/team`, icon: ClipboardList }]
+      : []),
     {
       label: "Programming",
       icon: LayoutGrid,
