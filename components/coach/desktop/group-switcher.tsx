@@ -3,18 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { ChevronDown, Plus } from "lucide-react";
+import { ChevronDown, Plus, Search, Pencil } from "lucide-react";
 
 interface OrgGroup {
   id: string;
   name: string;
+  focusTag: string | null;
 }
 
-// Lets an org owner/admin jump between every group in their organization
-// without signing out — "I'm an admin over both, I need to get in and
-// update the group programs." Ordinary coaches (no org role, or a
-// non-admin org role) never see this at all: `groups` stays null for them
-// and the header renders as it always did.
+// Lets a coach jump between every group they run without signing out —
+// either every group in their organization (if they're an owner/admin),
+// or just the groups they personally coach otherwise. Shows nothing for
+// a coach who only ever runs one group: `groups` stays null and the
+// header renders as it always did.
 export function GroupSwitcher({
   groupId,
   groupName,
@@ -31,6 +32,9 @@ export function GroupSwitcher({
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [filterQuery, setFilterQuery] = useState("");
+  const [editingTagFor, setEditingTagFor] = useState<string | null>(null);
+  const [tagDraft, setTagDraft] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -41,25 +45,64 @@ export function GroupSwitcher({
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
-      const { data: membership } = await supabase
-        .from("organization_memberships")
-        .select("organization_id, role")
-        .eq("profile_id", user.id)
-        .maybeSingle();
-      if (!membership || (membership.role !== "owner" && membership.role !== "admin")) return;
 
-      const { data: orgGroups } = await supabase
-        .from("groups")
-        .select("id, name")
-        .eq("organization_id", membership.organization_id)
-        .order("name");
-      if (!cancelled) setGroups(orgGroups ?? []);
+      const [{ data: membership }, { data: coachedRows }] = await Promise.all([
+        supabase
+          .from("organization_memberships")
+          .select("organization_id, role")
+          .eq("profile_id", user.id)
+          .maybeSingle(),
+        supabase
+          .from("group_memberships")
+          .select("groups ( id, name, focus_tag )")
+          .eq("profile_id", user.id)
+          .eq("role", "coach"),
+      ]);
+
+      const byId = new Map<string, OrgGroup>();
+      for (const row of coachedRows ?? []) {
+        const g = (row as any).groups;
+        if (g) byId.set(g.id, { id: g.id, name: g.name, focusTag: g.focus_tag ?? null });
+      }
+
+      if (membership && (membership.role === "owner" || membership.role === "admin")) {
+        const { data: orgGroups } = await supabase
+          .from("groups")
+          .select("id, name, focus_tag")
+          .eq("organization_id", membership.organization_id)
+          .order("name");
+        for (const g of orgGroups ?? []) {
+          byId.set(g.id, { id: g.id, name: g.name, focusTag: g.focus_tag ?? null });
+        }
+      }
+
+      // Only worth showing once there's actually more than one group to
+      // jump between — a coach running exactly one group sees the plain
+      // static header, unchanged from before this existed.
+      if (!cancelled && byId.size > 1) {
+        setGroups([...byId.values()].sort((a, b) => a.name.localeCompare(b.name)));
+      }
     }
     run();
     return () => {
       cancelled = true;
     };
   }, []);
+
+  async function persistTag(targetGroupId: string, tag: string) {
+    const supabase = createBrowserClient();
+    await supabase.from("groups").update({ focus_tag: tag.trim() || null }).eq("id", targetGroupId);
+    setGroups((prev) =>
+      prev ? prev.map((g) => (g.id === targetGroupId ? { ...g, focusTag: tag.trim() || null } : g)) : prev
+    );
+    setEditingTagFor(null);
+  }
+
+  const filteredGroups = (groups ?? []).filter((g) => {
+    const q = filterQuery.trim().toLowerCase();
+    if (!q) return true;
+    return g.name.toLowerCase().includes(q) || (g.focusTag ?? "").toLowerCase().includes(q);
+  });
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -195,8 +238,20 @@ export function GroupSwitcher({
         </button>
         {open && (
           <div className="absolute left-full top-0 ml-1 w-64 bg-surface border border-steel/30 z-20 shadow-lg">
+            {groups.length > 3 && (
+              <div className="p-2 border-b border-steel/20">
+                <input
+                  type="text"
+                  value={filterQuery}
+                  onChange={(e) => setFilterQuery(e.target.value)}
+                  placeholder="Filter groups…"
+                  autoFocus
+                  className="w-full h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"
+                />
+              </div>
+            )}
             <div className="max-h-64 overflow-y-auto">
-              {groups.map((g) => (
+              {filteredGroups.map((g) => (
                 <button
                   key={g.id}
                   type="button"
@@ -207,8 +262,12 @@ export function GroupSwitcher({
                   }`}
                 >
                   {g.name}
+                  {g.focusTag && <span className="text-steel"> · {g.focusTag}</span>}
                 </button>
               ))}
+              {filteredGroups.length === 0 && (
+                <p className="px-3 py-2.5 font-body text-xs text-steel">No groups match.</p>
+              )}
             </div>
           </div>
         )}
@@ -230,20 +289,75 @@ export function GroupSwitcher({
 
       {open && (
         <div className="absolute left-5 right-5 top-full mt-1 bg-surface border border-steel/30 z-20 shadow-lg">
+          {groups.length > 3 && (
+            <div className="p-2 border-b border-steel/20 flex items-center gap-2">
+              <Search className="w-3.5 h-3.5 text-steel shrink-0" />
+              <input
+                type="text"
+                value={filterQuery}
+                onChange={(e) => setFilterQuery(e.target.value)}
+                placeholder="Filter groups…"
+                autoFocus
+                className="flex-1 h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"
+              />
+            </div>
+          )}
           <div className="max-h-64 overflow-y-auto">
-            {groups.map((g) => (
-              <button
+            {filteredGroups.map((g) => (
+              <div
                 key={g.id}
-                type="button"
-                onClick={() => switchTo(g.id)}
-                disabled={switching}
-                className={`w-full text-left px-3 py-2.5 font-body text-sm disabled:opacity-50 ${
-                  g.id === groupId ? "text-rust bg-rust/10" : "text-chalk hover:bg-graphite/50"
+                className={`flex items-center gap-1 group ${
+                  g.id === groupId ? "bg-rust/10" : "hover:bg-graphite/50"
                 }`}
               >
-                {g.name}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => switchTo(g.id)}
+                  disabled={switching}
+                  className={`flex-1 min-w-0 text-left px-3 py-2.5 font-body text-sm disabled:opacity-50 ${
+                    g.id === groupId ? "text-rust" : "text-chalk"
+                  }`}
+                >
+                  {editingTagFor === g.id ? (
+                    <input
+                      type="text"
+                      autoFocus
+                      value={tagDraft}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => setTagDraft(e.target.value)}
+                      onBlur={() => persistTag(g.id, tagDraft)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                      }}
+                      placeholder="e.g. Bodybuilding"
+                      className="w-full h-6 bg-graphite border border-steel/30 text-chalk px-1.5 font-body text-xs focus:outline-none focus:border-rust"
+                    />
+                  ) : (
+                    <>
+                      {g.name}
+                      {g.focusTag && <span className="text-steel"> · {g.focusTag}</span>}
+                    </>
+                  )}
+                </button>
+                {editingTagFor !== g.id && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setTagDraft(g.focusTag ?? "");
+                      setEditingTagFor(g.id);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 shrink-0 px-2 text-steel active:text-rust"
+                    aria-label={`Tag ${g.name}`}
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
             ))}
+            {filteredGroups.length === 0 && (
+              <p className="px-3 py-2.5 font-body text-xs text-steel">No groups match.</p>
+            )}
           </div>
           <div className="border-t border-steel/20 p-2.5">
             {error && (

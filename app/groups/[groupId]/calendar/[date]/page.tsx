@@ -10,6 +10,7 @@ import { CancelBookingButton } from "@/components/athlete/cancel-booking-button"
 import { RescheduleSlotButton } from "@/components/athlete/reschedule-slot-button";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { BuyCreditsButton } from "@/components/athlete/buy-credits-button";
+import { DayHourGrid } from "@/components/coach/desktop/day-hour-grid";
 
 export default async function CoachDayDetailPage(
   props: {
@@ -262,7 +263,7 @@ export default async function CoachDayDetailPage(
 
   const { data: bookingRows } = await supabase
     .from("bookings")
-    .select("id, start_at, athlete_id, profiles!bookings_athlete_id_fkey ( full_name )")
+    .select("id, start_at, end_at, athlete_id, profiles!bookings_athlete_id_fkey ( full_name )")
     .eq("coach_id", user.id)
     .eq("status", "confirmed")
     .gte("start_at", date.toISOString())
@@ -337,6 +338,17 @@ export default async function CoachDayDetailPage(
           </p>
         )}
       </div>
+
+      <DayHourGrid
+        windows={windows.filter((w) => w.weekday === date.getDay())}
+        bookings={(bookingRows ?? []).map((b: any) => ({
+          id: b.id,
+          start: new Date(b.start_at),
+          end: new Date(b.end_at),
+          label: b.profiles?.full_name ?? "Client",
+        }))}
+        events={(dayEventRows ?? []).map((e) => ({ id: e.id, time: e.event_time, title: e.title }))}
+      />
 
       {dayEventRows && dayEventRows.length > 0 && (
         <div className="mb-6 max-w-lg">

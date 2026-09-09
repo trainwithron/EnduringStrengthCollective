@@ -135,6 +135,12 @@ function LoginForm() {
             Forgot password?
           </Link>
         </p>
+        <p className="font-body text-sm text-steel text-center mt-2">
+          New coach?{" "}
+          <Link href="/signup" className="text-rust">
+            Create your organization
+          </Link>
+        </p>
       </div>
     </main>
   );

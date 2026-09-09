@@ -564,7 +564,12 @@ export function MealPlanGenerator({
 
       <div className="grid grid-cols-2 gap-2">
         <label className="block">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">Current daily calories</span>
+          <span className="font-body text-[11px] text-steel uppercase tracking-wide">
+            Current daily calories{" "}
+            <a href="#macro-calculator" className="normal-case text-rust font-normal tracking-normal">
+              (don&apos;t know? check here)
+            </a>
+          </span>
           <input
             type="number"
             value={currentCalories}

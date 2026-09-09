@@ -8,6 +8,7 @@ import {
   computeSuggestedReminderDate,
   type AthleteProgramInfo,
   type AthleteMacroInfo,
+  type ReminderRule,
 } from "@/lib/coaching-suggestions";
 import { SuggestionSettings } from "@/components/coach/desktop/suggestion-settings";
 import { NeedsAttentionPanel, type NeedsAttentionItem } from "@/components/coach/desktop/needs-attention-panel";
@@ -210,12 +211,18 @@ export default async function CoachDashboardPage(
   // everywhere else this app computes calendar dates.
   const { data: prefsRow } = await supabase
     .from("coach_preferences")
-    .select("suggestion_mode, suggestion_lead_days")
+    .select("suggestion_mode, suggestion_lead_days, suggestion_lead_mode, suggestion_lead_weekday")
     .eq("coach_id", user.id)
     .maybeSingle();
 
   const suggestionMode = (prefsRow?.suggestion_mode ?? "list") as "list" | "auto_add";
   const suggestionLeadDays = prefsRow?.suggestion_lead_days ?? 3;
+  const suggestionLeadMode = (prefsRow?.suggestion_lead_mode ?? "days_before") as "days_before" | "weekday_before";
+  const suggestionLeadWeekday = prefsRow?.suggestion_lead_weekday ?? 5;
+  const reminderRule: ReminderRule =
+    suggestionLeadMode === "weekday_before"
+      ? { mode: "weekday_before", weekday: suggestionLeadWeekday }
+      : { mode: "days_before", days: suggestionLeadDays };
 
   const today = new Date();
 
@@ -275,7 +282,7 @@ export default async function CoachDashboardPage(
     }
   }
 
-  const rawSuggestions = computeProgramEndingSuggestions(athleteInfos, today, suggestionLeadDays);
+  const rawSuggestions = computeProgramEndingSuggestions(athleteInfos, today, reminderRule);
 
   // Macro suggestions: does each (non-group-tier) athlete have any macro
   // target set for the coming week?
@@ -346,7 +353,7 @@ export default async function CoachDashboardPage(
   const needsAttentionItems: NeedsAttentionItem[] = [];
 
   for (const s of activeSuggestions) {
-    const suggestedDate = computeSuggestedReminderDate(s.programEndDate, suggestionLeadDays, today);
+    const suggestedDate = computeSuggestedReminderDate(s.programEndDate, reminderRule, today);
     const suggestedDateKey = dateKey(suggestedDate);
 
     if (suggestionMode === "auto_add") {
@@ -431,6 +438,8 @@ export default async function CoachDashboardPage(
         coachId={user.id}
         initialMode={suggestionMode}
         initialLeadDays={suggestionLeadDays}
+        initialLeadMode={suggestionLeadMode}
+        initialLeadWeekday={suggestionLeadWeekday}
       />
 
       <NeedsAttentionPanel coachId={user.id} items={needsAttentionItems} />

@@ -42,7 +42,7 @@ export function NutritionTools({
 
   return (
     <div className="space-y-8">
-      <div>
+      <div id="macro-calculator">
         <h3 className="font-body text-xs text-steel uppercase tracking-wide mb-3">
           Macro calculator
         </h3>

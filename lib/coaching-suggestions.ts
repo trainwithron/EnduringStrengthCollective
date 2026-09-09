@@ -33,20 +33,51 @@ function daysBetween(a: Date, b: Date): number {
   return Math.round((startOfDay(b).getTime() - startOfDay(a).getTime()) / msPerDay);
 }
 
-// Active from `leadDays` before the end date through the end date itself
+// Either a coach thinks in a plain day count ("3 days before"), or in a
+// specific weekday ("the Friday before") — some coaches have a
+// designated admin day of the week and want reminders anchored to that,
+// not an arbitrary number.
+export type ReminderRule =
+  | { mode: "days_before"; days: number }
+  | { mode: "weekday_before"; weekday: number }; // 0=Sun..6=Sat
+
+// The actual calendar date a reminder rule resolves to for a given
+// deadline — the single place both suggestion-activity and the
+// auto-add-to-calendar date share, so they can never disagree.
+function resolveReminderDate(deadline: Date, rule: ReminderRule): Date {
+  if (rule.mode === "days_before") {
+    const d = new Date(deadline);
+    d.setDate(d.getDate() - rule.days);
+    return startOfDay(d);
+  }
+  // weekday_before: the most recent occurrence of `weekday` strictly
+  // before the deadline — always steps back at least 1 day, up to 7, so
+  // a deadline that itself falls on the target weekday still gets a
+  // full week's notice rather than firing same-day.
+  const d = startOfDay(deadline);
+  do {
+    d.setDate(d.getDate() - 1);
+  } while (d.getDay() !== rule.weekday);
+  return d;
+}
+
+// Active from the resolved reminder date through the end date itself
 // (inclusive) — once the end date has passed without action, this stops
 // suggesting it (a missed window, not a nagging one).
 export function computeProgramEndingSuggestions(
   athletes: AthleteProgramInfo[],
   today: Date,
-  leadDays: number
+  rule: ReminderRule
 ): ProgramEndingSuggestion[] {
   const suggestions: ProgramEndingSuggestion[] = [];
+  const todayStart = startOfDay(today);
 
   for (const athlete of athletes) {
     if (!athlete.programEndDate) continue;
+    const reminderDate = resolveReminderDate(athlete.programEndDate, rule);
+    const endDateStart = startOfDay(athlete.programEndDate);
+    if (todayStart < reminderDate || todayStart > endDateStart) continue;
     const daysUntilEnd = daysBetween(today, athlete.programEndDate);
-    if (daysUntilEnd < 0 || daysUntilEnd > leadDays) continue;
 
     suggestions.push({
       athleteId: athlete.athleteId,
@@ -96,17 +127,15 @@ export function computeMacrosMissingSuggestions(
     }));
 }
 
-// Where an auto-added (or one-click-added) reminder should land: lead
-// days before the end date, e.g. a Friday end with a 3-day lead lands on
-// Tuesday — matching "prompt me Tuesday/Wednesday/Thursday" for a Friday
-// deadline. Falls back to today if that date has already passed (the
-// coach acted partway through the window).
+// Where an auto-added (or one-click-added) reminder should land, per the
+// coach's own rule (a plain day count, or a specific weekday). Falls back
+// to today if that date has already passed (the coach acted partway
+// through the window).
 export function computeSuggestedReminderDate(
   programEndDate: Date,
-  leadDays: number,
+  rule: ReminderRule,
   today: Date
 ): Date {
-  const target = new Date(programEndDate);
-  target.setDate(target.getDate() - leadDays);
-  return startOfDay(target) < startOfDay(today) ? startOfDay(today) : startOfDay(target);
+  const target = resolveReminderDate(programEndDate, rule);
+  return target < startOfDay(today) ? startOfDay(today) : target;
 }
