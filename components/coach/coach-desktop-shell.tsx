@@ -24,6 +24,7 @@ import {
   Menu,
   X,
   Building2,
+  ShoppingBag,
 } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
@@ -65,7 +66,8 @@ type Active =
   | "challenges"
   | "leaderboard"
   | "team"
-  | "revenue-splits";
+  | "revenue-splits"
+  | "pro-shop";
 
 interface NavLeaf {
   key: Active;
@@ -259,6 +261,7 @@ export function CoachDesktopShell({
     { key: "leaderboard", label: "Leaderboard", href: `/groups/${groupId}/leaderboard`, icon: Trophy },
     { key: "challenges", label: "Challenges", href: `/groups/${groupId}/challenges`, icon: Flag },
     { key: "referrals", label: "Referrals", href: `/groups/${groupId}/referrals`, icon: HeartHandshake },
+    { key: "pro-shop", label: "Pro Shop", href: `/groups/${groupId}/pro-shop`, icon: ShoppingBag },
   ];
 
   const groupHasActiveChild = (group: NavGroup) => group.items.some((i) => i.key === active);

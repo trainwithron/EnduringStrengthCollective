@@ -117,6 +117,12 @@ export default async function BusinessDashboardPage(
     .eq("coach_id", user.id);
   const totalReferralClicks = (referralRows ?? []).reduce((sum, r) => sum + (r.click_count ?? 0), 0);
 
+  const { data: proShopRows } = await supabase
+    .from("pro_shop_links")
+    .select("click_count")
+    .eq("coach_id", user.id);
+  const totalProShopClicks = (proShopRows ?? []).reduce((sum, r) => sum + (r.click_count ?? 0), 0);
+
   const estimatedMRR = computeEstimatedMRR(clients.map((c) => ({ monthlyRate: c.monthlyRate })));
   const engagement = computeEngagement(
     [...uniqueAthleteIds].map((id) => ({ lastActiveDateKey: lastActiveByAthlete.get(id) ?? null })),
@@ -145,7 +151,7 @@ export default async function BusinessDashboardPage(
         </p>
       </div>
 
-      <div className="grid grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-6 gap-4 mb-8">
         <div className="border border-steel/20 p-4">
           <p className="font-display text-3xl leading-none">{uniqueAthleteIds.size}</p>
           <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Active clients</p>
@@ -173,6 +179,10 @@ export default async function BusinessDashboardPage(
         <div className="border border-steel/20 p-4">
           <p className="font-display text-3xl leading-none">{totalReferralClicks}</p>
           <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Referral clicks</p>
+        </div>
+        <div className="border border-steel/20 p-4">
+          <p className="font-display text-3xl leading-none">{totalProShopClicks}</p>
+          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Pro Shop clicks</p>
         </div>
       </div>
 
