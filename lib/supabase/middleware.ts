@@ -49,6 +49,7 @@ export async function updateSession(request: NextRequest) {
     // session cookie yet, same gotcha already hit once for /pr/ and
     // /share/.
     pathname.startsWith("/set-password") ||
+    pathname.startsWith("/confirm-email") ||
     pathname.startsWith("/forgot-password");
 
   if (!user && !isPublicPath) {

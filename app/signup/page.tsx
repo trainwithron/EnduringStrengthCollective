@@ -2,17 +2,15 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { createBrowserClient } from "@/lib/supabase/client";
 
 export default function SignupPage() {
-  const router = useRouter();
   const [fullName, setFullName] = useState("");
   const [orgName, setOrgName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -28,24 +26,28 @@ export default function SignupPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Couldn't create your account.");
 
-      // Same credentials the person just typed into this form — signing
-      // them in immediately after their own signup, same as any normal
-      // "create account" flow anywhere else.
-      const supabase = createBrowserClient();
-      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-      if (signInError) {
-        // Account exists either way — send them to sign in by hand rather
-        // than get stuck on an error here.
-        router.push("/login");
-        return;
-      }
-
-      router.push(`/groups/${data.groupId}/branding`);
-      router.refresh();
+      // The account needs a confirmed email before it can sign in, so
+      // there's nothing to redirect into yet — the confirmation link
+      // (sent to the address just entered) is what gets them signed in.
+      setSubmittedEmail(email);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't create your account.");
       setSubmitting(false);
     }
+  }
+
+  if (submittedEmail) {
+    return (
+      <main className="min-h-screen flex items-center justify-center px-6 text-center">
+        <div className="max-w-sm">
+          <h1 className="font-display uppercase text-2xl font-bold">Check your email</h1>
+          <p className="font-body text-steel text-sm mt-3">
+            We sent a confirmation link to <span className="text-chalk">{submittedEmail}</span>. Click it
+            to activate your account and sign in — your organization is already set up and waiting.
+          </p>
+        </div>
+      </main>
+    );
   }
 
   return (
