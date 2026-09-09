@@ -22,7 +22,9 @@ export function CommentPreview({
       }`}
     >
       <MessageCircle className="w-4 h-4" />
-      <span className="font-body text-sm tabular-nums">{commentCount}</span>
+      <span className="font-body text-sm">
+        {commentCount === 0 ? "Comment" : `${commentCount} ${commentCount === 1 ? "Comment" : "Comments"}`}
+      </span>
     </button>
   );
 }
