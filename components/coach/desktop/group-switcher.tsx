@@ -11,11 +11,12 @@ interface OrgGroup {
   focusTag: string | null;
 }
 
-// Lets a coach jump between every group they run without signing out —
-// either every group in their organization (if they're an owner/admin),
-// or just the groups they personally coach otherwise. Shows nothing for
-// a coach who only ever runs one group: `groups` stays null and the
-// header renders as it always did.
+// Clicking the current group's name always opens a dropdown — every
+// group this coach runs (or, if they're an org owner/admin, every group
+// in the org), a way to switch into any of them, rename the current one,
+// tag any of them, and create a new one. One UI regardless of how many
+// groups exist today, so creating your *first* additional group was
+// never gated behind already having a second one.
 export function GroupSwitcher({
   groupId,
   groupName,
@@ -27,7 +28,7 @@ export function GroupSwitcher({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [groups, setGroups] = useState<OrgGroup[] | null>(null);
+  const [groups, setGroups] = useState<OrgGroup[]>([{ id: groupId, name: groupName, focusTag: null }]);
   const [switching, setSwitching] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -78,10 +79,7 @@ export function GroupSwitcher({
         }
       }
 
-      // Only worth showing once there's actually more than one group to
-      // jump between — a coach running exactly one group sees the plain
-      // static header, unchanged from before this existed.
-      if (!cancelled && byId.size > 1) {
+      if (!cancelled && byId.size > 0) {
         setGroups([...byId.values()].sort((a, b) => a.name.localeCompare(b.name)));
       }
     }
@@ -100,20 +98,18 @@ export function GroupSwitcher({
     }
     const supabase = createBrowserClient();
     await supabase.from("groups").update({ name: trimmed }).eq("id", groupId);
-    setGroups((prev) => (prev ? prev.map((g) => (g.id === groupId ? { ...g, name: trimmed } : g)) : prev));
+    setGroups((prev) => prev.map((g) => (g.id === groupId ? { ...g, name: trimmed } : g)));
     router.refresh();
   }
 
   async function persistTag(targetGroupId: string, tag: string) {
     const supabase = createBrowserClient();
     await supabase.from("groups").update({ focus_tag: tag.trim() || null }).eq("id", targetGroupId);
-    setGroups((prev) =>
-      prev ? prev.map((g) => (g.id === targetGroupId ? { ...g, focusTag: tag.trim() || null } : g)) : prev
-    );
+    setGroups((prev) => prev.map((g) => (g.id === targetGroupId ? { ...g, focusTag: tag.trim() || null } : g)));
     setEditingTagFor(null);
   }
 
-  const filteredGroups = (groups ?? []).filter((g) => {
+  const filteredGroups = groups.filter((g) => {
     const q = filterQuery.trim().toLowerCase();
     if (!q) return true;
     return g.name.toLowerCase().includes(q) || (g.focusTag ?? "").toLowerCase().includes(q);
@@ -189,6 +185,7 @@ export function GroupSwitcher({
       .maybeSingle();
     if (!membership) {
       setCreating(false);
+      setError("Couldn't find your organization — try again.");
       return;
     }
 
@@ -221,55 +218,6 @@ export function GroupSwitcher({
     .slice(0, 2)
     .join("")
     .toUpperCase();
-
-  // Not an org owner/admin (or still resolving) — the plain static header,
-  // unchanged from before this feature existed.
-  if (!groups) {
-    if (collapsed) {
-      return (
-        <div className="h-16 flex items-center justify-center border-b border-steel/20" title={groupName}>
-          <span className="font-display font-bold text-sm">{initials}</span>
-        </div>
-      );
-    }
-    return (
-      <div className="px-5 pt-6 pb-5 border-b border-steel/20 group">
-        <p className="font-body text-[11px] text-steel uppercase tracking-wide">Coaching</p>
-        {editingName ? (
-          <input
-            type="text"
-            autoFocus
-            value={nameDraft}
-            onChange={(e) => setNameDraft(e.target.value)}
-            onBlur={() => persistName(nameDraft)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-              if (e.key === "Escape") {
-                setNameDraft(groupName);
-                setEditingName(false);
-              }
-            }}
-            className="w-full h-8 mt-1 bg-graphite border border-steel/30 text-chalk px-2 font-display font-bold text-lg uppercase focus:outline-none focus:border-rust"
-          />
-        ) : (
-          <div className="flex items-center gap-1.5 mt-1">
-            <h1 className="font-display font-bold text-lg uppercase leading-tight">{groupName}</h1>
-            <button
-              type="button"
-              onClick={() => {
-                setNameDraft(groupName);
-                setEditingName(true);
-              }}
-              className="opacity-0 group-hover:opacity-100 text-steel active:text-rust shrink-0"
-              aria-label="Rename group"
-            >
-              <Pencil className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  }
 
   if (collapsed) {
     return (
@@ -314,6 +262,35 @@ export function GroupSwitcher({
               {filteredGroups.length === 0 && (
                 <p className="px-3 py-2.5 font-body text-xs text-steel">No groups match.</p>
               )}
+            </div>
+            <div className="border-t border-steel/20 p-2.5">
+              {error && (
+                <p className="font-body text-[11px] text-rust mb-1.5" role="alert">
+                  {error}
+                </p>
+              )}
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleCreateGroup();
+                  }}
+                  placeholder="New group name"
+                  disabled={creating}
+                  className="flex-1 h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust disabled:opacity-60"
+                />
+                <button
+                  type="button"
+                  onClick={handleCreateGroup}
+                  disabled={creating || !newName.trim()}
+                  className="h-8 px-2 bg-rust text-graphite flex items-center justify-center disabled:opacity-40"
+                  aria-label="Create group"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
         )}
