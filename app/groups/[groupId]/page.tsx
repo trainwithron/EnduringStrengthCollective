@@ -11,6 +11,7 @@ import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { getViewerOrgTheme } from "@/lib/org-theme-server";
 import { computeScheduledDates, isLocked } from "@/lib/program-schedule";
 import { getWeekRange, isWithinRange } from "@/lib/week-range";
+import { resolveDayMacroTarget } from "@/lib/todays-macros";
 import type { RosterMember } from "@/lib/types";
 
 const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -131,7 +132,7 @@ export default async function GroupHubPage(
     // weightLogs, macros, and this athlete's habit definitions are all
     // independent of each other — only the habit *completion* lookup
     // right after needs to wait (it needs the due habits' ids first).
-    const [{ data: weightRows }, macroResult, { data: habitRows }] = await Promise.all([
+    const [{ data: weightRows }, macroResult, mealPlanResult, { data: habitRows }] = await Promise.all([
       supabase
         .from("body_weight_logs")
         .select("id, logged_date, weight")
@@ -145,6 +146,14 @@ export default async function GroupHubPage(
         ? supabase
             .from("daily_macros")
             .select("calories, protein_g, carbs_g, fat_g")
+            .eq("athlete_id", user.id)
+            .eq("log_date", todayKey)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      macrosEnabled
+        ? supabase
+            .from("meal_plans")
+            .select("meals, macros")
             .eq("athlete_id", user.id)
             .eq("log_date", todayKey)
             .maybeSingle()
@@ -163,14 +172,15 @@ export default async function GroupHubPage(
       weight: w.weight,
     }));
 
-    if (macroResult.data) {
-      todayMacros = {
-        calories: macroResult.data.calories,
-        proteinG: macroResult.data.protein_g,
-        carbsG: macroResult.data.carbs_g,
-        fatG: macroResult.data.fat_g,
-      };
-    }
+    // A day's meal plan carries its own macros, computed for the exact
+    // meals it saved — that target wins over daily_macros when both
+    // exist, so this widget's number never contradicts the actual plan.
+    // See lib/todays-macros.ts.
+    todayMacros = resolveDayMacroTarget(
+      macroResult.data ?? null,
+      (mealPlanResult.data?.macros as any) ?? null,
+      (mealPlanResult.data?.meals as any) ?? null
+    );
 
     const dueHabitDefs = (habitRows ?? []).filter((h) => isHabitDueOn(h.weekdays, new Date()));
 

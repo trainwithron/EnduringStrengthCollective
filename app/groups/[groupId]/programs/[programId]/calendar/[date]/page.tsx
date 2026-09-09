@@ -13,6 +13,7 @@ import { TodayWidget } from "@/components/athlete/today-widget";
 import { DayMealsView } from "@/components/athlete/day-meals-view";
 import { computeScheduledDates } from "@/lib/program-schedule";
 import { isHabitDueOn } from "@/lib/habits";
+import { resolveDayMacroTarget } from "@/lib/todays-macros";
 
 export default async function DayDetailPage(
   props: {
@@ -127,22 +128,20 @@ export default async function DayDetailPage(
         .eq("athlete_id", user.id)
         .eq("log_date", params.date)
         .maybeSingle();
-      if (macrosRow) {
-        dayMacros = {
-          calories: macrosRow.calories,
-          proteinG: macrosRow.protein_g,
-          carbsG: macrosRow.carbs_g,
-          fatG: macrosRow.fat_g,
-        };
-      }
 
       const { data: mealPlanRow } = await supabase
         .from("meal_plans")
-        .select("meals")
+        .select("meals, macros")
         .eq("athlete_id", user.id)
         .eq("log_date", params.date)
         .maybeSingle();
       dayMeals = (mealPlanRow?.meals as any) ?? null;
+
+      // A day's meal plan carries its own macros, computed for the exact
+      // meals shown below — that target wins over daily_macros when both
+      // exist, so the number here never contradicts what's actually
+      // assigned. See lib/todays-macros.ts.
+      dayMacros = resolveDayMacroTarget(macrosRow ?? null, mealPlanRow?.macros ?? null, dayMeals);
     }
 
     const { data: habitDefs } = await supabase
