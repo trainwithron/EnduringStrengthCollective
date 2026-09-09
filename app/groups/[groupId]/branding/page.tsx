@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { BrandingForm } from "@/components/coach/desktop/branding-form";
+import { InviteCoachForm } from "@/components/coach/desktop/invite-coach-form";
 import type { ButtonShape, DisplayFont, BodyFont } from "@/lib/theme";
 
 export default async function BrandingPage(
@@ -78,6 +79,7 @@ export default async function BrandingPage(
   }));
 
   const isOwner = orgMembership.role === "owner";
+  const isOwnerOrAdmin = orgMembership.role === "owner" || orgMembership.role === "admin";
 
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="branding">
@@ -114,6 +116,12 @@ export default async function BrandingPage(
           </div>
         </div>
       </div>
+
+      {isOwnerOrAdmin && (
+        <div className="mb-8">
+          <InviteCoachForm groupId={params.groupId} />
+        </div>
+      )}
 
       <h2 className="font-display uppercase text-lg tracking-wide mb-3 border-t border-steel/20 pt-6">
         Branding
