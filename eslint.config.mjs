@@ -20,6 +20,13 @@ const eslintConfig = [
       "out/**",
       "build/**",
       "next-env.d.ts",
+      // Agent-spawned worktrees for background tasks live under here —
+      // each is a full checkout of this repo at a point in time, not
+      // part of the actual app; linting them just double-reports (and
+      // sometimes mis-reports, since file-scoped overrides below are
+      // keyed to paths at the repo root) whatever the real source tree
+      // already covers.
+      ".claude/worktrees/**",
     ],
   },
   {

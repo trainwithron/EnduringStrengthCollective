@@ -24,6 +24,11 @@ export function DailyMacrosForm({
   const [fat, setFat] = useState(initial.fatG?.toString() ?? "");
   const [bodyWeight, setBodyWeight] = useState(latestBodyWeight?.toString() ?? "");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // Was there ever a saved row for this day, independent of what's
+  // currently typed in the form — governs whether "Clear this day" shows
+  // at all, since there's nothing to clear on a day nobody has saved yet.
+  const [hasSavedEntry, setHasSavedEntry] = useState(initial.calories != null);
   const router = useRouter();
 
   function handleBodyWeightChange(value: string) {
@@ -41,6 +46,7 @@ export function DailyMacrosForm({
 
   async function handleSave() {
     setSaving(true);
+    setError(null);
     const supabase = createBrowserClient();
     const {
       data: { user },
@@ -50,7 +56,7 @@ export function DailyMacrosForm({
       return;
     }
 
-    await supabase.from("daily_macros").upsert(
+    const { error: saveError } = await supabase.from("daily_macros").upsert(
       {
         athlete_id: athleteId,
         group_id: groupId,
@@ -64,6 +70,39 @@ export function DailyMacrosForm({
       { onConflict: "athlete_id,log_date" }
     );
     setSaving(false);
+    if (saveError) {
+      setError("Couldn't save — try again.");
+      return;
+    }
+    setHasSavedEntry(true);
+    router.refresh();
+  }
+
+  // A coach testing different calorie numbers before settling on a real
+  // target would otherwise leave whatever they last typed as a permanent,
+  // real-looking data point on this client's calorie trend graph — this
+  // is the actual undo, removing the day entirely rather than leaving a
+  // stray number behind.
+  async function handleClear() {
+    if (!window.confirm(`Clear the saved macro target for ${date}? This can't be undone.`)) return;
+    setSaving(true);
+    setError(null);
+    const supabase = createBrowserClient();
+    const { error: deleteError } = await supabase
+      .from("daily_macros")
+      .delete()
+      .eq("athlete_id", athleteId)
+      .eq("log_date", date);
+    setSaving(false);
+    if (deleteError) {
+      setError("Couldn't clear this day — try again.");
+      return;
+    }
+    setCalories("");
+    setProtein("");
+    setCarbs("");
+    setFat("");
+    setHasSavedEntry(false);
     router.refresh();
   }
 
@@ -149,14 +188,29 @@ export function DailyMacrosForm({
         </button>
       </div>
 
-      <button
-        type="button"
-        onClick={handleSave}
-        disabled={saving}
-        className="w-full h-9 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
-      >
-        Save macros
-      </button>
+      {error && <p className="font-body text-xs text-rust">{error}</p>}
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="flex-1 h-9 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
+        >
+          Save macros
+        </button>
+        {hasSavedEntry && (
+          <button
+            type="button"
+            onClick={handleClear}
+            disabled={saving}
+            title="Remove this day's saved target entirely — use this instead of leaving a test number in place"
+            className="h-9 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust disabled:opacity-40"
+          >
+            Clear this day
+          </button>
+        )}
+      </div>
     </div>
   );
 }

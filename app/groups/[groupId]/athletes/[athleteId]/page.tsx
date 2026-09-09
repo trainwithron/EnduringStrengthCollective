@@ -7,6 +7,8 @@ import { SessionCreditsControl } from "@/components/coach/session-credits-contro
 import { PrivateFromOrgToggle } from "@/components/coach/private-from-org-toggle";
 import { CoachLoggedBadge } from "@/components/coach-logged-badge";
 import { NutritionTools } from "@/components/coach/desktop/nutrition-tools";
+import { TrendChart } from "@/components/coach/desktop/trend-chart";
+import { ExerciseProgressionChart } from "@/components/coach/desktop/exercise-progression-chart";
 import { isHabitDueOn } from "@/lib/habits";
 import { computeWeeklyWeightTrend } from "@/lib/weight-trend";
 
@@ -203,6 +205,61 @@ export default async function AthleteProfilePage(
     todayKey
   );
 
+  // Every real logged set for this client, grouped into a per-exercise
+  // trend — this is what "see a graph of your progress" is actually built
+  // from: no separate schema, every set already carries its own
+  // completed_at timestamp. New exercises show up here automatically the
+  // first time they're logged, with no setup needed. Capped generously
+  // (500 rows) rather than unbounded, same caution as the workout-history
+  // list above.
+  const { data: exerciseHistoryRows } = await supabase
+    .from("set_logs")
+    .select(
+      "weight, completed_at, session_exercises!inner ( exercise_name, session_id, athlete_sessions!inner ( athlete_id, group_id ) )"
+    )
+    .eq("session_exercises.athlete_sessions.athlete_id", params.athleteId)
+    .eq("session_exercises.athlete_sessions.group_id", params.groupId)
+    .eq("status", "completed")
+    .not("weight", "is", null)
+    .order("completed_at", { ascending: true })
+    .limit(500);
+
+  const progressionByExercise = new Map<string, Map<string, number>>();
+  for (const row of (exerciseHistoryRows ?? []) as any[]) {
+    const name = row.session_exercises.exercise_name;
+    const date = (row.completed_at as string).slice(0, 10);
+    const weight = row.weight as number;
+    const byDate = progressionByExercise.get(name) ?? new Map<string, number>();
+    // Best set of the day per exercise, same "session best" convention PR
+    // detection already uses — several sets the same day collapse to one
+    // point instead of a jagged same-day zig-zag.
+    if (!byDate.has(date) || weight > byDate.get(date)!) {
+      byDate.set(date, weight);
+    }
+    progressionByExercise.set(name, byDate);
+  }
+  const progressionData: Record<string, { date: string; value: number }[]> = {};
+  for (const [name, byDate] of progressionByExercise) {
+    progressionData[name] = Array.from(byDate.entries())
+      .map(([date, value]) => ({ date, value }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  // Coach-set calorie targets over time — deliberately the target, not
+  // actual intake, since nothing in this app logs what a client really
+  // ate. Reads clean because daily_macros is one row per real calendar
+  // day (upserted, never duplicated) — clearing a day via the new "Clear
+  // this day" control removes it here too, so a coach testing numbers
+  // doesn't leave a fake point behind.
+  const { data: calorieRows } = await supabase
+    .from("daily_macros")
+    .select("log_date, calories")
+    .eq("athlete_id", params.athleteId)
+    .eq("group_id", params.groupId)
+    .not("calories", "is", null)
+    .order("log_date", { ascending: true });
+  const calorieTrend = (calorieRows ?? []).map((r) => ({ date: r.log_date, value: r.calories as number }));
+
   const { data: existingPlan } = macrosEnabled
     ? await supabase
         .from("meal_plans")
@@ -394,8 +451,15 @@ export default async function AthleteProfilePage(
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
               Body weight
             </h2>
+            <TrendChart
+              points={(weightLogs ?? [])
+                .slice()
+                .reverse()
+                .map((w) => ({ date: w.logged_date, value: w.weight }))}
+              unit=" lbs"
+            />
             {weightLogs && weightLogs.length > 0 ? (
-              <div className="divide-y divide-steel/15">
+              <div className="divide-y divide-steel/15 mt-2">
                 {weightLogs.map((w) => (
                   <div key={w.id} className="py-2 flex items-center justify-between">
                     <span className="font-body text-sm text-steel">
@@ -411,7 +475,32 @@ export default async function AthleteProfilePage(
           </section>
         </div>
 
-        <section>
+        <div>
+          <section>
+            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+              Progress
+            </h2>
+            <div className="grid grid-cols-2 gap-8 pb-6 mb-6 border-b border-steel/15">
+              <div>
+                <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
+                  Exercise
+                </p>
+                <ExerciseProgressionChart progressionData={progressionData} />
+              </div>
+              <div>
+                <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
+                  Calorie target
+                </p>
+                <TrendChart
+                  points={calorieTrend}
+                  unit=" cal"
+                  emptyLabel="No calorie targets set yet."
+                />
+              </div>
+            </div>
+          </section>
+
+          <section>
           <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
             Logged workouts
             {totalCompleted > RECENT_LOGS_LIMIT && (
@@ -447,7 +536,8 @@ export default async function AthleteProfilePage(
               ))}
             </div>
           )}
-        </section>
+          </section>
+        </div>
       </div>
 
       {macrosEnabled && (
