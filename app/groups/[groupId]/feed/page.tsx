@@ -6,6 +6,7 @@ import { NewPostComposer } from "@/components/feed/new-post-composer";
 import { PostComposerDesktop } from "@/components/feed/desktop/post-composer-desktop";
 import { ChannelTabs } from "@/components/feed/channel-tabs";
 import { FeedSettingsButton } from "@/components/feed/feed-settings-button";
+import { ClearChannelButton } from "@/components/feed/clear-channel-button";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { GroupLeaderboardTabs } from "@/components/leaderboard/group-leaderboard-tabs";
@@ -140,7 +141,10 @@ export default async function FeedPage(
         </div>
 
         <div className="max-w-[640px]">
-          <ChannelTabs basePath={`/groups/${params.groupId}/feed`} active={channel} />
+          <div className="flex items-center justify-between">
+            <ChannelTabs basePath={`/groups/${params.groupId}/feed`} active={channel} />
+            <ClearChannelButton groupId={params.groupId} channel={channel} />
+          </div>
           <div className="pt-6">
             {leaderboardCard}
             <PostComposerDesktop
@@ -175,7 +179,10 @@ export default async function FeedPage(
           <h1 className="font-display font-bold text-3xl uppercase leading-none">
             Team feed
           </h1>
-          <FeedSettingsButton initialLevel={feedBroadcastLevel} />
+          <div className="flex items-center">
+            <ClearChannelButton groupId={params.groupId} channel={channel} />
+            <FeedSettingsButton initialLevel={feedBroadcastLevel} />
+          </div>
         </div>
       </header>
 
