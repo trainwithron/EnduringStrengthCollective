@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
@@ -47,9 +48,12 @@ function timeAgo(iso: string): string {
 export default async function CoachDashboardPage(
   props: {
     params: Promise<{ groupId: string }>;
+    searchParams: Promise<{ scope?: string }>;
   }
 ) {
   const params = await props.params;
+  const searchParams = await props.searchParams;
+  const scopeAll = searchParams.scope === "all";
   const supabase = createServerClient();
   const {
     data: { user },
@@ -78,15 +82,21 @@ export default async function CoachDashboardPage(
     .eq("id", params.groupId)
     .single();
 
-  // Every group this coach moderates, not just the one currently open —
-  // the dashboard's whole point is a cross-group activity feed.
+  // Every group this coach moderates — fetched either way so the scope
+  // toggle below always knows how many groups exist, but only actually
+  // used for cross-group activity when the coach explicitly asks for it
+  // (?scope=all). Defaults to just the group currently open, matching
+  // every other page in the app — a coach running visually distinct
+  // groups (e.g. a bodybuilding group vs. a 60+ group) doesn't want one
+  // group's activity bleeding into the other's dashboard by default.
   const { data: coachedGroups } = await supabase
     .from("group_memberships")
     .select("group_id, groups ( name )")
     .eq("profile_id", user.id)
     .eq("role", "coach");
 
-  const groupIds = (coachedGroups ?? []).map((g: any) => g.group_id);
+  const allGroupIds = (coachedGroups ?? []).map((g: any) => g.group_id);
+  const groupIds = scopeAll ? allGroupIds : [params.groupId];
   const groupNameById = new Map<string, string>(
     (coachedGroups ?? []).map((g: any) => [g.group_id, g.groups?.name ?? "Group"])
   );
@@ -174,13 +184,15 @@ export default async function CoachDashboardPage(
     }
   }
 
-  // Sessions this coach has booked, across every group they coach — the
-  // closest thing to a "transaction" this app actually has (there's no
-  // real payment system; session credits are a manual coach-set counter).
+  // Sessions this coach has booked, scoped the same way as everything
+  // else on this page — the closest thing to a "transaction" this app
+  // actually has (there's no real payment system; session credits are a
+  // manual coach-set counter).
   const { data: bookings } = await supabase
     .from("bookings")
     .select("id, group_id, created_at, start_at, status, profiles!bookings_athlete_id_fkey ( full_name )")
     .eq("coach_id", user.id)
+    .in("group_id", groupIds)
     .order("created_at", { ascending: false })
     .limit(ACTIVITY_LIMIT);
 
@@ -425,13 +437,36 @@ export default async function CoachDashboardPage(
 
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="dashboard">
-      <div className="pb-6 border-b border-steel/20 mb-6">
-        <h1 className="font-display font-bold text-3xl uppercase leading-none">Dashboard</h1>
-        <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
-          Recent activity across every group you coach
-          {groupIds.length > 1 ? ` (${groupIds.length} groups)` : ""} — completed workouts, new
-          comments, and booked sessions.
-        </p>
+      <div className="pb-6 border-b border-steel/20 mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display font-bold text-3xl uppercase leading-none">Dashboard</h1>
+          <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
+            {scopeAll
+              ? `Recent activity across every group you coach (${allGroupIds.length} groups)`
+              : "Recent activity in this group"}{" "}
+            — completed workouts, new comments, and booked sessions.
+          </p>
+        </div>
+        {allGroupIds.length > 1 && (
+          <div className="flex gap-2 shrink-0">
+            <Link
+              href={`/groups/${params.groupId}/dashboard`}
+              className={`h-8 px-3 flex items-center font-body text-xs border ${
+                !scopeAll ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
+              }`}
+            >
+              This group
+            </Link>
+            <Link
+              href={`/groups/${params.groupId}/dashboard?scope=all`}
+              className={`h-8 px-3 flex items-center font-body text-xs border ${
+                scopeAll ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
+              }`}
+            >
+              All groups
+            </Link>
+          </div>
+        )}
       </div>
 
       <SuggestionSettings
