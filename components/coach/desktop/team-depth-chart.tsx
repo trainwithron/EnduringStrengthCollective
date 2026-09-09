@@ -121,7 +121,7 @@ export function TeamDepthChart({
     return (
       <div className="border border-steel/20 p-6 max-w-lg">
         <p className="font-body text-sm text-chalk">
-          Team mode adds position groups and a depth chart on top of this group's roster —
+          Team mode adds position groups and a depth chart on top of this group&apos;s roster —
           everything else (programming, logging, the feed) works exactly the same.
         </p>
         <button
@@ -164,7 +164,7 @@ export function TeamDepthChart({
           ))}
           {sortedPositions.length === 0 && (
             <p className="font-body text-sm text-steel">
-              No positions yet — add one below (e.g. "Offensive Line," "Point Guard").
+              No positions yet — add one below (e.g. &quot;Offensive Line,&quot; &quot;Point Guard&quot;).
             </p>
           )}
         </div>

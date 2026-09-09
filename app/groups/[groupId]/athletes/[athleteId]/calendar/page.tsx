@@ -4,7 +4,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { HabitManager, type ClientHabit } from "@/components/coach/desktop/habit-manager";
 import { computeScheduledDates } from "@/lib/program-schedule";
-import { isHabitDueOn, habitFrequencyLabel } from "@/lib/habits";
+import { isHabitDueOn } from "@/lib/habits";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
@@ -109,7 +109,7 @@ export default async function ClientCalendarPage(
     .eq("is_active", true)
     .maybeSingle();
 
-  let workoutByDateKey = new Map<string, { id: string; title: string }>();
+  const workoutByDateKey = new Map<string, { id: string; title: string }>();
   let loggedIds = new Set<string>();
   if (program) {
     const { data: workouts } = await supabase

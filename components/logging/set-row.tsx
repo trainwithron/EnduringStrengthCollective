@@ -81,19 +81,15 @@ export function SetRow({
 }) {
   const [weight, setWeight] = useState(set.weight?.toString() ?? "");
   const [reps, setReps] = useState(set.reps?.toString() ?? "");
-  const [saving, setSaving] = useState(false);
-
   async function persist(
     fields: Partial<Pick<SetLogEntry, "weight" | "reps" | "status">>
   ) {
-    setSaving(true);
     const supabase = createBrowserClient();
     const payload: Record<string, unknown> = { ...fields };
     if (fields.status === "completed") {
       payload.completed_at = new Date().toISOString();
     }
     await supabase.from("set_logs").update(payload).eq("id", set.id);
-    setSaving(false);
     // Send only the fields that changed — the parent merges this onto its
     // latest state via functional setState, so it's safe regardless of
     // which concurrent save (weight/reps vs. status) resolves last.

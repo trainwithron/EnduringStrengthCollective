@@ -371,8 +371,8 @@ export function ImportWizard({
       <div className="border border-steel/20 bg-surface/40 p-6">
         <p className="font-body text-sm text-steel mb-4">
           Upload a spreadsheet export (.csv or .xlsx) — columns and headers can be in any order.
-          We'll match exercises against your library automatically, add anything new, and build the
-          program. Nothing to confirm on your end unless the file itself can't be read.
+          We&apos;ll match exercises against your library automatically, add anything new, and build the
+          program. Nothing to confirm on your end unless the file itself can&apos;t be read.
         </p>
         <input
           type="file"

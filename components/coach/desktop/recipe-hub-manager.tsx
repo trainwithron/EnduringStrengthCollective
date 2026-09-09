@@ -36,10 +36,8 @@ const ROLE_LABELS: Record<IngredientRole, string> = {
 };
 
 export function RecipeHubManager({
-  groupId,
   initialRecipes,
 }: {
-  groupId: string;
   initialRecipes: RecipeRow[];
 }) {
   const [recipes, setRecipes] = useState(initialRecipes);
@@ -99,8 +97,8 @@ export function RecipeHubManager({
 
       {recipes.length === 0 ? (
         <p className="font-body text-sm text-steel py-6">
-          No custom recipes yet. Add one — it'll show up as an option in the Meal Planner
-          alongside the built-in recipes, scaled to whatever macros a client's plan needs.
+          No custom recipes yet. Add one — it&apos;ll show up as an option in the Meal Planner
+          alongside the built-in recipes, scaled to whatever macros a client&apos;s plan needs.
         </p>
       ) : (
         <div className="space-y-3">
@@ -339,8 +337,8 @@ function RecipeCard({
               </button>
             </div>
             <p className="font-body text-[11px] text-steel mb-2">
-              Use at most one "source" ingredient per macro — its amount is solved directly from
-              the target (e.g. protein target ÷ protein per 100g). Add as many "fixed" ingredients
+              Use at most one &quot;source&quot; ingredient per macro — its amount is solved directly from
+              the target (e.g. protein target ÷ protein per 100g). Add as many &quot;fixed&quot; ingredients
               as you want (herbs, a fixed drizzle, produce) — they never scale.
             </p>
 
@@ -428,7 +426,7 @@ function IngredientEditor({
       {ingredient.role === "fixed" ? (
         <label className="block mt-2">
           <span className="font-body text-[11px] text-steel">
-            Display text (e.g. "1-2 cups steamed" — leave blank to show just the label)
+            Display text (e.g. &quot;1-2 cups steamed&quot; — leave blank to show just the label)
           </span>
           <input
             type="text"

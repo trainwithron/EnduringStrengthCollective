@@ -76,12 +76,12 @@ export default async function RecipeHubPage(
         <h1 className="font-display font-bold text-3xl uppercase leading-none">Recipe Hub</h1>
         <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
           Your own recipes, built from real ingredients — each one scales automatically to hit
-          whatever protein/carb/fat target a client's meal plan calls for, right alongside the
+          whatever protein/carb/fat target a client&apos;s meal plan calls for, right alongside the
           built-in recipe database in the Meal Planner.
         </p>
       </div>
 
-      <RecipeHubManager groupId={params.groupId} initialRecipes={recipes} />
+      <RecipeHubManager initialRecipes={recipes} />
     </CoachDesktopShell>
   );
 }

@@ -117,7 +117,7 @@ export function GeminiImportGuide() {
             and close matches to your library are used automatically, anything with no match gets
             added as a new exercise, and any guessed (fuzzy) match gets flagged in the result so
             you know what to double-check. Vision extraction from an image is less reliable than a
-            real spreadsheet export, so it's worth a glance at the finished program either way.
+            real spreadsheet export, so it&apos;s worth a glance at the finished program either way.
           </p>
         </div>
       )}

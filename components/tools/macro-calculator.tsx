@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import {
-  estimateProteinFromBodyWeight,
   estimateMaintenanceCalories,
   applyGoalAdjustment,
   fillCarbsAndFat,

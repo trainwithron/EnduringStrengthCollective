@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { BuilderExercise } from "@/lib/types";
-import { TRACKED_FIELD_DEFS, TARGET_COLUMN, TARGET_PROP, fieldDef, type TrackedField } from "@/lib/exercise-fields";
+import { TARGET_COLUMN, fieldDef, type TrackedField } from "@/lib/exercise-fields";
 
 type Mode = "all" | "class";
 

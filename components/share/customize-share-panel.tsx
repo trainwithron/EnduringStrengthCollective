@@ -61,7 +61,7 @@ export function CustomizeSharePanel({
       {open && (
         <div className="mt-3 space-y-2">
           <p className="font-body text-[11px] text-steel">
-            Basic stats always show. Pick which of today's top sets show too.
+            Basic stats always show. Pick which of today&apos;s top sets show too.
           </p>
           {candidates.map((c) => {
             const isSelected = selected.has(c.name);

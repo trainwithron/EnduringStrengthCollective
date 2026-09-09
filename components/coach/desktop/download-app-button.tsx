@@ -109,7 +109,7 @@ export function DownloadAppButton({
                   On an iPhone
                 </p>
                 <p className="font-body text-sm text-chalk mt-1">
-                  Open that link in Safari, tap the Share icon, then "Add to Home Screen."
+                  Open that link in Safari, tap the Share icon, then &quot;Add to Home Screen.&quot;
                 </p>
               </div>
               <div>
@@ -117,14 +117,14 @@ export function DownloadAppButton({
                   On Android
                 </p>
                 <p className="font-body text-sm text-chalk mt-1">
-                  Open that link in Chrome, tap the menu (⋮), then "Add to Home Screen" or
-                  "Install app."
+                  Open that link in Chrome, tap the menu (⋮), then &quot;Add to Home Screen&quot; or
+                  &quot;Install app.&quot;
                 </p>
               </div>
             </div>
 
             <p className="font-body text-xs text-steel mt-5 pt-4 border-t border-steel/15">
-              Once it's installed and you sign in from the home-screen icon, you'll
+              Once it&apos;s installed and you sign in from the home-screen icon, you&apos;ll
               see the same client-style app your athletes use — for logging your own
               training. Admin tools like this one still only show up in a regular
               browser tab.

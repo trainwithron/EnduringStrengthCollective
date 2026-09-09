@@ -23,7 +23,6 @@ export function RevenueSplitEditor({
   const [shares, setShares] = useState<Record<string, string>>(
     Object.fromEntries(coaches.map((c) => [c.profileId, c.revenueSharePct.toString()]))
   );
-  const [saving, setSaving] = useState<string | null>(null);
 
   const result = computeRevenueSplit(
     totalRevenueCents,
@@ -34,27 +33,23 @@ export function RevenueSplitEditor({
   async function persistPlatformFee(value: string) {
     setPlatformFeePct(value);
     if (!isOwner) return;
-    setSaving("platform");
     const supabase = createBrowserClient();
     await supabase
       .from("organizations")
       .update({ platform_fee_pct: parseFloat(value) || 0 })
       .eq("id", organizationId);
-    setSaving(null);
     router.refresh();
   }
 
   async function persistShare(profileId: string, value: string) {
     setShares((prev) => ({ ...prev, [profileId]: value }));
     if (!isOwner) return;
-    setSaving(profileId);
     const supabase = createBrowserClient();
     await supabase
       .from("organization_memberships")
       .update({ revenue_share_pct: parseFloat(value) || 0 })
       .eq("organization_id", organizationId)
       .eq("profile_id", profileId);
-    setSaving(null);
     router.refresh();
   }
 

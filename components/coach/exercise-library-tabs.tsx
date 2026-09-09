@@ -15,8 +15,7 @@ interface PatternWithLadder {
   ladder: { key: string; exerciseName: string; tier: "A" | "B" | "C" | null }[];
 }
 
-const TABS = ["exercises", "patterns", "one-rep-max", "macro-calculator"] as const;
-type Tab = (typeof TABS)[number];
+type Tab = "exercises" | "patterns" | "one-rep-max" | "macro-calculator";
 
 export function ExerciseLibraryTabs({
   coachId,

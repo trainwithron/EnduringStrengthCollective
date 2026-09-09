@@ -328,7 +328,6 @@ export function CoachDesktopShell({
 
       const open = openGroups[entry.label] ?? true;
       const hasActive = groupHasActiveChild(entry);
-      const Icon = entry.icon;
 
       if (collapsed) {
         // No room for a submenu in the icon rail — each item in the group
