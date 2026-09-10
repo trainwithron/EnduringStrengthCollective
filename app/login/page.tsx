@@ -64,9 +64,7 @@ function LoginForm() {
     if (membership) {
       const wantsMobileHome =
         membership.role !== "coach" || isStandaloneDisplay() || isMobileUserAgent();
-      const destination = wantsMobileHome
-        ? `/groups/${membership.group_id}`
-        : `/groups/${membership.group_id}/clients`;
+      const destination = wantsMobileHome ? `/groups/${membership.group_id}` : "/dashboard";
       router.push(destination);
     } else {
       router.push("/");

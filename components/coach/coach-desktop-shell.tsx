@@ -24,6 +24,7 @@ import {
   X,
   Building2,
   Layers,
+  Home,
 } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
@@ -367,6 +368,16 @@ export function CoachDesktopShell({
 
   const sidebarContent = (
     <>
+      <Link
+        href="/dashboard"
+        title="Home"
+        className={`flex items-center gap-3 h-11 font-body text-sm text-steel active:text-chalk border-b border-steel/20 ${
+          collapsed ? "justify-center" : "px-5"
+        }`}
+      >
+        <Home className="w-4 h-4 shrink-0" strokeWidth={2.25} />
+        {!collapsed && "Home"}
+      </Link>
       <GroupSwitcher groupId={groupId} groupName={groupName} collapsed={collapsed} />
       <nav className="flex-1 py-3 overflow-y-auto">{renderNav()}</nav>
       {isPlatformAdmin && (
