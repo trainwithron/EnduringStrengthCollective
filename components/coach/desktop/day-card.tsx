@@ -13,12 +13,30 @@ import {
   type TrackedField,
 } from "@/lib/exercise-fields";
 import { parseQuickEntry } from "@/lib/quick-entry";
+import { matchExercise } from "@/lib/exercise-matching";
 import { ExerciseBuilderCard, type MovementPatternOption } from "../exercise-builder-card";
 import { TextNoteCard } from "../text-note-card";
 import { BulkEditDayPanel } from "./bulk-edit-day-panel";
 import { formatShortDate } from "@/lib/program-schedule";
 import { GripVertical, ChevronDown, ChevronUp } from "lucide-react";
 import { flashSaved, flashSaveError } from "@/lib/save-toast";
+
+// Quick-add is typed fast, so a bare "Bench" for an existing "Bench
+// Press" is common — matchExercise's fuzzy threshold is deliberately
+// conservative (avoids merging genuinely different exercises that share
+// a word, e.g. "Barbell Bench Press" vs "Barbell Overhead Press"), which
+// means a short real prefix like that doesn't cross it. This adds one
+// narrower, safe fallback specifically for quick-add: if exactly one
+// library exercise starts with what was typed, reuse it — never applied
+// when it's ambiguous between two or more candidates.
+function resolveQuickAddExerciseName(typedName: string, library: string[]): string {
+  const match = matchExercise(typedName, library.map((name) => ({ name })), []);
+  if (match.exerciseName) return match.exerciseName;
+
+  const normalizedTyped = typedName.trim().toLowerCase();
+  const prefixMatches = library.filter((name) => name.toLowerCase().startsWith(normalizedTyped));
+  return prefixMatches.length === 1 ? prefixMatches[0] : typedName;
+}
 
 export function DayCard({
   day,
@@ -244,12 +262,14 @@ export function DayCard({
       const supabase = createBrowserClient();
       const nextOrder = day.items.length > 0 ? Math.max(...day.items.map((i) => i.order)) + 1 : 0;
 
+      const resolvedExerciseName = resolveQuickAddExerciseName(parsed.exerciseName, exerciseLibrary);
+
       const { data: newRow, error: insertError } = await supabase
         .from("group_workout_exercises")
         .insert({
           workout_id: day.id,
           group_id: groupId,
-          exercise_name: parsed.exerciseName,
+          exercise_name: resolvedExerciseName,
           exercise_order: nextOrder,
         })
         .select("id, tracked_fields")
@@ -280,7 +300,7 @@ export function DayCard({
         kind: "exercise",
         id: newRow.id,
         order: nextOrder,
-        exerciseName: parsed.exerciseName,
+        exerciseName: resolvedExerciseName,
         movementPatternId: null,
         trackedFields: newRow.tracked_fields ?? DEFAULT_TRACKED_FIELDS,
         notes: null,
