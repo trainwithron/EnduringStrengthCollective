@@ -7,6 +7,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { CardSizeToggle } from "@/components/coach/desktop/card-size-toggle";
 import { readCardSize, writeCardSize, type CardSize } from "@/lib/card-size";
 import type { RosterMember, ClientTier } from "@/lib/types";
+import { MoreVertical } from "lucide-react";
 
 const TIER_LABELS: Record<NonNullable<ClientTier>, string> = {
   one_on_one: "1-on-1",
@@ -67,6 +68,11 @@ export function ClientCardGrid({
   const [rows, setRows] = useState(members);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // "Make coach" is a rare, higher-consequence action — tucked behind a
+  // small overflow menu per card instead of sitting in the front-row
+  // action bar next to Log/Remove, per direct feedback that it didn't
+  // need to be front-and-center.
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>("attention");
   const [tierFilter, setTierFilter] = useState<ClientTier | "all">("all");
   const [size, setSize] = useState<CardSize>("medium");
@@ -260,7 +266,7 @@ export function ClientCardGrid({
                   <span className="font-body text-xs text-steel whitespace-nowrap">{credits} credits</span>
                 </div>
 
-                <div className="flex items-center justify-center gap-3 w-full pt-2 mt-1 border-t border-steel/15">
+                <div className="relative flex items-center justify-center gap-3 w-full pt-2 mt-1 border-t border-steel/15">
                   <Link
                     href={`/groups/${groupId}/athletes/${member.profileId}/log`}
                     className="font-body text-xs text-rust"
@@ -269,20 +275,37 @@ export function ClientCardGrid({
                   </Link>
                   <button
                     type="button"
-                    onClick={() => handleRoleToggle(member)}
-                    disabled={busy}
-                    className="font-body text-xs text-steel active:text-rust transition-colors disabled:opacity-40"
-                  >
-                    {member.role === "coach" ? "Make athlete" : "Make coach"}
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => handleRemove(member)}
                     disabled={busy}
                     className="font-body text-xs text-steel active:text-rust transition-colors disabled:opacity-40"
                   >
                     Remove
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setOpenMenuId((id) => (id === member.profileId ? null : member.profileId))}
+                    disabled={busy}
+                    aria-label="More actions"
+                    className="text-steel active:text-rust transition-colors disabled:opacity-40"
+                  >
+                    <MoreVertical className="w-3.5 h-3.5" />
+                  </button>
+
+                  {openMenuId === member.profileId && (
+                    <div className="absolute right-0 bottom-full mb-1 bg-surface border border-steel/30 z-10 shadow-lg">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenMenuId(null);
+                          handleRoleToggle(member);
+                        }}
+                        disabled={busy}
+                        className="whitespace-nowrap px-3 py-2 font-body text-xs text-chalk hover:bg-graphite/50 disabled:opacity-40"
+                      >
+                        {member.role === "coach" ? "Make athlete" : "Make coach"}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             );
