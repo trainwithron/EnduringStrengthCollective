@@ -19,6 +19,10 @@ export default {
         chalk: "var(--chalk)",
         steel: "#8A8578",
         moss: "#6B8F71",
+        // Third accent for a 3-way category split (Upper/Lower/
+        // Conditioning) where rust and moss are already spoken for —
+        // colorblind-safety checked, see program-card-visuals.
+        blue: "#4A7A9E",
       },
       fontFamily: {
         // Same var()-reference trick as the colors above — lets the

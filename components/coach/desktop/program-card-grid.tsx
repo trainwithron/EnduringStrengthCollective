@@ -7,7 +7,9 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { ProgramActiveToggle } from "@/components/coach/program-active-toggle";
 import { CardSizeToggle } from "@/components/coach/desktop/card-size-toggle";
 import { ProgramCardMenu } from "@/components/coach/desktop/program-card-menu";
+import { ProgramCardVisual } from "@/components/coach/desktop/program-card-visual";
 import { readCardSize, writeCardSize, type CardSize } from "@/lib/card-size";
+import type { ProgramCardVisualData } from "@/lib/program-card-data";
 
 export interface ProgramCardData {
   id: string;
@@ -36,9 +38,11 @@ const STORAGE_KEY = "esc-card-size-programs";
 export function ProgramCardGrid({
   groupId,
   programs,
+  visualsByProgramId = {},
 }: {
   groupId: string;
   programs: ProgramCardData[];
+  visualsByProgramId?: Record<string, ProgramCardVisualData>;
 }) {
   const [size, setSize] = useState<CardSize>("medium");
 
@@ -76,7 +80,7 @@ export function ProgramCardGrid({
       ) : (
         <div className={`grid ${GRID_CLASS[size]} mb-6`}>
           {sharedPrograms.map((p) => (
-            <ProgramCard key={p.id} groupId={groupId} program={p} size={size} />
+            <ProgramCard key={p.id} groupId={groupId} program={p} size={size} visual={visualsByProgramId[p.id]} />
           ))}
         </div>
       )}
@@ -92,7 +96,7 @@ export function ProgramCardGrid({
       ) : (
         <div className={`grid ${GRID_CLASS[size]}`}>
           {clientPrograms.map((p) => (
-            <ProgramCard key={p.id} groupId={groupId} program={p} size={size} />
+            <ProgramCard key={p.id} groupId={groupId} program={p} size={size} visual={visualsByProgramId[p.id]} />
           ))}
         </div>
       )}
@@ -104,10 +108,12 @@ function ProgramCard({
   groupId,
   program,
   size,
+  visual,
 }: {
   groupId: string;
   program: ProgramCardData;
   size: CardSize;
+  visual?: ProgramCardVisualData;
 }) {
   const [coverPath, setCoverPath] = useState(program.coverImagePath);
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
@@ -165,6 +171,8 @@ function ProgramCard({
         {signedUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={signedUrl} alt="" className="w-full h-full object-cover" />
+        ) : visual ? (
+          <ProgramCardVisual weeklySeries={visual.weeklySeries} categorySplit={visual.categorySplit} />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-surface to-graphite">
             <LayoutGrid className="w-6 h-6 text-steel/40" strokeWidth={1.5} />

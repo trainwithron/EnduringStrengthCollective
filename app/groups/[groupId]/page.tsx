@@ -4,6 +4,7 @@ import { RosterList } from "@/components/group/roster-list";
 import { WeightLogWidget } from "@/components/athlete/weight-log-widget";
 import { TodayWidget } from "@/components/athlete/today-widget";
 import { ProgramCardList } from "@/components/athlete/program-card-list";
+import { computeProgramCardVisuals } from "@/lib/program-card-data";
 import { WeekAtAGlance, type WeekDayEntry } from "@/components/athlete/week-at-a-glance";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
@@ -145,6 +146,18 @@ export default async function GroupHubPage(
   const viewerTier = roster.find((m) => m.profileId === athleteId)?.clientTier ?? null;
   const macrosEnabled = viewerTier !== "group";
 
+  // Only worth computing for this athlete's own visible programs that
+  // have no manual cover photo — same "skip what won't render" guard as
+  // the coach's own Programs grid.
+  const coachId = roster.find((m) => m.role === "coach")?.profileId;
+  const uncoveredProgramIds = (programs ?? [])
+    .filter((p: any) => !p.cover_image_path)
+    .map((p: any) => p.id);
+  const visualsMap = coachId
+    ? await computeProgramCardVisuals(supabase, uncoveredProgramIds, coachId)
+    : new Map();
+  const visualsByProgramId = Object.fromEntries(visualsMap);
+
   if (showMobileView && athleteId) {
     // weightLogs, macros, and this athlete's habit definitions are all
     // independent of each other — only the habit *completion* lookup
@@ -262,6 +275,7 @@ export default async function GroupHubPage(
               workoutCount: p.workouts?.[0]?.count ?? 0,
               coverImagePath: p.cover_image_path ?? null,
             }))}
+            visualsByProgramId={visualsByProgramId}
           />
         ) : (
           <p className="font-body text-sm text-steel py-2">No programs assigned.</p>

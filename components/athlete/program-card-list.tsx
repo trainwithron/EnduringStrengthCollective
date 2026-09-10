@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { LayoutGrid } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { ProgramCardVisual } from "@/components/coach/desktop/program-card-visual";
+import type { ProgramCardVisualData } from "@/lib/program-card-data";
 
 export interface AthleteProgramCard {
   id: string;
@@ -15,20 +17,30 @@ export interface AthleteProgramCard {
 export function ProgramCardList({
   groupId,
   programs,
+  visualsByProgramId = {},
 }: {
   groupId: string;
   programs: AthleteProgramCard[];
+  visualsByProgramId?: Record<string, ProgramCardVisualData>;
 }) {
   return (
     <div className="grid grid-cols-2 gap-3">
       {programs.map((p) => (
-        <ProgramCard key={p.id} groupId={groupId} program={p} />
+        <ProgramCard key={p.id} groupId={groupId} program={p} visual={visualsByProgramId[p.id]} />
       ))}
     </div>
   );
 }
 
-function ProgramCard({ groupId, program }: { groupId: string; program: AthleteProgramCard }) {
+function ProgramCard({
+  groupId,
+  program,
+  visual,
+}: {
+  groupId: string;
+  program: AthleteProgramCard;
+  visual?: ProgramCardVisualData;
+}) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,6 +67,8 @@ function ProgramCard({ groupId, program }: { groupId: string; program: AthletePr
         {signedUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={signedUrl} alt="" className="w-full h-full object-cover" />
+        ) : visual ? (
+          <ProgramCardVisual weeklySeries={visual.weeklySeries} categorySplit={visual.categorySplit} />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-surface to-graphite">
             <LayoutGrid className="w-6 h-6 text-steel/40" strokeWidth={1.5} />

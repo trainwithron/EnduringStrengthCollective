@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ProgramCardGrid, type ProgramCardData } from "@/components/coach/desktop/program-card-grid";
+import { computeProgramCardVisuals } from "@/lib/program-card-data";
 
 export default async function ProgramsListPage(
   props: {
@@ -61,6 +62,13 @@ export default async function ProgramsListPage(
     athleteName: p.profiles?.full_name ?? null,
   }));
 
+  // Only worth computing for cards that'll actually show it (no manual
+  // cover photo) — a program with a real uploaded photo never needs
+  // this data at all.
+  const uncoveredProgramIds = cards.filter((c) => !c.coverImagePath).map((c) => c.id);
+  const visualsMap = await computeProgramCardVisuals(supabase, uncoveredProgramIds, user.id);
+  const visualsByProgramId = Object.fromEntries(visualsMap);
+
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="programs">
       <div className="pb-6 border-b border-steel/20 mb-6">
@@ -84,7 +92,7 @@ export default async function ProgramsListPage(
         </div>
       </div>
 
-      <ProgramCardGrid groupId={params.groupId} programs={cards} />
+      <ProgramCardGrid groupId={params.groupId} programs={cards} visualsByProgramId={visualsByProgramId} />
     </CoachDesktopShell>
   );
 }
