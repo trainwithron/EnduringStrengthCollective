@@ -81,6 +81,47 @@ export default async function CoachHomePage() {
     .filter((g) => g.group_kind === "team" || !g.group_kind)
     .sort((a, b) => a.name.localeCompare(b.name));
 
+  // "Has something new happened here" dot — same coach_view_state data
+  // and same signals (posts since feed_seen_at, workout_logs since
+  // clients_seen_at) already driving the sidebar's unread counts inside
+  // a group, just collapsed to a boolean for the Home card. A group with
+  // no coach_view_state row yet (never visited) gets no dot — nothing to
+  // compare against, matching the existing "don't flood on first look"
+  // rule the shell's own seeding already follows.
+  const allGroupIds = allGroups.map((g) => g.id);
+  const unseenByGroup = new Map<string, boolean>();
+  if (allGroupIds.length > 0) {
+    const { data: viewStateRows } = await supabase
+      .from("coach_view_state")
+      .select("group_id, feed_seen_at, clients_seen_at")
+      .eq("coach_id", user.id)
+      .in("group_id", allGroupIds);
+
+    const seenByGroup = new Map<string, { feed: string | null; clients: string | null }>();
+    for (const row of viewStateRows ?? []) {
+      seenByGroup.set(row.group_id, { feed: row.feed_seen_at, clients: row.clients_seen_at });
+    }
+
+    if (seenByGroup.size > 0) {
+      const visitedGroupIds = [...seenByGroup.keys()];
+      const [{ data: recentPosts }, { data: recentGroupLogs }] = await Promise.all([
+        supabase.from("posts").select("group_id, created_at").in("group_id", visitedGroupIds),
+        supabase.from("workout_logs").select("group_id, created_at").in("group_id", visitedGroupIds),
+      ]);
+
+      for (const groupId of visitedGroupIds) {
+        const seen = seenByGroup.get(groupId)!;
+        const hasNewPost = (recentPosts ?? []).some(
+          (p) => p.group_id === groupId && (!seen.feed || p.created_at > seen.feed)
+        );
+        const hasNewLog = (recentGroupLogs ?? []).some(
+          (l) => l.group_id === groupId && (!seen.clients || l.created_at > seen.clients)
+        );
+        unseenByGroup.set(groupId, hasNewPost || hasNewLog);
+      }
+    }
+  }
+
   // Member counts for team/social group cards.
   const teamAndSocialIds = [...teamGroups, ...socialGroups].map((g) => g.id);
   const memberCountByGroup = new Map<string, number>();
@@ -126,6 +167,7 @@ export default async function CoachHomePage() {
         fullName: profile?.full_name ?? "Client",
         avatarUrl: profile?.avatar_url ?? null,
         lastWorkoutAt: lastLogByAthlete.get(row.profile_id) ?? null,
+        hasUnseenActivity: unseenByGroup.get(row.group_id) ?? false,
       };
     });
 
@@ -142,12 +184,14 @@ export default async function CoachHomePage() {
     name: g.name,
     focusTag: g.focus_tag,
     memberCount: memberCountByGroup.get(g.id) ?? 0,
+    hasUnseenActivity: unseenByGroup.get(g.id) ?? false,
   }));
   const socialCards: HomeGroupCardData[] = socialGroups.map((g) => ({
     id: g.id,
     name: g.name,
     focusTag: g.focus_tag,
     memberCount: memberCountByGroup.get(g.id) ?? 0,
+    hasUnseenActivity: unseenByGroup.get(g.id) ?? false,
   }));
 
   const orgName = org?.display_name || org?.name || "Your Coaching Business";

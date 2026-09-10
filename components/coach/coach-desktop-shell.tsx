@@ -213,9 +213,18 @@ export function CoachDesktopShell({
           { onConflict: "coach_id,group_id" }
         );
         state = { feed_seen_at: nowIso, clients_seen_at: nowIso };
-      } else if (active === "feed" || active === "clients") {
+      } else if (active === "feed" || active === "clients" || active === "dashboard") {
+        // Visiting the group's own Dashboard (which already surfaces a
+        // "Recent Activity" feed of completions/comments) counts as
+        // having seen both signals — otherwise a coach who navigates via
+        // Home → Dashboard and never opens Feed/Clients directly would
+        // see a Home-page activity dot that can never clear.
         const patch =
-          active === "feed" ? { feed_seen_at: nowIso } : { clients_seen_at: nowIso };
+          active === "feed"
+            ? { feed_seen_at: nowIso }
+            : active === "clients"
+            ? { clients_seen_at: nowIso }
+            : { feed_seen_at: nowIso, clients_seen_at: nowIso };
         await supabase
           .from("coach_view_state")
           .update(patch)

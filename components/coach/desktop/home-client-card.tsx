@@ -34,18 +34,24 @@ export interface HomeClientCardData {
   fullName: string;
   avatarUrl: string | null;
   lastWorkoutAt: string | null;
+  hasUnseenActivity: boolean;
 }
 
 // A 1-on-1 client's "group" is invisible bookkeeping — this card shows
-// the client's own identity, not a group name, and links straight to
-// their profile rather than into a group page.
+// the client's own identity, but links into their solo group's own
+// dashboard, same destination a real team/social group card lands on,
+// so Home behaves as one consistent "click a card, land on its
+// dashboard" flow regardless of card type.
 export function HomeClientCard({ client }: { client: HomeClientCardData }) {
   const status = statusLabel(client.lastWorkoutAt);
   return (
     <Link
-      href={`/groups/${client.groupId}/athletes/${client.athleteId}`}
-      className="flex items-center gap-3 border border-steel/30 bg-surface p-3 hover:border-rust/50 transition-colors"
+      href={`/groups/${client.groupId}/dashboard`}
+      className="relative flex items-center gap-3 border border-steel/30 bg-surface p-3 hover:border-rust/50 transition-colors"
     >
+      {client.hasUnseenActivity && (
+        <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-rust" />
+      )}
       {client.avatarUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={client.avatarUrl} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />

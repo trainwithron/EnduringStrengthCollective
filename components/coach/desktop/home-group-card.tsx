@@ -5,6 +5,7 @@ export interface HomeGroupCardData {
   name: string;
   focusTag: string | null;
   memberCount: number;
+  hasUnseenActivity: boolean;
 }
 
 // Team/social groups keep their own identity front and center (unlike
@@ -15,8 +16,11 @@ export function HomeGroupCard({ group }: { group: HomeGroupCardData }) {
   return (
     <Link
       href={`/groups/${group.id}/dashboard`}
-      className="flex flex-col gap-1 border border-steel/30 bg-surface p-3 hover:border-rust/50 transition-colors"
+      className="relative flex flex-col gap-1 border border-steel/30 bg-surface p-3 hover:border-rust/50 transition-colors"
     >
+      {group.hasUnseenActivity && (
+        <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-rust" />
+      )}
       <p className="font-body text-sm text-chalk truncate">{group.name}</p>
       <p className="font-body text-xs text-steel">
         {group.memberCount} {group.memberCount === 1 ? "member" : "members"}
