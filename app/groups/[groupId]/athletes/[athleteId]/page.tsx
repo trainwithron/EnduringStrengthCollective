@@ -6,6 +6,7 @@ import { AthleteNotesEditor } from "@/components/coach/athlete-notes-editor";
 import { SessionCreditsControl } from "@/components/coach/session-credits-control";
 import { PackageAssignmentControl } from "@/components/coach/package-assignment-control";
 import { PrivateFromOrgToggle } from "@/components/coach/private-from-org-toggle";
+import { ChangeClientGroupControl } from "@/components/coach/change-client-group-control";
 import { CoachLoggedBadge } from "@/components/coach-logged-badge";
 import { NutritionTools } from "@/components/coach/desktop/nutrition-tools";
 import { TrendChart } from "@/components/coach/desktop/trend-chart";
@@ -492,6 +493,15 @@ export default async function AthleteProfilePage(
               athleteId={params.athleteId}
               groupId={params.groupId}
               initialValue={athleteMembership.private_from_org ?? false}
+            />
+          </section>
+
+          <section>
+            <ChangeClientGroupControl
+              athleteId={params.athleteId}
+              athleteName={profile?.full_name ?? "This client"}
+              currentGroupId={params.groupId}
+              currentGroupName={group?.name ?? "this group"}
             />
           </section>
 
