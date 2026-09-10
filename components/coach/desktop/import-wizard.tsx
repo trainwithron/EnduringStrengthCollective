@@ -551,7 +551,17 @@ export function ImportWizard({
           className="font-body text-sm text-chalk disabled:opacity-40"
         />
         {status === "working" && (
-          <p className="font-body text-xs text-steel mt-3">{statusLabel}</p>
+          <div className="mt-3">
+            <p className="font-body text-xs text-steel flex items-center gap-2">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-rust animate-pulse" />
+              {statusLabel}
+            </p>
+            {statusLabel === "Writing a program with AI…" && (
+              <p className="font-body text-[11px] text-steel/70 mt-1">
+                Longer programs can take up to a minute — hang tight, this hasn&apos;t stalled.
+              </p>
+            )}
+          </div>
         )}
         {status === "error" && error && (
           <p className="font-body text-xs text-rust mt-3" role="alert">

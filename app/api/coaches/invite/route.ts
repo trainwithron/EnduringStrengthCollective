@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { toFriendlyAuthEmailError } from "@/lib/auth-email-error";
 
 // Which org-level role an invite can grant. "owner" is set once at
 // org creation and never assigned through this flow.
@@ -55,12 +56,8 @@ export async function POST(request: Request) {
   );
 
   if (inviteError || !invited?.user) {
-    const message = inviteError?.message ?? "Couldn't invite this coach.";
-    const isDuplicate = /already registered|already exists|already been registered/i.test(message);
-    return NextResponse.json(
-      { error: isDuplicate ? "That email is already registered to an account." : message },
-      { status: isDuplicate ? 409 : 502 }
-    );
+    const { error, status } = toFriendlyAuthEmailError(inviteError?.message ?? "Couldn't invite this coach.");
+    return NextResponse.json({ error }, { status });
   }
 
   const newUserId = invited.user.id;

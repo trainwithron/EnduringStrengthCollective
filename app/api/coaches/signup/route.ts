@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { createOrganization } from "@/lib/org-creation";
+import { toFriendlyAuthEmailError } from "@/lib/auth-email-error";
 
 // Self-service coach signup — a brand-new person, no pre-existing
 // invite/relationship, creating their own account AND their own
@@ -46,12 +47,8 @@ export async function POST(request: Request) {
   });
 
   if (createError || !created?.user) {
-    const message = createError?.message ?? "Couldn't create your account.";
-    const isDuplicate = /already registered|already exists|already been registered/i.test(message);
-    return NextResponse.json(
-      { error: isDuplicate ? "That email is already registered to an account." : message },
-      { status: isDuplicate ? 409 : 502 }
-    );
+    const { error, status } = toFriendlyAuthEmailError(createError?.message ?? "Couldn't create your account.");
+    return NextResponse.json({ error }, { status });
   }
 
   const newUserId = created.user.id;
