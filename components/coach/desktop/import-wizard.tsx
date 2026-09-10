@@ -348,6 +348,38 @@ export function ImportWizard({
     router.refresh();
   }
 
+  const [aiPrompt, setAiPrompt] = useState("");
+
+  async function handleAiGenerate() {
+    if (processingRef.current || !aiPrompt.trim()) return;
+    processingRef.current = true;
+    setStatus("working");
+    setError(null);
+    setStatusLabel("Writing a program with AI…");
+
+    try {
+      const res = await fetch("/api/ai/generate-program", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ prompt: aiPrompt, groupId }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setStatus("error");
+        setError(data.error ?? "Couldn't generate a program — try again.");
+        processingRef.current = false;
+        return;
+      }
+
+      prepareImport(data.rows, data.programName, `AI-generated from: "${aiPrompt.trim()}"`);
+    } catch (err) {
+      setStatus("error");
+      setError(err instanceof Error ? err.message : "Couldn't generate a program — try again.");
+      processingRef.current = false;
+    }
+  }
+
   async function handleAiPhotoUpload(file: File) {
     if (processingRef.current) return;
     processingRef.current = true;
@@ -545,6 +577,29 @@ export function ImportWizard({
           }}
           className="font-body text-sm text-chalk disabled:opacity-40"
         />
+      </div>
+
+      <div className="border border-steel/20 bg-surface/40 p-6">
+        <p className="font-body text-sm text-steel mb-4">
+          Or describe the program you want and AI will write a full draft — same review pipeline as
+          above, and it prefers exercises already in your library. Nothing is created until you confirm.
+        </p>
+        <textarea
+          value={aiPrompt}
+          onChange={(e) => setAiPrompt(e.target.value)}
+          disabled={status === "working"}
+          rows={3}
+          placeholder='e.g. "12-week strength block, 4 days/week, squat/bench/deadlift focus, intermediate client"'
+          className="w-full bg-graphite border border-steel/30 text-chalk px-3 py-2 font-body text-sm focus:outline-none focus:border-rust resize-none disabled:opacity-40"
+        />
+        <button
+          type="button"
+          onClick={handleAiGenerate}
+          disabled={status === "working" || !aiPrompt.trim()}
+          className="mt-3 h-9 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
+        >
+          Generate program
+        </button>
       </div>
     </div>
   );
