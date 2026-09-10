@@ -6,6 +6,7 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { HomeClientCard, type HomeClientCardData } from "@/components/coach/desktop/home-client-card";
 import { HomeGroupCard, type HomeGroupCardData } from "@/components/coach/desktop/home-group-card";
 import { NeedsReplyPanel, type NeedsReplyThread } from "@/components/coach/desktop/needs-reply-panel";
+import { MarkAllSeenButton } from "@/components/coach/desktop/mark-all-seen-button";
 import { findThreadsNeedingReply } from "@/lib/notification-priority";
 
 interface GroupRow {
@@ -264,7 +265,10 @@ export default async function CoachHomePage() {
 
   const content = (
     <>
-      <h1 className="font-display font-bold text-2xl uppercase mb-6">Home</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="font-display font-bold text-2xl uppercase">Home</h1>
+        <MarkAllSeenButton groupIds={allGroupIds} />
+      </div>
 
       <NeedsReplyPanel coachId={user.id} threads={needsReplyThreads} />
 

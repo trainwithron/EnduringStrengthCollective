@@ -38,15 +38,17 @@ export interface HomeClientCardData {
 }
 
 // A 1-on-1 client's "group" is invisible bookkeeping — this card shows
-// the client's own identity, but links into their solo group's own
-// dashboard, same destination a real team/social group card lands on,
-// so Home behaves as one consistent "click a card, land on its
-// dashboard" flow regardless of card type.
+// the client's own identity and links straight into their profile page
+// (stats, PRs, current program, notes, body weight), which is more
+// useful than a solo-group activity dashboard for a card that's really
+// about one specific person. Team/social group cards still land on
+// their group dashboard (components/coach/desktop/home-group-card.tsx) —
+// only this per-client destination changed.
 export function HomeClientCard({ client }: { client: HomeClientCardData }) {
   const status = statusLabel(client.lastWorkoutAt);
   return (
     <Link
-      href={`/groups/${client.groupId}/dashboard`}
+      href={`/groups/${client.groupId}/athletes/${client.athleteId}`}
       className="relative flex items-center gap-3 border border-steel/30 bg-surface p-3 hover:border-rust/50 transition-colors"
     >
       {client.hasUnseenActivity && (
