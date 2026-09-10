@@ -81,4 +81,28 @@ describe("findThreadsNeedingReply", () => {
     );
     expect(stale).toHaveLength(1);
   });
+
+  it("suppresses a thread dismissed after its last comment", () => {
+    const stale = findThreadsNeedingReply(
+      [{ postId: "p1", groupId: "g1", authorId: "athlete-1", createdAt: "2026-09-10T01:00:00Z" }],
+      coachId,
+      now,
+      8,
+      new Map([["p1", "2026-09-10T03:00:00Z"]])
+    );
+    expect(stale).toHaveLength(0);
+  });
+
+  it("re-flags a dismissed thread once a newer non-coach reply lands", () => {
+    const stale = findThreadsNeedingReply(
+      [
+        { postId: "p1", groupId: "g1", authorId: "athlete-1", createdAt: "2026-09-10T01:00:00Z" },
+      ],
+      coachId,
+      now,
+      8,
+      new Map([["p1", "2026-09-10T00:00:00Z"]]) // dismissed before that comment existed
+    );
+    expect(stale).toHaveLength(1);
+  });
 });

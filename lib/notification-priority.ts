@@ -32,11 +32,17 @@ export interface StaleThread {
 // coach and has sat for longer than the staleness window — a read-time
 // heuristic (no scheduled job needed) for surfacing a quiet question in
 // a group that isn't already on the 1-on-1 fast path above.
+//
+// `dismissedAt` (postId -> ISO timestamp) is the manual "clear this"
+// escape hatch — a thread the coach dismissed stays cleared only up to
+// that moment: a newer non-coach reply after the dismissal makes the
+// thread reappear, since that's a genuinely new thing to respond to.
 export function findThreadsNeedingReply(
   comments: CommentActivity[],
   coachId: string,
   now: Date,
-  staleAfterHours = 8
+  staleAfterHours = 8,
+  dismissedAt: Map<string, string> = new Map()
 ): StaleThread[] {
   const latestByPost = new Map<string, CommentActivity>();
   for (const c of comments) {
@@ -50,9 +56,12 @@ export function findThreadsNeedingReply(
   const result: StaleThread[] = [];
   for (const latest of latestByPost.values()) {
     if (latest.authorId === coachId) continue;
-    if (now.getTime() - new Date(latest.createdAt).getTime() >= staleMs) {
-      result.push({ postId: latest.postId, groupId: latest.groupId, lastCommentAt: latest.createdAt });
-    }
+    if (now.getTime() - new Date(latest.createdAt).getTime() < staleMs) continue;
+
+    const dismissed = dismissedAt.get(latest.postId);
+    if (dismissed && new Date(dismissed).getTime() >= new Date(latest.createdAt).getTime()) continue;
+
+    result.push({ postId: latest.postId, groupId: latest.groupId, lastCommentAt: latest.createdAt });
   }
   return result;
 }

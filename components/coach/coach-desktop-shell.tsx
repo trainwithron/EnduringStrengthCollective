@@ -51,6 +51,7 @@ const SIDEBAR_WIDTH_COLLAPSED = 68;
 const COLLAPSE_STORAGE_KEY = "coach-sidebar-collapsed";
 
 type Active =
+  | "home"
   | "dashboard"
   | "programs"
   | "exercise-library"
@@ -109,6 +110,7 @@ export function CoachDesktopShell({
   const [clientsUnread, setClientsUnread] = useState(0);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [teamMode, setTeamMode] = useState(false);
+  const [groupKind, setGroupKind] = useState<"one_on_one" | "social" | "team" | null>(null);
 
   // Team (position groups/depth chart) is an opt-in feature for coaches
   // running an actual team sport — most individual-training coaches never
@@ -116,13 +118,18 @@ export function CoachDesktopShell({
   // turned on (from the Team page's own "Enable" button); a small
   // "Enable Team Sports" link takes its place in the nav until then, so
   // it's still discoverable without permanently cluttering everyone else's
-  // sidebar.
+  // sidebar. Also grabs group_kind here — same query, no extra round
+  // trip — to badge the top-bar name as Client/Group/Social so it's never
+  // ambiguous whether "Karina Ramirez" up top is a person or a team.
   useEffect(() => {
     let cancelled = false;
     async function run() {
       const supabase = createBrowserClient();
-      const { data } = await supabase.from("groups").select("team_mode").eq("id", groupId).maybeSingle();
-      if (!cancelled) setTeamMode(data?.team_mode ?? false);
+      const { data } = await supabase.from("groups").select("team_mode, group_kind").eq("id", groupId).maybeSingle();
+      if (!cancelled) {
+        setTeamMode(data?.team_mode ?? false);
+        setGroupKind((data?.group_kind as "one_on_one" | "social" | "team" | null) ?? "team");
+      }
     }
     run();
     return () => {
@@ -163,6 +170,21 @@ export function CoachDesktopShell({
       // Storage unavailable (private browsing, etc.) — default expanded.
     }
   }, []);
+
+  // Remembers the last group this coach actually looked at, so the
+  // cross-group Home dashboard (app/dashboard/page.tsx) can default its
+  // own sidebar to somewhere real instead of showing no nav at all.
+  // Non-httpOnly on purpose — this is UI convenience, not access control,
+  // and the server-rendered Home page needs to read it via cookies().
+  useEffect(() => {
+    try {
+      document.cookie = `last_group=${encodeURIComponent(
+        JSON.stringify({ id: groupId, name: groupName })
+      )}; path=/; max-age=${60 * 60 * 24 * 90}`;
+    } catch {
+      // Non-fatal — Home just falls back to its minimal shell.
+    }
+  }, [groupId, groupName]);
 
   function toggleCollapsed() {
     setCollapsed((prev) => {
@@ -380,9 +402,9 @@ export function CoachDesktopShell({
       <Link
         href="/dashboard"
         title="Home"
-        className={`flex items-center gap-3 h-11 font-body text-sm text-steel active:text-chalk border-b border-steel/20 ${
+        className={`flex items-center gap-3 h-11 font-body text-sm border-b border-steel/20 transition-colors ${
           collapsed ? "justify-center" : "px-5"
-        }`}
+        } ${active === "home" ? "text-rust bg-rust/10" : "text-steel active:text-chalk"}`}
       >
         <Home className="w-4 h-4 shrink-0" strokeWidth={2.25} />
         {!collapsed && "Home"}
@@ -436,7 +458,28 @@ export function CoachDesktopShell({
         >
           {collapsed ? <ChevronsRight className="w-4 h-4" /> : <ChevronsLeft className="w-4 h-4" />}
         </button>
-        <p className="font-display uppercase text-sm tracking-wide truncate lg:hidden">{groupName}</p>
+        {/* Always visible, not just on mobile — the sidebar's own name
+            label is easy to miss when your eyes are on the main content,
+            and picking up someone else's client/program by mistake is a
+            real risk this exists to head off. */}
+        <div className="flex items-center gap-2 min-w-0">
+          <p className="font-display font-bold text-lg md:text-2xl uppercase tracking-wide truncate">
+            {groupName}
+          </p>
+          {groupKind && (
+            <span
+              className={`shrink-0 font-body text-[10px] uppercase tracking-wide px-1.5 py-0.5 border ${
+                groupKind === "one_on_one"
+                  ? "border-rust text-rust"
+                  : groupKind === "social"
+                  ? "border-moss text-moss"
+                  : "border-steel/40 text-steel"
+              }`}
+            >
+              {groupKind === "one_on_one" ? "Client" : groupKind === "social" ? "Social" : "Group"}
+            </span>
+          )}
+        </div>
         <div className="ml-auto flex items-center gap-1.5 shrink-0">
           <DownloadAppButton variant="topbar" />
           <ViewAsClientButton groupId={groupId} />

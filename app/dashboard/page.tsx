@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase/server";
-import Link from "next/link";
 import { CoachHomeShell } from "@/components/coach/coach-home-shell";
+import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { HomeClientCard, type HomeClientCardData } from "@/components/coach/desktop/home-client-card";
 import { HomeGroupCard, type HomeGroupCardData } from "@/components/coach/desktop/home-group-card";
+import { NeedsReplyPanel, type NeedsReplyThread } from "@/components/coach/desktop/needs-reply-panel";
 import { findThreadsNeedingReply } from "@/lib/notification-priority";
 
 interface GroupRow {
@@ -144,12 +146,20 @@ export default async function CoachHomePage() {
   // 1-on-1 groups — those already get prompt, direct notification on the
   // client's own activity (see complete-workout-button.tsx), not a
   // dashboard staleness check.
-  const staleThreadsByGroup = new Map<string, { count: number; groupName: string }>();
+  let needsReplyThreads: NeedsReplyThread[] = [];
   if (teamAndSocialIds.length > 0) {
-    const { data: commentRows } = await supabase
-      .from("comments")
-      .select("post_id, group_id, author_id, created_at")
-      .in("group_id", teamAndSocialIds);
+    const [{ data: commentRows }, { data: dismissedRows }] = await Promise.all([
+      supabase
+        .from("comments")
+        .select("post_id, group_id, author_id, created_at, body, profiles ( full_name )")
+        .in("group_id", teamAndSocialIds),
+      supabase
+        .from("coach_dismissed_reply_alerts")
+        .select("post_id, dismissed_at")
+        .eq("coach_id", user.id),
+    ]);
+
+    const dismissedAt = new Map((dismissedRows ?? []).map((d) => [d.post_id, d.dismissed_at]));
 
     const stale = findThreadsNeedingReply(
       (commentRows ?? []).map((c) => ({
@@ -159,15 +169,34 @@ export default async function CoachHomePage() {
         createdAt: c.created_at,
       })),
       user.id,
-      new Date()
+      new Date(),
+      8,
+      dismissedAt
     );
 
-    const nameByGroupId = new Map([...teamGroups, ...socialGroups].map((g) => [g.id, g.name]));
-    for (const t of stale) {
-      const existing = staleThreadsByGroup.get(t.groupId);
-      staleThreadsByGroup.set(t.groupId, {
-        count: (existing?.count ?? 0) + 1,
-        groupName: nameByGroupId.get(t.groupId) ?? "Group",
+    if (stale.length > 0) {
+      const postIds = stale.map((t) => t.postId);
+      const { data: postRows } = await supabase.from("posts").select("id, channel").in("id", postIds);
+      const channelByPostId = new Map((postRows ?? []).map((p) => [p.id, p.channel]));
+
+      // The exact comment row behind each stale thread — same (postId,
+      // createdAt) pair findThreadsNeedingReply already picked as "the
+      // latest" — so the alert can show who said what, not just a count.
+      const commentByKey = new Map(
+        (commentRows ?? []).map((c) => [`${c.post_id}:${c.created_at}`, c])
+      );
+
+      const nameByGroupId = new Map([...teamGroups, ...socialGroups].map((g) => [g.id, g.name]));
+      needsReplyThreads = stale.map((t) => {
+        const comment = commentByKey.get(`${t.postId}:${t.lastCommentAt}`) as any;
+        return {
+          postId: t.postId,
+          groupId: t.groupId,
+          groupName: nameByGroupId.get(t.groupId) ?? "Group",
+          channel: channelByPostId.get(t.postId) ?? "general",
+          authorName: comment?.profiles?.full_name ?? "Someone",
+          snippet: comment?.body ?? "",
+        };
       });
     }
   }
@@ -233,28 +262,11 @@ export default async function CoachHomePage() {
 
   const orgName = org?.display_name || org?.name || "Your Coaching Business";
 
-  return (
-    <CoachHomeShell orgName={orgName}>
+  const content = (
+    <>
       <h1 className="font-display font-bold text-2xl uppercase mb-6">Home</h1>
 
-      {staleThreadsByGroup.size > 0 && (
-        <section className="mb-10 border border-rust/30 bg-rust/5 p-4">
-          <h2 className="font-display uppercase text-sm tracking-wide text-rust mb-2">
-            Needs a reply
-          </h2>
-          <div className="space-y-1.5">
-            {[...staleThreadsByGroup.entries()].map(([groupId, { count, groupName }]) => (
-              <Link
-                key={groupId}
-                href={`/groups/${groupId}/feed`}
-                className="block font-body text-sm text-chalk active:text-rust"
-              >
-                {groupName} — {count} question{count === 1 ? "" : "s"} unanswered 8+ hours
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
+      <NeedsReplyPanel coachId={user.id} threads={needsReplyThreads} />
 
       <section className="mb-10">
         <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">1-on-1 Clients</h2>
@@ -292,6 +304,36 @@ export default async function CoachHomePage() {
           </div>
         </section>
       )}
-    </CoachHomeShell>
+    </>
   );
+
+  // A coach who's actually navigated into a group before gets the real
+  // full nav (Programming/Clients/Business/etc.) on Home too, scoped to
+  // whichever group they looked at most recently — set by
+  // CoachDesktopShell itself on mount. Validated against the coach's own
+  // real group list so a stale/forged cookie can never point Home's nav
+  // at a group they don't actually have access to; falls back to the
+  // minimal shell before that cookie exists at all (a brand-new coach).
+  const lastGroupCookie = (await cookies()).get("last_group")?.value;
+  let lastGroup: { id: string; name: string } | null = null;
+  if (lastGroupCookie) {
+    try {
+      const parsed = JSON.parse(decodeURIComponent(lastGroupCookie));
+      if (parsed?.id && allGroups.some((g) => g.id === parsed.id)) {
+        lastGroup = { id: parsed.id, name: parsed.name ?? "Group" };
+      }
+    } catch {
+      // Malformed cookie — fall through to the minimal shell.
+    }
+  }
+
+  if (lastGroup) {
+    return (
+      <CoachDesktopShell groupId={lastGroup.id} groupName={lastGroup.name} active="home">
+        {content}
+      </CoachDesktopShell>
+    );
+  }
+
+  return <CoachHomeShell orgName={orgName}>{content}</CoachHomeShell>;
 }

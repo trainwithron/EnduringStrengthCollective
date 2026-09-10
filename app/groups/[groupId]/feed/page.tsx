@@ -18,10 +18,49 @@ import type { FeedChannel, FeedPost } from "@/lib/types";
 
 const VALID_CHANNELS: FeedChannel[] = ["announcements", "form_checks", "pr_board", "general"];
 
+function mapPostRow(p: any, groupId: string, viewerId: string | null): FeedPost {
+  return {
+    id: p.id,
+    groupId,
+    postType: p.post_type,
+    channel: p.channel,
+    pinnedAt: p.pinned_at,
+    body: p.body,
+    mediaUrl: p.media_url,
+    mediaType: p.media_type,
+    createdAt: p.created_at,
+    author: {
+      id: p.profiles.id,
+      fullName: p.profiles.full_name,
+      avatarUrl: p.profiles.avatar_url,
+    },
+    workoutSummary: p.workout_logs
+      ? {
+          totalVolume: p.workout_logs.total_volume,
+          totalSetsCompleted: p.workout_logs.total_sets_completed,
+          newPrs: p.workout_logs.new_prs ?? [],
+          loggedByCoach: p.workout_logs.logged_by_coach ?? false,
+          broadcastLevel: p.broadcast_level ?? "full",
+        }
+      : null,
+    reactionCount: p.reactions?.length ?? 0,
+    viewerHasReacted: (p.reactions ?? []).some((r: any) => r.profile_id === viewerId),
+    commentCount: p.comments?.length ?? 0,
+  };
+}
+
+const POST_SELECT = `
+  id, post_type, channel, pinned_at, body, media_url, media_type, created_at, broadcast_level,
+  profiles!posts_author_id_fkey ( id, full_name, avatar_url ),
+  workout_logs ( total_volume, total_sets_completed, new_prs, logged_by_coach ),
+  reactions ( profile_id ),
+  comments ( id )
+`;
+
 export default async function FeedPage(
   props: {
     params: Promise<{ groupId: string }>;
-    searchParams: Promise<{ channel?: string }>;
+    searchParams: Promise<{ channel?: string; highlight?: string }>;
   }
 ) {
   const searchParams = await props.searchParams;
@@ -84,51 +123,32 @@ export default async function FeedPage(
 
   const { data: posts } = await supabase
     .from("posts")
-    .select(
-      `
-      id, post_type, channel, pinned_at, body, media_url, media_type, created_at, broadcast_level,
-      profiles!posts_author_id_fkey ( id, full_name, avatar_url ),
-      workout_logs ( total_volume, total_sets_completed, new_prs, logged_by_coach ),
-      reactions ( profile_id ),
-      comments ( id )
-    `
-    )
+    .select(POST_SELECT)
     .eq("group_id", params.groupId)
     .eq("channel", channel)
     .order("pinned_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
     .limit(30);
 
-  const shaped: FeedPost[] = (posts ?? []).map((p: any) => ({
-    id: p.id,
-    groupId: params.groupId,
-    postType: p.post_type,
-    channel: p.channel,
-    pinnedAt: p.pinned_at,
-    body: p.body,
-    mediaUrl: p.media_url,
-    mediaType: p.media_type,
-    createdAt: p.created_at,
-    author: {
-      id: p.profiles.id,
-      fullName: p.profiles.full_name,
-      avatarUrl: p.profiles.avatar_url,
-    },
-    workoutSummary: p.workout_logs
-      ? {
-          totalVolume: p.workout_logs.total_volume,
-          totalSetsCompleted: p.workout_logs.total_sets_completed,
-          newPrs: p.workout_logs.new_prs ?? [],
-          loggedByCoach: p.workout_logs.logged_by_coach ?? false,
-          broadcastLevel: p.broadcast_level ?? "full",
-        }
-      : null,
-    reactionCount: p.reactions?.length ?? 0,
-    viewerHasReacted: (p.reactions ?? []).some(
-      (r: any) => r.profile_id === athleteId
-    ),
-    commentCount: p.comments?.length ?? 0,
-  }));
+  let shaped: FeedPost[] = (posts ?? []).map((p: any) => mapPostRow(p, params.groupId, athleteId));
+
+  // A "Needs a reply" link deep-links straight to the stale post — but
+  // that post may be older than the 30 most recent shown here (staleness
+  // is about the comment, not the post itself), so fetch it directly
+  // whenever it isn't already in the window rather than silently
+  // dropping the one thing the coach came here to look at.
+  const highlightPostId = searchParams.highlight ?? null;
+  if (highlightPostId && !shaped.some((p) => p.id === highlightPostId)) {
+    const { data: highlighted } = await supabase
+      .from("posts")
+      .select(POST_SELECT)
+      .eq("id", highlightPostId)
+      .eq("group_id", params.groupId)
+      .maybeSingle();
+    if (highlighted) {
+      shaped = [mapPostRow(highlighted, params.groupId, athleteId), ...shaped];
+    }
+  }
 
   // Leaderboard now lives at the top of General instead of its own nav
   // tab — every post is a reminder it's there, per the ask ("every time
@@ -181,6 +201,7 @@ export default async function FeedPage(
               viewerId={user?.id ?? null}
               channel={channel}
               isCoach={isCoach}
+              highlightPostId={highlightPostId}
             />
           </div>
         </div>
@@ -227,6 +248,7 @@ export default async function FeedPage(
         viewerId={athleteId}
         channel={channel}
         isCoach={renderAsCoach}
+        highlightPostId={highlightPostId}
       />
       <NewPostComposer
         groupId={params.groupId}

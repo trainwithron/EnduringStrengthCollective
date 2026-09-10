@@ -11,14 +11,26 @@ export function FeedList({
   viewerId,
   channel,
   isCoach,
+  highlightPostId,
 }: {
   groupId: string;
   initialPosts: FeedPost[];
   viewerId: string | null;
   channel: FeedChannel;
   isCoach: boolean;
+  // Set when arriving from a deep link (e.g. the Home dashboard's "Needs
+  // a reply" alert) — scrolls to and rings the specific post so it's
+  // never just "somewhere in the feed."
+  highlightPostId?: string | null;
 }) {
   const [posts, setPosts] = useState(initialPosts);
+
+  useEffect(() => {
+    if (!highlightPostId) return;
+    const el = document.getElementById(`post-${highlightPostId}`);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightPostId]);
 
   useEffect(() => {
     const supabase = createBrowserClient();
@@ -157,7 +169,17 @@ export function FeedList({
   return (
     <div className="divide-y divide-steel/15">
       {posts.map((post) => (
-        <PostCard key={post.id} post={post} viewerId={viewerId} isCoach={isCoach} />
+        <div
+          key={post.id}
+          id={`post-${post.id}`}
+          className={
+            post.id === highlightPostId
+              ? "ring-2 ring-inset ring-rust bg-rust/5 scroll-mt-20"
+              : "scroll-mt-20"
+          }
+        >
+          <PostCard post={post} viewerId={viewerId} isCoach={isCoach} />
+        </div>
       ))}
     </div>
   );
