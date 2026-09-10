@@ -44,6 +44,12 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/share/") ||
     pathname.startsWith("/book/") ||
     pathname.startsWith("/api/discovery-availability/") ||
+    // Stripe calls this directly with no user session at all — its own
+    // signature check is the real auth, same gotcha as /pr/ and /share/
+    // above. Without this, every webhook delivery 307s to /login instead
+    // of reaching the route handler, silently breaking credit/subscription
+    // grants in every environment, including production.
+    pathname.startsWith("/api/stripe/webhook") ||
     // An invite email's link establishes a real session client-side, from
     // the URL fragment — the initial server-rendered request has no
     // session cookie yet, same gotcha already hit once for /pr/ and
