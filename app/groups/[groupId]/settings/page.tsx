@@ -8,6 +8,7 @@ import { PushNotificationToggle } from "@/components/athlete/push-notification-t
 import { WearablePlaceholder } from "@/components/athlete/wearable-placeholder";
 import { PackagePicker, type PackageOption } from "@/components/athlete/package-picker";
 import { ManageBillingLink } from "@/components/athlete/manage-billing-link";
+import { ProfileDetailsEditor } from "@/components/athlete/profile-details-editor";
 
 export default async function SettingsPage(
   props: {
@@ -26,7 +27,7 @@ export default async function SettingsPage(
     redirect("/login");
   }
 
-  const [{ data: profile }, { data: membership }, { data: ouraConnection }] = await Promise.all([
+  const [{ data: profile }, { data: membership }, { data: ouraConnection }, { data: profileDetails }] = await Promise.all([
     supabase
       .from("profiles")
       .select("full_name, avatar_url")
@@ -43,6 +44,11 @@ export default async function SettingsPage(
       .select("status")
       .eq("profile_id", user.id)
       .eq("provider", "oura")
+      .maybeSingle(),
+    supabase
+      .from("athlete_profile_details")
+      .select("bio, birthday, phone, emergency_contact_name, emergency_contact_phone")
+      .eq("athlete_id", user.id)
       .maybeSingle(),
   ]);
   const isCoach = membership?.role === "coach";
@@ -89,6 +95,19 @@ export default async function SettingsPage(
 
       <section className="px-5 pt-8">
         <div className="pb-4 border-b border-steel/20">
+          <p className="font-body text-sm mb-3">About you</p>
+          <ProfileDetailsEditor
+            athleteId={user.id}
+            initial={{
+              bio: profileDetails?.bio ?? "",
+              birthday: profileDetails?.birthday ?? "",
+              phone: profileDetails?.phone ?? "",
+              emergencyContactName: profileDetails?.emergency_contact_name ?? "",
+              emergencyContactPhone: profileDetails?.emergency_contact_phone ?? "",
+            }}
+          />
+        </div>
+        <div className="pb-4 border-b border-steel/20 pt-4">
           <PushNotificationToggle />
         </div>
         <div className="pb-4 border-b border-steel/20 pt-4">

@@ -143,6 +143,15 @@ export default async function AthleteProfilePage(
     .eq("group_id", params.groupId)
     .maybeSingle();
 
+  // Self-reported by the athlete in their own Settings — RLS already
+  // scopes this to "self or a coach who actually coaches them," so no
+  // extra filtering needed here.
+  const { data: profileDetails } = await supabase
+    .from("athlete_profile_details")
+    .select("bio, birthday, phone, emergency_contact_name, emergency_contact_phone")
+    .eq("athlete_id", params.athleteId)
+    .maybeSingle();
+
   // Published packages need no assignment — every client already sees
   // them — so only private ones are relevant to assign from this page.
   const { data: privatePackageRows } = await supabase
@@ -386,6 +395,29 @@ export default async function AthleteProfilePage(
 
       <div className="grid grid-cols-[320px_1fr] gap-10 items-start">
         <div className="space-y-8">
+          {(profileDetails?.bio ||
+            profileDetails?.birthday ||
+            profileDetails?.phone ||
+            profileDetails?.emergency_contact_name) && (
+            <section>
+              <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">About</h2>
+              {profileDetails?.bio && (
+                <p className="font-body text-sm text-chalk mb-2">{profileDetails.bio}</p>
+              )}
+              <div className="font-body text-xs text-steel space-y-0.5">
+                {profileDetails?.birthday && (
+                  <p>Birthday: {new Date(`${profileDetails.birthday}T00:00:00`).toLocaleDateString()}</p>
+                )}
+                {profileDetails?.phone && <p>Phone: {profileDetails.phone}</p>}
+                {profileDetails?.emergency_contact_name && (
+                  <p>
+                    Emergency contact: {profileDetails.emergency_contact_name}
+                    {profileDetails?.emergency_contact_phone && ` · ${profileDetails.emergency_contact_phone}`}
+                  </p>
+                )}
+              </div>
+            </section>
+          )}
           <section>
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
               Stats
