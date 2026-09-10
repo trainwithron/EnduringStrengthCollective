@@ -101,7 +101,7 @@ export default async function ClientsPage(
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <AddClientButton groupId={params.groupId} createdBy={user.id} />
+          <AddClientButton groupId={params.groupId} groupName={group?.name ?? "This group"} createdBy={user.id} />
         </div>
       </div>
 

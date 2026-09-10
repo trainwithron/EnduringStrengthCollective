@@ -5,10 +5,19 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { ChevronDown, Plus, Search, Pencil } from "lucide-react";
 
+type GroupKind = "one_on_one" | "social" | "team";
+
+const GROUP_KIND_LABELS: Record<GroupKind, string> = {
+  one_on_one: "1-on-1",
+  social: "Social",
+  team: "Team",
+};
+
 interface OrgGroup {
   id: string;
   name: string;
   focusTag: string | null;
+  kind: GroupKind;
 }
 
 // Clicking the current group's name always opens a dropdown — every
@@ -28,7 +37,10 @@ export function GroupSwitcher({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [groups, setGroups] = useState<OrgGroup[]>([{ id: groupId, name: groupName, focusTag: null }]);
+  const [groups, setGroups] = useState<OrgGroup[]>([
+    { id: groupId, name: groupName, focusTag: null, kind: "team" },
+  ]);
+  const [newKind, setNewKind] = useState<GroupKind>("team");
   const [switching, setSwitching] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -57,7 +69,7 @@ export function GroupSwitcher({
           .maybeSingle(),
         supabase
           .from("group_memberships")
-          .select("groups ( id, name, focus_tag )")
+          .select("groups ( id, name, focus_tag, group_kind )")
           .eq("profile_id", user.id)
           .eq("role", "coach"),
       ]);
@@ -65,17 +77,17 @@ export function GroupSwitcher({
       const byId = new Map<string, OrgGroup>();
       for (const row of coachedRows ?? []) {
         const g = (row as any).groups;
-        if (g) byId.set(g.id, { id: g.id, name: g.name, focusTag: g.focus_tag ?? null });
+        if (g) byId.set(g.id, { id: g.id, name: g.name, focusTag: g.focus_tag ?? null, kind: (g.group_kind ?? "team") as GroupKind });
       }
 
       if (membership && (membership.role === "owner" || membership.role === "admin")) {
         const { data: orgGroups } = await supabase
           .from("groups")
-          .select("id, name, focus_tag")
+          .select("id, name, focus_tag, group_kind")
           .eq("organization_id", membership.organization_id)
           .order("name");
         for (const g of orgGroups ?? []) {
-          byId.set(g.id, { id: g.id, name: g.name, focusTag: g.focus_tag ?? null });
+          byId.set(g.id, { id: g.id, name: g.name, focusTag: g.focus_tag ?? null, kind: (g.group_kind ?? "team") as GroupKind });
         }
       }
 
@@ -109,11 +121,22 @@ export function GroupSwitcher({
     setEditingTagFor(null);
   }
 
+  async function persistKind(targetGroupId: string, kind: GroupKind) {
+    const supabase = createBrowserClient();
+    await supabase.from("groups").update({ group_kind: kind }).eq("id", targetGroupId);
+    setGroups((prev) => prev.map((g) => (g.id === targetGroupId ? { ...g, kind } : g)));
+  }
+
   const filteredGroups = groups.filter((g) => {
     const q = filterQuery.trim().toLowerCase();
     if (!q) return true;
     return g.name.toLowerCase().includes(q) || (g.focusTag ?? "").toLowerCase().includes(q);
   });
+  const groupSections = [
+    { key: "team" as GroupKind, label: "Groups", list: filteredGroups.filter((g) => g.kind === "team") },
+    { key: "social" as GroupKind, label: "Social groups", list: filteredGroups.filter((g) => g.kind === "social") },
+    { key: "one_on_one" as GroupKind, label: "1-on-1 clients", list: filteredGroups.filter((g) => g.kind === "one_on_one") },
+  ];
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -195,9 +218,13 @@ export function GroupSwitcher({
     // Postgres rejects an INSERT ... RETURNING whose row fails the
     // SELECT policy check outright, not just the RETURNING data.
     const newGroupId = crypto.randomUUID();
-    const { error: groupError } = await supabase
-      .from("groups")
-      .insert({ id: newGroupId, name: trimmed, created_by: user.id, organization_id: membership.organization_id });
+    const { error: groupError } = await supabase.from("groups").insert({
+      id: newGroupId,
+      name: trimmed,
+      created_by: user.id,
+      organization_id: membership.organization_id,
+      group_kind: newKind,
+    });
 
     if (groupError) {
       setCreating(false);
@@ -245,20 +272,30 @@ export function GroupSwitcher({
               </div>
             )}
             <div className="max-h-64 overflow-y-auto">
-              {filteredGroups.map((g) => (
-                <button
-                  key={g.id}
-                  type="button"
-                  onClick={() => switchTo(g.id)}
-                  disabled={switching}
-                  className={`w-full text-left px-3 py-2.5 font-body text-sm disabled:opacity-50 ${
-                    g.id === groupId ? "text-rust bg-rust/10" : "text-chalk hover:bg-graphite/50"
-                  }`}
-                >
-                  {g.name}
-                  {g.focusTag && <span className="text-steel"> · {g.focusTag}</span>}
-                </button>
-              ))}
+              {groupSections.map(
+                (section) =>
+                  section.list.length > 0 && (
+                    <div key={section.key}>
+                      <p className="px-3 pt-2 pb-1 font-body text-[10px] text-steel uppercase tracking-wide">
+                        {section.label}
+                      </p>
+                      {section.list.map((g) => (
+                        <button
+                          key={g.id}
+                          type="button"
+                          onClick={() => switchTo(g.id)}
+                          disabled={switching}
+                          className={`w-full text-left px-3 py-2.5 font-body text-sm disabled:opacity-50 ${
+                            g.id === groupId ? "text-rust bg-rust/10" : "text-chalk hover:bg-graphite/50"
+                          }`}
+                        >
+                          {g.name}
+                          {g.focusTag && <span className="text-steel"> · {g.focusTag}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )
+              )}
               {filteredGroups.length === 0 && (
                 <p className="px-3 py-2.5 font-body text-xs text-steel">No groups match.</p>
               )}
@@ -269,6 +306,20 @@ export function GroupSwitcher({
                   {error}
                 </p>
               )}
+              <div className="flex items-center gap-1 mb-1.5">
+                {(Object.keys(GROUP_KIND_LABELS) as GroupKind[]).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setNewKind(k)}
+                    className={`h-6 px-2 font-body text-[11px] border ${
+                      newKind === k ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
+                    }`}
+                  >
+                    {GROUP_KIND_LABELS[k]}
+                  </button>
+                ))}
+              </div>
               <div className="flex items-center gap-1.5">
                 <input
                   type="text"
@@ -353,58 +404,83 @@ export function GroupSwitcher({
             </div>
           )}
           <div className="max-h-64 overflow-y-auto">
-            {filteredGroups.map((g) => (
-              <div
-                key={g.id}
-                className={`flex items-center gap-1 group ${
-                  g.id === groupId ? "bg-rust/10" : "hover:bg-graphite/50"
-                }`}
-              >
-                <button
-                  type="button"
-                  onClick={() => switchTo(g.id)}
-                  disabled={switching}
-                  className={`flex-1 min-w-0 text-left px-3 py-2.5 font-body text-sm disabled:opacity-50 ${
-                    g.id === groupId ? "text-rust" : "text-chalk"
-                  }`}
-                >
-                  {editingTagFor === g.id ? (
-                    <input
-                      type="text"
-                      autoFocus
-                      value={tagDraft}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => setTagDraft(e.target.value)}
-                      onBlur={() => persistTag(g.id, tagDraft)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-                      }}
-                      placeholder="e.g. Bodybuilding"
-                      className="w-full h-6 bg-graphite border border-steel/30 text-chalk px-1.5 font-body text-xs focus:outline-none focus:border-rust"
-                    />
-                  ) : (
-                    <>
-                      {g.name}
-                      {g.focusTag && <span className="text-steel"> · {g.focusTag}</span>}
-                    </>
-                  )}
-                </button>
-                {editingTagFor !== g.id && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setTagDraft(g.focusTag ?? "");
-                      setEditingTagFor(g.id);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 shrink-0 px-2 text-steel active:text-rust"
-                    aria-label={`Tag ${g.name}`}
-                  >
-                    <Pencil className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-            ))}
+            {groupSections.map(
+              (section) =>
+                section.list.length > 0 && (
+                  <div key={section.key}>
+                    <p className="px-3 pt-2 pb-1 font-body text-[10px] text-steel uppercase tracking-wide">
+                      {section.label}
+                    </p>
+                    {section.list.map((g) => (
+                      <div
+                        key={g.id}
+                        className={`flex items-center gap-1 group ${
+                          g.id === groupId ? "bg-rust/10" : "hover:bg-graphite/50"
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => switchTo(g.id)}
+                          disabled={switching}
+                          className={`flex-1 min-w-0 text-left px-3 py-2.5 font-body text-sm disabled:opacity-50 ${
+                            g.id === groupId ? "text-rust" : "text-chalk"
+                          }`}
+                        >
+                          {editingTagFor === g.id ? (
+                            <input
+                              type="text"
+                              autoFocus
+                              value={tagDraft}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => setTagDraft(e.target.value)}
+                              onBlur={() => persistTag(g.id, tagDraft)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                              }}
+                              placeholder="e.g. Bodybuilding"
+                              className="w-full h-6 bg-graphite border border-steel/30 text-chalk px-1.5 font-body text-xs focus:outline-none focus:border-rust"
+                            />
+                          ) : (
+                            <>
+                              {g.name}
+                              {g.focusTag && <span className="text-steel"> · {g.focusTag}</span>}
+                            </>
+                          )}
+                        </button>
+                        {editingTagFor !== g.id && (
+                          <>
+                            <select
+                              value={g.kind}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => persistKind(g.id, e.target.value as GroupKind)}
+                              aria-label={`Group kind for ${g.name}`}
+                              className="opacity-0 group-hover:opacity-100 shrink-0 h-6 bg-graphite border border-steel/30 text-steel font-body text-[10px] focus:outline-none"
+                            >
+                              {(Object.keys(GROUP_KIND_LABELS) as GroupKind[]).map((k) => (
+                                <option key={k} value={k}>
+                                  {GROUP_KIND_LABELS[k]}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setTagDraft(g.focusTag ?? "");
+                                setEditingTagFor(g.id);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 shrink-0 px-2 text-steel active:text-rust"
+                              aria-label={`Tag ${g.name}`}
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )
+            )}
             {filteredGroups.length === 0 && (
               <p className="px-3 py-2.5 font-body text-xs text-steel">No groups match.</p>
             )}
@@ -415,6 +491,20 @@ export function GroupSwitcher({
                 {error}
               </p>
             )}
+            <div className="flex items-center gap-1 mb-1.5">
+              {(Object.keys(GROUP_KIND_LABELS) as GroupKind[]).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setNewKind(k)}
+                  className={`h-6 px-2 font-body text-[11px] border ${
+                    newKind === k ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
+                  }`}
+                >
+                  {GROUP_KIND_LABELS[k]}
+                </button>
+              ))}
+            </div>
             <div className="flex items-center gap-1.5">
               <input
                 type="text"
