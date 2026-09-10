@@ -13,7 +13,7 @@ export default async function NutritionPage(
 ) {
   const params = await props.params;
   const searchParams = await props.searchParams;
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -101,7 +101,7 @@ export default async function NutritionPage(
 }
 
 async function NutritionSection({ groupId, athleteId }: { groupId: string; athleteId: string }) {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const todayKey = new Date().toISOString().slice(0, 10);
 
   const { data: weightLogs } = await supabase

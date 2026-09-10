@@ -43,7 +43,7 @@ function isValidRow(row: any): row is ParsedImportRow {
 }
 
 export async function POST(request: Request) {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

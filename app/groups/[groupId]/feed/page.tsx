@@ -24,7 +24,7 @@ export default async function FeedPage(
 ) {
   const searchParams = await props.searchParams;
   const params = await props.params;
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -47,7 +47,7 @@ export default async function FeedPage(
   // A coach opening the installed home-screen app gets the same mobile
   // feed an athlete gets, so they can post/react/comment naturally
   // instead of the desktop composer built for running a business.
-  const showMobileView = !isCoach || prefersAthleteStyleView();
+  const showMobileView = !isCoach || await prefersAthleteStyleView();
 
   const channel: FeedChannel = VALID_CHANNELS.includes(searchParams.channel as FeedChannel)
     ? (searchParams.channel as FeedChannel)

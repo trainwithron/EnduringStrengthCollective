@@ -9,7 +9,7 @@ import { exchangeOuraCode } from "@/lib/oura";
 // same browser tab, so the user's own auth session is still valid here —
 // no need to smuggle their identity through the state param.
 export async function GET(request: Request) {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

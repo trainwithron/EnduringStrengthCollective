@@ -54,7 +54,7 @@ export default async function CoachDashboardPage(
   const params = await props.params;
   const searchParams = await props.searchParams;
   const scopeAll = searchParams.scope === "all";
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

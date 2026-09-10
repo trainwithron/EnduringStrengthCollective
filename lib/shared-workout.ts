@@ -5,7 +5,7 @@ import { estimateOneRepMax } from "@/lib/one-rep-max";
 // card (fetched via /api/workout-share/[postId]) so both surfaces
 // compute "top lifts" / PR list / totals identically from one place.
 export async function getSharedWorkout(postId: string) {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
   const { data: post } = await supabase
     .from("posts")

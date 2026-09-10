@@ -31,7 +31,7 @@ const VALID_SLOTS = ["breakfast", "lunch", "dinner", "snack", "any"];
 const VALID_ARCHETYPES = ["omnivore", "vegetarian", "vegan", "carnivore", "keto", "paleo"];
 
 export async function POST(request: Request) {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

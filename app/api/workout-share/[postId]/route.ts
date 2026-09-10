@@ -9,7 +9,7 @@ import { getSharedWorkout } from "@/lib/shared-workout";
 // ever returns something for someone who could already see the post.
 export async function GET(_request: Request, props: { params: Promise<{ postId: string }> }) {
   const params = await props.params;
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

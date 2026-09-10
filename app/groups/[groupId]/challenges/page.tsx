@@ -13,7 +13,7 @@ export default async function ChallengesPage(
   }
 ) {
   const params = await props.params;
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -38,7 +38,7 @@ export default async function ChallengesPage(
   }
 
   const isCoach = membership.role === "coach";
-  const showMobileView = !isCoach || prefersAthleteStyleView();
+  const showMobileView = !isCoach || await prefersAthleteStyleView();
 
   if (isCoach && !showMobileView) {
     const { data: group } = await supabase

@@ -18,7 +18,7 @@ export default async function BrandingPage(
   const params = await props.params;
   const searchParams = await props.searchParams;
   const tab: OrgTab = searchParams.tab === "branding" ? "branding" : "team";
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

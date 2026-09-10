@@ -43,7 +43,7 @@ export default async function ProgramCalendarPage(
 ) {
   const searchParams = await props.searchParams;
   const params = await props.params;
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -72,7 +72,7 @@ export default async function ProgramCalendarPage(
   // A coach on a phone tracks their own completions here too, same as an
   // athlete — booking (which is a client booking *with* their coach)
   // stays athlete-only below, that part genuinely doesn't apply to them.
-  const showMobileView = membership.role === "athlete" || prefersAthleteStyleView();
+  const showMobileView = membership.role === "athlete" || await prefersAthleteStyleView();
 
   const { data: program } = await supabase
     .from("programs")

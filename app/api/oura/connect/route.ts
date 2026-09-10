@@ -7,7 +7,7 @@ import { getOuraAuthorizeUrl, isOuraConfigured } from "@/lib/oura";
 // page (a plain <a href>, not a fetch call) so the browser follows the
 // redirect straight to Oura's consent screen.
 export async function GET(request: Request) {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

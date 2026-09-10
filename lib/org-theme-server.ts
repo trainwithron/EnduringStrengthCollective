@@ -14,7 +14,7 @@ import {
 // signed-out visitor (marketing/login pages) or a user with no org yet.
 export async function getViewerOrgTheme(): Promise<OrgTheme> {
   try {
-    const supabase = createServerClient();
+    const supabase = await createServerClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();

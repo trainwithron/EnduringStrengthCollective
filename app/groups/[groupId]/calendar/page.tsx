@@ -62,7 +62,7 @@ export default async function CoachCalendarPage(
 ) {
   const searchParams = await props.searchParams;
   const params = await props.params;
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -82,7 +82,7 @@ export default async function CoachCalendarPage(
   // doesn't need the full booking/scheduling dashboard built for running
   // a business. The same coach in a plain browser tab still gets the
   // full desktop calendar below.
-  const showMobileView = !isCoach || prefersAthleteStyleView();
+  const showMobileView = !isCoach || await prefersAthleteStyleView();
 
   // A coach picking a client to schedule (mobile) — completely independent
   // of any program state, so it's handled before the self-training

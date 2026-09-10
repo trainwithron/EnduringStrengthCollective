@@ -7,7 +7,7 @@ export default async function InvitePage(
   }
 ) {
   const params = await props.params;
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
 
   const { data, error } = await supabase
     .rpc("get_invite_info", { _code: params.code })

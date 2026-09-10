@@ -23,7 +23,7 @@ export default async function ResourcesPage(
   const params = await props.params;
   const searchParams = await props.searchParams;
   const tab: ResourceTab = searchParams.tab === "shop" ? "shop" : "referrals";
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -48,7 +48,7 @@ export default async function ResourcesPage(
   }
 
   const isCoach = membership.role === "coach";
-  const showMobileView = !isCoach || prefersAthleteStyleView();
+  const showMobileView = !isCoach || await prefersAthleteStyleView();
 
   // Both directories are coach-scoped, shared across every group that
   // coach runs — same resolution as before the merge.

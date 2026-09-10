@@ -22,7 +22,7 @@ export default async function GroupHubPage(
   }
 ) {
   const params = await props.params;
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -117,7 +117,7 @@ export default async function GroupHubPage(
   // training doesn't need the dense desktop coaching tools. The same
   // coach at an actual desktop still gets the full shell (linked back to
   // from Settings).
-  const showMobileView = !isCoach || prefersAthleteStyleView();
+  const showMobileView = !isCoach || await prefersAthleteStyleView();
 
   let weightLogs: { id: string; loggedDate: string; weight: number }[] = [];
   let todayMacros: { calories: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null } | null = null;

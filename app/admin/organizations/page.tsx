@@ -4,7 +4,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { NewOrganizationForm } from "@/components/admin/new-organization-form";
 
 export default async function AdminOrganizationsPage() {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

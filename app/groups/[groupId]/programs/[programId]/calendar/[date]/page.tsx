@@ -24,7 +24,7 @@ export default async function DayDetailPage(
 ) {
   const searchParams = await props.searchParams;
   const params = await props.params;
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();

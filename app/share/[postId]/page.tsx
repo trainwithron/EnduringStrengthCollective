@@ -58,7 +58,7 @@ export default async function ShareWorkoutPage(
   // A quiet nicety for a logged-in viewer landing here right after their
   // own completion — everyone else (the whole point of this page) sees
   // just the card, no app chrome.
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
