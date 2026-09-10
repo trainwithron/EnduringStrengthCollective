@@ -21,7 +21,7 @@
     "react-dom": "19.2.8",
     "stripe": "^22.6.1",
     "web-push": "^3.6.7",
-    "xlsx": "^0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "@types/node": "^20.16.10",
