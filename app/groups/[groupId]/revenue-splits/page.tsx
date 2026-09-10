@@ -62,15 +62,16 @@ export default async function RevenueSplitsPage(
 
   const { data: memberRows } = await supabase
     .from("organization_memberships")
-    .select("profile_id, role, revenue_share_pct, profiles ( full_name )")
+    .select("profile_id, role, revenue_share_pct, stripe_connect_status, profiles ( full_name )")
     .eq("organization_id", orgMembership.organization_id)
     .order("role", { ascending: true });
 
-  const coaches: CoachShare[] = (memberRows ?? []).map((m) => ({
+  const coaches: (CoachShare & { stripeConnectStatus: string })[] = (memberRows ?? []).map((m) => ({
     profileId: m.profile_id,
     fullName: (m.profiles as any)?.full_name ?? "Unknown",
     role: m.role,
     revenueSharePct: m.revenue_share_pct,
+    stripeConnectStatus: m.stripe_connect_status ?? "not_connected",
   }));
 
   // Total estimated revenue for this org: client monthly rates across
@@ -127,6 +128,8 @@ export default async function RevenueSplitsPage(
       </div>
       <RevenueSplitEditor
         organizationId={orgMembership.organization_id}
+        groupId={params.groupId}
+        currentUserId={user.id}
         totalRevenueCents={totalRevenueCents}
         initialPlatformFeePct={org?.platform_fee_pct ?? 10}
         coaches={coaches}

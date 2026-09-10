@@ -1,7 +1,79 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getStripeClient, isStripeConfigured } from "@/lib/stripe";
+import { computeRevenueSplit, type CoachShare } from "@/lib/revenue-splits";
 import type Stripe from "stripe";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+// Splits a payment's proceeds across the org's coaches per the existing
+// platform_fee_pct/revenue_share_pct model (lib/revenue-splits.ts —
+// unchanged math, just wired to real transfers here) and moves each
+// coach's cut to their connected Stripe account. A coach who hasn't
+// finished Connect onboarding yet (no enabled connected account) is
+// silently skipped rather than blocking the whole payment — their share
+// simply isn't transferred until they connect, same as how a package
+// with is_active=false just doesn't appear rather than erroring.
+async function createRevenueSplitTransfers(
+  supabase: SupabaseClient,
+  stripe: Stripe,
+  eventId: string,
+  groupId: string,
+  amountCents: number
+) {
+  const { data: group } = await supabase.from("groups").select("organization_id").eq("id", groupId).maybeSingle();
+  if (!group?.organization_id) return;
+
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("platform_fee_pct")
+    .eq("id", group.organization_id)
+    .maybeSingle();
+  if (!org) return;
+
+  const { data: memberRows } = await supabase
+    .from("organization_memberships")
+    .select("profile_id, role, revenue_share_pct, stripe_connect_account_id, stripe_connect_status, profiles ( full_name )")
+    .eq("organization_id", group.organization_id);
+  if (!memberRows || memberRows.length === 0) return;
+
+  const coaches: CoachShare[] = memberRows.map((m) => ({
+    profileId: m.profile_id,
+    fullName: (m.profiles as any)?.full_name ?? "Unknown",
+    role: m.role,
+    revenueSharePct: m.revenue_share_pct,
+  }));
+  const split = computeRevenueSplit(amountCents, org.platform_fee_pct, coaches);
+  const connectByProfile = new Map(memberRows.map((m) => [m.profile_id, m]));
+
+  for (const share of split.coachShares) {
+    if (share.amountCents <= 0) continue;
+    const member = connectByProfile.get(share.profileId);
+    if (!member || member.stripe_connect_status !== "enabled" || !member.stripe_connect_account_id) continue;
+
+    const { error: insertError } = await supabase.from("revenue_split_transfers").insert({
+      stripe_event_id: eventId,
+      coach_id: share.profileId,
+      organization_id: group.organization_id,
+      amount_cents: share.amountCents,
+    });
+    if (insertError) {
+      if (insertError.code === "23505") continue; // already transferred for this event
+      throw insertError;
+    }
+
+    const transfer = await stripe.transfers.create({
+      amount: share.amountCents,
+      currency: "usd",
+      destination: member.stripe_connect_account_id,
+      transfer_group: eventId,
+    });
+    await supabase
+      .from("revenue_split_transfers")
+      .update({ stripe_transfer_id: transfer.id })
+      .eq("stripe_event_id", eventId)
+      .eq("coach_id", share.profileId);
+  }
+}
 
 // The only unauthenticated route in this app — Stripe calls this
 // directly, with no user session. Its "auth" is the signature check
@@ -69,6 +141,8 @@ export async function POST(request: Request) {
             p_delta: credits,
           });
           if (rpcError) throw rpcError;
+
+          await createRevenueSplitTransfers(supabase, stripe, event.id, groupId, session.amount_total ?? 0);
         } else if (session.mode === "subscription" && typeof session.subscription === "string") {
           await supabase.from("membership_subscriptions").upsert(
             {
@@ -132,6 +206,27 @@ export async function POST(request: Request) {
           p_delta: pkg.sessions_granted,
         });
         if (rpcError) throw rpcError;
+
+        await createRevenueSplitTransfers(supabase, stripe, event.id, groupId, invoice.amount_paid ?? 0);
+        break;
+      }
+
+      // A coach's Connect Express onboarding status changed — reflects
+      // charges_enabled/payouts_enabled so the revenue-split transfer
+      // logic above knows whether this coach can actually receive a
+      // transfer yet, and so the UI can show a real status instead of
+      // just "connected or not."
+      case "account.updated": {
+        const account = event.data.object as Stripe.Account;
+        const status = account.details_submitted
+          ? account.charges_enabled && account.payouts_enabled
+            ? "enabled"
+            : "restricted"
+          : "pending";
+        await supabase
+          .from("organization_memberships")
+          .update({ stripe_connect_status: status })
+          .eq("stripe_connect_account_id", account.id);
         break;
       }
 

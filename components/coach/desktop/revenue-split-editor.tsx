@@ -5,17 +5,28 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { computeRevenueSplit, formatSplitCents, type CoachShare } from "@/lib/revenue-splits";
 
+const CONNECT_STATUS_LABEL: Record<string, string> = {
+  not_connected: "Not connected",
+  pending: "Pending",
+  enabled: "Active",
+  restricted: "Action needed",
+};
+
 export function RevenueSplitEditor({
   organizationId,
+  groupId,
+  currentUserId,
   totalRevenueCents,
   initialPlatformFeePct,
   coaches,
   isOwner,
 }: {
   organizationId: string;
+  groupId: string;
+  currentUserId: string;
   totalRevenueCents: number;
   initialPlatformFeePct: number;
-  coaches: CoachShare[];
+  coaches: (CoachShare & { stripeConnectStatus: string })[];
   isOwner: boolean;
 }) {
   const router = useRouter();
@@ -23,6 +34,26 @@ export function RevenueSplitEditor({
   const [shares, setShares] = useState<Record<string, string>>(
     Object.fromEntries(coaches.map((c) => [c.profileId, c.revenueSharePct.toString()]))
   );
+  const [connecting, setConnecting] = useState(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
+
+  async function handleConnectStripe() {
+    setConnecting(true);
+    setConnectError(null);
+    try {
+      const res = await fetch("/api/stripe/connect/onboard", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ organizationId, groupId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Couldn't start Stripe onboarding.");
+      window.location.href = data.url;
+    } catch (err) {
+      setConnectError(err instanceof Error ? err.message : "Couldn't start Stripe onboarding.");
+      setConnecting(false);
+    }
+  }
 
   const result = computeRevenueSplit(
     totalRevenueCents,
@@ -92,31 +123,51 @@ export function RevenueSplitEditor({
           Coach shares (of the remainder)
         </h3>
         <div className="divide-y divide-steel/15">
-          {result.coachShares.map((share) => (
-            <div key={share.profileId} className="py-2.5 flex items-center justify-between gap-4">
-              <span className="font-body text-sm">
-                {share.fullName}
-                {coaches.find((c) => c.profileId === share.profileId)?.role === "owner" && (
-                  <span className="text-steel"> (owner)</span>
-                )}
-              </span>
-              <div className="flex items-center gap-3">
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={shares[share.profileId]}
-                  onChange={(e) => persistShare(share.profileId, e.target.value)}
-                  disabled={!isOwner}
-                  className="w-16 h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs disabled:opacity-50"
-                />
-                <span className="font-body text-xs text-steel">%</span>
-                <span className="font-body text-sm w-20 text-right">
-                  {formatSplitCents(share.amountCents)}
+          {result.coachShares.map((share) => {
+            const coach = coaches.find((c) => c.profileId === share.profileId);
+            const status = coach?.stripeConnectStatus ?? "not_connected";
+            return (
+              <div key={share.profileId} className="py-2.5 flex items-center justify-between gap-4">
+                <span className="font-body text-sm">
+                  {share.fullName}
+                  {coach?.role === "owner" && <span className="text-steel"> (owner)</span>}
                 </span>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={shares[share.profileId]}
+                    onChange={(e) => persistShare(share.profileId, e.target.value)}
+                    disabled={!isOwner}
+                    className="w-16 h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs disabled:opacity-50"
+                  />
+                  <span className="font-body text-xs text-steel">%</span>
+                  <span className="font-body text-sm w-20 text-right">
+                    {formatSplitCents(share.amountCents)}
+                  </span>
+                  {share.profileId === currentUserId ? (
+                    status === "enabled" ? (
+                      <span className="font-body text-xs text-positive w-28 text-right">Stripe connected</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleConnectStripe}
+                        disabled={connecting}
+                        className="font-body text-xs text-rust underline decoration-dotted disabled:opacity-40 w-28 text-right"
+                      >
+                        {connecting ? "Redirecting…" : "Connect Stripe"}
+                      </button>
+                    )
+                  ) : (
+                    <span className="font-body text-xs text-steel w-28 text-right">
+                      {CONNECT_STATUS_LABEL[status] ?? status}
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
         {totalSharePct !== 100 && (
           <p className="font-body text-xs text-amber-500 mt-2">
@@ -131,10 +182,17 @@ export function RevenueSplitEditor({
       {!isOwner && (
         <p className="font-body text-xs text-steel">Only the organization owner can edit these splits.</p>
       )}
+      {connectError && (
+        <p className="font-body text-xs text-rust" role="alert">
+          {connectError}
+        </p>
+      )}
 
       <p className="font-body text-xs text-steel max-w-[65ch]">
-        Nothing here moves real money yet — this is the split that would drive actual Stripe Connect
-        transfers once a payment processor is connected.
+        Once a coach&apos;s Stripe connection shows &ldquo;Stripe connected,&rdquo; their share of every
+        real payment is transferred to their own Stripe account automatically when it comes in. A coach
+        who hasn&apos;t connected yet simply isn&apos;t paid out until they do — nothing blocks the
+        payment itself.
       </p>
     </div>
   );
