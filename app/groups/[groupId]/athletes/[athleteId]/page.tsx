@@ -7,6 +7,7 @@ import { SessionCreditsControl } from "@/components/coach/session-credits-contro
 import { PackageAssignmentControl } from "@/components/coach/package-assignment-control";
 import { PrivateFromOrgToggle } from "@/components/coach/private-from-org-toggle";
 import { ChangeClientGroupControl } from "@/components/coach/change-client-group-control";
+import { ClientProgrammingMenu } from "@/components/coach/client-programming-menu";
 import { CoachLoggedBadge } from "@/components/coach-logged-badge";
 import { NutritionTools } from "@/components/coach/desktop/nutrition-tools";
 import { TrendChart } from "@/components/coach/desktop/trend-chart";
@@ -378,6 +379,11 @@ export default async function AthleteProfilePage(
           >
             Log in-person session
           </Link>
+          <ClientProgrammingMenu
+            groupId={params.groupId}
+            athleteId={params.athleteId}
+            athleteFullName={profile?.full_name ?? "Client"}
+          />
           <Link
             href={`/groups/${params.groupId}/athletes/${params.athleteId}/calendar`}
             className="inline-flex items-center h-9 font-body text-xs text-rust border border-rust px-3"
