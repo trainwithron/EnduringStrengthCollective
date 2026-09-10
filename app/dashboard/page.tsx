@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
+import Link from "next/link";
 import { CoachHomeShell } from "@/components/coach/coach-home-shell";
 import { HomeClientCard, type HomeClientCardData } from "@/components/coach/desktop/home-client-card";
 import { HomeGroupCard, type HomeGroupCardData } from "@/components/coach/desktop/home-group-card";
+import { findThreadsNeedingReply } from "@/lib/notification-priority";
 
 interface GroupRow {
   id: string;
@@ -135,6 +137,41 @@ export default async function CoachHomePage() {
     }
   }
 
+  // "Needs a reply" — the one thing worth surfacing from a big/social
+  // group's ordinary feed chatter (per the notification-priority design):
+  // a question that's gone unanswered a while. Computed on read from
+  // real comment timestamps, no scheduled job. Deliberately excludes
+  // 1-on-1 groups — those already get prompt, direct notification on the
+  // client's own activity (see complete-workout-button.tsx), not a
+  // dashboard staleness check.
+  const staleThreadsByGroup = new Map<string, { count: number; groupName: string }>();
+  if (teamAndSocialIds.length > 0) {
+    const { data: commentRows } = await supabase
+      .from("comments")
+      .select("post_id, group_id, author_id, created_at")
+      .in("group_id", teamAndSocialIds);
+
+    const stale = findThreadsNeedingReply(
+      (commentRows ?? []).map((c) => ({
+        postId: c.post_id,
+        groupId: c.group_id,
+        authorId: c.author_id,
+        createdAt: c.created_at,
+      })),
+      user.id,
+      new Date()
+    );
+
+    const nameByGroupId = new Map([...teamGroups, ...socialGroups].map((g) => [g.id, g.name]));
+    for (const t of stale) {
+      const existing = staleThreadsByGroup.get(t.groupId);
+      staleThreadsByGroup.set(t.groupId, {
+        count: (existing?.count ?? 0) + 1,
+        groupName: nameByGroupId.get(t.groupId) ?? "Group",
+      });
+    }
+  }
+
   // A 1-on-1 client's group has exactly one athlete member — fetch that
   // member's profile plus their most recent workout_logs entry, same
   // lastLogByAthlete pattern already used on the Clients roster page.
@@ -199,6 +236,25 @@ export default async function CoachHomePage() {
   return (
     <CoachHomeShell orgName={orgName}>
       <h1 className="font-display font-bold text-2xl uppercase mb-6">Home</h1>
+
+      {staleThreadsByGroup.size > 0 && (
+        <section className="mb-10 border border-rust/30 bg-rust/5 p-4">
+          <h2 className="font-display uppercase text-sm tracking-wide text-rust mb-2">
+            Needs a reply
+          </h2>
+          <div className="space-y-1.5">
+            {[...staleThreadsByGroup.entries()].map(([groupId, { count, groupName }]) => (
+              <Link
+                key={groupId}
+                href={`/groups/${groupId}/feed`}
+                className="block font-body text-sm text-chalk active:text-rust"
+              >
+                {groupName} — {count} question{count === 1 ? "" : "s"} unanswered 8+ hours
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="mb-10">
         <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">1-on-1 Clients</h2>

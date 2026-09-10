@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
+import { notifyPush } from "@/lib/push-notify";
+import { isHighPriorityClient } from "@/lib/notification-priority";
 
 // This project has no generated Supabase Database type, so a fresh RPC's
 // result falls back to an untyped shape — spelled out explicitly here
@@ -59,13 +61,41 @@ export function CompleteWorkoutButton({
       return;
     }
 
-    const { data: athleteProfile } = await supabase
-      .from("profiles")
-      .select("feed_broadcast_level")
-      .eq("id", result.athlete_id)
-      .maybeSingle();
+    const [{ data: athleteProfile }, { data: athleteMembership }] = await Promise.all([
+      supabase.from("profiles").select("feed_broadcast_level, full_name").eq("id", result.athlete_id).maybeSingle(),
+      supabase
+        .from("group_memberships")
+        .select("client_tier")
+        .eq("group_id", result.group_id)
+        .eq("profile_id", result.athlete_id)
+        .maybeSingle(),
+    ]);
     const broadcastLevel = athleteProfile?.feed_broadcast_level ?? "full";
     const newPrs = result.new_prs ?? [];
+
+    // A 1-on-1 client's own training is exactly the "notify promptly"
+    // case from the priority-tiers design — a big/online-tier group's
+    // routine completions stay off the coach's push channel entirely,
+    // on purpose (see lib/notification-priority.ts).
+    if (isHighPriorityClient(athleteMembership?.client_tier ?? null)) {
+      const { data: coachMembership } = await supabase
+        .from("group_memberships")
+        .select("profile_id")
+        .eq("group_id", result.group_id)
+        .eq("role", "coach")
+        .limit(1)
+        .maybeSingle();
+      if (coachMembership) {
+        const athleteName = athleteProfile?.full_name ?? "Your client";
+        const prSuffix = newPrs.length > 0 ? " — new PR! 🎉" : "";
+        notifyPush(
+          coachMembership.profile_id,
+          "Workout logged",
+          `${athleteName} completed a workout${prSuffix}`,
+          `/groups/${result.group_id}/athletes/${result.athlete_id}`
+        );
+      }
+    }
 
     // The athlete's own broadcast preference is captured onto the post
     // itself — not just read live — so the card renders consistently even
