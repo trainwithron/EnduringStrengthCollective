@@ -8,6 +8,7 @@ import { BookSlotButton } from "@/components/athlete/book-slot-button";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { RescheduleSlotButton } from "@/components/athlete/reschedule-slot-button";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
+import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { TodayWidget } from "@/components/athlete/today-widget";
 import { DayMealsView } from "@/components/athlete/day-meals-view";
 import { computeScheduledDates } from "@/lib/program-schedule";
@@ -15,6 +16,7 @@ import { isHabitDueOn } from "@/lib/habits";
 import { resolveDayMacroTarget } from "@/lib/todays-macros";
 import { CalendarPurchasePrompt } from "@/components/athlete/calendar-purchase-prompt";
 import type { PackageOption } from "@/components/athlete/package-picker";
+import { getEffectiveAthlete } from "@/lib/acting-as";
 
 export default async function DayDetailPage(
   props: {
@@ -68,6 +70,25 @@ export default async function DayDetailPage(
     .limit(1)
     .maybeSingle();
 
+  // A coach "acting as" a client sees exactly what that client would see
+  // here — every `membership.role === "athlete"` gate below also opens for
+  // an impersonated session, keyed off the resolved athlete id. The
+  // coach-only "Booked — {name} / Open" status line stays real-coach-only.
+  const effective = await getEffectiveAthlete(params.groupId, user.id);
+  const isActingAsOther = effective.isActingAsOther;
+  const athleteId = effective.athleteId;
+  const viewingAsAthlete = membership.role === "athlete" || isActingAsOther;
+
+  let actingAsFullName: string | null = null;
+  if (isActingAsOther) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", athleteId)
+      .maybeSingle();
+    actingAsFullName = profile?.full_name ?? "Client";
+  }
+
   const date = new Date(`${params.date}T00:00:00`);
 
   // Everything actually assigned to this athlete for this specific date —
@@ -78,11 +99,11 @@ export default async function DayDetailPage(
   let dayHabits: { id: string; title: string; completed: boolean }[] = [];
   let dayMeals: Record<string, any[]> | null = null;
 
-  if (membership.role === "athlete") {
+  if (viewingAsAthlete) {
     const { data: assignment } = await supabase
       .from("workout_assignments")
       .select("workouts ( id, title )")
-      .eq("athlete_id", user.id)
+      .eq("athlete_id", athleteId)
       .eq("scheduled_date", params.date)
       .maybeSingle();
 
@@ -118,7 +139,7 @@ export default async function DayDetailPage(
       .from("group_memberships")
       .select("client_tier")
       .eq("group_id", params.groupId)
-      .eq("profile_id", user.id)
+      .eq("profile_id", athleteId)
       .maybeSingle();
     const macrosEnabled = membershipTier?.client_tier !== "group";
 
@@ -126,14 +147,14 @@ export default async function DayDetailPage(
       const { data: macrosRow } = await supabase
         .from("daily_macros")
         .select("calories, protein_g, carbs_g, fat_g")
-        .eq("athlete_id", user.id)
+        .eq("athlete_id", athleteId)
         .eq("log_date", params.date)
         .maybeSingle();
 
       const { data: mealPlanRow } = await supabase
         .from("meal_plans")
         .select("meals, macros")
-        .eq("athlete_id", user.id)
+        .eq("athlete_id", athleteId)
         .eq("log_date", params.date)
         .maybeSingle();
       dayMeals = (mealPlanRow?.meals as any) ?? null;
@@ -148,7 +169,7 @@ export default async function DayDetailPage(
     const { data: habitDefs } = await supabase
       .from("client_habits")
       .select("id, title, weekdays")
-      .eq("athlete_id", user.id)
+      .eq("athlete_id", athleteId)
       .eq("group_id", params.groupId)
       .eq("active", true);
     const dueHabitDefs = (habitDefs ?? []).filter((h) => isHabitDueOn(h.weekdays, date));
@@ -214,11 +235,11 @@ export default async function DayDetailPage(
 
     bookingsForDay = bookingRows ?? [];
 
-    if (membership.role === "athlete") {
+    if (viewingAsAthlete) {
       const { data: creditsRow } = await supabase
         .from("session_credits")
         .select("balance")
-        .eq("athlete_id", user.id)
+        .eq("athlete_id", athleteId)
         .eq("group_id", params.groupId)
         .maybeSingle();
       creditBalance = creditsRow?.balance ?? 0;
@@ -226,7 +247,7 @@ export default async function DayDetailPage(
       const { data: subscriptionRow } = await supabase
         .from("membership_subscriptions")
         .select("current_period_end")
-        .eq("athlete_id", user.id)
+        .eq("athlete_id", athleteId)
         .eq("group_id", params.groupId)
         .eq("status", "active")
         .maybeSingle();
@@ -264,12 +285,12 @@ export default async function DayDetailPage(
   // server-side (must be their own, still confirmed) before any slot is
   // offered as a destination.
   let reschedulingBooking: { id: string; start_at: string } | null = null;
-  if (membership.role === "athlete" && searchParams.reschedule) {
+  if (viewingAsAthlete && searchParams.reschedule) {
     const { data: rb } = await supabase
       .from("bookings")
       .select("id, start_at")
       .eq("id", searchParams.reschedule)
-      .eq("athlete_id", user.id)
+      .eq("athlete_id", athleteId)
       .eq("status", "confirmed")
       .maybeSingle();
     reschedulingBooking = rb;
@@ -277,6 +298,9 @@ export default async function DayDetailPage(
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
+      {isActingAsOther && (
+        <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
+      )}
       <header className="px-5 pt-8 pb-6 border-b border-steel/20">
         <Link href={backHref} className="font-body text-xs text-steel uppercase tracking-wide">
           &larr; Back to calendar
@@ -284,7 +308,7 @@ export default async function DayDetailPage(
         <h1 className="font-display font-bold text-3xl leading-none mt-3 uppercase">
           {date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
         </h1>
-        {membership.role === "athlete" && coachMembership && (
+        {viewingAsAthlete && coachMembership && (
           <div className="mt-3">
             <p className="font-body text-xs text-steel">
               Session credits available: {creditBalance}
@@ -310,7 +334,7 @@ export default async function DayDetailPage(
         )}
       </header>
 
-      {membership.role === "athlete" && (dayWorkout || dayMacros || dayHabits.length > 0 || dayMeals) && (
+      {viewingAsAthlete && (dayWorkout || dayMacros || dayHabits.length > 0 || dayMeals) && (
         <section className="px-5 pt-6 space-y-4">
           {dayWorkout && (
             <div className="border border-steel/20 p-4">
@@ -344,7 +368,7 @@ export default async function DayDetailPage(
             {slots.map(({ start, durationMinutes }) => {
               const iso = start.toISOString();
               const booking = bookingByTime.get(start.getTime());
-              const isMine = booking?.athlete_id === user.id;
+              const isMine = booking?.athlete_id === athleteId;
               const isBeingRescheduled = booking?.id === reschedulingBooking?.id;
               const endAt = new Date(start.getTime() + durationMinutes * 60000);
 
@@ -354,7 +378,7 @@ export default async function DayDetailPage(
                     {formatSlotTime(start)}
                   </span>
 
-                  {membership.role === "coach" ? (
+                  {membership.role === "coach" && !isActingAsOther ? (
                     <span className="font-body text-xs text-steel">
                       {booking
                         ? `Booked — ${(booking.profiles as any)?.full_name ?? "Client"}`
@@ -384,7 +408,7 @@ export default async function DayDetailPage(
                   ) : creditBalance > 0 ? (
                     <BookSlotButton
                       coachId={coachMembership.profile_id}
-                      athleteId={user.id}
+                      athleteId={athleteId}
                       groupId={params.groupId}
                       startAt={iso}
                       endAt={endAt.toISOString()}
@@ -399,7 +423,7 @@ export default async function DayDetailPage(
         )}
       </section>
 
-      {membership.role === "athlete" && (
+      {viewingAsAthlete && (
         <BottomTabBar groupId={params.groupId} activeOverride="calendar" />
       )}
     </main>

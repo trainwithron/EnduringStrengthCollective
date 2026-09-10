@@ -2,12 +2,15 @@ import Link from "next/link";
 import { StartWorkoutButton } from "@/components/logging/start-workout-button";
 import { PreStartExerciseRow } from "@/components/logging/pre-start-exercise-row";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
+import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { renderNoteBody } from "@/lib/text-note-format";
 import type { WorkoutOverviewData } from "@/lib/workout-overview-data";
 
 // Shared between the athlete's own workout overview and the coach's
 // "log for a client" equivalent. `backHref` and `loggingForName` are the
-// only things that differ between the two contexts.
+// only things that differ between the two contexts. `actingAs` is a third,
+// distinct context — a coach viewing this as part of "View as Client" —
+// separate from `loggingForName`'s in-person coach-logs-a-session flow.
 export function WorkoutOverviewView({
   data,
   groupId,
@@ -16,6 +19,7 @@ export function WorkoutOverviewView({
   backHref,
   loggingForName,
   loggedByCoach,
+  actingAs,
 }: {
   data: WorkoutOverviewData;
   groupId: string;
@@ -24,6 +28,7 @@ export function WorkoutOverviewView({
   backHref: string;
   loggingForName?: string;
   loggedByCoach?: boolean;
+  actingAs?: { fullName: string; groupId: string };
 }) {
   const { workout, exercises, dayNotes, lastTimeByExercise, videoUrlByExerciseId, goalByExerciseId, existingSession } =
     data;
@@ -34,6 +39,7 @@ export function WorkoutOverviewView({
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-28">
+      {actingAs && <ActingAsBanner athleteFullName={actingAs.fullName} groupId={actingAs.groupId} />}
       <header className="px-5 pt-8 pb-6 border-b border-steel/20">
         <Link href={backHref} className="font-body text-xs text-steel uppercase tracking-wide">
           &larr; Back to program

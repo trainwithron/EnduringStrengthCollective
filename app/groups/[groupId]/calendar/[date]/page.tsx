@@ -10,9 +10,11 @@ import { BookSlotButton } from "@/components/athlete/book-slot-button";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { RescheduleSlotButton } from "@/components/athlete/reschedule-slot-button";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
+import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { DayHourGrid } from "@/components/coach/desktop/day-hour-grid";
 import { CalendarPurchasePrompt } from "@/components/athlete/calendar-purchase-prompt";
 import type { PackageOption } from "@/components/athlete/package-picker";
+import { getEffectiveAthlete } from "@/lib/acting-as";
 
 export default async function CoachDayDetailPage(
   props: {
@@ -54,11 +56,28 @@ export default async function CoachDayDetailPage(
     );
   }
 
+  // A coach "acting as" a client reaches this same booking view — that's
+  // the whole point of impersonation, so real athletes and an impersonated
+  // session both take this branch, keyed off the resolved athlete id
+  // rather than the real signed-in user's own id.
+  const effective = await getEffectiveAthlete(params.groupId, user.id);
+  const athleteId = effective.athleteId;
+
+  let actingAsFullName: string | null = null;
+  if (effective.isActingAsOther) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", athleteId)
+      .maybeSingle();
+    actingAsFullName = profile?.full_name ?? "Client";
+  }
+
   // An athlete booking with their coach — same logic as the program-scoped
   // day-detail page, just reachable at the group level so it works even
   // with no active program assigned (a client should always be able to
   // see and book their coach's open hours).
-  if (membership.role === "athlete") {
+  if (membership.role === "athlete" || effective.isActingAsOther) {
     const { data: coachMembership } = await supabase
       .from("group_memberships")
       .select("profile_id")
@@ -119,7 +138,7 @@ export default async function CoachDayDetailPage(
       const { data: creditsRow } = await supabase
         .from("session_credits")
         .select("balance")
-        .eq("athlete_id", user.id)
+        .eq("athlete_id", athleteId)
         .eq("group_id", params.groupId)
         .maybeSingle();
       creditBalance = creditsRow?.balance ?? 0;
@@ -127,7 +146,7 @@ export default async function CoachDayDetailPage(
       const { data: subscriptionRow } = await supabase
         .from("membership_subscriptions")
         .select("current_period_end")
-        .eq("athlete_id", user.id)
+        .eq("athlete_id", athleteId)
         .eq("group_id", params.groupId)
         .eq("status", "active")
         .maybeSingle();
@@ -160,7 +179,7 @@ export default async function CoachDayDetailPage(
         .from("bookings")
         .select("id, start_at")
         .eq("id", searchParams.reschedule)
-        .eq("athlete_id", user.id)
+        .eq("athlete_id", athleteId)
         .eq("status", "confirmed")
         .maybeSingle();
       reschedulingBooking = rb;
@@ -168,6 +187,9 @@ export default async function CoachDayDetailPage(
 
     return (
       <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
+        {effective.isActingAsOther && (
+          <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
+        )}
         <header className="px-5 pt-8 pb-6 border-b border-steel/20">
           <Link href={backHref} className="font-body text-xs text-steel uppercase tracking-wide">
             &larr; Back to calendar
@@ -215,7 +237,7 @@ export default async function CoachDayDetailPage(
               {slots.map(({ start, durationMinutes }) => {
                 const iso = start.toISOString();
                 const booking = bookingByTime.get(start.getTime());
-                const isMine = booking?.athlete_id === user.id;
+                const isMine = booking?.athlete_id === athleteId;
                 const isBeingRescheduled = booking?.id === reschedulingBooking?.id;
                 const endAt = new Date(start.getTime() + durationMinutes * 60000);
 
@@ -249,7 +271,7 @@ export default async function CoachDayDetailPage(
                     ) : creditBalance > 0 ? (
                       <BookSlotButton
                         coachId={coachMembership.profile_id}
-                        athleteId={user.id}
+                        athleteId={athleteId}
                         groupId={params.groupId}
                         startAt={iso}
                         endAt={endAt.toISOString()}

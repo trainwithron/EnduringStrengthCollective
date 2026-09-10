@@ -3,7 +3,9 @@ import { createServerClient } from "@/lib/supabase/server";
 import { getWorkoutOverviewData } from "@/lib/workout-overview-data";
 import { WorkoutOverviewView } from "@/components/logging/workout-overview-view";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
+import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { computeScheduledDates, formatShortDate, isLocked } from "@/lib/program-schedule";
+import { getEffectiveAthlete } from "@/lib/acting-as";
 
 export default async function WorkoutOverviewPage(
   props: {
@@ -20,10 +22,24 @@ export default async function WorkoutOverviewPage(
     redirect("/login");
   }
 
+  const effective = await getEffectiveAthlete(params.groupId, user.id);
+  let actingAsFullName: string | null = null;
+  if (effective.isActingAsOther) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", effective.athleteId)
+      .maybeSingle();
+    actingAsFullName = profile?.full_name ?? "Client";
+  }
+  const actingAs = effective.isActingAsOther
+    ? { fullName: actingAsFullName ?? "Client", groupId: params.groupId }
+    : undefined;
+
   const data = await getWorkoutOverviewData(supabase, {
     groupId: params.groupId,
     workoutId: params.workoutId,
-    athleteId: user.id,
+    athleteId: effective.athleteId,
   });
 
   if (!data) {
@@ -37,8 +53,11 @@ export default async function WorkoutOverviewPage(
   }
 
   // Content-dripping only applies to the athlete viewing their own,
-  // not-yet-started upcoming workout — never to a coach, and never once a
-  // session already exists for it (started early in person, say).
+  // not-yet-started upcoming workout — never to a coach (including a
+  // coach currently "acting as" a client — real coach role always wins,
+  // matching the "coach is never locked out" rule used elsewhere in this
+  // app), and never once a session already exists for it (started early
+  // in person, say).
   const { data: membership } = await supabase
     .from("group_memberships")
     .select("role")
@@ -55,7 +74,7 @@ export default async function WorkoutOverviewPage(
     const { data: overrides } = await supabase
       .from("workout_assignments")
       .select("scheduled_date")
-      .eq("athlete_id", user.id)
+      .eq("athlete_id", effective.athleteId)
       .eq("workout_id", params.workoutId)
       .lte("scheduled_date", todayKey)
       .limit(1);
@@ -66,8 +85,9 @@ export default async function WorkoutOverviewPage(
           data={data}
           groupId={params.groupId}
           workoutId={params.workoutId}
-          athleteId={user.id}
+          athleteId={effective.athleteId}
           backHref={`/groups/${params.groupId}/programs/${data.workout.programId}`}
+          actingAs={actingAs}
         />
       );
     }
@@ -95,10 +115,13 @@ export default async function WorkoutOverviewPage(
 
       if (isLocked(scheduledDate, new Date(), program.visibility_window)) {
         return (
-          <main className="min-h-screen bg-graphite text-chalk font-body pb-24 flex items-center justify-center px-6">
-            <p className="font-body text-steel text-center max-w-[40ch]">
-              This workout unlocks on {formatShortDate(scheduledDate!)}.
-            </p>
+          <main className="min-h-screen bg-graphite text-chalk font-body pb-24 flex flex-col">
+            {actingAs && <ActingAsBanner athleteFullName={actingAs.fullName} groupId={actingAs.groupId} />}
+            <div className="flex-1 flex items-center justify-center px-6">
+              <p className="font-body text-steel text-center max-w-[40ch]">
+                This workout unlocks on {formatShortDate(scheduledDate!)}.
+              </p>
+            </div>
             <BottomTabBar groupId={params.groupId} activeOverride="workout" />
           </main>
         );
@@ -111,8 +134,9 @@ export default async function WorkoutOverviewPage(
       data={data}
       groupId={params.groupId}
       workoutId={params.workoutId}
-      athleteId={user.id}
+      athleteId={effective.athleteId}
       backHref={`/groups/${params.groupId}/programs/${data.workout.programId}`}
+      actingAs={actingAs}
     />
   );
 }

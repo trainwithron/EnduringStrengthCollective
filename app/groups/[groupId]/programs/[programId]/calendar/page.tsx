@@ -3,8 +3,10 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { computeScheduledDates, isSameDay, isLocked } from "@/lib/program-schedule";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
+import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
+import { getEffectiveAthlete } from "@/lib/acting-as";
 import { Lock } from "lucide-react";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
@@ -69,10 +71,28 @@ export default async function ProgramCalendarPage(
     );
   }
 
+  // A coach "acting as" a client sees exactly what that client would see
+  // here — every `membership.role === "athlete"` gate below also opens for
+  // an impersonated session, keyed off the resolved athlete id.
+  const effective = await getEffectiveAthlete(params.groupId, user.id);
+  const isActingAsOther = effective.isActingAsOther;
+  const athleteId = effective.athleteId;
+  const viewingAsAthlete = membership.role === "athlete" || isActingAsOther;
+
+  let actingAsFullName: string | null = null;
+  if (isActingAsOther) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", athleteId)
+      .maybeSingle();
+    actingAsFullName = profile?.full_name ?? "Client";
+  }
+
   // A coach on a phone tracks their own completions here too, same as an
   // athlete — booking (which is a client booking *with* their coach)
   // stays athlete-only below, that part genuinely doesn't apply to them.
-  const showMobileView = membership.role === "athlete" || await prefersAthleteStyleView();
+  const showMobileView = viewingAsAthlete || await prefersAthleteStyleView();
 
   const { data: program } = await supabase
     .from("programs")
@@ -96,6 +116,9 @@ export default async function ProgramCalendarPage(
   if (!program.start_date || !program.training_days || program.training_days.length === 0) {
     return (
       <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
+        {isActingAsOther && (
+          <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
+        )}
         <header className="px-5 pt-8 pb-6 border-b border-steel/20">
           <Link href={backHref} className="font-body text-xs text-steel uppercase tracking-wide">
             &larr; Back to program
@@ -132,7 +155,7 @@ export default async function ProgramCalendarPage(
     const { data: logs } = await supabase
       .from("workout_logs")
       .select("workout_id")
-      .eq("athlete_id", user.id)
+      .eq("athlete_id", athleteId)
       .in("workout_id", (workouts ?? []).map((w) => w.id));
     loggedIds = new Set((logs ?? []).map((l) => l.workout_id));
   }
@@ -166,12 +189,12 @@ export default async function ProgramCalendarPage(
       .eq("coach_id", coachMembership.profile_id);
     hasAvailability = (count ?? 0) > 0;
 
-    if (membership.role === "athlete" && hasAvailability) {
+    if (viewingAsAthlete && hasAvailability) {
       const { data: bookingRows } = await supabase
         .from("bookings")
         .select("id, start_at")
         .eq("coach_id", coachMembership.profile_id)
-        .eq("athlete_id", user.id)
+        .eq("athlete_id", athleteId)
         .eq("status", "confirmed")
         .gte("start_at", new Date().toISOString())
         .order("start_at", { ascending: true });
@@ -179,11 +202,11 @@ export default async function ProgramCalendarPage(
     }
   }
 
-  if (membership.role === "athlete") {
+  if (viewingAsAthlete) {
     const { data: creditsRow } = await supabase
       .from("session_credits")
       .select("balance")
-      .eq("athlete_id", user.id)
+      .eq("athlete_id", athleteId)
       .eq("group_id", params.groupId)
       .maybeSingle();
     creditBalance = creditsRow?.balance ?? 0;
@@ -247,6 +270,9 @@ export default async function ProgramCalendarPage(
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
+      {isActingAsOther && (
+        <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
+      )}
       <header className="px-5 pt-8 pb-6 border-b border-steel/20">
         <Link href={backHref} className="font-body text-xs text-steel uppercase tracking-wide">
           &larr; Back to program
@@ -254,7 +280,7 @@ export default async function ProgramCalendarPage(
         <h1 className="font-display font-bold text-4xl leading-none mt-3 uppercase">
           {program.name}
         </h1>
-        {membership.role === "athlete" && coachMembership && (
+        {viewingAsAthlete && coachMembership && (
           <p className="font-body text-xs text-steel mt-3">
             Session credits available: <span className="text-chalk font-medium">{creditBalance}</span>
           </p>
@@ -345,7 +371,7 @@ export default async function ProgramCalendarPage(
               const isToday = isSameDay(date, today);
               const done = w ? loggedIds.has(w.id) : false;
               const locked =
-                membership.role === "athlete" && w
+                viewingAsAthlete && w
                   ? isLocked(date, today, program.visibility_window) && !done
                   : false;
 
@@ -433,7 +459,7 @@ export default async function ProgramCalendarPage(
               const isToday = isSameDay(date, today);
               const done = w ? loggedIds.has(w.id) : false;
               const locked =
-                membership.role === "athlete" && w
+                viewingAsAthlete && w
                   ? isLocked(date, today, program.visibility_window) && !done
                   : false;
               const exerciseCount = w ? (w.group_workout_exercises?.[0]?.count ?? 0) : 0;

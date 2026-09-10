@@ -6,11 +6,13 @@ import { CalendarPageTabs } from "@/components/coach/desktop/calendar-page-tabs"
 import { CalendarGrid, type CalendarEventEntry } from "@/components/coach/desktop/calendar-grid";
 import { CalendarClientList } from "@/components/coach/desktop/calendar-client-list";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
+import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { computeScheduledDates } from "@/lib/program-schedule";
 import { ScheduleClientPicker } from "@/components/coach/schedule-client-picker";
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
+import { getEffectiveAthlete } from "@/lib/acting-as";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
@@ -77,18 +79,36 @@ export default async function CoachCalendarPage(
     .maybeSingle();
 
   const isCoach = membership?.role === "coach";
+  // A coach "acting as" a client sees that client's own booking calendar —
+  // isCoach above still reflects the real signed-in user, so the desktop
+  // calendar branch further down stays correctly gated.
+  const effective = await getEffectiveAthlete(params.groupId, user.id);
+  const isActingAsOther = effective.isActingAsOther;
+  const athleteId = effective.athleteId;
   // A coach opening the installed home-screen app gets the same
   // athlete-style calendar a client gets — logging their own training
   // doesn't need the full booking/scheduling dashboard built for running
   // a business. The same coach in a plain browser tab still gets the
-  // full desktop calendar below.
-  const showMobileView = !isCoach || await prefersAthleteStyleView();
+  // full desktop calendar below. Acting as a client always wins.
+  const showMobileView = isActingAsOther || !isCoach || await prefersAthleteStyleView();
+
+  let actingAsFullName: string | null = null;
+  if (isActingAsOther) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", athleteId)
+      .maybeSingle();
+    actingAsFullName = profile?.full_name ?? "Client";
+  }
 
   // A coach picking a client to schedule (mobile) — completely independent
   // of any program state, so it's handled before the self-training
   // redirect logic below ever runs (that logic would otherwise bounce a
-  // coach with their own active program straight past this).
-  if (showMobileView && isCoach) {
+  // coach with their own active program straight past this). Never shown
+  // while acting as a client — that's the coach's own tool, not part of
+  // the client's real experience.
+  if (showMobileView && isCoach && !isActingAsOther) {
     const { data: clientMemberships } = await supabase
       .from("group_memberships")
       .select("profile_id, profiles ( full_name )")
@@ -193,7 +213,7 @@ export default async function CoachCalendarPage(
       .from("programs")
       .select("id, start_date, training_days")
       .eq("group_id", params.groupId)
-      .eq("athlete_id", user.id)
+      .eq("athlete_id", athleteId)
       .eq("is_active", true)
       .maybeSingle();
 
@@ -245,7 +265,7 @@ export default async function CoachCalendarPage(
           .from("bookings")
           .select("id, start_at")
           .eq("coach_id", coachMembership.profile_id)
-          .eq("athlete_id", user.id)
+          .eq("athlete_id", athleteId)
           .eq("status", "confirmed")
           .gte("start_at", new Date().toISOString())
           .order("start_at", { ascending: true });
@@ -255,7 +275,7 @@ export default async function CoachCalendarPage(
       const { data: creditsRow } = await supabase
         .from("session_credits")
         .select("balance")
-        .eq("athlete_id", user.id)
+        .eq("athlete_id", athleteId)
         .eq("group_id", params.groupId)
         .maybeSingle();
       creditBalance = creditsRow?.balance ?? 0;
@@ -318,7 +338,7 @@ export default async function CoachCalendarPage(
     }
 
     let scheduleClientsForCoach: { id: string; fullName: string; balance: number }[] = [];
-    if (isCoach) {
+    if (isCoach && !isActingAsOther) {
       const { data: cm } = await supabase
         .from("group_memberships")
         .select("profile_id, profiles ( full_name )")
@@ -342,7 +362,10 @@ export default async function CoachCalendarPage(
 
     return (
       <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
-        {isCoach && (
+        {isActingAsOther && (
+          <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
+        )}
+        {isCoach && !isActingAsOther && (
           <ScheduleClientPicker groupId={params.groupId} clients={scheduleClientsForCoach} />
         )}
         <header className="px-5 pt-8 pb-6 border-b border-steel/20">

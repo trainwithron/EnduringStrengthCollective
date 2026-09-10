@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
+import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { MacroCalculator } from "@/components/tools/macro-calculator";
+import { getEffectiveAthlete } from "@/lib/acting-as";
 
 export default async function MacroCalculatorPage(
   props: {
@@ -37,7 +39,9 @@ export default async function MacroCalculatorPage(
     );
   }
 
-  if (membership.role === "coach") {
+  const effective = await getEffectiveAthlete(params.groupId, user.id);
+
+  if (membership.role === "coach" && !effective.isActingAsOther) {
     const { data: group } = await supabase
       .from("groups")
       .select("name")
@@ -60,8 +64,21 @@ export default async function MacroCalculatorPage(
     );
   }
 
+  let actingAsFullName: string | null = null;
+  if (effective.isActingAsOther) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", effective.athleteId)
+      .maybeSingle();
+    actingAsFullName = profile?.full_name ?? "Client";
+  }
+
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
+      {effective.isActingAsOther && (
+        <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
+      )}
       <header className="px-5 pt-8 pb-6 border-b border-steel/20">
         <Link
           href={`/groups/${params.groupId}/settings`}

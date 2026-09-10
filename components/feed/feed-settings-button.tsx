@@ -6,7 +6,13 @@ import { FeedBroadcastSettings } from "@/components/athlete/feed-broadcast-setti
 
 type BroadcastLevel = "full" | "prs_only" | "checkin_only" | "private";
 
-export function FeedSettingsButton({ initialLevel }: { initialLevel: BroadcastLevel }) {
+export function FeedSettingsButton({
+  initialLevel,
+  profileId,
+}: {
+  initialLevel: BroadcastLevel;
+  profileId: string;
+}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -22,7 +28,7 @@ export function FeedSettingsButton({ initialLevel }: { initialLevel: BroadcastLe
 
       {open && (
         <div className="px-5 pt-4 pb-2 border-b border-steel/20 bg-surface/30">
-          <FeedBroadcastSettings initialLevel={initialLevel} />
+          <FeedBroadcastSettings initialLevel={initialLevel} profileId={profileId} />
         </div>
       )}
     </div>

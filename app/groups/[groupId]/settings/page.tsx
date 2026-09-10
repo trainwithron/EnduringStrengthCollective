@@ -2,6 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
+import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
+import { getEffectiveAthlete } from "@/lib/acting-as";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { EditDisplayName } from "@/components/athlete/edit-display-name";
 import { PushNotificationToggle } from "@/components/athlete/push-notification-toggle";
@@ -27,28 +29,36 @@ export default async function SettingsPage(
     redirect("/login");
   }
 
+  // A coach "acting as" a client sees that client's real Settings page —
+  // their own profile, billing, and account controls — exactly what QA'ing
+  // "does it look right on their end" requires. Deriving isCoach from the
+  // effective athlete (not the real signed-in user) naturally reads as
+  // false while impersonating an athlete, without any special-casing below.
+  const effective = await getEffectiveAthlete(params.groupId, user.id);
+  const athleteId = effective.athleteId;
+
   const [{ data: profile }, { data: membership }, { data: ouraConnection }, { data: profileDetails }] = await Promise.all([
     supabase
       .from("profiles")
       .select("full_name, avatar_url")
-      .eq("id", user.id)
+      .eq("id", athleteId)
       .single(),
     supabase
       .from("group_memberships")
       .select("role")
       .eq("group_id", params.groupId)
-      .eq("profile_id", user.id)
+      .eq("profile_id", athleteId)
       .maybeSingle(),
     supabase
       .from("wearable_connections")
       .select("status")
-      .eq("profile_id", user.id)
+      .eq("profile_id", athleteId)
       .eq("provider", "oura")
       .maybeSingle(),
     supabase
       .from("athlete_profile_details")
       .select("bio, birthday, phone, emergency_contact_name, emergency_contact_phone")
-      .eq("athlete_id", user.id)
+      .eq("athlete_id", athleteId)
       .maybeSingle(),
   ]);
   const isCoach = membership?.role === "coach";
@@ -71,8 +81,16 @@ export default async function SettingsPage(
     }));
   }
 
+  let actingAsFullName: string | null = null;
+  if (effective.isActingAsOther) {
+    actingAsFullName = profile?.full_name ?? "Client";
+  }
+
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
+      {effective.isActingAsOther && (
+        <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
+      )}
       <header className="px-5 pt-8 pb-6 border-b border-steel/20">
         <Link
           href={`/groups/${params.groupId}`}
@@ -88,8 +106,10 @@ export default async function SettingsPage(
       <section className="px-5 pt-6 flex items-center gap-3">
         <Avatar name={profile?.full_name ?? "?"} url={profile?.avatar_url ?? null} />
         <div className="flex-1">
-          <EditDisplayName initialName={profile?.full_name ?? ""} />
-          <p className="font-body text-xs text-steel mt-0.5">{user.email}</p>
+          <EditDisplayName initialName={profile?.full_name ?? ""} profileId={athleteId} />
+          {!effective.isActingAsOther && (
+            <p className="font-body text-xs text-steel mt-0.5">{user.email}</p>
+          )}
         </div>
       </section>
 
@@ -97,7 +117,7 @@ export default async function SettingsPage(
         <div className="pb-4 border-b border-steel/20">
           <p className="font-body text-sm mb-3">About you</p>
           <ProfileDetailsEditor
-            athleteId={user.id}
+            athleteId={athleteId}
             initial={{
               bio: profileDetails?.bio ?? "",
               birthday: profileDetails?.birthday ?? "",

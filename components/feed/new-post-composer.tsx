@@ -13,11 +13,16 @@ export function NewPostComposer({
   raised,
   defaultChannel = "general",
   isCoach = false,
+  authorId,
 }: {
   groupId: string;
   raised?: boolean;
   defaultChannel?: FeedChannel;
   isCoach?: boolean;
+  // Explicit so a coach "acting as" a client posts under the client's own
+  // id, not whoever is actually signed in — defaults to the signed-in
+  // viewer when the caller doesn't override it.
+  authorId?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [body, setBody] = useState("");
@@ -49,10 +54,14 @@ export function NewPostComposer({
     setSubmitting(true);
     setError(null);
     const supabase = createBrowserClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    let posterId = authorId ?? null;
+    if (!posterId) {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      posterId = user?.id ?? null;
+    }
+    if (!posterId) {
       setSubmitting(false);
       return;
     }
@@ -83,7 +92,7 @@ export function NewPostComposer({
     const mentionedIds = trimmedBody ? getConfirmedMentionIds(trimmedBody) : [];
     const { error: insertError } = await supabase.from("posts").insert({
       group_id: groupId,
-      author_id: user.id,
+      author_id: posterId,
       post_type: "user_post",
       channel,
       body: trimmedBody,
@@ -105,12 +114,12 @@ export function NewPostComposer({
       const { data: viewerProfile } = await supabase
         .from("profiles")
         .select("full_name")
-        .eq("id", user.id)
+        .eq("id", posterId)
         .maybeSingle();
       const authorName = viewerProfile?.full_name ?? "Someone";
       const feedUrl = `/groups/${groupId}/feed`;
       for (const id of mentionedIds) {
-        if (id !== user.id) notifyPush(id, "You were mentioned", `${authorName} mentioned you in a post`, feedUrl);
+        if (id !== posterId) notifyPush(id, "You were mentioned", `${authorName} mentioned you in a post`, feedUrl);
       }
     }
 

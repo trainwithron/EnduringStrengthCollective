@@ -6,8 +6,11 @@ import { TodayWidget } from "@/components/athlete/today-widget";
 import { ProgramCardList } from "@/components/athlete/program-card-list";
 import { WeekAtAGlance, type WeekDayEntry } from "@/components/athlete/week-at-a-glance";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
+import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
+import { ViewAsClientEntryPoint } from "@/components/athlete/view-as-client-entry-point";
 import { isHabitDueOn } from "@/lib/habits";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
+import { getEffectiveAthlete } from "@/lib/acting-as";
 import { getViewerOrgTheme } from "@/lib/org-theme-server";
 import { computeScheduledDates, isLocked } from "@/lib/program-schedule";
 import { getWeekRange, isWithinRange } from "@/lib/week-range";
@@ -26,6 +29,15 @@ export default async function GroupHubPage(
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // A coach standing in a client's mobile experience ("View as Client")
+  // resolves to that client's id here — every query below that would
+  // otherwise use the signed-in user's own id uses this instead. For
+  // anyone else (an athlete, or a coach not currently acting as someone)
+  // this is just their own id.
+  const effective = user ? await getEffectiveAthlete(params.groupId, user.id) : null;
+  const athleteId = effective?.athleteId;
+  const isActingAsOther = effective?.isActingAsOther ?? false;
 
   // These five only need params.groupId or the viewer's own id — none
   // depends on another's result — so they fire as one round trip instead
@@ -67,7 +79,7 @@ export default async function GroupHubPage(
       .select("id, name, cover_image_path, workouts(count)")
       .eq("group_id", params.groupId)
       .eq("is_active", true)
-      .or(`athlete_id.is.null,athlete_id.eq.${user?.id ?? ""}`)
+      .or(`athlete_id.is.null,athlete_id.eq.${athleteId ?? ""}`)
       .order("created_at", { ascending: false }),
     user
       ? supabase
@@ -116,8 +128,9 @@ export default async function GroupHubPage(
   // same lightweight experience an athlete gets: logging their own
   // training doesn't need the dense desktop coaching tools. The same
   // coach at an actual desktop still gets the full shell (linked back to
-  // from Settings).
-  const showMobileView = !isCoach || await prefersAthleteStyleView();
+  // from Settings). Acting as a client always wins — that's the whole
+  // point of picking someone from "View as Client."
+  const showMobileView = isActingAsOther || !isCoach || await prefersAthleteStyleView();
 
   let weightLogs: { id: string; loggedDate: string; weight: number }[] = [];
   let todayMacros: { calories: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null } | null = null;
@@ -125,10 +138,14 @@ export default async function GroupHubPage(
   let weekDays: WeekDayEntry[] = [];
   const todayKey = new Date().toISOString().slice(0, 10);
 
-  const viewerTier = roster.find((m) => m.profileId === user?.id)?.clientTier ?? null;
+  const actingAsFullName = isActingAsOther
+    ? roster.find((m) => m.profileId === athleteId)?.fullName ?? "Client"
+    : null;
+
+  const viewerTier = roster.find((m) => m.profileId === athleteId)?.clientTier ?? null;
   const macrosEnabled = viewerTier !== "group";
 
-  if (showMobileView && user) {
+  if (showMobileView && athleteId) {
     // weightLogs, macros, and this athlete's habit definitions are all
     // independent of each other — only the habit *completion* lookup
     // right after needs to wait (it needs the due habits' ids first).
@@ -136,7 +153,7 @@ export default async function GroupHubPage(
       supabase
         .from("body_weight_logs")
         .select("id, logged_date, weight")
-        .eq("athlete_id", user.id)
+        .eq("athlete_id", athleteId)
         .eq("group_id", params.groupId)
         .order("logged_date", { ascending: false })
         .limit(7),
@@ -146,7 +163,7 @@ export default async function GroupHubPage(
         ? supabase
             .from("daily_macros")
             .select("calories, protein_g, carbs_g, fat_g")
-            .eq("athlete_id", user.id)
+            .eq("athlete_id", athleteId)
             .eq("log_date", todayKey)
             .maybeSingle()
         : Promise.resolve({ data: null }),
@@ -154,14 +171,14 @@ export default async function GroupHubPage(
         ? supabase
             .from("meal_plans")
             .select("meals, macros")
-            .eq("athlete_id", user.id)
+            .eq("athlete_id", athleteId)
             .eq("log_date", todayKey)
             .maybeSingle()
         : Promise.resolve({ data: null }),
       supabase
         .from("client_habits")
         .select("id, title, weekdays")
-        .eq("athlete_id", user.id)
+        .eq("athlete_id", athleteId)
         .eq("group_id", params.groupId)
         .eq("active", true),
     ]);
@@ -198,13 +215,21 @@ export default async function GroupHubPage(
       completed: completedIds.has(h.id),
     }));
 
-    weekDays = await computeThisWeek(supabase, { groupId: params.groupId, athleteId: user.id });
+    weekDays = await computeThisWeek(supabase, { groupId: params.groupId, athleteId });
   }
 
   const orgTheme = await getViewerOrgTheme();
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
+      {isActingAsOther && (
+        <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
+      )}
+      {isCoach && showMobileView && !isActingAsOther && (
+        <div className="px-5 pt-4">
+          <ViewAsClientEntryPoint />
+        </div>
+      )}
       <GroupHubHeader
         name={group.name}
         description={group.description}
@@ -243,12 +268,12 @@ export default async function GroupHubPage(
         )}
       </section>
 
-      {showMobileView && user && (
+      {showMobileView && athleteId && (
         <section className="px-5 pt-6 space-y-4">
           {weekDays.length > 0 && <WeekAtAGlance groupId={params.groupId} days={weekDays} />}
           <TodayWidget todayDate={todayKey} macros={todayMacros} habits={todayHabits} />
           <WeightLogWidget
-            athleteId={user.id}
+            athleteId={athleteId}
             groupId={params.groupId}
             initialLogs={weightLogs}
           />

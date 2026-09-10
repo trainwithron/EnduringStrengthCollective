@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 
-export function EditDisplayName({ initialName }: { initialName: string }) {
+export function EditDisplayName({ initialName, profileId }: { initialName: string; profileId: string }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(initialName);
@@ -20,17 +20,10 @@ export function EditDisplayName({ initialName }: { initialName: string }) {
     setSaving(true);
     setError(null);
     const supabase = createBrowserClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      setSaving(false);
-      return;
-    }
     const { error: updateError } = await supabase
       .from("profiles")
       .update({ full_name: trimmed })
-      .eq("id", user.id);
+      .eq("id", profileId);
     setSaving(false);
     if (updateError) {
       setError("Couldn't save — check your connection and try again.");

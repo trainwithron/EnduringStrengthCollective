@@ -28,7 +28,13 @@ const OPTIONS: { value: BroadcastLevel; label: string; description: string }[] =
   },
 ];
 
-export function FeedBroadcastSettings({ initialLevel }: { initialLevel: BroadcastLevel }) {
+export function FeedBroadcastSettings({
+  initialLevel,
+  profileId,
+}: {
+  initialLevel: BroadcastLevel;
+  profileId: string;
+}) {
   const [level, setLevel] = useState<BroadcastLevel>(initialLevel);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,20 +45,15 @@ export function FeedBroadcastSettings({ initialLevel }: { initialLevel: Broadcas
     setSaving(true);
     setError(null);
     const supabase = createBrowserClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (user) {
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({ feed_broadcast_level: value })
-        .eq("id", user.id);
-      // The selected radio already visually updated — without this, a
-      // failed save would look identical to a successful one.
-      if (updateError) {
-        setLevel(previous);
-        setError("Couldn't save — check your connection and try again.");
-      }
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({ feed_broadcast_level: value })
+      .eq("id", profileId);
+    // The selected radio already visually updated — without this, a
+    // failed save would look identical to a successful one.
+    if (updateError) {
+      setLevel(previous);
+      setError("Couldn't save — check your connection and try again.");
     }
     setSaving(false);
   }

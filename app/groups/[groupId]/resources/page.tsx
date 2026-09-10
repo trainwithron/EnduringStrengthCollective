@@ -11,6 +11,8 @@ import { ReferralDirectoryList } from "@/components/athlete/referral-directory-l
 import { ProShopManager, type ProShopLink } from "@/components/coach/desktop/pro-shop-manager";
 import { ProShopList } from "@/components/athlete/pro-shop-list";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
+import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
+import { getEffectiveAthlete } from "@/lib/acting-as";
 
 type ResourceTab = "referrals" | "shop";
 
@@ -48,7 +50,19 @@ export default async function ResourcesPage(
   }
 
   const isCoach = membership.role === "coach";
-  const showMobileView = !isCoach || await prefersAthleteStyleView();
+  const effective = await getEffectiveAthlete(params.groupId, user.id);
+  const isActingAsOther = effective.isActingAsOther;
+  const showMobileView = isActingAsOther || !isCoach || await prefersAthleteStyleView();
+
+  let actingAsFullName: string | null = null;
+  if (isActingAsOther) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", effective.athleteId)
+      .maybeSingle();
+    actingAsFullName = profile?.full_name ?? "Client";
+  }
 
   // Both directories are coach-scoped, shared across every group that
   // coach runs — same resolution as before the merge.
@@ -150,6 +164,9 @@ export default async function ResourcesPage(
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
+      {isActingAsOther && (
+        <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
+      )}
       <header className="px-5 pt-8 pb-6 border-b border-steel/20">
         <Link
           href={`/groups/${params.groupId}/settings`}

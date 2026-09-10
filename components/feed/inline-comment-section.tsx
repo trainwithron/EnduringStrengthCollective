@@ -144,16 +144,12 @@ export function InlineCommentSection({
   }
 
   async function handleSend() {
-    if (!body.trim() || sending) return;
+    if (!body.trim() || sending || !viewerId) return;
     setSending(true);
     setError(null);
     const trimmedBody = body.trim();
     try {
       const supabase = createBrowserClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) return;
 
       // group_id is required by the schema; look it up from the post.
       // author_id is only needed for the push notification below, not
@@ -173,7 +169,7 @@ export function InlineCommentSection({
       const { error: insertError } = await supabase.from("comments").insert({
         post_id: postId,
         group_id: post.group_id,
-        author_id: user.id,
+        author_id: viewerId,
         parent_comment_id: replyTo,
         body: trimmedBody,
         mentioned_profile_ids: confirmedMentionIds,
@@ -194,11 +190,11 @@ export function InlineCommentSection({
       const { data: viewerProfile } = await supabase
         .from("profiles")
         .select("full_name")
-        .eq("id", user.id)
+        .eq("id", viewerId)
         .maybeSingle();
       const commenterName = viewerProfile?.full_name ?? "Someone";
       const feedUrl = `/groups/${post.group_id}/feed`;
-      const notified = new Set<string>([user.id]);
+      const notified = new Set<string>([viewerId]);
       if (post.author_id && !notified.has(post.author_id)) {
         notifyPush(post.author_id, "New comment", `${commenterName} commented on your post`, feedUrl);
         notified.add(post.author_id);
