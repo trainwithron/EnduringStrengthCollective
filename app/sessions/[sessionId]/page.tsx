@@ -44,7 +44,7 @@ export default async function SessionPage(
       `
       id, exercise_name, exercise_order, is_swapped, is_added, movement_pattern_id, tracked_fields, group_workout_exercise_id,
       group_workout_exercises ( notes ),
-      set_logs ( id, set_order, weight, reps, rpe, rir, tempo, time_seconds, height, distance, status )
+      set_logs ( id, set_order, weight, reps, rpe, rir, tempo, time_seconds, height, distance, rest_seconds, pace, status )
     `
     )
     .eq("session_id", params.sessionId)
@@ -61,12 +61,23 @@ export default async function SessionPage(
 
   const targetsByExerciseAndOrder = new Map<
     string,
-    { rpe: number | null; rir: number | null; tempo: string | null; timeSeconds: number | null; height: number | null; distance: number | null }
+    {
+      rpe: number | null;
+      rir: number | null;
+      tempo: string | null;
+      timeSeconds: number | null;
+      height: number | null;
+      distance: number | null;
+      restSeconds: number | null;
+      pace: string | null;
+    }
   >();
   if (templateExerciseIds.length > 0) {
     const { data: templateSets } = await supabase
       .from("group_workout_exercise_sets")
-      .select("group_workout_exercise_id, set_order, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance")
+      .select(
+        "group_workout_exercise_id, set_order, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance, target_rest_seconds, target_pace"
+      )
       .in("group_workout_exercise_id", templateExerciseIds);
     for (const t of templateSets ?? []) {
       targetsByExerciseAndOrder.set(`${t.group_workout_exercise_id}:${t.set_order}`, {
@@ -76,6 +87,8 @@ export default async function SessionPage(
         timeSeconds: t.target_time_seconds,
         height: t.target_height,
         distance: t.target_distance,
+        restSeconds: t.target_rest_seconds,
+        pace: t.target_pace,
       });
     }
   }
@@ -140,6 +153,8 @@ export default async function SessionPage(
               timeSeconds: sl.time_seconds,
               height: sl.height,
               distance: sl.distance,
+              restSeconds: sl.rest_seconds,
+              pace: sl.pace,
               status: sl.status,
               targetRpe: target?.rpe ?? null,
               targetRir: target?.rir ?? null,
@@ -147,6 +162,8 @@ export default async function SessionPage(
               targetTimeSeconds: target?.timeSeconds ?? null,
               targetHeight: target?.height ?? null,
               targetDistance: target?.distance ?? null,
+              targetRestSeconds: target?.restSeconds ?? null,
+              targetPace: target?.pace ?? null,
             };
           }),
       };

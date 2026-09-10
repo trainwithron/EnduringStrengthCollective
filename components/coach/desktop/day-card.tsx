@@ -518,6 +518,23 @@ export function DayCard({
                           )
                         )
                       }
+                      // A patch and a full sets replacement made back-to-back in
+                      // the same handler (e.g. removing a tracked field, or
+                      // applying a cardio preset) would otherwise race: both
+                      // onUpdate and onSetsChange close over this same render's
+                      // `day.items`, so the second call always overwrites the
+                      // first's change instead of composing with it — found
+                      // live while verifying the Energy System preset (set
+                      // count updated, but tracked_fields visibly reverted).
+                      // This single combined callback computes both fields in
+                      // one map pass instead of two sequential ones.
+                      onFieldsAndSetsChange={(trackedFields, sets) =>
+                        onItemsChange(
+                          day.items.map((i) =>
+                            i.id === item.id && i.kind === "exercise" ? { ...i, trackedFields, sets } : i
+                          )
+                        )
+                      }
                       onDeleted={() => onItemsChange(day.items.filter((i) => i.id !== item.id))}
                       onDuplicated={(newExercise) => insertAfter(item.id, newExercise)}
                     />

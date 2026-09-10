@@ -111,7 +111,7 @@ export function SessionLogger({
       const { data: sets } = await supabase
         .from("set_logs")
         .insert({ session_exercise_id: sessionExercise.id, set_order: 0 })
-        .select("id, set_order, weight, reps, rpe, rir, tempo, time_seconds, height, distance, status");
+        .select("id, set_order, weight, reps, rpe, rir, tempo, time_seconds, height, distance, rest_seconds, pace, status");
 
       setExercises((prev) => [
         ...prev,
@@ -136,6 +136,8 @@ export function SessionLogger({
             timeSeconds: s.time_seconds,
             height: s.height,
             distance: s.distance,
+            restSeconds: s.rest_seconds,
+            pace: s.pace,
             status: s.status,
           })),
         },

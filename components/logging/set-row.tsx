@@ -18,6 +18,8 @@ const TARGET_PROP: Partial<Record<TrackedField, keyof SetLogEntry>> = {
   time: "targetTimeSeconds",
   height: "targetHeight",
   distance: "targetDistance",
+  rest: "targetRestSeconds",
+  pace: "targetPace",
 };
 
 function ActualCell({
@@ -151,6 +153,8 @@ export function SetRow({
     set.timeSeconds,
     set.height,
     set.distance,
+    set.restSeconds,
+    set.pace,
     set.status,
   ]);
 

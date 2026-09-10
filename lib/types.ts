@@ -37,6 +37,8 @@ export interface SetLogEntry {
   timeSeconds: number | null;
   height: number | null;
   distance: number | null;
+  restSeconds: number | null;
+  pace: string | null;
   status: SetLogStatus;
   // The prescribed value for each "extra" field (RPE, RIR, tempo, etc.),
   // shown only as a placeholder hint during logging — never pre-filled
@@ -51,6 +53,8 @@ export interface SetLogEntry {
   targetTimeSeconds?: number | null;
   targetHeight?: number | null;
   targetDistance?: number | null;
+  targetRestSeconds?: number | null;
+  targetPace?: string | null;
 }
 
 export interface SessionExerciseEntry {
@@ -81,9 +85,13 @@ export interface ExerciseSetTarget {
   targetTimeSeconds: number | null;
   targetHeight: number | null;
   targetDistance: number | null;
+  targetRestSeconds: number | null;
+  targetPace: string | null;
   // Optional structured rep range (distinct from the free-text targetReps
   // above) — only used by Double Progression to know when a set has
-  // maxed out reps and should bump weight instead.
+  // maxed out reps and should bump weight instead. Reused as a distance
+  // floor/ceiling for the same purpose when an exercise tracks Distance
+  // instead of Reps (see lib/progression-models.ts).
   repMin: number | null;
   repMax: number | null;
 }

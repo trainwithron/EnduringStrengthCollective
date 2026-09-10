@@ -12,7 +12,9 @@ export type TrackedField =
   | "tempo"
   | "time"
   | "height"
-  | "distance";
+  | "distance"
+  | "rest"
+  | "pace";
 
 export const TRACKED_FIELD_DEFS: { key: TrackedField; label: string; kind: "number" | "text" }[] = [
   { key: "reps", label: "Reps", kind: "text" },
@@ -23,6 +25,10 @@ export const TRACKED_FIELD_DEFS: { key: TrackedField; label: string; kind: "numb
   { key: "time", label: "Sec", kind: "number" },
   { key: "height", label: "Height", kind: "number" },
   { key: "distance", label: "Distance", kind: "number" },
+  { key: "rest", label: "Rest (s)", kind: "number" },
+  // Free text, same convention as Tempo — holds a real pace ("8:30/mi"),
+  // an effort label ("easy"), or an RPE-per-mile note.
+  { key: "pace", label: "Pace", kind: "text" },
 ];
 
 export const DEFAULT_TRACKED_FIELDS: TrackedField[] = ["reps", "weight", "rpe"];
@@ -47,6 +53,8 @@ export const TARGET_COLUMN: Record<TrackedField, string> = {
   time: "target_time_seconds",
   height: "target_height",
   distance: "target_distance",
+  rest: "target_rest_seconds",
+  pace: "target_pace",
 };
 
 export const TARGET_PROP: Record<TrackedField, string> = {
@@ -58,6 +66,8 @@ export const TARGET_PROP: Record<TrackedField, string> = {
   time: "targetTimeSeconds",
   height: "targetHeight",
   distance: "targetDistance",
+  rest: "targetRestSeconds",
+  pace: "targetPace",
 };
 
 // set_logs column + SetLogEntry property per field (actual logged values).
@@ -70,6 +80,8 @@ export const ACTUAL_COLUMN: Record<TrackedField, string> = {
   time: "time_seconds",
   height: "height",
   distance: "distance",
+  rest: "rest_seconds",
+  pace: "pace",
 };
 
 export const ACTUAL_PROP: Record<TrackedField, string> = {
@@ -81,6 +93,8 @@ export const ACTUAL_PROP: Record<TrackedField, string> = {
   time: "timeSeconds",
   height: "height",
   distance: "distance",
+  rest: "restSeconds",
+  pace: "pace",
 };
 
 // Shared shape mapper: a raw group_workout_exercise_sets row (snake_case,
@@ -96,6 +110,8 @@ export function mapSetRow(row: {
   target_time_seconds: number | null;
   target_height: number | null;
   target_distance: number | null;
+  target_rest_seconds?: number | null;
+  target_pace?: string | null;
   rep_min?: number | null;
   rep_max?: number | null;
 }): ExerciseSetTarget {
@@ -110,6 +126,8 @@ export function mapSetRow(row: {
     targetTimeSeconds: row.target_time_seconds,
     targetHeight: row.target_height,
     targetDistance: row.target_distance,
+    targetRestSeconds: row.target_rest_seconds ?? null,
+    targetPace: row.target_pace ?? null,
     repMin: row.rep_min ?? null,
     repMax: row.rep_max ?? null,
   };
@@ -144,4 +162,4 @@ export function formatCondensedSets(
 }
 
 export const SET_ROW_SELECT =
-  "id, set_order, target_reps, target_weight, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance, rep_min, rep_max";
+  "id, set_order, target_reps, target_weight, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance, target_rest_seconds, target_pace, rep_min, rep_max";

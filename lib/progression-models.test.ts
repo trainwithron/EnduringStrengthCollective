@@ -4,6 +4,9 @@ import {
   generateLinearProgression,
   generateDoubleProgression,
   generateUndulatingProgression,
+  generateIntervalProgression,
+  parseNumericPaceSecondsPerUnit,
+  formatPaceSecondsToClock,
   DEFAULT_UNDULATING_WAVE,
 } from "./progression-models";
 
@@ -78,5 +81,66 @@ describe("generateUndulatingProgression", () => {
       { weeks: 1, wave: [{ reps: 6 }] }
     );
     expect(result[0].reps).toBe(6);
+  });
+});
+
+describe("generateIntervalProgression", () => {
+  const source = { rounds: 8, workSeconds: 9, restSeconds: 55 };
+
+  it("steps rounds up while holding work/rest fixed", () => {
+    const result = generateIntervalProgression(source, { weeks: 3, axis: "rounds", amountPerWeek: 1 });
+    expect(result.map((r) => r.rounds)).toEqual([9, 10, 11]);
+    expect(result.every((r) => r.workSeconds === 9 && r.restSeconds === 55)).toBe(true);
+  });
+
+  it("steps rest down while holding rounds/work fixed", () => {
+    const result = generateIntervalProgression(source, { weeks: 3, axis: "rest", amountPerWeek: -5 });
+    expect(result.map((r) => r.restSeconds)).toEqual([50, 45, 40]);
+    expect(result.every((r) => r.rounds === 8 && r.workSeconds === 9)).toBe(true);
+  });
+
+  it("steps work up while holding rounds/rest fixed", () => {
+    const result = generateIntervalProgression(source, { weeks: 2, axis: "work", amountPerWeek: 2 });
+    expect(result.map((r) => r.workSeconds)).toEqual([11, 13]);
+  });
+
+  it("clamps rest at 0 instead of going negative on a long decrease", () => {
+    const result = generateIntervalProgression(source, { weeks: 20, axis: "rest", amountPerWeek: -10 });
+    expect(result[result.length - 1].restSeconds).toBe(0);
+  });
+
+  it("clamps rounds at 1 instead of going to 0 or negative", () => {
+    const result = generateIntervalProgression(source, { weeks: 20, axis: "rounds", amountPerWeek: -1 });
+    expect(result[result.length - 1].rounds).toBe(1);
+  });
+});
+
+describe("parseNumericPaceSecondsPerUnit", () => {
+  it("parses a plain number of seconds", () => {
+    expect(parseNumericPaceSecondsPerUnit("540")).toBe(540);
+  });
+  it("parses an M:SS clock-formatted pace", () => {
+    expect(parseNumericPaceSecondsPerUnit("9:00")).toBe(540);
+    expect(parseNumericPaceSecondsPerUnit("8:30")).toBe(510);
+  });
+  it("returns null for an effort label instead of throwing", () => {
+    expect(parseNumericPaceSecondsPerUnit("easy")).toBeNull();
+    expect(parseNumericPaceSecondsPerUnit("conversational")).toBeNull();
+  });
+  it("handles null/empty", () => {
+    expect(parseNumericPaceSecondsPerUnit(null)).toBeNull();
+    expect(parseNumericPaceSecondsPerUnit("")).toBeNull();
+  });
+});
+
+describe("formatPaceSecondsToClock", () => {
+  it("formats seconds back to M:SS", () => {
+    expect(formatPaceSecondsToClock(540)).toBe("9:00");
+    expect(formatPaceSecondsToClock(510)).toBe("8:30");
+    expect(formatPaceSecondsToClock(65)).toBe("1:05");
+  });
+  it("round-trips through the parser", () => {
+    const seconds = parseNumericPaceSecondsPerUnit("8:30")!;
+    expect(formatPaceSecondsToClock(seconds)).toBe("8:30");
   });
 });

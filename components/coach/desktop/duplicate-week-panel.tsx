@@ -3,18 +3,37 @@
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { BuilderDay, BuilderItem } from "@/lib/types";
-import type { TrackedField } from "@/lib/exercise-fields";
+import { SET_ROW_SELECT, mapSetRow, type TrackedField } from "@/lib/exercise-fields";
 import {
   generateLinearProgression,
   generateDoubleProgression,
   generateUndulatingProgression,
+  generateIntervalProgression,
+  parseNumericPaceSecondsPerUnit,
+  formatPaceSecondsToClock,
   DEFAULT_UNDULATING_WAVE,
   type ProgressionResultWeek,
+  type IntervalResultWeek,
   type UndulatingWaveStep,
 } from "@/lib/progression-models";
 import { flashSaved, flashSaveError } from "@/lib/save-toast";
 
 type Model = "linear" | "double" | "undulating";
+type IntervalAxis = "rounds" | "rest" | "work";
+
+// An interval exercise (Time + Rest tracked) progresses at the exercise
+// level — "rounds" is literally how many set rows exist, not a per-set
+// value — so it can't share the per-set progression tracks below at all;
+// a distance/pace exercise (Distance + Pace, no Reps) *does* share that
+// system, just with distance mapped onto the "reps" slot and a parsed
+// numeric pace onto "weight" (see buildProgressionSource) — the exact
+// reuse the original ask called for.
+function isIntervalExercise(trackedFields: TrackedField[]): boolean {
+  return trackedFields.includes("time") && trackedFields.includes("rest");
+}
+function isDistancePaceExercise(trackedFields: TrackedField[]): boolean {
+  return trackedFields.includes("distance") && trackedFields.includes("pace") && !trackedFields.includes("reps");
+}
 
 function parseReps(text: string | null): number | null {
   if (!text) return null;
@@ -55,6 +74,8 @@ export function DuplicateWeekPanel({
   const [linearWeightPct, setLinearWeightPct] = useState("2.5");
   const [doubleWeightBumpPct, setDoubleWeightBumpPct] = useState("5");
   const [wave, setWave] = useState<UndulatingWaveStep[]>(DEFAULT_UNDULATING_WAVE);
+  const [intervalAxis, setIntervalAxis] = useState<IntervalAxis>("rounds");
+  const [intervalAmountPerWeek, setIntervalAmountPerWeek] = useState("1");
   const [classRepsEnabled, setClassRepsEnabled] = useState(false);
   const [classRepCycles, setClassRepCycles] = useState<Record<"A" | "B" | "C", string>>({
     A: "",
@@ -67,6 +88,10 @@ export function DuplicateWeekPanel({
     setWave((prev) => prev.map((s, i) => (i === index ? { ...s, ...patch } : s)));
   }
 
+  const hasIntervalExercise = sourceDays.some((d) =>
+    d.items.some((i) => i.kind === "exercise" && isIntervalExercise(i.trackedFields))
+  );
+
   async function handleGenerate() {
     const weekCount = Number(weeks);
     if (!weekCount || weekCount < 1) return;
@@ -77,7 +102,11 @@ export function DuplicateWeekPanel({
 
     // Flatten every set across the source week into an independent
     // progression track — each set only depends on its own targets, never
-    // on any other set's.
+    // on any other set's. A distance/pace exercise shares this exact
+    // system (distance mapped onto the "reps" slot, a parsed numeric pace
+    // onto "weight") — only a true interval exercise (Time+Rest) is
+    // fundamentally different, since its "rounds" is a row count, not a
+    // per-set value, and gets its own track list below.
     interface SetTrack {
       dayIndex: number;
       dayTitle: string;
@@ -88,6 +117,7 @@ export function DuplicateWeekPanel({
       notes: string | null;
       tier: "A" | "B" | "C" | null;
       setOrder: number;
+      isDistancePace: boolean;
       otherTargets: {
         rpe: number | null;
         rir: number | null;
@@ -95,10 +125,13 @@ export function DuplicateWeekPanel({
         timeSeconds: number | null;
         height: number | null;
         distance: number | null;
+        restSeconds: number | null;
+        pace: string | null;
       };
       // Carried through unchanged onto every generated week's sets — the
-      // range itself doesn't move, only where reps sit within it — so a
-      // coach can chain another duplication off these new weeks later.
+      // range itself doesn't move, only where reps/distance sit within
+      // it — so a coach can chain another duplication off these new
+      // weeks later.
       repRange: { min: number | null; max: number | null };
       results: ProgressionResultWeek[];
       // Set when the source reps text wasn't a plain integer (a range
@@ -106,11 +139,30 @@ export function DuplicateWeekPanel({
       // cycle — the write step uses this raw text instead of the model's
       // (meaningless, truncated) numeric result for every generated week.
       preserveRepsText: string | null;
+      // Same idea for a distance/pace exercise's pace, when it's an
+      // effort label ("easy") rather than a real parseable pace — the
+      // model's computed "weight" (bumped pace) is meaningless for text
+      // like that, so the original label carries forward unchanged.
+      preservePaceText: string | null;
+    }
+
+    interface IntervalTrack {
+      dayIndex: number;
+      dayTitle: string;
+      itemOrder: number;
+      exerciseName: string;
+      movementPatternId: string | null;
+      trackedFields: TrackedField[];
+      notes: string | null;
+      tier: "A" | "B" | "C" | null;
+      otherTargets: { rpe: number | null; rir: number | null; tempo: string | null; height: number | null };
+      results: IntervalResultWeek[];
     }
 
     const sortedDays = sourceDays.slice().sort((a, b) => a.dayIndex - b.dayIndex);
     const dayNoteTracks: { dayIndex: number; dayTitle: string; itemOrder: number; body: string }[] = [];
     const setTracks: SetTrack[] = [];
+    const intervalTracks: IntervalTrack[] = [];
 
     for (const day of sortedDays) {
       for (const item of day.items) {
@@ -123,13 +175,53 @@ export function DuplicateWeekPanel({
           });
           continue;
         }
+
+        if (isIntervalExercise(item.trackedFields)) {
+          const firstSet = item.sets[0];
+          const results = generateIntervalProgression(
+            {
+              rounds: item.sets.length,
+              workSeconds: firstSet?.targetTimeSeconds ?? 0,
+              restSeconds: firstSet?.targetRestSeconds ?? 0,
+            },
+            { weeks: weekCount, axis: intervalAxis, amountPerWeek: Number(intervalAmountPerWeek) || 0 }
+          );
+          intervalTracks.push({
+            dayIndex: day.dayIndex,
+            dayTitle: day.title,
+            itemOrder: item.order,
+            exerciseName: item.exerciseName,
+            movementPatternId: item.movementPatternId,
+            trackedFields: item.trackedFields,
+            notes: item.notes,
+            tier: item.tier,
+            otherTargets: {
+              rpe: firstSet?.targetRpe ?? null,
+              rir: firstSet?.targetRir ?? null,
+              tempo: firstSet?.targetTempo ?? null,
+              height: firstSet?.targetHeight ?? null,
+            },
+            results,
+          });
+          continue;
+        }
+
+        const isDistancePace = isDistancePaceExercise(item.trackedFields);
+
         for (const set of item.sets) {
-          const source = {
-            weight: set.targetWeight,
-            reps: parseReps(set.targetReps),
-            repMin: set.repMin,
-            repMax: set.repMax,
-          };
+          const source = isDistancePace
+            ? {
+                weight: parseNumericPaceSecondsPerUnit(set.targetPace),
+                reps: set.targetDistance,
+                repMin: set.repMin,
+                repMax: set.repMax,
+              }
+            : {
+                weight: set.targetWeight,
+                reps: parseReps(set.targetReps),
+                repMin: set.repMin,
+                repMax: set.repMax,
+              };
 
           let results: ProgressionResultWeek[];
           if (model === "linear") {
@@ -150,9 +242,10 @@ export function DuplicateWeekPanel({
           // weight-progression model produced `results` — a coach can
           // set week-by-week rep targets per A/B/C class independent of
           // whether weight is climbing linearly, via double progression,
-          // or an undulating wave.
+          // or an undulating wave. Doesn't apply to a distance/pace
+          // exercise — there are no reps to override there.
           let repsOverriddenByClass = false;
-          if (classRepsEnabled && item.tier) {
+          if (!isDistancePace && classRepsEnabled && item.tier) {
             const cycleText = classRepCycles[item.tier];
             const cycle = cycleText
               .split(",")
@@ -174,6 +267,7 @@ export function DuplicateWeekPanel({
             notes: item.notes,
             tier: item.tier,
             setOrder: set.setOrder,
+            isDistancePace,
             otherTargets: {
               rpe: set.targetRpe,
               rir: set.targetRir,
@@ -181,12 +275,18 @@ export function DuplicateWeekPanel({
               timeSeconds: set.targetTimeSeconds,
               height: set.targetHeight,
               distance: set.targetDistance,
+              restSeconds: set.targetRestSeconds,
+              pace: set.targetPace,
             },
             repRange: { min: set.repMin, max: set.repMax },
             results,
             preserveRepsText:
-              !repsOverriddenByClass && set.targetReps && !isPlainInteger(set.targetReps)
+              !isDistancePace && !repsOverriddenByClass && set.targetReps && !isPlainInteger(set.targetReps)
                 ? set.targetReps
+                : null,
+            preservePaceText:
+              isDistancePace && set.targetPace && parseNumericPaceSecondsPerUnit(set.targetPace) === null
+                ? set.targetPace
                 : null,
           });
         }
@@ -246,11 +346,67 @@ export function DuplicateWeekPanel({
         }
 
         const tracksForDay = setTracks.filter((t) => t.dayIndex === day.dayIndex);
-        const exerciseOrders = Array.from(new Set(tracksForDay.map((t) => t.itemOrder))).sort(
-          (a, b) => a - b
-        );
+        const intervalTracksForDay = intervalTracks.filter((t) => t.dayIndex === day.dayIndex);
+        const exerciseOrders = Array.from(
+          new Set([...tracksForDay.map((t) => t.itemOrder), ...intervalTracksForDay.map((t) => t.itemOrder)])
+        ).sort((a, b) => a - b);
 
         for (const itemOrder of exerciseOrders) {
+          const intervalTrack = intervalTracksForDay.find((t) => t.itemOrder === itemOrder);
+
+          if (intervalTrack) {
+            const { data: exerciseRow, error: exerciseError } = await supabase
+              .from("group_workout_exercises")
+              .insert({
+                workout_id: workoutRow.id,
+                group_id: groupId,
+                exercise_name: intervalTrack.exerciseName,
+                exercise_order: itemOrder,
+                movement_pattern_id: intervalTrack.movementPatternId,
+                tracked_fields: intervalTrack.trackedFields,
+                notes: intervalTrack.notes,
+              })
+              .select("id")
+              .single();
+            if (exerciseError || !exerciseRow) {
+              anyFailed = true;
+              continue;
+            }
+
+            const result = intervalTrack.results[offset];
+            const setsPayload = Array.from({ length: result.rounds }, (_, i) => ({
+              group_workout_exercise_id: exerciseRow.id,
+              set_order: i,
+              target_time_seconds: result.workSeconds,
+              target_rest_seconds: result.restSeconds,
+              target_rpe: intervalTrack.otherTargets.rpe,
+              target_rir: intervalTrack.otherTargets.rir,
+              target_tempo: intervalTrack.otherTargets.tempo,
+              target_height: intervalTrack.otherTargets.height,
+            }));
+
+            const { data: setsData, error: setsError } = await supabase
+              .from("group_workout_exercise_sets")
+              .insert(setsPayload)
+              .select(SET_ROW_SELECT);
+            if (setsError) anyFailed = true;
+
+            items.push({
+              kind: "exercise",
+              id: exerciseRow.id,
+              order: itemOrder,
+              exerciseName: intervalTrack.exerciseName,
+              movementPatternId: intervalTrack.movementPatternId,
+              trackedFields: intervalTrack.trackedFields,
+              notes: intervalTrack.notes,
+              videoPath: null,
+              youtubeUrl: null,
+              tier: intervalTrack.tier,
+              sets: (setsData ?? []).map(mapSetRow),
+            });
+            continue;
+          }
+
           const tracksForExercise = tracksForDay.filter((t) => t.itemOrder === itemOrder);
           const first = tracksForExercise[0];
 
@@ -277,6 +433,24 @@ export function DuplicateWeekPanel({
             .sort((a, b) => a.setOrder - b.setOrder)
             .map((track) => {
               const result = track.results[offset];
+              if (track.isDistancePace) {
+                return {
+                  group_workout_exercise_id: exerciseRow.id,
+                  set_order: track.setOrder,
+                  target_distance: result.reps,
+                  target_pace:
+                    track.preservePaceText ??
+                    (result.weight != null ? formatPaceSecondsToClock(result.weight) : null),
+                  target_rpe: track.otherTargets.rpe,
+                  target_rir: track.otherTargets.rir,
+                  target_tempo: track.otherTargets.tempo,
+                  target_time_seconds: track.otherTargets.timeSeconds,
+                  target_height: track.otherTargets.height,
+                  target_rest_seconds: track.otherTargets.restSeconds,
+                  rep_min: track.repRange.min,
+                  rep_max: track.repRange.max,
+                };
+              }
               return {
                 group_workout_exercise_id: exerciseRow.id,
                 set_order: track.setOrder,
@@ -289,6 +463,8 @@ export function DuplicateWeekPanel({
                 target_time_seconds: track.otherTargets.timeSeconds,
                 target_height: track.otherTargets.height,
                 target_distance: track.otherTargets.distance,
+                target_rest_seconds: track.otherTargets.restSeconds,
+                target_pace: track.otherTargets.pace,
                 rep_min: track.repRange.min,
                 rep_max: track.repRange.max,
               };
@@ -297,9 +473,7 @@ export function DuplicateWeekPanel({
           const { data: setsData, error: setsError } = await supabase
             .from("group_workout_exercise_sets")
             .insert(setsPayload)
-            .select(
-              "id, set_order, target_reps, target_weight, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance, rep_min, rep_max"
-            );
+            .select(SET_ROW_SELECT);
           if (setsError) anyFailed = true;
 
           items.push({
@@ -313,20 +487,7 @@ export function DuplicateWeekPanel({
             videoPath: null,
             youtubeUrl: null,
             tier: first.tier,
-            sets: (setsData ?? []).map((s) => ({
-              id: s.id,
-              setOrder: s.set_order,
-              targetReps: s.target_reps,
-              targetWeight: s.target_weight,
-              targetRpe: s.target_rpe,
-              targetRir: s.target_rir,
-              targetTempo: s.target_tempo,
-              targetTimeSeconds: s.target_time_seconds,
-              targetHeight: s.target_height,
-              targetDistance: s.target_distance,
-              repMin: s.rep_min,
-              repMax: s.rep_max,
-            })),
+            sets: (setsData ?? []).map(mapSetRow),
           });
         }
 
@@ -381,6 +542,49 @@ export function DuplicateWeekPanel({
           className="w-16 h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
         />
       </div>
+
+      {hasIntervalExercise && (
+        <div className="border border-steel/20 p-3 space-y-2">
+          <p className="font-body text-xs text-steel uppercase tracking-wide">
+            Interval exercises (Time + Rest) — progress:
+          </p>
+          <div className="flex gap-1">
+            {(["rounds", "rest", "work"] as IntervalAxis[]).map((axis) => (
+              <button
+                key={axis}
+                type="button"
+                onClick={() => setIntervalAxis(axis)}
+                className={`h-8 px-3 font-body text-xs border ${
+                  intervalAxis === axis ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
+                }`}
+              >
+                {axis === "rounds" ? "Rounds" : axis === "rest" ? "Rest" : "Work"}
+              </button>
+            ))}
+          </div>
+          <label className="flex items-center gap-2">
+            <span className="font-body text-xs text-steel w-40">
+              {intervalAxis === "rounds"
+                ? "Rounds / week"
+                : intervalAxis === "rest"
+                ? "Rest change / week (s)"
+                : "Work change / week (s)"}
+            </span>
+            <input
+              type="number"
+              value={intervalAmountPerWeek}
+              onChange={(e) => setIntervalAmountPerWeek(e.target.value)}
+              className="w-20 h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
+            />
+            <span className="font-body text-[11px] text-steel">
+              {intervalAxis === "rest" ? "(negative = shorter rest)" : "(negative to decrease)"}
+            </span>
+          </label>
+          <p className="font-body text-[11px] text-steel">
+            Non-interval exercises in this week use the model below instead.
+          </p>
+        </div>
+      )}
 
       <div className="flex gap-1">
         {(["linear", "double", "undulating"] as Model[]).map((m) => (

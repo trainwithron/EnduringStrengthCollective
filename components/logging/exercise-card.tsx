@@ -78,7 +78,7 @@ export function ExerciseCard({
       const { data: set } = await supabase
         .from("set_logs")
         .insert({ session_exercise_id: exercise.id, set_order: nextOrder })
-        .select("id, set_order, weight, reps, rpe, rir, tempo, time_seconds, height, distance, status")
+        .select("id, set_order, weight, reps, rpe, rir, tempo, time_seconds, height, distance, rest_seconds, pace, status")
         .single();
 
       if (set) {
@@ -93,6 +93,8 @@ export function ExerciseCard({
           timeSeconds: set.time_seconds,
           height: set.height,
           distance: set.distance,
+          restSeconds: set.rest_seconds,
+          pace: set.pace,
           status: set.status,
         });
       }

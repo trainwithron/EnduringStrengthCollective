@@ -17,6 +17,7 @@ import {
 } from "@/lib/exercise-fields";
 import { ChevronDown, ChevronUp, Copy, GripVertical, Trash2 } from "lucide-react";
 import { flashSaved, flashSaveError } from "@/lib/save-toast";
+import { CARDIO_PRESETS, type CardioPreset } from "@/lib/cardio-presets";
 
 export interface MovementPatternOption {
   id: string;
@@ -87,6 +88,7 @@ export function ExerciseBuilderCard({
   onMoveDown,
   onUpdate,
   onSetsChange,
+  onFieldsAndSetsChange,
   onDeleted,
   onDuplicated,
 }: {
@@ -101,6 +103,14 @@ export function ExerciseBuilderCard({
   onMoveDown: () => void;
   onUpdate: (patch: Partial<Omit<BuilderExercise, "kind" | "id" | "order" | "sets">>) => void;
   onSetsChange: (sets: ExerciseSetTarget[]) => void;
+  // Updates trackedFields and sets atomically in one call — required
+  // whenever both change together in the same handler (e.g. switching to
+  // an Energy System preset, or clearing a removed field's values).
+  // Calling onUpdate then onSetsChange separately for that case is a real
+  // race: both close over the same stale parent state, so the second
+  // call silently overwrites the first's change instead of composing
+  // with it.
+  onFieldsAndSetsChange: (trackedFields: TrackedField[], sets: ExerciseSetTarget[]) => void;
   onDeleted: () => void;
   onDuplicated: (newExercise: BuilderExercise) => void;
 }) {
@@ -108,6 +118,8 @@ export function ExerciseBuilderCard({
   const [collapsed, setCollapsed] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [addFieldOpen, setAddFieldOpen] = useState(false);
+  const [presetMenuOpen, setPresetMenuOpen] = useState(false);
+  const [presetBusy, setPresetBusy] = useState(false);
   const [notesDraft, setNotesDraft] = useState(exercise.notes ?? "");
   const [busy, setBusy] = useState(false);
   const [repMinDraft, setRepMinDraft] = useState(exercise.sets[0]?.repMin?.toString() ?? "");
@@ -224,6 +236,8 @@ export function ExerciseBuilderCard({
           target_time_seconds: last?.targetTimeSeconds ?? null,
           target_height: last?.targetHeight ?? null,
           target_distance: last?.targetDistance ?? null,
+          target_rest_seconds: last?.targetRestSeconds ?? null,
+          target_pace: last?.targetPace ?? null,
         })
         .select(SET_ROW_SELECT)
         .single();
@@ -331,12 +345,105 @@ export function ExerciseBuilderCard({
         .in("id", setIds);
       clearFailed = !!clearError;
     }
-    onUpdate({ trackedFields: nextFields });
-    onSetsChange(exercise.sets.map((s) => ({ ...s, [TARGET_PROP[field]]: null })));
+    onFieldsAndSetsChange(
+      nextFields,
+      exercise.sets.map((s) => ({ ...s, [TARGET_PROP[field]]: null }))
+    );
     if (clearFailed) {
       flashSaveError("Field removed, but couldn't clear its saved values.");
     } else {
       flashSaved();
+    }
+  }
+
+  // One-click energy-system preset: switches this exercise to Time+Rest
+  // tracking, adjusts its set count to match the preset's round count
+  // (adding or removing rows as needed), and fills every set with the
+  // preset's work/rest — all fully editable afterward, same as every
+  // other prefilled default in this app.
+  async function applyCardioPreset(preset: CardioPreset) {
+    if (presetBusy) return;
+    setPresetBusy(true);
+    try {
+      const nextFields = orderTrackedFields(["time", "rest"]);
+      const supabase = createBrowserClient();
+      const { error: fieldsError } = await supabase
+        .from("group_workout_exercises")
+        .update({ tracked_fields: nextFields })
+        .eq("id", exercise.id);
+      if (fieldsError) {
+        flashSaveError("Couldn't apply that preset — try again.");
+        return;
+      }
+
+      let sets = exercise.sets;
+      if (preset.rounds > sets.length) {
+        const startOrder = sets.length > 0 ? Math.max(...sets.map((s) => s.setOrder)) + 1 : 0;
+        const toAdd = preset.rounds - sets.length;
+        const { data, error } = await supabase
+          .from("group_workout_exercise_sets")
+          .insert(
+            Array.from({ length: toAdd }, (_, i) => ({
+              group_workout_exercise_id: exercise.id,
+              set_order: startOrder + i,
+              target_time_seconds: preset.workSeconds,
+              target_rest_seconds: preset.restSeconds,
+            }))
+          )
+          .select(SET_ROW_SELECT);
+        if (error) {
+          flashSaveError("Preset's fields applied, but couldn't add rounds — try again.");
+        } else {
+          sets = [...sets, ...(data ?? []).map(mapSetRow)];
+        }
+      } else if (preset.rounds < sets.length) {
+        const toRemove = sets.slice(preset.rounds);
+        const { error } = await supabase
+          .from("group_workout_exercise_sets")
+          .delete()
+          .in("id", toRemove.map((s) => s.id));
+        if (!error) sets = sets.slice(0, preset.rounds);
+      }
+
+      const setIds = sets.map((s) => s.id);
+      if (setIds.length > 0) {
+        await supabase
+          .from("group_workout_exercise_sets")
+          .update({ target_time_seconds: preset.workSeconds, target_rest_seconds: preset.restSeconds })
+          .in("id", setIds);
+        sets = sets.map((s) => ({ ...s, targetTimeSeconds: preset.workSeconds, targetRestSeconds: preset.restSeconds }));
+      }
+
+      onFieldsAndSetsChange(nextFields, sets);
+      setPresetMenuOpen(false);
+      flashSaved();
+    } finally {
+      setPresetBusy(false);
+    }
+  }
+
+  // Runner mode: distance + pace (+ RPE), no round-count change — a
+  // distance/pace exercise is one continuous or single-interval effort,
+  // not a multi-round scheme.
+  async function applyRunnerMode() {
+    if (presetBusy) return;
+    setPresetBusy(true);
+    try {
+      const nextFields = orderTrackedFields(["distance", "pace", "rpe"]);
+      const supabase = createBrowserClient();
+      const { error } = await supabase
+        .from("group_workout_exercises")
+        .update({ tracked_fields: nextFields })
+        .eq("id", exercise.id);
+      if (error) {
+        flashSaveError("Couldn't switch to Runner mode — try again.");
+        return;
+      }
+      onUpdate({ trackedFields: nextFields });
+      setPresetMenuOpen(false);
+      flashSaved();
+    } finally {
+      setPresetBusy(false);
     }
   }
 
@@ -396,6 +503,8 @@ export function ExerciseBuilderCard({
             target_time_seconds: s.targetTimeSeconds,
             target_height: s.targetHeight,
             target_distance: s.targetDistance,
+            target_rest_seconds: s.targetRestSeconds,
+            target_pace: s.targetPace,
           }))
         )
         .select(SET_ROW_SELECT);
@@ -571,29 +680,69 @@ export function ExerciseBuilderCard({
             </div>
           </div>
 
-          <div className="relative mt-1.5">
+          <div className="flex items-center gap-3 flex-wrap mt-1.5">
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setAddFieldOpen((v) => !v)}
+                disabled={untrackedFields.length === 0}
+                className="font-body text-xs text-steel active:text-rust transition-colors disabled:opacity-30"
+              >
+                + Add
+              </button>
+              {addFieldOpen && untrackedFields.length > 0 && (
+                <div className="absolute z-10 left-0 mt-1 bg-surface border border-steel/30 flex flex-wrap gap-1 p-1.5 w-48">
+                  {untrackedFields.map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => handleAddField(f)}
+                      className="h-7 px-2 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust"
+                    >
+                      {fieldDef(f).label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setPresetMenuOpen((v) => !v)}
+                disabled={presetBusy}
+                className="font-body text-xs text-steel active:text-rust transition-colors disabled:opacity-30"
+              >
+                ⚡ Energy System
+              </button>
+              {presetMenuOpen && (
+                <div className="absolute z-10 left-0 mt-1 bg-surface border border-steel/30 flex flex-col w-56">
+                  {CARDIO_PRESETS.map((p) => (
+                    <button
+                      key={p.key}
+                      type="button"
+                      onClick={() => applyCardioPreset(p)}
+                      disabled={presetBusy}
+                      className="text-left px-2.5 py-2 border-b border-steel/15 last:border-b-0 text-chalk font-body text-xs hover:bg-graphite/50 disabled:opacity-40"
+                    >
+                      <span className="block">{p.label}</span>
+                      <span className="block text-steel text-[10px] mt-0.5">
+                        {p.workSeconds}s work / {p.restSeconds}s rest × {p.rounds}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <button
               type="button"
-              onClick={() => setAddFieldOpen((v) => !v)}
-              disabled={untrackedFields.length === 0}
+              onClick={applyRunnerMode}
+              disabled={presetBusy}
               className="font-body text-xs text-steel active:text-rust transition-colors disabled:opacity-30"
             >
-              + Add
+              🏃 Runner mode
             </button>
-            {addFieldOpen && untrackedFields.length > 0 && (
-              <div className="absolute z-10 left-0 mt-1 bg-surface border border-steel/30 flex flex-wrap gap-1 p-1.5 w-48">
-                {untrackedFields.map((f) => (
-                  <button
-                    key={f}
-                    type="button"
-                    onClick={() => handleAddField(f)}
-                    className="h-7 px-2 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust"
-                  >
-                    {fieldDef(f).label}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
 
           <button
@@ -608,7 +757,9 @@ export function ExerciseBuilderCard({
             <div className="mt-2 pt-2 border-t border-steel/15 space-y-2">
               <div className="flex items-center gap-2">
                 <span className="font-body text-[10px] text-steel uppercase tracking-wide shrink-0">
-                  Rep range (for Double Progression)
+                  {exercise.trackedFields.includes("distance") && !exercise.trackedFields.includes("reps")
+                    ? "Distance range (for Double Progression)"
+                    : "Rep range (for Double Progression)"}
                 </span>
                 <input
                   type="number"
