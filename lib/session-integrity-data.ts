@@ -20,14 +20,25 @@ export interface AthleteIntegrityResult {
 // rest_seconds — no new tracking needed.
 export async function getIntegrityRollupForGroup(
   supabase: SupabaseClient,
-  groupId: string
+  groupId: string,
+  // Scopes the (heavier, session/set-joined) computation to just these
+  // athletes — the Clients roster page only ever needs this for the
+  // currently-visible page of a paginated roster, not every athlete the
+  // group has ever had (the unscoped whole-roster version of this query
+  // was a real driver of the 18.5s/1.1MB load a stress-test pass found
+  // at 500 athletes). Omit to compute for the whole group, unchanged.
+  athleteIds?: string[]
 ): Promise<Map<string, AthleteIntegrityResult>> {
-  const { data: sessions } = await supabase
+  if (athleteIds && athleteIds.length === 0) return new Map();
+
+  let query = supabase
     .from("athlete_sessions")
     .select("id, athlete_id, duration_seconds, completed_at")
     .eq("group_id", groupId)
     .eq("status", "completed")
     .not("duration_seconds", "is", null);
+  if (athleteIds) query = query.in("athlete_id", athleteIds);
+  const { data: sessions } = await query;
 
   const result = new Map<string, AthleteIntegrityResult>();
   if (!sessions || sessions.length === 0) return result;

@@ -3,13 +3,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ClientCardGrid } from "@/components/coach/desktop/client-card-grid";
 import { AddClientButton } from "@/components/coach/desktop/add-client-button";
-import { isLowReadiness } from "@/lib/wellness";
-import { getIntegrityRollupForGroup } from "@/lib/session-integrity-data";
 import type { RosterMember } from "@/lib/types";
-
-function todayIso() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 export default async function ClientsPage(
   props: {
@@ -49,22 +43,26 @@ export default async function ClientsPage(
     .eq("id", params.groupId)
     .single();
 
-  const { data: memberships } = await supabase
-    .from("group_memberships")
-    .select("role, profiles ( id, full_name, avatar_url ), profile_id, client_tier")
-    .eq("group_id", params.groupId);
-
-  const { data: recentLogs } = await supabase
-    .from("workout_logs")
-    .select("athlete_id, created_at")
-    .eq("group_id", params.groupId)
-    .order("created_at", { ascending: false });
+  // Cheap, roster-wide: name/avatar/tier for every member, plus one
+  // aggregate row per athlete for their most recent workout (a Postgres
+  // GROUP BY via RPC, not a raw fetch-every-log-row-and-reduce-in-JS scan
+  // — a stress-test pass found the old approach shipping a 1.1MB payload
+  // and taking 18.5s at 500 athletes). Credits/wellness/integrity are
+  // each a heavier per-athlete join (especially integrity's session/set
+  // join) and are deliberately NOT computed here for the whole roster —
+  // ClientCardGrid fetches those client-side, scoped to just the
+  // currently-visible page of athletes, once pagination is applied.
+  const [{ data: memberships }, { data: lastWorkoutRows }] = await Promise.all([
+    supabase
+      .from("group_memberships")
+      .select("role, profiles ( id, full_name, avatar_url ), profile_id, client_tier")
+      .eq("group_id", params.groupId),
+    supabase.rpc("get_last_workout_per_athlete", { p_group_id: params.groupId }),
+  ]);
 
   const lastLogByAthlete = new Map<string, string>();
-  for (const log of recentLogs ?? []) {
-    if (!lastLogByAthlete.has(log.athlete_id)) {
-      lastLogByAthlete.set(log.athlete_id, log.created_at);
-    }
+  for (const row of (lastWorkoutRows ?? []) as { athlete_id: string; last_logged_at: string }[]) {
+    lastLogByAthlete.set(row.athlete_id, row.last_logged_at);
   }
 
   const roster: RosterMember[] = (memberships ?? []).map((m: any) => ({
@@ -83,35 +81,6 @@ export default async function ClientsPage(
 
   const coaches = roster.filter((m) => m.role === "coach");
   const athletes = roster.filter((m) => m.role === "athlete");
-  const athleteIds = athletes.map((a) => a.profileId);
-
-  const creditsByAthleteId = new Map<string, number>();
-  const lowReadinessAthleteIds = new Set<string>();
-  // Soft integrity signal only — never blocks anything, just a quiet (or,
-  // for a repeated pattern, more visible) flag on the roster.
-  const integrityByAthleteId = await getIntegrityRollupForGroup(supabase, params.groupId);
-  if (athleteIds.length > 0) {
-    const { data: creditsRows } = await supabase
-      .from("session_credits")
-      .select("athlete_id, balance")
-      .eq("group_id", params.groupId)
-      .in("athlete_id", athleteIds);
-    for (const row of creditsRows ?? []) {
-      creditsByAthleteId.set(row.athlete_id, row.balance);
-    }
-
-    const { data: wellnessRows } = await supabase
-      .from("wellness_checkins")
-      .select("athlete_id, sleep_quality, soreness, energy")
-      .eq("group_id", params.groupId)
-      .eq("log_date", todayIso())
-      .in("athlete_id", athleteIds);
-    for (const row of wellnessRows ?? []) {
-      if (isLowReadiness({ sleepQuality: row.sleep_quality, soreness: row.soreness, energy: row.energy })) {
-        lowReadinessAthleteIds.add(row.athlete_id);
-      }
-    }
-  }
 
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="clients">
@@ -158,13 +127,7 @@ export default async function ClientsPage(
         </div>
       )}
 
-      <ClientCardGrid
-        groupId={params.groupId}
-        members={athletes}
-        creditsByAthleteId={creditsByAthleteId}
-        lowReadinessAthleteIds={lowReadinessAthleteIds}
-        integrityByAthleteId={integrityByAthleteId}
-      />
+      <ClientCardGrid groupId={params.groupId} members={athletes} />
     </CoachDesktopShell>
   );
 }

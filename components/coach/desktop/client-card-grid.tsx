@@ -1,13 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { CardSizeToggle } from "@/components/coach/desktop/card-size-toggle";
 import { readCardSize, writeCardSize, type CardSize } from "@/lib/card-size";
+import { isLowReadiness } from "@/lib/wellness";
+import { getIntegrityRollupForGroup, type AthleteIntegrityResult } from "@/lib/session-integrity-data";
 import type { RosterMember, ClientTier } from "@/lib/types";
-import { MoreVertical } from "lucide-react";
+import { MoreVertical, ChevronLeft, ChevronRight } from "lucide-react";
+
+// A real page of cards, not the whole roster — a stress-test pass found
+// the old unpaginated page taking 18.5s and shipping 1.1MB at 500
+// athletes, with every card's credits/wellness/integrity precomputed and
+// rendered into the DOM at once regardless of roster size.
+const PAGE_SIZE = 40;
+
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 const TIER_LABELS: Record<NonNullable<ClientTier>, string> = {
   one_on_one: "1-on-1",
@@ -59,15 +71,9 @@ const AVATAR_CLASS: Record<CardSize, string> = {
 export function ClientCardGrid({
   groupId,
   members,
-  creditsByAthleteId,
-  lowReadinessAthleteIds,
-  integrityByAthleteId,
 }: {
   groupId: string;
   members: RosterMember[];
-  creditsByAthleteId: Map<string, number>;
-  lowReadinessAthleteIds?: Set<string>;
-  integrityByAthleteId?: Map<string, { level: "none" | "single" | "pattern"; flaggedCount: number; totalSessions: number }>;
 }) {
   const [rows, setRows] = useState(members);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -80,7 +86,20 @@ export function ClientCardGrid({
   const [sortMode, setSortMode] = useState<SortMode>("attention");
   const [tierFilter, setTierFilter] = useState<ClientTier | "all">("all");
   const [size, setSize] = useState<CardSize>("medium");
+  const [page, setPage] = useState(0);
   const router = useRouter();
+
+  // Credits/wellness/integrity are each a heavier per-athlete lookup
+  // (integrity especially — a session/set join) that used to be
+  // precomputed server-side for the ENTIRE roster on every page load.
+  // Fetched here instead, client-side, scoped to just the athlete ids on
+  // the currently-visible PAGE — the actual fix for the stress-test
+  // finding, not just a rendering optimization.
+  const [creditsByAthleteId, setCreditsByAthleteId] = useState<Map<string, number>>(new Map());
+  const [lowReadinessAthleteIds, setLowReadinessAthleteIds] = useState<Set<string>>(new Set());
+  const [integrityByAthleteId, setIntegrityByAthleteId] = useState<Map<string, AthleteIntegrityResult>>(
+    new Map()
+  );
 
   useEffect(() => {
     setSize(readCardSize(STORAGE_KEY));
@@ -105,10 +124,75 @@ export function ClientCardGrid({
 
   const filteredRows = tierFilter === "all" ? rows : rows.filter((m) => m.clientTier === tierFilter);
 
-  const sortedRows = [...filteredRows].sort((a, b) => {
-    if (sortMode === "name") return a.fullName.localeCompare(b.fullName);
-    return daysSinceOf(b.lastWorkoutAt) - daysSinceOf(a.lastWorkoutAt);
-  });
+  const sortedRows = useMemo(
+    () =>
+      [...filteredRows].sort((a, b) => {
+        if (sortMode === "name") return a.fullName.localeCompare(b.fullName);
+        return daysSinceOf(b.lastWorkoutAt) - daysSinceOf(a.lastWorkoutAt);
+      }),
+    [filteredRows, sortMode]
+  );
+
+  const totalPages = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE));
+  const clampedPage = Math.min(page, totalPages - 1);
+  const pageRows = sortedRows.slice(clampedPage * PAGE_SIZE, (clampedPage + 1) * PAGE_SIZE);
+  const pageIdsKey = pageRows.map((m) => m.profileId).join(",");
+
+  // Sort/filter changing the composition of "what page 0 even means"
+  // resets back to the first page rather than leaving the viewer on a
+  // now-mismatched page number.
+  useEffect(() => {
+    setPage(0);
+  }, [sortMode, tierFilter]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      const pageIds = pageIdsKey ? pageIdsKey.split(",") : [];
+      if (pageIds.length === 0) {
+        setCreditsByAthleteId(new Map());
+        setLowReadinessAthleteIds(new Set());
+        setIntegrityByAthleteId(new Map());
+        return;
+      }
+      const supabase = createBrowserClient();
+      const [creditsResult, wellnessResult, integrityResult] = await Promise.all([
+        supabase
+          .from("session_credits")
+          .select("athlete_id, balance")
+          .eq("group_id", groupId)
+          .in("athlete_id", pageIds),
+        supabase
+          .from("wellness_checkins")
+          .select("athlete_id, sleep_quality, soreness, energy")
+          .eq("group_id", groupId)
+          .eq("log_date", todayIso())
+          .in("athlete_id", pageIds),
+        getIntegrityRollupForGroup(supabase, groupId, pageIds),
+      ]);
+      if (cancelled) return;
+
+      const credits = new Map<string, number>();
+      for (const row of creditsResult.data ?? []) {
+        credits.set(row.athlete_id, row.balance);
+      }
+      setCreditsByAthleteId(credits);
+
+      const lowReadiness = new Set<string>();
+      for (const row of wellnessResult.data ?? []) {
+        if (isLowReadiness({ sleepQuality: row.sleep_quality, soreness: row.soreness, energy: row.energy })) {
+          lowReadiness.add(row.athlete_id);
+        }
+      }
+      setLowReadinessAthleteIds(lowReadiness);
+
+      setIntegrityByAthleteId(integrityResult);
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [groupId, pageIdsKey]);
 
   async function handleTierChange(member: RosterMember, tier: ClientTier) {
     setRows((prev) =>
@@ -224,7 +308,7 @@ export function ClientCardGrid({
         </p>
       ) : (
         <div className={`grid ${GRID_CLASS[size]}`}>
-          {sortedRows.map((member) => {
+          {pageRows.map((member) => {
             const status = statusLabel(member.lastWorkoutAt);
             const credits = creditsByAthleteId.get(member.profileId) ?? 0;
             const busy = busyId === member.profileId;
@@ -346,6 +430,35 @@ export function ClientCardGrid({
               </div>
             );
           })}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-4 mt-6 pt-4 border-t border-steel/15">
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={clampedPage === 0}
+            aria-label="Previous page"
+            className="flex items-center gap-1 font-body text-xs text-steel active:text-rust transition-colors disabled:opacity-30"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Prev
+          </button>
+          <span className="font-body text-xs text-steel">
+            Page {clampedPage + 1} of {totalPages} &middot; {sortedRows.length}{" "}
+            {sortedRows.length === 1 ? "client" : "clients"}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+            disabled={clampedPage >= totalPages - 1}
+            aria-label="Next page"
+            className="flex items-center gap-1 font-body text-xs text-steel active:text-rust transition-colors disabled:opacity-30"
+          >
+            Next
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
       )}
     </div>
