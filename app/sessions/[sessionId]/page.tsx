@@ -234,6 +234,19 @@ export default async function SessionPage(
 
   const isOwnSession = session.athlete_id === user.id;
 
+  // Video upload/feedback is visible to the session's own athlete and to
+  // the group's coach (e.g. logging or reviewing in person) — not a
+  // random third party who happens to reach this URL; RLS enforces the
+  // real boundary regardless, this just decides what the UI offers.
+  const { data: viewerMembership } = await supabase
+    .from("group_memberships")
+    .select("role")
+    .eq("group_id", session.group_id)
+    .eq("profile_id", user.id)
+    .maybeSingle();
+  const viewerIsCoach = viewerMembership?.role === "coach";
+  const canUploadVideo = isOwnSession || viewerIsCoach;
+
   // A completed session that generated a shareable card can always be
   // revisited — not just right after finishing — so the athlete can grab
   // the link again later instead of it only being reachable the one time
@@ -284,6 +297,10 @@ export default async function SessionPage(
         lastTimeByExercise={lastTimeByExercise}
         ladderByExercise={ladderByExercise}
         raised={isOwnSession}
+        groupId={session.group_id}
+        athleteId={session.athlete_id}
+        viewerId={user.id}
+        canUploadVideo={canUploadVideo}
       />
 
       {isOwnSession && (

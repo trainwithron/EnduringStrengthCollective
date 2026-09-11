@@ -5,6 +5,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
 import { TRACKED_FIELD_DEFS, ACTUAL_COLUMN, ACTUAL_PROP, fieldDef, type TrackedField } from "@/lib/exercise-fields";
 import { SetRow } from "./set-row";
+import { ExerciseVideoThread } from "./exercise-video-thread";
 
 export function ExerciseCard({
   exercise,
@@ -17,6 +18,11 @@ export function ExerciseCard({
   onTrackedFieldsChange,
   onDelete,
   deleting,
+  sessionId,
+  groupId,
+  athleteId,
+  viewerId,
+  canUpload,
 }: {
   exercise: SessionExerciseEntry;
   lastTime?: { weight: number; reps: number };
@@ -28,6 +34,11 @@ export function ExerciseCard({
   onTrackedFieldsChange: (fields: TrackedField[]) => void;
   onDelete?: () => void;
   deleting?: boolean;
+  sessionId: string;
+  groupId: string;
+  athleteId: string;
+  viewerId: string | null;
+  canUpload: boolean;
 }) {
   const [swapping, setSwapping] = useState(false);
   const [nameDraft, setNameDraft] = useState(exercise.exerciseName);
@@ -334,6 +345,15 @@ export function ExerciseCard({
           + Add set
         </button>
       )}
+
+      <ExerciseVideoThread
+        sessionId={sessionId}
+        sessionExerciseId={exercise.id}
+        groupId={groupId}
+        athleteId={athleteId}
+        viewerId={viewerId}
+        canUpload={canUpload}
+      />
     </div>
   );
 }

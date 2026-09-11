@@ -121,7 +121,7 @@ export default async function AthleteProfilePage(
   const { data: logs } = await supabase
     .from("workout_logs")
     .select(
-      "id, total_volume, total_sets_completed, new_prs, created_at, logged_by_coach, workouts ( title, week_number, day_index )"
+      "id, session_id, total_volume, total_sets_completed, new_prs, created_at, logged_by_coach, workouts ( title, week_number, day_index )"
     )
     .eq("athlete_id", params.athleteId)
     .eq("group_id", params.groupId)
@@ -680,7 +680,11 @@ export default async function AthleteProfilePage(
           ) : (
             <div className="divide-y divide-steel/15">
               {workoutLogs.map((log: any) => (
-                <div key={log.id} className="py-3">
+                <Link
+                  key={log.id}
+                  href={log.session_id ? `/sessions/${log.session_id}` : "#"}
+                  className="block py-3 hover:bg-surface/40 transition-colors"
+                >
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-body font-medium text-[15px] flex items-center gap-2">
                       {log.workouts?.title ?? "Workout"}
@@ -697,7 +701,7 @@ export default async function AthleteProfilePage(
                       <span className="text-rust"> &middot; PR: {log.new_prs.join(", ")}</span>
                     )}
                   </p>
-                </div>
+                </Link>
               ))}
             </div>
           )}

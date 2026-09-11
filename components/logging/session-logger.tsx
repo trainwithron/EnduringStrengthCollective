@@ -13,6 +13,10 @@ export function SessionLogger({
   lastTimeByExercise,
   ladderByExercise,
   raised,
+  groupId,
+  athleteId,
+  viewerId,
+  canUploadVideo,
 }: {
   sessionId: string;
   isCompleted: boolean;
@@ -20,6 +24,10 @@ export function SessionLogger({
   lastTimeByExercise: Record<string, { weight: number; reps: number }>;
   ladderByExercise: Record<string, string[]>;
   raised?: boolean;
+  groupId: string;
+  athleteId: string;
+  viewerId: string | null;
+  canUploadVideo: boolean;
 }) {
   const [exercises, setExercises] = useState(initialExercises);
   const [addingExercise, setAddingExercise] = useState(false);
@@ -165,6 +173,11 @@ export function SessionLogger({
             onTrackedFieldsChange={(fields) => handleTrackedFieldsChange(exercise.id, fields)}
             onDelete={() => handleDeleteExercise(exercise.id)}
             deleting={deletingId === exercise.id}
+            sessionId={sessionId}
+            groupId={groupId}
+            athleteId={athleteId}
+            viewerId={viewerId}
+            canUpload={canUploadVideo}
           />
         ))}
       </div>
