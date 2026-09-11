@@ -34,14 +34,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "This package isn't available." }, { status: 404 });
   }
 
+  // Checked explicitly here too, not just left to RLS on the coach_packages
+  // read above — a genuine training relationship with THIS group
+  // specifically, not just any membership row (an access-only second
+  // membership to one of this coach's other groups shouldn't be able to
+  // buy a package scoped to a group it isn't actually training in).
   const { data: membership } = await supabase
     .from("group_memberships")
-    .select("role")
+    .select("role, membership_type")
     .eq("group_id", pkg.group_id)
     .eq("profile_id", user.id)
     .maybeSingle();
-  if (!membership) {
-    return NextResponse.json({ error: "You're not a member of this group." }, { status: 403 });
+  if (!membership || membership.role !== "athlete" || membership.membership_type !== "training") {
+    return NextResponse.json({ error: "You're not a training client of this group." }, { status: 403 });
   }
 
   const groupId = pkg.group_id;
