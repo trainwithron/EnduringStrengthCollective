@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { notifyPush } from "@/lib/push-notify";
+import { isHighPriorityClient } from "@/lib/notification-priority";
+import { isLowReadiness } from "@/lib/wellness";
 
 export interface WellnessCheckinValues {
   sleepQuality: number;
@@ -65,6 +68,35 @@ export function WellnessCheckinWidget({
       setError("Couldn't save — check your connection and try again.");
       setSubmitting(false);
       return;
+    }
+
+    // Low readiness genuinely can't wait for a digest — push the coach
+    // immediately, same 1-on-1-only tier gate the workout-completion
+    // push already uses (complete-workout-button.tsx) so a coach running
+    // a large team isn't flooded with every routine check-in.
+    if (isLowReadiness(values)) {
+      const [{ data: membership }, { data: profile }] = await Promise.all([
+        supabase.from("group_memberships").select("client_tier").eq("group_id", groupId).eq("profile_id", athleteId).maybeSingle(),
+        supabase.from("profiles").select("full_name").eq("id", athleteId).maybeSingle(),
+      ]);
+      if (isHighPriorityClient(membership?.client_tier ?? null)) {
+        const { data: coachMembership } = await supabase
+          .from("group_memberships")
+          .select("profile_id")
+          .eq("group_id", groupId)
+          .eq("role", "coach")
+          .limit(1)
+          .maybeSingle();
+        if (coachMembership) {
+          const athleteName = profile?.full_name ?? "Your client";
+          notifyPush(
+            coachMembership.profile_id,
+            "Low readiness flagged",
+            `${athleteName} logged low readiness today`,
+            `/groups/${groupId}/clients`
+          );
+        }
+      }
     }
 
     setSaved(values);

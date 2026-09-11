@@ -11,6 +11,8 @@ import { WearablePlaceholder } from "@/components/athlete/wearable-placeholder";
 import { PackagePicker, type PackageOption } from "@/components/athlete/package-picker";
 import { ManageBillingLink } from "@/components/athlete/manage-billing-link";
 import { ProfileDetailsEditor } from "@/components/athlete/profile-details-editor";
+import { ExportDataButton } from "@/components/athlete/export-data-button";
+import { DeleteAccountButton } from "@/components/athlete/delete-account-button";
 
 export default async function SettingsPage(
   props: {
@@ -182,6 +184,13 @@ export default async function SettingsPage(
             <p className="font-body text-xs text-steel mt-1">
               Programs, clients, business tools — the full site.
             </p>
+          </div>
+        )}
+        {!isCoach && !effective.isActingAsOther && (
+          <div className="border-t border-steel/20 pt-4 mt-4 space-y-3">
+            <p className="font-body text-sm">Your data</p>
+            <ExportDataButton />
+            <DeleteAccountButton />
           </div>
         )}
         <div className="border-t border-steel/20 pt-4 mt-4">

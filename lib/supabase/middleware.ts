@@ -56,7 +56,17 @@ export async function updateSession(request: NextRequest) {
     // /share/.
     pathname.startsWith("/set-password") ||
     pathname.startsWith("/confirm-email") ||
-    pathname.startsWith("/forgot-password");
+    pathname.startsWith("/forgot-password") ||
+    // Vercel Cron calls these with no user session at all — the
+    // CRON_SECRET bearer check inside each route is the real auth, same
+    // gotcha as the Stripe webhook above. Confirmed live: without this,
+    // every cron invocation (including the pre-existing /api/oura/sync)
+    // 307s to /login before ever reaching the route handler, silently
+    // breaking the sync/digest in every environment, including
+    // production — this was a real, previously-undetected bug, not just
+    // a new route needing an exemption.
+    pathname.startsWith("/api/oura/sync") ||
+    pathname.startsWith("/api/cron/");
 
   if (!user && !isPublicPath) {
     const redirectUrl = new URL("/login", request.url);

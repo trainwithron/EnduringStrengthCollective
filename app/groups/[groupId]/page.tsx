@@ -133,6 +133,12 @@ export default async function GroupHubPage(
   // from Settings). Acting as a client always wins — that's the whole
   // point of picking someone from "View as Client."
   const showMobileView = isActingAsOther || !isCoach || await prefersAthleteStyleView();
+  // Coach-only UI controls (Invite Athlete, roster role/remove actions)
+  // must reflect who the page is showing right now, not the real
+  // signed-in identity — a coach impersonating a client via "View as
+  // Client" should see exactly what that client would see, same
+  // discipline already applied to Feed/Calendar/Resources/Tools.
+  const renderAsCoach = isActingAsOther ? false : isCoach;
 
   let weightLogs: { id: string; loggedDate: string; weight: number }[] = [];
   let todayMacros: { calories: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null } | null = null;
@@ -260,7 +266,7 @@ export default async function GroupHubPage(
         name={group.name}
         description={group.description}
         memberCount={roster.length}
-        isCoach={isCoach}
+        isCoach={renderAsCoach}
         groupId={params.groupId}
         coachId={user?.id}
         viewerId={user?.id}
@@ -317,7 +323,7 @@ export default async function GroupHubPage(
         members={roster}
         groupId={params.groupId}
         viewerId={user?.id}
-        viewerIsCoach={isCoach}
+        viewerIsCoach={renderAsCoach}
       />
 
       {showMobileView && <BottomTabBar groupId={params.groupId} />}

@@ -6,6 +6,7 @@ import {
   type TeamPosition,
   type TeamPlayer,
 } from "@/components/coach/desktop/team-depth-chart";
+import { CoachPositionScopeList, type CoachStaffRow } from "@/components/coach/desktop/coach-position-scope-list";
 
 export default async function TeamPage(props: { params: Promise<{ groupId: string }> }) {
   const params = await props.params;
@@ -33,7 +34,7 @@ export default async function TeamPage(props: { params: Promise<{ groupId: strin
 
   // Group (for team_mode + name), the position list, and the roster are
   // independent lookups — one round trip instead of three.
-  const [{ data: group }, { data: positionRows }, { data: memberRows }] = await Promise.all([
+  const [{ data: group }, { data: positionRows }, { data: memberRows }, { data: coachRows }] = await Promise.all([
     supabase.from("groups").select("name, team_mode").eq("id", params.groupId).single(),
     supabase
       .from("group_positions")
@@ -45,6 +46,11 @@ export default async function TeamPage(props: { params: Promise<{ groupId: strin
       .select("profile_id, role, position_id, depth_order, profiles ( full_name )")
       .eq("group_id", params.groupId)
       .eq("role", "athlete"),
+    supabase
+      .from("group_memberships")
+      .select("profile_id, coach_position_id, profiles ( full_name )")
+      .eq("group_id", params.groupId)
+      .eq("role", "coach"),
   ]);
 
   const positions: TeamPosition[] = (positionRows ?? []).map((p) => ({
@@ -62,6 +68,14 @@ export default async function TeamPage(props: { params: Promise<{ groupId: strin
     }))
     .sort((a, b) => a.fullName.localeCompare(b.fullName));
 
+  const coaches: CoachStaffRow[] = (coachRows ?? [])
+    .map((c: any) => ({
+      profileId: c.profile_id,
+      fullName: c.profiles?.full_name ?? "Unknown",
+      coachPositionId: c.coach_position_id ?? null,
+    }))
+    .sort((a, b) => a.fullName.localeCompare(b.fullName));
+
   return (
     <CoachDesktopShell
       groupId={params.groupId}
@@ -75,6 +89,10 @@ export default async function TeamPage(props: { params: Promise<{ groupId: strin
           logging, the feed — works exactly the same; this just adds who plays where.
         </p>
       </div>
+
+      {group?.team_mode && positions.length > 0 && (
+        <CoachPositionScopeList groupId={params.groupId} positions={positions} initialCoaches={coaches} />
+      )}
 
       <TeamDepthChart
         groupId={params.groupId}

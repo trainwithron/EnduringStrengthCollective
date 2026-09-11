@@ -72,6 +72,8 @@ type Active =
   | "resources"
   | "challenges"
   | "team"
+  | "team-calendar"
+  | "game-detail"
   | "team-performance";
 
 interface NavLeaf {
@@ -314,7 +316,16 @@ export function CoachDesktopShell({
     },
     { key: "clients", label: "Clients", href: `/groups/${groupId}/clients`, icon: Users, badge: clientsUnread },
     ...(teamMode
-      ? [{ key: "team" as const, label: "Team", href: `/groups/${groupId}/team`, icon: ClipboardList }]
+      ? [
+          {
+            label: "Team",
+            icon: ClipboardList,
+            items: [
+              { key: "team" as const, label: "Depth Chart", href: `/groups/${groupId}/team`, icon: ClipboardList },
+              { key: "team-calendar" as const, label: "Team Calendar", href: `/groups/${groupId}/team/calendar`, icon: CalendarDays },
+            ],
+          },
+        ]
       : []),
     {
       label: "Programming",
