@@ -1,5 +1,20 @@
 import { describe, it, expect } from "vitest";
-import { detectColumns, parseImportRows, groupIntoWeeks } from "./workout-import-parser";
+import { detectColumns, parseImportRows, mergeIdenticalSetRows, groupIntoWeeks, type ParsedImportRow } from "./workout-import-parser";
+
+function row(overrides: Partial<ParsedImportRow>): ParsedImportRow {
+  return {
+    week: "Week 1",
+    day: "Day 1",
+    exerciseName: "Lateral Jumps",
+    sets: 1,
+    reps: "8",
+    weight: null,
+    rpe: null,
+    rest: null,
+    timeSeconds: null,
+    ...overrides,
+  };
+}
 
 describe("detectColumns", () => {
   it("auto-detects a typical export's headers", () => {
@@ -107,5 +122,67 @@ describe("groupIntoWeeks", () => {
       { week: "Peak", day: "Day 1", exerciseName: "Squat", sets: 3, reps: "3", weight: null, rpe: null, rest: null, timeSeconds: null },
     ]);
     expect(weeks.map((w) => w.weekNumber)).toEqual([1, 2]);
+  });
+});
+
+describe("mergeIdenticalSetRows", () => {
+  it("merges the real repro case — three identical Sets=1 rows into one Sets=3 row", () => {
+    const merged = mergeIdenticalSetRows([row({}), row({}), row({})]);
+    expect(merged).toEqual([row({ sets: 3 })]);
+  });
+
+  it("does not merge a genuine ramp set — each row's own weight differs", () => {
+    const rampRows = [
+      row({ exerciseName: "Back Squat", reps: "5", weight: 135 }),
+      row({ exerciseName: "Back Squat", reps: "5", weight: 185 }),
+      row({ exerciseName: "Back Squat", reps: "3", weight: 225 }),
+    ];
+    expect(mergeIdenticalSetRows(rampRows)).toEqual(rampRows);
+  });
+
+  it("does not merge across a day boundary even with identical values otherwise", () => {
+    const rows = [
+      row({ day: "Day 1" }),
+      row({ day: "Day 1" }),
+      row({ day: "Day 2" }),
+    ];
+    const merged = mergeIdenticalSetRows(rows);
+    expect(merged).toEqual([row({ day: "Day 1", sets: 2 }), row({ day: "Day 2", sets: 1 })]);
+  });
+
+  it("does not merge across a week boundary", () => {
+    const rows = [row({ week: "Week 1" }), row({ week: "Week 2" })];
+    expect(mergeIdenticalSetRows(rows)).toEqual(rows);
+  });
+
+  it("does not merge rows for a different exercise, even adjacent", () => {
+    const rows = [row({ exerciseName: "Lateral Jumps" }), row({ exerciseName: "Box Jumps" })];
+    expect(mergeIdenticalSetRows(rows)).toEqual(rows);
+  });
+
+  it("does not merge a row that already has sets > 1 (already correctly extracted)", () => {
+    const rows = [row({ sets: 3 }), row({ sets: 1 })];
+    expect(mergeIdenticalSetRows(rows)).toEqual(rows);
+  });
+
+  it("does not merge when rpe, rest, or timeSeconds differ", () => {
+    const byRpe = [row({ rpe: 7 }), row({ rpe: 8 })];
+    expect(mergeIdenticalSetRows(byRpe)).toEqual(byRpe);
+
+    const byRest = [row({ rest: "60s" }), row({ rest: "90s" })];
+    expect(mergeIdenticalSetRows(byRest)).toEqual(byRest);
+
+    const byTime = [row({ reps: null, timeSeconds: 30 }), row({ reps: null, timeSeconds: 45 })];
+    expect(mergeIdenticalSetRows(byTime)).toEqual(byTime);
+  });
+
+  it("only merges rows that are actually adjacent — a different exercise in between breaks the run", () => {
+    const rows = [row({}), row({ exerciseName: "Box Jumps" }), row({})];
+    expect(mergeIdenticalSetRows(rows)).toEqual(rows);
+  });
+
+  it("leaves a single row and an empty list unchanged", () => {
+    expect(mergeIdenticalSetRows([row({})])).toEqual([row({})]);
+    expect(mergeIdenticalSetRows([])).toEqual([]);
   });
 });

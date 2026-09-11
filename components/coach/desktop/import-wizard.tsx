@@ -7,6 +7,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import {
   detectColumns,
   parseImportRows,
+  mergeIdenticalSetRows,
   groupIntoWeeks,
   type ParsedImportRow,
 } from "@/lib/workout-import-parser";
@@ -129,7 +130,12 @@ export function ImportWizard({
       return;
     }
 
-    const parsed = parseImportRows(body, mapping);
+    // Self-heals a real AI-extraction mistake — a uniform set scheme
+    // like "3x8" occasionally comes back as three separate Sets=1 rows
+    // instead of one Sets=3 row. Never merges a genuine ramp set (each
+    // row's own target values must be identical) or across a day
+    // boundary — see mergeIdenticalSetRows' own doc comment.
+    const parsed = mergeIdenticalSetRows(parseImportRows(body, mapping));
     if (parsed.length === 0) {
       setStatus("error");
       setError("No rows had a value in the Exercise column.");

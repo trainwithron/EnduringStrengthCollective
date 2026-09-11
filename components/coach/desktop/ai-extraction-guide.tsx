@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-const GEMINI_PROMPT = `You are extracting a workout program from an image (a screenshot of a
+const AI_EXTRACTION_PROMPT = `You are extracting a workout program from an image (a screenshot of a
 workout tracking app, spreadsheet, or handwritten program) into a clean
 CSV file.
 
@@ -31,11 +31,21 @@ Rules for filling it in:
 - Rest: the rest period if shown (e.g. "90 sec" or "2 min"). Leave blank
   if not specified.
 
-One row per exercise per day (not one row per set) — if every set of an
-exercise has the same reps/weight, that's one row with Sets as the count.
-If sets genuinely differ from each other (e.g. a warm-up ramp: 135x5,
-185x5, 225x3), put one row per distinct set instead and set Sets to 1 on
-each.
+DEFAULT: one row per exercise per day, never one row per set. If an
+exercise shows "3x8" (3 sets of 8) or any other uniform set×rep scheme,
+that is ALWAYS exactly one CSV row, with Sets set to the number of sets
+(3, in this example) — never split it into multiple rows. This is the
+default for the overwhelming majority of exercises you'll see; assume it
+applies unless you hit the one specific exception below.
+
+EXCEPTION (rare): only if the image itself shows each set with a
+genuinely DIFFERENT weight or rep count from the others — the way a
+warm-up ramp is written out (e.g. 135x5, then 185x5, then 225x3) — put
+one row per distinct set instead, with Sets set to 1 on each of those
+rows. Do not apply this exception just because a scheme "could" be
+written as multiple sets — only apply it when the source material
+itself actually lists different numbers per set. When in doubt, prefer
+the one-row default above.
 
 Do not invent or guess values that aren't visible in the image — leave
 the field blank rather than fabricating a number. Preserve special
@@ -44,13 +54,16 @@ characters (°, ', etc.) exactly as written, don't substitute them.
 If the image is unclear or a value is illegible, put "?" in that cell
 rather than guessing, so it's obvious which fields need a manual check.`;
 
-export function GeminiImportGuide() {
+// Works with any AI chat tool (Gemini, ChatGPT, Claude, etc.) — the
+// prompt is model-agnostic, and the app-side matching/review step that
+// follows doesn't care which one produced the CSV.
+export function AiExtractionGuide() {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
     try {
-      await navigator.clipboard.writeText(GEMINI_PROMPT);
+      await navigator.clipboard.writeText(AI_EXTRACTION_PROMPT);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -80,11 +93,11 @@ export function GeminiImportGuide() {
               it currently lives in — one week at a time is fine, or the whole program if it fits.
             </li>
             <li>
-              Open Gemini, paste in the prompt below, and attach your screenshot(s) or PDF to the
-              same message.
+              Open an AI chat tool (Gemini, ChatGPT, Claude — any of them work), paste in the
+              prompt below, and attach your screenshot(s) or PDF to the same message.
             </li>
             <li>
-              Gemini replies with plain CSV text. Copy all of it — including the header row — into
+              It replies with plain CSV text. Copy all of it — including the header row — into
               a new file and save it with a <code className="text-chalk">.csv</code> extension
               (any plain text editor works: Notepad, TextEdit, VS Code).
             </li>
@@ -97,7 +110,7 @@ export function GeminiImportGuide() {
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <span className="font-body text-xs text-steel uppercase tracking-wide">
-                Prompt for Gemini
+                Prompt for your AI tool
               </span>
               <button
                 type="button"
@@ -113,7 +126,7 @@ export function GeminiImportGuide() {
               aria-label="AI prompt text"
               className="whitespace-pre-wrap font-body text-xs text-chalk bg-graphite border border-steel/20 p-4 max-h-96 overflow-y-auto focus:outline-none focus:ring-1 focus:ring-rust"
             >
-              {GEMINI_PROMPT}
+              {AI_EXTRACTION_PROMPT}
             </pre>
           </div>
 

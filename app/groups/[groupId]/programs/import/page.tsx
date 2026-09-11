@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ImportWizard } from "@/components/coach/desktop/import-wizard";
-import { GeminiImportGuide } from "@/components/coach/desktop/gemini-import-guide";
+import { AiExtractionGuide } from "@/components/coach/desktop/ai-extraction-guide";
 
 export default async function ImportProgramPage(
   props: {
@@ -78,7 +78,7 @@ export default async function ImportProgramPage(
         initialAliases={(aliasRows ?? []).map((a) => ({ rawName: a.raw_name, exerciseName: a.exercise_name }))}
       />
 
-      <GeminiImportGuide />
+      <AiExtractionGuide />
     </CoachDesktopShell>
   );
 }
