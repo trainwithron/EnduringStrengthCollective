@@ -23,6 +23,31 @@ export function computeScheduledDates(
   return result;
 }
 
+// A sensible default weekday spread for "this program trains N days a
+// week" — used to auto-schedule a program that has no explicit day
+// preference from the coach (currently: AI/import-generated programs,
+// which otherwise land with no start_date/training_days at all and
+// never resolve as "today's workout" or show on the calendar until a
+// coach manually configures them, unlike a manually-created program
+// which at least becomes the group's active program by default).
+// Spread evenly with rest days between hard training days rather than
+// clustering at the start of the week — the same rest-day-spacing
+// intuition a coach would apply by hand for 1-6 days/week; 7 trains
+// every day since there's no day left to rest on, deliberately.
+const DEFAULT_TRAINING_DAYS_BY_COUNT: Record<number, number[]> = {
+  1: [1], // Mon
+  2: [1, 4], // Mon, Thu
+  3: [1, 3, 5], // Mon, Wed, Fri
+  4: [1, 2, 4, 5], // Mon, Tue, Thu, Fri
+  5: [1, 2, 3, 4, 5], // Mon-Fri
+  6: [1, 2, 3, 4, 5, 6], // Mon-Sat
+  7: [0, 1, 2, 3, 4, 5, 6], // every day
+};
+
+export function defaultTrainingDaysForCount(daysPerWeek: number): number[] | null {
+  return DEFAULT_TRAINING_DAYS_BY_COUNT[daysPerWeek] ?? null;
+}
+
 export function formatShortDate(date: Date): string {
   return date.toLocaleDateString("en-US", {
     weekday: "short",

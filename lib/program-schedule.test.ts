@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeScheduledDates, isSameDay, isLocked } from "./program-schedule";
+import { computeScheduledDates, isSameDay, isLocked, defaultTrainingDaysForCount } from "./program-schedule";
 
 describe("computeScheduledDates", () => {
   it("walks forward through training days in order, skipping non-training days", () => {
@@ -14,6 +14,22 @@ describe("computeScheduledDates", () => {
   it("returns an empty map when there are no workouts or no training days", () => {
     expect(computeScheduledDates("2026-09-06", [1], []).size).toBe(0);
     expect(computeScheduledDates("2026-09-06", [], [{ id: "a" }]).size).toBe(0);
+  });
+});
+
+describe("defaultTrainingDaysForCount", () => {
+  it("spreads rest days between training days rather than clustering at the week's start", () => {
+    expect(defaultTrainingDaysForCount(3)).toEqual([1, 3, 5]); // Mon/Wed/Fri, not Mon/Tue/Wed
+    expect(defaultTrainingDaysForCount(4)).toEqual([1, 2, 4, 5]);
+  });
+
+  it("trains every day at 7/week since there's no day left to rest on", () => {
+    expect(defaultTrainingDaysForCount(7)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+  });
+
+  it("returns null for a count with no sensible default (0, or anything past a week)", () => {
+    expect(defaultTrainingDaysForCount(0)).toBeNull();
+    expect(defaultTrainingDaysForCount(8)).toBeNull();
   });
 });
 

@@ -17,6 +17,8 @@ import {
   type AliasEntry,
 } from "@/lib/exercise-matching";
 import { DEFAULT_TRACKED_FIELDS, type TrackedField } from "@/lib/exercise-fields";
+import { defaultTrainingDaysForCount } from "@/lib/program-schedule";
+import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 
 type Status = "idle" | "working" | "reviewing" | "done" | "error";
 
@@ -51,7 +53,10 @@ interface ImportSummary {
   matchedCount: number;
   createdExercises: string[];
   fuzzyMatches: { rawName: string; matchedTo: string; score: number }[];
+  schedule: { trainingDays: number[]; startDate: string } | null;
 }
+
+const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 // Everything needed to actually write the program to the database, once
 // any fuzzy matches have been reviewed (or there were none to review).
@@ -258,6 +263,21 @@ export function ImportWizard({
         );
     }
 
+    const weeks = groupIntoWeeks(parsed);
+
+    // Auto-schedule so an AI/import-generated program actually resolves
+    // as "today's workout" and shows on the calendar immediately, the
+    // same as a manually-created program does by defaulting to active —
+    // without this it silently sat inactive with no start date, invisible
+    // until a coach happened to find and configure it by hand. The
+    // training-day spread is a real guess (there's no coach preference to
+    // read here), so it's surfaced plainly in the success summary below
+    // rather than applied silently.
+    const daysPerWeek = weeks[0]?.days.length ?? 0;
+    const trainingDays = defaultTrainingDaysForCount(daysPerWeek);
+    const timezone = await getGroupCoachTimezone(supabase, groupId);
+    const startDate = trainingDays ? dateKeyInZone(timezone) : null;
+
     const { data: programRow, error: programError } = await supabase
       .from("programs")
       .insert({
@@ -265,7 +285,10 @@ export function ImportWizard({
         created_by: coachId,
         name: programName || "Imported Program",
         description,
-        is_active: false,
+        is_active: true,
+        start_date: startDate,
+        training_days: trainingDays,
+        visibility_window: "day",
       })
       .select("id")
       .single();
@@ -278,7 +301,15 @@ export function ImportWizard({
       return;
     }
 
-    const weeks = groupIntoWeeks(parsed);
+    // Only one *shared* program is ever active per group — same rule and
+    // same athlete_id-is-null scoping as the plain "New Program" form, so
+    // this can never deactivate a client's personal assigned program.
+    await supabase
+      .from("programs")
+      .update({ is_active: false })
+      .eq("group_id", groupId)
+      .is("athlete_id", null)
+      .neq("id", programRow.id);
 
     for (const week of weeks) {
       for (let dayIndex = 0; dayIndex < week.days.length; dayIndex++) {
@@ -333,6 +364,7 @@ export function ImportWizard({
       weekCount: weeks.length,
       matchedCount: resolutions.size - createdExercises.length,
       createdExercises,
+      schedule: trainingDays && startDate ? { trainingDays, startDate } : null,
       // Only the accepted guesses are worth flagging in the "just so you
       // know" summary — an overridden one is now just a plain new
       // exercise, same as anything else that matched nothing.
@@ -484,6 +516,19 @@ export function ImportWizard({
           {summary.weekCount === 1 ? "" : "s"} — {summary.matchedCount} exercise
           {summary.matchedCount === 1 ? "" : "s"} matched your existing library.
         </p>
+        {summary.schedule ? (
+          <p className="font-body text-xs text-steel mb-4">
+            Set as the active program, starting today and training{" "}
+            {summary.schedule.trainingDays.map((d) => WEEKDAY_LABELS[d]).join("/")} — it&apos;ll
+            show up on the calendar and as today&apos;s workout right away. Not the right days?
+            Change them anytime from this program&apos;s schedule settings.
+          </p>
+        ) : (
+          <p className="font-body text-xs text-steel mb-4">
+            Set as the active program — set a start date and training days from this
+            program&apos;s schedule settings to have it show up on the calendar.
+          </p>
+        )}
         {summary.createdExercises.length > 0 && (
           <p className="font-body text-xs text-steel mb-4">
             {summary.createdExercises.length} new exercise
@@ -599,7 +644,7 @@ export function ImportWizard({
             For the best result, mention:
           </p>
           <ul className="font-body text-xs text-steel space-y-0.5 list-disc list-inside">
-            <li>Duration and days per week (e.g. "8 weeks, 4 days/week")</li>
+            <li>Duration and days per week (e.g. &ldquo;8 weeks, 4 days/week&rdquo;)</li>
             <li>Experience level (beginner / intermediate / advanced)</li>
             <li>Focus — specific lifts, a goal (strength, hypertrophy, conditioning), or a sport</li>
             <li>Anything to avoid (an injury, equipment you don&apos;t have)</li>
