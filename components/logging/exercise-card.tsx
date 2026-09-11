@@ -23,6 +23,7 @@ export function ExerciseCard({
   athleteId,
   viewerId,
   canUpload,
+  onSetCompleted,
 }: {
   exercise: SessionExerciseEntry;
   lastTime?: { weight: number; reps: number };
@@ -39,6 +40,7 @@ export function ExerciseCard({
   athleteId: string;
   viewerId: string | null;
   canUpload: boolean;
+  onSetCompleted?: (set: SetLogEntry) => void;
 }) {
   const [swapping, setSwapping] = useState(false);
   const [nameDraft, setNameDraft] = useState(exercise.exerciseName);
@@ -330,7 +332,13 @@ export function ExerciseCard({
             setNumber={i + 1}
             trackedFields={exercise.trackedFields}
             readOnly={readOnly}
-            onChange={(patch) => onSetChange(set.id, patch)}
+            onChange={(patch) => {
+              const wasCompleted = set.status === "completed";
+              onSetChange(set.id, patch);
+              if (patch.status === "completed" && !wasCompleted) {
+                onSetCompleted?.({ ...set, ...patch });
+              }
+            }}
           />
         ))}
       </div>

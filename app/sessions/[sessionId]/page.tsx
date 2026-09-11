@@ -24,7 +24,7 @@ export default async function SessionPage(
 
   const { data: session } = await supabase
     .from("athlete_sessions")
-    .select("id, status, athlete_id, group_id, logged_by_coach, workout_id, workouts ( title )")
+    .select("id, status, athlete_id, group_id, logged_by_coach, workout_id, started_at, workouts ( title )")
     .eq("id", params.sessionId)
     .single();
 
@@ -301,6 +301,7 @@ export default async function SessionPage(
         athleteId={session.athlete_id}
         viewerId={user.id}
         canUploadVideo={canUploadVideo}
+        startedAt={session.started_at}
       />
 
       {isOwnSession && (

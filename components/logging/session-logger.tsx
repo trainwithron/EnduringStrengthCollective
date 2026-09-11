@@ -5,6 +5,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
 import { ExerciseCard } from "./exercise-card";
 import { CompleteWorkoutButton } from "@/components/session/complete-workout-button";
+import { RestTimerBar } from "@/components/session/rest-timer-bar";
 
 export function SessionLogger({
   sessionId,
@@ -17,6 +18,7 @@ export function SessionLogger({
   athleteId,
   viewerId,
   canUploadVideo,
+  startedAt,
 }: {
   sessionId: string;
   isCompleted: boolean;
@@ -28,8 +30,18 @@ export function SessionLogger({
   athleteId: string;
   viewerId: string | null;
   canUploadVideo: boolean;
+  startedAt: string;
 }) {
   const [exercises, setExercises] = useState(initialExercises);
+  const [pendingRestPrompt, setPendingRestPrompt] = useState<{ defaultSeconds: number } | null>(null);
+
+  // Smart-default rest duration: the set's own prescribed rest (from the
+  // cardio-interval work) when it has one, else a sensible generic
+  // fallback — never nothing, since the whole point is a one-tap preset.
+  function handleSetCompleted(set: SetLogEntry) {
+    const defaultSeconds = set.restSeconds ?? set.targetRestSeconds ?? 90;
+    setPendingRestPrompt({ defaultSeconds });
+  }
   const [addingExercise, setAddingExercise] = useState(false);
   const [newExerciseName, setNewExerciseName] = useState("");
   const [addExerciseBusy, setAddExerciseBusy] = useState(false);
@@ -158,7 +170,16 @@ export function SessionLogger({
   }
 
   return (
-    <section className="px-5 pt-4">
+    <>
+      {!isCompleted && (
+        <RestTimerBar
+          sessionId={sessionId}
+          startedAt={startedAt}
+          pendingPrompt={pendingRestPrompt}
+          onPromptHandled={() => setPendingRestPrompt(null)}
+        />
+      )}
+      <section className="px-5 pt-4">
       <div className="space-y-6">
         {exercises.map((exercise) => (
           <ExerciseCard
@@ -178,6 +199,7 @@ export function SessionLogger({
             athleteId={athleteId}
             viewerId={viewerId}
             canUpload={canUploadVideo}
+            onSetCompleted={handleSetCompleted}
           />
         ))}
       </div>
@@ -227,6 +249,7 @@ export function SessionLogger({
           raised={raised}
         />
       )}
-    </section>
+      </section>
+    </>
   );
 }
