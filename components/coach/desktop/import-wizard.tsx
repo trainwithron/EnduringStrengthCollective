@@ -590,10 +590,33 @@ export function ImportWizard({
       </div>
 
       <div className="border border-steel/20 bg-surface/40 p-6">
-        <p className="font-body text-sm text-steel mb-4">
+        <p className="font-body text-sm text-steel mb-3">
           Or describe the program you want and AI will write a full draft — same review pipeline as
           above, and it prefers exercises already in your library. Nothing is created until you confirm.
         </p>
+        <div className="mb-3 border border-steel/15 bg-graphite/60 p-3">
+          <p className="font-body text-[11px] text-steel uppercase tracking-wide mb-1.5">
+            For the best result, mention:
+          </p>
+          <ul className="font-body text-xs text-steel space-y-0.5 list-disc list-inside">
+            <li>Duration and days per week (e.g. "8 weeks, 4 days/week")</li>
+            <li>Experience level (beginner / intermediate / advanced)</li>
+            <li>Focus — specific lifts, a goal (strength, hypertrophy, conditioning), or a sport</li>
+            <li>Anything to avoid (an injury, equipment you don&apos;t have)</li>
+          </ul>
+          <button
+            type="button"
+            onClick={() =>
+              setAiPrompt(
+                'An 8-week intermediate strength block, 4 days/week, upper/lower split, built around squat/bench/deadlift/overhead press. No dumbbells past 50 lbs available.'
+              )
+            }
+            disabled={status === "working"}
+            className="mt-2 font-body text-[11px] text-rust underline decoration-dotted disabled:opacity-40"
+          >
+            Use this example →
+          </button>
+        </div>
         <textarea
           value={aiPrompt}
           onChange={(e) => setAiPrompt(e.target.value)}

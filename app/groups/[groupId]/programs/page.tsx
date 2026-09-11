@@ -81,7 +81,7 @@ export default async function ProgramsListPage(
             href={`/groups/${params.groupId}/programs/import`}
             className="font-body text-xs text-rust"
           >
-            Import from file
+            Import or build with AI →
           </Link>
           <Link
             href={`/groups/${params.groupId}/programs/new`}
@@ -90,6 +90,10 @@ export default async function ProgramsListPage(
             + New program
           </Link>
         </div>
+        <p className="font-body text-[11px] text-steel mt-1.5">
+          Upload a spreadsheet, upload a photo of a program, or just describe what you want in
+          plain English — AI writes the draft either way.
+        </p>
       </div>
 
       <ProgramCardGrid groupId={params.groupId} programs={cards} visualsByProgramId={visualsByProgramId} />
