@@ -2,37 +2,62 @@ import { describe, it, expect } from "vitest";
 import { getVolumeEquivalence } from "./volume-equivalence";
 
 describe("getVolumeEquivalence", () => {
-  it("picks the heaviest object that still clears 1x the total", () => {
-    // 30,000 / 20,000 (school bus) = 1.5 — the next-heaviest reference
-    // (blue whale, 300,000) doesn't clear 1x, so school bus wins.
-    const result = getVolumeEquivalence(30000);
-    expect(result?.plural).toBe("school buses");
-    expect(result?.count).toBe(1.5);
-    expect(result?.label).toBe("1.5 school buses");
+  it("returns the identical result for the same volume and seed (determinism)", () => {
+    const a = getVolumeEquivalence(12000, "post-abc");
+    const b = getVolumeEquivalence(12000, "post-abc");
+    expect(a).toEqual(b);
   });
 
-  it("uses singular, article-free phrasing when the count is exactly 1", () => {
-    const result = getVolumeEquivalence(2000);
-    expect(result?.plural).toBe("Volkswagen Beetles");
-    expect(result?.count).toBe(1);
-    expect(result?.label).toBe("1 Volkswagen Beetle");
+  it("produces real variety across different seeds at the same volume", () => {
+    const labels = new Set(
+      Array.from({ length: 20 }, (_, i) => getVolumeEquivalence(12000, `post-${i}`)?.label)
+    );
+    // Real variety, not a disguised constant — different workouts at the
+    // same volume shouldn't all land on the exact same object+phrasing.
+    expect(labels.size).toBeGreaterThan(1);
   });
 
-  it("picks blue whales for a very large volume", () => {
-    const result = getVolumeEquivalence(600000);
-    expect(result?.plural).toBe("blue whales");
-    expect(result?.count).toBe(2);
-    expect(result?.label).toBe("2 blue whales");
+  it("keeps the resolved count in a legible, readable range", () => {
+    for (let i = 0; i < 20; i++) {
+      const result = getVolumeEquivalence(8000, `seed-${i}`)!;
+      expect(result.count).toBeGreaterThan(0);
+      // A legible comparison is never a huge or vanishing count — the
+      // 0.5x-12x candidate filter should keep this well within reason.
+      expect(result.count).toBeLessThan(20);
+    }
   });
 
   it("returns null for zero or negative volume", () => {
-    expect(getVolumeEquivalence(0)).toBeNull();
-    expect(getVolumeEquivalence(-500)).toBeNull();
+    expect(getVolumeEquivalence(0, "post-x")).toBeNull();
+    expect(getVolumeEquivalence(-500, "post-x")).toBeNull();
   });
 
-  it("falls back to a partial lab-rat count for a tiny volume under 1 lb", () => {
-    const result = getVolumeEquivalence(0.5);
-    expect(result?.plural).toBe("lab rats");
-    expect(result?.count).toBe(0.5);
+  it("falls back to a sensible single object for a genuinely tiny volume", () => {
+    const result = getVolumeEquivalence(0.5, "post-tiny");
+    expect(result).not.toBeNull();
+    expect(result!.count).toBeGreaterThan(0);
+  });
+
+  it("falls back to a sensible single object for a genuinely enormous volume", () => {
+    const result = getVolumeEquivalence(50000000, "post-huge");
+    expect(result).not.toBeNull();
+    expect(result!.count).toBeGreaterThan(0);
+  });
+
+  it("uses singular, article-free phrasing when the count is exactly 1", () => {
+    // 2000 lbs is exactly the Volkswagen Beetle / Smart car weight —
+    // whichever the seed picks, the count-1 case should drop the article.
+    const result = getVolumeEquivalence(2000, "post-exact")!;
+    if (result.count === 1) {
+      expect(result.label.startsWith("1 ")).toBe(true);
+      expect(result.label).not.toMatch(/^1 a /);
+    }
+  });
+
+  it("composes a full sentence containing the resolved object name", () => {
+    const result = getVolumeEquivalence(12000, "post-sentence")!;
+    const bareName = result.count === 1 ? result.singular.replace(/^(a|an)\s+/i, "") : result.plural;
+    expect(result.text).toContain(bareName);
+    expect(result.text).toContain(result.emoji);
   });
 });

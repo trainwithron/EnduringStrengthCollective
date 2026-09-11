@@ -1,5 +1,7 @@
 import { createServerClient } from "@/lib/supabase/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { estimateOneRepMax } from "@/lib/one-rep-max";
+import { computeWeekStreak } from "@/lib/consistency-streak";
 
 // Shared by the public /share/[postId] page and the in-feed expanded
 // card (fetched via /api/workout-share/[postId]) so both surfaces
@@ -75,6 +77,30 @@ export async function getSharedWorkout(postId: string) {
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);
 
+  // Consistency streak — same broadcastLevel === "full" gate as
+  // totalVolume, since this is the athlete's own activity pattern, not
+  // public-by-default data. Uses the service-role client deliberately:
+  // this page is genuinely public (no session to check RLS against —
+  // see the file-level comment on lib/supabase/service-role.ts), and the
+  // anon RLS policy on workout_logs only exposes rows tied to a public
+  // post, which would silently undercount every real streak (most of an
+  // athlete's history isn't individually shared). Only ever feeds a
+  // small derived integer (a week count) back out, never raw rows.
+  let weekStreak = 0;
+  if (broadcastLevel === "full") {
+    const twoYearsAgo = new Date(post.created_at);
+    twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
+    const serviceClient = createServiceRoleClient();
+    const { data: logRows } = await serviceClient
+      .from("workout_logs")
+      .select("created_at")
+      .eq("athlete_id", post.author_id)
+      .eq("group_id", post.group_id)
+      .gte("created_at", twoYearsAgo.toISOString());
+    const logDates = (logRows ?? []).map((r) => new Date(r.created_at));
+    weekStreak = computeWeekStreak(logDates, new Date(post.created_at));
+  }
+
   return {
     authorId: post.author_id as string,
     groupId: post.group_id,
@@ -83,6 +109,7 @@ export async function getSharedWorkout(postId: string) {
     broadcastLevel,
     totalVolume: broadcastLevel === "full" ? workoutLog.total_volume ?? 0 : null,
     totalSetsCompleted: broadcastLevel === "full" ? workoutLog.total_sets_completed ?? 0 : null,
+    weekStreak,
     topLifts,
     top5Candidates,
     selectedNames: post.shared_exercise_names ?? top5Candidates.slice(0, 3).map((l) => l.name),

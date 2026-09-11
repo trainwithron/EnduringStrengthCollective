@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { toBlob } from "html-to-image";
 import { getVolumeEquivalence } from "@/lib/volume-equivalence";
+import { pickGymJoke } from "@/lib/gym-jokes";
 
 interface SharedWorkoutData {
   groupName: string;
@@ -10,6 +11,7 @@ interface SharedWorkoutData {
   broadcastLevel: "full" | "prs_only" | "checkin_only";
   totalVolume: number | null;
   totalSetsCompleted: number | null;
+  weekStreak: number;
   topLifts: { name: string; weight: number; reps: number }[];
   prList: { name: string; weight: number; reps: number; oneRepMax: number }[];
   createdAt: string;
@@ -71,7 +73,8 @@ export function WorkoutCardExpanded({ postId }: { postId: string }) {
   }
 
   const volumeEquivalence =
-    data.totalVolume != null ? getVolumeEquivalence(data.totalVolume) : null;
+    data.totalVolume != null ? getVolumeEquivalence(data.totalVolume, postId) : null;
+  const gymJoke = pickGymJoke(new Date().toISOString().slice(0, 10));
 
   return (
     <div className="mt-3">
@@ -96,12 +99,15 @@ export function WorkoutCardExpanded({ postId }: { postId: string }) {
               lbs total volume &middot; {data.totalSetsCompleted} sets
             </p>
             {volumeEquivalence && (
-              <p className="font-body text-sm text-rust mt-2">
-                That&apos;s the weight of {volumeEquivalence.label}
-              </p>
+              <p className="font-body text-sm text-rust mt-2">{volumeEquivalence.text}</p>
+            )}
+            {data.weekStreak >= 2 && (
+              <p className="font-body text-sm text-rust mt-1">🔥 {data.weekStreak} week streak</p>
             )}
           </div>
         )}
+
+        <p className="font-body text-xs text-steel mt-3">😂 {gymJoke}</p>
 
         {data.topLifts.length > 0 && (
           <div className="mt-4">

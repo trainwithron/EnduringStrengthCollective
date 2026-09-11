@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { createServerClient } from "@/lib/supabase/server";
 import { getVolumeEquivalence } from "@/lib/volume-equivalence";
+import { pickGymJoke } from "@/lib/gym-jokes";
 import { getSharedWorkout } from "@/lib/shared-workout";
 import { PrListToggle } from "@/components/share/pr-list-toggle";
 import { ShareWorkoutButton } from "@/components/share/share-workout-button";
@@ -64,7 +65,8 @@ export default async function ShareWorkoutPage(
   } = await supabase.auth.getUser();
 
   const volumeEquivalence =
-    shared.totalVolume != null ? getVolumeEquivalence(shared.totalVolume) : null;
+    shared.totalVolume != null ? getVolumeEquivalence(shared.totalVolume, params.postId) : null;
+  const gymJoke = pickGymJoke(new Date().toISOString().slice(0, 10));
 
   const shareTitle =
     shared.prList.length > 0
@@ -93,8 +95,11 @@ export default async function ShareWorkoutPage(
                 lbs total volume &middot; {shared.totalSetsCompleted} sets
               </p>
               {volumeEquivalence && (
-                <p className="font-body text-sm text-rust mt-2">
-                  That&apos;s the weight of {volumeEquivalence.label}
+                <p className="font-body text-sm text-rust mt-2">{volumeEquivalence.text}</p>
+              )}
+              {shared.weekStreak >= 2 && (
+                <p className="font-body text-sm text-rust mt-1">
+                  🔥 {shared.weekStreak} week streak
                 </p>
               )}
             </>
@@ -104,6 +109,8 @@ export default async function ShareWorkoutPage(
             </p>
           )}
         </div>
+
+        <p className="font-body text-xs text-steel mt-4">😂 {gymJoke}</p>
 
         {shared.topLifts.length > 0 && (
           <div className="mt-6">
