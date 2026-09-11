@@ -27,11 +27,13 @@ function ActualCell({
   field,
   readOnly,
   onChange,
+  setNumber,
 }: {
   set: SetLogEntry;
   field: TrackedField;
   readOnly: boolean;
   onChange: (patch: Partial<SetLogEntry>) => void;
+  setNumber: number;
 }) {
   const prop = ACTUAL_PROP[field] as keyof SetLogEntry;
   const initial = set[prop];
@@ -59,6 +61,7 @@ function ActualCell({
       type={def.kind === "number" ? "number" : "text"}
       inputMode={def.kind === "number" ? "decimal" : undefined}
       placeholder={placeholder}
+      aria-label={`${def.label} for set ${setNumber}`}
       value={draft}
       disabled={readOnly}
       onChange={(e) => setDraft(e.target.value)}
@@ -167,6 +170,7 @@ export function SetRow({
           type="number"
           inputMode="decimal"
           placeholder="lbs"
+          aria-label={`Weight for set ${setNumber}, in pounds`}
           value={weight}
           disabled={readOnly}
           onChange={(e) => setWeight(e.target.value)}
@@ -182,6 +186,7 @@ export function SetRow({
           type="number"
           inputMode="numeric"
           placeholder="reps"
+          aria-label={`Reps for set ${setNumber}`}
           value={reps}
           disabled={readOnly}
           onChange={(e) => setReps(e.target.value)}
@@ -191,7 +196,7 @@ export function SetRow({
       )}
 
       {extraFields.map((field) => (
-        <ActualCell key={field} set={set} field={field} readOnly={readOnly} onChange={onChange} />
+        <ActualCell key={field} set={set} field={field} readOnly={readOnly} onChange={onChange} setNumber={setNumber} />
       ))}
 
       <span
