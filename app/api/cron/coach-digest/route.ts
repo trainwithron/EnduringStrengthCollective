@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendPushToProfile } from "@/lib/send-push";
 import { findThreadsNeedingReply } from "@/lib/notification-priority";
+import { DEFAULT_COACH_TIMEZONE, nowInZone } from "@/lib/timezone";
 
 // Triggered daily by the Vercel Cron entry in vercel.json. No user
 // session involved — auth is the CRON_SECRET header, same pattern as
@@ -18,7 +19,6 @@ export async function GET(request: Request) {
   }
 
   const supabase = createServiceRoleClient();
-  const isMonday = new Date().getUTCDay() === 1;
 
   const { data: coachRows } = await supabase
     .from("group_memberships")
@@ -35,6 +35,18 @@ export async function GET(request: Request) {
       teamSocialGroupIdsByCoach.set(coachId, [...(teamSocialGroupIdsByCoach.get(coachId) ?? []), row.group_id]);
     }
   }
+
+  // "Is it Monday" has to be asked in each coach's own zone, not whatever
+  // day the cron's UTC clock happens to read — otherwise the weekly recap
+  // fires a day early or late for anyone not in the UTC zone (same class
+  // of bug as the workout-visibility lock — see lib/timezone.ts).
+  const { data: timezoneRows } = await supabase
+    .from("profiles")
+    .select("id, timezone")
+    .in("id", [...groupIdsByCoach.keys()]);
+  const timezoneByCoach = new Map(
+    (timezoneRows ?? []).map((r) => [r.id, r.timezone ?? DEFAULT_COACH_TIMEZONE])
+  );
 
   const results: { coachId: string; sent: boolean; summary?: string }[] = [];
 
@@ -107,8 +119,9 @@ export async function GET(request: Request) {
       }
     }
 
-    // Weekly business recap — Mondays only, income across every group
-    // this coach runs over the last 7 days.
+    // Weekly business recap — Mondays only (in this coach's own zone),
+    // income across every group this coach runs over the last 7 days.
+    const isMonday = nowInZone(timezoneByCoach.get(coachId) ?? DEFAULT_COACH_TIMEZONE).getUTCDay() === 1;
     if (isMonday) {
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const { data: purchases } = await supabase

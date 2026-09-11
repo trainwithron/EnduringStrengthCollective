@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { computeScheduledDates, isLocked } from "./program-schedule";
+import { dateKeyInZone, getGroupCoachTimezone, nowInZone } from "./timezone";
 
 export type TodaysWorkoutResult =
   | { status: "ready"; workoutId: string }
@@ -20,7 +21,13 @@ export async function getTodaysWorkoutId(
   supabase: SupabaseClient,
   { groupId, athleteId }: { groupId: string; athleteId: string }
 ): Promise<TodaysWorkoutResult> {
-  const todayKey = new Date().toISOString().slice(0, 10);
+  // "Today" for a program's own schedule is the group's coach's real
+  // wall-clock day, not whatever date the server's own UTC clock reads —
+  // see lib/timezone.ts. Without this, a workout could unlock (or an
+  // override fail to match) hours early or late for any coach/athlete not
+  // literally in the UTC zone.
+  const timezone = await getGroupCoachTimezone(supabase, groupId);
+  const todayKey = dateKeyInZone(timezone);
   const { data: override } = await supabase
     .from("workout_assignments")
     .select("workout_id")
@@ -90,7 +97,7 @@ export async function getTodaysWorkoutId(
       workouts
     );
     const scheduledDate = scheduledDateByDayId.get(next.id);
-    if (isLocked(scheduledDate, new Date(), program.visibility_window)) {
+    if (isLocked(scheduledDate, nowInZone(timezone), program.visibility_window)) {
       return { status: "locked", unlocksOn: scheduledDate! };
     }
   }

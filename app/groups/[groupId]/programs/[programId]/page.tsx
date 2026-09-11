@@ -11,6 +11,7 @@ import {
   isLocked,
   type VisibilityWindow,
 } from "@/lib/program-schedule";
+import { getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
 import { Lock } from "lucide-react";
 import type { BuilderDay, BuilderExercise, BuilderNote } from "@/lib/types";
 
@@ -100,7 +101,11 @@ export default async function ProgramDetailPage(
     program.start_date && program.training_days && program.training_days.length > 0
       ? computeScheduledDates(program.start_date, program.training_days, workouts ?? [])
       : new Map<string, Date>();
-  const today = new Date();
+  // This group's coach's real wall-clock day, not the server's own UTC
+  // clock — see lib/timezone.ts. Otherwise a day's lock state here reads
+  // early or late for anyone not in the UTC zone.
+  const timezone = await getGroupCoachTimezone(supabase, params.groupId);
+  const today = nowInZone(timezone);
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">

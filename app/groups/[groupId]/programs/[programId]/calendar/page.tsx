@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { computeScheduledDates, isSameDay, isLocked } from "@/lib/program-schedule";
+import { getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
@@ -212,7 +213,12 @@ export default async function ProgramCalendarPage(
     creditBalance = creditsRow?.balance ?? 0;
   }
 
-  const today = new Date();
+  // This group's coach's real wall-clock day, not the server's own UTC
+  // clock — see lib/timezone.ts. Otherwise "today" on this calendar (and
+  // every locked/unlocked day computed from it) reads a day early or late
+  // for anyone not in the UTC zone.
+  const timezone = await getGroupCoachTimezone(supabase, params.groupId);
+  const today = nowInZone(timezone);
   const view = searchParams.view === "week" ? "week" : "month";
   const monthParam = searchParams.month; // "YYYY-MM"
   let year = today.getFullYear();

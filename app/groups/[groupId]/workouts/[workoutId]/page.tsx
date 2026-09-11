@@ -6,6 +6,7 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { computeScheduledDates, formatShortDate, isLocked } from "@/lib/program-schedule";
 import { getEffectiveAthlete } from "@/lib/acting-as";
+import { dateKeyInZone, getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
 
 export default async function WorkoutOverviewPage(
   props: {
@@ -70,7 +71,8 @@ export default async function WorkoutOverviewPage(
     // already arrived, always unlocks it early — same rule /today already
     // applies, extended here so opening the workout's URL directly (not
     // just visiting /today) respects the same explicit assignment.
-    const todayKey = new Date().toISOString().slice(0, 10);
+    const timezone = await getGroupCoachTimezone(supabase, params.groupId);
+    const todayKey = dateKeyInZone(timezone);
     const { data: overrides } = await supabase
       .from("workout_assignments")
       .select("scheduled_date")
@@ -113,7 +115,7 @@ export default async function WorkoutOverviewPage(
       );
       const scheduledDate = scheduledDateByDayId.get(params.workoutId);
 
-      if (isLocked(scheduledDate, new Date(), program.visibility_window)) {
+      if (isLocked(scheduledDate, nowInZone(timezone), program.visibility_window)) {
         return (
           <main className="min-h-screen bg-graphite text-chalk font-body pb-24 flex flex-col">
             {actingAs && <ActingAsBanner athleteFullName={actingAs.fullName} groupId={actingAs.groupId} />}

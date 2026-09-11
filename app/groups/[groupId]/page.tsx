@@ -15,6 +15,7 @@ import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { getViewerOrgTheme } from "@/lib/org-theme-server";
 import { computeScheduledDates, isLocked } from "@/lib/program-schedule";
+import { dateKeyInZone, getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
 import { getWeekRange, isWithinRange } from "@/lib/week-range";
 import { resolveDayMacroTarget } from "@/lib/todays-macros";
 import type { RosterMember } from "@/lib/types";
@@ -145,7 +146,12 @@ export default async function GroupHubPage(
   let todayHabits: { id: string; title: string; completed: boolean }[] = [];
   let weekDays: WeekDayEntry[] = [];
   let wellnessCheckin: WellnessCheckinValues | null = null;
-  const todayKey = new Date().toISOString().slice(0, 10);
+  // "Today" here means this group's coach's real wall-clock day, not the
+  // server's own UTC clock — see lib/timezone.ts. Otherwise a workout's
+  // lock state, today's macro/habit lookups, and the "This Week" widget
+  // could all read a day early or late for anyone not in the UTC zone.
+  const timezone = await getGroupCoachTimezone(supabase, params.groupId);
+  const todayKey = dateKeyInZone(timezone);
 
   const actingAsFullName = isActingAsOther
     ? roster.find((m) => m.profileId === athleteId)?.fullName ?? "Client"
@@ -379,7 +385,8 @@ async function computeThisWeek(
     workouts
   );
 
-  const today = new Date();
+  const timezone = await getGroupCoachTimezone(supabase, groupId);
+  const today = nowInZone(timezone);
   const { start, end } = getWeekRange(today);
   const thisWeek = workouts
     .map((w) => ({ ...w, date: scheduledDateByDayId.get(w.id) }))
