@@ -1,25 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import type { LeaderboardEntry } from "@/lib/leaderboard";
+import type { PositionRanking } from "@/lib/leaderboard";
 import { LeaderboardRows, TABS, TAB_LABELS, SCORE_LABEL, type LeaderboardTab } from "./leaderboard-rows";
 
-type RankedEntry = LeaderboardEntry & { rank: number };
-
-export function GroupLeaderboardTabs({
-  workouts,
-  volume,
-  prs,
+export function PositionLeaderboard({
+  positionGroups,
   viewerId,
 }: {
-  workouts: RankedEntry[];
-  volume: RankedEntry[];
-  prs: RankedEntry[];
+  positionGroups: PositionRanking[];
   viewerId: string | null;
 }) {
   const [tab, setTab] = useState<LeaderboardTab>("workouts");
-  const data: Record<LeaderboardTab, RankedEntry[]> = { workouts, volume, prs };
-  const active = data[tab];
+  const rankingKey =
+    tab === "workouts" ? "workoutsRanking" : tab === "volume" ? "volumeRanking" : "prsRanking";
 
   return (
     <div>
@@ -38,7 +32,20 @@ export function GroupLeaderboardTabs({
         ))}
       </div>
 
-      <LeaderboardRows entries={active} viewerId={viewerId} scoreLabel={SCORE_LABEL[tab]} />
+      <div className="space-y-5">
+        {positionGroups.map((group) => (
+          <div key={group.positionId ?? "unassigned"}>
+            <h4 className="font-body text-xs text-steel uppercase tracking-wide mb-1.5">
+              {group.positionName}
+            </h4>
+            <LeaderboardRows
+              entries={group[rankingKey]}
+              viewerId={viewerId}
+              scoreLabel={SCORE_LABEL[tab]}
+            />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

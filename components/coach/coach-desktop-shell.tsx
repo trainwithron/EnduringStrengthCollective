@@ -25,6 +25,7 @@ import {
   Building2,
   Layers,
   Home,
+  MonitorPlay,
 } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
@@ -411,6 +412,20 @@ export function CoachDesktopShell({
       </Link>
       <GroupSwitcher groupId={groupId} groupName={groupName} collapsed={collapsed} />
       <nav className="flex-1 py-3 overflow-y-auto">{renderNav()}</nav>
+      <div className={`border-t border-steel/20 py-2 ${collapsed ? "px-2" : "px-5"}`}>
+        <a
+          href={`/groups/${groupId}/display`}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Display Mode"
+          className={`flex items-center gap-2 font-body text-xs text-steel active:text-chalk ${
+            collapsed ? "justify-center" : ""
+          }`}
+        >
+          <MonitorPlay className="w-3.5 h-3.5 shrink-0" strokeWidth={2.25} />
+          {!collapsed && "Display Mode"}
+        </a>
+      </div>
       {isPlatformAdmin && (
         <div className={`border-t border-steel/20 py-2 ${collapsed ? "px-2" : "px-5"}`}>
           <Link

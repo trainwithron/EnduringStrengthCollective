@@ -11,7 +11,7 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { LiveGroupLeaderboard } from "@/components/leaderboard/live-group-leaderboard";
-import { getGroupLeaderboardRankings } from "@/lib/leaderboard-data";
+import { getGroupLeaderboardRankings, getPositionLeaderboardRankings } from "@/lib/leaderboard-data";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import type { FeedChannel, FeedPost } from "@/lib/types";
@@ -154,12 +154,26 @@ export default async function FeedPage(
   // tab — every post is a reminder it's there, per the ask ("every time
   // anything gets posted, everyone can see the leaderboard").
   const leaderboard = channel === "general" ? await getGroupLeaderboardRankings(supabase, params.groupId) : null;
+  // Position-grouped rankings only cost a query for team_mode groups —
+  // the common case (team_mode off) skips this entirely.
+  let positionGroups: Awaited<ReturnType<typeof getPositionLeaderboardRankings>> | null = null;
+  if (leaderboard) {
+    const { data: leaderboardGroup } = await supabase
+      .from("groups")
+      .select("team_mode")
+      .eq("id", params.groupId)
+      .maybeSingle();
+    if (leaderboardGroup?.team_mode) {
+      positionGroups = await getPositionLeaderboardRankings(supabase, params.groupId);
+    }
+  }
   const leaderboardCard = leaderboard && (
     <div className="border border-steel/20 p-4 mb-4">
       <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">Leaderboard</h2>
       <LiveGroupLeaderboard
         groupId={params.groupId}
         initialRankings={leaderboard}
+        initialPositionGroups={positionGroups}
         viewerId={athleteId}
       />
     </div>
