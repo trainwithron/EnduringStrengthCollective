@@ -26,6 +26,7 @@ import {
   Layers,
   Home,
   MonitorPlay,
+  Activity,
 } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
@@ -68,7 +69,8 @@ type Active =
   | "packages"
   | "resources"
   | "challenges"
-  | "team";
+  | "team"
+  | "team-performance";
 
 interface NavLeaf {
   key: Active;
@@ -288,6 +290,7 @@ export function CoachDesktopShell({
 
   const nav: NavEntry[] = [
     { key: "dashboard", label: "Dashboard", href: `/groups/${groupId}/dashboard`, icon: LayoutDashboard },
+    { key: "team-performance", label: "Team Performance", href: `/groups/${groupId}/team-performance`, icon: Activity },
     {
       label: "Business",
       icon: TrendingUp,
