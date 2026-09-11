@@ -158,7 +158,14 @@ export function ChangeClientGroupControl({
     return (
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setOpen(true);
+          // "Existing group" is already the default `destination` below, so
+          // without this the fetch only ever fires if a coach clicks that
+          // already-active toggle again — which they have no reason to do,
+          // leaving the dropdown stuck on "No other groups yet" forever.
+          loadOrgGroups();
+        }}
         className="font-body text-xs text-steel underline decoration-dotted active:text-rust"
       >
         Move to a different group
