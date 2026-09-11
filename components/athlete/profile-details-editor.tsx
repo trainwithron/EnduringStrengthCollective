@@ -53,8 +53,11 @@ export function ProfileDetailsEditor({
   return (
     <div className="space-y-3">
       <div>
-        <label className="font-body text-xs text-steel">About me</label>
+        <label htmlFor="profile-bio" className="font-body text-xs text-steel">
+          About me
+        </label>
         <textarea
+          id="profile-bio"
           value={details.bio}
           onChange={(e) => setDetails((d) => ({ ...d, bio: e.target.value }))}
           onBlur={handleBlur("bio")}
@@ -65,8 +68,11 @@ export function ProfileDetailsEditor({
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="font-body text-xs text-steel">Birthday</label>
+          <label htmlFor="profile-birthday" className="font-body text-xs text-steel">
+            Birthday
+          </label>
           <input
+            id="profile-birthday"
             type="date"
             value={details.birthday}
             onChange={(e) => setDetails((d) => ({ ...d, birthday: e.target.value }))}
@@ -75,8 +81,11 @@ export function ProfileDetailsEditor({
           />
         </div>
         <div>
-          <label className="font-body text-xs text-steel">Phone</label>
+          <label htmlFor="profile-phone" className="font-body text-xs text-steel">
+            Phone
+          </label>
           <input
+            id="profile-phone"
             type="tel"
             value={details.phone}
             onChange={(e) => setDetails((d) => ({ ...d, phone: e.target.value }))}
@@ -87,8 +96,11 @@ export function ProfileDetailsEditor({
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="font-body text-xs text-steel">Emergency contact name</label>
+          <label htmlFor="profile-emergency-name" className="font-body text-xs text-steel">
+            Emergency contact name
+          </label>
           <input
+            id="profile-emergency-name"
             type="text"
             value={details.emergencyContactName}
             onChange={(e) => setDetails((d) => ({ ...d, emergencyContactName: e.target.value }))}
@@ -97,8 +109,11 @@ export function ProfileDetailsEditor({
           />
         </div>
         <div>
-          <label className="font-body text-xs text-steel">Emergency contact phone</label>
+          <label htmlFor="profile-emergency-phone" className="font-body text-xs text-steel">
+            Emergency contact phone
+          </label>
           <input
+            id="profile-emergency-phone"
             type="tel"
             value={details.emergencyContactPhone}
             onChange={(e) => setDetails((d) => ({ ...d, emergencyContactPhone: e.target.value }))}

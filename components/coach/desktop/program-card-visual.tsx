@@ -13,8 +13,8 @@ const SPARK_H = 60;
 // Literal hex, not var(--token), matching the same convention already
 // used by components/coach/desktop/trend-chart.tsx for SVG presentation
 // attributes.
-const RUST = "#C4622D";
-const STEEL = "#8A8578";
+const RUST = "#D2703B";
+const STEEL = "#908B7E";
 const MOSS = "#6B8F71";
 const BLUE = "#4A7A9E";
 

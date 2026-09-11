@@ -195,6 +195,7 @@ export function SetRow({
       ))}
 
       <span
+        role="img"
         aria-label={isComplete ? "Set complete" : isSkipped ? "Set skipped" : "Set pending"}
         className={`ml-auto w-10 h-10 flex items-center justify-center border shrink-0 ${
           isComplete

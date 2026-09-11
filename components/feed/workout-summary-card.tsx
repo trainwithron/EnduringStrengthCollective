@@ -174,7 +174,7 @@ function PrBurst() {
           key={i}
           className="absolute w-1 h-6 origin-bottom rounded-full"
           style={{
-            backgroundColor: i % 2 === 0 ? "#C4622D" : "#6B8F71",
+            backgroundColor: i % 2 === 0 ? "#D2703B" : "#6B8F71",
             transform: `rotate(${(360 / bars.length) * i}deg) translateY(-40px)`,
             animation: `pr-burst 700ms ease-out forwards`,
             animationDelay: `${i * 15}ms`,

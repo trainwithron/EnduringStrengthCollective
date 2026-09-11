@@ -107,7 +107,12 @@ export function GeminiImportGuide() {
                 {copied ? "Copied!" : "Copy prompt"}
               </button>
             </div>
-            <pre className="whitespace-pre-wrap font-body text-xs text-chalk bg-graphite border border-steel/20 p-4 max-h-96 overflow-y-auto">
+            <pre
+              tabIndex={0}
+              role="region"
+              aria-label="AI prompt text"
+              className="whitespace-pre-wrap font-body text-xs text-chalk bg-graphite border border-steel/20 p-4 max-h-96 overflow-y-auto focus:outline-none focus:ring-1 focus:ring-rust"
+            >
               {GEMINI_PROMPT}
             </pre>
           </div>

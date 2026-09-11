@@ -17,7 +17,10 @@ export default {
         surface: "#262422",
         rust: "var(--rust)",
         chalk: "var(--chalk)",
-        steel: "#8A8578",
+        // Nudged from #8A8578 — the original failed WCAG AA contrast
+        // (4.2:1) against the surface card background; this clears 4.5:1
+        // there while reading as visually identical at a glance.
+        steel: "#908B7E",
         moss: "#6B8F71",
         // Third accent for a 3-way category split (Upper/Lower/
         // Conditioning) where rust and moss are already spoken for —

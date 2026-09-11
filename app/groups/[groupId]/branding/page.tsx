@@ -172,7 +172,7 @@ export default async function BrandingPage(
         <BrandingForm
           organizationId={orgMembership.organization_id}
           initialButtonShape={(org?.button_shape as ButtonShape) ?? "sharp"}
-          initialAccentColor={org?.accent_color ?? "#C4622D"}
+          initialAccentColor={org?.accent_color ?? "#D2703B"}
           initialBackgroundColor={org?.background_color ?? "#1C1B1A"}
           initialTextColor={org?.text_color ?? "#EDE8E0"}
           initialFontDisplay={(org?.font_display as DisplayFont) ?? "Barlow Condensed"}

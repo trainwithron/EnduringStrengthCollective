@@ -128,6 +128,8 @@ export function ProgramScheduleSettings({
             type="button"
             onClick={() => toggleDay(day.value)}
             disabled={saving}
+            aria-label={day.label}
+            aria-pressed={trainingDays.includes(day.value)}
             className={`h-6 w-6 flex items-center justify-center border font-body text-[10px] transition-colors disabled:opacity-40 ${
               trainingDays.includes(day.value)
                 ? "bg-rust border-rust text-graphite"

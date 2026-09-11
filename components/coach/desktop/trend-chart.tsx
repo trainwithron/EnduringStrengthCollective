@@ -57,9 +57,9 @@ export function TrendChart({
           strokeWidth={1.5}
           strokeDasharray="4 3"
         />
-        <path d={linePath} fill="none" stroke="#C4622D" strokeWidth={2} />
+        <path d={linePath} fill="none" stroke="#D2703B" strokeWidth={2} />
         {plotted.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r={i === plotted.length - 1 ? 3.5 : 2.5} fill="#C4622D" />
+          <circle key={i} cx={p.x} cy={p.y} r={i === plotted.length - 1 ? 3.5 : 2.5} fill="#D2703B" />
         ))}
         <text x={PADDING} y={12} fontSize="10" fill="#8A8168" fontFamily="Inter, sans-serif">
           {maxValue}

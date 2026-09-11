@@ -28,10 +28,12 @@ function TargetCell({
   value,
   kind,
   onCommit,
+  label,
 }: {
   value: string;
   kind: "number" | "text";
   onCommit: (raw: string) => void;
+  label: string;
 }) {
   const [draft, setDraft] = useState(value);
 
@@ -52,6 +54,7 @@ function TargetCell({
     <input
       type={kind === "number" ? "number" : "text"}
       inputMode={kind === "number" ? "decimal" : undefined}
+      aria-label={label}
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={commit}
@@ -669,11 +672,12 @@ export function ExerciseBuilderCard({
                     <span className="w-14 shrink-0 font-body text-[10px] text-steel uppercase tracking-wide">
                       {def.label}
                     </span>
-                    {exercise.sets.map((set) => (
+                    {exercise.sets.map((set, i) => (
                       <TargetCell
                         key={set.id}
                         value={targetValue(set, field)}
                         kind={def.kind}
+                        label={`${def.label}, set ${i + 1}`}
                         onCommit={(raw) =>
                           set.id === firstSetId && exercise.sets.length > 1
                             ? handleFirstSetCommit(set.id, field, raw)

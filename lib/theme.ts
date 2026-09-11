@@ -17,7 +17,12 @@ export const BUTTON_SHAPE_LABELS: Record<ButtonShape, string> = {
   pill: "Pill",
 };
 
-export const DEFAULT_ACCENT_COLOR = "#C4622D";
+// Nudged from #C4622D — the original failed WCAG AA contrast (4.5:1)
+// both as button text-on-background and as accent text on the app's
+// dark surfaces; this clears 4.5:1 in both directions. Only affects the
+// platform default — a coach who's customized their own accent color
+// isn't automatically contrast-checked.
+export const DEFAULT_ACCENT_COLOR = "#D2703B";
 export const DEFAULT_BACKGROUND_COLOR = "#1C1B1A";
 export const DEFAULT_TEXT_COLOR = "#EDE8E0";
 

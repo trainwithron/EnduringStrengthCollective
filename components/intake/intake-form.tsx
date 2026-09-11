@@ -162,7 +162,11 @@ export function IntakeForm({
           <p className="font-body text-sm text-steel mb-3">
             We ask this first so we know how to handle your information correctly.
           </p>
+          <label htmlFor="date-of-birth" className="sr-only">
+            Your date of birth
+          </label>
           <input
+            id="date-of-birth"
             type="date"
             value={dateOfBirth}
             onChange={(e) => setDateOfBirth(e.target.value)}
@@ -267,7 +271,12 @@ export function IntakeForm({
           </div>
         ) : (
           <div className="border border-steel/20 p-4">
-            <p className="font-body text-xs text-steel whitespace-pre-wrap max-h-60 overflow-y-auto">
+            <p
+              tabIndex={0}
+              role="region"
+              aria-label="Liability waiver text"
+              className="font-body text-xs text-steel whitespace-pre-wrap max-h-60 overflow-y-auto focus:outline-none focus:ring-1 focus:ring-rust"
+            >
               {waiverText || DEFAULT_WAIVER_TEXT}
             </p>
             <label className="flex items-start gap-2 mt-4">

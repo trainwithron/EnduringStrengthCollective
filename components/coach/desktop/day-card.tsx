@@ -369,6 +369,7 @@ export function DayCard({
         <div className="flex-1 min-w-0 flex flex-col">
           <input
             type="text"
+            aria-label="Day title"
             value={titleDraft}
             onChange={(e) => setTitleDraft(e.target.value)}
             onBlur={() => {

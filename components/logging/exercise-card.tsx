@@ -194,14 +194,14 @@ export function ExerciseCard({
           </div>
         ) : (
           <>
-            <h3 className="font-body font-medium text-[15px]">
-              {exercise.exerciseName}
+            <h2 className="font-body font-medium text-[15px]">
+              {exercise.exerciseName || "Untitled exercise"}
               {exercise.isSwapped && (
                 <span className="font-body text-[11px] text-steel ml-2 align-middle">
                   swapped
                 </span>
               )}
-            </h3>
+            </h2>
             {!readOnly && (
               <div className="flex items-center gap-3 shrink-0">
                 <button

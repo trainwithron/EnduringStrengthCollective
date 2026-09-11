@@ -64,6 +64,7 @@ export function ViewAsClientButton({ groupId }: { groupId: string }) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
+        aria-label="View as Client"
         className="flex items-center gap-1.5 h-9 px-2.5 md:px-3 border border-steel/30 text-chalk active:border-rust active:text-rust transition-colors"
       >
         <Eye className="w-4 h-4 shrink-0" strokeWidth={2.25} />

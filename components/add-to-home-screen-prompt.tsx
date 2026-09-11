@@ -70,7 +70,11 @@ export function AddToHomeScreenPrompt() {
     // (back link, title). Rendered first in the document, a normal-flow
     // block at the top just pushes everything else down, no coordination
     // with individual pages needed.
-    <div className="relative z-10 bg-surface border-b border-steel/30 px-4 py-3 flex items-start gap-3">
+    <div
+      role="region"
+      aria-label="Add to home screen"
+      className="relative z-10 bg-surface border-b border-steel/30 px-4 py-3 flex items-start gap-3"
+    >
       <div className="flex-1 min-w-0">
         <p className="font-body text-sm font-medium text-chalk">
           Add this to your home screen
