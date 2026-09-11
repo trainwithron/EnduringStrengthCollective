@@ -98,13 +98,17 @@ export default async function AthleteProfilePage(
   const activeProgram = personalProgram ?? sharedProgram;
 
   // Stats (total count, volume, PRs) need every logged workout to stay
-  // accurate — the displayed history below is capped separately so the
-  // page doesn't slow down after months of real use.
+  // accurate, and the displayed history below is just the first 50 of
+  // this same, already-descending-ordered list — one query serves both
+  // instead of fetching workout_logs twice with overlapping filters.
   const { data: allLogs } = await supabase
     .from("workout_logs")
-    .select("total_volume, new_prs, created_at")
+    .select(
+      "id, session_id, total_volume, total_sets_completed, new_prs, created_at, logged_by_coach, workouts ( title, week_number, day_index )"
+    )
     .eq("athlete_id", params.athleteId)
-    .eq("group_id", params.groupId);
+    .eq("group_id", params.groupId)
+    .order("created_at", { ascending: false });
 
   const totalCompleted = allLogs?.length ?? 0;
   const totalVolume = (allLogs ?? []).reduce((sum, l) => sum + (l.total_volume ?? 0), 0);
@@ -118,17 +122,7 @@ export default async function AthleteProfilePage(
   prEntries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const RECENT_LOGS_LIMIT = 50;
-  const { data: logs } = await supabase
-    .from("workout_logs")
-    .select(
-      "id, session_id, total_volume, total_sets_completed, new_prs, created_at, logged_by_coach, workouts ( title, week_number, day_index )"
-    )
-    .eq("athlete_id", params.athleteId)
-    .eq("group_id", params.groupId)
-    .order("created_at", { ascending: false })
-    .limit(RECENT_LOGS_LIMIT);
-
-  const workoutLogs = logs ?? [];
+  const workoutLogs = (allLogs ?? []).slice(0, RECENT_LOGS_LIMIT);
 
   const { data: noteRow } = await supabase
     .from("athlete_notes")
@@ -212,15 +206,6 @@ export default async function AthleteProfilePage(
   const totalHabitsDue = habitCompliance.reduce((sum, h) => sum + h.due, 0);
   const totalHabitsCompleted = habitCompliance.reduce((sum, h) => sum + h.completed, 0);
 
-  const { data: macroRows } = await supabase
-    .from("daily_macros")
-    .select("log_date")
-    .eq("athlete_id", params.athleteId)
-    .gte("log_date", weekStartKey)
-    .lte("log_date", todayKey)
-    .not("calories", "is", null);
-  const daysWithMacroTarget = macroRows?.length ?? 0;
-
   const { data: weightLogs } = await supabase
     .from("body_weight_logs")
     .select("id, logged_date, weight")
@@ -288,6 +273,11 @@ export default async function AthleteProfilePage(
     .not("calories", "is", null)
     .order("log_date", { ascending: true });
   const calorieTrend = (calorieRows ?? []).map((r) => ({ date: r.log_date, value: r.calories as number }));
+  // Same rows as above, just the last-7-days slice — one query serves
+  // both instead of a second round trip against the same table/filter.
+  const daysWithMacroTarget = (calorieRows ?? []).filter(
+    (r) => r.log_date >= weekStartKey && r.log_date <= todayKey
+  ).length;
 
   const thirtyDaysAgoKey = (() => {
     const d = new Date();

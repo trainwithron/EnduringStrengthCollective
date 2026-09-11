@@ -8,6 +8,31 @@ export interface EffectiveAthlete {
   isActingAsOther: boolean;
 }
 
+// Pure decision logic, split out from the cookies() read below so it's
+// unit-testable without mocking Next.js internals — a stale/malformed/
+// wrong-group cookie value must always fall back to the real user, never
+// throw or silently resolve to someone else's data.
+export function resolveActingAs(
+  rawCookieValue: string | null | undefined,
+  groupId: string,
+  realUserId: string
+): EffectiveAthlete {
+  if (!rawCookieValue) {
+    return { athleteId: realUserId, realUserId, isActingAsOther: false };
+  }
+
+  try {
+    const parsed = JSON.parse(rawCookieValue) as { athleteId?: string; groupId?: string };
+    if (parsed.athleteId && parsed.groupId === groupId) {
+      return { athleteId: parsed.athleteId, realUserId, isActingAsOther: true };
+    }
+  } catch {
+    // Malformed cookie — fall through to the real user.
+  }
+
+  return { athleteId: realUserId, realUserId, isActingAsOther: false };
+}
+
 // Resolves "which athlete's data should this page load" for a coach who
 // may be standing in a client's mobile experience. The cookie only ever
 // changes *which id a page queries with* — every read/write still goes
@@ -20,18 +45,5 @@ export async function getEffectiveAthlete(
 ): Promise<EffectiveAthlete> {
   const cookieStore = await cookies();
   const raw = cookieStore.get(ACTING_AS_COOKIE)?.value;
-  if (!raw) {
-    return { athleteId: realUserId, realUserId, isActingAsOther: false };
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as { athleteId?: string; groupId?: string };
-    if (parsed.athleteId && parsed.groupId === groupId) {
-      return { athleteId: parsed.athleteId, realUserId, isActingAsOther: true };
-    }
-  } catch {
-    // Malformed cookie — fall through to the real user.
-  }
-
-  return { athleteId: realUserId, realUserId, isActingAsOther: false };
+  return resolveActingAs(raw, groupId, realUserId);
 }
