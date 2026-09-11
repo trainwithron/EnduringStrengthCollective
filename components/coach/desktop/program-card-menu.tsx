@@ -22,8 +22,26 @@ interface GroupOption {
   id: string;
   name: string;
 }
+interface PositionOption {
+  id: string;
+  name: string;
+  athleteCount: number;
+}
+interface BulkAssignResult {
+  succeeded: number;
+  total: number;
+  failedNames: string[];
+  positionName: string;
+}
 
-type View = "menu" | "assign" | "assign-self" | "duplicate-org" | "duplicate-group";
+type View =
+  | "menu"
+  | "assign"
+  | "assign-self"
+  | "assign-position"
+  | "assign-position-result"
+  | "duplicate-org"
+  | "duplicate-group";
 
 function todayDateString(): string {
   return new Date().toISOString().slice(0, 10);
@@ -46,6 +64,9 @@ export function ProgramCardMenu({
   const [clients, setClients] = useState<ClientOption[] | null>(null);
   const [orgs, setOrgs] = useState<OrgOption[] | null>(null);
   const [orgGroups, setOrgGroups] = useState<GroupOption[] | null>(null);
+  const [positions, setPositions] = useState<PositionOption[] | null>(null);
+  const [assignProgress, setAssignProgress] = useState<string | null>(null);
+  const [bulkResult, setBulkResult] = useState<BulkAssignResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [assignStartDate, setAssignStartDate] = useState(todayDateString());
@@ -139,6 +160,98 @@ export function ProgramCardMenu({
       .order("name");
     setOrgGroups(data ?? []);
     setView("duplicate-group");
+  }
+
+  // Same "load positions with real players, ignore empty ones" shape
+  // already used by the position-aware leaderboard and Team Depth Chart —
+  // this menu doesn't pre-check whether any exist before showing the
+  // button (same as "Duplicate to another organization →" below), it
+  // just shows an empty state once loaded.
+  async function loadPositions() {
+    if (positions) return;
+    const supabase = createBrowserClient();
+    const [{ data: posRows }, { data: memberRows }] = await Promise.all([
+      supabase.from("group_positions").select("id, name, sort_order").eq("group_id", groupId).order("sort_order"),
+      supabase
+        .from("group_memberships")
+        .select("position_id")
+        .eq("group_id", groupId)
+        .eq("role", "athlete")
+        .not("position_id", "is", null),
+    ]);
+    const countByPosition = new Map<string, number>();
+    for (const m of memberRows ?? []) {
+      countByPosition.set(m.position_id, (countByPosition.get(m.position_id) ?? 0) + 1);
+    }
+    const options = (posRows ?? [])
+      .map((p) => ({ id: p.id, name: p.name, athleteCount: countByPosition.get(p.id) ?? 0 }))
+      .filter((p) => p.athleteCount > 0);
+    setPositions(options);
+  }
+
+  async function handleAssignToPosition(position: PositionOption) {
+    const supabase = createBrowserClient();
+    const { data: memberRows } = await supabase
+      .from("group_memberships")
+      .select("profile_id, profiles ( full_name )")
+      .eq("group_id", groupId)
+      .eq("position_id", position.id)
+      .eq("role", "athlete");
+    const athletes = (memberRows ?? [])
+      .map((row: any) => ({ id: row.profile_id, fullName: row.profiles?.full_name ?? "Unknown" }))
+      .filter((a) => !!a.id);
+    if (athletes.length === 0) return;
+
+    if (
+      !window.confirm(
+        `Assign "${programName}" to all ${athletes.length} athletes on ${position.name}?\n\n${athletes
+          .map((a) => a.fullName)
+          .join(", ")}`
+      )
+    ) {
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setBusy(false);
+      return;
+    }
+
+    let succeeded = 0;
+    const failedNames: string[] = [];
+    for (let i = 0; i < athletes.length; i++) {
+      const athlete = athletes[i];
+      setAssignProgress(`Assigning ${i + 1} of ${athletes.length}…`);
+      const result = await duplicateProgram(supabase, {
+        sourceProgramId: programId,
+        destinationGroupId: groupId,
+        createdBy: user.id,
+        athleteId: athlete.id,
+        clientName: athlete.fullName,
+        startDate: assignStartDate || undefined,
+      });
+      if ("error" in result) {
+        failedNames.push(athlete.fullName);
+      } else {
+        succeeded++;
+        notifyPush(
+          athlete.id,
+          "New program",
+          `Your coach assigned you a new program: ${programName} — ${athlete.fullName}`,
+          `/groups/${groupId}/programs/${result.programId}`
+        );
+      }
+    }
+
+    setBusy(false);
+    setAssignProgress(null);
+    setBulkResult({ succeeded, total: athletes.length, failedNames, positionName: position.name });
+    setView("assign-position-result");
   }
 
   async function handleAssignToClient(client: ClientOption) {
@@ -340,6 +453,17 @@ export function ProgramCardMenu({
                 type="button"
                 onClick={() => {
                   setAssignStartDate(todayDateString());
+                  setView("assign-position");
+                  loadPositions();
+                }}
+                className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50"
+              >
+                Assign to Position →
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAssignStartDate(todayDateString());
                   setView("assign-self");
                 }}
                 className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50"
@@ -434,6 +558,71 @@ export function ProgramCardMenu({
                 className="w-full h-8 mt-2.5 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
               >
                 {busy ? "Assigning…" : "Assign & open"}
+              </button>
+            </div>
+          )}
+
+          {view === "assign-position" && (
+            <div>
+              <p className="font-body text-[11px] text-steel uppercase tracking-wide px-3 pt-2.5 pb-1.5">
+                Assign to which position?
+              </p>
+              <div className="px-3 pb-2">
+                <label className="font-body text-[11px] text-steel">
+                  Start date
+                  <input
+                    type="date"
+                    value={assignStartDate}
+                    onChange={(e) => setAssignStartDate(e.target.value)}
+                    className="w-full h-8 mt-1 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"
+                  />
+                </label>
+              </div>
+              <div className="max-h-72 overflow-y-auto">
+                {positions === null && (
+                  <p className="font-body text-xs text-steel px-3 py-2.5">Loading…</p>
+                )}
+                {positions?.length === 0 && (
+                  <p className="font-body text-xs text-steel px-3 py-2.5">
+                    No positions with players assigned yet — set this up from the Team page.
+                  </p>
+                )}
+                {positions?.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => handleAssignToPosition(p)}
+                    className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50 disabled:opacity-40"
+                  >
+                    {busy ? assignProgress ?? "Assigning…" : `${p.name} (${p.athleteCount})`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {view === "assign-position-result" && bulkResult && (
+            <div className="p-3">
+              <p className="font-body text-sm text-chalk">
+                Assigned to {bulkResult.succeeded} of {bulkResult.total} athletes on{" "}
+                {bulkResult.positionName}.
+              </p>
+              {bulkResult.failedNames.length > 0 && (
+                <p className="font-body text-xs text-rust mt-1.5">
+                  Failed: {bulkResult.failedNames.join(", ")}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setView(null);
+                  setBulkResult(null);
+                  router.refresh();
+                }}
+                className="w-full h-8 mt-2.5 bg-rust text-graphite font-body text-xs font-medium"
+              >
+                Done
               </button>
             </div>
           )}
