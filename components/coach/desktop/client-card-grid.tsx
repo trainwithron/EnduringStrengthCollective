@@ -61,11 +61,13 @@ export function ClientCardGrid({
   members,
   creditsByAthleteId,
   lowReadinessAthleteIds,
+  integrityByAthleteId,
 }: {
   groupId: string;
   members: RosterMember[];
   creditsByAthleteId: Map<string, number>;
   lowReadinessAthleteIds?: Set<string>;
+  integrityByAthleteId?: Map<string, { level: "none" | "single" | "pattern"; flaggedCount: number; totalSessions: number }>;
 }) {
   const [rows, setRows] = useState(members);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -259,6 +261,32 @@ export function ClientCardGrid({
                     ⚠ Low readiness
                   </span>
                 )}
+
+                {(() => {
+                  const integrity = integrityByAthleteId?.get(member.profileId);
+                  if (!integrity || integrity.level === "none") return null;
+                  // A lone fast session is a quiet, easy-to-dismiss
+                  // anomaly (genuinely fast athlete, a partial
+                  // coach-logged session) — a repeated pattern is the
+                  // real signal worth a conversation, so it gets
+                  // stronger visual weight (rust, not just steel/amber),
+                  // same escalation shape as the readiness flag above.
+                  return integrity.level === "pattern" ? (
+                    <span
+                      title={`${integrity.flaggedCount} of ${integrity.totalSessions} recent sessions logged implausibly fast`}
+                      className="font-body text-[11px] text-rust bg-rust/10 border border-rust/40 px-1.5 py-0.5"
+                    >
+                      ⏱ Fast sessions ({integrity.flaggedCount})
+                    </span>
+                  ) : (
+                    <span
+                      title="One recent session was logged faster than the prescribed sets/rest would realistically take"
+                      className="font-body text-[11px] text-steel bg-steel/10 border border-steel/30 px-1.5 py-0.5"
+                    >
+                      ⏱ Fast session
+                    </span>
+                  );
+                })()}
 
                 <div className="flex items-center gap-2 w-full justify-center mt-1">
                   <select

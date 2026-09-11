@@ -1,5 +1,7 @@
 import { getProgressionGoalsBatch } from "@/lib/progressions";
 import { DEFAULT_TRACKED_FIELDS, mapSetRow, type TrackedField } from "@/lib/exercise-fields";
+import { findCorrelatingWeightSuggestion, resolveWeightSuggestion } from "@/lib/set-suggestions";
+import { parseNumericReps } from "@/lib/program-card-visuals";
 import type { ExerciseSetTarget } from "@/lib/types";
 
 export interface WorkoutOverviewExercise {
@@ -27,6 +29,10 @@ export interface WorkoutOverviewData {
   lastTimeByExercise: Record<string, { weight: number; reps: number }>;
   videoUrlByExerciseId: Map<string, string>;
   goalByExerciseId: Map<string, { weight: number | null; reps: number | null }>;
+  // Correlating-week weight suggestion, keyed by this set's own template
+  // id — a grayed-out placeholder shown in the logging UI, never
+  // auto-committed as a real value (see lib/set-suggestions.ts).
+  suggestedWeightBySetId: Map<string, number | null>;
   existingSession: { id: string; status: string } | null;
 }
 
@@ -182,9 +188,9 @@ export async function getWorkoutOverviewData(
           .from("set_logs")
           .select(
             `
-        weight, reps, completed_at,
+        weight, reps, rpe, rir, set_order, completed_at,
         session_exercises!inner (
-          exercise_name,
+          exercise_name, group_workout_exercise_id,
           athlete_sessions!inner ( athlete_id )
         )
       `
@@ -236,6 +242,75 @@ export async function getWorkoutOverviewData(
 
   const goalByExerciseId = goalsBatch;
 
+  // Correlating-week weight suggestion — for each historical logged set,
+  // recover what its OWN target reps/RPE/RIR actually were (not the
+  // current workout's), by looking up the template row it was logged
+  // against. Batched: one extra query for every distinct
+  // (group_workout_exercise_id) seen in history, not one per row.
+  const priorRows = (priorSetsResult.data ?? []) as any[];
+  const templateExerciseIds = Array.from(
+    new Set(
+      priorRows
+        .map((r) => r.session_exercises.group_workout_exercise_id as string | null)
+        .filter((id): id is string => !!id)
+    )
+  );
+  const { data: historicalTargetRows } = templateExerciseIds.length > 0
+    ? await supabase
+        .from("group_workout_exercise_sets")
+        .select("group_workout_exercise_id, set_order, target_reps, target_rpe, target_rir")
+        .in("group_workout_exercise_id", templateExerciseIds)
+    : { data: [] as any[] };
+
+  const targetByExerciseAndOrder = new Map<
+    string,
+    { targetReps: number | null; targetRpe: number | null; targetRir: number | null }
+  >();
+  for (const row of (historicalTargetRows ?? []) as any[]) {
+    targetByExerciseAndOrder.set(`${row.group_workout_exercise_id}::${row.set_order}`, {
+      targetReps: parseNumericReps(row.target_reps),
+      targetRpe: row.target_rpe,
+      targetRir: row.target_rir,
+    });
+  }
+
+  const historyByExerciseName = new Map<
+    string,
+    { loggedAt: string; weight: number | null; targetReps: number | null; targetRpe: number | null; targetRir: number | null }[]
+  >();
+  for (const row of priorRows) {
+    const name = row.session_exercises.exercise_name as string;
+    const templateId = row.session_exercises.group_workout_exercise_id as string | null;
+    const targets = templateId
+      ? targetByExerciseAndOrder.get(`${templateId}::${row.set_order}`)
+      : undefined;
+    const list = historyByExerciseName.get(name) ?? [];
+    list.push({
+      loggedAt: row.completed_at,
+      weight: row.weight,
+      targetReps: targets?.targetReps ?? null,
+      targetRpe: targets?.targetRpe ?? row.rpe ?? null,
+      targetRir: targets?.targetRir ?? row.rir ?? null,
+    });
+    historyByExerciseName.set(name, list);
+  }
+
+  const suggestedWeightBySetId = new Map<string, number | null>();
+  for (const ex of exercises) {
+    const history = historyByExerciseName.get(ex.exerciseName) ?? [];
+    for (const set of ex.sets) {
+      const currentTargetReps = parseNumericReps(set.targetReps);
+      const correlatingMatch = findCorrelatingWeightSuggestion(
+        history,
+        currentTargetReps,
+        set.targetRpe,
+        set.targetRir
+      );
+      const suggestion = resolveWeightSuggestion(correlatingMatch, set.targetWeight);
+      if (suggestion != null) suggestedWeightBySetId.set(set.id, suggestion);
+    }
+  }
+
   const dayNotes = (workout.workout_notes ?? [])
     .slice()
     .sort((a: any, b: any) => a.position - b.position)
@@ -253,6 +328,7 @@ export async function getWorkoutOverviewData(
     lastTimeByExercise,
     videoUrlByExerciseId,
     goalByExerciseId,
+    suggestedWeightBySetId,
     existingSession: existingSessionRow,
   };
 }

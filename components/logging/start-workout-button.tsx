@@ -97,24 +97,22 @@ export function StartWorkoutButton({
         ? ex.sets.map((target) => ({
             session_exercise_id: sessionExerciseId,
             set_order: target.setOrder,
-            // Per-set targets win; fall back to the progression rule's
-            // computed goal (same as before per-set targets existed)
-            // whenever the coach left that field blank for this set.
-            weight: target.targetWeight ?? ex.goalWeight ?? null,
+            // An explicit per-set target_weight is a real coach decision,
+            // so it still pre-fills for real. A progression-rule "goal"
+            // (ex.goalWeight) is a computed guess, not something the
+            // coach actually typed — it's now surfaced as the same kind
+            // of grayed-out, swipe/tap-to-accept suggestion as the
+            // correlating-history lookup (lib/set-suggestions.ts,
+            // resolved fresh on the session page), rather than silently
+            // committed as if the athlete had already reported it.
+            weight: target.targetWeight ?? null,
             reps: parseRepsTarget(target.targetReps) ?? ex.goalReps ?? null,
-            // RPE/RIR/tempo/time/height/distance start genuinely blank —
-            // a prescribed value here is a *target*, shown as a hint in
-            // the logging UI (set-row.tsx reads it back via the session
-            // page's target_* join), not pre-committed as if it were
-            // already reported. Weight/reps are the exception: a coach
-            // types a real number regardless of the plan, so pre-filling
-            // those isn't the same "did this happen or not" ambiguity.
           }))
         : [
             {
               session_exercise_id: sessionExerciseId,
               set_order: 0,
-              weight: ex.goalWeight ?? null,
+              weight: null,
               reps: ex.goalReps ?? null,
             },
           ];

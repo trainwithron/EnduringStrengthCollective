@@ -4,6 +4,7 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ClientCardGrid } from "@/components/coach/desktop/client-card-grid";
 import { AddClientButton } from "@/components/coach/desktop/add-client-button";
 import { isLowReadiness } from "@/lib/wellness";
+import { getIntegrityRollupForGroup } from "@/lib/session-integrity-data";
 import type { RosterMember } from "@/lib/types";
 
 function todayIso() {
@@ -86,6 +87,9 @@ export default async function ClientsPage(
 
   const creditsByAthleteId = new Map<string, number>();
   const lowReadinessAthleteIds = new Set<string>();
+  // Soft integrity signal only — never blocks anything, just a quiet (or,
+  // for a repeated pattern, more visible) flag on the roster.
+  const integrityByAthleteId = await getIntegrityRollupForGroup(supabase, params.groupId);
   if (athleteIds.length > 0) {
     const { data: creditsRows } = await supabase
       .from("session_credits")
@@ -159,6 +163,7 @@ export default async function ClientsPage(
         members={athletes}
         creditsByAthleteId={creditsByAthleteId}
         lowReadinessAthleteIds={lowReadinessAthleteIds}
+        integrityByAthleteId={integrityByAthleteId}
       />
     </CoachDesktopShell>
   );

@@ -55,6 +55,10 @@ export interface SetLogEntry {
   targetDistance?: number | null;
   targetRestSeconds?: number | null;
   targetPace?: string | null;
+  // Correlating-week weight suggestion (lib/set-suggestions.ts) — a
+  // grayed-out placeholder in the logging UI, accepted via swipe/tap;
+  // never auto-committed the way a coach-set target_weight already is.
+  suggestedWeight?: number | null;
 }
 
 export interface SessionExerciseEntry {

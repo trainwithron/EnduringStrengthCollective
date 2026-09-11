@@ -4,7 +4,7 @@ import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
 import { TRACKED_FIELD_DEFS, ACTUAL_COLUMN, ACTUAL_PROP, fieldDef, type TrackedField } from "@/lib/exercise-fields";
-import { SetRow } from "./set-row";
+import { ExerciseSetGrid } from "./exercise-set-grid";
 import { ExerciseVideoThread } from "./exercise-video-thread";
 
 export function ExerciseCard({
@@ -324,24 +324,19 @@ export function ExerciseCard({
         </div>
       )}
 
-      <div className="space-y-2">
-        {exercise.sets.map((set, i) => (
-          <SetRow
-            key={set.id}
-            set={set}
-            setNumber={i + 1}
-            trackedFields={exercise.trackedFields}
-            readOnly={readOnly}
-            onChange={(patch) => {
-              const wasCompleted = set.status === "completed";
-              onSetChange(set.id, patch);
-              if (patch.status === "completed" && !wasCompleted) {
-                onSetCompleted?.({ ...set, ...patch });
-              }
-            }}
-          />
-        ))}
-      </div>
+      <ExerciseSetGrid
+        sets={exercise.sets}
+        trackedFields={exercise.trackedFields}
+        readOnly={readOnly}
+        onSetChange={(setId, patch) => {
+          const set = exercise.sets.find((s) => s.id === setId);
+          const wasCompleted = set?.status === "completed";
+          onSetChange(setId, patch);
+          if (patch.status === "completed" && !wasCompleted && set) {
+            onSetCompleted?.({ ...set, ...patch });
+          }
+        }}
+      />
 
       {!readOnly && (
         <button

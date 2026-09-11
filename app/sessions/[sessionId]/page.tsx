@@ -6,6 +6,8 @@ import { DEFAULT_TRACKED_FIELDS } from "@/lib/exercise-fields";
 import { CoachLoggedBadge } from "@/components/coach-logged-badge";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import type { SessionExerciseEntry } from "@/lib/types";
+import { findCorrelatingWeightSuggestion, resolveWeightSuggestion } from "@/lib/set-suggestions";
+import { parseNumericReps } from "@/lib/program-card-visuals";
 
 export default async function SessionPage(
   props: {
@@ -70,13 +72,15 @@ export default async function SessionPage(
       distance: number | null;
       restSeconds: number | null;
       pace: string | null;
+      reps: number | null;
+      weight: number | null;
     }
   >();
   if (templateExerciseIds.length > 0) {
     const { data: templateSets } = await supabase
       .from("group_workout_exercise_sets")
       .select(
-        "group_workout_exercise_id, set_order, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance, target_rest_seconds, target_pace"
+        "group_workout_exercise_id, set_order, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance, target_rest_seconds, target_pace, target_reps, target_weight"
       )
       .in("group_workout_exercise_id", templateExerciseIds);
     for (const t of templateSets ?? []) {
@@ -89,8 +93,82 @@ export default async function SessionPage(
         distance: t.target_distance,
         restSeconds: t.target_rest_seconds,
         pace: t.target_pace,
+        reps: parseNumericReps(t.target_reps),
+        weight: t.target_weight,
       });
     }
+  }
+
+  // Correlating-week weight suggestion (lib/set-suggestions.ts) — real
+  // logged history for this athlete on these exercises, joined back to
+  // each historical set's OWN target reps/RPE/RIR the same way the
+  // workout-overview page does it. A grayed-out hint only; never
+  // committed into set_logs the way a coach-set target_weight already is.
+  const exerciseNamesInSession = Array.from(
+    new Set((sessionExercises ?? []).map((se: any) => se.exercise_name as string))
+  );
+  const { data: priorRows } = exerciseNamesInSession.length > 0
+    ? await supabase
+        .from("set_logs")
+        .select(
+          `
+          weight, rpe, rir, set_order, completed_at,
+          session_exercises!inner (
+            exercise_name, group_workout_exercise_id,
+            athlete_sessions!inner ( athlete_id )
+          )
+        `
+        )
+        .in("session_exercises.exercise_name", exerciseNamesInSession)
+        .eq("session_exercises.athlete_sessions.athlete_id", session.athlete_id)
+        .eq("status", "completed")
+    : { data: [] as any[] };
+
+  const priorTemplateIds = Array.from(
+    new Set(
+      (priorRows ?? [])
+        .map((r: any) => r.session_exercises.group_workout_exercise_id as string | null)
+        .filter((id: string | null): id is string => !!id)
+    )
+  );
+  const { data: priorTargetRows } = priorTemplateIds.length > 0
+    ? await supabase
+        .from("group_workout_exercise_sets")
+        .select("group_workout_exercise_id, set_order, target_reps, target_rpe, target_rir")
+        .in("group_workout_exercise_id", priorTemplateIds)
+    : { data: [] as any[] };
+
+  const priorTargetByExerciseAndOrder = new Map<
+    string,
+    { targetReps: number | null; targetRpe: number | null; targetRir: number | null }
+  >();
+  for (const row of priorTargetRows ?? []) {
+    priorTargetByExerciseAndOrder.set(`${row.group_workout_exercise_id}::${row.set_order}`, {
+      targetReps: parseNumericReps(row.target_reps),
+      targetRpe: row.target_rpe,
+      targetRir: row.target_rir,
+    });
+  }
+
+  const historyByExerciseName = new Map<
+    string,
+    { loggedAt: string; weight: number | null; targetReps: number | null; targetRpe: number | null; targetRir: number | null }[]
+  >();
+  for (const row of (priorRows ?? []) as any[]) {
+    const name = row.session_exercises.exercise_name as string;
+    const templateId = row.session_exercises.group_workout_exercise_id as string | null;
+    const targets = templateId
+      ? priorTargetByExerciseAndOrder.get(`${templateId}::${row.set_order}`)
+      : undefined;
+    const list = historyByExerciseName.get(name) ?? [];
+    list.push({
+      loggedAt: row.completed_at,
+      weight: row.weight,
+      targetReps: targets?.targetReps ?? null,
+      targetRpe: targets?.targetRpe ?? row.rpe ?? null,
+      targetRir: targets?.targetRir ?? row.rir ?? null,
+    });
+    historyByExerciseName.set(name, list);
   }
 
   // Exercise video/YouTube is attached on the coach's shared exercise
@@ -164,6 +242,18 @@ export default async function SessionPage(
               targetDistance: target?.distance ?? null,
               targetRestSeconds: target?.restSeconds ?? null,
               targetPace: target?.pace ?? null,
+              suggestedWeight:
+                sl.weight == null
+                  ? resolveWeightSuggestion(
+                      findCorrelatingWeightSuggestion(
+                        historyByExerciseName.get(se.exercise_name) ?? [],
+                        target?.reps ?? null,
+                        target?.rpe ?? null,
+                        target?.rir ?? null
+                      ),
+                      target?.weight ?? null
+                    )
+                  : null,
             };
           }),
       };
