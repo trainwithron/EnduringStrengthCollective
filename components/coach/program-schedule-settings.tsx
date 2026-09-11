@@ -108,6 +108,7 @@ export function ProgramScheduleSettings({
         </span>
         <input
           type="date"
+          aria-label="Start date"
           value={startDate}
           onChange={(e) => {
             setStartDate(e.target.value);
@@ -165,6 +166,7 @@ export function ProgramScheduleSettings({
         </span>
         <input
           type="number"
+          aria-label="Shift schedule by this many days"
           value={shiftDays}
           onChange={(e) => setShiftDays(e.target.value)}
           disabled={saving || !startDate}

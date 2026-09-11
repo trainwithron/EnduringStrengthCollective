@@ -75,6 +75,7 @@ export function ExerciseNameInput({
           onCommit?.(value);
         }}
         placeholder="Exercise name"
+        aria-label="Exercise name"
         className="w-full h-10 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
       />
       {showDropdown && position && typeof document !== "undefined" &&
