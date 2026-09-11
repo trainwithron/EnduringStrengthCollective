@@ -238,7 +238,7 @@ export default async function CoachDayDetailPage(
                 const iso = start.toISOString();
                 const booking = bookingByTime.get(start.getTime());
                 const isMine = booking?.athlete_id === athleteId;
-                const isBeingRescheduled = booking?.id === reschedulingBooking?.id;
+                const isBeingRescheduled = !!reschedulingBooking && booking?.id === reschedulingBooking.id;
                 const endAt = new Date(start.getTime() + durationMinutes * 60000);
 
                 return (

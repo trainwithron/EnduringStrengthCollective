@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { IntakeForm } from "@/components/intake/intake-form";
+import { SignOutButton } from "@/components/group/sign-out-button";
 
 export default async function IntakePage(
   props: { searchParams: Promise<{ next?: string }> }
@@ -58,6 +59,9 @@ export default async function IntakePage(
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body px-5 py-10">
       <div className="max-w-lg mx-auto">
+        <div className="flex justify-end mb-4">
+          <SignOutButton />
+        </div>
         <h1 className="font-display font-bold text-3xl uppercase leading-none mb-2">
           Before you get started
         </h1>

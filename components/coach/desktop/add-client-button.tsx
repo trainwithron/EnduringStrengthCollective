@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { UserPlus } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -72,6 +72,13 @@ export function AddClientButton({
   const [directError, setDirectError] = useState<string | null>(null);
   const [directSuccess, setDirectSuccess] = useState(false);
 
+  // Caches the group created for the "new 1-on-1 group" destination so a
+  // failed first attempt (e.g. the invite email hitting a rate limit) and a
+  // retry via the other mode reuse the same group instead of each silently
+  // creating its own — which previously left an orphaned, member-less group
+  // behind on every retry.
+  const createdGroupIdRef = useRef<string | null>(null);
+
   // Lazily fetches every group this coach coaches (plus every group in
   // the org, if owner/admin) — same fetch shape GroupSwitcher already
   // uses, since that's exactly what "groups I could add a client to"
@@ -129,6 +136,8 @@ export function AddClientButton({
     }
 
     // destination === "new"
+    if (createdGroupIdRef.current) return createdGroupIdRef.current;
+
     const supabase = createBrowserClient();
     const {
       data: { user },
@@ -161,6 +170,7 @@ export function AddClientButton({
       return null;
     }
     await supabase.from("group_memberships").insert({ group_id: newGroupId, profile_id: user.id, role: "coach" });
+    createdGroupIdRef.current = newGroupId;
     return newGroupId;
   }
 
@@ -252,6 +262,7 @@ export function AddClientButton({
     setSelectedExistingGroupId("");
     setNewGroupName("");
     setDestinationError(null);
+    createdGroupIdRef.current = null;
   }
 
   if (!open) {

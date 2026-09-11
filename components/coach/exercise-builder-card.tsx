@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { ExerciseNameInput } from "./exercise-name-input";
 import { ExerciseMediaPicker } from "./exercise-media-picker";
@@ -124,6 +124,21 @@ export function ExerciseBuilderCard({
   const [busy, setBusy] = useState(false);
   const [repMinDraft, setRepMinDraft] = useState(exercise.sets[0]?.repMin?.toString() ?? "");
   const [repMaxDraft, setRepMaxDraft] = useState(exercise.sets[0]?.repMax?.toString() ?? "");
+  // Both rep-range fields persist on their own onBlur — tabbing from min
+  // straight to max (a completely normal way to fill this in) fires two
+  // independent async saves back to back. Without debouncing, the first
+  // save (still carrying the old, empty max) can resolve AFTER the second,
+  // silently wiping out the max value that was just typed. Found live
+  // during a fresh-account walkthrough. Coalescing rapid blurs into one
+  // call with the latest values closes the race.
+  const repRangeSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function schedulePersistRepRange(minRaw: string, maxRaw: string) {
+    if (repRangeSaveTimer.current) clearTimeout(repRangeSaveTimer.current);
+    repRangeSaveTimer.current = setTimeout(() => {
+      repRangeSaveTimer.current = null;
+      persistRepRange(minRaw, maxRaw);
+    }, 200);
+  }
   // Guards handleAddSet/handleRemoveSet against a real race: both compute
   // their target set_order/row off the `exercise.sets` closure, which is
   // stale until the parent re-renders with the updated array. Two clicks
@@ -765,7 +780,7 @@ export function ExerciseBuilderCard({
                   type="number"
                   value={repMinDraft}
                   onChange={(e) => setRepMinDraft(e.target.value)}
-                  onBlur={() => persistRepRange(repMinDraft, repMaxDraft)}
+                  onBlur={() => schedulePersistRepRange(repMinDraft, repMaxDraft)}
                   placeholder="Min"
                   className="w-14 h-8 bg-graphite border border-steel/30 text-chalk px-1 font-body text-xs text-center focus:outline-none focus:border-rust"
                 />
@@ -774,7 +789,7 @@ export function ExerciseBuilderCard({
                   type="number"
                   value={repMaxDraft}
                   onChange={(e) => setRepMaxDraft(e.target.value)}
-                  onBlur={() => persistRepRange(repMinDraft, repMaxDraft)}
+                  onBlur={() => schedulePersistRepRange(repMinDraft, repMaxDraft)}
                   placeholder="Max"
                   className="w-14 h-8 bg-graphite border border-steel/30 text-chalk px-1 font-body text-xs text-center focus:outline-none focus:border-rust"
                 />

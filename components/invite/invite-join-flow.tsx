@@ -46,7 +46,7 @@ async function ensureProfile(
 
   if (!profile) {
     const name = metadataName || readPendingName(code, email) || email?.split("@")[0] || "New member";
-    await supabase.from("profiles").insert({ id: userId, full_name: name });
+    await supabase.from("profiles").insert({ id: userId, full_name: name, intake_required: true });
     window.localStorage.removeItem(`invite_pending_signup_${code}`);
   }
 }
@@ -265,8 +265,7 @@ export function InviteJoinFlow({
         You&apos;re invited
       </h1>
       <p className="font-body text-steel text-sm text-center mt-2 mb-6">
-        Join <span className="text-chalk">{groupName}</span> on The Enduring Strength
-        Collective.
+        Join <span className="text-chalk">{groupName}</span>.
       </p>
 
       <div className="flex border border-steel/30 mb-5">

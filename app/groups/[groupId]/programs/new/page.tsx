@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { NewProgramForm } from "@/components/coach/new-program-form";
+import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 
 export default async function NewProgramPage(
   props: {
@@ -35,24 +35,24 @@ export default async function NewProgramPage(
     );
   }
 
+  const { data: group } = await supabase
+    .from("groups")
+    .select("name")
+    .eq("id", params.groupId)
+    .single();
+
   return (
-    <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
-      <header className="px-5 pt-8 pb-6 border-b border-steel/20">
-        <Link
-          href={`/groups/${params.groupId}`}
-          className="font-body text-xs text-steel uppercase tracking-wide"
-        >
-          &larr; Back to group
-        </Link>
-        <h1 className="font-display font-bold text-3xl leading-none mt-3 uppercase">
-          New program
-        </h1>
+    <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="programs">
+      <div className="pb-6 border-b border-steel/20 mb-6">
+        <h1 className="font-display font-bold text-3xl uppercase leading-none">New program</h1>
         <p className="font-body text-sm text-steel mt-2">
           A program is a training block — you&apos;ll add workouts to it next.
         </p>
-      </header>
+      </div>
 
-      <NewProgramForm groupId={params.groupId} createdBy={user.id} />
-    </main>
+      <div className="max-w-lg">
+        <NewProgramForm groupId={params.groupId} createdBy={user.id} />
+      </div>
+    </CoachDesktopShell>
   );
 }

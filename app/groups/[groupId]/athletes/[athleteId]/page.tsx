@@ -515,17 +515,26 @@ export default async function AthleteProfilePage(
                   <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
                     Sleep quality
                   </p>
-                  <TrendChart points={sleepQualityTrend} emptyLabel="No check-ins yet." />
+                  <TrendChart
+                    points={sleepQualityTrend}
+                    emptyLabel="Only checked in once so far — needs a second check-in to chart a trend."
+                  />
                 </div>
                 <div>
                   <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
                     Soreness (higher = fresher)
                   </p>
-                  <TrendChart points={sorenessTrend} emptyLabel="No check-ins yet." />
+                  <TrendChart
+                    points={sorenessTrend}
+                    emptyLabel="Only checked in once so far — needs a second check-in to chart a trend."
+                  />
                 </div>
                 <div>
                   <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Energy</p>
-                  <TrendChart points={energyTrend} emptyLabel="No check-ins yet." />
+                  <TrendChart
+                    points={energyTrend}
+                    emptyLabel="Only checked in once so far — needs a second check-in to chart a trend."
+                  />
                 </div>
               </div>
             </section>
