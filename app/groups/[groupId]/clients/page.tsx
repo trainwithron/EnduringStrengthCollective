@@ -3,7 +3,12 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ClientCardGrid } from "@/components/coach/desktop/client-card-grid";
 import { AddClientButton } from "@/components/coach/desktop/add-client-button";
+import { isLowReadiness } from "@/lib/wellness";
 import type { RosterMember } from "@/lib/types";
+
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
 
 export default async function ClientsPage(
   props: {
@@ -80,6 +85,7 @@ export default async function ClientsPage(
   const athleteIds = athletes.map((a) => a.profileId);
 
   const creditsByAthleteId = new Map<string, number>();
+  const lowReadinessAthleteIds = new Set<string>();
   if (athleteIds.length > 0) {
     const { data: creditsRows } = await supabase
       .from("session_credits")
@@ -88,6 +94,18 @@ export default async function ClientsPage(
       .in("athlete_id", athleteIds);
     for (const row of creditsRows ?? []) {
       creditsByAthleteId.set(row.athlete_id, row.balance);
+    }
+
+    const { data: wellnessRows } = await supabase
+      .from("wellness_checkins")
+      .select("athlete_id, sleep_quality, soreness, energy")
+      .eq("group_id", params.groupId)
+      .eq("log_date", todayIso())
+      .in("athlete_id", athleteIds);
+    for (const row of wellnessRows ?? []) {
+      if (isLowReadiness({ sleepQuality: row.sleep_quality, soreness: row.soreness, energy: row.energy })) {
+        lowReadinessAthleteIds.add(row.athlete_id);
+      }
     }
   }
 
@@ -140,6 +158,7 @@ export default async function ClientsPage(
         groupId={params.groupId}
         members={athletes}
         creditsByAthleteId={creditsByAthleteId}
+        lowReadinessAthleteIds={lowReadinessAthleteIds}
       />
     </CoachDesktopShell>
   );

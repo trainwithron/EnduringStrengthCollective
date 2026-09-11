@@ -60,10 +60,12 @@ export function ClientCardGrid({
   groupId,
   members,
   creditsByAthleteId,
+  lowReadinessAthleteIds,
 }: {
   groupId: string;
   members: RosterMember[];
   creditsByAthleteId: Map<string, number>;
+  lowReadinessAthleteIds?: Set<string>;
 }) {
   const [rows, setRows] = useState(members);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -251,6 +253,12 @@ export function ClientCardGrid({
                   <span className={`w-1.5 h-1.5 rounded-full ${status.dotClass}`} />
                   <span className="font-body text-xs text-steel">{status.text}</span>
                 </span>
+
+                {lowReadinessAthleteIds?.has(member.profileId) && (
+                  <span className="font-body text-[11px] text-amber-400 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.5">
+                    ⚠ Low readiness
+                  </span>
+                )}
 
                 <div className="flex items-center gap-2 w-full justify-center mt-1">
                   <select

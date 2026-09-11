@@ -317,6 +317,17 @@ export default async function AthleteProfilePage(
     .filter((m) => m.metric_type === "sleep_score")
     .map((m) => ({ date: m.metric_date, value: m.value }));
 
+  const { data: wellnessRows } = await supabase
+    .from("wellness_checkins")
+    .select("log_date, sleep_quality, soreness, energy")
+    .eq("athlete_id", params.athleteId)
+    .eq("group_id", params.groupId)
+    .gte("log_date", thirtyDaysAgoKey)
+    .order("log_date", { ascending: true });
+  const sleepQualityTrend = (wellnessRows ?? []).map((r) => ({ date: r.log_date, value: r.sleep_quality }));
+  const sorenessTrend = (wellnessRows ?? []).map((r) => ({ date: r.log_date, value: r.soreness }));
+  const energyTrend = (wellnessRows ?? []).map((r) => ({ date: r.log_date, value: r.energy }));
+
   const { data: existingPlan } = macrosEnabled
     ? await supabase
         .from("meal_plans")
@@ -500,6 +511,32 @@ export default async function AthleteProfilePage(
                     (tracks whether a target was set — actual intake isn&apos;t logged yet)
                   </span>
                 </p>
+              </div>
+            </section>
+          )}
+
+          {(wellnessRows ?? []).length > 0 && (
+            <section>
+              <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+                Wellness
+              </h2>
+              <div className="space-y-4 pb-2">
+                <div>
+                  <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
+                    Sleep quality
+                  </p>
+                  <TrendChart points={sleepQualityTrend} emptyLabel="No check-ins yet." />
+                </div>
+                <div>
+                  <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
+                    Soreness (higher = fresher)
+                  </p>
+                  <TrendChart points={sorenessTrend} emptyLabel="No check-ins yet." />
+                </div>
+                <div>
+                  <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Energy</p>
+                  <TrendChart points={energyTrend} emptyLabel="No check-ins yet." />
+                </div>
               </div>
             </section>
           )}

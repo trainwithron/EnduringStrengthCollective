@@ -3,6 +3,7 @@ import { GroupHubHeader } from "@/components/group/group-hub-header";
 import { RosterList } from "@/components/group/roster-list";
 import { WeightLogWidget } from "@/components/athlete/weight-log-widget";
 import { TodayWidget } from "@/components/athlete/today-widget";
+import { WellnessCheckinWidget, type WellnessCheckinValues } from "@/components/athlete/wellness-checkin-widget";
 import { ProgramCardList } from "@/components/athlete/program-card-list";
 import { computeProgramCardVisuals } from "@/lib/program-card-data";
 import { WeekAtAGlance, type WeekDayEntry } from "@/components/athlete/week-at-a-glance";
@@ -137,6 +138,7 @@ export default async function GroupHubPage(
   let todayMacros: { calories: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null } | null = null;
   let todayHabits: { id: string; title: string; completed: boolean }[] = [];
   let weekDays: WeekDayEntry[] = [];
+  let wellnessCheckin: WellnessCheckinValues | null = null;
   const todayKey = new Date().toISOString().slice(0, 10);
 
   const actingAsFullName = isActingAsOther
@@ -162,7 +164,7 @@ export default async function GroupHubPage(
     // weightLogs, macros, and this athlete's habit definitions are all
     // independent of each other — only the habit *completion* lookup
     // right after needs to wait (it needs the due habits' ids first).
-    const [{ data: weightRows }, macroResult, mealPlanResult, { data: habitRows }] = await Promise.all([
+    const [{ data: weightRows }, macroResult, mealPlanResult, { data: habitRows }, { data: wellnessRow }] = await Promise.all([
       supabase
         .from("body_weight_logs")
         .select("id, logged_date, weight")
@@ -194,7 +196,18 @@ export default async function GroupHubPage(
         .eq("athlete_id", athleteId)
         .eq("group_id", params.groupId)
         .eq("active", true),
+      supabase
+        .from("wellness_checkins")
+        .select("sleep_quality, soreness, energy")
+        .eq("athlete_id", athleteId)
+        .eq("group_id", params.groupId)
+        .eq("log_date", todayKey)
+        .maybeSingle(),
     ]);
+
+    wellnessCheckin = wellnessRow
+      ? { sleepQuality: wellnessRow.sleep_quality, soreness: wellnessRow.soreness, energy: wellnessRow.energy }
+      : null;
 
     weightLogs = (weightRows ?? []).map((w) => ({
       id: w.id,
@@ -285,6 +298,12 @@ export default async function GroupHubPage(
       {showMobileView && athleteId && (
         <section className="px-5 pt-6 space-y-4">
           {weekDays.length > 0 && <WeekAtAGlance groupId={params.groupId} days={weekDays} />}
+          <WellnessCheckinWidget
+            athleteId={athleteId}
+            groupId={params.groupId}
+            todayDate={todayKey}
+            initialCheckin={wellnessCheckin}
+          />
           <TodayWidget todayDate={todayKey} macros={todayMacros} habits={todayHabits} />
           <WeightLogWidget
             athleteId={athleteId}
