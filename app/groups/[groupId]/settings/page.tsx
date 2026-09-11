@@ -166,6 +166,11 @@ export default async function SettingsPage(
           </Link>
         </div>
         <div className="border-t border-steel/20 pt-4 mt-4">
+          <Link href="/partners" className="font-body text-sm text-rust">
+            Find a training partner →
+          </Link>
+        </div>
+        <div className="border-t border-steel/20 pt-4 mt-4">
           <Link
             href={`/groups/${params.groupId}/resources`}
             className="font-body text-sm text-rust"
