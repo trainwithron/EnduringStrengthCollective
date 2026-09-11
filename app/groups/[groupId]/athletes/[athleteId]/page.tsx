@@ -8,6 +8,8 @@ import { PackageAssignmentControl } from "@/components/coach/package-assignment-
 import { PrivateFromOrgToggle } from "@/components/coach/private-from-org-toggle";
 import { ChangeClientGroupControl } from "@/components/coach/change-client-group-control";
 import { ClientProgrammingMenu } from "@/components/coach/client-programming-menu";
+import { MinorConsentControl } from "@/components/coach/minor-consent-control";
+import { isUnder13 } from "@/lib/coppa";
 import { CoachLoggedBadge } from "@/components/coach-logged-badge";
 import { NutritionTools } from "@/components/coach/desktop/nutrition-tools";
 import { TrendChart } from "@/components/coach/desktop/trend-chart";
@@ -137,6 +139,21 @@ export default async function AthleteProfilePage(
     .eq("athlete_id", params.athleteId)
     .eq("group_id", params.groupId)
     .maybeSingle();
+
+  const { data: intakeDob } = await supabase
+    .from("client_intake")
+    .select("date_of_birth")
+    .eq("athlete_id", params.athleteId)
+    .maybeSingle();
+  const isMinor = !!intakeDob?.date_of_birth && isUnder13(intakeDob.date_of_birth, new Date());
+
+  const { data: minorConsentRow } = isMinor
+    ? await supabase
+        .from("minor_consent")
+        .select("verified, method, notes, verified_at")
+        .eq("athlete_id", params.athleteId)
+        .maybeSingle()
+    : { data: null };
 
   // Self-reported by the athlete in their own Settings — RLS already
   // scopes this to "self or a coach who actually coaches them," so no
@@ -537,6 +554,19 @@ export default async function AthleteProfilePage(
                   />
                 </div>
               </div>
+            </section>
+          )}
+
+          {isMinor && (
+            <section>
+              <MinorConsentControl
+                athleteId={params.athleteId}
+                groupId={params.groupId}
+                initialVerified={minorConsentRow?.verified ?? false}
+                initialMethod={(minorConsentRow?.method as any) ?? null}
+                initialNotes={minorConsentRow?.notes ?? ""}
+                initialVerifiedAt={minorConsentRow?.verified_at ?? null}
+              />
             </section>
           )}
 

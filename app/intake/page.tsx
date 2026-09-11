@@ -52,7 +52,13 @@ export default async function IntakePage(
 
   const { data: existing } = await supabase
     .from("client_intake")
-    .select("par_q_answers, waiver_accepted, waiver_signed_name, completed_at")
+    .select("par_q_answers, waiver_accepted, waiver_signed_name, completed_at, date_of_birth")
+    .eq("athlete_id", user.id)
+    .maybeSingle();
+
+  const { data: consent } = await supabase
+    .from("minor_consent")
+    .select("verified")
     .eq("athlete_id", user.id)
     .maybeSingle();
 
@@ -80,6 +86,8 @@ export default async function IntakePage(
           initialWaiverAccepted={existing?.waiver_accepted ?? false}
           initialWaiverSignedName={existing?.waiver_signed_name ?? ""}
           alreadyCompleted={!!existing?.completed_at}
+          initialDateOfBirth={existing?.date_of_birth ?? null}
+          parentalConsentVerified={consent?.verified ?? false}
         />
       </div>
     </main>

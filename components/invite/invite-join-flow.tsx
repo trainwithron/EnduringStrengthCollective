@@ -173,7 +173,9 @@ export function InviteJoinFlow({
       }
 
       if (data.session && data.user) {
-        await supabase.from("profiles").insert({ id: data.user.id, full_name: trimmedName });
+        await supabase
+          .from("profiles")
+          .insert({ id: data.user.id, full_name: trimmedName, intake_required: true });
         window.localStorage.removeItem(`invite_pending_signup_${code}`);
         setAuthedEmail(data.user.email ?? null);
         setPhase("authed");
