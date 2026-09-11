@@ -54,6 +54,7 @@ function TargetCell({
     <input
       type={kind === "number" ? "number" : "text"}
       inputMode={kind === "number" ? "decimal" : undefined}
+      min={kind === "number" ? "0" : undefined}
       aria-label={label}
       value={draft}
       onChange={(e) => setDraft(e.target.value)}

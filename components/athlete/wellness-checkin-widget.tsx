@@ -142,6 +142,8 @@ export function WellnessCheckinWidget({
                   <button
                     key={n}
                     type="button"
+                    aria-label={`${field.label}: ${n} of 5${n === 1 ? ` (${field.lowLabel})` : n === 5 ? ` (${field.highLabel})` : ""}`}
+                    aria-pressed={draft[field.key] === n}
                     onClick={() => setDraft((prev) => ({ ...prev, [field.key]: n }))}
                     className={`flex-1 h-9 border font-body text-sm ${
                       draft[field.key] === n

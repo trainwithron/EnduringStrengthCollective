@@ -22,7 +22,7 @@ function statusLabel(lastWorkoutAt: string | null): { text: string; dotClass: st
 function initialsOf(name: string) {
   return name
     .split(" ")
-    .map((p) => p[0])
+    .map((p) => Array.from(p)[0] ?? "")
     .slice(0, 2)
     .join("")
     .toUpperCase();

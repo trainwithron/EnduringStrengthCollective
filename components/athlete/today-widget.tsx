@@ -57,6 +57,8 @@ export function TodayWidget({
       <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">Today</h2>
 
       {hasMacros && (
+        <>
+        <p className="font-body text-[10px] text-steel uppercase tracking-wide mb-1">Your targets today</p>
         <div className="grid grid-cols-4 gap-2 text-center mb-4">
           <div>
             <p className="font-display text-lg leading-none">{macros!.calories ?? "--"}</p>
@@ -75,6 +77,7 @@ export function TodayWidget({
             <p className="font-body text-[10px] text-steel uppercase mt-1">Fat</p>
           </div>
         </div>
+        </>
       )}
 
       {error && (

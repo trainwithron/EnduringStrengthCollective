@@ -122,6 +122,7 @@ export function DailyMacrosForm({
         </label>
         <input
           type="number"
+          min="0"
           value={calories}
           onChange={(e) => setCalories(e.target.value)}
           className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm mt-1 focus:outline-none focus:border-rust"
@@ -134,6 +135,7 @@ export function DailyMacrosForm({
         </label>
         <input
           type="number"
+          min="0"
           value={bodyWeight}
           onChange={(e) => handleBodyWeightChange(e.target.value)}
           placeholder={latestBodyWeight ? undefined : "No weight logged yet"}
@@ -148,6 +150,7 @@ export function DailyMacrosForm({
           </label>
           <input
             type="number"
+            min="0"
             value={protein}
             onChange={(e) => setProtein(e.target.value)}
             className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm mt-1 focus:outline-none focus:border-rust"
@@ -159,6 +162,7 @@ export function DailyMacrosForm({
           </label>
           <input
             type="number"
+            min="0"
             value={carbs}
             onChange={(e) => setCarbs(e.target.value)}
             className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm mt-1 focus:outline-none focus:border-rust"
@@ -170,6 +174,7 @@ export function DailyMacrosForm({
           </label>
           <input
             type="number"
+            min="0"
             value={fat}
             onChange={(e) => setFat(e.target.value)}
             className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm mt-1 focus:outline-none focus:border-rust"
