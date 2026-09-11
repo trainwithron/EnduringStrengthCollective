@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { ExerciseMediaPicker } from "./exercise-media-picker";
+import { AutoCategorizeButton } from "./auto-categorize-button";
+import { classifyExerciseCategory } from "@/lib/exercise-category-classifier";
 import { Trash2 } from "lucide-react";
 
 export interface LibraryExerciseRow {
@@ -28,8 +30,24 @@ export function ExerciseLibraryList({
   const [search, setSearch] = useState("");
   const [newName, setNewName] = useState("");
   const [newCategory, setNewCategory] = useState<string>("");
+  // Tracks whether the category dropdown is still following the
+  // classifier's live suggestion, or the coach has taken the wheel by
+  // picking one themselves — a suggestion, never a silent auto-assign.
+  const [categoryAutoSuggested, setCategoryAutoSuggested] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  function handleNewNameChange(value: string) {
+    setNewName(value);
+    if (categoryAutoSuggested) {
+      setNewCategory(classifyExerciseCategory(value) ?? "");
+    }
+  }
+
+  function handleNewCategoryChange(value: string) {
+    setNewCategory(value);
+    setCategoryAutoSuggested(false);
+  }
 
   const visible = exercises
     .filter((e) => e.name.toLowerCase().includes(search.trim().toLowerCase()))
@@ -64,6 +82,8 @@ export function ExerciseLibraryList({
         },
       ]);
       setNewName("");
+      setNewCategory("");
+      setCategoryAutoSuggested(true);
     }
     setSubmitting(false);
   }
@@ -93,10 +113,20 @@ export function ExerciseLibraryList({
           className="h-10 w-64 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
         />
         <div className="flex-1" />
+        <AutoCategorizeButton exercises={exercises} onApplied={(id, category) => {
+          setExercises((prev) => prev.map((e) => (e.id === id ? { ...e, category } : e)));
+        }} />
         <select
           value={newCategory}
-          onChange={(e) => setNewCategory(e.target.value)}
-          className="h-10 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust"
+          onChange={(e) => handleNewCategoryChange(e.target.value)}
+          aria-label={
+            categoryAutoSuggested && newCategory
+              ? `Category, suggested ${newCategory} — change to override`
+              : "Category"
+          }
+          className={`h-10 bg-surface border text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust ${
+            categoryAutoSuggested && newCategory ? "border-rust/50" : "border-steel/30"
+          }`}
         >
           <option value="">No category</option>
           {CATEGORIES.map((c) => (
@@ -108,7 +138,7 @@ export function ExerciseLibraryList({
         <input
           type="text"
           value={newName}
-          onChange={(e) => setNewName(e.target.value)}
+          onChange={(e) => handleNewNameChange(e.target.value)}
           placeholder="New exercise name"
           className="h-10 w-56 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
         />
