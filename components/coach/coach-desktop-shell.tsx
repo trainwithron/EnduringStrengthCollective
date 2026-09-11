@@ -67,6 +67,8 @@ type Active =
   | "branding"
   | "business"
   | "packages"
+  | "waiver"
+  | "support"
   | "resources"
   | "challenges"
   | "team"
@@ -112,6 +114,7 @@ export function CoachDesktopShell({
   const [feedUnread, setFeedUnread] = useState(0);
   const [clientsUnread, setClientsUnread] = useState(0);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
+  const [openSupportCount, setOpenSupportCount] = useState(0);
   const [teamMode, setTeamMode] = useState(false);
   const [groupKind, setGroupKind] = useState<"one_on_one" | "social" | "team" | null>(null);
 
@@ -157,6 +160,13 @@ export function CoachDesktopShell({
         .eq("id", user.id)
         .maybeSingle();
       if (!cancelled) setIsPlatformAdmin(data?.is_platform_admin ?? false);
+      if (data?.is_platform_admin) {
+        const { count } = await supabase
+          .from("support_requests")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "open");
+        if (!cancelled) setOpenSupportCount(count ?? 0);
+      }
     }
     run();
     return () => {
@@ -297,6 +307,8 @@ export function CoachDesktopShell({
       items: [
         { key: "business", label: "Overview", href: `/groups/${groupId}/business`, icon: TrendingUp },
         { key: "packages", label: "Packages", href: `/groups/${groupId}/business/packages`, icon: Layers },
+        { key: "waiver", label: "Waiver", href: `/groups/${groupId}/business/waiver`, icon: ClipboardList },
+        { key: "support", label: "Support", href: `/groups/${groupId}/business/support`, icon: HeartHandshake },
         { key: "branding", label: "Organization", href: `/groups/${groupId}/branding`, icon: Palette },
       ],
     },
@@ -430,7 +442,7 @@ export function CoachDesktopShell({
         </a>
       </div>
       {isPlatformAdmin && (
-        <div className={`border-t border-steel/20 py-2 ${collapsed ? "px-2" : "px-5"}`}>
+        <div className={`border-t border-steel/20 py-2 ${collapsed ? "px-2" : "px-5"} space-y-2`}>
           <Link
             href="/admin/organizations"
             title="Organizations"
@@ -440,6 +452,17 @@ export function CoachDesktopShell({
           >
             <Building2 className="w-3.5 h-3.5 shrink-0" strokeWidth={2.25} />
             {!collapsed && "Organizations"}
+          </Link>
+          <Link
+            href="/admin/support"
+            title="Support Inbox"
+            className={`relative flex items-center gap-2 font-body text-xs text-steel active:text-chalk ${
+              collapsed ? "justify-center" : ""
+            }`}
+          >
+            <HeartHandshake className="w-3.5 h-3.5 shrink-0" strokeWidth={2.25} />
+            {!collapsed && "Support Inbox"}
+            <NavBadge count={openSupportCount} collapsed={collapsed} />
           </Link>
         </div>
       )}

@@ -53,7 +53,7 @@ export async function POST(request: Request) {
 
   const { error: profileError } = await serviceRole
     .from("profiles")
-    .insert({ id: newUserId, full_name: trimmedName });
+    .insert({ id: newUserId, full_name: trimmedName, intake_required: true });
   if (profileError) {
     return NextResponse.json({ error: `Couldn't create their profile: ${profileError.message}` }, { status: 502 });
   }

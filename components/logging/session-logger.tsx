@@ -33,14 +33,20 @@ export function SessionLogger({
   startedAt: string;
 }) {
   const [exercises, setExercises] = useState(initialExercises);
-  const [pendingRestPrompt, setPendingRestPrompt] = useState<{ defaultSeconds: number } | null>(null);
+  const [pendingRestPrompt, setPendingRestPrompt] = useState<{
+    defaultSeconds: number;
+    isPrescribed: boolean;
+  } | null>(null);
 
   // Smart-default rest duration: the set's own prescribed rest (from the
   // cardio-interval work) when it has one, else a sensible generic
-  // fallback — never nothing, since the whole point is a one-tap preset.
+  // fallback. When the coach actually prescribed a rest period,
+  // `isPrescribed` tells the timer bar to auto-start the countdown at
+  // that duration immediately, rather than waiting for a manual pick —
+  // there's nothing to choose when the coach already specified it.
   function handleSetCompleted(set: SetLogEntry) {
-    const defaultSeconds = set.restSeconds ?? set.targetRestSeconds ?? 90;
-    setPendingRestPrompt({ defaultSeconds });
+    const prescribed = set.restSeconds ?? set.targetRestSeconds ?? null;
+    setPendingRestPrompt({ defaultSeconds: prescribed ?? 90, isPrescribed: prescribed != null });
   }
   const [addingExercise, setAddingExercise] = useState(false);
   const [newExerciseName, setNewExerciseName] = useState("");

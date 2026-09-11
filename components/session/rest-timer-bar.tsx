@@ -22,8 +22,10 @@ export function RestTimerBar({
   sessionId: string;
   startedAt: string;
   // A set just auto-completed — offer to start a rest timer, defaulting
-  // to that exercise's own target rest if it has one.
-  pendingPrompt: { defaultSeconds: number } | null;
+  // to that exercise's own target rest if it has one. When isPrescribed
+  // is true, the coach actually specified this rest period, so the
+  // countdown auto-starts immediately instead of waiting for a tap.
+  pendingPrompt: { defaultSeconds: number; isPrescribed: boolean } | null;
   onPromptHandled: () => void;
 }) {
   const [running, setRunning] = useState<RunningState | null>(null);
@@ -89,6 +91,17 @@ export function RestTimerBar({
     acquireWakeLock();
     onPromptHandled();
   }
+
+  // A coach-prescribed rest period needs no manual pick — auto-start the
+  // countdown the moment the prompt arrives (still skippable/+15s-able
+  // like any other running timer). A generic (unprescribed) completion
+  // still falls through to the tap-a-preset prompt below.
+  useEffect(() => {
+    if (pendingPrompt?.isPrescribed && !running) {
+      startPreset(pendingPrompt.defaultSeconds);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingPrompt]);
 
   function addFifteen() {
     if (!running) return;

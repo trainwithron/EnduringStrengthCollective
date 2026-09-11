@@ -64,6 +64,31 @@ function SetPasswordForm() {
       .limit(1)
       .maybeSingle();
 
+    // New clients added via the Add Client flow are flagged
+    // intake_required — send them to the PAR-Q+/waiver intake first,
+    // instead of straight into their group. Existing accounts (never
+    // flagged) are completely unaffected.
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("intake_required")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profile?.intake_required) {
+      const { data: intake } = await supabase
+        .from("client_intake")
+        .select("completed_at")
+        .eq("athlete_id", user.id)
+        .maybeSingle();
+
+      if (!intake?.completed_at) {
+        const next = membership ? `/groups/${membership.group_id}` : "/";
+        router.push(`/intake?next=${encodeURIComponent(next)}`);
+        router.refresh();
+        return;
+      }
+    }
+
     router.push(membership ? `/groups/${membership.group_id}` : "/");
     router.refresh();
   }

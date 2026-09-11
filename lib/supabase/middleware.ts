@@ -69,5 +69,36 @@ export async function updateSession(request: NextRequest) {
     return redirectResponse;
   }
 
+  // Hard gate: a client added via the Add Client flow (profiles.intake_required)
+  // who hasn't completed the PAR-Q+/waiver intake yet cannot reach any
+  // /groups/** page — catches a direct URL visit, not just the one-time
+  // post-signup redirect in app/set-password/page.tsx. Scoped to /groups
+  // only so /intake itself, /login, /set-password, etc. never loop.
+  // Existing accounts (intake_required defaults false) are never touched.
+  if (user && pathname.startsWith("/groups")) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("intake_required")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profile?.intake_required) {
+      const { data: intake } = await supabase
+        .from("client_intake")
+        .select("completed_at")
+        .eq("athlete_id", user.id)
+        .maybeSingle();
+
+      if (!intake?.completed_at) {
+        const redirectUrl = new URL("/intake", request.url);
+        const redirectResponse = NextResponse.redirect(redirectUrl);
+        response.cookies.getAll().forEach((cookie) => {
+          redirectResponse.cookies.set(cookie);
+        });
+        return redirectResponse;
+      }
+    }
+  }
+
   return response;
 }
