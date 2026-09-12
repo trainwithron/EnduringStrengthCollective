@@ -24,6 +24,7 @@ export function ExerciseCard({
   viewerId,
   canUpload,
   onSetCompleted,
+  gamificationEnabled,
 }: {
   exercise: SessionExerciseEntry;
   lastTime?: { weight: number; reps: number };
@@ -41,6 +42,7 @@ export function ExerciseCard({
   viewerId: string | null;
   canUpload: boolean;
   onSetCompleted?: (set: SetLogEntry) => void;
+  gamificationEnabled?: boolean;
 }) {
   const [swapping, setSwapping] = useState(false);
   const [nameDraft, setNameDraft] = useState(exercise.exerciseName);
@@ -336,6 +338,8 @@ export function ExerciseCard({
             onSetCompleted?.({ ...set, ...patch });
           }
         }}
+        priorBest={exercise.priorBest}
+        gamificationEnabled={gamificationEnabled ?? true}
       />
 
       {!readOnly && (

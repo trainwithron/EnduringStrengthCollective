@@ -19,6 +19,7 @@ export function SessionLogger({
   viewerId,
   canUploadVideo,
   startedAt,
+  gamificationEnabled,
 }: {
   sessionId: string;
   isCompleted: boolean;
@@ -31,6 +32,7 @@ export function SessionLogger({
   viewerId: string | null;
   canUploadVideo: boolean;
   startedAt: string;
+  gamificationEnabled: boolean;
 }) {
   const [exercises, setExercises] = useState(initialExercises);
   const [pendingRestPrompt, setPendingRestPrompt] = useState<{
@@ -206,6 +208,7 @@ export function SessionLogger({
             viewerId={viewerId}
             canUpload={canUploadVideo}
             onSetCompleted={handleSetCompleted}
+            gamificationEnabled={gamificationEnabled}
           />
         ))}
       </div>

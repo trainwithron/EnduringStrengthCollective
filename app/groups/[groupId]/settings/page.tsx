@@ -14,6 +14,7 @@ import { ManageBillingLink } from "@/components/athlete/manage-billing-link";
 import { ProfileDetailsEditor } from "@/components/athlete/profile-details-editor";
 import { ExportDataButton } from "@/components/athlete/export-data-button";
 import { DeleteAccountButton } from "@/components/athlete/delete-account-button";
+import { GamificationToggle } from "@/components/coach/gamification-toggle";
 
 export default async function SettingsPage(
   props: {
@@ -40,30 +41,36 @@ export default async function SettingsPage(
   const effective = await getEffectiveAthlete(params.groupId, user.id);
   const athleteId = effective.athleteId;
 
-  const [{ data: profile }, { data: membership }, { data: ouraConnection }, { data: profileDetails }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("full_name, avatar_url")
-      .eq("id", athleteId)
-      .single(),
-    supabase
-      .from("group_memberships")
-      .select("role")
-      .eq("group_id", params.groupId)
-      .eq("profile_id", athleteId)
-      .maybeSingle(),
-    supabase
-      .from("wearable_connections")
-      .select("status")
-      .eq("profile_id", athleteId)
-      .eq("provider", "oura")
-      .maybeSingle(),
-    supabase
-      .from("athlete_profile_details")
-      .select("bio, birthday, phone, emergency_contact_name, emergency_contact_phone")
-      .eq("athlete_id", athleteId)
-      .maybeSingle(),
-  ]);
+  const [{ data: profile }, { data: membership }, { data: ouraConnection }, { data: profileDetails }, { data: group }] =
+    await Promise.all([
+      supabase
+        .from("profiles")
+        .select("full_name, avatar_url")
+        .eq("id", athleteId)
+        .single(),
+      supabase
+        .from("group_memberships")
+        .select("role")
+        .eq("group_id", params.groupId)
+        .eq("profile_id", athleteId)
+        .maybeSingle(),
+      supabase
+        .from("wearable_connections")
+        .select("status")
+        .eq("profile_id", athleteId)
+        .eq("provider", "oura")
+        .maybeSingle(),
+      supabase
+        .from("athlete_profile_details")
+        .select("bio, birthday, phone, emergency_contact_name, emergency_contact_phone")
+        .eq("athlete_id", athleteId)
+        .maybeSingle(),
+      supabase
+        .from("groups")
+        .select("gamification_enabled")
+        .eq("id", params.groupId)
+        .maybeSingle(),
+    ]);
   const isCoach = membership?.role === "coach";
 
   let packages: PackageOption[] = [];
@@ -128,6 +135,12 @@ export default async function SettingsPage(
             <p className="font-body text-xs text-steel mt-1">
               Programs, clients, business tools — the full site.
             </p>
+            <div className="mt-4 pt-4 border-t border-steel/15">
+              <GamificationToggle
+                groupId={params.groupId}
+                initialEnabled={group?.gamification_enabled ?? true}
+              />
+            </div>
           </SettingsGroup>
         )}
 

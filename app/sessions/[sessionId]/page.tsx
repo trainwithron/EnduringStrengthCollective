@@ -8,6 +8,7 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import type { SessionExerciseEntry } from "@/lib/types";
 import { findCorrelatingWeightSuggestion, resolveWeightSuggestion } from "@/lib/set-suggestions";
 import { parseNumericReps } from "@/lib/program-card-visuals";
+import { computePriorBest } from "@/lib/obstacle-unlock";
 
 export default async function SessionPage(
   props: {
@@ -112,9 +113,9 @@ export default async function SessionPage(
         .from("set_logs")
         .select(
           `
-          weight, rpe, rir, set_order, completed_at,
+          weight, reps, rpe, rir, set_order, completed_at,
           session_exercises!inner (
-            exercise_name, group_workout_exercise_id,
+            exercise_name, group_workout_exercise_id, session_id,
             athlete_sessions!inner ( athlete_id )
           )
         `
@@ -123,6 +124,32 @@ export default async function SessionPage(
         .eq("session_exercises.athlete_sessions.athlete_id", session.athlete_id)
         .eq("status", "completed")
     : { data: [] as any[] };
+
+  // Obstacle-unlock mechanic (lib/obstacle-unlock.ts) — this athlete's
+  // real all-time best (weight/reps/single-set volume) per exercise name,
+  // from the exact same historical rows already fetched just above for
+  // the weight-suggestion feature (no new query) — but excluding THIS
+  // session specifically, unlike that feature's own history. A "genuine
+  // PR" can't be measured against a set logged moments ago in the same
+  // session; the weight-suggestion feature's own history query is left
+  // untouched since it's a separate, already-shipped behavior.
+  const priorBestByExerciseName = new Map<
+    string,
+    { maxWeight: number | null; maxReps: number | null; maxVolume: number | null }
+  >();
+  {
+    const rowsByName = new Map<string, { weight: number | null; reps: number | null }[]>();
+    for (const row of (priorRows ?? []) as any[]) {
+      if (row.session_exercises.session_id === params.sessionId) continue;
+      const name = row.session_exercises.exercise_name as string;
+      const list = rowsByName.get(name) ?? [];
+      list.push({ weight: row.weight, reps: row.reps });
+      rowsByName.set(name, list);
+    }
+    for (const [name, rows] of rowsByName) {
+      priorBestByExerciseName.set(name, computePriorBest(rows));
+    }
+  }
 
   const priorTemplateIds = Array.from(
     new Set(
@@ -181,6 +208,15 @@ export default async function SessionPage(
     .limit(1)
     .maybeSingle();
 
+  // Per-group on/off preference for the gamified-logging thread (Phase 1:
+  // the obstacle-unlock mechanic) — same reasoning as optional RPE/RIR.
+  const { data: groupRow } = await supabase
+    .from("groups")
+    .select("gamification_enabled")
+    .eq("id", session.group_id)
+    .maybeSingle();
+  const gamificationEnabled = groupRow?.gamification_enabled ?? true;
+
   const mediaByName = new Map<string, { videoPath: string | null; youtubeUrl: string | null }>();
   if (coachMembership) {
     const { data: libraryRows } = await supabase
@@ -213,6 +249,11 @@ export default async function SessionPage(
         videoUrl,
         youtubeUrl: media?.youtubeUrl ?? null,
         notes: se.group_workout_exercises?.notes ?? null,
+        priorBest: priorBestByExerciseName.get(se.exercise_name) ?? {
+          maxWeight: null,
+          maxReps: null,
+          maxVolume: null,
+        },
         sets: (se.set_logs ?? [])
           .slice()
           .sort((a: any, b: any) => a.set_order - b.set_order)
@@ -234,6 +275,8 @@ export default async function SessionPage(
               restSeconds: sl.rest_seconds,
               pace: sl.pace,
               status: sl.status,
+              targetReps: target?.reps ?? null,
+              targetWeight: target?.weight ?? null,
               targetRpe: target?.rpe ?? null,
               targetRir: target?.rir ?? null,
               targetTempo: target?.tempo ?? null,
@@ -392,6 +435,7 @@ export default async function SessionPage(
         viewerId={user.id}
         canUploadVideo={canUploadVideo}
         startedAt={session.started_at}
+        gamificationEnabled={gamificationEnabled}
       />
 
       {isOwnSession && (

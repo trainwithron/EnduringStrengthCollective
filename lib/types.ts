@@ -43,10 +43,13 @@ export interface SetLogEntry {
   // The prescribed value for each "extra" field (RPE, RIR, tempo, etc.),
   // shown only as a placeholder hint during logging — never pre-filled
   // into the real column, so a set never silently counts as "done" just
-  // because a target existed. Weight/reps aren't included here since
-  // those already pre-fill for real (a coach/athlete types a genuine
-  // weight regardless of plan, so there's no meaningful "leave it
-  // unsubmitted" state for them the way there is for RPE/RIR/etc.).
+  // because a target existed. Weight/reps already pre-fill for real (a
+  // coach/athlete types a genuine weight regardless of plan), so there's
+  // no placeholder-hint use for these two — targetReps/targetWeight
+  // exist purely for the obstacle-unlock mechanic (lib/obstacle-unlock.ts)
+  // to compare an actual logged set against today's real prescribed goal.
+  targetReps?: number | null;
+  targetWeight?: number | null;
   targetRpe?: number | null;
   targetRir?: number | null;
   targetTempo?: string | null;
@@ -72,6 +75,12 @@ export interface SessionExerciseEntry {
   youtubeUrl: string | null;
   notes: string | null;
   sets: SetLogEntry[];
+  // This athlete's real all-time best (weight/reps/single-set volume) on
+  // this exact exercise name, from every other completed session — the
+  // obstacle-unlock mechanic's PR-path input (lib/obstacle-unlock.ts).
+  // Optional/undefined on any render path that doesn't compute it (the
+  // coach's own program-builder preview, etc.).
+  priorBest?: { maxWeight: number | null; maxReps: number | null; maxVolume: number | null };
 }
 
 // ----------------------------------------------------------------------------

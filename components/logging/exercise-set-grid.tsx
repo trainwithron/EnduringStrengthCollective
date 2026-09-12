@@ -12,7 +12,8 @@ import {
   type TrackedField,
 } from "@/lib/exercise-fields";
 import { parseNumericReps } from "@/lib/program-card-visuals";
-import { Check } from "lucide-react";
+import { isExerciseUnlocked, type PriorBest } from "@/lib/obstacle-unlock";
+import { Check, Lock, LockOpen } from "lucide-react";
 
 // Metrics-as-rows, sets-as-columns — one row per tracked field (Reps,
 // Weight, RPE, ...), one cell per set, scrolling horizontally instead of
@@ -68,12 +69,19 @@ function GridCell({
   readOnly,
   onChange,
   setNumber,
+  locked,
 }: {
   set: SetLogEntry;
   field: TrackedField;
   readOnly: boolean;
   onChange: (patch: Partial<SetLogEntry>) => void;
   setNumber: number;
+  // Obstacle-unlock mechanic (lib/obstacle-unlock.ts, Phase 1 of the
+  // gamified-logging thread) — only ever true for the weight cell of an
+  // exercise that hasn't cleared its goal yet. The suggested weight
+  // itself still shows (an athlete needs the real number to train), this
+  // just adds the lock badge signaling there's a goal to beat.
+  locked?: boolean;
 }) {
   const prop = ACTUAL_PROP[field] as keyof SetLogEntry;
   const value = set[prop];
@@ -121,21 +129,31 @@ function GridCell({
     commit(suggestion);
   }, !readOnly && draft.trim() === "" && suggestion != null);
 
+  const showLock = !!locked && draft.trim() === "" && suggestion != null;
+
   return (
-    <input
-      type={isNumeric ? "number" : "text"}
-      inputMode={isNumeric ? "decimal" : undefined}
-      aria-label={`${def.label} for set ${setNumber}${
-        suggestion != null && draft.trim() === "" ? `, suggested ${suggestion}` : ""
-      }`}
-      placeholder={placeholder}
-      value={draft}
-      disabled={readOnly}
-      onChange={(e) => setDraft(e.target.value)}
-      onBlur={handleBlur}
-      {...swipe}
-      className="w-16 h-10 shrink-0 bg-surface border border-steel/30 rounded-token-pill text-chalk px-1 font-body text-sm text-center focus:outline-none focus:border-rust disabled:opacity-60 touch-pan-y"
-    />
+    <div className="relative w-16 h-10 shrink-0">
+      <input
+        type={isNumeric ? "number" : "text"}
+        inputMode={isNumeric ? "decimal" : undefined}
+        aria-label={`${def.label} for set ${setNumber}${
+          suggestion != null && draft.trim() === "" ? `, suggested ${suggestion}` : ""
+        }${showLock ? ", locked until you hit this goal" : ""}`}
+        placeholder={placeholder}
+        value={draft}
+        disabled={readOnly}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={handleBlur}
+        {...swipe}
+        className="w-16 h-10 bg-surface border border-steel/30 rounded-token-pill text-chalk px-1 font-body text-sm text-center focus:outline-none focus:border-rust disabled:opacity-60 touch-pan-y"
+      />
+      {showLock && (
+        <Lock
+          aria-hidden="true"
+          className="w-3 h-3 absolute top-0.5 right-1.5 text-steel pointer-events-none"
+        />
+      )}
+    </div>
   );
 }
 
@@ -205,13 +223,53 @@ export function ExerciseSetGrid({
   trackedFields,
   readOnly,
   onSetChange,
+  priorBest,
+  gamificationEnabled = true,
 }: {
   sets: SetLogEntry[];
   trackedFields: TrackedField[];
   readOnly: boolean;
   onSetChange: (setId: string, patch: Partial<SetLogEntry>) => void;
+  priorBest?: PriorBest;
+  gamificationEnabled?: boolean;
 }) {
   const fields = orderTrackedFields(trackedFields);
+
+  // Obstacle-unlock (Phase 1 of the gamified-logging thread,
+  // lib/obstacle-unlock.ts) — re-derived from the exercise's real current
+  // sets on every render rather than stored as separate state, so it's
+  // always consistent with whatever's actually logged (including surviving
+  // a reload, or self-correcting if a cleared value gets edited back
+  // down). Off entirely when gamification is disabled for this group, or
+  // once any set proves the goal cleared.
+  const unlocked =
+    !gamificationEnabled ||
+    isExerciseUnlocked(
+      sets.map((s) => ({
+        weight: s.weight,
+        reps: s.reps,
+        targetWeight: s.targetWeight ?? null,
+        targetReps: s.targetReps ?? null,
+      })),
+      priorBest ?? { maxWeight: null, maxReps: null, maxVolume: null }
+    );
+
+  // One-shot "defeated the obstacle" feedback exactly at the moment it
+  // flips from locked to unlocked — never on the initial locked or
+  // already-unlocked render, and never again afterward for this exercise
+  // instance (matches "the unlock persists," not a repeated animation).
+  const [justUnlocked, setJustUnlocked] = useState(false);
+  const wasUnlocked = useRef(unlocked);
+  useEffect(() => {
+    if (unlocked && !wasUnlocked.current) {
+      vibrateConfirm();
+      setJustUnlocked(true);
+      const t = setTimeout(() => setJustUnlocked(false), 900);
+      wasUnlocked.current = unlocked;
+      return () => clearTimeout(t);
+    }
+    wasUnlocked.current = unlocked;
+  }, [unlocked]);
 
   // Swipe-to-fill (b): a per-row drag handle propagates set 1's current
   // value for THAT field across every other set in the row — scoped per
@@ -304,8 +362,14 @@ export function ExerciseSetGrid({
 
         {fields.map((field) => (
           <div key={field} className="flex items-center gap-1.5">
-            <span className="w-16 shrink-0 font-body text-xs text-steel truncate">
+            <span className="w-16 shrink-0 font-body text-xs text-steel truncate flex items-center gap-1">
               {fieldDef(field).label}
+              {field === "weight" && justUnlocked && (
+                <LockOpen
+                  aria-hidden="true"
+                  className="w-3 h-3 text-rust animate-[obstacle-unlock-pop_0.7s_ease-out]"
+                />
+              )}
             </span>
             <RowHandle field={field} />
             {sets.map((set, i) => (
@@ -316,6 +380,7 @@ export function ExerciseSetGrid({
                 readOnly={readOnly}
                 setNumber={i + 1}
                 onChange={(patch) => onSetChange(set.id, patch)}
+                locked={field === "weight" && !unlocked}
               />
             ))}
           </div>
