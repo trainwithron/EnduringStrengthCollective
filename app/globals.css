@@ -63,6 +63,47 @@
   }
 }
 
+/* Phase 3 (custom_shape_theming_idea.md) — per-set equipment confirm.
+   A milestone barbell number (135/225/315/405...) gets the bigger pop;
+   every other confirmed weight gets the subtler variant below. */
+@keyframes equipment-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes equipment-pop-subtle {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Per-exercise progressive fill's finale — fires once, the instant every
+   set in the exercise is done. */
+@keyframes equipment-finale-flash {
+  0% {
+    filter: brightness(1);
+  }
+  40% {
+    filter: brightness(1.8);
+  }
+  100% {
+    filter: brightness(1);
+  }
+}
+
 :root {
   /* Space-separated R G B (not hex) — required so Tailwind's
      rgb(var(--x) / <alpha-value>) pattern in tailwind.config.ts can

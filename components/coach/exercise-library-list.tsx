@@ -5,6 +5,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { ExerciseMediaPicker } from "./exercise-media-picker";
 import { AutoCategorizeButton } from "./auto-categorize-button";
 import { classifyExerciseCategory } from "@/lib/exercise-category-classifier";
+import { classifyEquipmentType, type EquipmentType } from "@/lib/equipment-classifier";
 import { Trash2 } from "lucide-react";
 
 export interface LibraryExerciseRow {
@@ -14,10 +15,25 @@ export interface LibraryExerciseRow {
   youtubeUrl: string | null;
   tier: "A" | "B" | "C" | null;
   category: string | null;
+  equipmentType: EquipmentType | null;
 }
 
 const CATEGORIES = ["Push", "Pull", "Legs", "Core", "Full Body", "Cardio", "Mobility"] as const;
 const CATEGORY_ORDER = [...CATEGORIES, "Uncategorized"];
+
+// Labels, not raw enum values — shown in the Exercise Library's per-row
+// select. Powers Phase 3 of the gamified-logging thread
+// (custom_shape_theming_idea.md): the per-set visual during logging
+// follows what equipment an exercise actually uses.
+const EQUIPMENT_TYPES: { value: EquipmentType; label: string }[] = [
+  { value: "barbell", label: "Barbell" },
+  { value: "dumbbell", label: "Dumbbell" },
+  { value: "kettlebell", label: "Kettlebell" },
+  { value: "machine", label: "Machine" },
+  { value: "cable", label: "Cable" },
+  { value: "band", label: "Band" },
+  { value: "bodyweight", label: "Bodyweight" },
+];
 
 export function ExerciseLibraryList({
   coachId,
@@ -30,10 +46,12 @@ export function ExerciseLibraryList({
   const [search, setSearch] = useState("");
   const [newName, setNewName] = useState("");
   const [newCategory, setNewCategory] = useState<string>("");
-  // Tracks whether the category dropdown is still following the
-  // classifier's live suggestion, or the coach has taken the wheel by
+  const [newEquipmentType, setNewEquipmentType] = useState<string>("");
+  // Tracks whether the category/equipment dropdowns are still following
+  // the classifiers' live suggestion, or the coach has taken the wheel by
   // picking one themselves — a suggestion, never a silent auto-assign.
   const [categoryAutoSuggested, setCategoryAutoSuggested] = useState(true);
+  const [equipmentAutoSuggested, setEquipmentAutoSuggested] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -42,11 +60,19 @@ export function ExerciseLibraryList({
     if (categoryAutoSuggested) {
       setNewCategory(classifyExerciseCategory(value) ?? "");
     }
+    if (equipmentAutoSuggested) {
+      setNewEquipmentType(classifyEquipmentType(value) ?? "");
+    }
   }
 
   function handleNewCategoryChange(value: string) {
     setNewCategory(value);
     setCategoryAutoSuggested(false);
+  }
+
+  function handleNewEquipmentTypeChange(value: string) {
+    setNewEquipmentType(value);
+    setEquipmentAutoSuggested(false);
   }
 
   const visible = exercises
@@ -65,8 +91,13 @@ export function ExerciseLibraryList({
     const supabase = createBrowserClient();
     const { data } = await supabase
       .from("exercise_library")
-      .insert({ created_by: coachId, name: trimmed, category: newCategory || null })
-      .select("id, name, video_path, youtube_url, category")
+      .insert({
+        created_by: coachId,
+        name: trimmed,
+        category: newCategory || null,
+        equipment_type: newEquipmentType || null,
+      })
+      .select("id, name, video_path, youtube_url, category, equipment_type")
       .single();
 
     if (data) {
@@ -79,11 +110,14 @@ export function ExerciseLibraryList({
           youtubeUrl: data.youtube_url,
           tier: null,
           category: data.category,
+          equipmentType: data.equipment_type,
         },
       ]);
       setNewName("");
       setNewCategory("");
+      setNewEquipmentType("");
       setCategoryAutoSuggested(true);
+      setEquipmentAutoSuggested(true);
     }
     setSubmitting(false);
   }
@@ -93,6 +127,13 @@ export function ExerciseLibraryList({
     setExercises((prev) => prev.map((e) => (e.id === id ? { ...e, category: value } : e)));
     const supabase = createBrowserClient();
     await supabase.from("exercise_library").update({ category: value }).eq("id", id);
+  }
+
+  async function handleEquipmentTypeChange(id: string, equipmentType: string) {
+    const value = (equipmentType || null) as EquipmentType | null;
+    setExercises((prev) => prev.map((e) => (e.id === id ? { ...e, equipmentType: value } : e)));
+    const supabase = createBrowserClient();
+    await supabase.from("exercise_library").update({ equipment_type: value }).eq("id", id);
   }
 
   async function handleDelete(id: string) {
@@ -132,6 +173,25 @@ export function ExerciseLibraryList({
           {CATEGORIES.map((c) => (
             <option key={c} value={c}>
               {c}
+            </option>
+          ))}
+        </select>
+        <select
+          value={newEquipmentType}
+          onChange={(e) => handleNewEquipmentTypeChange(e.target.value)}
+          aria-label={
+            equipmentAutoSuggested && newEquipmentType
+              ? `Equipment, suggested ${newEquipmentType} — change to override`
+              : "Equipment"
+          }
+          className={`h-10 bg-surface border text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust ${
+            equipmentAutoSuggested && newEquipmentType ? "border-rust/50" : "border-steel/30"
+          }`}
+        >
+          <option value="">No equipment</option>
+          {EQUIPMENT_TYPES.map((e) => (
+            <option key={e.value} value={e.value}>
+              {e.label}
             </option>
           ))}
         </select>
@@ -183,6 +243,19 @@ export function ExerciseLibraryList({
                         {CATEGORIES.map((c) => (
                           <option key={c} value={c}>
                             {c}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={ex.equipmentType ?? ""}
+                        onChange={(e) => handleEquipmentTypeChange(ex.id, e.target.value)}
+                        aria-label={`Equipment for ${ex.name}`}
+                        className="h-8 bg-surface border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"
+                      >
+                        <option value="">No equipment</option>
+                        {EQUIPMENT_TYPES.map((e) => (
+                          <option key={e.value} value={e.value}>
+                            {e.label}
                           </option>
                         ))}
                       </select>

@@ -1,4 +1,5 @@
 import type { TrackedField } from "./exercise-fields";
+import type { EquipmentType } from "./equipment-classifier";
 
 export type MemberRole = "coach" | "athlete";
 
@@ -87,6 +88,13 @@ export interface SessionExerciseEntry {
   // Optional/undefined on any render path that doesn't compute it (the
   // coach's own program-builder preview, etc.).
   priorBest?: { maxWeight: number | null; maxReps: number | null; maxVolume: number | null };
+  // Phase 3 of the gamified-logging thread (custom_shape_theming_idea.md)
+  // — which per-set visual/animation treatment to use (barbell plate
+  // math, kettlebell scaling, dumbbell number, or a generic default for
+  // everything else). From the coach's exercise_library, keyed by name;
+  // null/undefined when unset or unmatched — falls back to the generic
+  // treatment, never blocks logging either way.
+  equipmentType?: EquipmentType | null;
 }
 
 // ----------------------------------------------------------------------------

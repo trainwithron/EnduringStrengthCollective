@@ -6,6 +6,7 @@ import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
 import { TRACKED_FIELD_DEFS, ACTUAL_COLUMN, ACTUAL_PROP, fieldDef, type TrackedField } from "@/lib/exercise-fields";
 import { ExerciseSetGrid } from "./exercise-set-grid";
 import { ExerciseVideoThread } from "./exercise-video-thread";
+import { EquipmentVisual } from "./equipment-visual";
 
 export function ExerciseCard({
   exercise,
@@ -56,6 +57,10 @@ export function ExerciseCard({
   const [addSetBusy, setAddSetBusy] = useState(false);
   const [fieldsOpen, setFieldsOpen] = useState(false);
   const [fieldsBusy, setFieldsBusy] = useState(false);
+  // Phase 3 (custom_shape_theming_idea.md) — the per-set equipment-visual
+  // confirm animation fires on a real weight commit, cleared shortly
+  // after so it never lingers as stuck-looking state.
+  const [justConfirmedWeightSetId, setJustConfirmedWeightSetId] = useState<string | null>(null);
 
   async function applySwap(name: string) {
     if (!name || name === exercise.exerciseName) {
@@ -326,6 +331,14 @@ export function ExerciseCard({
         </div>
       )}
 
+      {!readOnly && (
+        <EquipmentVisual
+          equipmentType={exercise.equipmentType}
+          sets={exercise.sets}
+          justConfirmedSetId={justConfirmedWeightSetId}
+        />
+      )}
+
       <ExerciseSetGrid
         sets={exercise.sets}
         trackedFields={exercise.trackedFields}
@@ -336,6 +349,10 @@ export function ExerciseCard({
           onSetChange(setId, patch);
           if (patch.status === "completed" && !wasCompleted && set) {
             onSetCompleted?.({ ...set, ...patch });
+          }
+          if ("weight" in patch && patch.weight != null) {
+            setJustConfirmedWeightSetId(setId);
+            setTimeout(() => setJustConfirmedWeightSetId(null), 800);
           }
         }}
         priorBest={exercise.priorBest}

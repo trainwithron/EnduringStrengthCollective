@@ -217,14 +217,21 @@ export default async function SessionPage(
     .maybeSingle();
   const gamificationEnabled = groupRow?.gamification_enabled ?? true;
 
-  const mediaByName = new Map<string, { videoPath: string | null; youtubeUrl: string | null }>();
+  const mediaByName = new Map<
+    string,
+    { videoPath: string | null; youtubeUrl: string | null; equipmentType: string | null }
+  >();
   if (coachMembership) {
     const { data: libraryRows } = await supabase
       .from("exercise_library")
-      .select("name, video_path, youtube_url")
+      .select("name, video_path, youtube_url, equipment_type")
       .eq("created_by", coachMembership.profile_id);
     for (const row of libraryRows ?? []) {
-      mediaByName.set(row.name, { videoPath: row.video_path, youtubeUrl: row.youtube_url });
+      mediaByName.set(row.name, {
+        videoPath: row.video_path,
+        youtubeUrl: row.youtube_url,
+        equipmentType: row.equipment_type,
+      });
     }
   }
 
@@ -248,6 +255,7 @@ export default async function SessionPage(
         trackedFields: se.tracked_fields ?? DEFAULT_TRACKED_FIELDS,
         videoUrl,
         youtubeUrl: media?.youtubeUrl ?? null,
+        equipmentType: (media?.equipmentType as SessionExerciseEntry["equipmentType"]) ?? null,
         notes: se.group_workout_exercises?.notes ?? null,
         priorBest: priorBestByExerciseName.get(se.exercise_name) ?? {
           maxWeight: null,

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ExerciseLibraryTabs } from "@/components/coach/exercise-library-tabs";
+import type { EquipmentType } from "@/lib/equipment-classifier";
 
 export default async function ExerciseLibraryPage(
   props: {
@@ -43,7 +44,7 @@ export default async function ExerciseLibraryPage(
 
   const { data: libraryRows } = await supabase
     .from("exercise_library")
-    .select("id, name, video_path, youtube_url, category")
+    .select("id, name, video_path, youtube_url, category, equipment_type")
     .eq("created_by", user.id)
     .order("name");
 
@@ -64,6 +65,7 @@ export default async function ExerciseLibraryPage(
     youtubeUrl: r.youtube_url,
     tier: tierByName.get(r.name) ?? null,
     category: r.category as string | null,
+    equipmentType: r.equipment_type as EquipmentType | null,
   }));
 
   const { data: patterns } = await supabase
