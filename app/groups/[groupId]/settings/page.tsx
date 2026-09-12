@@ -197,6 +197,9 @@ export default async function SettingsPage(
             <Link href="/partners" className="block font-body text-sm text-rust">
               Find a training partner →
             </Link>
+            <Link href={`/share/journey/${athleteId}`} className="block font-body text-sm text-rust">
+              Share my progress →
+            </Link>
             <Link
               href={`/groups/${params.groupId}/resources`}
               className="block font-body text-sm text-rust"
