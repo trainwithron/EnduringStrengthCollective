@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { HabitManager, type ClientHabit } from "@/components/coach/desktop/habit-manager";
+import { BulkMacroRangeForm } from "@/components/coach/desktop/bulk-macro-range-form";
 import { computeScheduledDates } from "@/lib/program-schedule";
 import { isHabitDueOn } from "@/lib/habits";
 
@@ -155,6 +156,16 @@ export default async function ClientCalendarPage(
   }
 
   // This client's habits + this month's check-off status.
+  const { data: latestWeightRow } = macrosEnabled
+    ? await supabase
+        .from("body_weight_logs")
+        .select("weight")
+        .eq("athlete_id", params.athleteId)
+        .order("logged_date", { ascending: false })
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
+
   const { data: habitRows } = await supabase
     .from("client_habits")
     .select("id, title, weekdays, active")
@@ -361,7 +372,16 @@ export default async function ClientCalendarPage(
           </div>
         </div>
 
-        <HabitManager athleteId={params.athleteId} groupId={params.groupId} initialHabits={habits} />
+        <div className="space-y-6">
+          <HabitManager athleteId={params.athleteId} groupId={params.groupId} initialHabits={habits} />
+          {macrosEnabled && (
+            <BulkMacroRangeForm
+              athleteId={params.athleteId}
+              groupId={params.groupId}
+              latestBodyWeight={latestWeightRow?.weight ?? null}
+            />
+          )}
+        </div>
       </div>
 
       {(macrosByDateKey.size > 0 || activeHabits.length > 0 || assignmentByDateKey.size > 0 || mealPlanByDateKey.size > 0) && (
