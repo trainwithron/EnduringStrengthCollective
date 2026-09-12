@@ -81,7 +81,14 @@ export async function getScheduledWorkouts(
   return result;
 }
 
-export type DayWorkoutStatus = "done" | "missed" | "planned" | "locked" | "rest" | "no-program";
+export type DayWorkoutStatus =
+  | "done"
+  | "missed"
+  | "planned"
+  | "locked"
+  | "rest"
+  | "no-program"
+  | "unscheduled";
 
 export interface DayWorkoutInfo {
   status: DayWorkoutStatus;
@@ -124,6 +131,40 @@ export function resolveDayWorkout(
     return { status: "locked", workoutId: match.workoutId, title: match.title };
   }
   return { status: "planned", workoutId: match.workoutId, title: match.title };
+}
+
+// Fetches a program's full workout list regardless of whether it has a
+// schedule — used both by getScheduledWorkouts (which then maps dates
+// onto this same list) and by the unscheduled "playlist mode" fallback
+// below, which needs the raw ordered list with no dates at all.
+export async function getAllProgramWorkouts(
+  supabase: SupabaseClient,
+  programId: string
+): Promise<{ id: string; title: string }[]> {
+  const { data: workouts } = await supabase
+    .from("workouts")
+    .select("id, title")
+    .eq("program_id", programId)
+    .order("week_number", { ascending: true })
+    .order("day_index", { ascending: true });
+  return workouts ?? [];
+}
+
+// Real gap this closes: a program with no start_date/training_days set
+// has nothing for computeScheduledDates to plot, so resolveDayWorkout
+// alone would incorrectly report "no-program" for it. lib/todays-workout.ts
+// already has the correct behavior for this exact case ("playlist
+// mode" — just serve the next unlogged workout in order, no dates, no
+// locking) — this is that same fallback, extracted as a pure function so
+// Home's Day view can call it too instead of only the Workout tab.
+export function resolveNextUnloggedWorkout(
+  workouts: { id: string; title: string }[],
+  loggedIds: Set<string>
+): DayWorkoutInfo {
+  if (workouts.length === 0) return { status: "no-program", workoutId: null, title: null };
+  const next = workouts.find((w) => !loggedIds.has(w.id));
+  if (!next) return { status: "done", workoutId: null, title: null };
+  return { status: "planned", workoutId: next.id, title: next.title };
 }
 
 export function dateKeyOf(d: Date): string {

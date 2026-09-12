@@ -98,6 +98,24 @@ function WorkoutSection({
     );
   }
 
+  // Your active program has no start date/training days set, so it runs
+  // in "playlist mode" (same as the Workout tab) — nothing maps to a
+  // specific calendar date, so browsing to any date other than today
+  // has nothing real to show here.
+  if (workout.status === "unscheduled") {
+    return (
+      <div className="border border-steel/20 p-4">
+        <p className="font-body text-xs text-steel uppercase tracking-wide">
+          {dateLabel}
+          {readinessChip}
+        </p>
+        <p className="font-body text-sm text-steel mt-2">
+          Your program isn&apos;t scheduled by date — check the Workout tab for what&apos;s next.
+        </p>
+      </div>
+    );
+  }
+
   if (workout.status === "rest") {
     return (
       <div className="border border-steel/20 p-4">

@@ -25,7 +25,9 @@ import { resolveDayMacroTarget } from "@/lib/todays-macros";
 import {
   getActiveProgramForAthlete,
   getScheduledWorkouts,
+  getAllProgramWorkouts,
   resolveDayWorkout,
+  resolveNextUnloggedWorkout,
   dateKeyOf,
   parseDateKey,
   type ScheduledWorkoutEntry,
@@ -217,17 +219,24 @@ export default async function GroupHubPage(
   let weekRangeEnd = targetDate;
   const monthYear = targetDate.getFullYear();
   const monthIndex = targetDate.getMonth();
+  // A program with no start_date/training_days set has nothing for the
+  // calendar to plot — it runs in the same "playlist mode" the Workout
+  // tab (lib/todays-workout.ts) already uses for this exact case: just
+  // serve the next unlogged workout in order, no dates, no locking.
+  let isUnscheduledProgram = false;
 
   if (showMobileView && athleteId) {
     const program = await getActiveProgramForAthlete(supabase, params.groupId, athleteId);
-    const scheduledWorkouts: ScheduledWorkoutEntry[] = program
-      ? await getScheduledWorkouts(supabase, program)
-      : [];
-    const workoutIds = scheduledWorkouts.map((w) => w.workoutId);
+    isUnscheduledProgram = !!program && (!program.startDate || !program.trainingDays || program.trainingDays.length === 0);
+    const scheduledWorkouts: ScheduledWorkoutEntry[] =
+      program && !isUnscheduledProgram ? await getScheduledWorkouts(supabase, program) : [];
+    const allWorkouts = program && isUnscheduledProgram ? await getAllProgramWorkouts(supabase, program.id) : [];
+    const workoutIdsForLogCheck =
+      scheduledWorkouts.length > 0 ? scheduledWorkouts.map((w) => w.workoutId) : allWorkouts.map((w) => w.id);
 
     const [{ data: logRows }, { data: habitRows }] = await Promise.all([
-      workoutIds.length > 0
-        ? supabase.from("workout_logs").select("workout_id").eq("athlete_id", athleteId).in("workout_id", workoutIds)
+      workoutIdsForLogCheck.length > 0
+        ? supabase.from("workout_logs").select("workout_id").eq("athlete_id", athleteId).in("workout_id", workoutIdsForLogCheck)
         : Promise.resolve({ data: [] }),
       supabase
         .from("client_habits")
@@ -258,7 +267,11 @@ export default async function GroupHubPage(
     }
 
     if (view === "day") {
-      dayWorkout = resolveDayWorkout(scheduledWorkouts, loggedIds, targetDate, today, visibilityWindow);
+      dayWorkout = isUnscheduledProgram
+        ? isToday
+          ? resolveNextUnloggedWorkout(allWorkouts, loggedIds)
+          : { status: "unscheduled", workoutId: null, title: null }
+        : resolveDayWorkout(scheduledWorkouts, loggedIds, targetDate, today, visibilityWindow);
 
       const [macroResult, mealPlanResult, { data: dueLogRows }] = await Promise.all([
         macrosEnabled
@@ -334,17 +347,22 @@ export default async function GroupHubPage(
       weekRangeStart = weekStart;
       weekRangeEnd = rangeDates[6];
 
-      weekDays = await computeRangeSummaries(supabase, {
-        athleteId,
-        macrosEnabled,
-        dates: rangeDates,
-        scheduledWorkouts,
-        loggedIds,
-        today,
-        visibilityWindow,
-        habitDefs: habitRows ?? [],
-      });
-    } else {
+      // An unscheduled program's workouts have no calendar dates to plot
+      // at all — leave weekDays empty and let the page render its own
+      // explanatory message instead of a confusing blank grid.
+      weekDays = isUnscheduledProgram
+        ? []
+        : await computeRangeSummaries(supabase, {
+            athleteId,
+            macrosEnabled,
+            dates: rangeDates,
+            scheduledWorkouts,
+            loggedIds,
+            today,
+            visibilityWindow,
+            habitDefs: habitRows ?? [],
+          });
+    } else if (!isUnscheduledProgram) {
       const rangeDates = Array.from(
         { length: new Date(monthYear, monthIndex + 1, 0).getDate() },
         (_, i) => new Date(monthYear, monthIndex, i + 1)
@@ -450,7 +468,13 @@ export default async function GroupHubPage(
             </div>
           )}
 
-          {view === "week" && (
+          {view === "week" && isUnscheduledProgram && (
+            <p className="font-body text-sm text-steel max-w-[50ch]">
+              Your program isn&apos;t scheduled by date — Week and Month views need a start date
+              and training days set. Check the Workout tab for what&apos;s next.
+            </p>
+          )}
+          {view === "week" && !isUnscheduledProgram && (
             <HomeWeekView
               groupId={params.groupId}
               days={weekDays}
@@ -461,7 +485,13 @@ export default async function GroupHubPage(
             />
           )}
 
-          {view === "month" && (
+          {view === "month" && isUnscheduledProgram && (
+            <p className="font-body text-sm text-steel max-w-[50ch]">
+              Your program isn&apos;t scheduled by date — Week and Month views need a start date
+              and training days set. Check the Workout tab for what&apos;s next.
+            </p>
+          )}
+          {view === "month" && !isUnscheduledProgram && (
             <HomeMonthView
               groupId={params.groupId}
               year={monthYear}

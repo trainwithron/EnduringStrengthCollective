@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { resolveDayWorkout, type ScheduledWorkoutEntry } from "./athlete-day-schedule";
+import {
+  resolveDayWorkout,
+  resolveNextUnloggedWorkout,
+  type ScheduledWorkoutEntry,
+} from "./athlete-day-schedule";
 
 const today = new Date("2026-09-12T00:00:00");
 
@@ -52,5 +56,36 @@ describe("resolveDayWorkout", () => {
   it("never returns missed for today itself, even right at midnight", () => {
     const result = resolveDayWorkout(scheduled("2026-09-12"), new Set(), today, today, "day");
     expect(result.status).not.toBe("missed");
+  });
+});
+
+describe("resolveNextUnloggedWorkout", () => {
+  const workouts = [
+    { id: "w1", title: "Day 1" },
+    { id: "w2", title: "Day 2" },
+    { id: "w3", title: "Day 3" },
+  ];
+
+  it("returns no-program when the program has no workouts at all", () => {
+    expect(resolveNextUnloggedWorkout([], new Set())).toEqual({
+      status: "no-program",
+      workoutId: null,
+      title: null,
+    });
+  });
+
+  it("returns the first unlogged workout in order", () => {
+    const result = resolveNextUnloggedWorkout(workouts, new Set(["w1"]));
+    expect(result).toEqual({ status: "planned", workoutId: "w2", title: "Day 2" });
+  });
+
+  it("returns done when every workout is already logged", () => {
+    const result = resolveNextUnloggedWorkout(workouts, new Set(["w1", "w2", "w3"]));
+    expect(result.status).toBe("done");
+  });
+
+  it("returns the very first workout when nothing is logged yet", () => {
+    const result = resolveNextUnloggedWorkout(workouts, new Set());
+    expect(result).toEqual({ status: "planned", workoutId: "w1", title: "Day 1" });
   });
 });
