@@ -46,8 +46,19 @@ function weekLabel(weekStart: Date, weekEnd: Date): string {
   return `${startStr} – ${endStr}`;
 }
 
+// Real bug found in a stress-test pass: the shape-only regex this used
+// to have accepts a syntactically-valid-looking but calendar-invalid
+// string like "2026-13-45" (13 isn't a month), which `new Date(...)`
+// then silently turns into an Invalid Date — propagating as
+// "NaN-NaN-NaN" hrefs and an "Invalid Date – Invalid Date" heading in
+// Week/Month, not a crash, but a genuinely broken view. Confirming the
+// parsed date round-trips back to the same key catches this the same
+// way `Date.prototype.getTime()` is the standard way to detect an
+// Invalid Date in JS.
 function isValidDateKey(value: string | undefined): value is string {
-  return !!value && /^\d{4}-\d{2}-\d{2}$/.test(value);
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(`${value}T00:00:00`);
+  return !Number.isNaN(parsed.getTime()) && dateKeyOf(parsed) === value;
 }
 
 export default async function GroupHubPage(
