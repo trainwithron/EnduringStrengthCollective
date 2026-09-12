@@ -1,7 +1,8 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { GroupHubHeader } from "@/components/group/group-hub-header";
 import { RosterList } from "@/components/group/roster-list";
-import { WellnessCheckinWidget, type WellnessCheckinValues } from "@/components/athlete/wellness-checkin-widget";
+import { WellnessCheckinPopup } from "@/components/athlete/wellness-checkin-popup";
+import type { WellnessCheckinValues } from "@/components/athlete/wellness-checkin-widget";
 import { DayCard } from "@/components/athlete/day-card";
 import { HomeWeekView, type HomeDaySummary } from "@/components/athlete/home-week-view";
 import { HomeMonthView } from "@/components/athlete/home-month-view";
@@ -422,7 +423,7 @@ export default async function GroupHubPage(
           {view === "day" && (
             <div className="space-y-4">
               {isToday && (
-                <WellnessCheckinWidget
+                <WellnessCheckinPopup
                   athleteId={athleteId}
                   groupId={params.groupId}
                   todayDate={todayKey}
@@ -444,6 +445,7 @@ export default async function GroupHubPage(
                 habits={dayHabits}
                 weightLogs={weightLogs}
                 canBook={canBook}
+                wellnessCheckin={wellnessCheckin}
               />
             </div>
           )}

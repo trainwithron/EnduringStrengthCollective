@@ -1,0 +1,88 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { WellnessCheckinWidget, type WellnessCheckinValues } from "./wellness-checkin-widget";
+
+const DISMISS_KEY_PREFIX = "wellness-popup-dismissed-";
+
+function readDismissed(todayDate: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.sessionStorage.getItem(DISMISS_KEY_PREFIX + todayDate) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeDismissed(todayDate: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(DISMISS_KEY_PREFIX + todayDate, "1");
+  } catch {
+    // Storage unavailable — the popup just won't remember the skip past
+    // this page's own lifetime, which is a harmless degrade.
+  }
+}
+
+// Shown once per day, before/over the Day-card, the first time Home
+// loads that day — a real nudge (unlike the old scrollable widget it
+// replaces) but never a hard block: a visible "Skip for today" always
+// dismisses it, and it never reappears again that day once either
+// skipped or actually submitted. See
+// [[athlete_home_calendar_redesign]]'s wellness-popup section.
+export function WellnessCheckinPopup({
+  athleteId,
+  groupId,
+  todayDate,
+  initialCheckin,
+  onSaved,
+}: {
+  athleteId: string;
+  groupId: string;
+  todayDate: string;
+  initialCheckin: WellnessCheckinValues | null;
+  onSaved?: (values: WellnessCheckinValues) => void;
+}) {
+  const [checkin, setCheckin] = useState(initialCheckin);
+  const [dismissed, setDismissed] = useState(true); // default hidden until the effect below confirms it's actually needed, so SSR/hydration never briefly flashes the overlay for someone who already checked in or already dismissed it earlier today
+
+  useEffect(() => {
+    setDismissed(!!initialCheckin || readDismissed(todayDate));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todayDate]);
+
+  if (checkin || dismissed) return null;
+
+  function handleSkip() {
+    writeDismissed(todayDate);
+    setDismissed(true);
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-label="Wellness check-in"
+      className="fixed inset-0 z-40 bg-graphite/95 flex items-center justify-center p-6"
+    >
+      <div className="w-full max-w-sm">
+        <WellnessCheckinWidget
+          athleteId={athleteId}
+          groupId={groupId}
+          todayDate={todayDate}
+          initialCheckin={null}
+          onSaved={(values) => {
+            setCheckin(values);
+            onSaved?.(values);
+          }}
+        />
+        <button
+          type="button"
+          onClick={handleSkip}
+          className="w-full text-center font-body text-xs text-steel mt-3"
+        >
+          Skip for today
+        </button>
+      </div>
+    </div>
+  );
+}

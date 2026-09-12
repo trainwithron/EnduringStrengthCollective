@@ -30,11 +30,13 @@ export function WellnessCheckinWidget({
   groupId,
   todayDate,
   initialCheckin,
+  onSaved,
 }: {
   athleteId: string;
   groupId: string;
   todayDate: string;
   initialCheckin: WellnessCheckinValues | null;
+  onSaved?: (values: WellnessCheckinValues) => void;
 }) {
   const [saved, setSaved] = useState(initialCheckin);
   const [editing, setEditing] = useState(!initialCheckin);
@@ -102,6 +104,7 @@ export function WellnessCheckinWidget({
     setSaved(values);
     setEditing(false);
     setSubmitting(false);
+    onSaved?.(values);
   }
 
   return (

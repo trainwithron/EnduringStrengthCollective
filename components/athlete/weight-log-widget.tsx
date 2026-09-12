@@ -26,8 +26,29 @@ export function WeightLogWidget({
   const [weight, setWeight] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Collapsed to a single line by default — a full-height form every day
+  // for every athlete crowds the Day-card for something most people only
+  // touch occasionally (see [[athlete_home_calendar_redesign]]). Expands
+  // on tap; a coach who wants a real cadence just assigns a "Log body
+  // weight" habit instead, no new code needed for that.
+  const [expanded, setExpanded] = useState(false);
 
   const todayLog = logs.find((l) => l.loggedDate === todayIso());
+
+  if (!expanded) {
+    return (
+      <button
+        type="button"
+        onClick={() => setExpanded(true)}
+        className="w-full border border-steel/20 p-4 flex items-center justify-between text-left"
+      >
+        <span className="font-body text-sm text-chalk">
+          {todayLog ? `Today's weight: ${todayLog.weight} lbs` : "Log today's weight"}
+        </span>
+        <span className="font-body text-xs text-rust">{todayLog ? "Update" : "Log"}</span>
+      </button>
+    );
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -60,13 +81,21 @@ export function WeightLogWidget({
     ]);
     setWeight("");
     setSubmitting(false);
+    setExpanded(false);
   }
 
   return (
     <div className="border border-steel/20 p-4">
-      <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
-        Body weight
-      </h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="font-display uppercase text-sm tracking-wide text-steel">Body weight</h2>
+        <button
+          type="button"
+          onClick={() => setExpanded(false)}
+          className="font-body text-xs text-steel"
+        >
+          Close
+        </button>
+      </div>
 
       <form onSubmit={handleSubmit} className="flex items-center gap-2">
         <input

@@ -3,6 +3,7 @@ import { Lock, Check } from "lucide-react";
 import { TodayWidget, type TodayMacros, type TodayHabit } from "./today-widget";
 import { WeightLogWidget, type WeightLogEntry } from "./weight-log-widget";
 import type { DayWorkoutInfo } from "@/lib/athlete-day-schedule";
+import { computeReadinessAverage, type WellnessCheckinValues } from "@/lib/wellness";
 
 // One date's worth of Home content. `isToday` is the one flag that
 // decides whether this renders live, write-capable controls (Start
@@ -21,6 +22,7 @@ export function DayCard({
   habits,
   weightLogs,
   canBook,
+  wellnessCheckin,
 }: {
   groupId: string;
   athleteId: string;
@@ -32,6 +34,7 @@ export function DayCard({
   habits: TodayHabit[];
   weightLogs: WeightLogEntry[];
   canBook: boolean;
+  wellnessCheckin?: WellnessCheckinValues | null;
 }) {
   return (
     <div className="space-y-4">
@@ -42,6 +45,7 @@ export function DayCard({
         isToday={isToday}
         workout={workout}
         canBook={canBook}
+        wellnessCheckin={isToday ? wellnessCheckin ?? null : null}
       />
 
       {isToday ? (
@@ -63,6 +67,7 @@ function WorkoutSection({
   isToday,
   workout,
   canBook,
+  wellnessCheckin,
 }: {
   groupId: string;
   dateKey: string;
@@ -70,11 +75,21 @@ function WorkoutSection({
   isToday: boolean;
   workout: DayWorkoutInfo;
   canBook: boolean;
+  wellnessCheckin?: WellnessCheckinValues | null;
 }) {
+  const readinessChip = wellnessCheckin ? (
+    <span className="font-body text-[10px] text-steel border border-steel/30 px-2 py-0.5 ml-2">
+      Feeling {Math.round(computeReadinessAverage(wellnessCheckin))}/5 today
+    </span>
+  ) : null;
+
   if (workout.status === "no-program") {
     return (
       <div className="border border-steel/20 p-4">
-        <p className="font-body text-xs text-steel uppercase tracking-wide">{dateLabel}</p>
+        <p className="font-body text-xs text-steel uppercase tracking-wide">
+          {dateLabel}
+          {readinessChip}
+        </p>
         <p className="font-body text-sm text-steel mt-2">
           No active program in this group yet, or you&apos;ve completed every workout in it — set
           one up from the Coach Dashboard.
@@ -86,7 +101,10 @@ function WorkoutSection({
   if (workout.status === "rest") {
     return (
       <div className="border border-steel/20 p-4">
-        <p className="font-body text-xs text-steel uppercase tracking-wide">{dateLabel}</p>
+        <p className="font-body text-xs text-steel uppercase tracking-wide">
+          {dateLabel}
+          {readinessChip}
+        </p>
         {canBook ? (
           <Link
             href={`/groups/${groupId}/calendar/${dateKey}`}
@@ -105,7 +123,10 @@ function WorkoutSection({
 
   return (
     <div className="border border-steel/20 p-4">
-      <p className="font-body text-xs text-steel uppercase tracking-wide">{dateLabel}</p>
+      <p className="font-body text-xs text-steel uppercase tracking-wide">
+        {dateLabel}
+        {readinessChip}
+      </p>
       <p className="font-display font-bold text-xl uppercase leading-none mt-1">{workout.title}</p>
 
       <div className="mt-3">
