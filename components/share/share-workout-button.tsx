@@ -7,15 +7,20 @@ export function ShareWorkoutButton({
   postId,
   title,
   size = "small",
+  path,
 }: {
-  postId: string;
+  postId?: string;
   title: string;
   size?: "small" | "large";
+  // Override for a non-workout share surface (e.g. a milestone
+  // celebration card) that doesn't have a postId at all — defaults to
+  // the original `/share/{postId}` behavior when omitted.
+  path?: string;
 }) {
   const [copied, setCopied] = useState(false);
 
   async function handleShare() {
-    const url = `${window.location.origin}/share/${postId}`;
+    const url = `${window.location.origin}${path ?? `/share/${postId}`}`;
 
     if (navigator.share) {
       try {

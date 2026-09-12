@@ -9,6 +9,7 @@ import { PrivateFromOrgToggle } from "@/components/coach/private-from-org-toggle
 import { ChangeClientGroupControl } from "@/components/coach/change-client-group-control";
 import { ClientProgrammingMenu } from "@/components/coach/client-programming-menu";
 import { MinorConsentControl } from "@/components/coach/minor-consent-control";
+import { NutritionPhaseControl } from "@/components/coach/nutrition-phase-control";
 import { ParQAnswersPanel } from "@/components/coach/par-q-answers-panel";
 import { isUnder13 } from "@/lib/coppa";
 import { CoachLoggedBadge } from "@/components/coach-logged-badge";
@@ -137,6 +138,13 @@ export default async function AthleteProfilePage(
   const { data: creditsRow } = await supabase
     .from("session_credits")
     .select("balance")
+    .eq("athlete_id", params.athleteId)
+    .eq("group_id", params.groupId)
+    .maybeSingle();
+
+  const { data: nutritionPhaseRow } = await supabase
+    .from("nutrition_phases")
+    .select("phase, started_at")
     .eq("athlete_id", params.athleteId)
     .eq("group_id", params.groupId)
     .maybeSingle();
@@ -583,6 +591,16 @@ export default async function AthleteProfilePage(
               athleteId={params.athleteId}
               groupId={params.groupId}
               initialBalance={creditsRow?.balance ?? 0}
+            />
+          </section>
+
+          <section>
+            <NutritionPhaseControl
+              athleteId={params.athleteId}
+              groupId={params.groupId}
+              coachId={user.id}
+              initialTagged={nutritionPhaseRow?.phase === "reverse_diet"}
+              initialStartedAt={nutritionPhaseRow?.started_at ?? null}
             />
           </section>
 
