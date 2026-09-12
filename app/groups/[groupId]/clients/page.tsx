@@ -70,6 +70,21 @@ export default async function ClientsPage(
     lastLogByAthlete.set(row.athlete_id, row.last_logged_at);
   }
 
+  // Category 2 (Milestone Celebrations) — which nutrition phase (if any)
+  // each athlete is tagged with. Cheap and roster-wide (just a phase
+  // string per tagged athlete, not the underlying macro/weight time
+  // series) so the "Goal" filter can operate on the FULL roster before
+  // pagination, same as the existing Tier filter — unlike the heavier
+  // per-athlete trend computation below, which stays properly scoped.
+  const { data: taggedPhaseRows } = await supabase
+    .from("nutrition_phases")
+    .select("athlete_id, phase")
+    .eq("group_id", params.groupId);
+  const phaseByAthleteId = new Map<string, NutritionPhase>();
+  for (const row of taggedPhaseRows ?? []) {
+    phaseByAthleteId.set(row.athlete_id, row.phase as NutritionPhase);
+  }
+
   const roster: RosterMember[] = (memberships ?? []).map((m: any) => ({
     profileId: m.profile_id,
     fullName: m.profiles?.full_name ?? "Unknown",
@@ -77,6 +92,7 @@ export default async function ClientsPage(
     role: m.role,
     lastWorkoutAt: lastLogByAthlete.get(m.profile_id) ?? null,
     clientTier: m.client_tier ?? null,
+    nutritionPhase: phaseByAthleteId.get(m.profile_id) ?? null,
   }));
 
   roster.sort((a, b) => {
@@ -96,29 +112,24 @@ export default async function ClientsPage(
   // roster) — same cost discipline as the rest of this page, which
   // already keeps every per-athlete-heavy computation off the main
   // roster query.
-  const { data: taggedPhaseRows } = await supabase
-    .from("nutrition_phases")
-    .select("athlete_id, phase")
-    .eq("group_id", params.groupId);
-
   let phaseAlignmentSummary: { total: number; misaligned: number } | null = null;
-  if (taggedPhaseRows && taggedPhaseRows.length > 0) {
+  if (phaseByAthleteId.size > 0) {
     const sixWeeksAgo = new Date();
     sixWeeksAgo.setDate(sixWeeksAgo.getDate() - 42);
     let judged = 0;
     let misaligned = 0;
-    for (const row of taggedPhaseRows) {
+    for (const [athleteId, phase] of phaseByAthleteId) {
       const [{ data: macroRows }, { data: weightRows }] = await Promise.all([
         supabase
           .from("daily_macros")
           .select("log_date, calories")
-          .eq("athlete_id", row.athlete_id)
+          .eq("athlete_id", athleteId)
           .eq("group_id", params.groupId)
           .gte("log_date", sixWeeksAgo.toISOString().slice(0, 10)),
         supabase
           .from("body_weight_logs")
           .select("logged_date, weight")
-          .eq("athlete_id", row.athlete_id)
+          .eq("athlete_id", athleteId)
           .eq("group_id", params.groupId)
           .gte("logged_date", sixWeeksAgo.toISOString().slice(0, 10)),
       ]);
@@ -132,7 +143,7 @@ export default async function ClientsPage(
       const classification = classifyNutritionTrend(calorieSeries, weightSeries, new Date());
       if (!classification) continue;
       judged += 1;
-      if (!isTrendAligned(classification, row.phase as NutritionPhase)) misaligned += 1;
+      if (!isTrendAligned(classification, phase)) misaligned += 1;
     }
     if (judged > 0) phaseAlignmentSummary = { total: judged, misaligned };
   }

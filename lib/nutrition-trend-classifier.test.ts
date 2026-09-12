@@ -3,6 +3,7 @@ import {
   classifyNutritionTrend,
   expectedTrendForPhase,
   isTrendAligned,
+  computeNutritionWeeklySeries,
 } from "./nutrition-trend-classifier";
 
 describe("classifyNutritionTrend", () => {
@@ -80,5 +81,49 @@ describe("expectedTrendForPhase / isTrendAligned", () => {
     expect(
       isTrendAligned({ trend: "maintaining", calorieChangePct: 0, weightChangePct: 0 }, "bulk")
     ).toBe(false);
+  });
+});
+
+describe("computeNutritionWeeklySeries", () => {
+  const asOf = new Date("2026-09-12T00:00:00");
+
+  function dailyRows(startDaysAgo: number, endDaysAgo: number, value: number): { date: string; value: number }[] {
+    const rows: { date: string; value: number }[] = [];
+    for (let d = startDaysAgo; d >= endDaysAgo; d--) {
+      const date = new Date(asOf);
+      date.setDate(date.getDate() - d);
+      rows.push({ date: date.toISOString().slice(0, 10), value });
+    }
+    return rows;
+  }
+
+  it("indexes each series to its own first real week as 100", () => {
+    // 6 weeks of steady 2000 kcal, steady 180 lb.
+    const calorieRows = dailyRows(41, 0, 2000);
+    const weightRows = dailyRows(41, 0, 180);
+    const result = computeNutritionWeeklySeries(calorieRows, weightRows, asOf, 6);
+    expect(result.calorieIndexed).toHaveLength(6);
+    expect(result.calorieIndexed[0]).toBe(100);
+    expect(result.calorieIndexed.every((v) => v === 100)).toBe(true);
+    expect(result.weightIndexed.every((v) => v === 100)).toBe(true);
+  });
+
+  it("shows a real change relative to the first week", () => {
+    // First 3 weeks at 2000, last 3 weeks at 2200 (+10%).
+    const calorieRows = [...dailyRows(41, 21, 2000), ...dailyRows(20, 0, 2200)];
+    const weightRows = dailyRows(41, 0, 180);
+    const result = computeNutritionWeeklySeries(calorieRows, weightRows, asOf, 6);
+    expect(result.calorieIndexed[0]).toBe(100);
+    expect(result.calorieIndexed[5]).toBeCloseTo(110, 5);
+  });
+
+  it("leaves a week with no data as a gap (null), not a fake value", () => {
+    // Only the most recent week has any data at all.
+    const calorieRows = dailyRows(6, 0, 2000);
+    const weightRows: { date: string; value: number }[] = [];
+    const result = computeNutritionWeeklySeries(calorieRows, weightRows, asOf, 6);
+    expect(result.calorieIndexed.slice(0, 5).every((v) => v === null)).toBe(true);
+    expect(result.calorieIndexed[5]).toBe(100);
+    expect(result.weightIndexed.every((v) => v === null)).toBe(true);
   });
 });

@@ -86,3 +86,42 @@ export function expectedTrendForPhase(phase: NutritionPhase): NutritionTrend {
 export function isTrendAligned(classification: TrendClassification, phase: NutritionPhase): boolean {
   return classification.trend === expectedTrendForPhase(phase);
 }
+
+export interface NutritionWeeklySeries {
+  calorieIndexed: (number | null)[];
+  weightIndexed: (number | null)[];
+}
+
+// A small, visual-only companion to classifyNutritionTrend — buckets the
+// same two series into weekly averages (not the classifier's own two-
+// half comparison) and indexes each to its own first real week = 100,
+// same "index to a shared baseline" convention already used by
+// lib/program-card-visuals.ts's weekly volume sparkline. Feeds the
+// client-card trend line, not any detection logic — a coarser, lower
+// data-density bar (0.1 vs the classifier's 0.5) is fine here since a
+// gap just renders as a break in the line rather than a wrong verdict.
+export function computeNutritionWeeklySeries(
+  calorieRows: DateValueRow[],
+  weightRows: DateValueRow[],
+  asOf: Date,
+  weekCount = 6
+): NutritionWeeklySeries {
+  const calorieWeeks: (number | null)[] = [];
+  const weightWeeks: (number | null)[] = [];
+  for (let w = weekCount - 1; w >= 0; w--) {
+    const weekEnd = new Date(asOf);
+    weekEnd.setDate(weekEnd.getDate() - w * 7);
+    const weekStart = new Date(weekEnd);
+    weekStart.setDate(weekStart.getDate() - 6);
+    calorieWeeks.push(computeWindowedAverage(calorieRows, weekStart, weekEnd, 0.1));
+    weightWeeks.push(computeWindowedAverage(weightRows, weekStart, weekEnd, 0.1));
+  }
+
+  const firstCalorie = calorieWeeks.find((v) => v != null) ?? null;
+  const firstWeight = weightWeeks.find((v) => v != null) ?? null;
+
+  return {
+    calorieIndexed: calorieWeeks.map((v) => (v != null && firstCalorie ? (v / firstCalorie) * 100 : null)),
+    weightIndexed: weightWeeks.map((v) => (v != null && firstWeight ? (v / firstWeight) * 100 : null)),
+  };
+}

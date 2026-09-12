@@ -1,5 +1,6 @@
 import type { TrackedField } from "./exercise-fields";
 import type { EquipmentType } from "./equipment-classifier";
+import type { NutritionPhase } from "./nutrition-trend-classifier";
 
 export type MemberRole = "coach" | "athlete";
 
@@ -16,6 +17,10 @@ export interface RosterMember {
   role: MemberRole;
   lastWorkoutAt: string | null; // ISO timestamp, null = never logged
   clientTier: ClientTier;
+  // Milestone Celebrations, Category 2 — which nutrition phase (if any)
+  // a coach has tagged this athlete with. Optional/undefined on any
+  // roster-rendering path that doesn't fetch it.
+  nutritionPhase?: NutritionPhase | null;
 }
 
 export interface GroupSummary {

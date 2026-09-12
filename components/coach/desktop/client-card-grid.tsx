@@ -10,6 +10,12 @@ import { isLowReadiness } from "@/lib/wellness";
 import { getIntegrityRollupForGroup, type AthleteIntegrityResult } from "@/lib/session-integrity-data";
 import type { RosterMember, ClientTier } from "@/lib/types";
 import { MoreVertical, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  computeNutritionWeeklySeries,
+  type NutritionPhase,
+  type NutritionWeeklySeries,
+} from "@/lib/nutrition-trend-classifier";
+import { ClientCardNutritionSparkline } from "@/components/coach/desktop/client-card-nutrition-sparkline";
 
 // A real page of cards, not the whole roster — a stress-test pass found
 // the old unpaginated page taking 18.5s and shipping 1.1MB at 500
@@ -25,6 +31,12 @@ const TIER_LABELS: Record<NonNullable<ClientTier>, string> = {
   one_on_one: "1-on-1",
   online: "Online",
   group: "Group",
+};
+
+const GOAL_LABELS: Record<NonNullable<NutritionPhase>, string> = {
+  reverse_diet: "Reverse diet",
+  cut: "Cut",
+  bulk: "Bulk",
 };
 
 function daysSinceOf(lastWorkoutAt: string | null): number {
@@ -85,6 +97,7 @@ export function ClientCardGrid({
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>("attention");
   const [tierFilter, setTierFilter] = useState<ClientTier | "all">("all");
+  const [goalFilter, setGoalFilter] = useState<NutritionPhase | "all">("all");
   const [size, setSize] = useState<CardSize>("medium");
   const [page, setPage] = useState(0);
   const router = useRouter();
@@ -100,6 +113,14 @@ export function ClientCardGrid({
   const [integrityByAthleteId, setIntegrityByAthleteId] = useState<Map<string, AthleteIntegrityResult>>(
     new Map()
   );
+  // Milestone Celebrations, Category 2 — the trend-line sparkline itself
+  // needs the underlying macro/weight time series (heavier than a plain
+  // phase tag), so it's fetched here client-side, scoped to just the
+  // currently-visible page's TAGGED athletes — same cost discipline as
+  // credits/wellness/integrity above.
+  const [nutritionSeriesByAthleteId, setNutritionSeriesByAthleteId] = useState<
+    Map<string, NutritionWeeklySeries>
+  >(new Map());
 
   useEffect(() => {
     setSize(readCardSize(STORAGE_KEY));
@@ -122,7 +143,9 @@ export function ClientCardGrid({
 
   const isOnlyCoach = rows.filter((m) => m.role === "coach").length === 1;
 
-  const filteredRows = tierFilter === "all" ? rows : rows.filter((m) => m.clientTier === tierFilter);
+  const filteredRows = rows
+    .filter((m) => tierFilter === "all" || m.clientTier === tierFilter)
+    .filter((m) => goalFilter === "all" || m.nutritionPhase === goalFilter);
 
   const sortedRows = useMemo(
     () =>
@@ -137,13 +160,17 @@ export function ClientCardGrid({
   const clampedPage = Math.min(page, totalPages - 1);
   const pageRows = sortedRows.slice(clampedPage * PAGE_SIZE, (clampedPage + 1) * PAGE_SIZE);
   const pageIdsKey = pageRows.map((m) => m.profileId).join(",");
+  const taggedPageIdsKey = pageRows
+    .filter((m) => m.nutritionPhase)
+    .map((m) => m.profileId)
+    .join(",");
 
   // Sort/filter changing the composition of "what page 0 even means"
   // resets back to the first page rather than leaving the viewer on a
   // now-mismatched page number.
   useEffect(() => {
     setPage(0);
-  }, [sortMode, tierFilter]);
+  }, [sortMode, tierFilter, goalFilter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -193,6 +220,72 @@ export function ClientCardGrid({
       cancelled = true;
     };
   }, [groupId, pageIdsKey]);
+
+  // Milestone Celebrations, Category 2 sparkline — a separate, smaller
+  // fetch scoped to just this page's TAGGED athletes (usually a small
+  // subset of the page, often zero), since the underlying six-week
+  // macro/weight series is heavier than the plain phase tag already on
+  // `rows`.
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      const taggedIds = taggedPageIdsKey ? taggedPageIdsKey.split(",") : [];
+      if (taggedIds.length === 0) {
+        setNutritionSeriesByAthleteId(new Map());
+        return;
+      }
+      const sixWeeksAgo = new Date();
+      sixWeeksAgo.setDate(sixWeeksAgo.getDate() - 42);
+      const supabase = createBrowserClient();
+      const [macroResult, weightResult] = await Promise.all([
+        supabase
+          .from("daily_macros")
+          .select("athlete_id, log_date, calories")
+          .eq("group_id", groupId)
+          .in("athlete_id", taggedIds)
+          .gte("log_date", sixWeeksAgo.toISOString().slice(0, 10)),
+        supabase
+          .from("body_weight_logs")
+          .select("athlete_id, logged_date, weight")
+          .eq("group_id", groupId)
+          .in("athlete_id", taggedIds)
+          .gte("logged_date", sixWeeksAgo.toISOString().slice(0, 10)),
+      ]);
+      if (cancelled) return;
+
+      const calorieRowsByAthlete = new Map<string, { date: string; value: number }[]>();
+      for (const row of macroResult.data ?? []) {
+        if (row.calories == null) continue;
+        const list = calorieRowsByAthlete.get(row.athlete_id) ?? [];
+        list.push({ date: row.log_date, value: row.calories });
+        calorieRowsByAthlete.set(row.athlete_id, list);
+      }
+      const weightRowsByAthlete = new Map<string, { date: string; value: number }[]>();
+      for (const row of weightResult.data ?? []) {
+        const list = weightRowsByAthlete.get(row.athlete_id) ?? [];
+        list.push({ date: row.logged_date, value: row.weight });
+        weightRowsByAthlete.set(row.athlete_id, list);
+      }
+
+      const series = new Map<string, NutritionWeeklySeries>();
+      const now = new Date();
+      for (const athleteId of taggedIds) {
+        series.set(
+          athleteId,
+          computeNutritionWeeklySeries(
+            calorieRowsByAthlete.get(athleteId) ?? [],
+            weightRowsByAthlete.get(athleteId) ?? [],
+            now
+          )
+        );
+      }
+      setNutritionSeriesByAthleteId(series);
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [groupId, taggedPageIdsKey]);
 
   async function handleTierChange(member: RosterMember, tier: ClientTier) {
     setRows((prev) =>
@@ -302,6 +395,24 @@ export function ClientCardGrid({
         </div>
       </div>
 
+      {rows.some((m) => m.nutritionPhase) && (
+        <div className="flex items-center gap-2 mb-4">
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Goal</span>
+          {(["all", "reverse_diet", "cut", "bulk"] as const).map((g) => (
+            <button
+              key={g}
+              type="button"
+              onClick={() => setGoalFilter(g)}
+              className={`font-body text-xs px-2 py-1 border ${
+                goalFilter === g ? "text-rust border-rust" : "text-steel border-steel/30"
+              }`}
+            >
+              {g === "all" ? "All" : GOAL_LABELS[g]}
+            </button>
+          ))}
+        </div>
+      )}
+
       {sortedRows.length === 0 ? (
         <p className="font-body text-sm text-steel py-6">
           No athletes yet. Send an invite to get the first one training.
@@ -371,6 +482,13 @@ export function ClientCardGrid({
                     </span>
                   );
                 })()}
+
+                {member.nutritionPhase && nutritionSeriesByAthleteId.has(member.profileId) && (
+                  <ClientCardNutritionSparkline
+                    phase={member.nutritionPhase}
+                    series={nutritionSeriesByAthleteId.get(member.profileId)!}
+                  />
+                )}
 
                 <div className="flex items-center gap-2 w-full justify-center mt-1">
                   <select
