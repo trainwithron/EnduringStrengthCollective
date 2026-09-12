@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { computeScheduledDates, isLocked } from "./program-schedule";
+import { computeScheduledDates, isLocked, isSameDay } from "./program-schedule";
 import { dateKeyInZone, getGroupCoachTimezone, nowInZone } from "./timezone";
 
 export type TodaysWorkoutResult =
@@ -88,19 +88,41 @@ export async function getTodaysWorkoutId(
   const loggedIds = new Set((logs ?? []).map((l) => l.workout_id));
   const next = workouts.find((w) => !loggedIds.has(w.id));
 
-  if (!next) return { status: "done" };
-
   if (program.start_date && program.training_days && program.training_days.length > 0) {
     const scheduledDateByDayId = computeScheduledDates(
       program.start_date,
       program.training_days,
       workouts
     );
+    const now = nowInZone(timezone);
+
+    // Prefer whichever workout's own computed date is literally today —
+    // the same thing the calendar page highlights as "Today" — over the
+    // rolling "next unlogged in sequence" pick below. Without this, one
+    // skipped/missed day leaves the Workout tab permanently handing back
+    // that stale overdue workout while the calendar has already moved on
+    // to a later date, so the two disagree about what "today's workout"
+    // even means.
+    const todaysWorkout = workouts.find((w) => {
+      const d = scheduledDateByDayId.get(w.id);
+      return d && isSameDay(d, now);
+    });
+    if (todaysWorkout && !loggedIds.has(todaysWorkout.id)) {
+      return { status: "ready", workoutId: todaysWorkout.id };
+    }
+
+    // No workout falls on today's date (a rest day) or today's own
+    // workout is already logged — fall back to the rolling next-unlogged
+    // pick so there's still something to do instead of a dead end,
+    // gated by the same lock check as before.
+    if (!next) return { status: "done" };
     const scheduledDate = scheduledDateByDayId.get(next.id);
-    if (isLocked(scheduledDate, nowInZone(timezone), program.visibility_window)) {
+    if (isLocked(scheduledDate, now, program.visibility_window)) {
       return { status: "locked", unlocksOn: scheduledDate! };
     }
+    return { status: "ready", workoutId: next.id };
   }
 
+  if (!next) return { status: "done" };
   return { status: "ready", workoutId: next.id };
 }
