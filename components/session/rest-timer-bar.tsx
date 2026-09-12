@@ -5,6 +5,7 @@ import { computeRemainingSeconds, formatMMSS } from "@/lib/rest-timer-math";
 import { readRestTimerState, writeRestTimerState, clearRestTimerState } from "@/lib/rest-timer-storage";
 import { playRestAlert } from "@/lib/rest-alert";
 import { SessionStopwatch } from "./session-stopwatch";
+import { SnakeMiniGame } from "./snake-mini-game";
 
 const PRESETS = [60, 90, 120];
 
@@ -31,7 +32,17 @@ export function RestTimerBar({
   const [running, setRunning] = useState<RunningState | null>(null);
   const [remaining, setRemaining] = useState(0);
   const [justFinished, setJustFinished] = useState(false);
+  const [gameOpen, setGameOpen] = useState(false);
   const wakeLockRef = useRef<any>(null);
+
+  // Purely optional content riding on the countdown, per the governing
+  // "never blocks" constraint — closes itself the instant rest actually
+  // ends (whether that's the timer completing or a manual skip) so
+  // nobody's staring at a stale game board once it's time for the next
+  // set, without the game itself needing to know anything about why.
+  useEffect(() => {
+    if (!running) setGameOpen(false);
+  }, [running]);
 
   async function acquireWakeLock() {
     try {
@@ -142,6 +153,15 @@ export function RestTimerBar({
             >
               Skip
             </button>
+            <button
+              type="button"
+              onClick={() => setGameOpen((v) => !v)}
+              className={`h-8 px-2.5 border font-body text-xs ${
+                gameOpen ? "bg-rust border-rust text-graphite" : "border-steel/30 text-steel"
+              }`}
+            >
+              🎮 {gameOpen ? "Hide" : "Snake"}
+            </button>
           </div>
         )}
 
@@ -149,6 +169,8 @@ export function RestTimerBar({
           <p className="font-body text-sm text-rust">Rest complete! 💪</p>
         )}
       </div>
+
+      {running && gameOpen && <SnakeMiniGame onClose={() => setGameOpen(false)} />}
 
       {showPrompt && (
         <div className="flex items-center gap-2 mt-2.5">
