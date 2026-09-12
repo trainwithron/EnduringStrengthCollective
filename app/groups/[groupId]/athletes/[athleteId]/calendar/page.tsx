@@ -4,10 +4,10 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { HabitManager, type ClientHabit } from "@/components/coach/desktop/habit-manager";
 import { BulkMacroRangeForm } from "@/components/coach/desktop/bulk-macro-range-form";
+import { ClientCalendarGrid, type DayCellData } from "@/components/coach/desktop/client-calendar-grid";
+import type { WorkoutOption } from "@/components/coach/desktop/assign-workout-form";
 import { computeScheduledDates } from "@/lib/program-schedule";
 import { isHabitDueOn } from "@/lib/habits";
-
-const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
 function dateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
@@ -143,17 +143,37 @@ export default async function ClientCalendarPage(
   // Coach-assigned overrides for this athlete, this month.
   const { data: assignments } = await supabase
     .from("workout_assignments")
-    .select("scheduled_date, note, workouts ( title )")
+    .select("scheduled_date, workout_id, note, workouts ( title )")
     .eq("athlete_id", params.athleteId)
     .gte("scheduled_date", rangeStart)
     .lte("scheduled_date", rangeEnd);
-  const assignmentByDateKey = new Map<string, { title: string | null; note: string | null }>();
+  const assignmentByDateKey = new Map<
+    string,
+    { title: string | null; workoutId: string | null; note: string | null }
+  >();
   for (const a of assignments ?? []) {
     assignmentByDateKey.set(a.scheduled_date, {
       title: (a.workouts as any)?.title ?? null,
+      workoutId: a.workout_id,
       note: a.note,
     });
   }
+
+  // Every workout in the group (spanning every program, not just the
+  // active one) for the expanded panel's "assign a specific workout"
+  // dropdown — same list the dedicated day page already offers, fetched
+  // once here instead of per day.
+  const { data: allWorkouts } = await supabase
+    .from("workouts")
+    .select("id, title, week_number, day_index, programs ( name )")
+    .eq("group_id", params.groupId)
+    .order("week_number", { ascending: true })
+    .order("day_index", { ascending: true });
+
+  const workoutOptions: WorkoutOption[] = (allWorkouts ?? []).map((w: any) => ({
+    id: w.id,
+    label: `${w.programs?.name ?? "Program"} — Wk ${w.week_number} Day ${w.day_index + 1}: ${w.title}`,
+  }));
 
   // This client's habits + this month's check-off status.
   const { data: latestWeightRow } = macrosEnabled
@@ -239,6 +259,55 @@ export default async function ClientCalendarPage(
     ...Array.from({ length: daysInMonth }, (_, i) => new Date(year, monthIndex, i + 1)),
   ];
 
+  // Precompute every day's full cell + accordion-panel data server-side
+  // (as plain, serializable objects, not Maps) so the client-side
+  // accordion grid can expand any day inline without a round trip.
+  const cellData: Record<string, DayCellData> = {};
+  for (const d of cells) {
+    if (!d) continue;
+    const key = dateKey(d);
+    const override = assignmentByDateKey.get(key);
+    const programWorkout = workoutByDateKey.get(key);
+    const macroRow = macrosByDateKey.get(key);
+    const mealPlanRow = mealPlanByDateKey.get(key);
+    const cellDueHabits = variableHabits
+      .filter((h) => isHabitDueOn(h.weekdays, d))
+      .map((h) => ({ id: h.id, title: h.title, completed: completedHabitDates.has(`${h.id}:${key}`) }));
+    const panelDueHabits = activeHabits
+      .filter((h) => isHabitDueOn(h.weekdays, d))
+      .map((h) => ({ id: h.id, title: h.title, completed: completedHabitDates.has(`${h.id}:${key}`) }));
+
+    cellData[key] = {
+      dateKey: key,
+      dayNumber: d.getDate(),
+      isToday: key === dateKey(today),
+      overrideTitle: override ? override.title ?? override.note ?? "Assigned" : null,
+      assignmentWorkoutId: override?.workoutId ?? null,
+      assignmentNote: override?.note ?? "",
+      programWorkoutTitle: programWorkout?.title ?? null,
+      workoutDone: programWorkout ? loggedIds.has(programWorkout.id) : false,
+      macros: macroRow
+        ? {
+            calories: macroRow.calories,
+            proteinG: macroRow.protein_g,
+            carbsG: macroRow.carbs_g,
+            fatG: macroRow.fat_g,
+          }
+        : null,
+      mealPlan: mealPlanRow
+        ? { mealCount: mealPlanRow.meal_count, includeSnack: mealPlanRow.include_snack }
+        : null,
+      bookingCount: bookingCountByDateKey.get(key) ?? 0,
+      cellDueHabits,
+      panelDueHabits,
+    };
+  }
+
+  const weeks: (string | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) {
+    weeks.push(cells.slice(i, i + 7).map((d) => (d ? dateKey(d) : null)));
+  }
+
   const prevMonth = new Date(year, monthIndex - 1, 1);
   const nextMonth = new Date(year, monthIndex + 1, 1);
   const prevHref = `${backHref}/calendar?month=${prevMonth.getFullYear()}-${String(
@@ -277,99 +346,16 @@ export default async function ClientCalendarPage(
             </Link>
           </div>
 
-          <div className="grid grid-cols-7 gap-px bg-steel/15 border border-steel/15">
-            {WEEKDAY_LABELS.map((label) => (
-              <div
-                key={label}
-                className="bg-graphite text-center font-body text-[10px] text-steel uppercase tracking-wide py-1.5"
-              >
-                {label}
-              </div>
-            ))}
-
-            {cells.map((date, i) => {
-              if (!date) return <div key={i} className="bg-graphite min-h-[92px]" />;
-
-              const key = dateKey(date);
-              const isToday = key === dateKey(today);
-              const override = assignmentByDateKey.get(key);
-              const programWorkout = workoutByDateKey.get(key);
-              const done = programWorkout ? loggedIds.has(programWorkout.id) : false;
-              const macros = macrosByDateKey.get(key);
-              const mealPlan = mealPlanByDateKey.get(key);
-              const bookingCount = bookingCountByDateKey.get(key) ?? 0;
-              const dueHabits = variableHabits.filter((h) => isHabitDueOn(h.weekdays, date));
-
-              return (
-                <Link
-                  key={i}
-                  href={`${backHref}/calendar/${key}`}
-                  className={`bg-graphite min-h-[92px] p-1.5 flex flex-col gap-0.5 hover:bg-surface/40 transition-colors ${
-                    isToday ? "ring-1 ring-inset ring-rust" : ""
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={`font-body text-[10px] ${
-                        isToday ? "text-rust font-bold" : "text-steel"
-                      }`}
-                    >
-                      {date.getDate()}
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      {mealPlan && (
-                        <span className="font-body text-[9px] text-steel" title={`${mealPlan.meal_count} meals${mealPlan.include_snack ? " + snack" : ""}`}>
-                          🍽
-                        </span>
-                      )}
-                      {bookingCount > 0 && (
-                        <span className="font-body text-[9px] text-steel">
-                          📅 {bookingCount}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {override ? (
-                    <span className="font-body text-[10px] leading-tight text-rust">
-                      {override.title ?? override.note ?? "Assigned"}
-                    </span>
-                  ) : programWorkout ? (
-                    <span
-                      className={`font-body text-[10px] leading-tight ${
-                        done ? "text-positive" : "text-chalk"
-                      }`}
-                    >
-                      {programWorkout.title}
-                    </span>
-                  ) : null}
-                  {macros?.calories != null && (
-                    <span className="font-body text-[9px] text-steel">
-                      {macros.calories}cal
-                      {macros.protein_g != null && ` ${macros.protein_g}p`}
-                      {macros.carbs_g != null && ` ${macros.carbs_g}c`}
-                      {macros.fat_g != null && ` ${macros.fat_g}f`}
-                    </span>
-                  )}
-                  {dueHabits.slice(0, 2).map((h) => (
-                    <span
-                      key={h.id}
-                      className={`font-body text-[9px] leading-tight truncate ${
-                        completedHabitDates.has(`${h.id}:${key}`) ? "text-positive" : "text-steel"
-                      }`}
-                    >
-                      {completedHabitDates.has(`${h.id}:${key}`) ? "✓ " : "· "}
-                      {h.title}
-                    </span>
-                  ))}
-                  {dueHabits.length > 2 && (
-                    <span className="font-body text-[9px] text-steel">
-                      +{dueHabits.length - 2} more
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
+          <ClientCalendarGrid
+            groupId={params.groupId}
+            athleteId={params.athleteId}
+            backHref={backHref}
+            weeks={weeks}
+            cellData={cellData}
+            macrosEnabled={macrosEnabled}
+            workoutOptions={workoutOptions}
+            latestBodyWeight={latestWeightRow?.weight ?? null}
+          />
         </div>
 
         <div className="space-y-6">
