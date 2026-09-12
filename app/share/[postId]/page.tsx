@@ -110,6 +110,19 @@ export default async function ShareWorkoutPage(
           )}
         </div>
 
+        {shared.relativeStrengthMilestones.length > 0 && (
+          <div className="mt-6 space-y-1">
+            {shared.relativeStrengthMilestones.map((m) => (
+              <p
+                key={m.exerciseName}
+                className="font-display text-xl text-rust text-center leading-tight"
+              >
+                💪 {m.multiple}&times; bodyweight {m.exerciseName}!
+              </p>
+            ))}
+          </div>
+        )}
+
         {shared.compoundCelebration && (
           <p className="font-display text-lg text-rust text-center mt-6 leading-snug">
             {shared.compoundCelebration}

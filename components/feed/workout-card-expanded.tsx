@@ -14,6 +14,7 @@ interface SharedWorkoutData {
   weekStreak: number;
   totalWorkoutCount: number | null;
   compoundCelebration: string | null;
+  relativeStrengthMilestones: { exerciseName: string; multiple: number; weight: number; reps: number }[];
   topLifts: { name: string; weight: number; reps: number }[];
   celebratePrs: { name: string; weight: number; reps: number; oneRepMax: number }[];
   baselinePrs: { name: string; weight: number; reps: number; oneRepMax: number }[];
@@ -107,6 +108,16 @@ export function WorkoutCardExpanded({ postId }: { postId: string }) {
             {data.weekStreak >= 2 && (
               <p className="font-body text-sm text-rust mt-1">🔥 {data.weekStreak} week streak</p>
             )}
+          </div>
+        )}
+
+        {data.relativeStrengthMilestones.length > 0 && (
+          <div className="mt-4 space-y-1">
+            {data.relativeStrengthMilestones.map((m) => (
+              <p key={m.exerciseName} className="font-display text-base text-rust leading-tight">
+                💪 {m.multiple}&times; bodyweight {m.exerciseName}!
+              </p>
+            ))}
           </div>
         )}
 

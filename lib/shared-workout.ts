@@ -5,6 +5,7 @@ import { computeWeekStreak } from "@/lib/consistency-streak";
 import { splitPrsByBaseline } from "@/lib/pr-fatigue";
 import { computeHabitCompliance, computeCompliancePct, type HabitLogRow } from "@/lib/habits";
 import { shouldShowCompoundCelebration, buildCompoundCelebrationText } from "@/lib/compound-celebration";
+import { computeRelativeStrengthMilestone } from "@/lib/relative-strength-milestone";
 
 // Shared by the public /share/[postId] page and the in-feed expanded
 // card (fetched via /api/workout-share/[postId]) so both surfaces
@@ -240,6 +241,79 @@ export async function getSharedWorkout(postId: string) {
     }
   }
 
+  // Milestone Celebrations, piece #2 — a lift's estimated 1RM crossing a
+  // bodyweight-multiple threshold ("2x bodyweight deadlift") for the
+  // first time. A threshold crossing, not a trend — reuses this
+  // session's own `bestByExercise` (the exact same weight/reps pair
+  // `prList`'s oneRepMax already estimates from) and each exercise's
+  // prior best estimated 1RM from every OTHER completed session
+  // (excluding this one, same discipline as the PR-fatigue baseline
+  // check above). Gated to "full" only, not "prs_only" — body weight is
+  // more sensitive than a plain PR, so this stays out of the lighter
+  // broadcast tiers. Deliberately never surfaces the athlete's literal
+  // bodyweight number on this public page — only the multiple and the
+  // lift itself.
+  const relativeStrengthMilestones: {
+    exerciseName: string;
+    multiple: number;
+    weight: number;
+    reps: number;
+  }[] = [];
+  if (broadcastLevel === "full" && bestByExercise.size > 0) {
+    const serviceClient = createServiceRoleClient();
+    const asOf = new Date(post.created_at);
+    const { data: weightRow } = await serviceClient
+      .from("body_weight_logs")
+      .select("weight")
+      .eq("athlete_id", post.author_id)
+      .eq("group_id", post.group_id)
+      .lte("logged_date", asOf.toISOString().slice(0, 10))
+      .order("logged_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const bodyweight = weightRow?.weight ?? null;
+
+    if (bodyweight != null) {
+      const exerciseNamesThisSession = Array.from(bestByExercise.keys());
+      const { data: priorSetRows } = await serviceClient
+        .from("set_logs")
+        .select(
+          "weight, reps, status, session_exercises!inner ( session_id, exercise_name, athlete_sessions!inner ( athlete_id ) )"
+        )
+        .in("session_exercises.exercise_name", exerciseNamesThisSession)
+        .eq("status", "completed");
+
+      const priorBestEst1RmByName = new Map<string, number>();
+      for (const row of (priorSetRows ?? []) as any[]) {
+        const sessionExercise = row.session_exercises;
+        if (sessionExercise.session_id === workoutLog.session_id) continue;
+        if (sessionExercise.athlete_sessions?.athlete_id !== post.author_id) continue;
+        if (row.weight == null || row.reps == null) continue;
+        const est = estimateOneRepMax(row.weight, row.reps);
+        const name = sessionExercise.exercise_name;
+        const current = priorBestEst1RmByName.get(name);
+        if (current == null || est > current) priorBestEst1RmByName.set(name, est);
+      }
+
+      for (const [name, best] of bestByExercise) {
+        const currentEst1Rm = estimateOneRepMax(best.weight, best.reps);
+        const milestone = computeRelativeStrengthMilestone(
+          currentEst1Rm,
+          priorBestEst1RmByName.get(name) ?? null,
+          bodyweight
+        );
+        if (milestone) {
+          relativeStrengthMilestones.push({
+            exerciseName: name,
+            multiple: milestone.multiple,
+            weight: best.weight,
+            reps: best.reps,
+          });
+        }
+      }
+    }
+  }
+
   return {
     authorId: post.author_id as string,
     groupId: post.group_id,
@@ -253,6 +327,7 @@ export async function getSharedWorkout(postId: string) {
     habitCompliancePct,
     prCountThisMonth,
     compoundCelebration,
+    relativeStrengthMilestones,
     topLifts,
     top5Candidates,
     selectedNames: post.shared_exercise_names ?? top5Candidates.slice(0, 3).map((l) => l.name),
