@@ -18,7 +18,8 @@ export async function getSharedMilestone(milestoneId: string) {
     .eq("id", milestoneId)
     .maybeSingle();
 
-  if (!event || event.milestone_type !== "reverse_diet") return null;
+  if (!event) return null;
+  if (event.milestone_type !== "reverse_diet" && event.milestone_type !== "recovery_volume") return null;
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -31,19 +32,36 @@ export async function getSharedMilestone(milestoneId: string) {
     .eq("id", event.group_id)
     .maybeSingle();
 
-  const detail = event.detail as {
-    calorieIncrease: number;
-    weightChangePct: number;
-    weeklyExpectedGainLbs: number;
-    windowWeeks: number;
-  };
+  const athleteName = profile?.full_name ?? "An athlete";
+  const groupName = group?.name ?? "The Enduring Strength Collective";
 
+  if (event.milestone_type === "reverse_diet") {
+    const detail = event.detail as {
+      calorieIncrease: number;
+      weightChangePct: number;
+      weeklyExpectedGainLbs: number;
+      windowWeeks: number;
+    };
+    return {
+      id: event.id,
+      milestoneType: "reverse_diet" as const,
+      athleteName,
+      groupName,
+      weeklyExpectedGainLbs: detail.weeklyExpectedGainLbs,
+      weightTrendedDown: detail.weightChangePct <= -1,
+      windowWeeks: detail.windowWeeks,
+      detectedAt: event.detected_at as string,
+    };
+  }
+
+  const detail = event.detail as { readinessChangePct: number; volumeChangePct: number; windowWeeks: number };
   return {
     id: event.id,
-    athleteName: profile?.full_name ?? "An athlete",
-    groupName: group?.name ?? "The Enduring Strength Collective",
-    weeklyExpectedGainLbs: detail.weeklyExpectedGainLbs,
-    weightTrendedDown: detail.weightChangePct <= -1,
+    milestoneType: "recovery_volume" as const,
+    athleteName,
+    groupName,
+    readinessChangePct: detail.readinessChangePct,
+    volumeChangePct: detail.volumeChangePct,
     windowWeeks: detail.windowWeeks,
     detectedAt: event.detected_at as string,
   };
