@@ -3,7 +3,10 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { NutritionTools } from "@/components/coach/desktop/nutrition-tools";
+import { WeeklyCheckinPanel } from "@/components/coach/desktop/weekly-checkin-panel";
 import { computeWeeklyWeightTrend } from "@/lib/weight-trend";
+import { computeReadinessAverage } from "@/lib/wellness";
+import type { NutritionPhase } from "@/lib/nutrition-checkin";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
@@ -135,6 +138,7 @@ export default async function NutritionPage(
     { data: todayMealPlan },
     { data: weightLogs },
     { data: macroHistory },
+    { data: latestCheckin },
   ] = await Promise.all([
     macrosEnabled
       ? supabase
@@ -167,6 +171,15 @@ export default async function NutritionPage(
           .gte("log_date", thirtyDaysAgoKey)
           .order("log_date", { ascending: true })
       : Promise.resolve({ data: [] }),
+    macrosEnabled
+      ? supabase
+          .from("nutrition_checkins")
+          .select("new_calories, protein_g, carbs_g, fat_g, rationale, created_at")
+          .eq("athlete_id", athleteId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   const todayMacros = macrosEnabled
@@ -229,10 +242,41 @@ export default async function NutritionPage(
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
               Weekly check-in
             </h2>
-            <p className="font-body text-sm text-steel border border-steel/20 p-4">
-              Your coach hasn&apos;t run a weekly check-in yet — once they do, the result and the
-              reasoning behind it will show up here.
-            </p>
+            {latestCheckin ? (
+              <div className="border border-steel/20 p-4 space-y-3">
+                <p className="font-body text-sm text-chalk">{latestCheckin.rationale}</p>
+                <div className="grid grid-cols-4 gap-2 text-center">
+                  <div>
+                    <p className="font-display text-lg leading-none">{latestCheckin.new_calories}</p>
+                    <p className="font-body text-[10px] text-steel uppercase mt-1">Kcal</p>
+                  </div>
+                  <div>
+                    <p className="font-display text-lg leading-none">{latestCheckin.protein_g}</p>
+                    <p className="font-body text-[10px] text-steel uppercase mt-1">Protein</p>
+                  </div>
+                  <div>
+                    <p className="font-display text-lg leading-none">{latestCheckin.carbs_g}</p>
+                    <p className="font-body text-[10px] text-steel uppercase mt-1">Carbs</p>
+                  </div>
+                  <div>
+                    <p className="font-display text-lg leading-none">{latestCheckin.fat_g}</p>
+                    <p className="font-body text-[10px] text-steel uppercase mt-1">Fat</p>
+                  </div>
+                </div>
+                <p className="font-body text-[11px] text-steel pt-2 border-t border-steel/15">
+                  {new Date(latestCheckin.created_at).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </p>
+              </div>
+            ) : (
+              <p className="font-body text-sm text-steel border border-steel/20 p-4">
+                Your coach hasn&apos;t run a weekly check-in yet — once they do, the result and the
+                reasoning behind it will show up here.
+              </p>
+            )}
           </section>
 
           <section>
@@ -259,35 +303,105 @@ export default async function NutritionPage(
 async function NutritionSection({ groupId, athleteId }: { groupId: string; athleteId: string }) {
   const supabase = await createServerClient();
   const todayKey = new Date().toISOString().slice(0, 10);
+  const sevenDaysAgoKey = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-  const { data: weightLogs } = await supabase
-    .from("body_weight_logs")
-    .select("id, logged_date, weight")
-    .eq("athlete_id", athleteId)
-    .eq("group_id", groupId)
-    .order("logged_date", { ascending: false })
-    .limit(20);
+  const [
+    { data: weightLogs },
+    { data: existingPlan },
+    { data: recentMacroRow },
+    { data: wellnessRows },
+    { data: lastCheckinRow },
+  ] = await Promise.all([
+    supabase
+      .from("body_weight_logs")
+      .select("id, logged_date, weight")
+      .eq("athlete_id", athleteId)
+      .eq("group_id", groupId)
+      .order("logged_date", { ascending: false })
+      .limit(20),
+    supabase
+      .from("meal_plans")
+      .select("archetype, meal_count, include_snack, carb_cycling, rationale, macros, meals")
+      .eq("athlete_id", athleteId)
+      .eq("log_date", todayKey)
+      .maybeSingle(),
+    supabase
+      .from("daily_macros")
+      .select("calories")
+      .eq("athlete_id", athleteId)
+      .order("log_date", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("wellness_checkins")
+      .select("sleep_quality, soreness, energy")
+      .eq("athlete_id", athleteId)
+      .eq("group_id", groupId)
+      .gte("log_date", sevenDaysAgoKey),
+    supabase
+      .from("nutrition_checkins")
+      .select("phase, consecutive_surplus_spikes, dietary_restrictions")
+      .eq("athlete_id", athleteId)
+      .eq("group_id", groupId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
   const weightTrend = computeWeeklyWeightTrend(
     (weightLogs ?? []).map((w) => ({ loggedDate: w.logged_date, weight: w.weight })),
     todayKey
   );
 
-  const { data: existingPlan } = await supabase
-    .from("meal_plans")
-    .select("archetype, meal_count, include_snack, carb_cycling, rationale, macros, meals")
-    .eq("athlete_id", athleteId)
-    .eq("log_date", todayKey)
-    .maybeSingle();
+  // A default recovery rating from the week's actual wellness check-ins
+  // (same readiness math already used for the low-readiness roster
+  // flag) so the coach isn't guessing a number from memory — still
+  // fully editable before running the check-in.
+  let defaultRecoveryRating: number | null = null;
+  if (wellnessRows && wellnessRows.length > 0) {
+    const avgReadiness =
+      wellnessRows.reduce(
+        (sum, w) =>
+          sum +
+          computeReadinessAverage({
+            sleepQuality: w.sleep_quality,
+            soreness: w.soreness,
+            energy: w.energy,
+          }),
+        0
+      ) / wellnessRows.length;
+    defaultRecoveryRating = Math.min(5, Math.max(1, Math.round(avgReadiness)));
+  }
+
+  const lastCheckin = lastCheckinRow
+    ? {
+        phase: lastCheckinRow.phase as NutritionPhase,
+        consecutiveSurplusSpikes: lastCheckinRow.consecutive_surplus_spikes,
+        dietaryRestrictions: lastCheckinRow.dietary_restrictions ?? "",
+      }
+    : null;
 
   return (
-    <NutritionTools
-      athleteId={athleteId}
-      groupId={groupId}
-      date={todayKey}
-      latestBodyWeight={weightLogs?.[0]?.weight ?? null}
-      weightTrend={weightTrend}
-      existingPlan={existingPlan ?? null}
-    />
+    <div className="space-y-8">
+      <WeeklyCheckinPanel
+        athleteId={athleteId}
+        groupId={groupId}
+        weekAvgWeight={weightTrend.currentAvg}
+        lastWeekAvgWeight={weightTrend.previousAvg}
+        defaultCurrentCalories={recentMacroRow?.calories ?? null}
+        defaultRecoveryRating={defaultRecoveryRating}
+        lastCheckin={lastCheckin}
+      />
+      <div className="pt-6 border-t border-steel/20">
+        <NutritionTools
+          athleteId={athleteId}
+          groupId={groupId}
+          date={todayKey}
+          latestBodyWeight={weightLogs?.[0]?.weight ?? null}
+          weightTrend={weightTrend}
+          existingPlan={existingPlan ?? null}
+        />
+      </div>
+    </div>
   );
 }

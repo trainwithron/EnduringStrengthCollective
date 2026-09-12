@@ -4,6 +4,8 @@ import {
   fillCarbsAndFat,
   estimateMaintenanceCalories,
   applyGoalAdjustment,
+  detectDietArchetype,
+  computeArchetypeMacros,
 } from "./macros";
 
 describe("estimateProteinFromBodyWeight", () => {
@@ -57,5 +59,47 @@ describe("applyGoalAdjustment", () => {
 
   it("adds 10% for a lean bulk", () => {
     expect(applyGoalAdjustment(2500, "lean_bulk")).toBe(2750);
+  });
+});
+
+describe("detectDietArchetype", () => {
+  it("detects carnivore from either phrasing", () => {
+    expect(detectDietArchetype("Carnivore diet")).toBe("carnivore");
+    expect(detectDietArchetype("prefers zero carb")).toBe("carnivore");
+  });
+
+  it("detects keto", () => {
+    expect(detectDietArchetype("strict keto")).toBe("keto");
+  });
+
+  it("falls back to standard for anything else, including vegan/vegetarian/paleo", () => {
+    expect(detectDietArchetype("vegan")).toBe("standard");
+    expect(detectDietArchetype("vegetarian, no shellfish")).toBe("standard");
+    expect(detectDietArchetype("paleo")).toBe("standard");
+    expect(detectDietArchetype(null)).toBe("standard");
+    expect(detectDietArchetype("")).toBe("standard");
+  });
+});
+
+describe("computeArchetypeMacros", () => {
+  it("computes the standard split with both floors respected", () => {
+    const result = computeArchetypeMacros(2000, 180, "standard");
+    expect(result).toEqual({ proteinG: 180, carbsG: 194, fatG: 56, resolvedCalories: 2000 });
+  });
+
+  it("fixes carbs at 25g for keto, filling fat with the remainder", () => {
+    const result = computeArchetypeMacros(2000, 180, "keto");
+    expect(result).toEqual({ proteinG: 180, carbsG: 25, fatG: 131, resolvedCalories: 1999 });
+  });
+
+  it("zeroes carbs for carnivore, filling fat with the remainder", () => {
+    const result = computeArchetypeMacros(2000, 180, "carnivore");
+    expect(result).toEqual({ proteinG: 180, carbsG: 0, fatG: 142, resolvedCalories: 1998 });
+  });
+
+  it("respects the 45g fat floor and 50g carb floor even at very low calories", () => {
+    const result = computeArchetypeMacros(1200, 220, "standard");
+    expect(result.fatG).toBeGreaterThanOrEqual(45);
+    expect(result.carbsG).toBeGreaterThanOrEqual(50);
   });
 });

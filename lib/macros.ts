@@ -63,3 +63,57 @@ const GOAL_ADJUSTMENT_PCT: Record<MacroGoal, number> = {
 export function applyGoalAdjustment(maintenanceCalories: number, goal: MacroGoal): number {
   return Math.round(maintenanceCalories * (1 + GOAL_ADJUSTMENT_PCT[goal]));
 }
+
+// Ported from enduring_strength_fixed_1.html's runCheckInEngine() macro
+// split — protein locks to 1g/lb bodyweight regardless of archetype;
+// only carbs/fat branch. Kept in this file (not a second macro-math
+// module) per the nutrition check-in engine's own scoping note: this
+// extends the existing Smart Macro Fill math rather than duplicating it.
+export type DietArchetype = "keto" | "carnivore" | "standard";
+
+// The source tool's detectArchetype() also recognizes vegan/vegetarian/
+// paleo, but those only ever affect food *suggestions* elsewhere in that
+// tool — its own macro-split math treats every archetype other than
+// keto/carnivore identically (the "standard" branch below), so this
+// port only distinguishes the three buckets that actually change the
+// calorie math.
+export function detectDietArchetype(dietaryRestrictionsText: string | null | undefined): DietArchetype {
+  const t = (dietaryRestrictionsText ?? "").toLowerCase();
+  if (t.includes("carnivore") || t.includes("zero carb")) return "carnivore";
+  if (t.includes("keto")) return "keto";
+  return "standard";
+}
+
+export interface ArchetypeMacroSplit {
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  // The real total after rounding each macro to a whole gram — can
+  // differ slightly from the input `calories` target, same as the
+  // source tool's own resolvedBaseCals.
+  resolvedCalories: number;
+}
+
+export function computeArchetypeMacros(
+  calories: number,
+  bodyWeightLbs: number,
+  archetype: DietArchetype
+): ArchetypeMacroSplit {
+  const proteinG = estimateProteinFromBodyWeight(bodyWeightLbs);
+  let carbsG: number;
+  let fatG: number;
+
+  if (archetype === "carnivore") {
+    carbsG = 0;
+    fatG = Math.round((calories - proteinG * 4) / 9);
+  } else if (archetype === "keto") {
+    carbsG = 25;
+    fatG = Math.round((calories - proteinG * 4 - 25 * 4) / 9);
+  } else {
+    fatG = Math.max(45, Math.round((calories * 0.25) / 9));
+    carbsG = Math.max(50, Math.round((calories - proteinG * 4 - fatG * 9) / 4));
+  }
+
+  const resolvedCalories = proteinG * 4 + carbsG * 4 + fatG * 9;
+  return { proteinG, carbsG, fatG, resolvedCalories };
+}
