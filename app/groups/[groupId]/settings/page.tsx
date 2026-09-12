@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
@@ -115,9 +116,22 @@ export default async function SettingsPage(
         </div>
       </section>
 
-      <section className="px-5 pt-8">
-        <div className="pb-4 border-b border-steel/20">
-          <p className="font-body text-sm mb-3">About you</p>
+      <section className="px-5 pt-8 space-y-6">
+        {isCoach && (
+          <SettingsGroup label="Coaching" highlight>
+            <Link
+              href={`/groups/${params.groupId}/dashboard`}
+              className="font-body text-sm font-bold text-rust"
+            >
+              Coach Dashboard →
+            </Link>
+            <p className="font-body text-xs text-steel mt-1">
+              Programs, clients, business tools — the full site.
+            </p>
+          </SettingsGroup>
+        )}
+
+        <SettingsGroup label="Profile">
           <ProfileDetailsEditor
             athleteId={athleteId}
             initial={{
@@ -128,83 +142,98 @@ export default async function SettingsPage(
               emergencyContactPhone: profileDetails?.emergency_contact_phone ?? "",
             }}
           />
-        </div>
-        <div className="pb-4 border-b border-steel/20 pt-4">
-          <PushNotificationToggle />
-        </div>
-        <div className="pb-4 border-b border-steel/20 pt-4">
-          <WearablePlaceholder
-            groupId={params.groupId}
-            ouraConnected={!!ouraConnection}
-            ouraStatus={(ouraConnection?.status as "active" | "revoked" | "error" | undefined) ?? null}
-            ouraError={searchParams.oura_error ?? null}
-          />
-        </div>
+        </SettingsGroup>
+
+        <SettingsGroup label="Notifications & Devices">
+          <div className="pb-4 border-b border-steel/20">
+            <PushNotificationToggle />
+          </div>
+          <div className="pt-4">
+            <WearablePlaceholder
+              groupId={params.groupId}
+              ouraConnected={!!ouraConnection}
+              ouraStatus={(ouraConnection?.status as "active" | "revoked" | "error" | undefined) ?? null}
+              ouraError={searchParams.oura_error ?? null}
+            />
+          </div>
+        </SettingsGroup>
+
         {!isCoach && (
-          <div className="pb-4 border-b border-steel/20 pt-4">
-            <p className="font-body text-sm mb-3">Billing</p>
+          <SettingsGroup label="Billing">
             <PackagePicker packages={packages} />
             <div className="mt-3">
               <ManageBillingLink />
             </div>
-          </div>
+          </SettingsGroup>
         )}
-        <div className="border-t border-steel/20 pt-4">
-          <Link
-            href={`/groups/${params.groupId}/tools/one-rep-max`}
-            className="font-body text-sm text-rust"
-          >
-            1RM Calculator
-          </Link>
-        </div>
-        <div className="border-t border-steel/20 pt-4 mt-4">
-          <Link
-            href={`/groups/${params.groupId}/tools/macro-calculator`}
-            className="font-body text-sm text-rust"
-          >
-            Macro Calculator
-          </Link>
-        </div>
-        <div className="border-t border-steel/20 pt-4 mt-4">
-          <Link href="/partners" className="font-body text-sm text-rust">
-            Find a training partner →
-          </Link>
-        </div>
-        <div className="border-t border-steel/20 pt-4 mt-4">
-          <Link
-            href={`/groups/${params.groupId}/resources`}
-            className="font-body text-sm text-rust"
-          >
-            Resources
-          </Link>
-        </div>
-        {isCoach && (
-          <div className="border-t border-steel/20 pt-4 mt-4">
+
+        <SettingsGroup label="Tools & Community">
+          <div className="space-y-3">
             <Link
-              href={`/groups/${params.groupId}/dashboard`}
-              className="font-body text-sm text-rust"
+              href={`/groups/${params.groupId}/tools/one-rep-max`}
+              className="block font-body text-sm text-rust"
             >
-              Coach Dashboard &rarr;
+              1RM Calculator
             </Link>
-            <p className="font-body text-xs text-steel mt-1">
-              Programs, clients, business tools — the full site.
-            </p>
+            <Link
+              href={`/groups/${params.groupId}/tools/macro-calculator`}
+              className="block font-body text-sm text-rust"
+            >
+              Macro Calculator
+            </Link>
+            <Link href="/partners" className="block font-body text-sm text-rust">
+              Find a training partner →
+            </Link>
+            <Link
+              href={`/groups/${params.groupId}/resources`}
+              className="block font-body text-sm text-rust"
+            >
+              Resources
+            </Link>
           </div>
-        )}
+        </SettingsGroup>
+
         {!isCoach && !effective.isActingAsOther && (
-          <div className="border-t border-steel/20 pt-4 mt-4 space-y-3">
-            <p className="font-body text-sm">Your data</p>
-            <ExportDataButton />
-            <DeleteAccountButton />
-          </div>
+          <SettingsGroup label="Your Data">
+            <div className="space-y-3">
+              <ExportDataButton />
+              <DeleteAccountButton />
+            </div>
+          </SettingsGroup>
         )}
-        <div className="border-t border-steel/20 pt-4 mt-4">
+
+        <div className="pt-2 pb-4">
           <SignOutButton />
         </div>
       </section>
 
       <BottomTabBar groupId={params.groupId} activeOverride="settings" />
     </main>
+  );
+}
+
+function SettingsGroup({
+  label,
+  highlight,
+  children,
+}: {
+  label: string;
+  highlight?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div>
+      <p className="font-body text-[10px] font-bold uppercase tracking-wide text-rust mb-2">
+        {label}
+      </p>
+      <div
+        className={`border rounded-lg p-4 ${
+          highlight ? "border-rust/40 bg-surface/60" : "border-steel/20 bg-surface/30"
+        }`}
+      >
+        {children}
+      </div>
+    </div>
   );
 }
 
