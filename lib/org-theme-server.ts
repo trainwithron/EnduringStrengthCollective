@@ -26,12 +26,31 @@ export async function getViewerOrgTheme(): Promise<OrgTheme> {
       .eq("profile_id", user.id)
       .limit(1)
       .maybeSingle();
-    if (!membership) return DEFAULT_ORG_THEME;
+
+    // Athletes never get an organization_memberships row (that table is
+    // org *staff* — coaches/owners — not clients), so this falls back to
+    // deriving the org through whichever group they're actually in, the
+    // same path app/intake/page.tsx already uses for the waiver. Without
+    // this, every real athlete silently got the platform default theme
+    // instead of their own coach's branding — see migration
+    // 0127_org_branding_visible_to_athletes.sql for the matching RLS fix
+    // this depends on.
+    let organizationId = membership?.organization_id ?? null;
+    if (!organizationId) {
+      const { data: groupMembership } = await supabase
+        .from("group_memberships")
+        .select("groups ( organization_id )")
+        .eq("profile_id", user.id)
+        .limit(1)
+        .maybeSingle();
+      organizationId = (groupMembership as any)?.groups?.organization_id ?? null;
+    }
+    if (!organizationId) return DEFAULT_ORG_THEME;
 
     const { data: org } = await supabase
       .from("organizations")
       .select("name, button_shape, accent_color, background_color, text_color, font_display, font_body, logo_url, app_icon_url")
-      .eq("id", membership.organization_id)
+      .eq("id", organizationId)
       .maybeSingle();
     if (!org) return DEFAULT_ORG_THEME;
 
