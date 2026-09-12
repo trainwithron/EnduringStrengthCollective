@@ -27,6 +27,7 @@ import {
   Home,
   MonitorPlay,
   Activity,
+  CalendarClock,
 } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
@@ -301,33 +302,30 @@ export function CoachDesktopShell({
     setMobileNavOpen(false);
   }, [active]);
 
+  // Regrouped by function (Run my day / Build / Business / Engage)
+  // instead of the order features happened to get built in — see the
+  // "Reorganize the coach desktop sidebar" pass. Home itself lives
+  // outside this array entirely (rendered as its own fixed link above
+  // GroupSwitcher below) — it's already the flattest, first-reached
+  // item, which is exactly what "Run my day" wants for it.
   const nav: NavEntry[] = [
+    // Run my day — the highest-frequency items, flat, no group/extra
+    // click to reach any of them. Team Performance sits right next to
+    // Dashboard (not folded into a new group) since it's a light,
+    // roster-wide insights page every coach can use, not just team-mode
+    // groups — gating it behind a group would hide something that's
+    // reachable today for anyone who isn't running a team sport.
     { key: "dashboard", label: "Dashboard", href: `/groups/${groupId}/dashboard`, icon: LayoutDashboard },
     { key: "team-performance", label: "Team Performance", href: `/groups/${groupId}/team-performance`, icon: Activity },
-    {
-      label: "Business",
-      icon: TrendingUp,
-      items: [
-        { key: "business", label: "Overview", href: `/groups/${groupId}/business`, icon: TrendingUp },
-        { key: "packages", label: "Packages", href: `/groups/${groupId}/business/packages`, icon: Layers },
-        { key: "waiver", label: "Waiver", href: `/groups/${groupId}/business/waiver`, icon: ClipboardList },
-        { key: "support", label: "Support", href: `/groups/${groupId}/business/support`, icon: HeartHandshake },
-        { key: "branding", label: "Organization", href: `/groups/${groupId}/branding`, icon: Palette },
-      ],
-    },
     { key: "clients", label: "Clients", href: `/groups/${groupId}/clients`, icon: Users, badge: clientsUnread },
-    ...(teamMode
-      ? [
-          {
-            label: "Team",
-            icon: ClipboardList,
-            items: [
-              { key: "team" as const, label: "Depth Chart", href: `/groups/${groupId}/team`, icon: ClipboardList },
-              { key: "team-calendar" as const, label: "Team Calendar", href: `/groups/${groupId}/team/calendar`, icon: CalendarDays },
-            ],
-          },
-        ]
-      : []),
+    { key: "feed", label: "Team Feed", href: `/groups/${groupId}/feed`, icon: MessagesSquare, badge: feedUnread },
+    { key: "calendar", label: "Calendar", href: `/groups/${groupId}/calendar`, icon: CalendarDays },
+
+    // Build — creation/authoring tools, kept as their own adjacent
+    // collapsible groups (not merged into one literal "Build" super-
+    // group) so this reuses the exact same NavGroup shape/behavior
+    // already proven for Business, rather than inventing nested
+    // sub-sections the component doesn't support today.
     {
       label: "Programming",
       icon: LayoutGrid,
@@ -344,10 +342,45 @@ export function CoachDesktopShell({
         { key: "nutrition", label: "Meal Plans", href: `/groups/${groupId}/nutrition`, icon: Salad },
       ],
     },
-    { key: "calendar", label: "Calendar", href: `/groups/${groupId}/calendar`, icon: CalendarDays },
-    { key: "feed", label: "Team Feed", href: `/groups/${groupId}/feed`, icon: MessagesSquare, badge: feedUnread },
-    { key: "challenges", label: "Challenges", href: `/groups/${groupId}/challenges`, icon: Flag },
-    { key: "resources", label: "Resources", href: `/groups/${groupId}/resources`, icon: HeartHandshake },
+    ...(teamMode
+      ? [
+          {
+            label: "Team",
+            icon: ClipboardList,
+            items: [
+              { key: "team" as const, label: "Depth Chart", href: `/groups/${groupId}/team`, icon: ClipboardList },
+              { key: "team-calendar" as const, label: "Team Calendar", href: `/groups/${groupId}/team/calendar`, icon: CalendarDays },
+            ],
+          },
+        ]
+      : []),
+
+    // Business — unchanged, plus Availability (real bug fix: this route
+    // existed with no nav entry anywhere, reachable only by typing the
+    // URL directly).
+    {
+      label: "Business",
+      icon: TrendingUp,
+      items: [
+        { key: "business", label: "Overview", href: `/groups/${groupId}/business`, icon: TrendingUp },
+        { key: "packages", label: "Packages", href: `/groups/${groupId}/business/packages`, icon: Layers },
+        { key: "waiver", label: "Waiver", href: `/groups/${groupId}/business/waiver`, icon: ClipboardList },
+        { key: "availability", label: "Availability", href: `/groups/${groupId}/availability`, icon: CalendarClock },
+        { key: "support", label: "Support", href: `/groups/${groupId}/business/support`, icon: HeartHandshake },
+        { key: "branding", label: "Organization", href: `/groups/${groupId}/branding`, icon: Palette },
+      ],
+    },
+
+    // Engage — lighter, occasional-use surfaces, no longer sitting
+    // between Team Feed and Calendar the way they used to.
+    {
+      label: "Engage",
+      icon: Flag,
+      items: [
+        { key: "challenges", label: "Challenges", href: `/groups/${groupId}/challenges`, icon: Flag },
+        { key: "resources", label: "Resources", href: `/groups/${groupId}/resources`, icon: HeartHandshake },
+      ],
+    },
   ];
 
   const groupHasActiveChild = (group: NavGroup) => group.items.some((i) => i.key === active);
