@@ -3,10 +3,17 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Dumbbell, MessagesSquare, Settings, Calendar } from "lucide-react";
+import { Home, Dumbbell, MessagesSquare, Settings, Apple } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 
-type TabKey = "home" | "workout" | "feed" | "calendar" | "settings";
+// "calendar" stays a valid override value even though it's no longer a
+// rendered tab (Home's Day/Week/Month switcher absorbed it — see
+// [[athlete_home_calendar_redesign]]) — the still-reachable booking
+// pages (app/groups/[groupId]/calendar/**) pass it as their
+// activeOverride, and simply highlighting nothing is the honest,
+// zero-risk outcome for a page that isn't one of the 5 real tabs
+// anymore, without having to touch that separate booking flow here.
+type TabKey = "home" | "workout" | "feed" | "calendar" | "nutrition" | "settings";
 
 // The session page (`/sessions/[sessionId]`) has no groupId in its URL, so
 // it can't be matched by pathname here — it passes `activeOverride`
@@ -70,6 +77,8 @@ export function BottomTabBar({
       ? "calendar"
       : pathname.startsWith(`/groups/${groupId}/settings`)
       ? "settings"
+      : pathname.startsWith(`/groups/${groupId}/nutrition`)
+      ? "nutrition"
       : "home");
 
   const tabs: { key: TabKey; label: string; href: string; icon: typeof Home }[] = [
@@ -78,7 +87,7 @@ export function BottomTabBar({
     ...(hideFeed
       ? []
       : [{ key: "feed" as const, label: "Feed", href: `/groups/${groupId}/feed`, icon: MessagesSquare }]),
-    { key: "calendar", label: "Calendar", href: `/groups/${groupId}/calendar`, icon: Calendar },
+    { key: "nutrition", label: "Nutrition", href: `/groups/${groupId}/nutrition`, icon: Apple },
     { key: "settings", label: "Settings", href: `/groups/${groupId}/settings`, icon: Settings },
   ];
 
