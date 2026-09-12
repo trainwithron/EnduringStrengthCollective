@@ -9,6 +9,7 @@ import { PrivateFromOrgToggle } from "@/components/coach/private-from-org-toggle
 import { ChangeClientGroupControl } from "@/components/coach/change-client-group-control";
 import { ClientProgrammingMenu } from "@/components/coach/client-programming-menu";
 import { MinorConsentControl } from "@/components/coach/minor-consent-control";
+import { ParQAnswersPanel } from "@/components/coach/par-q-answers-panel";
 import { isUnder13 } from "@/lib/coppa";
 import { CoachLoggedBadge } from "@/components/coach-logged-badge";
 import { NutritionTools } from "@/components/coach/desktop/nutrition-tools";
@@ -140,12 +141,13 @@ export default async function AthleteProfilePage(
     .eq("group_id", params.groupId)
     .maybeSingle();
 
-  const { data: intakeDob } = await supabase
+  const { data: intake } = await supabase
     .from("client_intake")
-    .select("date_of_birth")
+    .select("date_of_birth, par_q_answers, waiver_accepted, waiver_signed_name, completed_at")
     .eq("athlete_id", params.athleteId)
     .maybeSingle();
-  const isMinor = !!intakeDob?.date_of_birth && isUnder13(intakeDob.date_of_birth, new Date());
+  const isMinor = !!intake?.date_of_birth && isUnder13(intake.date_of_birth, new Date());
+  const parQAnswers = (intake?.par_q_answers as { question: string; answer: boolean }[]) ?? [];
 
   const { data: minorConsentRow } = isMinor
     ? await supabase
@@ -554,6 +556,12 @@ export default async function AthleteProfilePage(
                   />
                 </div>
               </div>
+            </section>
+          )}
+
+          {parQAnswers.length > 0 && (
+            <section>
+              <ParQAnswersPanel answers={parQAnswers} />
             </section>
           )}
 
