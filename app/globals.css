@@ -29,7 +29,12 @@
 }
 
 :root {
-  --graphite: #1C1B1A;
+  /* Space-separated R G B (not hex) — required so Tailwind's
+     rgb(var(--x) / <alpha-value>) pattern in tailwind.config.ts can
+     apply opacity modifiers (bg-graphite/95, etc.) to these themeable
+     colors. A hex string in a CSS var can't be combined with Tailwind's
+     alpha-value substitution at all. */
+  --graphite: 28 27 26; /* #1C1B1A */
   --surface: #262422;
   /* Nudged from #C4622D — the original failed WCAG AA contrast (4.5:1)
      both as button text-on-background and as accent text on the dark
@@ -37,8 +42,8 @@
      to the platform default only — a coach who overrides this via their
      own branding isn't automatically contrast-checked (see WCAG audit
      notes). */
-  --rust: #D2703B;
-  --chalk: #EDE8E0;
+  --rust: 210 112 59; /* #D2703B */
+  --chalk: 237 232 224; /* #EDE8E0 */
   --steel: #908B7E;
   --moss: #6B8F71;
   --font-display: "Barlow Condensed";
@@ -55,8 +60,8 @@
 }
 
 body {
-  background-color: var(--graphite);
-  color: var(--chalk);
+  background-color: rgb(var(--graphite));
+  color: rgb(var(--chalk));
   position: relative;
 }
 
@@ -66,7 +71,7 @@ body {
    page paints its own opaque bg-graphite <main>, which would otherwise
    hide anything set on body alone. */
 .bg-graphite {
-  background-color: var(--graphite);
+  background-color: rgb(var(--graphite));
   background-image:
     radial-gradient(ellipse 1200px 700px at 20% -10%, rgba(196, 98, 45, 0.05), transparent 60%),
     radial-gradient(ellipse 900px 600px at 100% 30%, rgba(107, 143, 113, 0.04), transparent 55%);

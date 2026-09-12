@@ -9,14 +9,19 @@ export default {
   theme: {
     extend: {
       colors: {
-        // rust/graphite reference CSS custom properties (defaulted in
-        // globals.css's :root) so the coach desktop shell can override
-        // them locally per-coach for branding, without touching every
-        // component that uses bg-rust/text-graphite/etc.
-        graphite: "var(--graphite)",
+        // rust/graphite/chalk reference CSS custom properties (defaulted
+        // in globals.css's :root, storing space-separated "R G B" — not
+        // a hex string) so the coach desktop shell can override them
+        // locally per-coach for branding, without touching every
+        // component that uses bg-rust/text-graphite/etc. The
+        // rgb(var(--x) / <alpha-value>) form is required for opacity
+        // modifiers (bg-graphite/95, text-rust/60, etc.) to work at
+        // all — a plain var(--x) reference can't be combined with
+        // Tailwind's alpha-value substitution.
+        graphite: "rgb(var(--graphite) / <alpha-value>)",
         surface: "#262422",
-        rust: "var(--rust)",
-        chalk: "var(--chalk)",
+        rust: "rgb(var(--rust) / <alpha-value>)",
+        chalk: "rgb(var(--chalk) / <alpha-value>)",
         // Nudged from #8A8578 — the original failed WCAG AA contrast
         // (4.2:1) against the surface card background; this clears 4.5:1
         // there while reading as visually identical at a glance.

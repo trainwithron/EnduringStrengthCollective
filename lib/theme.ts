@@ -92,6 +92,22 @@ export const DEFAULT_ORG_THEME: OrgTheme = {
   orgName: null,
 };
 
+// tailwind.config.ts's graphite/rust/chalk colors read these CSS vars
+// through Tailwind's `rgb(var(--x) / <alpha-value>)` pattern — the only
+// way a CSS-variable-backed theme color can still support opacity
+// modifiers like bg-rust/50 (a bare hex string in a var() can't be
+// combined with Tailwind's alpha-value substitution at all; every
+// bg-graphite/NN-style utility across the app silently generated no
+// CSS whatsoever until this was in "R G B" form). So the vars themselves
+// store space-separated R G B channels, not a hex string — this
+// converts whatever hex a coach picked (or a default) into that form.
+function hexToRgbTriplet(hex: string): string {
+  const match = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!match) return "0 0 0";
+  const n = parseInt(match[1], 16);
+  return `${(n >> 16) & 255} ${(n >> 8) & 255} ${n & 255}`;
+}
+
 // The single place that turns an OrgTheme into the CSS custom properties
 // globals.css/tailwind.config.ts read (--rust/--graphite/--chalk/
 // --font-display/--font-body/--btn-radius) — applied at the app root so
@@ -100,9 +116,9 @@ export const DEFAULT_ORG_THEME: OrgTheme = {
 export function orgThemeToCssVars(theme: OrgTheme): CSSProperties {
   const scale = radiusScaleFor(theme.buttonShape);
   return {
-    "--rust": theme.accentColor,
-    "--graphite": theme.backgroundColor,
-    "--chalk": theme.textColor,
+    "--rust": hexToRgbTriplet(theme.accentColor),
+    "--graphite": hexToRgbTriplet(theme.backgroundColor),
+    "--chalk": hexToRgbTriplet(theme.textColor),
     "--font-display": `"${theme.fontDisplay}"`,
     "--font-body": `"${theme.fontBody}"`,
     "--btn-radius": BUTTON_SHAPE_RADIUS[theme.buttonShape],
