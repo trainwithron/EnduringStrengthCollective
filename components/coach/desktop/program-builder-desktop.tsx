@@ -35,6 +35,8 @@ export function ProgramBuilderDesktop({
   initialTrainingDays: number[] | null;
   initialVisibilityWindow: VisibilityWindow;
 }) {
+  const [name, setName] = useState(programName);
+  const [lastSavedName, setLastSavedName] = useState(programName);
   const [days, setDays] = useState<BuilderDay[]>(initialDays);
   const [startDate, setStartDate] = useState(initialStartDate);
   const [trainingDays, setTrainingDays] = useState(initialTrainingDays);
@@ -115,13 +117,45 @@ export function ProgramBuilderDesktop({
   const weekNumbers = Array.from(new Set(days.map((d) => d.weekNumber))).sort((a, b) => a - b);
   const nextWeekNumber = weekNumbers.length > 0 ? Math.max(...weekNumbers) + 1 : 1;
 
+  async function handleNameBlur() {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setName(lastSavedName);
+      return;
+    }
+    if (trimmed === lastSavedName) return;
+    const supabase = createBrowserClient();
+    const { error } = await supabase.from("programs").update({ name: trimmed }).eq("id", programId);
+    if (error) {
+      flashSaveError("Couldn't rename this program — try again.");
+      setName(lastSavedName);
+    } else {
+      setLastSavedName(trimmed);
+      setName(trimmed);
+      flashSaved();
+    }
+  }
+
   return (
     <div>
       <SaveToast />
       <div className="pb-6 border-b border-steel/20 mb-6">
         <div className="flex items-start justify-between gap-3">
-          <h1 className="font-display font-bold text-3xl uppercase leading-none">{programName}</h1>
-          <ProgramCardMenu programId={programId} programName={programName} groupId={groupId} />
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={handleNameBlur}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                e.currentTarget.blur();
+              }
+            }}
+            aria-label="Program name"
+            className="flex-1 bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-rust font-display font-bold text-3xl uppercase leading-none text-chalk"
+          />
+          <ProgramCardMenu programId={programId} programName={name} groupId={groupId} />
         </div>
         {programDescription && (
           <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">{programDescription}</p>
