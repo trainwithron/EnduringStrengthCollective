@@ -4,6 +4,30 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Recap & Up Next's card-swap reveal (components/coach/desktop/recap-and-up-next.tsx)
+   — a discrete click shrinks today's recap into a pinned header and pops
+   the next-workout card in from below with a springy overshoot, per the
+   coach's own decision after comparing this against scroll-to-reveal
+   (rejected: only a discrete click supports this bounce). */
+@keyframes recap-card-bounce-in {
+  0% {
+    opacity: 0;
+    transform: translateY(24px) scale(0.96);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.recap-bounce-in {
+  animation: recap-card-bounce-in 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
 :root {
   --graphite: #1C1B1A;
   --surface: #262422;
