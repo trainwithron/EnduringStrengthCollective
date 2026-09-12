@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { computeNewlyCrossedThresholds } from "@/lib/transformation-milestones";
 
 export interface WeightLogEntry {
   id: string;
@@ -32,21 +34,99 @@ export function WeightLogWidget({
   // on tap; a coach who wants a real cadence just assigns a "Log body
   // weight" habit instead, no new code needed for that.
   const [expanded, setExpanded] = useState(false);
+  // Transformation Cards — a real, newly-crossed weight-loss milestone.
+  // Detection is fully automated (right here, the instant a new weight
+  // is logged); actually generating/sharing a card stays the athlete's
+  // own choice via the "Create a card" link below, never auto-published.
+  const [newMilestone, setNewMilestone] = useState<{ id: string; thresholdLbs: number } | null>(null);
 
   const todayLog = logs.find((l) => l.loggedDate === todayIso());
 
+  async function checkTransformationMilestone(currentWeight: number) {
+    const supabase = createBrowserClient();
+    const { data: firstEntry } = await supabase
+      .from("body_weight_logs")
+      .select("weight")
+      .eq("athlete_id", athleteId)
+      .eq("group_id", groupId)
+      .order("logged_date", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (!firstEntry) return;
+
+    const totalLossLbs = firstEntry.weight - currentWeight;
+    if (totalLossLbs <= 0) return;
+
+    const { data: seenRows } = await supabase
+      .from("transformation_milestones")
+      .select("threshold_lbs")
+      .eq("athlete_id", athleteId)
+      .eq("group_id", groupId);
+    const seen = new Set((seenRows ?? []).map((r) => r.threshold_lbs));
+    const newly = computeNewlyCrossedThresholds(totalLossLbs, seen);
+    if (newly.length === 0) return;
+
+    // A logging gap (or a real sudden jump) can cross several tiers at
+    // once — mark all of them seen so none silently re-fires later, but
+    // only ever prompt about the highest one reached this check-in.
+    const highest = Math.max(...newly);
+    const { data: inserted } = await supabase
+      .from("transformation_milestones")
+      .insert(
+        newly.map((t) => ({
+          athlete_id: athleteId,
+          group_id: groupId,
+          threshold_lbs: t,
+          starting_weight: firstEntry.weight,
+          current_weight: currentWeight,
+        }))
+      )
+      .select("id, threshold_lbs");
+
+    const highestRow = (inserted ?? []).find((r) => r.threshold_lbs === highest);
+    if (highestRow) {
+      setNewMilestone({ id: highestRow.id, thresholdLbs: highest });
+    }
+  }
+
+  const milestoneBanner = newMilestone && (
+    <div className="border border-rust/40 bg-rust/5 p-3 mb-3">
+      <p className="font-body text-sm text-chalk">
+        🎉 You&apos;ve hit a real milestone — down {newMilestone.thresholdLbs}+ lbs since you started!
+      </p>
+      <div className="flex items-center gap-3 mt-2">
+        <Link
+          href={`/groups/${groupId}/transformation/new?milestone=${newMilestone.id}`}
+          className="font-body text-xs text-rust font-medium"
+        >
+          Create a card →
+        </Link>
+        <button
+          type="button"
+          onClick={() => setNewMilestone(null)}
+          className="font-body text-xs text-steel"
+        >
+          Not now
+        </button>
+      </div>
+    </div>
+  );
+
   if (!expanded) {
     return (
-      <button
-        type="button"
-        onClick={() => setExpanded(true)}
-        className="w-full border border-steel/20 p-4 flex items-center justify-between text-left"
-      >
-        <span className="font-body text-sm text-chalk">
-          {todayLog ? `Today's weight: ${todayLog.weight} lbs` : "Log today's weight"}
-        </span>
-        <span className="font-body text-xs text-rust">{todayLog ? "Update" : "Log"}</span>
-      </button>
+      <div>
+        {milestoneBanner}
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="w-full border border-steel/20 p-4 flex items-center justify-between text-left"
+        >
+          <span className="font-body text-sm text-chalk">
+            {todayLog ? `Today's weight: ${todayLog.weight} lbs` : "Log today's weight"}
+          </span>
+          <span className="font-body text-xs text-rust">{todayLog ? "Update" : "Log"}</span>
+        </button>
+      </div>
     );
   }
 
@@ -82,10 +162,12 @@ export function WeightLogWidget({
     setWeight("");
     setSubmitting(false);
     setExpanded(false);
+    await checkTransformationMilestone(data.weight);
   }
 
   return (
     <div className="border border-steel/20 p-4">
+      {milestoneBanner}
       <div className="flex items-center justify-between mb-3">
         <h2 className="font-display uppercase text-sm tracking-wide text-steel">Body weight</h2>
         <button

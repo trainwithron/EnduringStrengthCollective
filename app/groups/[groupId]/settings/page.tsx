@@ -201,6 +201,12 @@ export default async function SettingsPage(
               Share my progress →
             </Link>
             <Link
+              href={`/groups/${params.groupId}/progress-photos`}
+              className="block font-body text-sm text-rust"
+            >
+              My progress photos →
+            </Link>
+            <Link
               href={`/groups/${params.groupId}/resources`}
               className="block font-body text-sm text-rust"
             >

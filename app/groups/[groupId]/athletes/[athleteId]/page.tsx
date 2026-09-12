@@ -154,6 +154,26 @@ export default async function AthleteProfilePage(
     .eq("group_id", params.groupId)
     .maybeSingle();
 
+  // Transformation Cards — only the specific photos this athlete has
+  // explicitly chosen to share, never the full private journal. RLS
+  // already enforces this (progress_photos_select_own_or_shared), this
+  // query just matches that same filter explicitly.
+  const { data: sharedPhotoRows } = await supabase
+    .from("progress_photos")
+    .select("id, storage_path, taken_date")
+    .eq("athlete_id", params.athleteId)
+    .eq("group_id", params.groupId)
+    .eq("shared_with_coach", true)
+    .order("taken_date", { ascending: false });
+  const sharedPhotos = await Promise.all(
+    (sharedPhotoRows ?? []).map(async (p) => {
+      const { data: signed } = await supabase.storage
+        .from("progress-photos")
+        .createSignedUrl(p.storage_path, 3600);
+      return { id: p.id, takenDate: p.taken_date, signedUrl: signed?.signedUrl ?? null };
+    })
+  );
+
   // Category 2 (Milestone Celebrations) — a live "does the trend
   // actually match the tagged goal" read, computed fresh on every page
   // load rather than waiting for the weekly cron. Only queried when a
@@ -542,6 +562,34 @@ export default async function AthleteProfilePage(
               </div>
             )}
           </section>
+
+          {sharedPhotos.length > 0 && (
+            <section>
+              <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+                Progress Photos Shared With You
+              </h2>
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                {sharedPhotos.map((photo) => (
+                  <div key={photo.id}>
+                    {photo.signedUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={photo.signedUrl}
+                        alt=""
+                        className="w-full aspect-square object-cover"
+                      />
+                    )}
+                    <p className="font-body text-[10px] text-steel mt-1">
+                      {new Date(`${photo.takenDate}T00:00:00`).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           {(activeHabits.length > 0 || daysWithMacroTarget > 0) && (
             <section>
