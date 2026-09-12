@@ -62,6 +62,12 @@ export interface SetLogEntry {
   // grayed-out placeholder in the logging UI, accepted via swipe/tap;
   // never auto-committed the way a coach-set target_weight already is.
   suggestedWeight?: number | null;
+  // True once the athlete has explicitly committed a weight value this
+  // set (typed it, or accepted a suggestion) — false for a program's own
+  // pre-fill, which lands in this same `weight` column but was never a
+  // real attempt. The obstacle-unlock mechanic (lib/obstacle-unlock.ts)
+  // requires this before a set's weight/reps can ever clear the goal.
+  weightConfirmed?: boolean;
 }
 
 export interface SessionExerciseEntry {

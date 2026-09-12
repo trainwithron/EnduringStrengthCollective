@@ -110,11 +110,35 @@ function GridCell({
         : `${suggestion} (target)`
       : "—";
 
+  // What the obstacle-unlock mechanic protects — NOT the same thing as
+  // `suggestion` above, which the server deliberately nulls out the
+  // instant weight has a real value (it's a swipe-to-accept placeholder,
+  // pointless once already filled). A program's real target_weight stays
+  // present on the set regardless of fill state, which is exactly what's
+  // needed here: the lock has to keep showing over an already-pre-filled
+  // value, not just an empty one.
+  const hasGoalToProtect = field === "weight" && (set.targetWeight != null || suggestion != null);
+
   async function commit(next: string | number | null) {
-    if (next === value) return;
+    // Weight is the one field the obstacle-unlock mechanic cares about —
+    // a program's target pre-fills it into this same column before the
+    // athlete has done anything, so "the value changed" can't be the
+    // confirmation signal the way it is for every other field. Instead,
+    // any real blur-commit on weight — even one that leaves the number
+    // exactly as it was — flips weight_confirmed once and stays flipped,
+    // giving the athlete a single low-friction tap to say "yes, that's
+    // what I did" without requiring them to retype a number that was
+    // already right.
+    const needsConfirmWrite = field === "weight" && !set.weightConfirmed;
+    if (next === value && !needsConfirmWrite) return;
     const supabase = createBrowserClient();
-    await supabase.from("set_logs").update({ [ACTUAL_COLUMN[field]]: next }).eq("id", set.id);
-    onChange({ [prop]: next } as Partial<SetLogEntry>);
+    const payload: Record<string, unknown> = { [ACTUAL_COLUMN[field]]: next };
+    if (field === "weight") payload.weight_confirmed = next != null;
+    await supabase.from("set_logs").update(payload).eq("id", set.id);
+    onChange({
+      [prop]: next,
+      ...(field === "weight" ? { weightConfirmed: next != null } : {}),
+    } as Partial<SetLogEntry>);
   }
 
   async function handleBlur() {
@@ -129,7 +153,12 @@ function GridCell({
     commit(suggestion);
   }, !readOnly && draft.trim() === "" && suggestion != null);
 
-  const showLock = !!locked && draft.trim() === "" && suggestion != null;
+  // Decoupled from whether the cell is empty — pre-filled and swiped-in
+  // values show the overlay too, as long as this exercise's goal hasn't
+  // actually been cleared yet (a coach-set target auto-fills the exact
+  // value it's asking the athlete to hit, so "the cell has a value" was
+  // never a meaningful signal that the goal had actually been attempted).
+  const showLock = !!locked && hasGoalToProtect;
 
   return (
     <div className="relative w-16 h-10 shrink-0">
@@ -145,19 +174,30 @@ function GridCell({
         onChange={(e) => setDraft(e.target.value)}
         onBlur={handleBlur}
         {...swipe}
-        className={`w-16 h-10 rounded-token-pill text-chalk px-1 font-body text-sm text-center focus:outline-none focus:border-rust disabled:opacity-60 touch-pan-y ${
+        className={`w-16 h-10 rounded-token-pill font-body text-sm text-center focus:outline-none focus:border-rust disabled:opacity-60 touch-pan-y ${
           showLock
-            ? "bg-rust/10 border-2 border-dashed border-rust/70"
-            : "bg-surface border border-steel/30"
+            ? "bg-surface border-2 border-dashed border-rust/70 text-chalk/50"
+            : "bg-surface border border-steel/30 text-chalk"
         }`}
       />
       {showLock && (
-        <div
-          aria-hidden="true"
-          className="absolute -bottom-1.5 -right-1.5 w-5 h-5 rounded-full bg-graphite border-2 border-rust flex items-center justify-center pointer-events-none animate-[obstacle-lock-pulse_1.6s_ease-in-out_infinite]"
-        >
-          <Lock className="w-2.5 h-2.5 text-rust" strokeWidth={3} />
-        </div>
+        <>
+          {/* A real veil over the number, not just a frame around it — dims
+              it (still readable if you look, satisfying that the athlete
+              needs the real number to train by) without fully hiding it,
+              so it reads as "something to break through" rather than "a
+              badge decorating a fully-normal value." */}
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 rounded-token-pill bg-rust/15 pointer-events-none"
+          />
+          <div
+            aria-hidden="true"
+            className="absolute -bottom-1.5 -right-1.5 w-5 h-5 rounded-full bg-graphite border-2 border-rust flex items-center justify-center pointer-events-none animate-[obstacle-lock-pulse_1.6s_ease-in-out_infinite]"
+          >
+            <Lock className="w-2.5 h-2.5 text-rust" strokeWidth={3} />
+          </div>
+        </>
       )}
     </div>
   );
@@ -256,6 +296,7 @@ export function ExerciseSetGrid({
         reps: s.reps,
         targetWeight: s.targetWeight ?? null,
         targetReps: s.targetReps ?? null,
+        weightConfirmed: !!s.weightConfirmed,
       })),
       priorBest ?? { maxWeight: null, maxReps: null, maxVolume: null }
     );

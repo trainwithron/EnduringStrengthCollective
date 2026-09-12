@@ -88,6 +88,14 @@ export interface ObstacleSetInput {
   reps: number | null;
   targetWeight: number | null;
   targetReps: number | null;
+  // A program's target pre-fills weight (and reps) into the real set_logs
+  // row the instant a session starts — the value already sitting there is
+  // never itself proof of a real attempt. Only a set the athlete has
+  // explicitly committed a weight for (typed it, or accepted the swipe/tap
+  // suggestion) is eligible to clear the goal at all; an untouched
+  // pre-filled set that happens to already match the target doesn't
+  // count, no matter how exactly it matches.
+  weightConfirmed: boolean;
 }
 
 // Once any one set in the exercise clears it, the whole exercise reads
@@ -95,5 +103,7 @@ export interface ObstacleSetInput {
 // current set of sets on every render, not tracked as separate stored
 // state, so it self-corrects if a cleared value is edited back down.
 export function isExerciseUnlocked(sets: ObstacleSetInput[], prior: PriorBest): boolean {
-  return sets.some((s) => isObstacleCleared(s.weight, s.reps, s.targetWeight, s.targetReps, prior));
+  return sets.some(
+    (s) => s.weightConfirmed && isObstacleCleared(s.weight, s.reps, s.targetWeight, s.targetReps, prior)
+  );
 }

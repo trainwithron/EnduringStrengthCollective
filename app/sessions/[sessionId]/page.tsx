@@ -47,7 +47,7 @@ export default async function SessionPage(
       `
       id, exercise_name, exercise_order, is_swapped, is_added, movement_pattern_id, tracked_fields, group_workout_exercise_id,
       group_workout_exercises ( notes ),
-      set_logs ( id, set_order, weight, reps, rpe, rir, tempo, time_seconds, height, distance, rest_seconds, pace, status )
+      set_logs ( id, set_order, weight, reps, rpe, rir, tempo, time_seconds, height, distance, rest_seconds, pace, status, weight_confirmed )
     `
     )
     .eq("session_id", params.sessionId)
@@ -275,6 +275,7 @@ export default async function SessionPage(
               restSeconds: sl.rest_seconds,
               pace: sl.pace,
               status: sl.status,
+              weightConfirmed: !!sl.weight_confirmed,
               targetReps: target?.reps ?? null,
               targetWeight: target?.weight ?? null,
               targetRpe: target?.rpe ?? null,

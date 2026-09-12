@@ -99,12 +99,12 @@ describe("isObstacleCleared", () => {
 });
 
 describe("isExerciseUnlocked", () => {
-  it("unlocks the whole exercise once any single set clears it", () => {
+  it("unlocks the whole exercise once any single confirmed set clears it", () => {
     const prior = { maxWeight: 100, maxReps: 10, maxVolume: 1000 };
     const sets = [
-      { weight: 90, reps: 5, targetWeight: 100, targetReps: 5 }, // miss
-      { weight: 100, reps: 5, targetWeight: 100, targetReps: 5 }, // clears
-      { weight: null, reps: null, targetWeight: 100, targetReps: 5 }, // not yet logged
+      { weight: 90, reps: 5, targetWeight: 100, targetReps: 5, weightConfirmed: true }, // miss
+      { weight: 100, reps: 5, targetWeight: 100, targetReps: 5, weightConfirmed: true }, // clears
+      { weight: null, reps: null, targetWeight: 100, targetReps: 5, weightConfirmed: false }, // not yet logged
     ];
     expect(isExerciseUnlocked(sets, prior)).toBe(true);
   });
@@ -112,8 +112,19 @@ describe("isExerciseUnlocked", () => {
   it("stays locked when every set so far is a miss or unlogged", () => {
     const prior = { maxWeight: 100, maxReps: 10, maxVolume: 1000 };
     const sets = [
-      { weight: 90, reps: 5, targetWeight: 100, targetReps: 5 },
-      { weight: null, reps: null, targetWeight: 100, targetReps: 5 },
+      { weight: 90, reps: 5, targetWeight: 100, targetReps: 5, weightConfirmed: true },
+      { weight: null, reps: null, targetWeight: 100, targetReps: 5, weightConfirmed: false },
+    ];
+    expect(isExerciseUnlocked(sets, prior)).toBe(false);
+  });
+
+  it("an unconfirmed set never clears the goal, even when its pre-filled value already matches the target exactly", () => {
+    // The real bug this fixes: a program pre-fills weight/reps to match
+    // the target the instant a session starts, so a never-touched set can
+    // look identical to a genuinely logged one on paper.
+    const prior = { maxWeight: null, maxReps: null, maxVolume: null };
+    const sets = [
+      { weight: 100, reps: 5, targetWeight: 100, targetReps: 5, weightConfirmed: false },
     ];
     expect(isExerciseUnlocked(sets, prior)).toBe(false);
   });
