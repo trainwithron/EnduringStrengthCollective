@@ -17,6 +17,37 @@ export const BUTTON_SHAPE_LABELS: Record<ButtonShape, string> = {
   pill: "Pill",
 };
 
+// Widens the existing Button Shape setting from "one flat radius on
+// filled CTA buttons" into a real scale other surfaces (cards, inputs,
+// badges, the logging screen's set cells) can opt into. "Sharp" stays
+// every-corner-square everywhere, including sm/md/lg/pill/circle — a set-
+// number badge or a checkmark is a genuinely square token under Sharp,
+// same as a button. "Rounded" and "Pill" both soften the whole UI, not
+// just buttons — but at different intensities, so choosing between them
+// still means something beyond the CTA buttons: "Pill" reads noticeably
+// softer than "Rounded"'s more modest curve, at every role. Cards get a
+// gentler curve than pills/circles even under the same setting — a card
+// is a container holding a lot of content, not a discrete token, so the
+// same "soft" choice reads as intentional there without making the
+// layout feel like it's made of bubbles.
+export interface RadiusScale {
+  sm: string;
+  md: string;
+  lg: string;
+  pill: string;
+  circle: string;
+}
+
+const RADIUS_SCALE_BY_SHAPE: Record<ButtonShape, RadiusScale> = {
+  sharp: { sm: "0px", md: "0px", lg: "0px", pill: "0px", circle: "0px" },
+  rounded: { sm: "6px", md: "10px", lg: "16px", pill: "9999px", circle: "9999px" },
+  pill: { sm: "8px", md: "14px", lg: "22px", pill: "9999px", circle: "9999px" },
+};
+
+export function radiusScaleFor(shape: ButtonShape): RadiusScale {
+  return RADIUS_SCALE_BY_SHAPE[shape];
+}
+
 // Nudged from #C4622D — the original failed WCAG AA contrast (4.5:1)
 // both as button text-on-background and as accent text on the app's
 // dark surfaces; this clears 4.5:1 in both directions. Only affects the
@@ -67,6 +98,7 @@ export const DEFAULT_ORG_THEME: OrgTheme = {
 // every surface (coach desktop AND the athlete mobile app) shares one
 // identity, instead of each shell re-deriving this mapping itself.
 export function orgThemeToCssVars(theme: OrgTheme): CSSProperties {
+  const scale = radiusScaleFor(theme.buttonShape);
   return {
     "--rust": theme.accentColor,
     "--graphite": theme.backgroundColor,
@@ -74,5 +106,10 @@ export function orgThemeToCssVars(theme: OrgTheme): CSSProperties {
     "--font-display": `"${theme.fontDisplay}"`,
     "--font-body": `"${theme.fontBody}"`,
     "--btn-radius": BUTTON_SHAPE_RADIUS[theme.buttonShape],
+    "--r-sm": scale.sm,
+    "--r-md": scale.md,
+    "--r-lg": scale.lg,
+    "--r-pill": scale.pill,
+    "--r-circle": scale.circle,
   } as CSSProperties;
 }

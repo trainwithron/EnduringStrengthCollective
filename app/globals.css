@@ -43,6 +43,15 @@
   --moss: #6B8F71;
   --font-display: "Barlow Condensed";
   --font-body: "Inter";
+  /* Sharp-default fallback for the radius scale (lib/theme.ts's
+     radiusScaleFor) — the real values come from orgThemeToCssVars at
+     the <html> root in app/layout.tsx; this is only the safety net for
+     any render path that somehow skips that (there shouldn't be one). */
+  --r-sm: 0px;
+  --r-md: 0px;
+  --r-lg: 0px;
+  --r-pill: 0px;
+  --r-circle: 0px;
 }
 
 body {

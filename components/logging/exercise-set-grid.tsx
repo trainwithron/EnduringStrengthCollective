@@ -134,7 +134,7 @@ function GridCell({
       onChange={(e) => setDraft(e.target.value)}
       onBlur={handleBlur}
       {...swipe}
-      className="w-16 h-10 shrink-0 bg-surface border border-steel/30 text-chalk px-1 font-body text-sm text-center focus:outline-none focus:border-rust disabled:opacity-60 touch-pan-y"
+      className="w-16 h-10 shrink-0 bg-surface border border-steel/30 rounded-token-pill text-chalk px-1 font-body text-sm text-center focus:outline-none focus:border-rust disabled:opacity-60 touch-pan-y"
     />
   );
 }
@@ -313,7 +313,7 @@ export function ExerciseSetGrid({
                 key={set.id}
                 role="img"
                 aria-label={isComplete ? "Set complete" : isSkipped ? "Set skipped" : "Set pending"}
-                className={`w-16 h-8 shrink-0 flex items-center justify-center border ${
+                className={`w-16 h-8 shrink-0 flex items-center justify-center border rounded-token-circle ${
                   isComplete
                     ? "bg-moss border-moss text-graphite"
                     : isSkipped

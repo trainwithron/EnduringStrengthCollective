@@ -315,7 +315,7 @@ export function ClientCardGrid({
             return (
               <div
                 key={member.profileId}
-                className="border border-steel/20 bg-surface/40 p-4 flex flex-col items-center text-center gap-2"
+                className="border border-steel/20 bg-surface/40 rounded-token-lg p-4 flex flex-col items-center text-center gap-2"
               >
                 <Link href={`/groups/${groupId}/athletes/${member.profileId}`} className="flex flex-col items-center gap-2">
                   {member.avatarUrl ? (
@@ -341,7 +341,7 @@ export function ClientCardGrid({
                 </span>
 
                 {lowReadinessAthleteIds?.has(member.profileId) && (
-                  <span className="font-body text-[11px] text-amber-400 bg-amber-400/10 border border-amber-400/30 px-1.5 py-0.5">
+                  <span className="font-body text-[11px] text-amber-400 bg-amber-400/10 border border-amber-400/30 rounded-token-pill px-1.5 py-0.5">
                     ⚠ Low readiness
                   </span>
                 )}
@@ -358,14 +358,14 @@ export function ClientCardGrid({
                   return integrity.level === "pattern" ? (
                     <span
                       title={`${integrity.flaggedCount} of ${integrity.totalSessions} recent sessions logged implausibly fast`}
-                      className="font-body text-[11px] text-rust bg-rust/10 border border-rust/40 px-1.5 py-0.5"
+                      className="font-body text-[11px] text-rust bg-rust/10 border border-rust/40 rounded-token-pill px-1.5 py-0.5"
                     >
                       ⏱ Fast sessions ({integrity.flaggedCount})
                     </span>
                   ) : (
                     <span
                       title="One recent session was logged faster than the prescribed sets/rest would realistically take"
-                      className="font-body text-[11px] text-steel bg-steel/10 border border-steel/30 px-1.5 py-0.5"
+                      className="font-body text-[11px] text-steel bg-steel/10 border border-steel/30 rounded-token-pill px-1.5 py-0.5"
                     >
                       ⏱ Fast session
                     </span>
@@ -376,7 +376,7 @@ export function ClientCardGrid({
                   <select
                     value={member.clientTier ?? ""}
                     onChange={(e) => handleTierChange(member, (e.target.value || null) as ClientTier)}
-                    className="h-7 bg-graphite border border-steel/30 text-chalk px-1.5 font-body text-xs"
+                    className="h-7 bg-graphite border border-steel/30 rounded-token-sm text-chalk px-1.5 font-body text-xs"
                   >
                     <option value="">No tier</option>
                     <option value="one_on_one">1-on-1</option>

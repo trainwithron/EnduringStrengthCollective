@@ -34,6 +34,20 @@ export default {
         display: ["var(--font-display)", "sans-serif"],
         body: ["var(--font-body)", "sans-serif"],
       },
+      borderRadius: {
+        // Widens the org's existing Button Shape setting (lib/theme.ts's
+        // radiusScaleFor) from "one flat radius on filled CTA buttons"
+        // into a scale any surface can opt into — cards, inputs, badges,
+        // the logging screen's set cells. Named distinctly (not
+        // rounded-sm/md/lg) so this never silently reinterprets
+        // Tailwind's own built-in radius scale for anything that isn't
+        // deliberately opting in.
+        "token-sm": "var(--r-sm)",
+        "token-md": "var(--r-md)",
+        "token-lg": "var(--r-lg)",
+        "token-pill": "var(--r-pill)",
+        "token-circle": "var(--r-circle)",
+      },
     },
   },
   plugins: [],

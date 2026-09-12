@@ -112,7 +112,7 @@ export function RecapAndUpNext({
             the next-workout card is shown; the transition itself (not just
             the entrance below) uses the same springy overshoot easing. */}
         <div
-          className="border border-steel/20 bg-surface/40 transition-all duration-300"
+          className="border border-steel/20 bg-surface/40 rounded-token-lg transition-all duration-300"
           style={{ transitionTimingFunction: "cubic-bezier(.34,1.56,.64,1)" }}
         >
           {showNext ? (
@@ -191,10 +191,10 @@ export function RecapAndUpNext({
 
         {/* Card 2 — next workout, editable shadow preview. */}
         {showNext && nextWorkout && (
-          <div className="border border-steel/20 bg-surface/40 p-5 recap-bounce-in">
+          <div className="border border-steel/20 bg-surface/40 rounded-token-lg p-5 recap-bounce-in">
             <div className="flex items-center justify-between gap-3">
               <h2 className="font-display font-bold text-xl uppercase leading-none">{nextWorkout.title}</h2>
-              <span className="font-body text-[10px] text-rust uppercase tracking-wide border border-rust/40 px-2 py-1">
+              <span className="font-body text-[10px] text-rust uppercase tracking-wide border border-rust/40 rounded-token-pill px-2 py-1">
                 Editable draft
               </span>
             </div>

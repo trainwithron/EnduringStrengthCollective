@@ -7,6 +7,7 @@ import {
   BUTTON_SHAPE_LABELS,
   DISPLAY_FONT_OPTIONS,
   BODY_FONT_OPTIONS,
+  radiusScaleFor,
   type ButtonShape,
   type DisplayFont,
   type BodyFont,
@@ -238,6 +239,10 @@ export function BrandingForm({
 
           <div>
             <span className="font-body text-xs text-steel uppercase tracking-wide">Button shape</span>
+            <p className="font-body text-xs text-steel mt-1 max-w-[60ch]">
+              Also softens cards, badges, inputs, and the logging screen&apos;s set cells app-wide —
+              not just buttons.
+            </p>
             <div className="flex gap-2 mt-2">
               {SHAPES.map((shape) => (
                 <button
@@ -285,6 +290,32 @@ export function BrandingForm({
           >
             Save changes
           </button>
+
+          {(() => {
+            const scale = radiusScaleFor(buttonShape);
+            return (
+              <div className="flex items-center gap-3 mt-1">
+                <div
+                  className="px-3 py-2 text-xs border"
+                  style={{ borderColor: `${textColor}33`, borderRadius: scale.lg, color: textColor }}
+                >
+                  Card
+                </div>
+                <span
+                  className="px-2 py-1 text-[10px] uppercase border"
+                  style={{ borderColor: accentColor, color: accentColor, borderRadius: scale.pill }}
+                >
+                  Badge
+                </span>
+                <input
+                  readOnly
+                  value="Input"
+                  className="w-20 h-8 text-xs px-2 border bg-transparent"
+                  style={{ borderColor: `${textColor}33`, color: textColor, borderRadius: scale.sm }}
+                />
+              </div>
+            );
+          })()}
         </div>
       </Section>
 
