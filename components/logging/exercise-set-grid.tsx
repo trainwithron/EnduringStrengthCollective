@@ -240,7 +240,11 @@ export function ExerciseSetGrid({
   // spot the drag needs to start from) and drawn as a small solid dot —
   // still a real button with a full-height touch target, just a
   // precise, deliberately small visual mark rather than an icon that
-  // reads as "drag me from anywhere in this wide area."
+  // reads as "drag me from anywhere in this wide area." A plain tap does
+  // the identical thing as the drag — one action (propagate set 1's
+  // value), two ways to trigger it — rather than a different, narrower
+  // tap-only action, which would just reintroduce the same ambiguity
+  // this fix exists to remove.
   function RowHandle({ field }: { field: TrackedField }) {
     const dragStartX = useRef<number | null>(null);
     const dragFired = useRef(false);
@@ -248,8 +252,8 @@ export function ExerciseSetGrid({
     return (
       <button
         type="button"
-        aria-label={`Drag from here to fill every set's ${fieldDef(field).label} with set 1's value`}
-        title="Drag from here to fill every set"
+        aria-label={`Fill every set's ${fieldDef(field).label} with set 1's value — tap, or drag from here`}
+        title="Tap, or drag from here, to fill every set"
         onPointerDown={(e) => {
           dragStartX.current = e.clientX;
           dragFired.current = false;
@@ -261,6 +265,13 @@ export function ExerciseSetGrid({
             vibrateConfirm();
             handlePropagateRow(field);
           }
+        }}
+        onClick={() => {
+          // A real drag already fired this via onPointerMove above — the
+          // click that follows pointerup would otherwise double-fire it.
+          if (dragFired.current) return;
+          vibrateConfirm();
+          handlePropagateRow(field);
         }}
         className="w-5 h-10 shrink-0 flex items-center justify-center touch-none cursor-grab active:cursor-grabbing group"
       >
