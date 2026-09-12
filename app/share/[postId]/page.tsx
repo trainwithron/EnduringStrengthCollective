@@ -23,7 +23,7 @@ export async function generateMetadata(
   if (!shared) return { title: "Workout not found" };
 
   const title =
-    shared.prList.length > 0
+    shared.celebratePrs.length > 0
       ? `${shared.athleteName} just hit a new PR! 🎉`
       : `${shared.athleteName} just finished a workout! 💪`;
   const description =
@@ -69,7 +69,7 @@ export default async function ShareWorkoutPage(
   const gymJoke = pickGymJoke(new Date().toISOString().slice(0, 10));
 
   const shareTitle =
-    shared.prList.length > 0
+    shared.celebratePrs.length > 0
       ? `${shared.athleteName} just hit a new PR! 🎉`
       : `${shared.athleteName} just finished a workout! 💪`;
 
@@ -81,7 +81,7 @@ export default async function ShareWorkoutPage(
         </p>
 
         <h1 className="font-display font-bold text-3xl uppercase leading-tight mt-4">
-          {shared.prList.length > 0 ? "New PR 🎉" : "Workout Complete 💪"}
+          {shared.celebratePrs.length > 0 ? "New PR 🎉" : "Workout Complete 💪"}
         </h1>
         <p className="font-body text-lg mt-2">{shared.athleteName}</p>
 
@@ -105,7 +105,7 @@ export default async function ShareWorkoutPage(
             </>
           ) : (
             <p className="font-body text-sm text-steel uppercase tracking-wide">
-              {shared.prList.length > 0 ? "New personal record" : "Checked in"}
+              {shared.celebratePrs.length > 0 ? "New personal record" : "Checked in"}
             </p>
           )}
         </div>
@@ -130,7 +130,26 @@ export default async function ShareWorkoutPage(
           </div>
         )}
 
-        {shared.prList.length > 0 && <PrListToggle items={shared.prList} />}
+        {shared.celebratePrs.length > 0 && <PrListToggle items={shared.celebratePrs} />}
+
+        {shared.baselinePrs.length > 0 && (
+          <div className="mt-6 pt-4 border-t border-steel/20">
+            <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
+              Establishing your baseline
+            </p>
+            <p className="font-body text-sm text-steel">
+              {shared.baselinePrs.map((p) => p.name).join(", ")} —{" "}
+              {shared.baselinePrs.length === 1 ? "this is a new one" : "these are new"}, so there&apos;s
+              no history to compare against yet. Keep logging and the real records will show up
+              here soon.
+            </p>
+            {shared.totalWorkoutCount != null && shared.celebratePrs.length === 0 && (
+              <p className="font-body text-sm text-rust mt-2">
+                💪 Workout #{shared.totalWorkoutCount} in the books
+              </p>
+            )}
+          </div>
+        )}
 
         <p className="font-body text-xs text-steel mt-8">
           {new Date(shared.createdAt).toLocaleDateString(undefined, {

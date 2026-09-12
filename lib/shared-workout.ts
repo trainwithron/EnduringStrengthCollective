@@ -2,6 +2,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { estimateOneRepMax } from "@/lib/one-rep-max";
 import { computeWeekStreak } from "@/lib/consistency-streak";
+import { splitPrsByBaseline } from "@/lib/pr-fatigue";
 
 // Shared by the public /share/[postId] page and the in-feed expanded
 // card (fetched via /api/workout-share/[postId]) so both surfaces
@@ -77,6 +78,52 @@ export async function getSharedWorkout(postId: string) {
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);
 
+  // Phase 2 (PR-fatigue reframe) — a "PR" on an exercise this athlete has
+  // barely touched before isn't a real achievement yet, it's just the
+  // only data point that exists. Split the PR list into genuine,
+  // celebration-worthy PRs vs. still-establishing-baseline exercises,
+  // based on how many OTHER completed sessions (excluding this one)
+  // contain this exact exercise name for this athlete — same
+  // "exclude current session" pattern used for the obstacle-unlock
+  // mechanic's own priorBest computation.
+  const priorSessionCountByName = new Map<string, number>();
+  if (prList.length > 0 && workoutLog.session_id) {
+    // Service-role client, deliberately — this page is genuinely public
+    // (see the service-role file-level comment), and the anon PR-share
+    // RLS policies only expose rows belonging to THIS specific session,
+    // never the athlete's other sessions. A real baseline check needs
+    // exactly that other history, which anon can never see. Only ever
+    // feeds small derived counts back out, never raw rows — same
+    // reasoning already established for weekStreak below.
+    const serviceClientForHistory = createServiceRoleClient();
+    const { data: priorSessionExerciseRows } = await serviceClientForHistory
+      .from("session_exercises")
+      .select(
+        "session_id, exercise_name, athlete_sessions!inner ( athlete_id ), set_logs!inner ( status )"
+      )
+      .in(
+        "exercise_name",
+        prList.map((p) => p.name)
+      )
+      .eq("set_logs.status", "completed");
+
+    const sessionIdsByName = new Map<string, Set<string>>();
+    for (const row of (priorSessionExerciseRows ?? []) as any[]) {
+      if (row.session_id === workoutLog.session_id) continue;
+      if (row.athlete_sessions?.athlete_id !== post.author_id) continue;
+      const name = row.exercise_name;
+      if (!sessionIdsByName.has(name)) sessionIdsByName.set(name, new Set());
+      sessionIdsByName.get(name)!.add(row.session_id);
+    }
+    for (const [name, sessionIds] of sessionIdsByName) {
+      priorSessionCountByName.set(name, sessionIds.size);
+    }
+  }
+  const { celebrate: celebratePrs, establishingBaseline: baselinePrs } = splitPrsByBaseline(
+    prList,
+    priorSessionCountByName
+  );
+
   // Consistency streak — same broadcastLevel === "full" gate as
   // totalVolume, since this is the athlete's own activity pattern, not
   // public-by-default data. Uses the service-role client deliberately:
@@ -87,6 +134,7 @@ export async function getSharedWorkout(postId: string) {
   // athlete's history isn't individually shared). Only ever feeds a
   // small derived integer (a week count) back out, never raw rows.
   let weekStreak = 0;
+  let totalWorkoutCount: number | null = null;
   if (broadcastLevel === "full") {
     const twoYearsAgo = new Date(post.created_at);
     twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
@@ -99,6 +147,19 @@ export async function getSharedWorkout(postId: string) {
       .gte("created_at", twoYearsAgo.toISOString());
     const logDates = (logRows ?? []).map((r) => new Date(r.created_at));
     weekStreak = computeWeekStreak(logDates, new Date(post.created_at));
+
+    // Only needed as substitute celebratory content when a real PR is
+    // being reframed to a calm baseline message — a plain "workout
+    // complete" post has no use for this number, so skip the extra
+    // query in the common case.
+    if (baselinePrs.length > 0) {
+      const { count } = await serviceClient
+        .from("workout_logs")
+        .select("id", { count: "exact", head: true })
+        .eq("athlete_id", post.author_id)
+        .eq("group_id", post.group_id);
+      totalWorkoutCount = count ?? null;
+    }
   }
 
   return {
@@ -110,10 +171,13 @@ export async function getSharedWorkout(postId: string) {
     totalVolume: broadcastLevel === "full" ? workoutLog.total_volume ?? 0 : null,
     totalSetsCompleted: broadcastLevel === "full" ? workoutLog.total_sets_completed ?? 0 : null,
     weekStreak,
+    totalWorkoutCount,
     topLifts,
     top5Candidates,
     selectedNames: post.shared_exercise_names ?? top5Candidates.slice(0, 3).map((l) => l.name),
     prList,
+    celebratePrs,
+    baselinePrs,
     createdAt: post.created_at,
   };
 }

@@ -12,8 +12,10 @@ interface SharedWorkoutData {
   totalVolume: number | null;
   totalSetsCompleted: number | null;
   weekStreak: number;
+  totalWorkoutCount: number | null;
   topLifts: { name: string; weight: number; reps: number }[];
-  prList: { name: string; weight: number; reps: number; oneRepMax: number }[];
+  celebratePrs: { name: string; weight: number; reps: number; oneRepMax: number }[];
+  baselinePrs: { name: string; weight: number; reps: number; oneRepMax: number }[];
   createdAt: string;
 }
 
@@ -86,7 +88,7 @@ export function WorkoutCardExpanded({ postId }: { postId: string }) {
           {data.groupName}
         </p>
         <h3 className="font-display font-bold text-2xl uppercase leading-tight mt-3">
-          {data.prList.length > 0 ? "New PR 🎉" : "Workout Complete 💪"}
+          {data.celebratePrs.length > 0 ? "New PR 🎉" : "Workout Complete 💪"}
         </h3>
         <p className="font-body text-base mt-1">{data.athleteName}</p>
 
@@ -127,18 +129,34 @@ export function WorkoutCardExpanded({ postId }: { postId: string }) {
           </div>
         )}
 
-        {data.prList.length > 0 && (
+        {data.celebratePrs.length > 0 && (
           <div className="mt-4 pt-4 border-t border-steel/20">
             <p className="font-body text-xs text-rust uppercase tracking-wide mb-2">
               New PRs
             </p>
             <div className="space-y-1">
-              {data.prList.map((pr) => (
+              {data.celebratePrs.map((pr) => (
                 <p key={pr.name} className="font-body text-sm">
                   {pr.name}: {pr.weight} lbs &times; {pr.reps} (est. 1RM {pr.oneRepMax})
                 </p>
               ))}
             </div>
+          </div>
+        )}
+
+        {data.baselinePrs.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-steel/20">
+            <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
+              Establishing your baseline
+            </p>
+            <p className="font-body text-sm text-steel">
+              {data.baselinePrs.map((p) => p.name).join(", ")}
+            </p>
+            {data.totalWorkoutCount != null && data.celebratePrs.length === 0 && (
+              <p className="font-body text-sm text-rust mt-2">
+                💪 Workout #{data.totalWorkoutCount} in the books
+              </p>
+            )}
           </div>
         )}
 
