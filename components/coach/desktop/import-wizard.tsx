@@ -3,7 +3,19 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
+import * as cptable from "xlsx/dist/cpexcel.full.mjs";
 import { createBrowserClient } from "@/lib/supabase/client";
+
+// xlsx's own auto-load for its optional codepage-table module only fires
+// in a plain Node `require` context, not in a bundled browser build — so
+// $cptable stays undefined here and xlsx logs "Codepage tables are not
+// loaded" on every read() call that passes a `codepage` option, even
+// though codepage 65001 (UTF-8, the only one this app ever uses) already
+// has its own built-in decode path and doesn't actually need the table.
+// Loading it explicitly is the officially supported fix for a bundled
+// environment — it only silences the benign warning, it changes nothing
+// about how files are decoded.
+XLSX.set_cptable(cptable);
 import {
   detectColumns,
   parseImportRows,
