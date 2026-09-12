@@ -3,6 +3,8 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { estimateOneRepMax } from "@/lib/one-rep-max";
 import { computeWeekStreak } from "@/lib/consistency-streak";
 import { splitPrsByBaseline } from "@/lib/pr-fatigue";
+import { computeHabitCompliance, computeCompliancePct, type HabitLogRow } from "@/lib/habits";
+import { shouldShowCompoundCelebration, buildCompoundCelebrationText } from "@/lib/compound-celebration";
 
 // Shared by the public /share/[postId] page and the in-feed expanded
 // card (fetched via /api/workout-share/[postId]) so both surfaces
@@ -162,6 +164,82 @@ export async function getSharedWorkout(postId: string) {
     }
   }
 
+  // Milestone Celebrations, piece #1 (milestone_celebration_system_scoping.md)
+  // — the "everything's clicking" compound card. Purely presentation over
+  // three already-computed signals: this month's PR count, 7-day habit
+  // compliance (same math as the client-profile page's own "Last 7 Days"
+  // block, via the shared lib/habits.ts helper), and the streak already
+  // computed above. Same broadcastLevel === "full" gate and service-role
+  // reasoning as weekStreak — none of this is anon-visible data.
+  let habitCompliancePct: number | null = null;
+  let prCountThisMonth = 0;
+  let compoundCelebration: string | null = null;
+  if (broadcastLevel === "full") {
+    const serviceClient = createServiceRoleClient();
+    const asOf = new Date(post.created_at);
+
+    const monthStart = new Date(asOf.getFullYear(), asOf.getMonth(), 1);
+    // Postgres stores microsecond precision; a JS Date round-trip through
+    // `asOf.toISOString()` truncates to milliseconds, which can make a
+    // workout_logs row's own `created_at` compare as slightly LATER than
+    // `asOf` even when `asOf` was derived from that exact same instant
+    // (this genuinely happened in testing — a post and its own workout_log
+    // sharing one `now()` value, off by fractional microseconds after the
+    // round-trip). A 1-second buffer is comfortably larger than that
+    // precision gap while still meaning "as of essentially this moment."
+    const asOfBuffered = new Date(asOf.getTime() + 1000);
+    const { data: monthLogRows } = await serviceClient
+      .from("workout_logs")
+      .select("new_prs")
+      .eq("athlete_id", post.author_id)
+      .eq("group_id", post.group_id)
+      .gte("created_at", monthStart.toISOString())
+      .lte("created_at", asOfBuffered.toISOString());
+    prCountThisMonth = (monthLogRows ?? []).reduce(
+      (sum, r) => sum + (r.new_prs?.length ?? 0),
+      0
+    );
+
+    const sevenDaysAgo = new Date(asOf);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    const windowDates = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(sevenDaysAgo);
+      d.setDate(d.getDate() + i);
+      return d;
+    });
+    const { data: habitRows } = await serviceClient
+      .from("client_habits")
+      .select("id, weekdays")
+      .eq("athlete_id", post.author_id)
+      .eq("group_id", post.group_id)
+      .eq("active", true);
+    const activeHabits = habitRows ?? [];
+    const { data: habitLogRowsRaw } = activeHabits.length > 0
+      ? await serviceClient
+          .from("habit_logs")
+          .select("habit_id, log_date, completed_at")
+          .in("habit_id", activeHabits.map((h) => h.id))
+          .gte("log_date", sevenDaysAgo.toISOString().slice(0, 10))
+          .lte("log_date", asOf.toISOString().slice(0, 10))
+      : { data: [] as any[] };
+    const habitLogRows: HabitLogRow[] = (habitLogRowsRaw ?? []).map((l: any) => ({
+      habitId: l.habit_id,
+      logDate: l.log_date,
+      completed: !!l.completed_at,
+    }));
+    const { totalDue, totalCompleted } = computeHabitCompliance(
+      activeHabits,
+      habitLogRows,
+      windowDates
+    );
+    habitCompliancePct = computeCompliancePct(totalCompleted, totalDue);
+
+    const compoundInputs = { habitCompliancePct, prCountThisMonth, weekStreak };
+    if (shouldShowCompoundCelebration(compoundInputs)) {
+      compoundCelebration = buildCompoundCelebrationText(compoundInputs);
+    }
+  }
+
   return {
     authorId: post.author_id as string,
     groupId: post.group_id,
@@ -172,6 +250,9 @@ export async function getSharedWorkout(postId: string) {
     totalSetsCompleted: broadcastLevel === "full" ? workoutLog.total_sets_completed ?? 0 : null,
     weekStreak,
     totalWorkoutCount,
+    habitCompliancePct,
+    prCountThisMonth,
+    compoundCelebration,
     topLifts,
     top5Candidates,
     selectedNames: post.shared_exercise_names ?? top5Candidates.slice(0, 3).map((l) => l.name),

@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { isHabitDueOn, habitFrequencyLabel } from "./habits";
+import {
+  isHabitDueOn,
+  habitFrequencyLabel,
+  computeHabitCompliance,
+  computeCompliancePct,
+} from "./habits";
 
 describe("isHabitDueOn", () => {
   it("is due when the date's weekday is in the habit's set", () => {
@@ -43,5 +48,50 @@ describe("habitFrequencyLabel", () => {
 
   it("ignores duplicate weekday entries", () => {
     expect(habitFrequencyLabel([1, 1, 3])).toBe("Mo/We");
+  });
+});
+
+describe("computeHabitCompliance", () => {
+  // 2026-09-07..13 is Mon..Sun.
+  const monday = new Date("2026-09-07T00:00:00");
+  const tuesday = new Date("2026-09-08T00:00:00");
+  const wednesday = new Date("2026-09-09T00:00:00");
+  const window = [monday, tuesday, wednesday];
+
+  it("sums due/completed across multiple habits", () => {
+    const habits = [
+      { id: "h1", weekdays: [1, 3] }, // due Mon, Wed
+      { id: "h2", weekdays: [2] }, // due Tue
+    ];
+    const logs = [
+      { habitId: "h1", logDate: "2026-09-07", completed: true },
+      { habitId: "h2", logDate: "2026-09-08", completed: false },
+    ];
+    const result = computeHabitCompliance(habits, logs, window);
+    expect(result).toEqual({ totalDue: 3, totalCompleted: 1 });
+  });
+
+  it("returns zero due for no active habits", () => {
+    expect(computeHabitCompliance([], [], window)).toEqual({ totalDue: 0, totalCompleted: 0 });
+  });
+
+  it("ignores a log row for a date the habit wasn't due", () => {
+    const habits = [{ id: "h1", weekdays: [1] }]; // due Mon only
+    const logs = [{ habitId: "h1", logDate: "2026-09-08", completed: true }]; // logged Tue
+    expect(computeHabitCompliance(habits, logs, window)).toEqual({ totalDue: 1, totalCompleted: 0 });
+  });
+});
+
+describe("computeCompliancePct", () => {
+  it("computes a rounded percentage", () => {
+    expect(computeCompliancePct(2, 3)).toBe(67);
+  });
+
+  it("returns null (not 0) when nothing was ever due", () => {
+    expect(computeCompliancePct(0, 0)).toBeNull();
+  });
+
+  it("returns 100 for a perfect week", () => {
+    expect(computeCompliancePct(7, 7)).toBe(100);
   });
 });

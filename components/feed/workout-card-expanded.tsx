@@ -13,6 +13,7 @@ interface SharedWorkoutData {
   totalSetsCompleted: number | null;
   weekStreak: number;
   totalWorkoutCount: number | null;
+  compoundCelebration: string | null;
   topLifts: { name: string; weight: number; reps: number }[];
   celebratePrs: { name: string; weight: number; reps: number; oneRepMax: number }[];
   baselinePrs: { name: string; weight: number; reps: number; oneRepMax: number }[];
@@ -107,6 +108,12 @@ export function WorkoutCardExpanded({ postId }: { postId: string }) {
               <p className="font-body text-sm text-rust mt-1">🔥 {data.weekStreak} week streak</p>
             )}
           </div>
+        )}
+
+        {data.compoundCelebration && (
+          <p className="font-display text-base text-rust mt-4 leading-snug">
+            {data.compoundCelebration}
+          </p>
         )}
 
         <p className="font-body text-xs text-steel mt-3">😂 {gymJoke}</p>

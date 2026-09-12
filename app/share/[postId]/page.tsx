@@ -110,6 +110,12 @@ export default async function ShareWorkoutPage(
           )}
         </div>
 
+        {shared.compoundCelebration && (
+          <p className="font-display text-lg text-rust text-center mt-6 leading-snug">
+            {shared.compoundCelebration}
+          </p>
+        )}
+
         <p className="font-body text-xs text-steel mt-4">😂 {gymJoke}</p>
 
         {shared.topLifts.length > 0 && (
