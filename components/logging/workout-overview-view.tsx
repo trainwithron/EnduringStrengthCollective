@@ -3,6 +3,7 @@ import { StartWorkoutButton } from "@/components/logging/start-workout-button";
 import { PreStartExerciseRow } from "@/components/logging/pre-start-exercise-row";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
+import { RefreshOnBfcacheRestore } from "@/components/logging/refresh-on-bfcache-restore";
 import { renderNoteBody } from "@/lib/text-note-format";
 import type { WorkoutOverviewData } from "@/lib/workout-overview-data";
 
@@ -39,6 +40,7 @@ export function WorkoutOverviewView({
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-28">
+      <RefreshOnBfcacheRestore />
       {actingAs && <ActingAsBanner athleteFullName={actingAs.fullName} groupId={actingAs.groupId} />}
       <header className="px-5 pt-8 pb-6 border-b border-steel/20">
         <Link href={backHref} className="font-body text-xs text-steel uppercase tracking-wide">

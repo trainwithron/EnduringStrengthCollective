@@ -44,10 +44,12 @@ export function StartWorkoutButton({
   loggedByCoach?: boolean;
 }) {
   const [starting, setStarting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   async function handleStart() {
     setStarting(true);
+    setError(null);
     const supabase = createBrowserClient();
 
     const { data: session, error: sessionError } = await supabase
@@ -61,8 +63,14 @@ export function StartWorkoutButton({
       .select("id")
       .single();
 
+    // Silently doing nothing here reads as "the button doesn't work" —
+    // a real, reported symptom that turned out to actually be a stale
+    // cached page hiding an already-started session (see
+    // RefreshOnBfcacheRestore), but a genuine failure here (a network
+    // blip, etc.) deserves the same visible feedback either way.
     if (sessionError || !session) {
       setStarting(false);
+      setError("Couldn't start the workout — check your connection and try again.");
       return;
     }
 
@@ -126,13 +134,20 @@ export function StartWorkoutButton({
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleStart}
-      disabled={starting}
-      className="w-full h-14 bg-rust text-graphite font-display uppercase text-lg font-bold disabled:opacity-40 active:bg-rust/80 transition-colors"
-    >
-      {starting ? "Starting…" : "Start workout"}
-    </button>
+    <div>
+      {error && (
+        <p className="font-body text-xs text-rust mb-2 text-center" role="alert">
+          {error}
+        </p>
+      )}
+      <button
+        type="button"
+        onClick={handleStart}
+        disabled={starting}
+        className="w-full h-14 bg-rust text-graphite font-display uppercase text-lg font-bold disabled:opacity-40 active:bg-rust/80 transition-colors"
+      >
+        {starting ? "Starting…" : "Start workout"}
+      </button>
+    </div>
   );
 }
