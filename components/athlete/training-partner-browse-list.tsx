@@ -91,7 +91,7 @@ export function TrainingPartnerBrowseList({
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 rows={2}
-                placeholder="Say hi, and share how they can reach you — a number, Instagram, or where to find you."
+                placeholder="Introduce yourself — what you're training for, your schedule, what gym or area you're in."
                 className="w-full bg-graphite border border-steel/30 text-chalk px-2.5 py-2 font-body text-sm focus:outline-none focus:border-rust resize-none"
               />
               {error && (
