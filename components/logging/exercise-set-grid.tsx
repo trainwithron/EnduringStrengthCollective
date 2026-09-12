@@ -138,20 +138,26 @@ function GridCell({
         inputMode={isNumeric ? "decimal" : undefined}
         aria-label={`${def.label} for set ${setNumber}${
           suggestion != null && draft.trim() === "" ? `, suggested ${suggestion}` : ""
-        }${showLock ? ", locked until you hit this goal" : ""}`}
+        }${showLock ? " — locked, beat this to unlock it" : ""}`}
         placeholder={placeholder}
         value={draft}
         disabled={readOnly}
         onChange={(e) => setDraft(e.target.value)}
         onBlur={handleBlur}
         {...swipe}
-        className="w-16 h-10 bg-surface border border-steel/30 rounded-token-pill text-chalk px-1 font-body text-sm text-center focus:outline-none focus:border-rust disabled:opacity-60 touch-pan-y"
+        className={`w-16 h-10 rounded-token-pill text-chalk px-1 font-body text-sm text-center focus:outline-none focus:border-rust disabled:opacity-60 touch-pan-y ${
+          showLock
+            ? "bg-rust/10 border-2 border-dashed border-rust/70"
+            : "bg-surface border border-steel/30"
+        }`}
       />
       {showLock && (
-        <Lock
+        <div
           aria-hidden="true"
-          className="w-3 h-3 absolute top-0.5 right-1.5 text-steel pointer-events-none"
-        />
+          className="absolute -bottom-1.5 -right-1.5 w-5 h-5 rounded-full bg-graphite border-2 border-rust flex items-center justify-center pointer-events-none animate-[obstacle-lock-pulse_1.6s_ease-in-out_infinite]"
+        >
+          <Lock className="w-2.5 h-2.5 text-rust" strokeWidth={3} />
+        </div>
       )}
     </div>
   );
