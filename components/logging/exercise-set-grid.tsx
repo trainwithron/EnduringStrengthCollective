@@ -12,7 +12,7 @@ import {
   type TrackedField,
 } from "@/lib/exercise-fields";
 import { parseNumericReps } from "@/lib/program-card-visuals";
-import { Check, GripVertical } from "lucide-react";
+import { Check } from "lucide-react";
 
 // Metrics-as-rows, sets-as-columns — one row per tracked field (Reps,
 // Weight, RPE, ...), one cell per set, scrolling horizontally instead of
@@ -233,15 +233,23 @@ export function ExerciseSetGrid({
     for (const s of rest) onSetChange(s.id, { [prop]: value } as Partial<SetLogEntry>);
   }
 
+  // Real usage feedback: the old handle sat at the far left of the row,
+  // past the field-label column — nothing marked where set 1 actually
+  // was, so the drag had no reliable starting point ("I can't hardly get
+  // it"). Moved to sit immediately left of set 1's own cell (the exact
+  // spot the drag needs to start from) and drawn as a small solid dot —
+  // still a real button with a full-height touch target, just a
+  // precise, deliberately small visual mark rather than an icon that
+  // reads as "drag me from anywhere in this wide area."
   function RowHandle({ field }: { field: TrackedField }) {
     const dragStartX = useRef<number | null>(null);
     const dragFired = useRef(false);
-    if (readOnly || sets.length < 2) return <div className="w-6 shrink-0" />;
+    if (readOnly || sets.length < 2) return <div className="w-5 shrink-0" />;
     return (
       <button
         type="button"
-        aria-label={`Drag to fill every set's ${fieldDef(field).label} with set 1's value`}
-        title="Drag to fill every set"
+        aria-label={`Drag from here to fill every set's ${fieldDef(field).label} with set 1's value`}
+        title="Drag from here to fill every set"
         onPointerDown={(e) => {
           dragStartX.current = e.clientX;
           dragFired.current = false;
@@ -254,9 +262,9 @@ export function ExerciseSetGrid({
             handlePropagateRow(field);
           }
         }}
-        className="w-6 h-10 shrink-0 flex items-center justify-center text-steel active:text-rust touch-none cursor-grab active:cursor-grabbing"
+        className="w-5 h-10 shrink-0 flex items-center justify-center touch-none cursor-grab active:cursor-grabbing group"
       >
-        <GripVertical className="w-3.5 h-3.5" />
+        <span className="w-2.5 h-2.5 rounded-full bg-steel group-active:bg-rust group-active:scale-125 transition-transform" />
       </button>
     );
   }
@@ -274,8 +282,8 @@ export function ExerciseSetGrid({
       ))}
       <div className="inline-flex flex-col gap-1.5 min-w-full">
         <div className="flex items-center gap-1.5">
-          <div className="w-6 shrink-0" />
           <div className="w-16 shrink-0" />
+          <div className="w-5 shrink-0" />
           {sets.map((set, i) => (
             <span key={set.id} className="w-16 shrink-0 text-center font-body text-xs text-steel">
               {i + 1}
@@ -285,10 +293,10 @@ export function ExerciseSetGrid({
 
         {fields.map((field) => (
           <div key={field} className="flex items-center gap-1.5">
-            <RowHandle field={field} />
             <span className="w-16 shrink-0 font-body text-xs text-steel truncate">
               {fieldDef(field).label}
             </span>
+            <RowHandle field={field} />
             {sets.map((set, i) => (
               <GridCell
                 key={set.id}
@@ -303,8 +311,8 @@ export function ExerciseSetGrid({
         ))}
 
         <div className="flex items-center gap-1.5">
-          <div className="w-6 shrink-0" />
           <span className="w-16 shrink-0 font-body text-xs text-steel truncate">Status</span>
+          <div className="w-5 shrink-0" />
           {sets.map((set) => {
             const isComplete = set.status === "completed";
             const isSkipped = set.status === "skipped";
