@@ -2,20 +2,21 @@ import type { Metadata } from "next";
 import { getSharedMilestone, type SharedMilestone } from "@/lib/shared-milestone";
 import { ShareWorkoutButton } from "@/components/share/share-workout-button";
 
-// Milestone Celebrations — the public celebration card for either
-// trend-based detector (reverse-diet flagship, recovery-volume
-// fast-follow). Deliberately public, no auth check, same model as
-// /share/[postId] — but reads exclusively through the service-role
-// client scoped to this one exact id (see lib/shared-milestone.ts),
-// never an anon RLS grant, since this data is more personal than a
-// workout PR. The reverse-diet card never surfaces raw calorie targets
-// or the athlete's literal weight — only the relative "expected vs
-// actual" framing.
+// Milestone Celebrations — the public celebration card for every trend-
+// based detector in this thread (reverse-diet flagship, recovery-volume
+// fast-follow, Category 2's cut/bulk phase alignment). Deliberately
+// public, no auth check, same model as /share/[postId] — but reads
+// exclusively through the service-role client scoped to this one exact
+// id (see lib/shared-milestone.ts), never an anon RLS grant, since this
+// data is more personal than a workout PR. The reverse-diet card never
+// surfaces raw calorie targets or the athlete's literal weight — only
+// the relative "expected vs actual" framing.
 
 function cardTitle(shared: SharedMilestone): string {
-  return shared.milestoneType === "reverse_diet"
-    ? `${shared.athleteName}'s metabolism is adapting 🔥`
-    : `${shared.athleteName} is training harder AND recovering better 💪`;
+  if (shared.milestoneType === "reverse_diet") return `${shared.athleteName}'s metabolism is adapting 🔥`;
+  if (shared.milestoneType === "recovery_volume")
+    return `${shared.athleteName} is training harder AND recovering better 💪`;
+  return `${shared.athleteName}'s ${shared.phase} is right on track 🎯`;
 }
 
 export async function generateMetadata(
@@ -47,6 +48,12 @@ export default async function ShareMilestonePage(
   }
 
   const shareTitle = cardTitle(shared);
+  const headline =
+    shared.milestoneType === "reverse_diet"
+      ? "Metabolism Milestone 🔥"
+      : shared.milestoneType === "recovery_volume"
+      ? "Recovery Milestone 💪"
+      : `${shared.phase === "cut" ? "Cut" : "Bulk"} On Track 🎯`;
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body flex items-center justify-center px-6 py-16">
@@ -55,12 +62,10 @@ export default async function ShareMilestonePage(
           {shared.groupName}
         </p>
 
-        <h1 className="font-display font-bold text-2xl uppercase leading-tight mt-4">
-          {shared.milestoneType === "reverse_diet" ? "Metabolism Milestone 🔥" : "Recovery Milestone 💪"}
-        </h1>
+        <h1 className="font-display font-bold text-2xl uppercase leading-tight mt-4">{headline}</h1>
         <p className="font-body text-lg mt-2">{shared.athleteName}</p>
 
-        {shared.milestoneType === "reverse_diet" ? (
+        {shared.milestoneType === "reverse_diet" && (
           <div className="mt-8 pb-6 border-b border-steel/20 space-y-3">
             <p className="font-body text-sm">
               Over the last {shared.windowWeeks} weeks, calories went up — deliberately, as part of
@@ -77,7 +82,9 @@ export default async function ShareMilestonePage(
               That&apos;s not luck — that&apos;s a metabolism working harder.
             </p>
           </div>
-        ) : (
+        )}
+
+        {shared.milestoneType === "recovery_volume" && (
           <div className="mt-8 pb-6 border-b border-steel/20 space-y-3">
             <p className="font-body text-sm">
               Over the last {shared.windowWeeks} weeks, logged training volume climbed
@@ -93,6 +100,27 @@ export default async function ShareMilestonePage(
             <p className="font-body text-sm mt-3">
               That combination — more work, no worse recovery — is the real sign a program is
               actually working.
+            </p>
+          </div>
+        )}
+
+        {shared.milestoneType === "phase_alignment" && (
+          <div className="mt-8 pb-6 border-b border-steel/20 space-y-3">
+            <p className="font-body text-sm">
+              Over the last {shared.windowWeeks} weeks, the plan was a real {shared.phase} — and the
+              numbers actually followed it.
+            </p>
+            <p className="font-display text-3xl leading-none text-rust">
+              {shared.calorieChangePct > 0 ? "+" : ""}
+              {shared.calorieChangePct}% calories
+            </p>
+            <p className="font-body text-xs text-steel uppercase tracking-wide">
+              weight {shared.weightChangePct > 0 ? "+" : ""}
+              {shared.weightChangePct}% over the same window
+            </p>
+            <p className="font-body text-sm mt-3">
+              Trend lines that actually match the plan — that&apos;s a program executing exactly as
+              designed.
             </p>
           </div>
         )}

@@ -5,6 +5,7 @@ import { sendPushToProfile } from "@/lib/send-push";
 import { computeReverseDietMilestone } from "@/lib/metabolic-trend";
 import { computeRecoveryVolumeMilestone } from "@/lib/recovery-volume-milestone";
 import { computeReadinessAverage } from "@/lib/wellness";
+import { classifyNutritionTrend, isTrendAligned, type NutritionPhase } from "@/lib/nutrition-trend-classifier";
 
 // Milestone Celebrations — weekly scan for both trend-based detectors
 // sharing this thread's one dual-trend engine (lib/metabolic-trend.ts's
@@ -16,13 +17,14 @@ import { computeReadinessAverage } from "@/lib/wellness";
 
 const REVERSE_DIET_WINDOW_WEEKS = 6;
 const RECOVERY_VOLUME_WINDOW_WEEKS = 4;
+const PHASE_ALIGNMENT_WINDOW_WEEKS = 6;
 const COOLDOWN_WEEKS = 8; // don't refire the same athlete+type again this soon
 
 async function recordMilestone(
   supabase: SupabaseClient,
   athleteId: string,
   groupId: string,
-  milestoneType: "reverse_diet" | "recovery_volume",
+  milestoneType: "reverse_diet" | "recovery_volume" | "phase_alignment",
   detail: Record<string, unknown>,
   athleteBody: string,
   coachBody: string
@@ -220,10 +222,83 @@ export async function GET(request: Request) {
     if (fired) recoveryVolumeDetected += 1;
   }
 
+  // --- Category 2: cut/bulk phase alignment — coach-tagged athletes,
+  // same false-positive guard as the reverse-diet flagship. Reuses the
+  // general trend classifier (lib/nutrition-trend-classifier.ts) rather
+  // than the flagship's own tightly-calibrated success check: alignment
+  // just means the observed trend actually matches the tagged phase.
+  let phaseAlignmentScanned = 0;
+  let phaseAlignmentDetected = 0;
+
+  const phaseAlignmentCutoff = new Date(now);
+  phaseAlignmentCutoff.setDate(phaseAlignmentCutoff.getDate() - PHASE_ALIGNMENT_WINDOW_WEEKS * 7);
+
+  const { data: cutBulkRows } = await supabase
+    .from("nutrition_phases")
+    .select("athlete_id, group_id, phase, started_at")
+    .in("phase", ["cut", "bulk"])
+    .lte("started_at", phaseAlignmentCutoff.toISOString().slice(0, 10));
+
+  for (const row of cutBulkRows ?? []) {
+    phaseAlignmentScanned += 1;
+    if (await alreadyFiredRecently(supabase, row.athlete_id, "phase_alignment", now)) continue;
+
+    const windowStart = new Date(now);
+    windowStart.setDate(windowStart.getDate() - PHASE_ALIGNMENT_WINDOW_WEEKS * 7);
+
+    const { data: macroRows } = await supabase
+      .from("daily_macros")
+      .select("log_date, calories")
+      .eq("athlete_id", row.athlete_id)
+      .eq("group_id", row.group_id)
+      .gte("log_date", windowStart.toISOString().slice(0, 10));
+    const { data: weightRows } = await supabase
+      .from("body_weight_logs")
+      .select("logged_date, weight")
+      .eq("athlete_id", row.athlete_id)
+      .eq("group_id", row.group_id)
+      .gte("logged_date", windowStart.toISOString().slice(0, 10));
+
+    const calorieSeries = (macroRows ?? [])
+      .filter((r) => r.calories != null)
+      .map((r) => ({ date: r.log_date as string, value: r.calories as number }));
+    const weightSeries = (weightRows ?? []).map((r) => ({
+      date: r.logged_date as string,
+      value: r.weight as number,
+    }));
+
+    const classification = classifyNutritionTrend(calorieSeries, weightSeries, now, PHASE_ALIGNMENT_WINDOW_WEEKS);
+    // Silent when there isn't enough data, or when the trend simply
+    // doesn't match yet — a mismatch is a live, on-page signal for the
+    // coach (see the athlete profile page), not something the cron
+    // pushes a notification about. Only a genuine, confirmed alignment
+    // is celebration-worthy.
+    if (!classification || !isTrendAligned(classification, row.phase as NutritionPhase)) continue;
+
+    const phaseLabel = row.phase === "cut" ? "cut" : "bulk";
+    const fired = await recordMilestone(
+      supabase,
+      row.athlete_id,
+      row.group_id,
+      "phase_alignment",
+      {
+        phase: row.phase,
+        calorieChangePct: classification.calorieChangePct,
+        weightChangePct: classification.weightChangePct,
+        windowWeeks: PHASE_ALIGNMENT_WINDOW_WEEKS,
+      },
+      `Your ${phaseLabel} is doing exactly what it's supposed to — the trend lines match the plan.`,
+      `A tagged athlete's ${phaseLabel} is trending exactly as planned.`
+    );
+    if (fired) phaseAlignmentDetected += 1;
+  }
+
   return NextResponse.json({
     reverseDietScanned,
     reverseDietDetected,
     recoveryVolumeScanned,
     recoveryVolumeDetected,
+    phaseAlignmentScanned,
+    phaseAlignmentDetected,
   });
 }

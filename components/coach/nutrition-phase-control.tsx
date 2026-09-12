@@ -2,39 +2,48 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import type { NutritionPhase } from "@/lib/nutrition-trend-classifier";
 
-// Milestone Celebrations flagship (reverse-diet detector) — the coach's
-// own explicit opt-in tag. The detector only ever fires for an athlete
-// tagged here, avoiding a false "congratulations" for someone who just
-// happened to eat more without gaining but wasn't actually on a
-// deliberate reverse-diet protocol (Ron's own confirmed decision).
+const PHASE_LABELS: Record<NutritionPhase, string> = {
+  reverse_diet: "Reverse diet",
+  cut: "Cut",
+  bulk: "Bulk",
+};
+
+// Milestone Celebrations (flagship + Category 2) — the coach's own
+// explicit opt-in tag for whichever nutrition phase an athlete is
+// actually running. The trend-based detectors only ever evaluate an
+// athlete tagged here, avoiding a false "congratulations" (or a false
+// "off track" flag) for someone whose eating just happened to shift
+// without a deliberate protocol behind it (Ron's own confirmed
+// decision, made for the reverse-diet flagship and extended here).
 export function NutritionPhaseControl({
   athleteId,
   groupId,
   coachId,
-  initialTagged,
+  initialPhase,
   initialStartedAt,
 }: {
   athleteId: string;
   groupId: string;
   coachId: string;
-  initialTagged: boolean;
+  initialPhase: NutritionPhase | null;
   initialStartedAt: string | null;
 }) {
-  const [tagged, setTagged] = useState(initialTagged);
+  const [phase, setPhase] = useState<NutritionPhase | null>(initialPhase);
   const [startedAt, setStartedAt] = useState(initialStartedAt);
   const [saving, setSaving] = useState(false);
 
-  async function handleToggle() {
+  async function handleChange(value: string) {
     setSaving(true);
     const supabase = createBrowserClient();
-    if (tagged) {
+    if (!value) {
       await supabase
         .from("nutrition_phases")
         .delete()
         .eq("athlete_id", athleteId)
         .eq("group_id", groupId);
-      setTagged(false);
+      setPhase(null);
       setStartedAt(null);
     } else {
       const today = new Date().toISOString().slice(0, 10);
@@ -42,13 +51,13 @@ export function NutritionPhaseControl({
         {
           athlete_id: athleteId,
           group_id: groupId,
-          phase: "reverse_diet",
+          phase: value,
           started_at: today,
           created_by: coachId,
         },
         { onConflict: "athlete_id,group_id" }
       );
-      setTagged(true);
+      setPhase(value as NutritionPhase);
       setStartedAt(today);
     }
     setSaving(false);
@@ -57,21 +66,22 @@ export function NutritionPhaseControl({
   return (
     <div className="flex items-center gap-3">
       <span className="font-body text-xs text-steel uppercase tracking-wide">
-        Reverse diet tracking
+        Nutrition phase tracking
       </span>
-      <button
-        type="button"
-        onClick={handleToggle}
+      <select
+        value={phase ?? ""}
+        onChange={(e) => handleChange(e.target.value)}
         disabled={saving}
-        className={`h-8 px-3 border font-body text-xs transition-colors disabled:opacity-40 ${
-          tagged
-            ? "bg-rust border-rust text-graphite"
-            : "border-steel/30 text-steel active:border-rust active:text-rust"
-        }`}
+        className="h-8 bg-surface border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust disabled:opacity-40"
       >
-        {saving ? "Saving…" : tagged ? "On — untag" : "Tag as reverse dieting"}
-      </button>
-      {tagged && startedAt && (
+        <option value="">Not tracking</option>
+        {(Object.keys(PHASE_LABELS) as NutritionPhase[]).map((p) => (
+          <option key={p} value={p}>
+            {PHASE_LABELS[p]}
+          </option>
+        ))}
+      </select>
+      {phase && startedAt && (
         <span className="font-body text-[11px] text-steel">
           since {new Date(`${startedAt}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
         </span>

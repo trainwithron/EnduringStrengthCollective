@@ -18,6 +18,11 @@ import { TrendChart } from "@/components/coach/desktop/trend-chart";
 import { ExerciseProgressionChart } from "@/components/coach/desktop/exercise-progression-chart";
 import { isHabitDueOn } from "@/lib/habits";
 import { computeWeeklyWeightTrend } from "@/lib/weight-trend";
+import {
+  classifyNutritionTrend,
+  isTrendAligned,
+  type NutritionPhase,
+} from "@/lib/nutrition-trend-classifier";
 
 export default async function AthleteProfilePage(
   props: {
@@ -148,6 +153,52 @@ export default async function AthleteProfilePage(
     .eq("athlete_id", params.athleteId)
     .eq("group_id", params.groupId)
     .maybeSingle();
+
+  // Category 2 (Milestone Celebrations) — a live "does the trend
+  // actually match the tagged goal" read, computed fresh on every page
+  // load rather than waiting for the weekly cron. Only queried when a
+  // phase is actually tagged, since there's nothing to classify
+  // otherwise.
+  let nutritionTrendAlignment: {
+    trend: string;
+    aligned: boolean;
+    calorieChangePct: number;
+    weightChangePct: number;
+  } | null = null;
+  if (nutritionPhaseRow?.phase) {
+    const sixWeeksAgo = new Date();
+    sixWeeksAgo.setDate(sixWeeksAgo.getDate() - 42);
+    const [{ data: macroRows }, { data: weightRowsForTrend }] = await Promise.all([
+      supabase
+        .from("daily_macros")
+        .select("log_date, calories")
+        .eq("athlete_id", params.athleteId)
+        .eq("group_id", params.groupId)
+        .gte("log_date", sixWeeksAgo.toISOString().slice(0, 10)),
+      supabase
+        .from("body_weight_logs")
+        .select("logged_date, weight")
+        .eq("athlete_id", params.athleteId)
+        .eq("group_id", params.groupId)
+        .gte("logged_date", sixWeeksAgo.toISOString().slice(0, 10)),
+    ]);
+    const calorieSeries = (macroRows ?? [])
+      .filter((r) => r.calories != null)
+      .map((r) => ({ date: r.log_date as string, value: r.calories as number }));
+    const weightSeries = (weightRowsForTrend ?? []).map((r) => ({
+      date: r.logged_date as string,
+      value: r.weight as number,
+    }));
+    const classification = classifyNutritionTrend(calorieSeries, weightSeries, new Date());
+    if (classification) {
+      nutritionTrendAlignment = {
+        trend: classification.trend,
+        aligned: isTrendAligned(classification, nutritionPhaseRow.phase as NutritionPhase),
+        calorieChangePct: classification.calorieChangePct,
+        weightChangePct: classification.weightChangePct,
+      };
+    }
+  }
 
   const { data: intake } = await supabase
     .from("client_intake")
@@ -599,9 +650,20 @@ export default async function AthleteProfilePage(
               athleteId={params.athleteId}
               groupId={params.groupId}
               coachId={user.id}
-              initialTagged={nutritionPhaseRow?.phase === "reverse_diet"}
+              initialPhase={(nutritionPhaseRow?.phase as NutritionPhase | undefined) ?? null}
               initialStartedAt={nutritionPhaseRow?.started_at ?? null}
             />
+            {nutritionTrendAlignment && (
+              <p
+                className={`font-body text-xs mt-2 ${
+                  nutritionTrendAlignment.aligned ? "text-positive" : "text-rust"
+                }`}
+              >
+                {nutritionTrendAlignment.aligned
+                  ? "✓ Trending as expected for this phase"
+                  : `⚠ Trend reads as "${nutritionTrendAlignment.trend.replace("_", " ")}" — doesn't match the tagged goal yet, worth a look`}
+              </p>
+            )}
           </section>
 
           <section>

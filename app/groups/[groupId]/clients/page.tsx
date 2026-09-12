@@ -4,6 +4,11 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ClientCardGrid } from "@/components/coach/desktop/client-card-grid";
 import { AddClientButton } from "@/components/coach/desktop/add-client-button";
 import type { RosterMember } from "@/lib/types";
+import {
+  classifyNutritionTrend,
+  isTrendAligned,
+  type NutritionPhase,
+} from "@/lib/nutrition-trend-classifier";
 
 export default async function ClientsPage(
   props: {
@@ -82,6 +87,56 @@ export default async function ClientsPage(
   const coaches = roster.filter((m) => m.role === "coach");
   const athletes = roster.filter((m) => m.role === "athlete");
 
+  // Category 2 (Milestone Celebrations) — Ron's own framing: the
+  // platform should be able to "intuit what you're doing by your trend
+  // lines," and a coach with too many clients whose trend doesn't match
+  // their tagged goal is itself a useful signal, not just each client's
+  // own concern. Deliberately bounded to the small set of athletes a
+  // coach has actually tagged (not a per-athlete scan of the whole
+  // roster) — same cost discipline as the rest of this page, which
+  // already keeps every per-athlete-heavy computation off the main
+  // roster query.
+  const { data: taggedPhaseRows } = await supabase
+    .from("nutrition_phases")
+    .select("athlete_id, phase")
+    .eq("group_id", params.groupId);
+
+  let phaseAlignmentSummary: { total: number; misaligned: number } | null = null;
+  if (taggedPhaseRows && taggedPhaseRows.length > 0) {
+    const sixWeeksAgo = new Date();
+    sixWeeksAgo.setDate(sixWeeksAgo.getDate() - 42);
+    let judged = 0;
+    let misaligned = 0;
+    for (const row of taggedPhaseRows) {
+      const [{ data: macroRows }, { data: weightRows }] = await Promise.all([
+        supabase
+          .from("daily_macros")
+          .select("log_date, calories")
+          .eq("athlete_id", row.athlete_id)
+          .eq("group_id", params.groupId)
+          .gte("log_date", sixWeeksAgo.toISOString().slice(0, 10)),
+        supabase
+          .from("body_weight_logs")
+          .select("logged_date, weight")
+          .eq("athlete_id", row.athlete_id)
+          .eq("group_id", params.groupId)
+          .gte("logged_date", sixWeeksAgo.toISOString().slice(0, 10)),
+      ]);
+      const calorieSeries = (macroRows ?? [])
+        .filter((r) => r.calories != null)
+        .map((r) => ({ date: r.log_date as string, value: r.calories as number }));
+      const weightSeries = (weightRows ?? []).map((r) => ({
+        date: r.logged_date as string,
+        value: r.weight as number,
+      }));
+      const classification = classifyNutritionTrend(calorieSeries, weightSeries, new Date());
+      if (!classification) continue;
+      judged += 1;
+      if (!isTrendAligned(classification, row.phase as NutritionPhase)) misaligned += 1;
+    }
+    if (judged > 0) phaseAlignmentSummary = { total: judged, misaligned };
+  }
+
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="clients">
       <div className="pb-6 border-b border-steel/20 mb-6 flex items-center justify-between">
@@ -95,6 +150,16 @@ export default async function ClientsPage(
           <AddClientButton groupId={params.groupId} groupName={group?.name ?? "This group"} createdBy={user.id} />
         </div>
       </div>
+
+      {phaseAlignmentSummary && phaseAlignmentSummary.misaligned > 0 && (
+        <div className="mb-6 px-4 py-3 border border-rust/30 bg-rust/5">
+          <p className="font-body text-sm">
+            {phaseAlignmentSummary.misaligned} of {phaseAlignmentSummary.total} tagged nutrition
+            phases {phaseAlignmentSummary.misaligned === 1 ? "isn't" : "aren't"} trending toward their
+            goal yet — worth a look on those client profiles.
+          </p>
+        </div>
+      )}
 
       {coaches.length > 0 && (
         <div className="mb-8">

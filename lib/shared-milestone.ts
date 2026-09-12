@@ -19,7 +19,13 @@ export async function getSharedMilestone(milestoneId: string) {
     .maybeSingle();
 
   if (!event) return null;
-  if (event.milestone_type !== "reverse_diet" && event.milestone_type !== "recovery_volume") return null;
+  if (
+    event.milestone_type !== "reverse_diet" &&
+    event.milestone_type !== "recovery_volume" &&
+    event.milestone_type !== "phase_alignment"
+  ) {
+    return null;
+  }
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -54,14 +60,34 @@ export async function getSharedMilestone(milestoneId: string) {
     };
   }
 
-  const detail = event.detail as { readinessChangePct: number; volumeChangePct: number; windowWeeks: number };
+  if (event.milestone_type === "recovery_volume") {
+    const detail = event.detail as { readinessChangePct: number; volumeChangePct: number; windowWeeks: number };
+    return {
+      id: event.id,
+      milestoneType: "recovery_volume" as const,
+      athleteName,
+      groupName,
+      readinessChangePct: detail.readinessChangePct,
+      volumeChangePct: detail.volumeChangePct,
+      windowWeeks: detail.windowWeeks,
+      detectedAt: event.detected_at as string,
+    };
+  }
+
+  const detail = event.detail as {
+    phase: "cut" | "bulk";
+    calorieChangePct: number;
+    weightChangePct: number;
+    windowWeeks: number;
+  };
   return {
     id: event.id,
-    milestoneType: "recovery_volume" as const,
+    milestoneType: "phase_alignment" as const,
     athleteName,
     groupName,
-    readinessChangePct: detail.readinessChangePct,
-    volumeChangePct: detail.volumeChangePct,
+    phase: detail.phase,
+    calorieChangePct: detail.calorieChangePct,
+    weightChangePct: detail.weightChangePct,
     windowWeeks: detail.windowWeeks,
     detectedAt: event.detected_at as string,
   };
