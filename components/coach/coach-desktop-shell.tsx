@@ -32,6 +32,7 @@ import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
 import { GroupSwitcher } from "@/components/coach/desktop/group-switcher";
 import { ViewAsClientButton } from "@/components/coach/desktop/view-as-client-button";
+import { ViewModeToggle } from "@/components/coach/view-mode-toggle";
 import { createBrowserClient } from "@/lib/supabase/client";
 
 function NavBadge({ count, collapsed }: { count: number; collapsed?: boolean }) {
@@ -451,6 +452,9 @@ export function CoachDesktopShell({
           <MonitorPlay className="w-3.5 h-3.5 shrink-0" strokeWidth={2.25} />
           {!collapsed && "Display Mode"}
         </a>
+      </div>
+      <div className={`border-t border-steel/20 py-2 ${collapsed ? "px-2" : "px-5"}`}>
+        <ViewModeToggle targetMode="mobile" label="Client-Facing Mode" collapsed={collapsed} />
       </div>
       {isPlatformAdmin && (
         <div className={`border-t border-steel/20 py-2 ${collapsed ? "px-2" : "px-5"} space-y-2`}>

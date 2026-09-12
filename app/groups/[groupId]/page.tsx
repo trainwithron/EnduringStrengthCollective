@@ -10,6 +10,7 @@ import { WeekAtAGlance, type WeekDayEntry } from "@/components/athlete/week-at-a
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { ViewAsClientEntryPoint } from "@/components/athlete/view-as-client-entry-point";
+import { ViewModeToggle } from "@/components/coach/view-mode-toggle";
 import { isHabitDueOn } from "@/lib/habits";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { getEffectiveAthlete } from "@/lib/acting-as";
@@ -264,8 +265,9 @@ export default async function GroupHubPage(
         <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
       )}
       {isCoach && showMobileView && !isActingAsOther && (
-        <div className="px-5 pt-4">
+        <div className="px-5 pt-4 flex items-center justify-between gap-3">
           <ViewAsClientEntryPoint />
+          <ViewModeToggle targetMode="desktop" label="Desktop Mode" variant="button" />
         </div>
       )}
       <GroupHubHeader
