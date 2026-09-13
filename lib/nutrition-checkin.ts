@@ -18,15 +18,29 @@
 
 export type NutritionPhase = "fat_loss" | "hypertrophy" | "maintenance" | "reverse_diet";
 
+// Coach-adjustable "how big should the engine's change be" dial, resolved
+// 2026-09-13 — a straight 1-15% range is fine (Ron's own framing: "5%
+// change, 10% change... pretty substantial whenever you're talking
+// fifteen hundred, two thousand calories"). Applies only to the branches
+// that represent a deliberate, planned adjustment (reverse-diet's
+// increase, fat-loss's stall cut) — NOT to the too-rapid-loss safety
+// correction, which stays fixed regardless of the coach's aggressiveness
+// preference (see tooRapidCalAdjustPct below for why).
+export const MIN_ADJUSTMENT_PCT = 1;
+export const MAX_ADJUSTMENT_PCT = 15;
+export const DEFAULT_ADJUSTMENT_PCT = 5;
+
+export function clampAdjustmentPct(value: number): number {
+  return Math.min(MAX_ADJUSTMENT_PCT, Math.max(MIN_ADJUSTMENT_PCT, value));
+}
+
 export const PHASE_CONFIG = {
   MIN_ADHERENT_DAYS: 5,
-  // Ron's resolved threshold shape (2026-09-13, same one applied to the
-  // milestone flagship's own detector): a real reverse-diet bump reads
-  // as a percentage of current calories, 3-10% scaled by how aggressive
-  // the phase is. Fixed at the floor of that range for now — a coach-
-  // adjustable version (a slider + exact date-range assignment) is
-  // planned but explicitly deferred while Ron finalizes that UI; this
-  // fixed default is a real, usable placeholder, not a guess.
+  // These are the ORIGINAL ported defaults (Ron's standalone tool),
+  // still used exactly as before whenever a caller doesn't pass an
+  // explicit `adjustmentPct` — every existing test and call site is
+  // unaffected. When a coach does set one, it overrides these for
+  // whichever branch actually fires (see runCheckInEngine).
   reverse_diet: {
     increasePct: 3,
     // Same tolerance already used by lib/metabolic-trend.ts's own
@@ -43,6 +57,11 @@ export const PHASE_CONFIG = {
     stallCutConservativePct: 0.96,
     stallCutAggressivePct: 0.92,
     tooRapidPctThreshold: -1.5,
+    // Deliberately NOT tied to the coach's adjustmentPct dial — this is a
+    // fatigue/lean-mass safety correction for loss that's already too
+    // fast, not a planned change the coach is dialing the size of. A
+    // coach setting a small adjustmentPct (e.g. 1%) for gentle planned
+    // bumps shouldn't also weaken this safety valve.
     tooRapidCalAdjustPct: 1.05,
   },
   hypertrophy: {
@@ -68,6 +87,11 @@ export interface CheckInInput {
   // spiked without yet triggering a trim. 0 if this is the first
   // check-in, or the athlete isn't in a hypertrophy phase.
   consecutiveSurplusSpikes: number;
+  // Coach-set "how big should a planned change be" dial, 1-15. Omit to
+  // keep the original ported defaults (8%/4%/3%) exactly as before —
+  // every existing caller that doesn't pass this sees byte-identical
+  // behavior.
+  adjustmentPct?: number;
 }
 
 export interface CheckInResult {
@@ -90,18 +114,23 @@ export function runCheckInEngine(input: CheckInInput): CheckInResult {
     rationale = `Inconsistent adherence (${adherenceDays}/7 days). Caloric baseline held steady to re-establish execution.`;
   } else if (phase === "fat_loss") {
     const cfg = PHASE_CONFIG.fat_loss;
+    // A coach-set dial overrides the aggressive cut size directly; the
+    // conservative (low-recovery) cut stays exactly half of it, the same
+    // ratio the original ported defaults already used (4% is half of 8%).
+    const aggressiveCutPct = input.adjustmentPct != null ? clampAdjustmentPct(input.adjustmentPct) : (1 - cfg.stallCutAggressivePct) * 100;
+    const conservativeCutPct = input.adjustmentPct != null ? aggressiveCutPct / 2 : (1 - cfg.stallCutConservativePct) * 100;
     if (pctChange >= cfg.optimalPctMin && pctChange <= cfg.optimalPctMax) {
       rationale = `Optimal fat loss rate achieved. Calorie targets held steady.`;
     } else if (pctChange > cfg.stallPctThreshold && deltaLbs >= cfg.stallDeltaLbsThreshold) {
       if (recoveryRating <= cfg.lowRecoveryThreshold) {
-        newCalories = Math.round(currentCalories * cfg.stallCutConservativePct);
+        newCalories = Math.round(currentCalories * (1 - conservativeCutPct / 100));
         rationale = `Fat loss plateau detected, but fatigue is high. Applied a conservative ${Math.round(
-          (1 - cfg.stallCutConservativePct) * 100
+          conservativeCutPct
         )}% deficit.`;
       } else {
-        newCalories = Math.round(currentCalories * cfg.stallCutAggressivePct);
+        newCalories = Math.round(currentCalories * (1 - aggressiveCutPct / 100));
         rationale = `Weight stalled over past 7 days. Scaled daily calories down ${Math.round(
-          (1 - cfg.stallCutAggressivePct) * 100
+          aggressiveCutPct
         )}% to re-stimulate fat loss.`;
       }
     } else if (pctChange < cfg.tooRapidPctThreshold) {
@@ -137,9 +166,10 @@ export function runCheckInEngine(input: CheckInInput): CheckInResult {
     }
   } else if (phase === "reverse_diet") {
     const cfg = PHASE_CONFIG.reverse_diet;
+    const increasePct = input.adjustmentPct != null ? clampAdjustmentPct(input.adjustmentPct) : cfg.increasePct;
     if (pctChange <= cfg.weightFlatOrDownMaxPct) {
-      newCalories = Math.round(currentCalories * (1 + cfg.increasePct / 100));
-      rationale = `Weight held flat or dropped — reverse diet progressing as planned. Increased calories ${cfg.increasePct}%.`;
+      newCalories = Math.round(currentCalories * (1 + increasePct / 100));
+      rationale = `Weight held flat or dropped — reverse diet progressing as planned. Increased calories ${increasePct}%.`;
     } else {
       rationale = `Weight trending up. Holding calories steady this week rather than pushing the reverse diet further.`;
     }

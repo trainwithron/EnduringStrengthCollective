@@ -4,6 +4,10 @@ import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import {
   runCheckInEngine,
+  clampAdjustmentPct,
+  DEFAULT_ADJUSTMENT_PCT,
+  MIN_ADJUSTMENT_PCT,
+  MAX_ADJUSTMENT_PCT,
   type NutritionPhase,
   type CheckInResult,
 } from "@/lib/nutrition-checkin";
@@ -47,9 +51,11 @@ export function WeeklyCheckinPanel({
     phase: NutritionPhase;
     consecutiveSurplusSpikes: number;
     dietaryRestrictions: string;
+    adjustmentPct: number;
   } | null;
 }) {
   const [phase, setPhase] = useState<NutritionPhase>(lastCheckin?.phase ?? "fat_loss");
+  const [adjustmentPct, setAdjustmentPct] = useState(lastCheckin?.adjustmentPct ?? DEFAULT_ADJUSTMENT_PCT);
   const [prevWeight, setPrevWeight] = useState(
     lastWeekAvgWeight != null ? String(lastWeekAvgWeight) : ""
   );
@@ -88,6 +94,7 @@ export function WeeklyCheckinPanel({
       adherenceDays: Number(adherenceDays),
       recoveryRating: Number(recoveryRating),
       consecutiveSurplusSpikes: lastCheckin?.consecutiveSurplusSpikes ?? 0,
+      adjustmentPct,
     });
     setResult(engineResult);
     const archetype = detectDietArchetype(dietaryRestrictions);
@@ -117,6 +124,7 @@ export function WeeklyCheckinPanel({
       new_calories: result.newCalories,
       rationale: result.rationale,
       consecutive_surplus_spikes: result.consecutiveSurplusSpikes,
+      adjustment_pct: adjustmentPct,
       diet_archetype: archetype,
       dietary_restrictions: dietaryRestrictions,
       protein_g: macros.proteinG,
@@ -177,6 +185,25 @@ export function WeeklyCheckinPanel({
               </option>
             ))}
           </select>
+        </label>
+
+        <label className="flex flex-col gap-1 col-span-2">
+          <span className="font-body text-[10px] text-steel uppercase tracking-wide">
+            Adjustment size — {adjustmentPct}% {phase === "reverse_diet" ? "increase" : "cut"}
+          </span>
+          <input
+            type="range"
+            min={MIN_ADJUSTMENT_PCT}
+            max={MAX_ADJUSTMENT_PCT}
+            step={1}
+            value={adjustmentPct}
+            onChange={(e) => setAdjustmentPct(clampAdjustmentPct(Number(e.target.value)))}
+            className="w-full accent-rust"
+          />
+          <span className="font-body text-[10px] text-steel">
+            How big a planned calorie change to make when one&apos;s due — gentler for a client who
+            needs a soft touch, bigger for one who can handle a real jump.
+          </span>
         </label>
 
         <label className="flex flex-col gap-1">

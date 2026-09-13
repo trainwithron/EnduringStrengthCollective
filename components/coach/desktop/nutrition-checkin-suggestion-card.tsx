@@ -17,6 +17,7 @@ export interface CheckinSuggestion {
   proteinG: number;
   carbsG: number;
   fatG: number;
+  adjustmentPct: number;
   generatedAt: string;
 }
 
@@ -70,6 +71,7 @@ export function NutritionCheckinSuggestionCard({
       protein_g: suggestion.proteinG,
       carbs_g: suggestion.carbsG,
       fat_g: suggestion.fatG,
+      adjustment_pct: suggestion.adjustmentPct,
       created_by: user?.id,
     });
     if (checkinError) {

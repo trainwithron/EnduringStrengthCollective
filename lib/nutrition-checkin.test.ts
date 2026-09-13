@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PHASE_CONFIG, runCheckInEngine, type CheckInInput } from "./nutrition-checkin";
+import { PHASE_CONFIG, runCheckInEngine, clampAdjustmentPct, type CheckInInput } from "./nutrition-checkin";
 
 // All weight pairs below are deliberately chosen (base weight 20 lbs)
 // so prevWeight/deltaLbs*100 lands on an exact, floating-point-safe
@@ -165,6 +165,54 @@ describe("runCheckInEngine — reverse_diet", () => {
     );
     expect(result.newCalories).toBe(2000);
     expect(result.rationale).toContain("Inconsistent adherence");
+  });
+});
+
+describe("clampAdjustmentPct", () => {
+  it("clamps below the floor up to 1", () => {
+    expect(clampAdjustmentPct(0)).toBe(1);
+    expect(clampAdjustmentPct(-5)).toBe(1);
+  });
+  it("clamps above the ceiling down to 15", () => {
+    expect(clampAdjustmentPct(20)).toBe(15);
+  });
+  it("leaves an in-range value untouched", () => {
+    expect(clampAdjustmentPct(7)).toBe(7);
+  });
+});
+
+describe("runCheckInEngine — coach-adjustable adjustmentPct", () => {
+  it("uses the coach-set percentage for a reverse-diet increase instead of the fixed default", () => {
+    const result = runCheckInEngine(baseInput({ phase: "reverse_diet", currWeightLbs: 20, adjustmentPct: 10 }));
+    expect(result.newCalories).toBe(Math.round(2000 * 1.1));
+    expect(result.rationale).toContain("Increased calories 10%");
+  });
+
+  it("clamps an out-of-range adjustmentPct before applying it", () => {
+    const result = runCheckInEngine(baseInput({ phase: "reverse_diet", currWeightLbs: 20, adjustmentPct: 999 }));
+    expect(result.newCalories).toBe(Math.round(2000 * 1.15));
+  });
+
+  it("uses the coach-set percentage for the aggressive fat-loss stall cut, with the conservative cut at exactly half", () => {
+    const aggressive = runCheckInEngine(
+      baseInput({ currWeightLbs: 19.96, recoveryRating: 3, adjustmentPct: 12 })
+    );
+    expect(aggressive.newCalories).toBe(Math.round(2000 * (1 - 12 / 100)));
+
+    const conservative = runCheckInEngine(
+      baseInput({ currWeightLbs: 19.96, recoveryRating: 2, adjustmentPct: 12 })
+    );
+    expect(conservative.newCalories).toBe(Math.round(2000 * (1 - 6 / 100)));
+  });
+
+  it("leaves the too-rapid-loss safety correction fixed regardless of adjustmentPct", () => {
+    const result = runCheckInEngine(baseInput({ currWeightLbs: 19.68, adjustmentPct: 1 }));
+    expect(result.newCalories).toBe(Math.round(2000 * PHASE_CONFIG.fat_loss.tooRapidCalAdjustPct));
+  });
+
+  it("without adjustmentPct, behavior is unchanged from the original ported defaults", () => {
+    const result = runCheckInEngine(baseInput({ phase: "reverse_diet", currWeightLbs: 20 }));
+    expect(result.newCalories).toBe(Math.round(2000 * (1 + PHASE_CONFIG.reverse_diet.increasePct / 100)));
   });
 });
 

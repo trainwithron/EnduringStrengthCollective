@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { runCheckInEngine, type NutritionPhase } from "@/lib/nutrition-checkin";
+import { runCheckInEngine, DEFAULT_ADJUSTMENT_PCT, type NutritionPhase } from "@/lib/nutrition-checkin";
 import { computeWeeklyWeightTrend } from "@/lib/weight-trend";
 import { computeReadinessAverage } from "@/lib/wellness";
 import { computeArchetypeMacros, detectDietArchetype } from "@/lib/macros";
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
   const { data: recentCheckins } = await supabase
     .from("nutrition_checkins")
     .select(
-      "athlete_id, group_id, phase, new_calories, consecutive_surplus_spikes, dietary_restrictions, created_at"
+      "athlete_id, group_id, phase, new_calories, consecutive_surplus_spikes, dietary_restrictions, adjustment_pct, created_at"
     )
     .order("created_at", { ascending: false });
 
@@ -52,6 +52,7 @@ export async function GET(request: Request) {
     new_calories: number;
     consecutive_surplus_spikes: number;
     dietary_restrictions: string | null;
+    adjustment_pct: number | null;
     created_at: string;
   }
 
@@ -108,6 +109,7 @@ export async function GET(request: Request) {
       adherenceDays: AUTOMATED_ADHERENCE_DAYS,
       recoveryRating,
       consecutiveSurplusSpikes: last.consecutive_surplus_spikes,
+      adjustmentPct: last.adjustment_pct ?? DEFAULT_ADJUSTMENT_PCT,
     });
 
     // Only a real, actionable recommendation is worth a coach's
@@ -136,6 +138,7 @@ export async function GET(request: Request) {
       protein_g: macros.proteinG,
       carbs_g: macros.carbsG,
       fat_g: macros.fatG,
+      adjustment_pct: last.adjustment_pct ?? DEFAULT_ADJUSTMENT_PCT,
       diet_archetype: archetype,
       dietary_restrictions: last.dietary_restrictions ?? "",
     });

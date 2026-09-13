@@ -342,7 +342,7 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
       .gte("log_date", sevenDaysAgoKey),
     supabase
       .from("nutrition_checkins")
-      .select("phase, consecutive_surplus_spikes, dietary_restrictions")
+      .select("phase, consecutive_surplus_spikes, dietary_restrictions, adjustment_pct")
       .eq("athlete_id", athleteId)
       .eq("group_id", groupId)
       .order("created_at", { ascending: false })
@@ -351,7 +351,7 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
     supabase
       .from("nutrition_checkin_suggestions")
       .select(
-        "id, phase, prev_weight_lbs, curr_weight_lbs, current_calories, adherence_days, recovery_rating, consecutive_surplus_spikes, new_calories, rationale, protein_g, carbs_g, fat_g, generated_at"
+        "id, phase, prev_weight_lbs, curr_weight_lbs, current_calories, adherence_days, recovery_rating, consecutive_surplus_spikes, new_calories, rationale, protein_g, carbs_g, fat_g, adjustment_pct, generated_at"
       )
       .eq("athlete_id", athleteId)
       .eq("group_id", groupId)
@@ -389,6 +389,7 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
         phase: lastCheckinRow.phase as NutritionPhase,
         consecutiveSurplusSpikes: lastCheckinRow.consecutive_surplus_spikes,
         dietaryRestrictions: lastCheckinRow.dietary_restrictions ?? "",
+        adjustmentPct: lastCheckinRow.adjustment_pct,
       }
     : null;
 
@@ -406,6 +407,7 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
     proteinG: s.protein_g,
     carbsG: s.carbs_g,
     fatG: s.fat_g,
+    adjustmentPct: s.adjustment_pct,
     generatedAt: s.generated_at,
   }));
 
