@@ -4,10 +4,30 @@ import { useEffect, useRef, useState } from "react";
 import { computeRemainingSeconds, formatMMSS } from "@/lib/rest-timer-math";
 import { readRestTimerState, writeRestTimerState, clearRestTimerState } from "@/lib/rest-timer-storage";
 import { playRestAlert } from "@/lib/rest-alert";
+import { MIN_REST_SECONDS_FOR_GAME } from "@/lib/rest-timer-difficulty";
 import { SessionStopwatch } from "./session-stopwatch";
 import { SnakeMiniGame } from "./snake-mini-game";
+import { FlappyMiniGame } from "./flappy-mini-game";
+import { EndlessRunnerMiniGame } from "./endless-runner-mini-game";
+import { WhackAMoleMiniGame } from "./whack-a-mole-mini-game";
+import { BreakoutMiniGame } from "./breakout-mini-game";
+import { LaneDodgeMiniGame } from "./lane-dodge-mini-game";
 
 const PRESETS = [60, 90, 120];
+
+// The rest-timer mini-game library (Phase 4, custom_shape_theming_idea.md)
+// — Ron's confirmed six, Tetris/2048/Simon Says explicitly excluded as
+// worse fits for the escalating-difficulty-to-natural-death mechanic.
+type GameKey = "snake" | "flappy" | "runner" | "whack-a-mole" | "breakout" | "lane-dodge";
+const GAME_LABELS: Record<GameKey, string> = {
+  snake: "Snake",
+  flappy: "Flappy",
+  runner: "Runner",
+  "whack-a-mole": "Whack-a-Mole",
+  breakout: "Breakout",
+  "lane-dodge": "Lane Dodge",
+};
+const GAME_ORDER: GameKey[] = ["snake", "flappy", "runner", "whack-a-mole", "breakout", "lane-dodge"];
 
 interface RunningState {
   startedAtMs: number;
@@ -32,7 +52,8 @@ export function RestTimerBar({
   const [running, setRunning] = useState<RunningState | null>(null);
   const [remaining, setRemaining] = useState(0);
   const [justFinished, setJustFinished] = useState(false);
-  const [gameOpen, setGameOpen] = useState(false);
+  const [selectedGame, setSelectedGame] = useState<GameKey | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const wakeLockRef = useRef<any>(null);
 
   // Purely optional content riding on the countdown, per the governing
@@ -41,7 +62,10 @@ export function RestTimerBar({
   // nobody's staring at a stale game board once it's time for the next
   // set, without the game itself needing to know anything about why.
   useEffect(() => {
-    if (!running) setGameOpen(false);
+    if (!running) {
+      setSelectedGame(null);
+      setPickerOpen(false);
+    }
   }, [running]);
 
   async function acquireWakeLock() {
@@ -153,15 +177,40 @@ export function RestTimerBar({
             >
               Skip
             </button>
-            <button
-              type="button"
-              onClick={() => setGameOpen((v) => !v)}
-              className={`h-8 px-2.5 border font-body text-xs ${
-                gameOpen ? "bg-rust border-rust text-graphite" : "border-steel/30 text-steel"
-              }`}
-            >
-              🎮 {gameOpen ? "Hide" : "Snake"}
-            </button>
+            {/* Below the 45s minimum, no mini-game — just the plain
+                countdown above. A real game needs a real ~20-25s+
+                window to feel like a game rather than a flash on
+                screen (custom_shape_theming_idea.md). */}
+            {running.durationSeconds >= MIN_REST_SECONDS_FOR_GAME && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => (selectedGame ? setSelectedGame(null) : setPickerOpen((v) => !v))}
+                  className={`h-8 px-2.5 border font-body text-xs ${
+                    selectedGame ? "bg-rust border-rust text-graphite" : "border-steel/30 text-steel"
+                  }`}
+                >
+                  🎮 {selectedGame ? "Hide" : "Play"}
+                </button>
+                {pickerOpen && !selectedGame && (
+                  <div className="absolute right-0 top-full mt-1 z-20 bg-surface border border-steel/30 py-1 w-40">
+                    {GAME_ORDER.map((key) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => {
+                          setSelectedGame(key);
+                          setPickerOpen(false);
+                        }}
+                        className="w-full text-left px-3 py-1.5 font-body text-xs text-chalk active:text-rust"
+                      >
+                        {GAME_LABELS[key]}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -170,7 +219,14 @@ export function RestTimerBar({
         )}
       </div>
 
-      {running && gameOpen && <SnakeMiniGame onClose={() => setGameOpen(false)} />}
+      {running && selectedGame && (
+        <MiniGameSlot
+          gameKey={selectedGame}
+          startedAtMs={running.startedAtMs}
+          durationSeconds={running.durationSeconds}
+          onClose={() => setSelectedGame(null)}
+        />
+      )}
 
       {showPrompt && (
         <div className="flex items-center gap-2 mt-2.5">
@@ -210,4 +266,34 @@ export function RestTimerBar({
       )}
     </div>
   );
+}
+
+// A thin switch over the six-game library — keeps rest-timer-bar.tsx
+// itself from needing to know each game's own prop shape beyond the
+// three they all share (onClose, startedAtMs, durationSeconds).
+function MiniGameSlot({
+  gameKey,
+  startedAtMs,
+  durationSeconds,
+  onClose,
+}: {
+  gameKey: GameKey;
+  startedAtMs: number;
+  durationSeconds: number;
+  onClose: () => void;
+}) {
+  switch (gameKey) {
+    case "snake":
+      return <SnakeMiniGame onClose={onClose} startedAtMs={startedAtMs} durationSeconds={durationSeconds} />;
+    case "flappy":
+      return <FlappyMiniGame onClose={onClose} startedAtMs={startedAtMs} durationSeconds={durationSeconds} />;
+    case "runner":
+      return <EndlessRunnerMiniGame onClose={onClose} startedAtMs={startedAtMs} durationSeconds={durationSeconds} />;
+    case "whack-a-mole":
+      return <WhackAMoleMiniGame onClose={onClose} startedAtMs={startedAtMs} durationSeconds={durationSeconds} />;
+    case "breakout":
+      return <BreakoutMiniGame onClose={onClose} startedAtMs={startedAtMs} durationSeconds={durationSeconds} />;
+    case "lane-dodge":
+      return <LaneDodgeMiniGame onClose={onClose} startedAtMs={startedAtMs} durationSeconds={durationSeconds} />;
+  }
 }

@@ -33,3 +33,35 @@ export function recordSnakeScore(score: number): number {
   }
   return score;
 }
+
+// Generic per-game version of the same convention, for the rest of the
+// mini-game library (Flappy-style, endless runner, whack-a-mole,
+// breakout, lane-dodge) — one storage key per game rather than
+// duplicating the read/record pair five more times.
+function gameStorageKey(gameKey: string): string {
+  return `esc-rest-timer-${gameKey}-high-score`;
+}
+
+export function readGameHighScore(gameKey: string): number {
+  if (typeof window === "undefined") return 0;
+  try {
+    const stored = window.localStorage.getItem(gameStorageKey(gameKey));
+    const n = stored ? Number(stored) : 0;
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function recordGameHighScore(gameKey: string, score: number): number {
+  const previous = readGameHighScore(gameKey);
+  if (score <= previous) return previous;
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.setItem(gameStorageKey(gameKey), String(score));
+    } catch {
+      // Private-browsing / storage-blocked — non-fatal, same as above.
+    }
+  }
+  return score;
+}

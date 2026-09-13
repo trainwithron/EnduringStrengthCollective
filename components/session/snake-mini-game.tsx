@@ -3,11 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 import { createSnakeGame, stepSnakeGame, type Direction, type SnakeGameState } from "@/lib/snake-game";
 import { readSnakeHighScore, recordSnakeScore } from "@/lib/rest-timer-high-score";
+import { computeDifficultyProgress, computeDifficultyMultiplier } from "@/lib/rest-timer-difficulty";
 
 const GRID_SIZE = 15;
 const CELL_PX = 16;
 const CANVAS_PX = GRID_SIZE * CELL_PX;
-const TICK_MS = 180; // a calm, casual pace — this is dead-time filler, not a twitch game
+// A calm, casual starting pace, ramping faster as the rest window closes
+// (shared difficulty engine, Phase 4's rest-timer-mini-game library) —
+// this is dead-time filler, not a twitch game, so the ramp stays gentle
+// early and only bites in the back stretch.
+const TICK_MS_START = 180;
+const TICK_MS_MIN = 90;
 const SWIPE_THRESHOLD_PX = 16;
 
 const RUST = "#D2703B";
@@ -19,7 +25,15 @@ const GRAPHITE = "#1C1B1A";
 // rest-timer-bar.tsx). Never pauses, extends, or gates that countdown —
 // it just fills the same dead time with something to do. The caller is
 // responsible for actually unmounting this when the rest period ends.
-export function SnakeMiniGame({ onClose }: { onClose: () => void }) {
+export function SnakeMiniGame({
+  onClose,
+  startedAtMs,
+  durationSeconds,
+}: {
+  onClose: () => void;
+  startedAtMs: number;
+  durationSeconds: number;
+}) {
   const [gameState, setGameState] = useState<SnakeGameState>(() => createSnakeGame(GRID_SIZE));
   const [highScore, setHighScore] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -32,18 +46,25 @@ export function SnakeMiniGame({ onClose }: { onClose: () => void }) {
     setHighScore(readSnakeHighScore());
   }, []);
 
-  // The tick interval reads gameStateRef (always current) rather than
-  // closing over a stale `gameState` — a plain setInterval would
-  // otherwise keep stepping from whatever state existed when the
-  // interval was created.
+  // Self-scheduling via setTimeout rather than a fixed setInterval, so
+  // the tick delay can keep ramping continuously against real elapsed
+  // rest time (the shared difficulty engine) instead of only updating
+  // when this effect happens to re-run.
   useEffect(() => {
     if (gameState.status === "over") return;
-    const interval = setInterval(() => {
-      setGameState((prev) => stepSnakeGame(prev, pendingDirectionRef.current));
-      pendingDirectionRef.current = null;
-    }, TICK_MS);
-    return () => clearInterval(interval);
-  }, [gameState.status]);
+    let timeoutId: ReturnType<typeof setTimeout>;
+    function scheduleNext() {
+      const progress = computeDifficultyProgress(Date.now() - startedAtMs, durationSeconds * 1000);
+      const tickMs = computeDifficultyMultiplier(progress, TICK_MS_START, TICK_MS_MIN);
+      timeoutId = setTimeout(() => {
+        setGameState((prev) => stepSnakeGame(prev, pendingDirectionRef.current));
+        pendingDirectionRef.current = null;
+        scheduleNext();
+      }, tickMs);
+    }
+    scheduleNext();
+    return () => clearTimeout(timeoutId);
+  }, [gameState.status, startedAtMs, durationSeconds]);
 
   useEffect(() => {
     if (gameState.status === "over") {
