@@ -14,6 +14,8 @@ import {
 import { getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
 import { computeProgramDayProgress } from "@/lib/program-day-progress";
 import { ProgramProgressBanner } from "@/components/coach/program-progress-banner";
+import { gatherProgrammingSpotterFlags } from "@/lib/programming-spotter-gather";
+import { ProgrammingSpotterPanel } from "@/components/coach/desktop/programming-spotter-panel";
 import { Lock } from "lucide-react";
 import type { BuilderDay, BuilderExercise, BuilderNote } from "@/lib/types";
 
@@ -360,6 +362,8 @@ async function CoachProgramBuilder({
     }
   }
 
+  const spotterFlags = await gatherProgrammingSpotterFlags(supabase, { programId, programName, coachId });
+
   return (
     <CoachDesktopShell groupId={groupId} groupName={group?.name ?? "Coaching"} active="programs">
       {dayProgress && (
@@ -370,6 +374,7 @@ async function CoachProgramBuilder({
           totalVolumeLbs={totalVolumeLbs}
         />
       )}
+      <ProgrammingSpotterPanel programId={programId} flags={spotterFlags} />
       <ProgramBuilderDesktop
         programId={programId}
         groupId={groupId}
