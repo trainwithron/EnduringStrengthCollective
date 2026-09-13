@@ -36,6 +36,7 @@ export function computeWindowedAverage(
 export interface ReverseDietMilestoneResult {
   qualifies: boolean;
   calorieIncrease: number; // kcal/day, first-half avg vs last-half avg of the window
+  calorieIncreasePct: number; // calorieIncrease as a % of the first-half average
   weightChangePct: number; // over the window, relative to the starting average
   // Ron's own framing: "you'd be gaining ~X lbs/week at this rate" — a
   // standard 3500 kcal/lb conversion applied to the calorie increase
@@ -58,7 +59,14 @@ export function computeReverseDietMilestone(
   weightRows: DateValueRow[],
   asOf: Date,
   windowWeeks = 6,
-  calorieIncreaseThresholdKcal = 75,
+  // Ron's resolved threshold (2026-09-13): a real reverse-diet bump reads
+  // as a PERCENTAGE of current intake, not a flat kcal number — a gentle
+  // adjustment sits near 3%, an aggressive one near 10%. There's no
+  // "how aggressive was this phase" signal tracked anywhere yet, so this
+  // defaults to the floor of that resolved range (the most permissive
+  // real number in it) rather than guessing at an aggressiveness score —
+  // tunable per phase later once that signal exists.
+  calorieIncreasePctThreshold = 3,
   weightChangeToleranceMinPct = -100,
   weightChangeToleranceMaxPct = 0.5
 ): ReverseDietMilestoneResult | null {
@@ -78,20 +86,28 @@ export function computeReverseDietMilestone(
     secondHalfCalories == null ||
     firstHalfWeight == null ||
     secondHalfWeight == null ||
+    firstHalfCalories === 0 ||
     firstHalfWeight === 0
   ) {
     return null;
   }
 
   const calorieIncrease = Math.round(secondHalfCalories - firstHalfCalories);
+  const calorieIncreasePct = (calorieIncrease / firstHalfCalories) * 100;
   const weightChangeLbs = secondHalfWeight - firstHalfWeight;
   const weightChangePct = (weightChangeLbs / firstHalfWeight) * 100;
   const weeklyExpectedGainLbs = Math.round((calorieIncrease * 7 * 10) / KCAL_PER_LB) / 10;
 
   const qualifies =
-    calorieIncrease >= calorieIncreaseThresholdKcal &&
+    calorieIncreasePct >= calorieIncreasePctThreshold &&
     weightChangePct >= weightChangeToleranceMinPct &&
     weightChangePct <= weightChangeToleranceMaxPct;
 
-  return { qualifies, calorieIncrease, weightChangePct: Math.round(weightChangePct * 10) / 10, weeklyExpectedGainLbs };
+  return {
+    qualifies,
+    calorieIncrease,
+    calorieIncreasePct: Math.round(calorieIncreasePct * 10) / 10,
+    weightChangePct: Math.round(weightChangePct * 10) / 10,
+    weeklyExpectedGainLbs,
+  };
 }

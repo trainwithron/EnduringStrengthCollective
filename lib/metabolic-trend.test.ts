@@ -74,6 +74,25 @@ describe("computeReverseDietMilestone", () => {
     expect(result!.qualifies).toBe(false);
   });
 
+  it("scales the threshold by percentage of current calories, not a flat kcal number", () => {
+    // Base 3000 kcal + 80 kcal (2.67%) — would have qualified under the
+    // old flat +75 kcal rule but must NOT qualify under Ron's resolved
+    // percentage-of-calories rule (3% of 3000 = 90 kcal needed).
+    const calorieRows = [...buildDailyRows(41, 21, 3000), ...buildDailyRows(20, 0, 3080)];
+    const weightRows = [...buildDailyRows(41, 21, 180), ...buildDailyRows(20, 0, 180)];
+    const result = computeReverseDietMilestone(calorieRows, weightRows, asOf);
+    expect(result!.calorieIncreasePct).toBe(2.7);
+    expect(result!.qualifies).toBe(false);
+  });
+
+  it("reports calorieIncreasePct and qualifies once it clears the 3% floor", () => {
+    const calorieRows = [...buildDailyRows(41, 21, 2000), ...buildDailyRows(20, 0, 2100)]; // +5%
+    const weightRows = [...buildDailyRows(41, 21, 180), ...buildDailyRows(20, 0, 180)];
+    const result = computeReverseDietMilestone(calorieRows, weightRows, asOf);
+    expect(result!.calorieIncreasePct).toBe(5);
+    expect(result!.qualifies).toBe(true);
+  });
+
   it("does not qualify when weight meaningfully increased alongside calories", () => {
     const calorieRows = [...buildDailyRows(41, 21, 2200), ...buildDailyRows(20, 0, 2300)];
     const weightRows = [...buildDailyRows(41, 21, 180), ...buildDailyRows(20, 0, 184)]; // +2.2%
