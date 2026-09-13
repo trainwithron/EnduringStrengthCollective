@@ -10,6 +10,7 @@ import { ChangeClientGroupControl } from "@/components/coach/change-client-group
 import { ClientProgrammingMenu } from "@/components/coach/client-programming-menu";
 import { MinorConsentControl } from "@/components/coach/minor-consent-control";
 import { NutritionPhaseControl } from "@/components/coach/nutrition-phase-control";
+import { VideoCheckinRecorder } from "@/components/coach/video-checkin-recorder";
 import { ParQAnswersPanel } from "@/components/coach/par-q-answers-panel";
 import { isUnder13 } from "@/lib/coppa";
 import { CoachLoggedBadge } from "@/components/coach-logged-badge";
@@ -489,6 +490,7 @@ export default async function AthleteProfilePage(
           >
             Calendar
           </Link>
+          <VideoCheckinRecorder athleteId={params.athleteId} groupId={params.groupId} coachId={user.id} />
           <Link
             href={`/groups/${params.groupId}/calendar?client=${params.athleteId}`}
             className="inline-flex items-center h-9 font-body text-xs text-graphite bg-rust px-3 font-medium"
