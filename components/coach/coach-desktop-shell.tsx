@@ -29,6 +29,7 @@ import {
   Activity,
   CalendarClock,
   Mail,
+  Trophy,
 } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
@@ -78,7 +79,8 @@ type Active =
   | "team-calendar"
   | "game-detail"
   | "team-performance"
-  | "messages";
+  | "messages"
+  | "records";
 
 interface NavLeaf {
   key: Active;
@@ -414,6 +416,7 @@ export function CoachDesktopShell({
       icon: Flag,
       items: [
         { key: "challenges", label: "Challenges", href: `/groups/${groupId}/challenges`, icon: Flag },
+        { key: "records", label: "Hall of Fame", href: `/groups/${groupId}/records`, icon: Trophy },
         { key: "resources", label: "Resources", href: `/groups/${groupId}/resources`, icon: HeartHandshake },
       ],
     },

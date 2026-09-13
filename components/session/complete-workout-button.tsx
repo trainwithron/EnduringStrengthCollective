@@ -16,6 +16,12 @@ interface CompleteWorkoutResult {
   total_volume: number;
   total_sets_completed: number;
   new_prs: string[];
+  // Group record book (record_holders_hall_of_fame_scoping memory) —
+  // weight-only for now, computed alongside the existing personal-PR
+  // check inside the same RPC. Exercise names that just became the
+  // group's new all-time-best weight, distinct from newPrs (a personal
+  // best) — an exercise can be both at once.
+  new_records: string[];
 }
 
 export function CompleteWorkoutButton({
@@ -72,6 +78,7 @@ export function CompleteWorkoutButton({
     ]);
     const broadcastLevel = athleteProfile?.feed_broadcast_level ?? "full";
     const newPrs = result.new_prs ?? [];
+    const newRecords = result.new_records ?? [];
 
     // A 1-on-1 client's own training is exactly the "notify promptly"
     // case from the priority-tiers design — a big/online-tier group's
@@ -87,7 +94,8 @@ export function CompleteWorkoutButton({
         .maybeSingle();
       if (coachMembership) {
         const athleteName = athleteProfile?.full_name ?? "Your client";
-        const prSuffix = newPrs.length > 0 ? " — new PR! 🎉" : "";
+        const prSuffix =
+          newRecords.length > 0 ? " — new GROUP RECORD! 🏆" : newPrs.length > 0 ? " — new PR! 🎉" : "";
         notifyPush(
           coachMembership.profile_id,
           "Workout logged",
