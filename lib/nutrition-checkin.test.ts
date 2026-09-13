@@ -130,6 +130,44 @@ describe("runCheckInEngine — hypertrophy", () => {
   });
 });
 
+describe("runCheckInEngine — reverse_diet", () => {
+  it("increases calories by the configured percentage when weight holds flat", () => {
+    const result = runCheckInEngine(baseInput({ phase: "reverse_diet", currWeightLbs: 20 }));
+    expect(result.newCalories).toBe(Math.round(2000 * (1 + PHASE_CONFIG.reverse_diet.increasePct / 100)));
+    expect(result.rationale).toContain("progressing as planned");
+  });
+
+  it("increases calories when weight actually dropped, not just held", () => {
+    const result = runCheckInEngine(baseInput({ phase: "reverse_diet", currWeightLbs: 19.8 }));
+    expect(result.newCalories).toBe(Math.round(2000 * (1 + PHASE_CONFIG.reverse_diet.increasePct / 100)));
+  });
+
+  it("still increases right at the flat-or-down boundary (+0.5%)", () => {
+    // 200 -> 201 is exactly +0.5% (floating-point-safe at this base weight)
+    const result = runCheckInEngine(
+      baseInput({ phase: "reverse_diet", prevWeightLbs: 200, currWeightLbs: 201 })
+    );
+    expect(result.newCalories).toBe(Math.round(2000 * (1 + PHASE_CONFIG.reverse_diet.increasePct / 100)));
+  });
+
+  it("holds calories steady when weight is trending up past the flat band", () => {
+    // 200 -> 202 is +1% (floating-point-safe) -- past the 0.5% ceiling
+    const result = runCheckInEngine(
+      baseInput({ phase: "reverse_diet", prevWeightLbs: 200, currWeightLbs: 202 })
+    );
+    expect(result.newCalories).toBe(2000);
+    expect(result.rationale).toContain("Holding calories steady");
+  });
+
+  it("still gates on adherence before evaluating the reverse-diet trend", () => {
+    const result = runCheckInEngine(
+      baseInput({ phase: "reverse_diet", currWeightLbs: 20, adherenceDays: PHASE_CONFIG.MIN_ADHERENT_DAYS - 1 })
+    );
+    expect(result.newCalories).toBe(2000);
+    expect(result.rationale).toContain("Inconsistent adherence");
+  });
+});
+
 describe("runCheckInEngine — maintenance", () => {
   it("holds steady with a maintenance-specific rationale", () => {
     const result = runCheckInEngine(baseInput({ phase: "maintenance", currWeightLbs: 20.05 }));

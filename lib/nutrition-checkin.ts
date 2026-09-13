@@ -16,10 +16,24 @@
 // optimalPctMax) so the more specific, accurate message is the one that
 // actually shows — the calorie math itself is unchanged either way.
 
-export type NutritionPhase = "fat_loss" | "hypertrophy" | "maintenance";
+export type NutritionPhase = "fat_loss" | "hypertrophy" | "maintenance" | "reverse_diet";
 
 export const PHASE_CONFIG = {
   MIN_ADHERENT_DAYS: 5,
+  // Ron's resolved threshold shape (2026-09-13, same one applied to the
+  // milestone flagship's own detector): a real reverse-diet bump reads
+  // as a percentage of current calories, 3-10% scaled by how aggressive
+  // the phase is. Fixed at the floor of that range for now — a coach-
+  // adjustable version (a slider + exact date-range assignment) is
+  // planned but explicitly deferred while Ron finalizes that UI; this
+  // fixed default is a real, usable placeholder, not a guess.
+  reverse_diet: {
+    increasePct: 3,
+    // Same tolerance already used by lib/metabolic-trend.ts's own
+    // qualifying band — "flat or down" means weight change up to this
+    // % of starting bodyweight still counts as on track.
+    weightFlatOrDownMaxPct: 0.5,
+  },
   fat_loss: {
     optimalPctMin: -1.2,
     optimalPctMax: -0.5,
@@ -120,6 +134,14 @@ export function runCheckInEngine(input: CheckInInput): CheckInResult {
     } else {
       spikes = 0;
       rationale = `Hypertrophy progression on track. Surplus held steady.`;
+    }
+  } else if (phase === "reverse_diet") {
+    const cfg = PHASE_CONFIG.reverse_diet;
+    if (pctChange <= cfg.weightFlatOrDownMaxPct) {
+      newCalories = Math.round(currentCalories * (1 + cfg.increasePct / 100));
+      rationale = `Weight held flat or dropped — reverse diet progressing as planned. Increased calories ${cfg.increasePct}%.`;
+    } else {
+      rationale = `Weight trending up. Holding calories steady this week rather than pushing the reverse diet further.`;
     }
   } else {
     rationale = `Body mass stabilized within maintenance threshold.`;

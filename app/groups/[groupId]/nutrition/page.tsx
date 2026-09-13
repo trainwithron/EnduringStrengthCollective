@@ -4,6 +4,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { NutritionTools } from "@/components/coach/desktop/nutrition-tools";
 import { WeeklyCheckinPanel } from "@/components/coach/desktop/weekly-checkin-panel";
+import { NutritionCheckinSuggestionsList } from "@/components/coach/desktop/nutrition-checkin-suggestions-list";
 import { computeWeeklyWeightTrend } from "@/lib/weight-trend";
 import { computeReadinessAverage } from "@/lib/wellness";
 import type { NutritionPhase } from "@/lib/nutrition-checkin";
@@ -311,6 +312,7 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
     { data: recentMacroRow },
     { data: wellnessRows },
     { data: lastCheckinRow },
+    { data: pendingSuggestionRows },
   ] = await Promise.all([
     supabase
       .from("body_weight_logs")
@@ -346,6 +348,15 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    supabase
+      .from("nutrition_checkin_suggestions")
+      .select(
+        "id, phase, prev_weight_lbs, curr_weight_lbs, current_calories, adherence_days, recovery_rating, consecutive_surplus_spikes, new_calories, rationale, protein_g, carbs_g, fat_g, generated_at"
+      )
+      .eq("athlete_id", athleteId)
+      .eq("group_id", groupId)
+      .eq("status", "pending")
+      .order("generated_at", { ascending: false }),
   ]);
 
   const weightTrend = computeWeeklyWeightTrend(
@@ -381,8 +392,30 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
       }
     : null;
 
+  const pendingSuggestions = (pendingSuggestionRows ?? []).map((s) => ({
+    id: s.id,
+    phase: s.phase,
+    prevWeightLbs: s.prev_weight_lbs,
+    currWeightLbs: s.curr_weight_lbs,
+    currentCalories: s.current_calories,
+    adherenceDays: s.adherence_days,
+    recoveryRating: s.recovery_rating,
+    consecutiveSurplusSpikes: s.consecutive_surplus_spikes,
+    newCalories: s.new_calories,
+    rationale: s.rationale,
+    proteinG: s.protein_g,
+    carbsG: s.carbs_g,
+    fatG: s.fat_g,
+    generatedAt: s.generated_at,
+  }));
+
   return (
     <div className="space-y-8">
+      <NutritionCheckinSuggestionsList
+        athleteId={athleteId}
+        groupId={groupId}
+        initialSuggestions={pendingSuggestions}
+      />
       <WeeklyCheckinPanel
         athleteId={athleteId}
         groupId={groupId}

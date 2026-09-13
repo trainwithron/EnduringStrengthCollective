@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/milestone-scan",
       "schedule": "0 14 * * 1"
+    },
+    {
+      "path": "/api/cron/nutrition-checkin-suggestions",
+      "schedule": "0 15 * * 1"
     }
   ]
 }

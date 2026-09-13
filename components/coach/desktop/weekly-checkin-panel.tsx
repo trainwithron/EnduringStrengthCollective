@@ -13,6 +13,7 @@ const PHASE_LABELS: Record<NutritionPhase, string> = {
   fat_loss: "Fat loss",
   hypertrophy: "Muscle building",
   maintenance: "Maintenance",
+  reverse_diet: "Reverse diet",
 };
 
 function todayIso(): string {
