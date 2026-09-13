@@ -16,7 +16,7 @@ import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import type { FeedChannel, FeedPost } from "@/lib/types";
 
-const VALID_CHANNELS: FeedChannel[] = ["announcements", "form_checks", "pr_board", "general"];
+const VALID_CHANNELS: FeedChannel[] = ["announcements", "form_checks", "pr_board", "general", "team_chat"];
 
 function mapPostRow(p: any, groupId: string, viewerId: string | null): FeedPost {
   return {

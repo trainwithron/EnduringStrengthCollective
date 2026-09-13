@@ -11,6 +11,7 @@ const CHANNEL_LABELS: Record<FeedChannel, string> = {
   form_checks: "Form Checks",
   pr_board: "PR Board",
   general: "General",
+  team_chat: "Team Chat",
 };
 
 // Org owner/admin only — a real, irreversible wipe of every post (and,

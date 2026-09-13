@@ -169,7 +169,7 @@ export interface BuilderDay {
   items: BuilderItem[];
 }
 
-export type FeedChannel = "announcements" | "form_checks" | "pr_board" | "general";
+export type FeedChannel = "announcements" | "form_checks" | "pr_board" | "general" | "team_chat";
 
 export interface FeedPost {
   id: string;

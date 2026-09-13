@@ -6,6 +6,10 @@ const CHANNELS: { key: FeedChannel; label: string }[] = [
   { key: "form_checks", label: "Form Checks" },
   { key: "pr_board", label: "PR Board" },
   { key: "general", label: "General" },
+  // More conversational/casual than the other 4 by design, not just in
+  // copy — same channel machinery underneath, so it sits last, past the
+  // more purposeful channels.
+  { key: "team_chat", label: "💬 Team Chat" },
 ];
 
 export function ChannelTabs({
