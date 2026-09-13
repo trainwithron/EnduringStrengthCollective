@@ -139,6 +139,52 @@ export default async function ClientCalendarDayPage(
     .limit(1)
     .maybeSingle();
 
+  // Goal-date-aware nutrition — the starting-point BMR/TDEE calculation
+  // (goal_date_aware_nutrition_and_programming_idea.md). Only ever
+  // computed when every real input actually exists for this client —
+  // the form itself hides the suggestion button otherwise, never a
+  // silent partial estimate.
+  const [{ data: profileDetails }, { data: connectionRow }] = await Promise.all([
+    supabase
+      .from("athlete_profile_details")
+      .select("height_cm, biological_sex, birthday, body_fat_pct")
+      .eq("athlete_id", params.athleteId)
+      .maybeSingle(),
+    supabase
+      .from("wearable_connections")
+      .select("id")
+      .eq("profile_id", params.athleteId)
+      .eq("provider", "oura")
+      .eq("status", "active")
+      .maybeSingle(),
+  ]);
+  let avgDailySteps: number | null = null;
+  if (connectionRow) {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const { data: stepRows } = await supabase
+      .from("wearable_daily_metrics")
+      .select("value")
+      .eq("connection_id", connectionRow.id)
+      .eq("metric_type", "steps")
+      .gte("metric_date", sevenDaysAgo.toISOString().slice(0, 10));
+    if (stepRows && stepRows.length > 0) {
+      avgDailySteps = Math.round(stepRows.reduce((sum, r) => sum + r.value, 0) / stepRows.length);
+    }
+  }
+  const bmrInputs =
+    profileDetails?.height_cm != null && profileDetails?.biological_sex != null && profileDetails?.birthday
+      ? {
+          heightCm: profileDetails.height_cm,
+          biologicalSex: profileDetails.biological_sex as "male" | "female",
+          age: Math.floor(
+            (Date.now() - new Date(profileDetails.birthday).getTime()) / (365.25 * 24 * 60 * 60 * 1000)
+          ),
+          bodyFatPct: profileDetails.body_fat_pct,
+          avgDailySteps,
+        }
+      : null;
+
   const { data: habitRows } = await supabase
     .from("client_habits")
     .select("id, title, weekdays")
@@ -236,6 +282,7 @@ export default async function ClientCalendarDayPage(
                 fatG: macros?.fat_g ?? null,
               }}
               latestBodyWeight={latestWeightRow?.weight ?? null}
+              bmrInputs={bmrInputs}
             />
           ) : (
             <p className="font-body text-xs text-steel">

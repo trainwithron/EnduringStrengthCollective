@@ -203,6 +203,9 @@ export default async function SettingsPage(
 
         <SettingsGroup label="Tools & Community">
           <div className="space-y-3">
+            <Link href={`/groups/${params.groupId}/goal`} className="block font-body text-sm text-rust">
+              My Goal
+            </Link>
             <Link
               href={`/groups/${params.groupId}/tools/one-rep-max`}
               className="block font-body text-sm text-rust"

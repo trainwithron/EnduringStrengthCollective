@@ -15,10 +15,13 @@ import { computeHabitCompliance, computeCompliancePct } from "./habits";
 import { hasEstablishedBaseline } from "./coach-briefing-baseline";
 import { isOnCooldown, COOLDOWN_DAYS } from "./coach-briefing-cooldown";
 import { isSustainedHrvSuppression, SUSTAINED_SUPPRESSION_DAYS } from "./hrv-suppression";
+import { isGoalReversal, type GoalType } from "./goal-reversal";
+import { GOAL_TYPE_LABELS } from "./goal-types";
 
 export type SignalKind =
   | "low_readiness"
   | "hrv_suppression"
+  | "goal_reversal"
   | "matched_load_trend_fatigue"
   | "matched_load_trend_gain"
   | "quiet_client"
@@ -249,6 +252,28 @@ export async function gatherCandidateSignals(
     hrvPointsByConnection.set(row.connection_id, list);
   }
 
+  // Goal-date-aware nutrition — the goal-reversal flag
+  // (goal_date_aware_nutrition_and_programming_idea.md). Only the two
+  // most recently CONFIRMED goals matter — a reversal is a genuine
+  // direction flip between what the coach most recently signed off on
+  // and the one before that, never compared against a still-'proposed'
+  // goal (which hasn't taken effect yet).
+  const { data: confirmedGoalRows } =
+    athleteIds.length > 0
+      ? await supabase
+          .from("client_goals")
+          .select("athlete_id, group_id, goal_type, confirmed_at, created_at")
+          .in("athlete_id", athleteIds)
+          .eq("status", "confirmed")
+          .order("confirmed_at", { ascending: false })
+      : { data: [] as { athlete_id: string; group_id: string; goal_type: string; confirmed_at: string; created_at: string }[] };
+  const confirmedGoalsByAthlete = new Map<string, { goalType: string; confirmedAt: string }[]>();
+  for (const row of confirmedGoalRows ?? []) {
+    const list = confirmedGoalsByAthlete.get(row.athlete_id) ?? [];
+    list.push({ goalType: row.goal_type, confirmedAt: row.confirmed_at });
+    confirmedGoalsByAthlete.set(row.athlete_id, list);
+  }
+
   const candidates: CandidateSignal[] = [];
 
   function pushIfEligible(signal: CandidateSignal) {
@@ -291,6 +316,29 @@ export async function gatherCandidateSignals(
           kind: "hrv_suppression",
           description: `${athlete.fullName}'s HRV balance has stayed below 50 for the last ${SUSTAINED_SUPPRESSION_DAYS} days in a row (recent readings: ${recentValues.join(", ")}).`,
           numericValues: [50, SUSTAINED_SUPPRESSION_DAYS, ...recentValues],
+          isStrongQuietTier: false,
+        });
+      }
+    }
+
+    // Goal-date-aware nutrition — goal-reversal flag. Only compares the
+    // two most recent CONFIRMED goals; the cooldown key includes the
+    // newer goal's own confirmation time so a real reversal only ever
+    // gets mentioned once, not every day it stays cooled down.
+    const confirmedGoals = confirmedGoalsByAthlete.get(athlete.profileId) ?? [];
+    if (confirmedGoals.length >= 2) {
+      const [newest, previous] = confirmedGoals;
+      if (isGoalReversal(previous.goalType as GoalType, newest.goalType as GoalType)) {
+        const previousLabel = GOAL_TYPE_LABELS[previous.goalType as GoalType] ?? previous.goalType;
+        const newLabel = GOAL_TYPE_LABELS[newest.goalType as GoalType] ?? newest.goalType;
+        pushIfEligible({
+          id: `goal_reversal::${athlete.profileId}::${newest.confirmedAt}`,
+          athleteId: athlete.profileId,
+          athleteName: athlete.fullName,
+          groupId: athlete.groupId,
+          kind: "goal_reversal",
+          description: `${athlete.fullName}'s new goal (${newLabel}) contradicts the goal confirmed on ${previous.confirmedAt.slice(0, 10)} (${previousLabel}) — worth a real conversation before anything changes.`,
+          numericValues: [],
           isStrongQuietTier: false,
         });
       }

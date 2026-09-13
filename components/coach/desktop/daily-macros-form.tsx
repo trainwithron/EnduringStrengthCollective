@@ -5,6 +5,20 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { PROTEIN_G_PER_LB, estimateProteinFromBodyWeight, fillCarbsAndFat as computeCarbsAndFat } from "@/lib/macros";
 import { notifyPush } from "@/lib/push-notify";
+import { computeBmr, computeTdee, activityCategoryFromSteps, type BiologicalSex } from "@/lib/bmr-tdee";
+
+// Goal-date-aware nutrition — feeds Smart Macro Fill its starting
+// calorie number from a real computed TDEE instead of a coach's manual
+// guess (goal_date_aware_nutrition_and_programming_idea.md). Only shown
+// when every required input is actually on file for this client — no
+// silent partial estimate.
+export interface BmrInputs {
+  heightCm: number;
+  biologicalSex: BiologicalSex;
+  age: number;
+  bodyFatPct: number | null;
+  avgDailySteps: number | null;
+}
 
 export function DailyMacrosForm({
   athleteId,
@@ -12,12 +26,14 @@ export function DailyMacrosForm({
   date,
   initial,
   latestBodyWeight,
+  bmrInputs = null,
 }: {
   athleteId: string;
   groupId: string;
   date: string; // "YYYY-MM-DD"
   initial: { calories: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null };
   latestBodyWeight: number | null;
+  bmrInputs?: BmrInputs | null;
 }) {
   const [calories, setCalories] = useState(initial.calories?.toString() ?? "");
   const [protein, setProtein] = useState(initial.proteinG?.toString() ?? "");
@@ -36,6 +52,25 @@ export function DailyMacrosForm({
     setBodyWeight(value);
     const w = Number(value);
     if (w > 0) setProtein(estimateProteinFromBodyWeight(w).toString());
+  }
+
+  function suggestCaloriesFromTdee() {
+    const weightLbs = Number(bodyWeight);
+    if (!bmrInputs || !weightLbs || weightLbs <= 0) return;
+    const weightKg = weightLbs * 0.453592;
+    const bmr = computeBmr({
+      weightKg,
+      heightCm: bmrInputs.heightCm,
+      age: bmrInputs.age,
+      sex: bmrInputs.biologicalSex,
+      bodyFatPct: bmrInputs.bodyFatPct,
+    });
+    // Falls back to a moderate default when no real step data exists yet
+    // for this client — still better than an unguided blank field, and
+    // clearly a starting point, not a final number either way.
+    const activity =
+      bmrInputs.avgDailySteps != null ? activityCategoryFromSteps(bmrInputs.avgDailySteps) : "moderate";
+    setCalories(computeTdee(bmr, activity).toString());
   }
 
   function fillCarbsAndFat(kind: "high" | "low") {
@@ -142,6 +177,17 @@ export function DailyMacrosForm({
           className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm mt-1 focus:outline-none focus:border-rust"
         />
       </div>
+
+      {bmrInputs && (
+        <button
+          type="button"
+          onClick={suggestCaloriesFromTdee}
+          disabled={!bodyWeight || Number(bodyWeight) <= 0}
+          className="w-full h-8 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust disabled:opacity-40"
+        >
+          Suggest calories from TDEE
+        </button>
+      )}
 
       <div className="grid grid-cols-3 gap-2">
         <div>

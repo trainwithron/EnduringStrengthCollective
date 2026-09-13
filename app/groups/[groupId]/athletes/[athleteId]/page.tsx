@@ -4,6 +4,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { AthleteNotesEditor } from "@/components/coach/athlete-notes-editor";
 import { SessionCreditsControl } from "@/components/coach/session-credits-control";
+import { GoalConfirmationControl } from "@/components/coach/goal-confirmation-control";
 import { PackageAssignmentControl } from "@/components/coach/package-assignment-control";
 import { PrivateFromOrgToggle } from "@/components/coach/private-from-org-toggle";
 import { ChangeClientGroupControl } from "@/components/coach/change-client-group-control";
@@ -164,6 +165,19 @@ export default async function AthleteProfilePage(
     .select("phase, started_at")
     .eq("athlete_id", params.athleteId)
     .eq("group_id", params.groupId)
+    .maybeSingle();
+
+  // Goal-date-aware nutrition/programming — the client always proposes,
+  // the coach confirms (goal_date_aware_nutrition_and_programming_idea.md).
+  // Only the most recent goal matters here — an older one is history,
+  // shown on the client's own /goal page, not repeated on this profile.
+  const { data: latestGoalRow } = await supabase
+    .from("client_goals")
+    .select("id, goal_type, custom_label, target_date, priority_note, status")
+    .eq("athlete_id", params.athleteId)
+    .eq("group_id", params.groupId)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   // Transformation Cards — only the specific photos this athlete has
@@ -747,6 +761,20 @@ export default async function AthleteProfilePage(
                 initialMethod={(minorConsentRow?.method as any) ?? null}
                 initialNotes={minorConsentRow?.notes ?? ""}
                 initialVerifiedAt={minorConsentRow?.verified_at ?? null}
+              />
+            </section>
+          )}
+
+          {latestGoalRow?.status === "proposed" && (
+            <section>
+              <GoalConfirmationControl
+                goal={{
+                  id: latestGoalRow.id,
+                  goalType: latestGoalRow.goal_type,
+                  customLabel: latestGoalRow.custom_label,
+                  targetDate: latestGoalRow.target_date,
+                  priorityNote: latestGoalRow.priority_note,
+                }}
               />
             </section>
           )}
