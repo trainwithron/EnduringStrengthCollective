@@ -1,4 +1,5 @@
 import { SkeletonBlock, SkeletonText, SkeletonPageHeader } from "@/components/ui/skeleton";
+import { LoadingTip } from "@/components/ui/loading-tip";
 
 // The heaviest athlete page (template + overrides + media + progression
 // goals + last-time lookups), and the one opened most often — so it's the
@@ -20,6 +21,7 @@ export default function WorkoutOverviewLoading() {
             </div>
           </div>
         ))}
+        <LoadingTip />
       </div>
     </main>
   );

@@ -1,4 +1,5 @@
 import { SkeletonBlock, SkeletonText, SkeletonPageHeader } from "@/components/ui/skeleton";
+import { LoadingTip } from "@/components/ui/loading-tip";
 
 export default function FeedLoading() {
   return (
@@ -26,6 +27,10 @@ export default function FeedLoading() {
             <SkeletonBlock className="h-16 w-full mt-3" />
           </div>
         ))}
+      </div>
+
+      <div className="px-5 pt-4">
+        <LoadingTip />
       </div>
     </main>
   );

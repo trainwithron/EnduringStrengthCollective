@@ -1,4 +1,5 @@
 import { SkeletonBlock, SkeletonText, SkeletonPageHeader } from "@/components/ui/skeleton";
+import { LoadingTip } from "@/components/ui/loading-tip";
 
 // Opened mid-workout, often on gym wifi/cellular — the one place where a
 // frozen screen is most likely to make someone tap twice.
@@ -18,6 +19,7 @@ export default function SessionLoading() {
             </div>
           </div>
         ))}
+        <LoadingTip />
       </div>
     </main>
   );
