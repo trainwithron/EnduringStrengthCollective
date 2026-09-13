@@ -173,7 +173,7 @@ export async function getCoachDashboardData(
         `
         weight, rpe, completed_at,
         session_exercises!inner (
-          exercise_name,
+          exercise_name, session_id,
           athlete_sessions!inner ( athlete_id, group_id )
         )
       `
@@ -185,10 +185,14 @@ export async function getCoachDashboardData(
       .gte("completed_at", ninetyDaysAgoKey)
       .order("completed_at", { ascending: true }),
     // Suppresses the fatigue direction for an athlete in a deliberate
-    // 'fat_loss' phase — falling strength/rising RPE at matched load is
-    // the EXPECTED result of a real deficit, not a fatigue signal, per
-    // ai_assistant_opus_deep_dive_findings.md's single biggest predictable
-    // false-positive. First-seen (most recent) row per athlete wins.
+    // 'fat_loss' or 'reverse_diet' phase — falling strength/rising RPE at
+    // matched load is the EXPECTED result of a real caloric deficit, not
+    // a fatigue signal, per ai_assistant_opus_deep_dive_findings.md's
+    // single biggest predictable false-positive (named there for
+    // 'fat_loss' specifically; 'reverse_diet' carries the identical
+    // caloric-deficit reasoning so it gets the same treatment). Never
+    // suppresses the celebration direction. First-seen (most recent) row
+    // per athlete wins.
     supabase
       .from("nutrition_checkins")
       .select("athlete_id, phase, created_at")
@@ -218,13 +222,9 @@ export async function getCoachDashboardData(
     const sessionExercise = row.session_exercises;
     const athleteId = sessionExercise?.athlete_sessions?.athlete_id;
     const exerciseName = sessionExercise?.exercise_name;
-    if (!athleteId || !exerciseName) continue;
-    // Grouped by completed_at's own date (not a real session id) — two
-    // genuinely separate same-day sessions on the same exercise are rare
-    // enough, and conflating them just slightly under-counts a streak
-    // rather than ever over-counting one.
-    const sessionDateKey = String(row.completed_at).slice(0, 10);
-    const key = `${athleteId}::${exerciseName}::${sessionDateKey}`;
+    const sessionId = sessionExercise?.session_id;
+    if (!athleteId || !exerciseName || !sessionId) continue;
+    const key = `${athleteId}::${exerciseName}::${sessionId}`;
     const existing = topSetByKey.get(key);
     if (!existing || row.weight > existing.weight || (row.weight === existing.weight && row.rpe > existing.rpe)) {
       topSetByKey.set(key, { athleteId, exerciseName, weight: row.weight, rpe: row.rpe, completedAt: row.completed_at });
@@ -371,13 +371,15 @@ export async function getCoachDashboardData(
       }
       // The single biggest predictable false-positive
       // (ai_assistant_opus_deep_dive_findings.md): an athlete in a
-      // deliberate fat_loss phase is SUPPOSED to show rising RPE at
-      // matched load — that's the expected result of the coach's own
-      // plan, not a fatigue signal. Never suppresses the celebration
-      // direction — a real strength gain is worth surfacing regardless
-      // of nutrition phase.
+      // deliberate fat_loss (or reverse_diet — same caloric-deficit
+      // reasoning) phase is SUPPOSED to show rising RPE at matched load —
+      // that's the expected result of the coach's own plan, not a
+      // fatigue signal. Never suppresses the celebration direction — a
+      // real strength gain is worth surfacing regardless of nutrition
+      // phase.
       const nutritionPhase = latestNutritionPhaseByAthlete.get(athlete.profileId);
-      if (bestFatigue && nutritionPhase !== "fat_loss") {
+      const inCaloricDeficitPhase = nutritionPhase === "fat_loss" || nutritionPhase === "reverse_diet";
+      if (bestFatigue && !inCaloricDeficitPhase) {
         heroFlags.push({
           kind: "matched_load_trend",
           athleteId: athlete.profileId,
