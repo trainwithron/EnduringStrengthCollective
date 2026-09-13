@@ -12,13 +12,16 @@ import { EndlessRunnerMiniGame } from "./endless-runner-mini-game";
 import { WhackAMoleMiniGame } from "./whack-a-mole-mini-game";
 import { BreakoutMiniGame } from "./breakout-mini-game";
 import { LaneDodgeMiniGame } from "./lane-dodge-mini-game";
+import { TriviaMiniGame } from "./trivia-mini-game";
 
 const PRESETS = [60, 90, 120];
 
 // The rest-timer mini-game library (Phase 4, custom_shape_theming_idea.md)
-// — Ron's confirmed six, Tetris/2048/Simon Says explicitly excluded as
-// worse fits for the escalating-difficulty-to-natural-death mechanic.
-type GameKey = "snake" | "flappy" | "runner" | "whack-a-mole" | "breakout" | "lane-dodge";
+// — Ron's confirmed six arcade games, Tetris/2048/Simon Says explicitly
+// excluded as worse fits for the escalating-difficulty-to-natural-death
+// mechanic — plus trivia, a genuinely different pacing shape (a fixed-
+// time flash round, not a difficulty ramp), listed alongside them.
+type GameKey = "snake" | "flappy" | "runner" | "whack-a-mole" | "breakout" | "lane-dodge" | "trivia";
 const GAME_LABELS: Record<GameKey, string> = {
   snake: "Snake",
   flappy: "Flappy",
@@ -26,8 +29,9 @@ const GAME_LABELS: Record<GameKey, string> = {
   "whack-a-mole": "Whack-a-Mole",
   breakout: "Breakout",
   "lane-dodge": "Lane Dodge",
+  trivia: "Trivia",
 };
-const GAME_ORDER: GameKey[] = ["snake", "flappy", "runner", "whack-a-mole", "breakout", "lane-dodge"];
+const GAME_ORDER: GameKey[] = ["snake", "flappy", "runner", "whack-a-mole", "breakout", "lane-dodge", "trivia"];
 
 interface RunningState {
   startedAtMs: number;
@@ -295,5 +299,9 @@ function MiniGameSlot({
       return <BreakoutMiniGame onClose={onClose} startedAtMs={startedAtMs} durationSeconds={durationSeconds} />;
     case "lane-dodge":
       return <LaneDodgeMiniGame onClose={onClose} startedAtMs={startedAtMs} durationSeconds={durationSeconds} />;
+    case "trivia":
+      // No difficulty ramp -- a fixed-time flash round, not a survival
+      // mechanic, so it doesn't need startedAtMs/durationSeconds at all.
+      return <TriviaMiniGame onClose={onClose} />;
   }
 }
