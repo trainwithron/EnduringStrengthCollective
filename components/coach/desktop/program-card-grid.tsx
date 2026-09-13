@@ -172,7 +172,7 @@ function ProgramCard({
           // eslint-disable-next-line @next/next/no-img-element
           <img src={signedUrl} alt="" className="w-full h-full object-cover" />
         ) : visual ? (
-          <ProgramCardVisual weeklySeries={visual.weeklySeries} categorySplit={visual.categorySplit} />
+          <ProgramCardVisual repsSeries={visual.repsSeries} weightSeries={visual.weightSeries} categorySplit={visual.categorySplit} />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-surface to-graphite">
             <LayoutGrid className="w-6 h-6 text-steel/40" strokeWidth={1.5} />

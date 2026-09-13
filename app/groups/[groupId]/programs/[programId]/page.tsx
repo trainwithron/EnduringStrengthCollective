@@ -12,6 +12,8 @@ import {
   type VisibilityWindow,
 } from "@/lib/program-schedule";
 import { getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
+import { computeProgramDayProgress } from "@/lib/program-day-progress";
+import { ProgramProgressBanner } from "@/components/coach/program-progress-banner";
 import { Lock } from "lucide-react";
 import type { BuilderDay, BuilderExercise, BuilderNote } from "@/lib/types";
 
@@ -107,6 +109,27 @@ export default async function ProgramDetailPage(
   const timezone = await getGroupCoachTimezone(supabase, params.groupId);
   const today = nowInZone(timezone);
 
+  // Day-N-of-M cumulative volume summary — only when the program has a
+  // real computed calendar span; an unscheduled program has no "M" to
+  // count against. Scoped to this athlete's own logged volume, since
+  // "you've moved X lbs" reads as personal progress, not the whole
+  // group's.
+  let dayProgress: { dayNumber: number; totalDays: number } | null = null;
+  let totalVolumeLbs = 0;
+  if (scheduledDateByDayId.size > 0) {
+    const lastScheduledDate = [...scheduledDateByDayId.values()].reduce((max, d) => (d > max ? d : max));
+    dayProgress = computeProgramDayProgress(program.start_date!, lastScheduledDate, today);
+    if (dayProgress) {
+      const workoutIds = (workouts ?? []).map((w) => w.id);
+      const { data: logRows } = await supabase
+        .from("workout_logs")
+        .select("total_volume")
+        .eq("athlete_id", user.id)
+        .in("workout_id", workoutIds);
+      totalVolumeLbs = (logRows ?? []).reduce((sum, r) => sum + (r.total_volume ?? 0), 0);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
       <header className="px-5 pt-8 pb-6 border-b border-steel/20">
@@ -135,6 +158,15 @@ export default async function ProgramDetailPage(
       </header>
 
       <section className="px-5 pt-6">
+        {dayProgress && (
+          <ProgramProgressBanner
+            programId={params.programId}
+            dayNumber={dayProgress.dayNumber}
+            totalDays={dayProgress.totalDays}
+            totalVolumeLbs={totalVolumeLbs}
+          />
+        )}
+
         {weekNumbers.length === 0 && (
           <p className="font-body text-sm text-steel py-3">No workouts assigned yet.</p>
         )}
@@ -304,8 +336,40 @@ async function CoachProgramBuilder({
     };
   });
 
+  // Day-N-of-M cumulative volume, coach-facing: total logged volume
+  // across every athlete on this program, since a coach viewing their own
+  // builder cares about the whole program's real usage, not just one
+  // person's — same reasoning that keeps this scoped to the athlete's own
+  // total on their own view of the same page.
+  let dayProgress: { dayNumber: number; totalDays: number } | null = null;
+  let totalVolumeLbs = 0;
+  if (startDate && trainingDays && trainingDays.length > 0 && workoutRows && workoutRows.length > 0) {
+    const scheduledDateByDayId = computeScheduledDates(startDate, trainingDays, workoutRows);
+    if (scheduledDateByDayId.size > 0) {
+      const lastScheduledDate = [...scheduledDateByDayId.values()].reduce((max, d) => (d > max ? d : max));
+      const timezone = await getGroupCoachTimezone(supabase, groupId);
+      dayProgress = computeProgramDayProgress(startDate, lastScheduledDate, nowInZone(timezone));
+      if (dayProgress) {
+        const workoutIds = workoutRows.map((w) => w.id);
+        const { data: logRows } = await supabase
+          .from("workout_logs")
+          .select("total_volume")
+          .in("workout_id", workoutIds);
+        totalVolumeLbs = (logRows ?? []).reduce((sum, r) => sum + (r.total_volume ?? 0), 0);
+      }
+    }
+  }
+
   return (
     <CoachDesktopShell groupId={groupId} groupName={group?.name ?? "Coaching"} active="programs">
+      {dayProgress && (
+        <ProgramProgressBanner
+          programId={programId}
+          dayNumber={dayProgress.dayNumber}
+          totalDays={dayProgress.totalDays}
+          totalVolumeLbs={totalVolumeLbs}
+        />
+      )}
       <ProgramBuilderDesktop
         programId={programId}
         groupId={groupId}

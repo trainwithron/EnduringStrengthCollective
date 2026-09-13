@@ -8,7 +8,17 @@ import {
 } from "./program-card-visuals";
 
 export interface ProgramCardVisualData {
-  weeklySeries: WeeklyVolumePoint[];
+  // Primary — always shown. Real, available data at plan-preview time
+  // regardless of whether a coach ever filled in target weights: sum of
+  // prescribed reps per week (planned) vs. real completed reps per week
+  // (actual). Weight-based volume, below, is a real signal too, but it's
+  // usually zero/missing before any workout is actually logged, which is
+  // exactly why it's demoted to secondary rather than the graph's driver.
+  repsSeries: WeeklyVolumePoint[];
+  // Secondary, layered on top of the same chart — null (not an empty
+  // array) when this program has no real weight data at all yet, so the
+  // component can skip drawing a flat, meaningless line.
+  weightSeries: WeeklyVolumePoint[] | null;
   categorySplit: CategorySplit;
 }
 
@@ -48,18 +58,35 @@ export async function computeProgramCardVisuals(
   const workoutIdByExerciseId = new Map((exercises ?? []).map((e) => [e.id as string, e.workout_id as string]));
   const exerciseIds = (exercises ?? []).map((e) => e.id as string);
 
-  const { data: sets } = exerciseIds.length
-    ? await supabase
-        .from("group_workout_exercise_sets")
-        .select("group_workout_exercise_id, target_weight, target_reps")
-        .in("group_workout_exercise_id", exerciseIds)
-    : { data: [] as any[] };
+  const [{ data: sets }, { data: completedSetLogs }] = await Promise.all([
+    exerciseIds.length
+      ? supabase
+          .from("group_workout_exercise_sets")
+          .select("group_workout_exercise_id, target_weight, target_reps")
+          .in("group_workout_exercise_id", exerciseIds)
+      : Promise.resolve({ data: [] as any[] }),
+    // Real completed reps, for the primary (weight-free) series — joined
+    // through session_exercises rather than workout_logs, since a
+    // workout_log row only carries a weighted total, never a rep count.
+    exerciseIds.length
+      ? supabase
+          .from("set_logs")
+          .select("reps, session_exercises!inner ( group_workout_exercise_id )")
+          .eq("status", "completed")
+          .in("session_exercises.group_workout_exercise_id", exerciseIds)
+      : Promise.resolve({ data: [] as any[] }),
+  ]);
 
-  // Planned volume per (program, week): sum(target_weight x parsed reps).
-  // A set with a non-numeric rep target ("8-10", "AMRAP") or no weight
-  // simply doesn't contribute — same silent-skip behavior as every other
-  // volume estimate already in this app.
-  const plannedByProgram = new Map<string, Map<number, number>>();
+  // Planned reps per (program, week): sum(parsed reps), regardless of
+  // whether a target weight was ever set — real, available data at
+  // plan-preview time, which is exactly what a weight-based estimate
+  // isn't (see ProgramCardVisualData's own comment).
+  const plannedRepsByProgram = new Map<string, Map<number, number>>();
+  // Planned volume (weight x reps) per (program, week) — the secondary
+  // series. A set with a non-numeric rep target ("8-10", "AMRAP") or no
+  // weight simply doesn't contribute to this one, same silent-skip
+  // behavior as every other volume estimate already in this app.
+  const plannedVolumeByProgram = new Map<string, Map<number, number>>();
   for (const s of sets ?? []) {
     const workoutId = workoutIdByExerciseId.get(s.group_workout_exercise_id);
     if (!workoutId) continue;
@@ -67,23 +94,45 @@ export async function computeProgramCardVisuals(
     const week = weekByWorkoutId.get(workoutId);
     if (!programId || !week) continue;
     const reps = parseNumericReps(s.target_reps);
-    if (!s.target_weight || !reps) continue;
-    const programMap = plannedByProgram.get(programId) ?? new Map<number, number>();
-    programMap.set(week, (programMap.get(week) ?? 0) + s.target_weight * reps);
-    plannedByProgram.set(programId, programMap);
+    if (reps) {
+      const repsMap = plannedRepsByProgram.get(programId) ?? new Map<number, number>();
+      repsMap.set(week, (repsMap.get(week) ?? 0) + reps);
+      plannedRepsByProgram.set(programId, repsMap);
+    }
+    if (s.target_weight && reps) {
+      const volumeMap = plannedVolumeByProgram.get(programId) ?? new Map<number, number>();
+      volumeMap.set(week, (volumeMap.get(week) ?? 0) + s.target_weight * reps);
+      plannedVolumeByProgram.set(programId, volumeMap);
+    }
+  }
+
+  // Actual reps per (program, week): sum(set_logs.reps) for real completed
+  // sets — the primary series' actual line.
+  const actualRepsByProgram = new Map<string, Map<number, number>>();
+  for (const row of (completedSetLogs ?? []) as any[]) {
+    const exerciseId = row.session_exercises?.group_workout_exercise_id;
+    const workoutId = exerciseId ? workoutIdByExerciseId.get(exerciseId) : undefined;
+    if (!workoutId || !row.reps) continue;
+    const programId = programByWorkoutId.get(workoutId);
+    const week = weekByWorkoutId.get(workoutId);
+    if (!programId || !week) continue;
+    const programMap = actualRepsByProgram.get(programId) ?? new Map<number, number>();
+    programMap.set(week, (programMap.get(week) ?? 0) + row.reps);
+    actualRepsByProgram.set(programId, programMap);
   }
 
   // Actual volume per (program, week): sum(workout_logs.total_volume) —
   // across every athlete who's logged against this program, for a
-  // shared program run by several clients at once.
-  const actualByProgram = new Map<string, Map<number, number>>();
+  // shared program run by several clients at once. The secondary series'
+  // actual line.
+  const actualVolumeByProgram = new Map<string, Map<number, number>>();
   for (const log of logs ?? []) {
     const programId = programByWorkoutId.get(log.workout_id);
     const week = weekByWorkoutId.get(log.workout_id);
     if (!programId || !week) continue;
-    const programMap = actualByProgram.get(programId) ?? new Map<number, number>();
+    const programMap = actualVolumeByProgram.get(programId) ?? new Map<number, number>();
     programMap.set(week, (programMap.get(week) ?? 0) + (log.total_volume ?? 0));
-    actualByProgram.set(programId, programMap);
+    actualVolumeByProgram.set(programId, programMap);
   }
 
   // Category counts per program, from this coach's own exercise_library.
@@ -111,11 +160,23 @@ export async function computeProgramCardVisuals(
   for (const programId of programIds) {
     const weekCount = maxWeekByProgram.get(programId);
     if (!weekCount) continue;
-    const planned = plannedByProgram.get(programId) ?? new Map<number, number>();
-    const actual = actualByProgram.get(programId) ?? new Map<number, number>();
-    const weeklySeries = computeWeeklyVolumeSeries(planned, actual, weekCount);
+
+    const plannedReps = plannedRepsByProgram.get(programId) ?? new Map<number, number>();
+    const actualReps = actualRepsByProgram.get(programId) ?? new Map<number, number>();
+    const repsSeries = computeWeeklyVolumeSeries(plannedReps, actualReps, weekCount);
+
+    const plannedVolume = plannedVolumeByProgram.get(programId);
+    const actualVolume = actualVolumeByProgram.get(programId);
+    // Only build the secondary weight series once real weight data exists
+    // somewhere — a program with no target weights ever set and nothing
+    // logged yet has nothing meaningful to layer on top.
+    const weightSeries =
+      (plannedVolume && plannedVolume.size > 0) || (actualVolume && actualVolume.size > 0)
+        ? computeWeeklyVolumeSeries(plannedVolume ?? new Map(), actualVolume ?? new Map(), weekCount)
+        : null;
+
     const categorySplit = bucketCategorySplit(categoryCountsByProgram.get(programId) ?? {});
-    result.set(programId, { weeklySeries, categorySplit });
+    result.set(programId, { repsSeries, weightSeries, categorySplit });
   }
 
   return result;
