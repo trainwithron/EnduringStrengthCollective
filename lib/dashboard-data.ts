@@ -8,6 +8,7 @@ import { computeTeamPulse } from "./team-pulse";
 import { computeQuietTier, type QuietTier } from "./quiet-client-tier";
 import { selectHeroFlag, type HeroFlag } from "./coach-hero-priority";
 import { isLowReadiness } from "./wellness";
+import { detectMatchedLoadTrend, type ExerciseSessionPoint } from "./matched-load-trend";
 import { computeEngagement, computeEstimatedMRR } from "./business-metrics";
 import { computeHabitCompliance, computeCompliancePct } from "./habits";
 
@@ -109,6 +110,8 @@ export async function getCoachDashboardData(
     };
   }
 
+  const ninetyDaysAgoKey = daysAgoKey(90);
+
   const [
     { data: athleteRows },
     { data: logRows },
@@ -117,6 +120,8 @@ export async function getCoachDashboardData(
     { data: habitRows },
     { data: bookingRows },
     { data: creditPurchaseRows },
+    { data: matchedLoadSetRows },
+    { data: nutritionPhaseRows },
   ] = await Promise.all([
     supabase
       .from("group_memberships")
@@ -157,6 +162,38 @@ export async function getCoachDashboardData(
       .select("amount_cents, created_at")
       .in("group_id", allGroupIds)
       .gte("created_at", daysAgoKey(30)),
+    // AI Assistant Slice 1 (lib/matched-load-trend.ts) — every completed
+    // set with a real weight+RPE, bounded to the last 90 days (enough
+    // real session history for a 3+ session trend without scanning an
+    // athlete's whole career). Grouped client-side into one top-set-per-
+    // session point per (athlete, exercise) below.
+    supabase
+      .from("set_logs")
+      .select(
+        `
+        weight, rpe, completed_at,
+        session_exercises!inner (
+          exercise_name,
+          athlete_sessions!inner ( athlete_id, group_id )
+        )
+      `
+      )
+      .eq("status", "completed")
+      .not("weight", "is", null)
+      .not("rpe", "is", null)
+      .in("session_exercises.athlete_sessions.group_id", allGroupIds)
+      .gte("completed_at", ninetyDaysAgoKey)
+      .order("completed_at", { ascending: true }),
+    // Suppresses the fatigue direction for an athlete in a deliberate
+    // 'fat_loss' phase — falling strength/rising RPE at matched load is
+    // the EXPECTED result of a real deficit, not a fatigue signal, per
+    // ai_assistant_opus_deep_dive_findings.md's single biggest predictable
+    // false-positive. First-seen (most recent) row per athlete wins.
+    supabase
+      .from("nutrition_checkins")
+      .select("athlete_id, phase, created_at")
+      .in("group_id", allGroupIds)
+      .order("created_at", { ascending: false }),
   ]);
 
   // Most recent completed-workout date per athlete — first occurrence
@@ -165,6 +202,52 @@ export async function getCoachDashboardData(
   for (const log of logRows ?? []) {
     if (!lastLoggedAtByAthlete.has(log.athlete_id)) {
       lastLoggedAtByAthlete.set(log.athlete_id, log.created_at);
+    }
+  }
+
+  // AI Assistant Slice 1 — reduce every logged set down to one top-set
+  // (heaviest) per (athlete, exercise, session), then group those into
+  // chronological point lists per (athlete, exercise) for the pure
+  // detector. A tie at the same top weight keeps the higher-RPE set,
+  // the "worst case" reading rather than an arbitrary pick.
+  const topSetByKey = new Map<
+    string,
+    { athleteId: string; exerciseName: string; weight: number; rpe: number; completedAt: string }
+  >();
+  for (const row of (matchedLoadSetRows ?? []) as any[]) {
+    const sessionExercise = row.session_exercises;
+    const athleteId = sessionExercise?.athlete_sessions?.athlete_id;
+    const exerciseName = sessionExercise?.exercise_name;
+    if (!athleteId || !exerciseName) continue;
+    // Grouped by completed_at's own date (not a real session id) — two
+    // genuinely separate same-day sessions on the same exercise are rare
+    // enough, and conflating them just slightly under-counts a streak
+    // rather than ever over-counting one.
+    const sessionDateKey = String(row.completed_at).slice(0, 10);
+    const key = `${athleteId}::${exerciseName}::${sessionDateKey}`;
+    const existing = topSetByKey.get(key);
+    if (!existing || row.weight > existing.weight || (row.weight === existing.weight && row.rpe > existing.rpe)) {
+      topSetByKey.set(key, { athleteId, exerciseName, weight: row.weight, rpe: row.rpe, completedAt: row.completed_at });
+    }
+  }
+  const exerciseHistoriesByAthlete = new Map<string, Map<string, ExerciseSessionPoint[]>>();
+  for (const top of topSetByKey.values()) {
+    const athleteMap = exerciseHistoriesByAthlete.get(top.athleteId) ?? new Map<string, ExerciseSessionPoint[]>();
+    const points = athleteMap.get(top.exerciseName) ?? [];
+    points.push({ sessionDate: top.completedAt, topWeight: top.weight, topSetRpe: top.rpe });
+    athleteMap.set(top.exerciseName, points);
+    exerciseHistoriesByAthlete.set(top.athleteId, athleteMap);
+  }
+  for (const athleteMap of exerciseHistoriesByAthlete.values()) {
+    for (const points of athleteMap.values()) {
+      points.sort((a, b) => new Date(a.sessionDate).getTime() - new Date(b.sessionDate).getTime());
+    }
+  }
+
+  const latestNutritionPhaseByAthlete = new Map<string, string>();
+  for (const row of nutritionPhaseRows ?? []) {
+    if (!latestNutritionPhaseByAthlete.has(row.athlete_id)) {
+      latestNutritionPhaseByAthlete.set(row.athlete_id, row.phase);
     }
   }
 
@@ -265,6 +348,61 @@ export async function getCoachDashboardData(
         readiness,
         href,
       });
+    }
+
+    // AI Assistant Slice 1 — pick this athlete's single most notable
+    // matched-load trend per direction (the longest-running one, if more
+    // than one exercise qualifies), rather than pushing one flag per
+    // exercise and flooding the candidate pool with near-duplicates for
+    // the same athlete.
+    const exerciseHistories = exerciseHistoriesByAthlete.get(athlete.profileId);
+    if (exerciseHistories) {
+      let bestFatigue: ReturnType<typeof detectMatchedLoadTrend> = null;
+      let bestGain: ReturnType<typeof detectMatchedLoadTrend> = null;
+      for (const [exerciseName, points] of exerciseHistories) {
+        const trend = detectMatchedLoadTrend(exerciseName, points);
+        if (!trend) continue;
+        if (trend.direction === "fatigue" && (!bestFatigue || trend.sessionCount > bestFatigue.sessionCount)) {
+          bestFatigue = trend;
+        }
+        if (trend.direction === "strength_gain" && (!bestGain || trend.sessionCount > bestGain.sessionCount)) {
+          bestGain = trend;
+        }
+      }
+      // The single biggest predictable false-positive
+      // (ai_assistant_opus_deep_dive_findings.md): an athlete in a
+      // deliberate fat_loss phase is SUPPOSED to show rising RPE at
+      // matched load — that's the expected result of the coach's own
+      // plan, not a fatigue signal. Never suppresses the celebration
+      // direction — a real strength gain is worth surfacing regardless
+      // of nutrition phase.
+      const nutritionPhase = latestNutritionPhaseByAthlete.get(athlete.profileId);
+      if (bestFatigue && nutritionPhase !== "fat_loss") {
+        heroFlags.push({
+          kind: "matched_load_trend",
+          athleteId: athlete.profileId,
+          athleteName: athlete.fullName,
+          groupId: athlete.groupId,
+          groupName: athlete.groupName,
+          direction: "fatigue",
+          exerciseName: bestFatigue.exerciseName,
+          sessionCount: bestFatigue.sessionCount,
+          href,
+        });
+      }
+      if (bestGain) {
+        heroFlags.push({
+          kind: "matched_load_trend",
+          athleteId: athlete.profileId,
+          athleteName: athlete.fullName,
+          groupId: athlete.groupId,
+          groupName: athlete.groupName,
+          direction: "strength_gain",
+          exerciseName: bestGain.exerciseName,
+          sessionCount: bestGain.sessionCount,
+          href,
+        });
+      }
     }
 
     const trainingDays =

@@ -7,9 +7,21 @@ const TIER_LABEL: Record<"mild" | "strong", string> = {
   strong: "has gone quiet — worth a personal check-in",
 };
 
+// AI Assistant Slice 1 (lib/matched-load-trend.ts) — states the verified
+// fact (RPE has moved a specific direction at a matched-or-favorable
+// load, for N real sessions) and nothing beyond it. Deliberately never
+// asserts a diagnosis ("overtraining," "great progress as fact") — the
+// governing rule for this whole feature line is verified fact stated
+// plainly, inferred judgment left as a question for the coach to ask.
 function sentenceFor(flag: HeroFlag): string {
   if (flag.kind === "low_readiness") {
     return `${flag.athleteName} logged low readiness today — worth a lighter session or a check-in.`;
+  }
+  if (flag.kind === "matched_load_trend") {
+    if (flag.direction === "fatigue") {
+      return `${flag.athleteName}'s RPE has risen on ${flag.exerciseName} across their last ${flag.sessionCount} sessions at the same or lower weight — worth checking in on recovery.`;
+    }
+    return `${flag.athleteName}'s RPE has dropped on ${flag.exerciseName} across their last ${flag.sessionCount} sessions at the same or higher weight — a real strength gain worth calling out.`;
   }
   if (flag.kind === "quiet_client") {
     return `${flag.athleteName} ${TIER_LABEL[flag.tier]}.`;

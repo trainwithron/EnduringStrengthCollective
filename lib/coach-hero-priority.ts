@@ -11,6 +11,7 @@
 //                                 Left out of this ranking entirely for
 //                                 now rather than faked.
 //   2. low wellness readiness
+//   2.5. matched-load trend (AI Assistant Slice 1 — lib/matched-load-trend.ts)
 //   3. missed workout / inactivity (quiet-client tier)
 //   4. missed habits / nutrition logging
 // Coach-responsiveness (unanswered threads) and business/account issues
@@ -19,13 +20,24 @@
 
 export type HeroFlag =
   | { kind: "low_readiness"; athleteId: string; athleteName: string; groupId: string; groupName: string; readiness: number }
+  | {
+      kind: "matched_load_trend";
+      athleteId: string;
+      athleteName: string;
+      groupId: string;
+      groupName: string;
+      direction: "fatigue" | "strength_gain";
+      exerciseName: string;
+      sessionCount: number;
+    }
   | { kind: "quiet_client"; athleteId: string; athleteName: string; groupId: string; groupName: string; tier: "mild" | "strong" }
   | { kind: "missed_habits"; athleteId: string; athleteName: string; groupId: string; groupName: string; missedCount: number };
 
 const KIND_RANK: Record<HeroFlag["kind"], number> = {
   low_readiness: 0,
-  quiet_client: 1,
-  missed_habits: 2,
+  matched_load_trend: 1,
+  quiet_client: 2,
+  missed_habits: 3,
 };
 
 // Within quiet_client, a strong tier outranks a mild one — both still

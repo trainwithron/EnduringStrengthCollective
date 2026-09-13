@@ -25,6 +25,23 @@ describe("selectHeroFlag", () => {
     expect(selectHeroFlag(flags)?.kind).toBe("low_readiness");
   });
 
+  it("picks low_readiness over matched_load_trend", () => {
+    const flags: HeroFlag[] = [
+      flag({ kind: "matched_load_trend", direction: "fatigue", exerciseName: "Back Squat", sessionCount: 3 } as any),
+      flag({ kind: "low_readiness", readiness: 1.5 } as any),
+    ];
+    expect(selectHeroFlag(flags)?.kind).toBe("low_readiness");
+  });
+
+  it("picks matched_load_trend over quiet_client and missed_habits", () => {
+    const flags: HeroFlag[] = [
+      flag({ kind: "missed_habits", missedCount: 5 } as any),
+      flag({ kind: "quiet_client", tier: "strong" } as any),
+      flag({ kind: "matched_load_trend", direction: "fatigue", exerciseName: "Back Squat", sessionCount: 3 } as any),
+    ];
+    expect(selectHeroFlag(flags)?.kind).toBe("matched_load_trend");
+  });
+
   it("picks quiet_client over missed_habits", () => {
     const flags: HeroFlag[] = [
       flag({ kind: "missed_habits", missedCount: 5 } as any),
