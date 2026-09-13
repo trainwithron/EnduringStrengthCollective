@@ -13,6 +13,7 @@ export function ClientSlotRow({
   isOverridden,
   ladder,
   lastLogged,
+  readyToMoveBack = false,
 }: {
   groupWorkoutExerciseId: string;
   athleteId: string;
@@ -22,6 +23,12 @@ export function ClientSlotRow({
   isOverridden: boolean;
   ladder: { exerciseName: string }[];
   lastLogged: { weight: number; reps: number } | null;
+  // AI Assistant Slice 3 ("Move them back") — real logged history shows
+  // this athlete has hit this slot's own rep ceiling on their substitute
+  // exercise. A nudge only, never automatic — "Reset to default" below
+  // is the same button it already was, this just tells the coach it's
+  // worth a look.
+  readyToMoveBack?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const router = useRouter();
@@ -88,6 +95,11 @@ export function ClientSlotRow({
       {lastLogged && (
         <p className="font-body text-xs text-steel mt-0.5">
           Last logged: {lastLogged.weight} &times; {lastLogged.reps}
+        </p>
+      )}
+      {readyToMoveBack && (
+        <p className="font-body text-xs text-rust mt-1">
+          Hit the rep ceiling on their last logged set here — worth considering moving them back to the regular exercise.
         </p>
       )}
 

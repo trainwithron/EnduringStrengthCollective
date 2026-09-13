@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { ClientPicker } from "@/components/coach/client-picker";
 import { ClientSlotRow } from "@/components/coach/client-slot-row";
+import { hasReachedProgressionCeiling } from "@/lib/move-them-back";
 
 export default async function WorkoutClientsPage(
   props: {
@@ -43,7 +44,7 @@ export default async function WorkoutClientsPage(
     .select(
       `
       id, title,
-      group_workout_exercises ( id, exercise_name, exercise_order, movement_pattern_id, group_workout_exercise_sets ( id ) )
+      group_workout_exercises ( id, exercise_name, exercise_order, movement_pattern_id, group_workout_exercise_sets ( id, rep_max ) )
     `
     )
     .eq("id", params.workoutId)
@@ -83,6 +84,7 @@ export default async function WorkoutClientsPage(
     isOverridden: boolean;
     ladder: { exerciseName: string }[];
     lastLogged: { weight: number; reps: number } | null;
+    readyToMoveBack: boolean;
   }> = [];
 
   if (selectedAthleteId && slots.length > 0) {
@@ -140,6 +142,7 @@ export default async function WorkoutClientsPage(
           .limit(1);
 
         const last = priorSets?.[0] as any;
+        const repMax = (s.group_workout_exercise_sets ?? [])[0]?.rep_max ?? null;
 
         return {
           id: s.id,
@@ -148,6 +151,10 @@ export default async function WorkoutClientsPage(
           isOverridden: Boolean(override),
           ladder: s.movement_pattern_id ? laddersByPattern.get(s.movement_pattern_id) ?? [] : [],
           lastLogged: last ? { weight: last.weight, reps: last.reps } : null,
+          // AI Assistant Slice 3 ("Move them back") — only meaningful for
+          // an actually-overridden slot; a client on the regular
+          // prescribed exercise has nothing to "move back" from.
+          readyToMoveBack: Boolean(override) && hasReachedProgressionCeiling(last?.reps ?? null, repMax),
         };
       })
     );
@@ -184,6 +191,7 @@ export default async function WorkoutClientsPage(
                 isOverridden={slot.isOverridden}
                 ladder={slot.ladder}
                 lastLogged={slot.lastLogged}
+                readyToMoveBack={slot.readyToMoveBack}
               />
             ))}
           </div>
