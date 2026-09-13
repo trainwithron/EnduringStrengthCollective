@@ -218,6 +218,20 @@ export default async function SettingsPage(
             >
               Resources
             </Link>
+            <Link
+              href={`/groups/${params.groupId}/records`}
+              className="block font-body text-sm text-rust"
+            >
+              Hall of Fame
+            </Link>
+            {!isCoach && (
+              <Link
+                href={`/groups/${params.groupId}/video-checkins`}
+                className="block font-body text-sm text-rust"
+              >
+                Video Check-ins
+              </Link>
+            )}
           </div>
         </SettingsGroup>
 
