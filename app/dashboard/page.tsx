@@ -8,6 +8,14 @@ import { HomeGroupCard, type HomeGroupCardData } from "@/components/coach/deskto
 import { NeedsReplyPanel, type NeedsReplyThread } from "@/components/coach/desktop/needs-reply-panel";
 import { MarkAllSeenButton } from "@/components/coach/desktop/mark-all-seen-button";
 import { findThreadsNeedingReply } from "@/lib/notification-priority";
+import { getCoachDashboardData } from "@/lib/dashboard-data";
+import { DashboardHero } from "@/components/coach/desktop/dashboard-hero";
+import { TeamPulseCard } from "@/components/coach/desktop/team-pulse-card";
+import { DashboardStatTiles } from "@/components/coach/desktop/dashboard-stat-tiles";
+import { DashboardTodayPanel } from "@/components/coach/desktop/dashboard-today-panel";
+import { DashboardWeekNarrative } from "@/components/coach/desktop/dashboard-week-narrative";
+import { DashboardAutoRefresh } from "@/components/coach/desktop/dashboard-auto-refresh";
+import { RosterSection } from "@/components/coach/desktop/roster-section";
 
 interface GroupRow {
   id: string;
@@ -85,6 +93,18 @@ export default async function CoachHomePage() {
   const teamGroups = allGroups
     .filter((g) => g.group_kind === "team" || !g.group_kind)
     .sort((a, b) => a.name.localeCompare(b.name));
+
+  // "N — Dual Signal" (coach_dashboard_redesign_scoping.md) — the hero
+  // flag/empty-state, per-team-group Team Pulse, stat tiles, today's
+  // bookings, and the frequency-normalized quiet-client tiers all come
+  // from one batched fetch, kept in its own lib since it's real DB
+  // orchestration (untested), pairing with the tested pure logic in
+  // lib/team-pulse.ts / lib/quiet-client-tier.ts / lib/coach-hero-priority.ts.
+  const dashboardData = await getCoachDashboardData(supabase, {
+    coachId: user.id,
+    teamGroups: teamGroups.map((g) => ({ id: g.id, name: g.name })),
+    allGroups: allGroups.map((g) => ({ id: g.id, name: g.name })),
+  });
 
   // "Has something new happened here" dot — same coach_view_state data
   // and same signals (posts since feed_seen_at, workout_logs since
@@ -228,6 +248,7 @@ export default async function CoachHomePage() {
 
     clientCards = (athleteRows ?? []).map((row) => {
       const profile = (row as any).profiles;
+      const tier = dashboardData.quietTierByAthlete.get(row.profile_id);
       return {
         groupId: row.group_id,
         athleteId: row.profile_id,
@@ -235,6 +256,7 @@ export default async function CoachHomePage() {
         avatarUrl: profile?.avatar_url ?? null,
         lastWorkoutAt: lastLogByAthlete.get(row.profile_id) ?? null,
         hasUnseenActivity: unseenByGroup.get(row.group_id) ?? false,
+        quietTier: tier === "mild" || tier === "strong" ? tier : undefined,
       };
     });
 
@@ -263,51 +285,85 @@ export default async function CoachHomePage() {
 
   const orgName = org?.display_name || org?.name || "Your Coaching Business";
 
+  // "N — Dual Signal" (coach_dashboard_redesign_scoping.md): a "Right
+  // now" hero beside per-team-group Team Pulse gauges, above a bento
+  // grid (stats, Today, This Week, the expandable roster wall). The
+  // customization layer (inline word-swap, tile show/hide/reorder,
+  // hover-peek) is deliberately not built yet — the doc's own
+  // recommended order is static layout, then smart backend (both here),
+  // then customization last.
   const content = (
     <>
+      <DashboardAutoRefresh />
       <div className="flex items-center justify-between mb-6">
         <h1 className="font-display font-bold text-2xl uppercase">Home</h1>
         <MarkAllSeenButton groupIds={allGroupIds} />
       </div>
 
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-6">
+        <div className="lg:col-span-2">
+          <DashboardHero flag={dashboardData.heroFlag} emptyState={dashboardData.heroEmptyState} />
+        </div>
+        <div className="space-y-3">
+          {dashboardData.teamPulses.map((team) => (
+            <TeamPulseCard key={team.groupId} team={team} />
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-6">
+        <DashboardStatTiles stats={dashboardData.statTiles} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-8">
+        <DashboardWeekNarrative text={dashboardData.weekNarrative} />
+        <DashboardTodayPanel bookings={dashboardData.todayBookings} />
+      </div>
+
       <NeedsReplyPanel coachId={user.id} threads={needsReplyThreads} />
 
-      <section className="mb-10">
-        <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">1-on-1 Clients</h2>
-        {clientCards.length === 0 ? (
-          <p className="font-body text-sm text-steel">No 1-on-1 clients yet.</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {clientCards.map((c) => (
-              <HomeClientCard key={c.athleteId} client={c} />
-            ))}
-          </div>
-        )}
-      </section>
+      <div className="space-y-3 mt-6">
+        <RosterSection
+          title="1-on-1 Clients"
+          summary={clientCards.length === 0 ? "No clients yet" : `${clientCards.length} client${clientCards.length === 1 ? "" : "s"}`}
+          needsAttentionCount={clientCards.filter((c) => c.quietTier).length}
+        >
+          {clientCards.length === 0 ? (
+            <p className="font-body text-sm text-steel">No 1-on-1 clients yet.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {clientCards.map((c) => (
+                <HomeClientCard key={c.athleteId} client={c} />
+              ))}
+            </div>
+          )}
+        </RosterSection>
 
-      <section className="mb-10">
-        <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">Groups</h2>
-        {teamCards.length === 0 ? (
-          <p className="font-body text-sm text-steel">No groups yet.</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {teamCards.map((g) => (
-              <HomeGroupCard key={g.id} group={g} />
-            ))}
-          </div>
-        )}
-      </section>
+        <RosterSection
+          title="Groups"
+          summary={teamCards.length === 0 ? "No groups yet" : `${teamCards.length} group${teamCards.length === 1 ? "" : "s"}`}
+        >
+          {teamCards.length === 0 ? (
+            <p className="font-body text-sm text-steel">No groups yet.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {teamCards.map((g) => (
+                <HomeGroupCard key={g.id} group={g} />
+              ))}
+            </div>
+          )}
+        </RosterSection>
 
-      {socialCards.length > 0 && (
-        <section>
-          <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">Social Groups</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {socialCards.map((g) => (
-              <HomeGroupCard key={g.id} group={g} />
-            ))}
-          </div>
-        </section>
-      )}
+        {socialCards.length > 0 && (
+          <RosterSection title="Social Groups" summary={`${socialCards.length} group${socialCards.length === 1 ? "" : "s"}`}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {socialCards.map((g) => (
+                <HomeGroupCard key={g.id} group={g} />
+              ))}
+            </div>
+          </RosterSection>
+        )}
+      </div>
     </>
   );
 

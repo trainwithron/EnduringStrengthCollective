@@ -35,6 +35,12 @@ export interface HomeClientCardData {
   avatarUrl: string | null;
   lastWorkoutAt: string | null;
   hasUnseenActivity: boolean;
+  // Frequency-normalized quiet-client tier (lib/quiet-client-tier.ts) —
+  // a different, program-aware signal from the plain "days since last
+  // log" status dot above; both render at once since they answer
+  // different questions ("how recently" vs. "relative to their own
+  // schedule").
+  quietTier?: "mild" | "strong";
 }
 
 // A 1-on-1 client's "group" is invisible bookkeeping — this card shows
@@ -68,6 +74,11 @@ export function HomeClientCard({ client }: { client: HomeClientCardData }) {
           <span className={`w-1.5 h-1.5 rounded-full ${status.dotClass}`} />
           {status.text}
         </p>
+        {client.quietTier && (
+          <p className="font-body text-[10px] text-rust uppercase tracking-wide mt-0.5">
+            {client.quietTier === "strong" ? "Reach out — quiet a while" : "Missing scheduled sessions"}
+          </p>
+        )}
       </div>
     </Link>
   );
