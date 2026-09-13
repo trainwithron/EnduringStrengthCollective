@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createServerClient } from "@/lib/supabase/server";
 import { SessionLogger } from "@/components/logging/session-logger";
+import type { PendingGateTask } from "@/components/session/rest-timer-bar";
+import { isHabitDueOn } from "@/lib/habits";
 import { DEFAULT_TRACKED_FIELDS } from "@/lib/exercise-fields";
 import { CoachLoggedBadge } from "@/components/coach-logged-badge";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
@@ -396,6 +398,49 @@ export default async function SessionPage(
 
   const isOwnSession = session.athlete_id === user.id;
 
+  // Pending-task gating (custom_shape_theming_idea.md) — a real due habit
+  // or an unanswered wellness check-in becomes the unlock key for this
+  // rest period's mini-game/trivia, rather than a nudge running alongside
+  // it freely. Only ever computed for the athlete's own session (a coach
+  // logging a client's session in-person sees no gate) and only when
+  // something is genuinely pending today — never invented to fill space.
+  const todayKey = new Date().toISOString().slice(0, 10);
+  let pendingGateTask: PendingGateTask | null = null;
+  if (isOwnSession && session.status !== "completed") {
+    const [{ data: habitRows }, { data: wellnessRow }] = await Promise.all([
+      supabase
+        .from("client_habits")
+        .select("id, title, weekdays")
+        .eq("athlete_id", session.athlete_id)
+        .eq("group_id", session.group_id)
+        .eq("active", true),
+      supabase
+        .from("wellness_checkins")
+        .select("id")
+        .eq("athlete_id", session.athlete_id)
+        .eq("group_id", session.group_id)
+        .eq("log_date", todayKey)
+        .maybeSingle(),
+    ]);
+    const todayForWeekday = new Date(`${todayKey}T00:00:00`);
+    const dueHabits = (habitRows ?? []).filter((h) => isHabitDueOn(h.weekdays, todayForWeekday));
+    if (dueHabits.length > 0) {
+      const { data: logRows } = await supabase
+        .from("habit_logs")
+        .select("habit_id, completed_at")
+        .in("habit_id", dueHabits.map((h) => h.id))
+        .eq("log_date", todayKey);
+      const completedIds = new Set((logRows ?? []).filter((l) => l.completed_at).map((l) => l.habit_id));
+      const firstPending = dueHabits.find((h) => !completedIds.has(h.id));
+      if (firstPending) {
+        pendingGateTask = { kind: "habit", habitId: firstPending.id, title: firstPending.title };
+      }
+    }
+    if (!pendingGateTask && !wellnessRow) {
+      pendingGateTask = { kind: "wellness" };
+    }
+  }
+
   // Video upload/feedback is visible to the session's own athlete and to
   // the group's coach (e.g. logging or reviewing in person) — not a
   // random third party who happens to reach this URL; RLS enforces the
@@ -465,6 +510,8 @@ export default async function SessionPage(
         canUploadVideo={canUploadVideo}
         startedAt={session.started_at}
         gamificationEnabled={gamificationEnabled}
+        pendingGateTask={pendingGateTask}
+        todayDate={todayKey}
       />
 
       {isOwnSession && (

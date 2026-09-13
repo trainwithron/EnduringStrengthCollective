@@ -40,6 +40,44 @@ export function CompleteWorkoutButton({
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
+  // Post-workout weight-log nudge — prompted right after "Complete
+  // Workout" is tapped (not mid-rest), since the athlete is likely still
+  // at the gym near a scale at that exact moment. Only for the athlete's
+  // own session (raised === isOwnSession, same signal already used for
+  // the bar's bottom offset) and only when they haven't already logged
+  // today — never a nag on a day they've already done it.
+  const [weightNudge, setWeightNudge] = useState<{ athleteId: string; groupId: string; navHref: string } | null>(
+    null
+  );
+  const [weightValue, setWeightValue] = useState("");
+  const [weightSubmitting, setWeightSubmitting] = useState(false);
+
+  function finishNavigation(navHref: string) {
+    router.push(navHref);
+  }
+
+  async function handleLogWeight() {
+    if (!weightNudge) return;
+    const value = Number(weightValue);
+    if (!value || value <= 0) {
+      finishNavigation(weightNudge.navHref);
+      return;
+    }
+    setWeightSubmitting(true);
+    const supabase = createBrowserClient();
+    await supabase.from("body_weight_logs").upsert(
+      {
+        athlete_id: weightNudge.athleteId,
+        group_id: weightNudge.groupId,
+        logged_date: new Date().toISOString().slice(0, 10),
+        weight: value,
+      },
+      { onConflict: "athlete_id,logged_date" }
+    );
+    setWeightSubmitting(false);
+    finishNavigation(weightNudge.navHref);
+  }
+
   function handleTap() {
     if (!allSetsResolved) {
       setConfirming(true);
@@ -134,7 +172,66 @@ export function CompleteWorkoutButton({
     // Every completed workout gets a celebratory, shareable card instead of
     // silently landing back on the group hub — that's the actual feedback
     // moment a client (or a coach logging in-person) gets after finishing.
-    router.push(postId ? `/share/${postId}` : `/groups/${result.group_id}`);
+    const navHref = postId ? `/share/${postId}` : `/groups/${result.group_id}`;
+
+    // Only for the athlete's own session (raised is set to isOwnSession by
+    // the caller) and only when today's weight hasn't already been logged.
+    if (raised) {
+      const todayKey = new Date().toISOString().slice(0, 10);
+      const { data: todayLog } = await supabase
+        .from("body_weight_logs")
+        .select("id")
+        .eq("athlete_id", result.athlete_id)
+        .eq("logged_date", todayKey)
+        .maybeSingle();
+      if (!todayLog) {
+        setWeightNudge({ athleteId: result.athlete_id, groupId: result.group_id, navHref });
+        setSubmitting(false);
+        return;
+      }
+    }
+
+    finishNavigation(navHref);
+  }
+
+  if (weightNudge) {
+    return (
+      <div
+        className={`fixed ${
+          raised ? "bottom-16" : "bottom-0"
+        } left-0 right-0 bg-graphite border-t border-steel/20 px-5 py-4`}
+      >
+        <p className="font-body text-sm text-chalk mb-2">Log today&apos;s weight while you&apos;re here?</p>
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            inputMode="decimal"
+            step="0.1"
+            autoFocus
+            value={weightValue}
+            onChange={(e) => setWeightValue(e.target.value)}
+            placeholder="Weight (lbs)"
+            className="flex-1 h-11 bg-surface border border-steel/30 text-chalk px-3 font-body focus:outline-none focus:border-rust"
+          />
+          <button
+            type="button"
+            onClick={handleLogWeight}
+            disabled={weightSubmitting}
+            className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
+          >
+            {weightSubmitting ? "Saving…" : "Save"}
+          </button>
+          <button
+            type="button"
+            onClick={() => finishNavigation(weightNudge.navHref)}
+            disabled={weightSubmitting}
+            className="h-11 px-3 border border-steel/30 text-steel font-body text-sm"
+          >
+            Skip
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (

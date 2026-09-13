@@ -5,6 +5,7 @@ import { computeRemainingSeconds, formatMMSS } from "@/lib/rest-timer-math";
 import { readRestTimerState, writeRestTimerState, clearRestTimerState } from "@/lib/rest-timer-storage";
 import { playRestAlert } from "@/lib/rest-alert";
 import { MIN_REST_SECONDS_FOR_GAME } from "@/lib/rest-timer-difficulty";
+import { createBrowserClient } from "@/lib/supabase/client";
 import { SessionStopwatch } from "./session-stopwatch";
 import { SnakeMiniGame } from "./snake-mini-game";
 import { FlappyMiniGame } from "./flappy-mini-game";
@@ -13,6 +14,15 @@ import { WhackAMoleMiniGame } from "./whack-a-mole-mini-game";
 import { BreakoutMiniGame } from "./breakout-mini-game";
 import { LaneDodgeMiniGame } from "./lane-dodge-mini-game";
 import { TriviaMiniGame } from "./trivia-mini-game";
+import { WellnessCheckinWidget } from "@/components/athlete/wellness-checkin-widget";
+
+// A real pending item — a habit that's due today and not yet checked
+// off, or no wellness check-in submitted today — becomes the unlock key
+// for that rest period's mini-game/trivia, rather than a nudge running
+// alongside it freely. Only ever set when a genuine pending item exists
+// (computed server-side, see app/sessions/[sessionId]/page.tsx) — never
+// invented to fill space when there's nothing actually due.
+export type PendingGateTask = { kind: "habit"; habitId: string; title: string } | { kind: "wellness" };
 
 const PRESETS = [60, 90, 120];
 
@@ -43,6 +53,10 @@ export function RestTimerBar({
   startedAt,
   pendingPrompt,
   onPromptHandled,
+  pendingTask,
+  athleteId,
+  groupId,
+  todayDate,
 }: {
   sessionId: string;
   startedAt: string;
@@ -52,12 +66,26 @@ export function RestTimerBar({
   // countdown auto-starts immediately instead of waiting for a tap.
   pendingPrompt: { defaultSeconds: number; isPrescribed: boolean } | null;
   onPromptHandled: () => void;
+  // A real pending item (a due habit, an unanswered wellness check-in)
+  // gates the game picker behind resolving it first — null whenever
+  // nothing is genuinely pending, in which case the picker behaves
+  // exactly as it always has.
+  pendingTask?: PendingGateTask | null;
+  athleteId?: string;
+  groupId?: string;
+  todayDate?: string;
 }) {
   const [running, setRunning] = useState<RunningState | null>(null);
   const [remaining, setRemaining] = useState(0);
   const [justFinished, setJustFinished] = useState(false);
   const [selectedGame, setSelectedGame] = useState<GameKey | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  // Once resolved, stays resolved for the rest of this session — the
+  // gate only ever needs to be cleared once, not re-cleared on every
+  // rest period.
+  const [taskResolved, setTaskResolved] = useState(!pendingTask);
+  const [gateOpen, setGateOpen] = useState(false);
+  const [habitSaving, setHabitSaving] = useState(false);
   const wakeLockRef = useRef<any>(null);
 
   // Purely optional content riding on the countdown, per the governing
@@ -155,6 +183,23 @@ export function RestTimerBar({
     setRunning(null);
   }
 
+  async function handleCompleteHabit() {
+    if (pendingTask?.kind !== "habit" || !todayDate || habitSaving) return;
+    setHabitSaving(true);
+    const supabase = createBrowserClient();
+    const { error } = await supabase
+      .from("habit_logs")
+      .upsert(
+        { habit_id: pendingTask.habitId, log_date: todayDate, completed_at: new Date().toISOString() },
+        { onConflict: "habit_id,log_date" }
+      );
+    setHabitSaving(false);
+    if (!error) {
+      setTaskResolved(true);
+      setGateOpen(false);
+    }
+  }
+
   const showPrompt = pendingPrompt && !running;
 
   return (
@@ -187,16 +232,26 @@ export function RestTimerBar({
                 screen (custom_shape_theming_idea.md). */}
             {running.durationSeconds >= MIN_REST_SECONDS_FOR_GAME && (
               <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => (selectedGame ? setSelectedGame(null) : setPickerOpen((v) => !v))}
-                  className={`h-8 px-2.5 border font-body text-xs ${
-                    selectedGame ? "bg-rust border-rust text-graphite" : "border-steel/30 text-steel"
-                  }`}
-                >
-                  🎮 {selectedGame ? "Hide" : "Play"}
-                </button>
-                {pickerOpen && !selectedGame && (
+                {pendingTask && !taskResolved ? (
+                  <button
+                    type="button"
+                    onClick={() => setGateOpen((v) => !v)}
+                    className="h-8 px-2.5 border border-steel/30 text-steel font-body text-xs"
+                  >
+                    🔒 Unlock
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => (selectedGame ? setSelectedGame(null) : setPickerOpen((v) => !v))}
+                    className={`h-8 px-2.5 border font-body text-xs ${
+                      selectedGame ? "bg-rust border-rust text-graphite" : "border-steel/30 text-steel"
+                    }`}
+                  >
+                    🎮 {selectedGame ? "Hide" : "Play"}
+                  </button>
+                )}
+                {pickerOpen && !selectedGame && !(pendingTask && !taskResolved) && (
                   <div className="absolute right-0 top-full mt-1 z-20 bg-surface border border-steel/30 py-1 w-40">
                     {GAME_ORDER.map((key) => (
                       <button
@@ -211,6 +266,34 @@ export function RestTimerBar({
                         {GAME_LABELS[key]}
                       </button>
                     ))}
+                  </div>
+                )}
+                {gateOpen && pendingTask && !taskResolved && (
+                  <div className="absolute right-0 top-full mt-1 z-20 bg-surface border border-steel/30 p-3 w-72">
+                    <p className="font-body text-xs text-steel mb-2">
+                      Finish this to unlock the mini-game/trivia:
+                    </p>
+                    {pendingTask.kind === "habit" ? (
+                      <button
+                        type="button"
+                        onClick={handleCompleteHabit}
+                        disabled={habitSaving}
+                        className="w-full h-9 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
+                      >
+                        {habitSaving ? "Saving…" : `Mark done: ${pendingTask.title}`}
+                      </button>
+                    ) : athleteId && groupId && todayDate ? (
+                      <WellnessCheckinWidget
+                        athleteId={athleteId}
+                        groupId={groupId}
+                        todayDate={todayDate}
+                        initialCheckin={null}
+                        onSaved={() => {
+                          setTaskResolved(true);
+                          setGateOpen(false);
+                        }}
+                      />
+                    ) : null}
                   </div>
                 )}
               </div>

@@ -5,7 +5,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
 import { ExerciseCard } from "./exercise-card";
 import { CompleteWorkoutButton } from "@/components/session/complete-workout-button";
-import { RestTimerBar } from "@/components/session/rest-timer-bar";
+import { RestTimerBar, type PendingGateTask } from "@/components/session/rest-timer-bar";
 
 export function SessionLogger({
   sessionId,
@@ -20,6 +20,8 @@ export function SessionLogger({
   canUploadVideo,
   startedAt,
   gamificationEnabled,
+  pendingGateTask,
+  todayDate,
 }: {
   sessionId: string;
   isCompleted: boolean;
@@ -33,6 +35,8 @@ export function SessionLogger({
   canUploadVideo: boolean;
   startedAt: string;
   gamificationEnabled: boolean;
+  pendingGateTask?: PendingGateTask | null;
+  todayDate?: string;
 }) {
   const [exercises, setExercises] = useState(initialExercises);
   const [pendingRestPrompt, setPendingRestPrompt] = useState<{
@@ -185,6 +189,10 @@ export function SessionLogger({
           startedAt={startedAt}
           pendingPrompt={pendingRestPrompt}
           onPromptHandled={() => setPendingRestPrompt(null)}
+          pendingTask={pendingGateTask}
+          athleteId={athleteId}
+          groupId={groupId}
+          todayDate={todayDate}
         />
       )}
       <section className="px-5 pt-4">
