@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { isDailyConfigured, getVideoRoom, createMeetingToken } from "@/lib/daily-video";
+import { meetsMinimumAge } from "@/lib/coppa";
+
+const VIDEO_CALL_MINIMUM_AGE = 18;
 
 // Authenticated — same shape as every other API route in this app.
 // Deliberately does its own authorization check via a plain SELECT
@@ -36,6 +39,20 @@ export async function POST(request: Request, props: { params: Promise<{ bookingI
   }
   if (booking.status !== "confirmed") {
     return NextResponse.json({ error: "This session is no longer scheduled." }, { status: 400 });
+  }
+
+  // Ron's direct instruction: video calling is 18+ only. Requires
+  // positive confirmation of adult status — a missing date of birth
+  // (a client who predates the intake flow, or hasn't completed it)
+  // is treated as ineligible, not defaulted to allowed. This is the
+  // real enforcement point, not just hiding the button in the UI.
+  const { data: intake } = await supabase
+    .from("client_intake")
+    .select("date_of_birth")
+    .eq("athlete_id", booking.athlete_id)
+    .maybeSingle();
+  if (!intake?.date_of_birth || !meetsMinimumAge(intake.date_of_birth, VIDEO_CALL_MINIMUM_AGE, new Date())) {
+    return NextResponse.json({ error: "Video calling is only available for clients 18 and older." }, { status: 403 });
   }
 
   const isOwner = user.id === booking.coach_id;

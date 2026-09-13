@@ -17,6 +17,7 @@ import { VideoCallButton } from "@/components/booking/video-call-button";
 import { BookingVideoPanel } from "@/components/coach/desktop/booking-video-panel";
 import type { PackageOption } from "@/components/athlete/package-picker";
 import { getEffectiveAthlete } from "@/lib/acting-as";
+import { meetsMinimumAge } from "@/lib/coppa";
 
 export default async function CoachDayDetailPage(
   props: {
@@ -349,6 +350,25 @@ export default async function CoachDayDetailPage(
     (bookingRows ?? []).map((b) => [new Date(b.start_at).getTime(), b as any])
   );
 
+  // Video calling is 18+ only (Ron's direct instruction) — the API
+  // route is the real enforcement; this is just so a coach isn't
+  // offered a "Make video call" control for a client it will only
+  // reject for. A missing/unconfirmed date of birth is NOT eligible,
+  // same "requires positive confirmation" rule as the server-side check.
+  const bookingAthleteIds = Array.from(new Set((bookingRows ?? []).map((b) => b.athlete_id)));
+  const videoEligibleAthleteIds = new Set<string>();
+  if (bookingAthleteIds.length > 0) {
+    const { data: intakeRows } = await supabase
+      .from("client_intake")
+      .select("athlete_id, date_of_birth")
+      .in("athlete_id", bookingAthleteIds);
+    for (const row of intakeRows ?? []) {
+      if (row.date_of_birth && meetsMinimumAge(row.date_of_birth, 18, new Date())) {
+        videoEligibleAthleteIds.add(row.athlete_id);
+      }
+    }
+  }
+
   // Selected client to assign into an open slot — carried via ?client= so
   // it survives the coach clicking through from either the client profile
   // or the main calendar's sidebar.
@@ -463,7 +483,9 @@ export default async function CoachDayDetailPage(
                       Booked — {(booking.profiles as any)?.full_name ?? "Client"}
                     </span>
                     <CancelBookingButton bookingId={booking.id} />
-                    <BookingVideoPanel bookingId={booking.id} initialSessionType={booking.session_type ?? "in_person"} />
+                    {videoEligibleAthleteIds.has(booking.athlete_id) && (
+                      <BookingVideoPanel bookingId={booking.id} initialSessionType={booking.session_type ?? "in_person"} />
+                    )}
                   </div>
                 ) : selectedClient ? (
                   selectedClient.balance > 0 ? (

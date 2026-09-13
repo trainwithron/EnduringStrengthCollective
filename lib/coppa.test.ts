@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isUnder13 } from "./coppa";
+import { isUnder13, meetsMinimumAge } from "./coppa";
 
 describe("isUnder13", () => {
   it("is true the day before the 13th birthday", () => {
@@ -27,5 +27,27 @@ describe("isUnder13", () => {
     // Feb 29 + 13 years forward past a non-leap Feb 28/29).
     expect(isUnder13("2016-02-29", new Date("2029-02-28T12:00:00"))).toBe(true);
     expect(isUnder13("2016-02-29", new Date("2029-03-02T12:00:00"))).toBe(false);
+  });
+});
+
+describe("meetsMinimumAge", () => {
+  it("is false the day before the Nth birthday", () => {
+    expect(meetsMinimumAge("2008-06-15", 18, new Date("2026-06-14T12:00:00"))).toBe(false);
+  });
+
+  it("is true on the Nth birthday itself", () => {
+    expect(meetsMinimumAge("2008-06-15", 18, new Date("2026-06-15T00:00:00"))).toBe(true);
+  });
+
+  it("is true the day after the Nth birthday", () => {
+    expect(meetsMinimumAge("2008-06-15", 18, new Date("2026-06-16T12:00:00"))).toBe(true);
+  });
+
+  it("is false for a clearly-under-18 birthdate", () => {
+    expect(meetsMinimumAge("2015-01-01", 18, new Date("2026-09-11T12:00:00"))).toBe(false);
+  });
+
+  it("is true for a clearly-adult birthdate", () => {
+    expect(meetsMinimumAge("1985-01-01", 18, new Date("2026-09-11T12:00:00"))).toBe(true);
   });
 });
