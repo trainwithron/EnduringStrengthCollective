@@ -2,6 +2,9 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ClientRateEditor } from "@/components/coach/desktop/client-rate-editor";
+import { SwappableTerm } from "@/components/coach/swappable-term";
+import { getCoachDashboardData } from "@/lib/dashboard-data";
+import { DashboardHero } from "@/components/coach/desktop/dashboard-hero";
 import {
   computeEstimatedMRR,
   computeEngagement,
@@ -188,8 +191,31 @@ export default async function BusinessDashboardPage(
     return d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth();
   }).length;
 
+  // Bento/hero visual identity extension (coach_dashboard_redesign_
+  // scoping.md) — Business gets the full treatment: the same "Right
+  // now" hero as Home, reusing the identical coach-wide flag priority
+  // engine (a coach who lands here directly, without going through Home
+  // first, still sees it). team_kind is fetched fresh here since this
+  // page never needed it before.
+  const { data: groupKindRows } = await supabase
+    .from("groups")
+    .select("id, name, group_kind")
+    .in("id", groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"]);
+  const allGroupsForHero = (groupKindRows ?? []).map((g) => ({ id: g.id, name: g.name }));
+  const teamGroupsForHero = (groupKindRows ?? [])
+    .filter((g) => g.group_kind === "team" || !g.group_kind)
+    .map((g) => ({ id: g.id, name: g.name }));
+  const heroData = await getCoachDashboardData(supabase, {
+    coachId: user.id,
+    teamGroups: teamGroupsForHero,
+    allGroups: allGroupsForHero,
+  });
+
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="business">
+      <div className="mb-6">
+        <DashboardHero flag={heroData.heroFlag} emptyState={heroData.heroEmptyState} />
+      </div>
       <div className="pb-6 border-b border-steel/20 mb-6">
         <h1 className="font-display font-bold text-3xl uppercase leading-none">Business</h1>
         <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
@@ -226,7 +252,9 @@ export default async function BusinessDashboardPage(
         </div>
         <div className="border border-steel/20 p-4">
           <p className="font-display text-3xl leading-none">{payingClientsCount}</p>
-          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Paying clients</p>
+          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">
+            Paying <SwappableTerm termKey="client" form="plural" />
+          </p>
           <p className="font-body text-[11px] text-steel mt-0.5">Active subscription or unused credits</p>
         </div>
         <div className="border border-steel/20 p-4">
@@ -252,7 +280,7 @@ export default async function BusinessDashboardPage(
       <div className="grid grid-cols-2 gap-6 mb-8">
         <div className="border border-steel/20 p-4">
           <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
-            Client growth (last 6 months)
+            <SwappableTerm termKey="client" form="singular" className="capitalize" /> growth (last 6 months)
           </h2>
           <div className="flex items-end gap-3 h-28">
             {growth.map((g) => (
@@ -286,7 +314,7 @@ export default async function BusinessDashboardPage(
 
       <div>
         <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
-          Client rates
+          <SwappableTerm termKey="client" form="singular" className="capitalize" /> rates
         </h2>
         <p className="font-body text-xs text-steel mb-3 max-w-[70ch]">
           Set what each client actually pays to see an estimated MRR above — this is a manual stand-in

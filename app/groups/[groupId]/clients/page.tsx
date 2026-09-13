@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ClientCardGrid } from "@/components/coach/desktop/client-card-grid";
 import { AddClientButton } from "@/components/coach/desktop/add-client-button";
+import { SwappableTerm } from "@/components/coach/swappable-term";
 import type { RosterMember } from "@/lib/types";
 import {
   classifyNutritionTrend,
@@ -152,7 +153,9 @@ export default async function ClientsPage(
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="clients">
       <div className="pb-6 border-b border-steel/20 mb-6 flex items-center justify-between">
         <div>
-          <h1 className="font-display font-bold text-3xl uppercase leading-none">Clients</h1>
+          <h1 className="font-display font-bold text-3xl uppercase leading-none">
+            <SwappableTerm termKey="client" form="plural" className="capitalize" />
+          </h1>
           <p className="font-body text-sm text-steel mt-2">
             {athletes.length} {athletes.length === 1 ? "client" : "clients"}
           </p>

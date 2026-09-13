@@ -37,6 +37,8 @@ import { GroupSwitcher } from "@/components/coach/desktop/group-switcher";
 import { ViewAsClientButton } from "@/components/coach/desktop/view-as-client-button";
 import { ViewModeToggle } from "@/components/coach/view-mode-toggle";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { TerminologyProvider } from "@/components/coach/terminology-provider";
+import { SwappableTerm } from "@/components/coach/swappable-term";
 
 function NavBadge({ count, collapsed }: { count: number; collapsed?: boolean }) {
   if (count <= 0) return null;
@@ -88,6 +90,11 @@ interface NavLeaf {
   href: string;
   icon: typeof LayoutGrid;
   badge?: number;
+  // When set, the nav label renders as a SwappableTerm (word-swap
+  // terminology system) instead of the plain `label` string — `label`
+  // still doubles as the collapsed-state tooltip title.
+  termKey?: import("@/lib/terminology").TermKey;
+  termForm?: import("@/lib/terminology").TermForm;
 }
 
 interface NavGroup {
@@ -354,7 +361,7 @@ export function CoachDesktopShell({
     // reachable today for anyone who isn't running a team sport.
     { key: "dashboard", label: "Dashboard", href: `/groups/${groupId}/dashboard`, icon: LayoutDashboard },
     { key: "team-performance", label: "Team Performance", href: `/groups/${groupId}/team-performance`, icon: Activity },
-    { key: "clients", label: "Clients", href: `/groups/${groupId}/clients`, icon: Users, badge: clientsUnread },
+    { key: "clients", label: "Clients", href: `/groups/${groupId}/clients`, icon: Users, badge: clientsUnread, termKey: "client", termForm: "plural" },
     { key: "messages", label: "Messages", href: `/groups/${groupId}/messages`, icon: Mail, badge: messagesUnread },
     { key: "feed", label: "Team Feed", href: `/groups/${groupId}/feed`, icon: MessagesSquare, badge: feedUnread },
     { key: "calendar", label: "Calendar", href: `/groups/${groupId}/calendar`, icon: CalendarDays },
@@ -368,7 +375,7 @@ export function CoachDesktopShell({
       label: "Programming",
       icon: LayoutGrid,
       items: [
-        { key: "programs", label: "Programs", href: `/groups/${groupId}/programs`, icon: LayoutGrid },
+        { key: "programs", label: "Programs", href: `/groups/${groupId}/programs`, icon: LayoutGrid, termKey: "program", termForm: "plural" },
         { key: "exercise-library", label: "Exercise Library", href: `/groups/${groupId}/exercise-library`, icon: Dumbbell },
       ],
     },
@@ -451,7 +458,13 @@ export function CoachDesktopShell({
         } ${isActive ? "text-rust bg-rust/10 border-r-2 border-rust" : "text-steel active:text-chalk"}`}
       >
         <Icon className={`shrink-0 ${indented ? "w-3.5 h-3.5" : "w-4 h-4"}`} strokeWidth={2.25} />
-        {item.label}
+        {item.termKey ? (
+          <span onClick={(e) => e.preventDefault()}>
+            <SwappableTerm termKey={item.termKey} form={item.termForm ?? "singular"} className="capitalize" />
+          </span>
+        ) : (
+          item.label
+        )}
         <NavBadge count={item.badge ?? 0} />
       </Link>
     );
@@ -563,6 +576,7 @@ export function CoachDesktopShell({
   );
 
   return (
+    <TerminologyProvider>
     <div className="min-h-screen bg-graphite text-chalk font-body">
       {/* Persistent top bar — always visible regardless of sidebar state,
           on every viewport. Houses the mobile nav toggle and the "View as
@@ -604,7 +618,13 @@ export function CoachDesktopShell({
                   : "border-steel/40 text-steel"
               }`}
             >
-              {groupKind === "one_on_one" ? "Client" : groupKind === "social" ? "Social" : "Group"}
+              {groupKind === "one_on_one" ? (
+                <SwappableTerm termKey="client" form="singular" className="capitalize" />
+              ) : groupKind === "social" ? (
+                "Social"
+              ) : (
+                <SwappableTerm termKey="group" form="singular" className="capitalize" />
+              )}
             </span>
           )}
         </div>
@@ -655,5 +675,6 @@ export function CoachDesktopShell({
         <main className="flex-1 min-w-0 px-4 py-6 md:px-10 md:py-8 max-w-[1400px]">{children}</main>
       </div>
     </div>
+    </TerminologyProvider>
   );
 }

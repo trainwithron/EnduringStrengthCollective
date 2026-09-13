@@ -15,7 +15,7 @@ export function RosterSection({
   defaultExpanded = false,
   children,
 }: {
-  title: string;
+  title: React.ReactNode;
   summary: string;
   needsAttentionCount?: number;
   defaultExpanded?: boolean;
@@ -25,10 +25,19 @@ export function RosterSection({
 
   return (
     <div className="border border-steel/20 bg-surface">
-      <button
-        type="button"
+      {/* A plain div, not a <button> — the title can contain a real
+          SwappableTerm button (word-swap terminology), and nested
+          buttons are invalid HTML. SwappableTerm stops its own click
+          from propagating, so picking a term doesn't also toggle this
+          section. */}
+      <div
+        role="button"
+        tabIndex={0}
         onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center justify-between p-4 text-left"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") setExpanded((v) => !v);
+        }}
+        className="w-full flex items-center justify-between p-4 text-left cursor-pointer"
       >
         <div className="flex items-center gap-2">
           {expanded ? (
@@ -46,7 +55,7 @@ export function RosterSection({
             {needsAttentionCount} need{needsAttentionCount === 1 ? "s" : ""} attention
           </span>
         )}
-      </button>
+      </div>
       {expanded && <div className="px-4 pb-4">{children}</div>}
     </div>
   );

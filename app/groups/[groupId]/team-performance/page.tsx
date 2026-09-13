@@ -7,6 +7,9 @@ import { computeEngagement } from "@/lib/business-metrics";
 import { computeDailyAverageReadiness, computeWeeklyActivity } from "@/lib/team-performance-metrics";
 import { computeReadinessAverage, isLowReadiness } from "@/lib/wellness";
 import { isHabitDueOn } from "@/lib/habits";
+import { getCoachDashboardData } from "@/lib/dashboard-data";
+import { DashboardHero } from "@/components/coach/desktop/dashboard-hero";
+import { TeamPulseCard } from "@/components/coach/desktop/team-pulse-card";
 
 function dateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
@@ -47,6 +50,17 @@ export default async function TeamPerformancePage(
     .select("name")
     .eq("id", params.groupId)
     .single();
+
+  // Bento/hero visual identity extension (coach_dashboard_redesign_
+  // scoping.md) — full treatment: the same hero + Team Pulse as Home,
+  // scoped to just this one group's roster (this page is already
+  // per-group, unlike Home/Business which span the coach's whole book).
+  const thisGroupForHero = [{ id: params.groupId, name: group?.name ?? "Group" }];
+  const heroData = await getCoachDashboardData(supabase, {
+    coachId: user.id,
+    teamGroups: thisGroupForHero,
+    allGroups: thisGroupForHero,
+  });
 
   const { data: memberRows } = await supabase
     .from("group_memberships")
@@ -182,6 +196,16 @@ export default async function TeamPerformancePage(
 
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="team-performance">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-6">
+        <div className="lg:col-span-2">
+          <DashboardHero flag={heroData.heroFlag} emptyState={heroData.heroEmptyState} />
+        </div>
+        <div className="space-y-3">
+          {heroData.teamPulses.map((team) => (
+            <TeamPulseCard key={team.groupId} team={team} />
+          ))}
+        </div>
+      </div>
       <div className="pb-6 border-b border-steel/20 mb-6">
         <h1 className="font-display font-bold text-3xl uppercase leading-none">Team Performance</h1>
         <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">

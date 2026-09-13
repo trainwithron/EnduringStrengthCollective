@@ -16,6 +16,8 @@ import { DashboardTodayPanel } from "@/components/coach/desktop/dashboard-today-
 import { DashboardWeekNarrative } from "@/components/coach/desktop/dashboard-week-narrative";
 import { DashboardAutoRefresh } from "@/components/coach/desktop/dashboard-auto-refresh";
 import { RosterSection } from "@/components/coach/desktop/roster-section";
+import { SwappableTerm } from "@/components/coach/swappable-term";
+import { DashboardTileGrid } from "@/components/coach/desktop/dashboard-tile-grid";
 
 interface GroupRow {
   id: string;
@@ -94,6 +96,16 @@ export default async function CoachHomePage() {
     .filter((g) => g.group_kind === "team" || !g.group_kind)
     .sort((a, b) => a.name.localeCompare(b.name));
 
+  // Per-coach tile arrangement + hover-peek defaults (coach_dashboard_
+  // redesign_scoping.md's customization layer) — a real DB row, not
+  // localStorage, so it follows a coach across devices.
+  const { data: layoutRow } = await supabase
+    .from("coach_dashboard_layout")
+    .select("hidden_tiles, tile_order, tile_metric_overrides")
+    .eq("coach_id", user.id)
+    .maybeSingle();
+  const tileMetricOverrides = (layoutRow?.tile_metric_overrides as Record<string, string>) ?? {};
+
   // "N — Dual Signal" (coach_dashboard_redesign_scoping.md) — the hero
   // flag/empty-state, per-team-group Team Pulse, stat tiles, today's
   // bookings, and the frequency-normalized quiet-client tiers all come
@@ -104,6 +116,7 @@ export default async function CoachHomePage() {
     coachId: user.id,
     teamGroups: teamGroups.map((g) => ({ id: g.id, name: g.name })),
     allGroups: allGroups.map((g) => ({ id: g.id, name: g.name })),
+    tileMetricOverrides,
   });
 
   // "Has something new happened here" dot — same coach_view_state data
@@ -311,59 +324,79 @@ export default async function CoachHomePage() {
         </div>
       </div>
 
-      <div className="mb-6">
-        <DashboardStatTiles stats={dashboardData.statTiles} />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-8">
-        <DashboardWeekNarrative text={dashboardData.weekNarrative} />
-        <DashboardTodayPanel bookings={dashboardData.todayBookings} />
-      </div>
-
       <NeedsReplyPanel coachId={user.id} threads={needsReplyThreads} />
 
-      <div className="space-y-3 mt-6">
-        <RosterSection
-          title="1-on-1 Clients"
-          summary={clientCards.length === 0 ? "No clients yet" : `${clientCards.length} client${clientCards.length === 1 ? "" : "s"}`}
-          needsAttentionCount={clientCards.filter((c) => c.quietTier).length}
-        >
-          {clientCards.length === 0 ? (
-            <p className="font-body text-sm text-steel">No 1-on-1 clients yet.</p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {clientCards.map((c) => (
-                <HomeClientCard key={c.athleteId} client={c} />
-              ))}
-            </div>
-          )}
-        </RosterSection>
+      <DashboardTileGrid
+        initialOrder={(layoutRow?.tile_order as string[] | undefined) ?? []}
+        initialHidden={(layoutRow?.hidden_tiles as string[] | undefined) ?? []}
+        tiles={[
+          {
+            key: "stats",
+            label: "Stats",
+            node: (
+              <DashboardStatTiles tiles={dashboardData.statTiles.tiles} initialOverrides={tileMetricOverrides} />
+            ),
+          },
+          {
+            key: "week",
+            label: "This Week",
+            node: <DashboardWeekNarrative text={dashboardData.weekNarrative} />,
+          },
+          {
+            key: "today",
+            label: "Today",
+            node: <DashboardTodayPanel bookings={dashboardData.todayBookings} />,
+          },
+          {
+            key: "roster",
+            label: "Roster",
+            node: (
+              <div className="space-y-3">
+                <RosterSection
+                  title={<>1-on-1 <SwappableTerm termKey="client" form="plural" className="capitalize" /></>}
+                  summary={clientCards.length === 0 ? "No clients yet" : `${clientCards.length} client${clientCards.length === 1 ? "" : "s"}`}
+                  needsAttentionCount={clientCards.filter((c) => c.quietTier).length}
+                >
+                  {clientCards.length === 0 ? (
+                    <p className="font-body text-sm text-steel">No 1-on-1 clients yet.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {clientCards.map((c) => (
+                        <HomeClientCard key={c.athleteId} client={c} />
+                      ))}
+                    </div>
+                  )}
+                </RosterSection>
 
-        <RosterSection
-          title="Groups"
-          summary={teamCards.length === 0 ? "No groups yet" : `${teamCards.length} group${teamCards.length === 1 ? "" : "s"}`}
-        >
-          {teamCards.length === 0 ? (
-            <p className="font-body text-sm text-steel">No groups yet.</p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {teamCards.map((g) => (
-                <HomeGroupCard key={g.id} group={g} />
-              ))}
-            </div>
-          )}
-        </RosterSection>
+                <RosterSection
+                  title={<SwappableTerm termKey="group" form="plural" className="capitalize" />}
+                  summary={teamCards.length === 0 ? "No groups yet" : `${teamCards.length} group${teamCards.length === 1 ? "" : "s"}`}
+                >
+                  {teamCards.length === 0 ? (
+                    <p className="font-body text-sm text-steel">No groups yet.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {teamCards.map((g) => (
+                        <HomeGroupCard key={g.id} group={g} />
+                      ))}
+                    </div>
+                  )}
+                </RosterSection>
 
-        {socialCards.length > 0 && (
-          <RosterSection title="Social Groups" summary={`${socialCards.length} group${socialCards.length === 1 ? "" : "s"}`}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {socialCards.map((g) => (
-                <HomeGroupCard key={g.id} group={g} />
-              ))}
-            </div>
-          </RosterSection>
-        )}
-      </div>
+                {socialCards.length > 0 && (
+                  <RosterSection title="Social Groups" summary={`${socialCards.length} group${socialCards.length === 1 ? "" : "s"}`}>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {socialCards.map((g) => (
+                        <HomeGroupCard key={g.id} group={g} />
+                      ))}
+                    </div>
+                  </RosterSection>
+                )}
+              </div>
+            ),
+          },
+        ]}
+      />
     </>
   );
 

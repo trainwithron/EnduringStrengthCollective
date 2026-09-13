@@ -4,6 +4,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ProgramCardGrid, type ProgramCardData } from "@/components/coach/desktop/program-card-grid";
 import { computeProgramCardVisuals } from "@/lib/program-card-data";
+import { SwappableTerm } from "@/components/coach/swappable-term";
 
 export default async function ProgramsListPage(
   props: {
@@ -72,7 +73,9 @@ export default async function ProgramsListPage(
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="programs">
       <div className="pb-6 border-b border-steel/20 mb-6">
-        <h1 className="font-display font-bold text-3xl uppercase leading-none">Programs</h1>
+        <h1 className="font-display font-bold text-3xl uppercase leading-none">
+          <SwappableTerm termKey="program" form="plural" className="capitalize" />
+        </h1>
         <p className="font-body text-sm text-steel mt-2">
           {cards.length} {cards.length === 1 ? "program" : "programs"}
         </p>

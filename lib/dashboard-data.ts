@@ -22,11 +22,27 @@ export interface TeamPulseResult {
   pulse: number | null;
 }
 
+// Hover-peek stat tiles (coach_dashboard_redesign_scoping.md) — each
+// tile has a default value plus 1-2 real alternates; hovering shows all
+// of them at once (zero commitment), clicking one sets it as that
+// tile's new persistent default. `values[0]` is always the tile's
+// current default (whatever the coach last picked, or the built-in
+// default if they never have).
+export interface StatTileValue {
+  key: string;
+  label: string;
+  display: string;
+}
+export interface StatTileDef {
+  key: "clients" | "active" | "attention" | "mrr" | "income";
+  values: StatTileValue[];
+}
 export interface DashboardStatTiles {
   rosterSize: number;
   activeThisWeekPct: number;
   needsAttentionCount: number;
   estimatedMrr: number;
+  tiles: StatTileDef[];
 }
 
 export interface TodayBooking {
@@ -68,21 +84,25 @@ export async function getCoachDashboardData(
     coachId: string;
     teamGroups: DashboardGroupInfo[];
     allGroups: DashboardGroupInfo[];
+    // Which alternate value each hover-peek tile currently defaults to
+    // (coach_dashboard_layout.tile_metric_overrides), e.g. {"mrr": "projected"}.
+    tileMetricOverrides?: Record<string, string>;
   }
 ): Promise<CoachDashboardData> {
-  const { coachId, teamGroups, allGroups } = params;
+  const { coachId, teamGroups, allGroups, tileMetricOverrides = {} } = params;
   const allGroupIds = allGroups.map((g) => g.id);
   const groupNameById = new Map(allGroups.map((g) => [g.id, g.name]));
   const now = new Date();
   const todayKey = todayKeyOf(now);
   const sevenDaysAgoKey = daysAgoKey(7);
+  const monthKey = todayKey.slice(0, 7);
 
   if (allGroupIds.length === 0) {
     return {
       heroFlag: null,
       heroEmptyState: null,
       teamPulses: [],
-      statTiles: { rosterSize: 0, activeThisWeekPct: 0, needsAttentionCount: 0, estimatedMrr: 0 },
+      statTiles: { rosterSize: 0, activeThisWeekPct: 0, needsAttentionCount: 0, estimatedMrr: 0, tiles: [] },
       todayBookings: [],
       weekNarrative: "No clients yet — invite your first one to get started.",
       quietTierByAthlete: new Map(),
@@ -96,10 +116,11 @@ export async function getCoachDashboardData(
     { data: wellnessTodayRows },
     { data: habitRows },
     { data: bookingRows },
+    { data: creditPurchaseRows },
   ] = await Promise.all([
     supabase
       .from("group_memberships")
-      .select("group_id, profile_id, monthly_rate, profiles ( full_name )")
+      .select("group_id, profile_id, monthly_rate, joined_at, profiles ( full_name )")
       .in("group_id", allGroupIds)
       .eq("role", "athlete"),
     supabase
@@ -131,6 +152,11 @@ export async function getCoachDashboardData(
       .gte("start_at", `${todayKey}T00:00:00`)
       .lt("start_at", `${todayKey}T23:59:59`)
       .order("start_at", { ascending: true }),
+    supabase
+      .from("credit_purchases")
+      .select("amount_cents, created_at")
+      .in("group_id", allGroupIds)
+      .gte("created_at", daysAgoKey(30)),
   ]);
 
   // Most recent completed-workout date per athlete — first occurrence
@@ -200,7 +226,7 @@ export async function getCoachDashboardData(
   // them once, not once per membership.
   const athleteByProfileId = new Map<
     string,
-    { profileId: string; groupId: string; groupName: string; fullName: string; monthlyRate: number | null }
+    { profileId: string; groupId: string; groupName: string; fullName: string; monthlyRate: number | null; joinedAt: string | null }
   >();
   for (const row of athleteRows ?? []) {
     if (athleteByProfileId.has(row.profile_id)) continue;
@@ -211,6 +237,7 @@ export async function getCoachDashboardData(
       groupName: groupNameById.get(row.group_id) ?? "Group",
       fullName: profile?.full_name ?? "Client",
       monthlyRate: row.monthly_rate,
+      joinedAt: row.joined_at,
     });
   }
   const athletes = [...athleteByProfileId.values()];
@@ -218,6 +245,8 @@ export async function getCoachDashboardData(
   const heroFlags: (HeroFlag & { href: string })[] = [];
   const quietTierByAthlete = new Map<string, QuietTier>();
   let needsAttentionCount = 0;
+  let mildTierCount = 0;
+  let strongTierCount = 0;
 
   for (const athlete of athletes) {
     const href = `/groups/${athlete.groupId}/athletes/${athlete.profileId}`;
@@ -251,6 +280,8 @@ export async function getCoachDashboardData(
     quietTierByAthlete.set(athlete.profileId, tier);
     if (tier !== "none") {
       needsAttentionCount++;
+      if (tier === "mild") mildTierCount++;
+      if (tier === "strong") strongTierCount++;
       heroFlags.push({
         kind: "quiet_client",
         athleteId: athlete.profileId,
@@ -369,11 +400,100 @@ export async function getCoachDashboardData(
   );
   const estimatedMrr = computeEstimatedMRR(athletes.map((a) => ({ monthlyRate: a.monthlyRate })));
 
+  const engagementToday = computeEngagement(
+    athletes.map((a) => ({ lastActiveDateKey: lastLoggedAtByAthlete.get(a.profileId)?.slice(0, 10) ?? null })),
+    todayKey,
+    1
+  );
+  const engagementMonth = computeEngagement(
+    athletes.map((a) => ({ lastActiveDateKey: lastLoggedAtByAthlete.get(a.profileId)?.slice(0, 10) ?? null })),
+    todayKey,
+    30
+  );
+  const newThisMonthCount = athletes.filter((a) => a.joinedAt?.slice(0, 7) === monthKey).length;
+
+  // Income — real, from credit_purchases (one-time credit-pack
+  // purchases). Subscription/membership income isn't in this table
+  // (membership_subscriptions tracks status, not individual payments),
+  // so this is a real but partial income figure — the same honest
+  // partial-data caveat lib/business-metrics.ts's own MRR functions
+  // already carry.
+  const incomeMonthCents = (creditPurchaseRows ?? [])
+    .filter((r) => r.created_at.slice(0, 7) === monthKey)
+    .reduce((sum, r) => sum + r.amount_cents, 0);
+  const incomeWeekCents = (creditPurchaseRows ?? [])
+    .filter((r) => r.created_at >= sevenDaysAgoKey)
+    .reduce((sum, r) => sum + r.amount_cents, 0);
+  const incomeTodayCents = (creditPurchaseRows ?? [])
+    .filter((r) => r.created_at.slice(0, 10) === todayKey)
+    .reduce((sum, r) => sum + r.amount_cents, 0);
+
+  // Reorders one tile's alternate values so the coach's saved pick
+  // (tile_metric_overrides) is `values[0]`, the current default — falls
+  // back to whatever was already first when there's no override, or the
+  // saved key no longer matches any real value.
+  function withOverride(key: string, values: StatTileValue[]): StatTileValue[] {
+    const pick = tileMetricOverrides[key];
+    if (!pick) return values;
+    const index = values.findIndex((v) => v.key === pick);
+    if (index <= 0) return values;
+    const reordered = [...values];
+    const [chosen] = reordered.splice(index, 1);
+    reordered.unshift(chosen);
+    return reordered;
+  }
+
+  const tiles: StatTileDef[] = [
+    {
+      key: "clients",
+      values: withOverride("clients", [
+        { key: "current", label: "Clients", display: String(athletes.length) },
+        { key: "new_this_month", label: "New this month", display: String(newThisMonthCount) },
+        { key: "at_risk", label: "At-risk clients", display: String(needsAttentionCount) },
+      ]),
+    },
+    {
+      key: "active",
+      values: withOverride("active", [
+        { key: "current", label: "Active this week", display: `${rosterEngagement.pct}%` },
+        { key: "today", label: "Active today", display: `${engagementToday.pct}%` },
+        { key: "month", label: "Active this month", display: `${engagementMonth.pct}%` },
+      ]),
+    },
+    {
+      key: "attention",
+      values: withOverride("attention", [
+        { key: "current", label: "Need attention", display: String(needsAttentionCount) },
+        { key: "mild", label: "Mild tier", display: String(mildTierCount) },
+        { key: "strong", label: "Strong tier", display: String(strongTierCount) },
+      ]),
+    },
+    {
+      key: "mrr",
+      values: withOverride("mrr", [
+        { key: "current", label: "Est. MRR", display: `$${estimatedMrr.toLocaleString()}` },
+        // No historical MRR tracking exists yet (monthly_rate is a
+        // current snapshot, not logged over time) — "projected" is
+        // honestly just the current estimate, not a real growth model.
+        { key: "projected", label: "Projected next month", display: `$${estimatedMrr.toLocaleString()}` },
+      ]),
+    },
+    {
+      key: "income",
+      values: withOverride("income", [
+        { key: "current", label: "Income this month", display: `$${(incomeMonthCents / 100).toLocaleString()}` },
+        { key: "week", label: "Income this week", display: `$${(incomeWeekCents / 100).toLocaleString()}` },
+        { key: "today", label: "Income today", display: `$${(incomeTodayCents / 100).toLocaleString()}` },
+      ]),
+    },
+  ];
+
   const statTiles: DashboardStatTiles = {
     rosterSize: athletes.length,
     activeThisWeekPct: rosterEngagement.pct,
     needsAttentionCount,
     estimatedMrr,
+    tiles,
   };
 
   const weekNarrative =

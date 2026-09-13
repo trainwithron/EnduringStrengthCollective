@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Home } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
+import { TerminologyProvider } from "@/components/coach/terminology-provider";
 
 // A dedicated, minimal shell for the one cross-group page in the app —
 // not a retrofit of CoachDesktopShell, which has a lot of group-keyed
@@ -11,6 +12,7 @@ import { DownloadAppButton } from "@/components/coach/desktop/download-app-butto
 // would be redundant.
 export function CoachHomeShell({ orgName, children }: { orgName: string; children: React.ReactNode }) {
   return (
+    <TerminologyProvider>
     <div className="min-h-screen bg-graphite text-chalk flex">
       <aside className="w-60 shrink-0 border-r border-steel/20 flex flex-col">
         <div className="px-5 pt-6 pb-5 border-b border-steel/20">
@@ -33,5 +35,6 @@ export function CoachHomeShell({ orgName, children }: { orgName: string; childre
       </aside>
       <main className="flex-1 px-8 py-8 max-w-5xl">{children}</main>
     </div>
+    </TerminologyProvider>
   );
 }

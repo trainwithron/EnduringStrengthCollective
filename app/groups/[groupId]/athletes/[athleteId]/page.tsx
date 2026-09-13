@@ -17,7 +17,9 @@ import { CoachLoggedBadge } from "@/components/coach-logged-badge";
 import { NutritionTools } from "@/components/coach/desktop/nutrition-tools";
 import { TrendChart } from "@/components/coach/desktop/trend-chart";
 import { ExerciseProgressionChart } from "@/components/coach/desktop/exercise-progression-chart";
-import { isHabitDueOn } from "@/lib/habits";
+import { isHabitDueOn, computeCompliancePct } from "@/lib/habits";
+import { computeQuietTier } from "@/lib/quiet-client-tier";
+import { isLowReadiness } from "@/lib/wellness";
 import { computeWeeklyWeightTrend } from "@/lib/weight-trend";
 import {
   classifyNutritionTrend,
@@ -106,6 +108,15 @@ export default async function AthleteProfilePage(
         .maybeSingle();
 
   const activeProgram = personalProgram ?? sharedProgram;
+
+  // Compact flag banner (coach_dashboard_redesign_scoping.md's visual
+  // identity extension — Client Profile gets tiles + this banner, no
+  // hero card). A separate lightweight query rather than widening the
+  // personalProgram/sharedProgram select above, since training_days
+  // isn't otherwise used anywhere else those two rows feed into.
+  const { data: activeProgramSchedule } = activeProgram
+    ? await supabase.from("programs").select("training_days").eq("id", activeProgram.id).maybeSingle()
+    : { data: null };
 
   // Stats (total count, volume, PRs) need every logged workout to stay
   // accurate, and the displayed history below is just the first 50 of
@@ -452,6 +463,35 @@ export default async function AthleteProfilePage(
     .join("")
     .toUpperCase();
 
+  // Single-athlete flag banner — same signals/priority as Home's hero
+  // (readiness > quiet tier > habits), scoped to just this one client.
+  const todaysWellnessRow = (wellnessRows ?? []).find((r) => r.log_date === todayKey);
+  const lastLoggedAt = allLogs?.[0]?.created_at ?? null;
+  const quietTier = computeQuietTier({
+    lastLoggedAt: lastLoggedAt ? new Date(lastLoggedAt) : null,
+    now: new Date(),
+    trainingDays: activeProgramSchedule?.training_days ?? null,
+  });
+  const habitCompliancePct = computeCompliancePct(totalHabitsCompleted, totalHabitsDue);
+
+  let profileFlag: string | null = null;
+  if (
+    todaysWellnessRow &&
+    isLowReadiness({
+      sleepQuality: todaysWellnessRow.sleep_quality,
+      soreness: todaysWellnessRow.soreness,
+      energy: todaysWellnessRow.energy,
+    })
+  ) {
+    profileFlag = "Logged low readiness today.";
+  } else if (quietTier === "strong") {
+    profileFlag = "Has gone quiet — worth a personal check-in.";
+  } else if (quietTier === "mild") {
+    profileFlag = "Hasn't logged in a while.";
+  } else if (habitCompliancePct != null && habitCompliancePct < 50) {
+    profileFlag = `Missed ${totalHabitsDue - totalHabitsCompleted} habit${totalHabitsDue - totalHabitsCompleted === 1 ? "" : "s"} this week.`;
+  }
+
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="clients">
       <div className="pb-6 border-b border-steel/20 mb-6">
@@ -483,6 +523,11 @@ export default async function AthleteProfilePage(
             </p>
           </div>
         </div>
+        {profileFlag && (
+          <p className="font-body text-xs text-rust border border-rust/40 bg-rust/5 px-3 py-1.5 mt-3 inline-block">
+            {profileFlag}
+          </p>
+        )}
         <div className="flex flex-wrap items-center gap-2 mt-4">
           {activeProgram && (
             <Link
