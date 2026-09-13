@@ -18,6 +18,10 @@ import { DashboardAutoRefresh } from "@/components/coach/desktop/dashboard-auto-
 import { RosterSection } from "@/components/coach/desktop/roster-section";
 import { SwappableTerm } from "@/components/coach/swappable-term";
 import { DashboardTileGrid } from "@/components/coach/desktop/dashboard-tile-grid";
+import {
+  CollectiveIntelligencePanel,
+  type CollectiveIntelligenceItem,
+} from "@/components/coach/desktop/collective-intelligence-panel";
 
 interface GroupRow {
   id: string;
@@ -126,6 +130,33 @@ export default async function CoachHomePage() {
   // no coach_view_state row yet (never visited) gets no dot — nothing to
   // compare against, matching the existing "don't flood on first look"
   // rule the shell's own seeding already follows.
+  // AI Assistant Slice 2 ("Collective Intelligence") — today's briefing,
+  // if the cron has already run. RLS (coach_briefing_items_select_
+  // assigned_or_cascade) already scopes this to athletes this coach
+  // actually staffs, so a plain select needs no extra group filtering.
+  const todayKey = new Date().toISOString().slice(0, 10);
+  const { data: todaysBriefing } = await supabase
+    .from("coach_briefings")
+    .select("id")
+    .eq("coach_id", user.id)
+    .eq("briefing_date", todayKey)
+    .maybeSingle();
+  let collectiveIntelligenceItems: CollectiveIntelligenceItem[] = [];
+  if (todaysBriefing) {
+    const { data: briefingItemRows } = await supabase
+      .from("coach_briefing_items")
+      .select("id, item_type, headline, athlete_id, group_id")
+      .eq("briefing_id", todaysBriefing.id)
+      .order("sort_order", { ascending: true });
+    collectiveIntelligenceItems = (briefingItemRows ?? []).map((row) => ({
+      id: row.id,
+      itemType: row.item_type as CollectiveIntelligenceItem["itemType"],
+      headline: row.headline,
+      athleteId: row.athlete_id,
+      groupId: row.group_id,
+    }));
+  }
+
   const allGroupIds = allGroups.map((g) => g.id);
   const unseenByGroup = new Map<string, boolean>();
   if (allGroupIds.length > 0) {
@@ -323,6 +354,8 @@ export default async function CoachHomePage() {
           ))}
         </div>
       </div>
+
+      <CollectiveIntelligencePanel items={collectiveIntelligenceItems} hasRunToday={!!todaysBriefing} />
 
       <NeedsReplyPanel coachId={user.id} threads={needsReplyThreads} />
 
