@@ -2,8 +2,42 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getStripeClient, isStripeConfigured } from "@/lib/stripe";
 import { computeRevenueSplit, type CoachShare } from "@/lib/revenue-splits";
+import { duplicateProgram } from "@/lib/program-duplication";
 import type Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
+
+// Package-Program Linking (package_program_linking_scoping.md) — fires
+// duplicateProgram() on genuine FIRST enrollment only, never on a
+// recurring renewal (a subscription's repeat invoice.paid events don't
+// call this at all; only the checkout that starts a subscription does).
+// `alreadyEnrolled` is the caller's own "does a prior row exist" check,
+// computed against whichever table actually represents enrollment for
+// that payment mode (credit_purchases for one-time, the pre-upsert
+// membership_subscriptions row for a subscription).
+async function assignLinkedProgramIfFirstEnrollment(
+  supabase: SupabaseClient,
+  {
+    coachPackageId,
+    athleteId,
+    groupId,
+    alreadyEnrolled,
+  }: { coachPackageId: string | null; athleteId: string; groupId: string; alreadyEnrolled: boolean }
+) {
+  if (!coachPackageId || alreadyEnrolled) return;
+  const { data: pkg } = await supabase
+    .from("coach_packages")
+    .select("default_program_id, coach_id")
+    .eq("id", coachPackageId)
+    .maybeSingle();
+  if (!pkg?.default_program_id) return;
+
+  await duplicateProgram(supabase, {
+    sourceProgramId: pkg.default_program_id,
+    destinationGroupId: groupId,
+    createdBy: pkg.coach_id,
+    athleteId,
+  });
+}
 
 // Splits a payment's proceeds across the org's coaches per the existing
 // platform_fee_pct/revenue_share_pct model (lib/revenue-splits.ts —
@@ -116,6 +150,19 @@ export async function POST(request: Request) {
           const credits = Number(session.metadata?.credits ?? 0);
           if (credits <= 0) break;
 
+          // Checked BEFORE inserting this event's own row — "any prior
+          // purchase of this exact package by this athlete" is what
+          // "first enrollment" means here, independent of the retry-
+          // idempotency check just below (which guards against the SAME
+          // event being processed twice, a different question).
+          const { count: priorPurchaseCount } = coachPackageId
+            ? await supabase
+                .from("credit_purchases")
+                .select("id", { count: "exact", head: true })
+                .eq("athlete_id", athleteId)
+                .eq("coach_package_id", coachPackageId)
+            : { count: 0 };
+
           // Idempotency: a Stripe retry of this same event hits the
           // unique constraint on stripe_event_id and gets treated as
           // already-processed below, rather than crediting twice.
@@ -143,7 +190,28 @@ export async function POST(request: Request) {
           if (rpcError) throw rpcError;
 
           await createRevenueSplitTransfers(supabase, stripe, event.id, groupId, session.amount_total ?? 0);
+          await assignLinkedProgramIfFirstEnrollment(supabase, {
+            coachPackageId,
+            athleteId,
+            groupId,
+            alreadyEnrolled: (priorPurchaseCount ?? 0) > 0,
+          });
         } else if (session.mode === "subscription" && typeof session.subscription === "string") {
+          // Checked BEFORE the upsert below — an existing row here means
+          // this athlete already had a subscription for this group
+          // (however it ended up in whatever state it's in); a genuinely
+          // brand-new subscriber has no row yet, which is the real
+          // "first enrollment" signal for the program-assignment side
+          // effect (recurring renewals never reach this branch at all —
+          // only invoice.paid fires for those, and that handler
+          // deliberately never touches program assignment).
+          const { data: existingSubscription } = await supabase
+            .from("membership_subscriptions")
+            .select("athlete_id")
+            .eq("athlete_id", athleteId)
+            .eq("group_id", groupId)
+            .maybeSingle();
+
           await supabase.from("membership_subscriptions").upsert(
             {
               athlete_id: athleteId,
@@ -156,6 +224,13 @@ export async function POST(request: Request) {
             },
             { onConflict: "athlete_id,group_id" }
           );
+
+          await assignLinkedProgramIfFirstEnrollment(supabase, {
+            coachPackageId,
+            athleteId,
+            groupId,
+            alreadyEnrolled: !!existingSubscription,
+          });
         }
         break;
       }

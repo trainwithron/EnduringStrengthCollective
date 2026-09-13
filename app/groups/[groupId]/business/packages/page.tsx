@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
-import { PackageManager, type CoachPackageRow } from "@/components/coach/desktop/package-manager";
+import { PackageManager, type CoachPackageRow, type LinkableProgramOption } from "@/components/coach/desktop/package-manager";
 
 export default async function PackagesPage(
   props: {
@@ -39,7 +39,7 @@ export default async function PackagesPage(
 
   const { data: packageRows } = await supabase
     .from("coach_packages")
-    .select("id, name, sessions_per_week, billing_type, sessions_granted, rate_cents, is_active, is_public")
+    .select("id, name, sessions_per_week, billing_type, sessions_granted, rate_cents, is_active, is_public, default_program_id")
     .eq("coach_id", user.id)
     .eq("group_id", params.groupId)
     .order("sessions_per_week", { ascending: true });
@@ -53,7 +53,20 @@ export default async function PackagesPage(
     isPublic: p.is_public,
     rateCents: p.rate_cents,
     isActive: p.is_active,
+    defaultProgramId: p.default_program_id,
   }));
+
+  // Same "shared, not-yet-personalized programs only" query the existing
+  // "Assign to Client" picker already uses — a package should only ever
+  // link to a program every client can independently get their own copy
+  // of, never someone's already-personalized one.
+  const { data: programRows } = await supabase
+    .from("programs")
+    .select("id, name")
+    .eq("group_id", params.groupId)
+    .is("athlete_id", null)
+    .order("name");
+  const linkablePrograms: LinkableProgramOption[] = (programRows ?? []).map((p) => ({ id: p.id, name: p.name }));
 
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="packages">
@@ -65,7 +78,7 @@ export default async function PackagesPage(
         </p>
       </div>
 
-      <PackageManager groupId={params.groupId} initialPackages={packages} />
+      <PackageManager groupId={params.groupId} initialPackages={packages} linkablePrograms={linkablePrograms} />
     </CoachDesktopShell>
   );
 }

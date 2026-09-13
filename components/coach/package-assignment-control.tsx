@@ -35,16 +35,27 @@ export function PackageAssignmentControl({
 
   async function toggle(packageId: string) {
     setBusyId(packageId);
-    const supabase = createBrowserClient();
     const isAssigned = assignedIds.has(packageId);
     if (isAssigned) {
+      // Removing an assignment has no side effect to run — still a
+      // direct RLS write, same as before.
+      const supabase = createBrowserClient();
       await supabase
         .from("package_assignments")
         .delete()
         .eq("coach_package_id", packageId)
         .eq("athlete_id", athleteId);
     } else {
-      await supabase.from("package_assignments").insert({ coach_package_id: packageId, athlete_id: athleteId });
+      // Assigning goes through a server route instead of a direct
+      // insert — a linked program (package_program_linking_scoping.md)
+      // needs duplicateProgram() to actually run, which only exists as
+      // a real TypeScript function, not something reachable from a
+      // plain RLS-gated insert.
+      await fetch("/api/coach/package-assignments", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ packageId, athleteId }),
+      });
     }
     setAssignedIds((prev) => {
       const next = new Set(prev);

@@ -12,6 +12,12 @@ export interface CoachPackageRow {
   rateCents: number;
   isActive: boolean;
   isPublic: boolean;
+  defaultProgramId: string | null;
+}
+
+export interface LinkableProgramOption {
+  id: string;
+  name: string;
 }
 
 function formatDollars(cents: number): string {
@@ -21,9 +27,11 @@ function formatDollars(cents: number): string {
 export function PackageManager({
   groupId,
   initialPackages,
+  linkablePrograms,
 }: {
   groupId: string;
   initialPackages: CoachPackageRow[];
+  linkablePrograms: LinkableProgramOption[];
 }) {
   const [packages, setPackages] = useState(initialPackages);
   const [name, setName] = useState("");
@@ -32,6 +40,7 @@ export function PackageManager({
   const [sessionsGranted, setSessionsGranted] = useState("12");
   const [ratePerSession, setRatePerSession] = useState("95");
   const [isPublic, setIsPublic] = useState(false);
+  const [defaultProgramId, setDefaultProgramId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -61,6 +70,7 @@ export function PackageManager({
           sessionsGranted: Number(sessionsGranted),
           rateCents,
           isPublic,
+          defaultProgramId: defaultProgramId || null,
         }),
       });
       const data = await res.json();
@@ -78,11 +88,13 @@ export function PackageManager({
             rateCents,
             isActive: true,
             isPublic,
+            defaultProgramId: defaultProgramId || null,
           },
         ].sort((a, b) => a.sessionsPerWeek - b.sessionsPerWeek || a.billingType.localeCompare(b.billingType))
       );
       setName("");
       setIsPublic(false);
+      setDefaultProgramId("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't create the package.");
     } finally {
@@ -143,6 +155,7 @@ export function PackageManager({
                 <th className="text-left font-body text-xs text-steel uppercase tracking-wide font-medium py-2">Rate</th>
                 <th className="text-left font-body text-xs text-steel uppercase tracking-wide font-medium py-2">Total</th>
                 <th className="text-left font-body text-xs text-steel uppercase tracking-wide font-medium py-2">Visibility</th>
+                <th className="text-left font-body text-xs text-steel uppercase tracking-wide font-medium py-2">Program</th>
                 <th className="py-2" />
               </tr>
             </thead>
@@ -175,6 +188,9 @@ export function PackageManager({
                     >
                       {p.isPublic ? "Published" : "Private"}
                     </button>
+                  </td>
+                  <td className="py-3 font-body text-xs text-steel">
+                    {p.defaultProgramId ? linkablePrograms.find((prog) => prog.id === p.defaultProgramId)?.name ?? "Linked" : "—"}
                   </td>
                   <td className="py-3 text-right">
                     <button
@@ -263,6 +279,26 @@ export function PackageManager({
             {billingType === "subscription" ? "/month" : " total"}
           </p>
         )}
+        <label className="flex flex-col gap-1">
+          <span className="font-body text-[11px] text-steel uppercase tracking-wide">
+            Link a program (optional)
+          </span>
+          <select
+            value={defaultProgramId}
+            onChange={(e) => setDefaultProgramId(e.target.value)}
+            className="h-9 px-2 bg-surface border border-steel/30 text-chalk font-body text-xs"
+          >
+            <option value="">No program — credits only</option>
+            {linkablePrograms.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <span className="font-body text-[10px] text-steel">
+            A client who buys or is assigned this package gets their own personal copy of this program automatically.
+          </span>
+        </label>
         <label className="flex items-center gap-2">
           <input
             type="checkbox"

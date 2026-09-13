@@ -39,7 +39,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { groupId, name, sessionsPerWeek, billingType, sessionsGranted, rateCents, isPublic } = body;
+  const { groupId, name, sessionsPerWeek, billingType, sessionsGranted, rateCents, isPublic, defaultProgramId } = body;
 
   if (
     !groupId ||
@@ -78,6 +78,7 @@ export async function POST(request: Request) {
       sessions_granted: sessionsGranted,
       rate_cents: rateCents,
       is_public: isPublic === true,
+      default_program_id: defaultProgramId ?? null,
     })
     .select("id")
     .single();
@@ -118,7 +119,8 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   const body = await request.json();
-  const { packageId, groupId, name, sessionsPerWeek, billingType, sessionsGranted, rateCents, isActive, isPublic } = body;
+  const { packageId, groupId, name, sessionsPerWeek, billingType, sessionsGranted, rateCents, isActive, isPublic, defaultProgramId } =
+    body;
   if (!packageId || !groupId) {
     return NextResponse.json({ error: "Missing packageId or groupId." }, { status: 400 });
   }
@@ -150,6 +152,7 @@ export async function PATCH(request: Request) {
   if (billingType != null) updates.billing_type = billingType;
   if (isActive != null) updates.is_active = isActive;
   if (isPublic != null) updates.is_public = isPublic;
+  if (defaultProgramId !== undefined) updates.default_program_id = defaultProgramId;
 
   // Stripe is only actually touched for a price/name-affecting change or
   // a deactivation that archives a Price — a pure isPublic/isActive-true
