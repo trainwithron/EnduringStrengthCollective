@@ -103,19 +103,29 @@ export interface OuraDailyPoint {
   value: number;
 }
 
-// Only the two fields confirmed against Oura's real v2 schema —
-// daily_activity.steps and daily_sleep.score. Total sleep duration in
-// minutes lives on the separate session-level "sleep" resource, not
-// daily_sleep; add it as its own fetch once that endpoint's exact shape
-// is verified, rather than guessing field names here.
+// Fields confirmed against Oura's real v2 schema — daily_activity.steps,
+// daily_sleep.score, and daily_readiness.contributors.hrv_balance/
+// resting_heart_rate (AI Assistant Slice 4 —
+// ai_assistant_opus_deep_dive_findings.md — needs no new OAuth scope,
+// the existing "daily" scope already covers daily_readiness). Total
+// sleep duration in minutes lives on the separate session-level "sleep"
+// resource, not daily_sleep or daily_readiness; deliberately not added
+// here yet — that's a materially different (multi-session-per-night)
+// shape, not a same-pattern addition, and would need its own verified
+// fetch rather than guessing at it blind.
 export async function fetchOuraDailyMetrics(
   accessToken: string,
   startDate: string,
   endDate: string
-): Promise<{ steps: OuraDailyPoint[]; sleepScore: OuraDailyPoint[] }> {
+): Promise<{
+  steps: OuraDailyPoint[];
+  sleepScore: OuraDailyPoint[];
+  hrvBalance: OuraDailyPoint[];
+  restingHeartRate: OuraDailyPoint[];
+}> {
   const params = new URLSearchParams({ start_date: startDate, end_date: endDate });
 
-  async function getCollection(path: "daily_activity" | "daily_sleep") {
+  async function getCollection(path: "daily_activity" | "daily_sleep" | "daily_readiness") {
     const response = await fetch(`${OURA_API_BASE}/${path}?${params.toString()}`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
@@ -126,10 +136,22 @@ export async function fetchOuraDailyMetrics(
     return data as Array<Record<string, unknown>>;
   }
 
-  const [activity, sleep] = await Promise.all([
+  const [activity, sleep, readiness] = await Promise.all([
     getCollection("daily_activity"),
     getCollection("daily_sleep"),
+    getCollection("daily_readiness"),
   ]);
+
+  function contributorPoints(field: string): OuraDailyPoint[] {
+    return readiness
+      .filter(
+        (d) =>
+          typeof d.day === "string" &&
+          d.contributors &&
+          typeof (d.contributors as Record<string, unknown>)[field] === "number"
+      )
+      .map((d) => ({ date: d.day as string, value: (d.contributors as Record<string, number>)[field] }));
+  }
 
   return {
     steps: activity
@@ -138,5 +160,7 @@ export async function fetchOuraDailyMetrics(
     sleepScore: sleep
       .filter((d) => typeof d.day === "string" && typeof d.score === "number")
       .map((d) => ({ date: d.day as string, value: d.score as number })),
+    hrvBalance: contributorPoints("hrv_balance"),
+    restingHeartRate: contributorPoints("resting_heart_rate"),
   };
 }

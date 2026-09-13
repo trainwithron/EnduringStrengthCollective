@@ -73,7 +73,11 @@ export async function GET(request: Request) {
           .eq("connection_id", connection.id);
       }
 
-      const { steps, sleepScore } = await fetchOuraDailyMetrics(accessToken, startDate, endDate);
+      const { steps, sleepScore, hrvBalance, restingHeartRate } = await fetchOuraDailyMetrics(
+        accessToken,
+        startDate,
+        endDate
+      );
 
       const rows = [
         ...steps.map((p) => ({
@@ -86,6 +90,18 @@ export async function GET(request: Request) {
           connection_id: connection.id,
           metric_date: p.date,
           metric_type: "sleep_score" as const,
+          value: p.value,
+        })),
+        ...hrvBalance.map((p) => ({
+          connection_id: connection.id,
+          metric_date: p.date,
+          metric_type: "hrv_balance" as const,
+          value: p.value,
+        })),
+        ...restingHeartRate.map((p) => ({
+          connection_id: connection.id,
+          metric_date: p.date,
+          metric_type: "resting_heart_rate" as const,
           value: p.value,
         })),
       ];

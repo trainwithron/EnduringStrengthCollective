@@ -14,9 +14,11 @@ import { detectMatchedLoadTrend, type ExerciseSessionPoint } from "./matched-loa
 import { computeHabitCompliance, computeCompliancePct } from "./habits";
 import { hasEstablishedBaseline } from "./coach-briefing-baseline";
 import { isOnCooldown, COOLDOWN_DAYS } from "./coach-briefing-cooldown";
+import { isSustainedHrvSuppression, SUSTAINED_SUPPRESSION_DAYS } from "./hrv-suppression";
 
 export type SignalKind =
   | "low_readiness"
+  | "hrv_suppression"
   | "matched_load_trend_fatigue"
   | "matched_load_trend_gain"
   | "quiet_client"
@@ -213,6 +215,40 @@ export async function gatherCandidateSignals(
     });
   }
 
+  // AI Assistant Slice 4 — HRV signal. A second-wave fetch (needs the
+  // roster's real profile ids first, unlike the athlete-agnostic queries
+  // above) scoped to just the athletes on this coach's roster who have
+  // an active Oura connection.
+  const athleteIds = [...athleteByProfileId.keys()];
+  const { data: wearableConnectionRows } =
+    athleteIds.length > 0
+      ? await supabase
+          .from("wearable_connections")
+          .select("id, profile_id, created_at")
+          .in("profile_id", athleteIds)
+          .eq("provider", "oura")
+          .eq("status", "active")
+      : { data: [] as { id: string; profile_id: string; created_at: string }[] };
+  const connectionByAthlete = new Map((wearableConnectionRows ?? []).map((c) => [c.profile_id, c]));
+  const connectionIds = (wearableConnectionRows ?? []).map((c) => c.id);
+  const hrvCutoffKey = daysAgoKey(SUSTAINED_SUPPRESSION_DAYS);
+  const { data: hrvMetricRows } =
+    connectionIds.length > 0
+      ? await supabase
+          .from("wearable_daily_metrics")
+          .select("connection_id, metric_date, value")
+          .in("connection_id", connectionIds)
+          .eq("metric_type", "hrv_balance")
+          .gte("metric_date", hrvCutoffKey)
+          .order("metric_date", { ascending: true })
+      : { data: [] as { connection_id: string; metric_date: string; value: number }[] };
+  const hrvPointsByConnection = new Map<string, { date: string; value: number }[]>();
+  for (const row of hrvMetricRows ?? []) {
+    const list = hrvPointsByConnection.get(row.connection_id) ?? [];
+    list.push({ date: row.metric_date, value: row.value });
+    hrvPointsByConnection.set(row.connection_id, list);
+  }
+
   const candidates: CandidateSignal[] = [];
 
   function pushIfEligible(signal: CandidateSignal) {
@@ -237,6 +273,27 @@ export async function gatherCandidateSignals(
         numericValues: [Number(readiness.toFixed(1))],
         isStrongQuietTier: false,
       });
+    }
+
+    const connection = connectionByAthlete.get(athlete.profileId);
+    if (connection) {
+      const connectionAgeDays = Math.floor(
+        (now.getTime() - new Date(connection.created_at).getTime()) / (1000 * 60 * 60 * 24)
+      );
+      const hrvPoints = hrvPointsByConnection.get(connection.id) ?? [];
+      if (isSustainedHrvSuppression(hrvPoints, connectionAgeDays)) {
+        const recentValues = hrvPoints.slice(-SUSTAINED_SUPPRESSION_DAYS).map((p) => p.value);
+        pushIfEligible({
+          id: `hrv_suppression::${athlete.profileId}`,
+          athleteId: athlete.profileId,
+          athleteName: athlete.fullName,
+          groupId: athlete.groupId,
+          kind: "hrv_suppression",
+          description: `${athlete.fullName}'s HRV balance has stayed below 50 for the last ${SUSTAINED_SUPPRESSION_DAYS} days in a row (recent readings: ${recentValues.join(", ")}).`,
+          numericValues: [50, SUSTAINED_SUPPRESSION_DAYS, ...recentValues],
+          isStrongQuietTier: false,
+        });
+      }
     }
 
     if (baselineEstablished) {
