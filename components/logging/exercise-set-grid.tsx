@@ -119,7 +119,7 @@ function GridCell({
   // value, not just an empty one.
   const hasGoalToProtect = field === "weight" && (set.targetWeight != null || suggestion != null);
 
-  async function commit(next: string | number | null) {
+  function commit(next: string | number | null) {
     // Weight is the one field the obstacle-unlock mechanic cares about —
     // a program's target pre-fills it into this same column before the
     // athlete has done anything, so "the value changed" can't be the
@@ -131,19 +131,40 @@ function GridCell({
     // already right.
     const needsConfirmWrite = field === "weight" && !set.weightConfirmed;
     if (next === value && !needsConfirmWrite) return;
-    const supabase = createBrowserClient();
-    const payload: Record<string, unknown> = { [ACTUAL_COLUMN[field]]: next };
-    if (field === "weight") payload.weight_confirmed = next != null;
-    await supabase.from("set_logs").update(payload).eq("id", set.id);
+
+    const previousWeightConfirmed = set.weightConfirmed;
+    // Apply the change to this exercise's real set data immediately — the
+    // completion-sync effect (and everything downstream of it: the
+    // checkmark, the rest timer) reacts to this right away instead of
+    // waiting on the write below. The write itself still happens, just in
+    // the background.
     onChange({
       [prop]: next,
       ...(field === "weight" ? { weightConfirmed: next != null } : {}),
     } as Partial<SetLogEntry>);
+
+    const supabase = createBrowserClient();
+    const payload: Record<string, unknown> = { [ACTUAL_COLUMN[field]]: next };
+    if (field === "weight") payload.weight_confirmed = next != null;
+    supabase
+      .from("set_logs")
+      .update(payload)
+      .eq("id", set.id)
+      .then(({ error }) => {
+        if (!error) return;
+        // A genuine write failure — revert to the last known-good value
+        // rather than leaving the UI showing something that was never
+        // actually saved.
+        onChange({
+          [prop]: value,
+          ...(field === "weight" ? { weightConfirmed: previousWeightConfirmed } : {}),
+        } as Partial<SetLogEntry>);
+      });
   }
 
-  async function handleBlur() {
+  function handleBlur() {
     const next = draft.trim() === "" ? null : isNumeric ? Number(draft) : draft.trim();
-    await commit(next);
+    commit(next);
   }
 
   const swipe = useSwipeGesture(() => {
@@ -232,12 +253,23 @@ function SetCompletionSync({
         return v !== null && v !== undefined && v !== ("" as unknown);
       });
 
-    async function persist(patch: Partial<SetLogEntry>) {
+    function persist(patch: Partial<SetLogEntry>) {
+      const previousStatus = set.status;
+      // Flip the status right away — this is what the checkmark and the
+      // rest-timer trigger key off, so they shouldn't wait on this write
+      // (itself already the SECOND round-trip after the field commit
+      // above) to show anything.
+      onChange(patch);
       const supabase = createBrowserClient();
       const payload: Record<string, unknown> = { ...patch };
       if (patch.status === "completed") payload.completed_at = new Date().toISOString();
-      await supabase.from("set_logs").update(payload).eq("id", set.id);
-      onChange(patch);
+      supabase
+        .from("set_logs")
+        .update(payload)
+        .eq("id", set.id)
+        .then(({ error }) => {
+          if (error) onChange({ status: previousStatus });
+        });
     }
 
     if (allFilled && set.status !== "completed") {
@@ -323,19 +355,29 @@ export function ExerciseSetGrid({
   // metric now that each metric is its own row, so filling in Rest
   // doesn't also overwrite Weight. Separate, separately-discoverable
   // gesture from each cell's own swipe-to-accept above.
-  async function handlePropagateRow(field: TrackedField) {
+  function handlePropagateRow(field: TrackedField) {
     const first = sets[0];
     if (!first || sets.length < 2) return;
     const prop = ACTUAL_PROP[field] as keyof SetLogEntry;
     const value = first[prop];
     if (value == null) return;
     const rest = sets.slice(1);
+    // Fill every other set's cell immediately — the bulk write happens in
+    // the background instead of the whole row waiting on it.
+    for (const s of rest) onSetChange(s.id, { [prop]: value } as Partial<SetLogEntry>);
+
     const supabase = createBrowserClient();
-    await supabase
+    supabase
       .from("set_logs")
       .update({ [ACTUAL_COLUMN[field]]: value })
-      .in("id", rest.map((s) => s.id));
-    for (const s of rest) onSetChange(s.id, { [prop]: value } as Partial<SetLogEntry>);
+      .in(
+        "id",
+        rest.map((s) => s.id)
+      )
+      .then(({ error }) => {
+        if (!error) return;
+        for (const s of rest) onSetChange(s.id, { [prop]: s[prop] } as Partial<SetLogEntry>);
+      });
   }
 
   // Real usage feedback: the old handle sat at the far left of the row,
