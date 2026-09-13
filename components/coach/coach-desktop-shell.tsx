@@ -28,6 +28,7 @@ import {
   MonitorPlay,
   Activity,
   CalendarClock,
+  Mail,
 } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
@@ -76,7 +77,8 @@ type Active =
   | "team"
   | "team-calendar"
   | "game-detail"
-  | "team-performance";
+  | "team-performance"
+  | "messages";
 
 interface NavLeaf {
   key: Active;
@@ -117,6 +119,7 @@ export function CoachDesktopShell({
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [feedUnread, setFeedUnread] = useState(0);
   const [clientsUnread, setClientsUnread] = useState(0);
+  const [messagesUnread, setMessagesUnread] = useState(0);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [openSupportCount, setOpenSupportCount] = useState(0);
   const [teamMode, setTeamMode] = useState(false);
@@ -296,6 +299,38 @@ export function CoachDesktopShell({
     };
   }, [groupId, active]);
 
+  // Coach<->Athlete DM unread count — a plain unread tally, not the
+  // seeded "since last seen" mechanism above (a real unread message has
+  // an unambiguous read/unread state already, no first-visit flood risk
+  // to guard against). Skipped while the Messages page itself is open —
+  // that page marks things read as they're opened, so a badge would just
+  // be showing stale state a moment later anyway.
+  useEffect(() => {
+    let cancelled = false;
+    if (active === "messages") {
+      setMessagesUnread(0);
+      return;
+    }
+    async function run() {
+      const supabase = createBrowserClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      const { count } = await supabase
+        .from("direct_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("group_id", groupId)
+        .eq("recipient_id", user.id)
+        .is("read_at", null);
+      if (!cancelled) setMessagesUnread(count ?? 0);
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [groupId, active]);
+
   // Close the mobile drawer on every route change (active section change)
   // so navigating doesn't leave the overlay stuck open.
   useEffect(() => {
@@ -318,6 +353,7 @@ export function CoachDesktopShell({
     { key: "dashboard", label: "Dashboard", href: `/groups/${groupId}/dashboard`, icon: LayoutDashboard },
     { key: "team-performance", label: "Team Performance", href: `/groups/${groupId}/team-performance`, icon: Activity },
     { key: "clients", label: "Clients", href: `/groups/${groupId}/clients`, icon: Users, badge: clientsUnread },
+    { key: "messages", label: "Messages", href: `/groups/${groupId}/messages`, icon: Mail, badge: messagesUnread },
     { key: "feed", label: "Team Feed", href: `/groups/${groupId}/feed`, icon: MessagesSquare, badge: feedUnread },
     { key: "calendar", label: "Calendar", href: `/groups/${groupId}/calendar`, icon: CalendarDays },
 

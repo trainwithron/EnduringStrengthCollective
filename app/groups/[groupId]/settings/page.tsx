@@ -171,6 +171,12 @@ export default async function SettingsPage(
           </div>
         </SettingsGroup>
 
+        <SettingsGroup label="Messages">
+          <Link href={`/groups/${params.groupId}/messages`} className="font-body text-sm font-bold text-rust">
+            {isCoach ? "Message your athletes →" : "Message your coach →"}
+          </Link>
+        </SettingsGroup>
+
         {!isCoach && (
           <SettingsGroup label="Billing">
             <PackagePicker packages={packages} />
