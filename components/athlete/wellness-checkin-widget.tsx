@@ -31,17 +31,26 @@ export function WellnessCheckinWidget({
   todayDate,
   initialCheckin,
   onSaved,
+  lifeImpactPrompt = null,
 }: {
   athleteId: string;
   groupId: string;
   todayDate: string;
   initialCheckin: WellnessCheckinValues | null;
   onSaved?: (values: WellnessCheckinValues) => void;
+  // AI Assistant Slice 5 (life_impact_reflection_prompt_idea.md) — set
+  // only when the occasional-cadence check (lib/life-impact-prompt.ts)
+  // says today is a day to ask. Deliberately optional, never blocks
+  // completing the numeric check-in — a client who ignores it still
+  // saves normally.
+  lifeImpactPrompt?: string | null;
 }) {
   const [saved, setSaved] = useState(initialCheckin);
   const [editing, setEditing] = useState(!initialCheckin);
   const [draft, setDraft] = useState<Partial<WellnessCheckinValues>>(initialCheckin ?? {});
   const [error, setError] = useState<string | null>(null);
+  const [lifeImpactNote, setLifeImpactNote] = useState("");
+  const [lifeImpactDismissed, setLifeImpactDismissed] = useState(false);
 
   const complete =
     draft.sleepQuality != null && draft.soreness != null && draft.energy != null;
@@ -61,6 +70,8 @@ export function WellnessCheckinWidget({
     setEditing(false);
     onSaved?.(values);
 
+    const trimmedLifeImpactNote = lifeImpactNote.trim();
+
     supabase
       .from("wellness_checkins")
       .upsert(
@@ -71,6 +82,8 @@ export function WellnessCheckinWidget({
           sleep_quality: values.sleepQuality,
           soreness: values.soreness,
           energy: values.energy,
+          ...(lifeImpactPrompt ? { life_impact_prompt: lifeImpactPrompt } : {}),
+          ...(trimmedLifeImpactNote ? { life_impact_note: trimmedLifeImpactNote } : {}),
         },
         { onConflict: "athlete_id,group_id,log_date" }
       )
@@ -170,6 +183,26 @@ export function WellnessCheckinWidget({
               </div>
             </div>
           ))}
+
+          {lifeImpactPrompt && !lifeImpactDismissed && (
+            <div className="pt-2 border-t border-steel/15">
+              <p className="font-body text-sm mb-1.5">{lifeImpactPrompt}</p>
+              <textarea
+                value={lifeImpactNote}
+                onChange={(e) => setLifeImpactNote(e.target.value)}
+                placeholder="Totally optional — only if something comes to mind."
+                rows={2}
+                className="w-full bg-surface border border-steel/30 text-chalk px-2 py-1.5 font-body text-sm focus:outline-none focus:border-rust"
+              />
+              <button
+                type="button"
+                onClick={() => setLifeImpactDismissed(true)}
+                className="font-body text-xs text-steel mt-1"
+              >
+                Skip this
+              </button>
+            </div>
+          )}
 
           <button
             type="button"

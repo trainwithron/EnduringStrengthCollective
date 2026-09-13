@@ -62,12 +62,14 @@ export function WellnessCheckinPopup({
   todayDate,
   initialCheckin,
   onSaved,
+  lifeImpactPrompt = null,
 }: {
   athleteId: string;
   groupId: string;
   todayDate: string;
   initialCheckin: WellnessCheckinValues | null;
   onSaved?: (values: WellnessCheckinValues) => void;
+  lifeImpactPrompt?: string | null;
 }) {
   const [checkin, setCheckin] = useState(initialCheckin);
   const [dismissed, setDismissed] = useState(true); // default hidden until the effect below confirms it's actually needed, so SSR/hydration never briefly flashes the overlay for someone who already checked in or already dismissed it earlier today
@@ -107,6 +109,7 @@ export function WellnessCheckinPopup({
             setCheckin(values);
             onSaved?.(values);
           }}
+          lifeImpactPrompt={lifeImpactPrompt}
         />
         <button
           type="button"

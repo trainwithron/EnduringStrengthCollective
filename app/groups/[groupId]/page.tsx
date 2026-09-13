@@ -2,6 +2,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { GroupHubHeader } from "@/components/group/group-hub-header";
 import { RosterList } from "@/components/group/roster-list";
 import { WellnessCheckinPopup } from "@/components/athlete/wellness-checkin-popup";
+import { shouldShowLifeImpactPrompt, pickLifeImpactPrompt } from "@/lib/life-impact-prompt";
 import type { WellnessCheckinValues } from "@/components/athlete/wellness-checkin-widget";
 import { DayCard } from "@/components/athlete/day-card";
 import { HomeWeekView, type HomeDaySummary } from "@/components/athlete/home-week-view";
@@ -223,6 +224,7 @@ export default async function GroupHubPage(
   let dayHabits: TodayHabit[] = [];
   let weightLogs: WeightLogEntry[] = [];
   let wellnessCheckin: WellnessCheckinValues | null = null;
+  let lifeImpactPrompt: string | null = null;
   let canBook = false;
   let weekDays: HomeDaySummary[] = [];
   let monthSummaryByDateKey = new Map<string, HomeDaySummary>();
@@ -325,7 +327,7 @@ export default async function GroupHubPage(
       }));
 
       if (isToday) {
-        const [{ data: weightRows }, { data: wellnessRow }] = await Promise.all([
+        const [{ data: weightRows }, { data: wellnessRow }, { data: lastLifeImpactRow }] = await Promise.all([
           supabase
             .from("body_weight_logs")
             .select("id, logged_date, weight")
@@ -340,11 +342,31 @@ export default async function GroupHubPage(
             .eq("group_id", params.groupId)
             .eq("log_date", todayKey)
             .maybeSingle(),
+          // AI Assistant Slice 5 — when this athlete last answered a life-
+          // impact reflection (not just was shown one), to drive the
+          // occasional-cadence gate below.
+          supabase
+            .from("wellness_checkins")
+            .select("log_date")
+            .eq("athlete_id", athleteId)
+            .eq("group_id", params.groupId)
+            .not("life_impact_note", "is", null)
+            .order("log_date", { ascending: false })
+            .limit(1)
+            .maybeSingle(),
         ]);
         weightLogs = (weightRows ?? []).map((w) => ({ id: w.id, loggedDate: w.logged_date, weight: w.weight }));
         wellnessCheckin = wellnessRow
           ? { sleepQuality: wellnessRow.sleep_quality, soreness: wellnessRow.soreness, energy: wellnessRow.energy }
           : null;
+        if (
+          shouldShowLifeImpactPrompt(
+            lastLifeImpactRow?.log_date ? new Date(lastLifeImpactRow.log_date) : null,
+            new Date()
+          )
+        ) {
+          lifeImpactPrompt = pickLifeImpactPrompt(athleteId, todayKey);
+        }
       }
     } else if (view === "week") {
       const weekStart = new Date(targetDate);
@@ -457,6 +479,7 @@ export default async function GroupHubPage(
                   groupId={params.groupId}
                   todayDate={todayKey}
                   initialCheckin={wellnessCheckin}
+                  lifeImpactPrompt={lifeImpactPrompt}
                 />
               )}
               <DayCard
