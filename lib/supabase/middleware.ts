@@ -67,7 +67,10 @@ export async function updateSession(request: NextRequest) {
     // a new route needing an exemption.
     pathname.startsWith("/api/oura/sync") ||
     pathname.startsWith("/api/withings/sync") ||
-    pathname.startsWith("/api/cron/");
+    pathname.startsWith("/api/cron/") ||
+    // An uptime monitor hits this with no session at all, same gotcha as
+    // the webhook/cron routes above.
+    pathname.startsWith("/api/health");
 
   if (!user && !isPublicPath) {
     const redirectUrl = new URL("/login", request.url);
