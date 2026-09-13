@@ -457,6 +457,15 @@ export default async function AthleteProfilePage(
     .eq("group_id", params.groupId)
     .gte("log_date", thirtyDaysAgoKey)
     .order("log_date", { ascending: true });
+
+  // AI Program Builder methodology grounding — real, persisted training
+  // maxes, auto-estimated from logged sets (lib/rpe-training-max.ts).
+  // Read-only here: the trigger on set_logs is the only writer.
+  const { data: trainingMaxRows } = await supabase
+    .from("athlete_training_maxes")
+    .select("exercise_name, estimated_max, updated_at")
+    .eq("athlete_id", params.athleteId)
+    .order("updated_at", { ascending: false });
   const sleepQualityTrend = (wellnessRows ?? []).map((r) => ({ date: r.log_date, value: r.sleep_quality }));
   const sorenessTrend = (wellnessRows ?? []).map((r) => ({ date: r.log_date, value: r.soreness }));
   const energyTrend = (wellnessRows ?? []).map((r) => ({ date: r.log_date, value: r.energy }));
@@ -742,6 +751,28 @@ export default async function AthleteProfilePage(
                     emptyLabel="Only checked in once so far — needs a second check-in to chart a trend."
                   />
                 </div>
+              </div>
+            </section>
+          )}
+
+          {(trainingMaxRows ?? []).length > 0 && (
+            <section>
+              <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+                Estimated Training Maxes
+              </h2>
+              <p className="font-body text-[11px] text-steel mb-2">
+                Auto-estimated from logged sets (weight, reps, and RPE) — never a typed-in number, and only ever
+                moves up as a harder set gets logged.
+              </p>
+              <div className="divide-y divide-steel/15">
+                {(trainingMaxRows ?? []).map((row) => (
+                  <div key={row.exercise_name} className="flex items-center justify-between py-2">
+                    <span className="font-body text-sm">{row.exercise_name}</span>
+                    <span className="font-body text-sm text-rust font-medium">
+                      {Math.round(row.estimated_max)} lbs
+                    </span>
+                  </div>
+                ))}
               </div>
             </section>
           )}
