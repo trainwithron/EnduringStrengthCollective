@@ -66,6 +66,7 @@ export async function updateSession(request: NextRequest) {
     // production — this was a real, previously-undetected bug, not just
     // a new route needing an exemption.
     pathname.startsWith("/api/oura/sync") ||
+    pathname.startsWith("/api/withings/sync") ||
     pathname.startsWith("/api/cron/");
 
   if (!user && !isPublicPath) {

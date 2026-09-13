@@ -19,7 +19,7 @@ import { GamificationToggle } from "@/components/coach/gamification-toggle";
 export default async function SettingsPage(
   props: {
     params: Promise<{ groupId: string }>;
-    searchParams: Promise<{ oura_error?: string }>;
+    searchParams: Promise<{ oura_error?: string; withings_error?: string }>;
   }
 ) {
   const params = await props.params;
@@ -41,8 +41,14 @@ export default async function SettingsPage(
   const effective = await getEffectiveAthlete(params.groupId, user.id);
   const athleteId = effective.athleteId;
 
-  const [{ data: profile }, { data: membership }, { data: ouraConnection }, { data: profileDetails }, { data: group }] =
-    await Promise.all([
+  const [
+    { data: profile },
+    { data: membership },
+    { data: ouraConnection },
+    { data: withingsConnection },
+    { data: profileDetails },
+    { data: group },
+  ] = await Promise.all([
       supabase
         .from("profiles")
         .select("full_name, avatar_url")
@@ -59,6 +65,12 @@ export default async function SettingsPage(
         .select("status")
         .eq("profile_id", athleteId)
         .eq("provider", "oura")
+        .maybeSingle(),
+      supabase
+        .from("wearable_connections")
+        .select("status")
+        .eq("profile_id", athleteId)
+        .eq("provider", "withings")
         .maybeSingle(),
       supabase
         .from("athlete_profile_details")
@@ -167,6 +179,9 @@ export default async function SettingsPage(
               ouraConnected={!!ouraConnection}
               ouraStatus={(ouraConnection?.status as "active" | "revoked" | "error" | undefined) ?? null}
               ouraError={searchParams.oura_error ?? null}
+              withingsConnected={!!withingsConnection}
+              withingsStatus={(withingsConnection?.status as "active" | "revoked" | "error" | undefined) ?? null}
+              withingsError={searchParams.withings_error ?? null}
             />
           </div>
         </SettingsGroup>

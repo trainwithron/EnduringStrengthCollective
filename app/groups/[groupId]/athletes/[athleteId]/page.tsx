@@ -384,12 +384,20 @@ export default async function AthleteProfilePage(
     return d.toISOString().slice(0, 10);
   })();
 
-  const { data: ouraConnection } = await supabase
-    .from("wearable_connections")
-    .select("id")
-    .eq("profile_id", params.athleteId)
-    .eq("provider", "oura")
-    .maybeSingle();
+  const [{ data: ouraConnection }, { data: withingsConnection }] = await Promise.all([
+    supabase
+      .from("wearable_connections")
+      .select("id")
+      .eq("profile_id", params.athleteId)
+      .eq("provider", "oura")
+      .maybeSingle(),
+    supabase
+      .from("wearable_connections")
+      .select("id")
+      .eq("profile_id", params.athleteId)
+      .eq("provider", "withings")
+      .maybeSingle(),
+  ]);
 
   const { data: wearableMetrics } = ouraConnection
     ? await supabase
@@ -405,6 +413,17 @@ export default async function AthleteProfilePage(
   const sleepScoreTrend = (wearableMetrics ?? [])
     .filter((m) => m.metric_type === "sleep_score")
     .map((m) => ({ date: m.metric_date, value: m.value }));
+
+  const { data: withingsMetrics } = withingsConnection
+    ? await supabase
+        .from("wearable_daily_metrics")
+        .select("metric_date, value")
+        .eq("connection_id", withingsConnection.id)
+        .eq("metric_type", "weight")
+        .gte("metric_date", thirtyDaysAgoKey)
+    : { data: null };
+
+  const withingsWeightTrend = (withingsMetrics ?? []).map((m) => ({ date: m.metric_date, value: m.value }));
 
   const { data: wellnessRows } = await supabase
     .from("wellness_checkins")
@@ -802,6 +821,20 @@ export default async function AthleteProfilePage(
                   </p>
                   <TrendChart points={sleepScoreTrend} emptyLabel="No sleep data synced yet." />
                 </div>
+              </div>
+            </section>
+          )}
+
+          {withingsConnection && (
+            <section>
+              <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+                Weight (Withings)
+              </h2>
+              <p className="font-body text-[11px] text-steel mb-2">
+                Auto-synced from a connected scale — separate from the manually-logged weight above.
+              </p>
+              <div className="pb-2">
+                <TrendChart points={withingsWeightTrend} emptyLabel="No weight synced yet." />
               </div>
             </section>
           )}
