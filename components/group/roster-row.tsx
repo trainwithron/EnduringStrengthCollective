@@ -40,6 +40,8 @@ export function RosterRow({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [optimisticRole, setOptimisticRole] = useState(member.role);
+  const [removed, setRemoved] = useState(false);
   const router = useRouter();
 
   const status = statusLabel(member.lastWorkoutAt);
@@ -50,58 +52,67 @@ export function RosterRow({
     .join("")
     .toUpperCase();
 
-  async function handleRoleToggle() {
-    if (member.role === "coach" && isOnlyCoach) {
+  function handleRoleToggle() {
+    if (optimisticRole === "coach" && isOnlyCoach) {
       setError("A group needs at least one coach.");
       return;
     }
-    setBusy(true);
     setError(null);
+    const previousRole = optimisticRole;
+    const nextRole = previousRole === "coach" ? "athlete" : "coach";
+    // Flip the label instantly; the mutation runs in the background so the
+    // click doesn't feel like it's waiting on a server round-trip.
+    setOptimisticRole(nextRole);
 
     const supabase = createBrowserClient();
-    const nextRole = member.role === "coach" ? "athlete" : "coach";
-    const { error: updateError } = await supabase
+    supabase
       .from("group_memberships")
       .update({ role: nextRole })
       .eq("group_id", groupId)
-      .eq("profile_id", member.profileId);
-
-    if (updateError) {
-      setError("Couldn't update role.");
-      setBusy(false);
-      return;
-    }
-
-    router.refresh();
+      .eq("profile_id", member.profileId)
+      .then(({ error: updateError }) => {
+        if (updateError) {
+          setOptimisticRole(previousRole);
+          setError("Couldn't update role.");
+          return;
+        }
+        router.refresh();
+      });
   }
 
-  async function handleRemove() {
-    if (member.role === "coach" && isOnlyCoach) {
+  function handleRemove() {
+    if (optimisticRole === "coach" && isOnlyCoach) {
       setError("A group needs at least one coach.");
       return;
     }
     if (!window.confirm(`Remove ${member.fullName} from the group?`)) return;
 
-    setBusy(true);
     setError(null);
+    setBusy(true);
+    // Hide the row immediately rather than waiting for the delete + a full
+    // page refresh before anything visually changes.
+    setRemoved(true);
 
     const supabase = createBrowserClient();
-    const { error: deleteError } = await supabase
+    supabase
       .from("group_memberships")
       .delete()
       .eq("group_id", groupId)
-      .eq("profile_id", member.profileId);
-
-    if (deleteError) {
-      setError("Couldn't remove member.");
-      setBusy(false);
-      return;
-    }
-
-    router.refresh();
+      .eq("profile_id", member.profileId)
+      .then(({ error: deleteError }) => {
+        if (deleteError) {
+          setRemoved(false);
+          setBusy(false);
+          setError("Couldn't remove member.");
+          return;
+        }
+        router.refresh();
+      });
   }
 
-  const linkToProfile = viewerIsCoach && member.role === "athlete";
+  if (removed) return null;
+
+  const linkToProfile = viewerIsCoach && optimisticRole === "athlete";
 
   const avatarAndName = (
     <>
@@ -144,7 +155,7 @@ export function RosterRow({
           avatarAndName
         )}
 
-        {member.role === "coach" && (
+        {optimisticRole === "coach" && (
           <span className="font-body text-[11px] tracking-wide text-rust shrink-0">
             Coach
           </span>
@@ -152,7 +163,7 @@ export function RosterRow({
 
         {viewerIsCoach && !isViewer && (
           <div className="flex items-center gap-3 shrink-0">
-            {member.role === "athlete" && (
+            {optimisticRole === "athlete" && (
               <Link
                 href={`/groups/${groupId}/athletes/${member.profileId}/log`}
                 className="font-body text-xs text-rust"
@@ -166,7 +177,7 @@ export function RosterRow({
               disabled={busy}
               className="font-body text-xs text-steel active:text-rust transition-colors disabled:opacity-40"
             >
-              {member.role === "coach" ? "Make athlete" : "Make coach"}
+              {optimisticRole === "coach" ? "Make athlete" : "Make coach"}
             </button>
             <button
               type="button"

@@ -17,38 +17,37 @@ export function ProgramActiveToggle({
   groupId: string;
   isActive: boolean;
 }) {
-  const [busy, setBusy] = useState(false);
+  const [optimisticActive, setOptimisticActive] = useState(isActive);
   const router = useRouter();
 
-  async function handleToggle() {
-    setBusy(true);
+  function handleToggle() {
+    const nextActive = !optimisticActive;
+    // Flip the label instantly; the (possibly two-step) write runs in the
+    // background instead of the button sitting on "…" through it.
+    setOptimisticActive(nextActive);
     const supabase = createBrowserClient();
 
-    if (isActive) {
-      await supabase.from("programs").update({ is_active: false }).eq("id", programId);
-    } else {
-      await supabase
-        .from("programs")
-        .update({ is_active: false })
-        .eq("group_id", groupId)
-        .neq("id", programId);
-      await supabase.from("programs").update({ is_active: true }).eq("id", programId);
-    }
+    const write = nextActive
+      ? supabase
+          .from("programs")
+          .update({ is_active: false })
+          .eq("group_id", groupId)
+          .neq("id", programId)
+          .then(() => supabase.from("programs").update({ is_active: true }).eq("id", programId))
+      : supabase.from("programs").update({ is_active: false }).eq("id", programId);
 
-    setBusy(false);
-    router.refresh();
+    write.then(() => router.refresh());
   }
 
   return (
     <button
       type="button"
       onClick={handleToggle}
-      disabled={busy}
-      className={`font-body text-[11px] shrink-0 transition-colors disabled:opacity-40 ${
-        isActive ? "text-moss active:text-steel" : "text-steel active:text-rust"
+      className={`font-body text-[11px] shrink-0 transition-colors ${
+        optimisticActive ? "text-moss active:text-steel" : "text-steel active:text-rust"
       }`}
     >
-      {busy ? "…" : isActive ? "Active" : "Set active"}
+      {optimisticActive ? "Active" : "Set active"}
     </button>
   );
 }

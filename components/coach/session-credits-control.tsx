@@ -13,21 +13,25 @@ export function SessionCreditsControl({
   initialBalance: number;
 }) {
   const [balance, setBalance] = useState(initialBalance);
-  const [saving, setSaving] = useState(false);
 
-  async function adjust(delta: number) {
-    setSaving(true);
+  function adjust(delta: number) {
+    // Reflect the change on the button instantly — the actual write stays
+    // an atomic DB-side increment (not a naive read-then-write, which
+    // would reopen the same race the booking flow had), it just runs in
+    // the background instead of the +/- waiting on a round-trip. The
+    // authoritative balance corrects this once the RPC resolves, in case
+    // it clamped (e.g. hit the zero floor) or genuinely failed.
+    setBalance((prev) => Math.max(0, prev + delta));
     const supabase = createBrowserClient();
-    // An atomic DB-side increment rather than read-then-write — closes the
-    // same race the booking flow had (two edits landing off the same
-    // stale starting balance).
-    const { data: newBalance } = await supabase.rpc("adjust_session_credits", {
-      p_athlete_id: athleteId,
-      p_group_id: groupId,
-      p_delta: delta,
-    });
-    if (typeof newBalance === "number") setBalance(newBalance);
-    setSaving(false);
+    supabase
+      .rpc("adjust_session_credits", {
+        p_athlete_id: athleteId,
+        p_group_id: groupId,
+        p_delta: delta,
+      })
+      .then(({ data: newBalance }) => {
+        if (typeof newBalance === "number") setBalance(newBalance);
+      });
   }
 
   return (
@@ -38,7 +42,7 @@ export function SessionCreditsControl({
       <button
         type="button"
         onClick={() => adjust(-1)}
-        disabled={saving || balance === 0}
+        disabled={balance === 0}
         className="w-8 h-8 flex items-center justify-center border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors disabled:opacity-40"
       >
         &minus;
@@ -47,7 +51,6 @@ export function SessionCreditsControl({
       <button
         type="button"
         onClick={() => adjust(1)}
-        disabled={saving}
         className="w-8 h-8 flex items-center justify-center border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors disabled:opacity-40"
       >
         +

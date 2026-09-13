@@ -88,7 +88,6 @@ export function ClientCardGrid({
   members: RosterMember[];
 }) {
   const [rows, setRows] = useState(members);
-  const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   // "Make coach" is a rare, higher-consequence action — tucked behind a
   // small overflow menu per card instead of sitting in the front-row
@@ -287,65 +286,79 @@ export function ClientCardGrid({
     };
   }, [groupId, taggedPageIdsKey]);
 
-  async function handleTierChange(member: RosterMember, tier: ClientTier) {
+  function handleTierChange(member: RosterMember, tier: ClientTier) {
     setRows((prev) =>
       prev.map((m) => (m.profileId === member.profileId ? { ...m, clientTier: tier } : m))
     );
     const supabase = createBrowserClient();
-    await supabase
+    supabase
       .from("group_memberships")
       .update({ client_tier: tier })
       .eq("group_id", groupId)
-      .eq("profile_id", member.profileId);
-    router.refresh();
+      .eq("profile_id", member.profileId)
+      .then(() => router.refresh());
   }
 
-  async function handleRoleToggle(member: RosterMember) {
+  function handleRoleToggle(member: RosterMember) {
     if (member.role === "coach" && isOnlyCoach) {
       setError("A group needs at least one coach.");
       return;
     }
-    setBusyId(member.profileId);
     setError(null);
-    const supabase = createBrowserClient();
     const nextRole = member.role === "coach" ? "athlete" : "coach";
-    const { error: updateError } = await supabase
+    // Flip the row's role instantly — the mutation confirms in the
+    // background instead of the label waiting on a full page refresh.
+    setRows((prev) =>
+      prev.map((m) => (m.profileId === member.profileId ? { ...m, role: nextRole } : m))
+    );
+
+    const supabase = createBrowserClient();
+    supabase
       .from("group_memberships")
       .update({ role: nextRole })
       .eq("group_id", groupId)
-      .eq("profile_id", member.profileId);
-
-    if (updateError) {
-      setError("Couldn't update role.");
-      setBusyId(null);
-      return;
-    }
-    router.refresh();
+      .eq("profile_id", member.profileId)
+      .then(({ error: updateError }) => {
+        if (updateError) {
+          setRows((prev) =>
+            prev.map((m) => (m.profileId === member.profileId ? { ...m, role: member.role } : m))
+          );
+          setError("Couldn't update role.");
+          return;
+        }
+        router.refresh();
+      });
   }
 
-  async function handleRemove(member: RosterMember) {
+  function handleRemove(member: RosterMember) {
     if (member.role === "coach" && isOnlyCoach) {
       setError("A group needs at least one coach.");
       return;
     }
     if (!window.confirm(`Remove ${member.fullName} from the group?`)) return;
 
-    setBusyId(member.profileId);
     setError(null);
+    // Drop the card immediately rather than waiting for the delete + a
+    // full page refresh before it disappears.
+    setRows((prev) => prev.filter((m) => m.profileId !== member.profileId));
+
     const supabase = createBrowserClient();
-    const { error: deleteError } = await supabase
+    supabase
       .from("group_memberships")
       .delete()
       .eq("group_id", groupId)
-      .eq("profile_id", member.profileId);
-
-    if (deleteError) {
-      setError("Couldn't remove member.");
-      setBusyId(null);
-      return;
-    }
-    setRows((prev) => prev.filter((m) => m.profileId !== member.profileId));
-    router.refresh();
+      .eq("profile_id", member.profileId)
+      .then(({ error: deleteError }) => {
+        if (deleteError) {
+          setRows((prev) => {
+            if (prev.some((m) => m.profileId === member.profileId)) return prev;
+            return [...prev, member];
+          });
+          setError("Couldn't remove member.");
+          return;
+        }
+        router.refresh();
+      });
   }
 
   return (
@@ -422,7 +435,6 @@ export function ClientCardGrid({
           {pageRows.map((member) => {
             const status = statusLabel(member.lastWorkoutAt);
             const credits = creditsByAthleteId.get(member.profileId) ?? 0;
-            const busy = busyId === member.profileId;
             return (
               <div
                 key={member.profileId}
@@ -514,7 +526,6 @@ export function ClientCardGrid({
                   <button
                     type="button"
                     onClick={() => handleRemove(member)}
-                    disabled={busy}
                     className="font-body text-xs text-steel active:text-rust transition-colors disabled:opacity-40"
                   >
                     Remove
@@ -522,7 +533,6 @@ export function ClientCardGrid({
                   <button
                     type="button"
                     onClick={() => setOpenMenuId((id) => (id === member.profileId ? null : member.profileId))}
-                    disabled={busy}
                     aria-label="More actions"
                     className="text-steel active:text-rust transition-colors disabled:opacity-40"
                   >
@@ -537,8 +547,7 @@ export function ClientCardGrid({
                           setOpenMenuId(null);
                           handleRoleToggle(member);
                         }}
-                        disabled={busy}
-                        className="whitespace-nowrap px-3 py-2 font-body text-xs text-chalk hover:bg-graphite/50 disabled:opacity-40"
+                            className="whitespace-nowrap px-3 py-2 font-body text-xs text-chalk hover:bg-graphite/50 disabled:opacity-40"
                       >
                         {member.role === "coach" ? "Make athlete" : "Make coach"}
                       </button>

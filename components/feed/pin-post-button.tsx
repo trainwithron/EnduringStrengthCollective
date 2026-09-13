@@ -12,24 +12,28 @@ export function PinPostButton({
   postId: string;
   pinned: boolean;
 }) {
-  const [submitting, setSubmitting] = useState(false);
+  const [optimisticPinned, setOptimisticPinned] = useState(pinned);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  async function handleToggle() {
-    setSubmitting(true);
+  function handleToggle() {
     setError(null);
+    const nextPinned = !optimisticPinned;
+    // Flip the pin state instantly; the write confirms in the background.
+    setOptimisticPinned(nextPinned);
     const supabase = createBrowserClient();
-    const { error: updateError } = await supabase
+    supabase
       .from("posts")
-      .update({ pinned_at: pinned ? null : new Date().toISOString() })
-      .eq("id", postId);
-    setSubmitting(false);
-    if (updateError) {
-      setError("Couldn't pin — try again.");
-      return;
-    }
-    router.refresh();
+      .update({ pinned_at: nextPinned ? new Date().toISOString() : null })
+      .eq("id", postId)
+      .then(({ error: updateError }) => {
+        if (updateError) {
+          setOptimisticPinned(!nextPinned);
+          setError("Couldn't pin — try again.");
+          return;
+        }
+        router.refresh();
+      });
   }
 
   return (
@@ -37,13 +41,12 @@ export function PinPostButton({
       <button
         type="button"
         onClick={handleToggle}
-        disabled={submitting}
-        className={`flex items-center gap-1 font-body text-xs transition-colors disabled:opacity-40 ${
-          pinned ? "text-rust" : "text-steel active:text-rust"
+        className={`flex items-center gap-1 font-body text-xs transition-colors ${
+          optimisticPinned ? "text-rust" : "text-steel active:text-rust"
         }`}
       >
-        <Pin className="w-3.5 h-3.5" fill={pinned ? "currentColor" : "none"} />
-        {pinned ? "Unpin" : "Pin"}
+        <Pin className="w-3.5 h-3.5" fill={optimisticPinned ? "currentColor" : "none"} />
+        {optimisticPinned ? "Unpin" : "Pin"}
       </button>
       {error && (
         <span className="font-body text-[11px] text-rust" role="alert">

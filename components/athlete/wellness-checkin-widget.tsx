@@ -41,70 +41,76 @@ export function WellnessCheckinWidget({
   const [saved, setSaved] = useState(initialCheckin);
   const [editing, setEditing] = useState(!initialCheckin);
   const [draft, setDraft] = useState<Partial<WellnessCheckinValues>>(initialCheckin ?? {});
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const complete =
     draft.sleepQuality != null && draft.soreness != null && draft.energy != null;
 
-  async function handleSave() {
+  function handleSave() {
     if (!complete) return;
-    setSubmitting(true);
     setError(null);
     const supabase = createBrowserClient();
     const values = draft as WellnessCheckinValues;
+    const previousSaved = saved;
 
-    const { error: upsertError } = await supabase.from("wellness_checkins").upsert(
-      {
-        athlete_id: athleteId,
-        group_id: groupId,
-        log_date: todayDate,
-        sleep_quality: values.sleepQuality,
-        soreness: values.soreness,
-        energy: values.energy,
-      },
-      { onConflict: "athlete_id,group_id,log_date" }
-    );
-
-    if (upsertError) {
-      setError("Couldn't save — check your connection and try again.");
-      setSubmitting(false);
-      return;
-    }
-
-    // Low readiness genuinely can't wait for a digest — push the coach
-    // immediately, same 1-on-1-only tier gate the workout-completion
-    // push already uses (complete-workout-button.tsx) so a coach running
-    // a large team isn't flooded with every routine check-in.
-    if (isLowReadiness(values)) {
-      const [{ data: membership }, { data: profile }] = await Promise.all([
-        supabase.from("group_memberships").select("client_tier").eq("group_id", groupId).eq("profile_id", athleteId).maybeSingle(),
-        supabase.from("profiles").select("full_name").eq("id", athleteId).maybeSingle(),
-      ]);
-      if (isHighPriorityClient(membership?.client_tier ?? null)) {
-        const { data: coachMembership } = await supabase
-          .from("group_memberships")
-          .select("profile_id")
-          .eq("group_id", groupId)
-          .eq("role", "coach")
-          .limit(1)
-          .maybeSingle();
-        if (coachMembership) {
-          const athleteName = profile?.full_name ?? "Your client";
-          notifyPush(
-            coachMembership.profile_id,
-            "Low readiness flagged",
-            `${athleteName} logged low readiness today`,
-            `/groups/${groupId}/clients`
-          );
-        }
-      }
-    }
-
+    // Show the saved summary immediately — the upsert and the (only for a
+    // low-readiness result) coach-notification lookups all run in the
+    // background instead of the button sitting on "Save" through 1-3
+    // sequential round-trips first.
     setSaved(values);
     setEditing(false);
-    setSubmitting(false);
     onSaved?.(values);
+
+    supabase
+      .from("wellness_checkins")
+      .upsert(
+        {
+          athlete_id: athleteId,
+          group_id: groupId,
+          log_date: todayDate,
+          sleep_quality: values.sleepQuality,
+          soreness: values.soreness,
+          energy: values.energy,
+        },
+        { onConflict: "athlete_id,group_id,log_date" }
+      )
+      .then(({ error: upsertError }) => {
+        if (upsertError) {
+          setSaved(previousSaved);
+          setEditing(true);
+          setError("Couldn't save — check your connection and try again.");
+          return;
+        }
+
+        // Low readiness genuinely can't wait for a digest — push the coach
+        // immediately, same 1-on-1-only tier gate the workout-completion
+        // push already uses (complete-workout-button.tsx) so a coach
+        // running a large team isn't flooded with every routine check-in.
+        if (!isLowReadiness(values)) return;
+        Promise.all([
+          supabase.from("group_memberships").select("client_tier").eq("group_id", groupId).eq("profile_id", athleteId).maybeSingle(),
+          supabase.from("profiles").select("full_name").eq("id", athleteId).maybeSingle(),
+        ]).then(([{ data: membership }, { data: profile }]) => {
+          if (!isHighPriorityClient(membership?.client_tier ?? null)) return;
+          supabase
+            .from("group_memberships")
+            .select("profile_id")
+            .eq("group_id", groupId)
+            .eq("role", "coach")
+            .limit(1)
+            .maybeSingle()
+            .then(({ data: coachMembership }) => {
+              if (!coachMembership) return;
+              const athleteName = profile?.full_name ?? "Your client";
+              notifyPush(
+                coachMembership.profile_id,
+                "Low readiness flagged",
+                `${athleteName} logged low readiness today`,
+                `/groups/${groupId}/clients`
+              );
+            });
+        });
+      });
   }
 
   return (
@@ -168,7 +174,7 @@ export function WellnessCheckinWidget({
           <button
             type="button"
             onClick={handleSave}
-            disabled={!complete || submitting}
+            disabled={!complete}
             className="w-full h-10 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
           >
             Save

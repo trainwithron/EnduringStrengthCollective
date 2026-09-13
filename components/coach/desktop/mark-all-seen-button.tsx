@@ -15,31 +15,35 @@ export function MarkAllSeenButton({ groupIds }: { groupIds: string[] }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
-  async function handleClick() {
+  function handleClick() {
     if (busy || groupIds.length === 0) return;
+    // Flip to the "cleared" state immediately — the write + refresh run in
+    // the background instead of the click waiting on a user lookup, an
+    // upsert, and a full page refresh before anything visibly happens.
     setBusy(true);
+
     const supabase = createBrowserClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      setBusy(false);
-      return;
-    }
-
-    const nowIso = new Date().toISOString();
-    await supabase.from("coach_view_state").upsert(
-      groupIds.map((groupId) => ({
-        coach_id: user.id,
-        group_id: groupId,
-        feed_seen_at: nowIso,
-        clients_seen_at: nowIso,
-      })),
-      { onConflict: "coach_id,group_id" }
-    );
-
-    setBusy(false);
-    router.refresh();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) {
+        setBusy(false);
+        return;
+      }
+      const nowIso = new Date().toISOString();
+      supabase
+        .from("coach_view_state")
+        .upsert(
+          groupIds.map((groupId) => ({
+            coach_id: user.id,
+            group_id: groupId,
+            feed_seen_at: nowIso,
+            clients_seen_at: nowIso,
+          })),
+          { onConflict: "coach_id,group_id" }
+        )
+        .then(() => {
+          router.refresh();
+        });
+    });
   }
 
   return (
