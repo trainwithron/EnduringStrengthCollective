@@ -13,9 +13,9 @@ export interface HomeDaySummary {
   habitsCompleted: number;
 }
 
-// One row per day of the week — same underlying per-day data the Day
+// One card per day of the week — same underlying per-day data the Day
 // view itself uses, just at a glance instead of expanded. Tapping any
-// row re-anchors Day view to that date; nothing here is directly
+// card re-anchors Day view to that date; nothing here is directly
 // actionable, matching [[athlete_home_calendar_redesign]]'s "Week/Month
 // stay purely informational" rule.
 export function HomeWeekView({
@@ -45,14 +45,16 @@ export function HomeWeekView({
         </Link>
       </div>
 
-      <div className="divide-y divide-steel/15 border-y border-steel/15">
+      <div className="space-y-2">
         {days.map((day) => {
           const isToday = day.dateKey === todayKey;
           return (
             <Link
               key={day.dateKey}
               href={`/groups/${groupId}?view=day&date=${day.dateKey}`}
-              className={`flex items-center gap-3 py-3 ${isToday ? "bg-surface/40" : ""}`}
+              className={`flex items-center gap-3 p-3 border active:bg-surface/60 ${
+                isToday ? "border-rust/50 bg-surface/40" : "border-steel/20"
+              }`}
             >
               <div className={`w-11 shrink-0 text-center ${isToday ? "text-rust" : "text-steel"}`}>
                 <p className="font-body text-[10px] uppercase tracking-wide">

@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
-import Link from "next/link";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 export type CalendarViewMode = "day" | "week" | "month";
@@ -52,8 +51,23 @@ export function ViewModeRedirector({ hasViewParam }: { hasViewParam: boolean }) 
 }
 
 export function DayWeekMonthSwitcher({ groupId }: { groupId: string }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const active = (searchParams.get("view") as CalendarViewMode | null) ?? "day";
+  const [isPending, startTransition] = useTransition();
+  const urlView = (searchParams.get("view") as CalendarViewMode | null) ?? "day";
+
+  // Switching Day/Week/Month re-fetches this whole page's data server-side
+  // — with a plain <Link>, nothing visibly changes until that round-trip
+  // finishes, reading as an unresponsive button. This mirrors the
+  // optimistic-update fix already applied to this app's other slow-feeling
+  // buttons: reflect the tap immediately via local state, let the real
+  // navigation catch up in the background.
+  const [optimisticView, setOptimisticView] = useState<CalendarViewMode | null>(null);
+  const active = optimisticView ?? urlView;
+
+  useEffect(() => {
+    setOptimisticView(null);
+  }, [urlView]);
 
   const tabs: { key: CalendarViewMode; label: string }[] = [
     { key: "day", label: "Day" },
@@ -61,21 +75,31 @@ export function DayWeekMonthSwitcher({ groupId }: { groupId: string }) {
     { key: "month", label: "Month" },
   ];
 
+  function handleSelect(mode: CalendarViewMode) {
+    if (mode === active) return;
+    setOptimisticView(mode);
+    writeViewMode(mode);
+    const href = mode === "day" ? `/groups/${groupId}` : `/groups/${groupId}?view=${mode}`;
+    startTransition(() => {
+      router.push(href);
+    });
+  }
+
   return (
     <div className="flex items-center gap-1 mb-3">
       {tabs.map((tab) => (
-        <Link
+        <button
           key={tab.key}
-          href={tab.key === "day" ? `/groups/${groupId}` : `/groups/${groupId}?view=${tab.key}`}
-          onClick={() => writeViewMode(tab.key)}
+          type="button"
+          onClick={() => handleSelect(tab.key)}
           className={`h-8 px-3 flex items-center font-body text-xs border ${
             active === tab.key
               ? "bg-rust text-graphite border-rust"
               : "border-steel/30 text-steel active:border-rust active:text-rust"
-          }`}
+          } ${isPending && active === tab.key ? "opacity-70" : ""}`}
         >
           {tab.label}
-        </Link>
+        </button>
       ))}
     </div>
   );
