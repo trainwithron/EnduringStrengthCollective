@@ -22,6 +22,7 @@ import {
   CollectiveIntelligencePanel,
   type CollectiveIntelligenceItem,
 } from "@/components/coach/desktop/collective-intelligence-panel";
+import { CollectiveIntelligenceChat } from "@/components/coach/desktop/collective-intelligence-chat";
 
 interface GroupRow {
   id: string;
@@ -339,6 +340,7 @@ export default async function CoachHomePage() {
   const content = (
     <>
       <DashboardAutoRefresh />
+      <CollectiveIntelligenceChat />
       <div className="flex items-center justify-between mb-6">
         <h1 className="font-display font-bold text-2xl uppercase">Home</h1>
         <MarkAllSeenButton groupIds={allGroupIds} />
