@@ -7,6 +7,7 @@ import { TRACKED_FIELD_DEFS, ACTUAL_COLUMN, ACTUAL_PROP, fieldDef, type TrackedF
 import { ExerciseSetGrid } from "./exercise-set-grid";
 import { ExerciseVideoThread } from "./exercise-video-thread";
 import { EquipmentVisual } from "./equipment-visual";
+import { ExerciseVolumeHistory } from "./exercise-volume-history";
 
 export function ExerciseCard({
   exercise,
@@ -284,6 +285,8 @@ export function ExerciseCard({
           Last time: {lastTime.weight} &times; {lastTime.reps}
         </p>
       )}
+
+      {exercise.volumeHistory && <ExerciseVolumeHistory history={exercise.volumeHistory} />}
 
       {!readOnly && (
         <div className="relative mb-2">

@@ -9,6 +9,7 @@ import type { SessionExerciseEntry } from "@/lib/types";
 import { findCorrelatingWeightSuggestion, resolveWeightSuggestion } from "@/lib/set-suggestions";
 import { parseNumericReps } from "@/lib/program-card-visuals";
 import { computePriorBest } from "@/lib/obstacle-unlock";
+import { computeVolumeHistory } from "@/lib/exercise-volume-history";
 
 export default async function SessionPage(
   props: {
@@ -137,17 +138,35 @@ export default async function SessionPage(
     string,
     { maxWeight: number | null; maxReps: number | null; maxVolume: number | null }
   >();
+  // Exercise volume-history sparkline (lib/exercise-volume-history.ts) —
+  // total tonnage per session on this exact exercise name, from the same
+  // historical rows just below, excluding the current session for the
+  // identical reason priorBestByExerciseName does: a session still in
+  // progress isn't real history yet.
+  const volumeHistoryByExerciseName = new Map<
+    string,
+    { sessionId: string; sessionDate: string; totalVolume: number }[]
+  >();
   {
-    const rowsByName = new Map<string, { weight: number | null; reps: number | null }[]>();
+    const rowsByName = new Map<
+      string,
+      { weight: number | null; reps: number | null; sessionId: string; completedAt: string | null }[]
+    >();
     for (const row of (priorRows ?? []) as any[]) {
       if (row.session_exercises.session_id === params.sessionId) continue;
       const name = row.session_exercises.exercise_name as string;
       const list = rowsByName.get(name) ?? [];
-      list.push({ weight: row.weight, reps: row.reps });
+      list.push({
+        weight: row.weight,
+        reps: row.reps,
+        sessionId: row.session_exercises.session_id,
+        completedAt: row.completed_at,
+      });
       rowsByName.set(name, list);
     }
     for (const [name, rows] of rowsByName) {
       priorBestByExerciseName.set(name, computePriorBest(rows));
+      volumeHistoryByExerciseName.set(name, computeVolumeHistory(rows));
     }
   }
 
@@ -262,6 +281,7 @@ export default async function SessionPage(
           maxReps: null,
           maxVolume: null,
         },
+        volumeHistory: volumeHistoryByExerciseName.get(se.exercise_name) ?? [],
         sets: (se.set_logs ?? [])
           .slice()
           .sort((a: any, b: any) => a.set_order - b.set_order)

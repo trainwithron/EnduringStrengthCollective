@@ -100,6 +100,12 @@ export interface SessionExerciseEntry {
   // null/undefined when unset or unmatched — falls back to the generic
   // treatment, never blocks logging either way.
   equipmentType?: EquipmentType | null;
+  // Total tonnage (weight x reps, summed per session) on this exact
+  // exercise name, across every other completed session — one point per
+  // session, oldest first. lib/exercise-volume-history.ts. Optional/
+  // undefined on any render path that doesn't compute it, same convention
+  // as priorBest above.
+  volumeHistory?: { sessionId: string; sessionDate: string; totalVolume: number }[];
 }
 
 // ----------------------------------------------------------------------------
