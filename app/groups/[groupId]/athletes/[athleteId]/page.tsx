@@ -22,6 +22,8 @@ import { isHabitDueOn, computeCompliancePct } from "@/lib/habits";
 import { computeQuietTier } from "@/lib/quiet-client-tier";
 import { isLowReadiness } from "@/lib/wellness";
 import { computeWeeklyWeightTrend } from "@/lib/weight-trend";
+import { deriveEventWindow, weeksUntilEvent, isWithinTaperWindow } from "@/lib/event-window";
+import { currentTaperMultiplier } from "@/lib/endurance-taper";
 import {
   classifyNutritionTrend,
   isTrendAligned,
@@ -466,6 +468,38 @@ export default async function AthleteProfilePage(
     .select("exercise_name, estimated_max, updated_at")
     .eq("athlete_id", params.athleteId)
     .order("updated_at", { ascending: false });
+
+  // Peaking & Tapering — the shared event_window object, read here just
+  // to surface a real "you're in taper" notice; nothing else in this app
+  // scales a program's actual volume from it yet.
+  const { data: latestConfirmedEventGoal } = await supabase
+    .from("client_goals")
+    .select("status, target_date, event_type, event_expected_duration_minutes, event_priority, weight_class_flag")
+    .eq("athlete_id", params.athleteId)
+    .eq("group_id", params.groupId)
+    .eq("status", "confirmed")
+    .not("target_date", "is", null)
+    .not("event_type", "is", null)
+    .order("confirmed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const eventWindow = latestConfirmedEventGoal
+    ? deriveEventWindow({
+        status: latestConfirmedEventGoal.status,
+        targetDate: latestConfirmedEventGoal.target_date,
+        eventType: latestConfirmedEventGoal.event_type,
+        eventExpectedDurationMinutes: latestConfirmedEventGoal.event_expected_duration_minutes,
+        eventPriority: latestConfirmedEventGoal.event_priority as "A" | "B" | "C" | null,
+        weightClassFlag: latestConfirmedEventGoal.weight_class_flag,
+      })
+    : null;
+  const ENDURANCE_TAPER_WEEKS = 2;
+  const todayDate = new Date();
+  const weeksOut = eventWindow ? weeksUntilEvent(eventWindow, todayDate) : null;
+  const inTaperWindow = eventWindow ? isWithinTaperWindow(eventWindow, todayDate, ENDURANCE_TAPER_WEEKS) : false;
+  const taperMultiplier =
+    eventWindow && weeksOut !== null ? currentTaperMultiplier(weeksOut, ENDURANCE_TAPER_WEEKS) : null;
   const sleepQualityTrend = (wellnessRows ?? []).map((r) => ({ date: r.log_date, value: r.sleep_quality }));
   const sorenessTrend = (wellnessRows ?? []).map((r) => ({ date: r.log_date, value: r.soreness }));
   const energyTrend = (wellnessRows ?? []).map((r) => ({ date: r.log_date, value: r.energy }));
@@ -773,6 +807,35 @@ export default async function AthleteProfilePage(
                     </span>
                   </div>
                 ))}
+              </div>
+            </section>
+          )}
+
+          {eventWindow && inTaperWindow && (
+            <section>
+              <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+                Event Taper
+              </h2>
+              <div className="border border-rust/30 bg-surface px-4 py-3">
+                <p className="font-body text-sm text-chalk">
+                  {weeksOut === 0
+                    ? `Race week for ${eventWindow.sportType ?? "their event"} — target date ${eventWindow.targetDate}.`
+                    : `${weeksOut} week${weeksOut === 1 ? "" : "s"} out from ${eventWindow.sportType ?? "their event"} (${eventWindow.targetDate}).`}
+                </p>
+                <p className="font-body text-xs text-steel mt-1">
+                  Recommended training volume this week: {Math.round((taperMultiplier ?? 1) * 100)}% of normal —
+                  intensity/pace stays exactly where it is, only volume comes down.
+                </p>
+                <p className="font-body text-xs text-steel mt-1">
+                  Nutrition note: don&apos;t cut calories to match the lower training volume this week — carb intake
+                  should stay level or increase, not fall with it.
+                </p>
+                {eventWindow.weightClassFlag && (
+                  <p className="font-body text-xs text-rust mt-2">
+                    ⚠ Flagged as also cutting weight for a weight class — peaking and cutting at the same time has
+                    no real evidence base to automate. Worth a direct conversation, not an automatic plan.
+                  </p>
+                )}
               </div>
             </section>
           )}

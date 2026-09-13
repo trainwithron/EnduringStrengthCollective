@@ -16,6 +16,7 @@ export function GoalProposalForm({ athleteId, groupId }: { athleteId: string; gr
   const [targetDate, setTargetDate] = useState("");
   const [eventType, setEventType] = useState("");
   const [eventPriority, setEventPriority] = useState<"" | "A" | "B" | "C">("");
+  const [weightClassFlag, setWeightClassFlag] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +36,7 @@ export function GoalProposalForm({ athleteId, groupId }: { athleteId: string; gr
       target_date: targetDate || null,
       event_type: goalTypeHasEventFields(goalType) ? eventType.trim() || null : null,
       event_priority: goalTypeHasEventFields(goalType) && eventPriority ? eventPriority : null,
+      weight_class_flag: goalType === "powerbuilding_strongman" ? weightClassFlag : false,
       created_by: athleteId,
     });
     setSubmitting(false);
@@ -104,6 +106,18 @@ export function GoalProposalForm({ athleteId, groupId }: { athleteId: string; gr
             <option value="C">C — tune-up</option>
           </select>
         </div>
+      )}
+
+      {goalType === "powerbuilding_strongman" && (
+        <label className="flex items-center gap-2 font-body text-xs text-steel">
+          <input
+            type="checkbox"
+            checked={weightClassFlag}
+            onChange={(e) => setWeightClassFlag(e.target.checked)}
+            className="accent-rust"
+          />
+          I&apos;m also cutting weight to make a weight class for this
+        </label>
       )}
 
       <div>
