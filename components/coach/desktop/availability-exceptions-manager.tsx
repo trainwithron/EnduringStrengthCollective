@@ -109,7 +109,7 @@ export function AvailabilityExceptionsManager({
   }
 
   return (
-    <div className="border border-steel/20 bg-surface/40 p-4 mb-6 max-w-lg">
+    <div className="border border-steel/20 bg-surface/40 rounded-token-lg p-4 mb-6 max-w-lg">
       <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">
         Block time off
       </p>

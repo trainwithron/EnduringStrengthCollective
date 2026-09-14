@@ -596,7 +596,7 @@ export function ImportWizard({
 
   return (
     <div className="max-w-2xl space-y-4">
-      <div className="border border-steel/20 bg-surface/40 p-6">
+      <div className="border border-steel/20 bg-surface/40 rounded-token-lg p-6">
         <p className="font-body text-sm text-steel mb-4">
           Upload a spreadsheet export (.csv or .xlsx) — columns and headers can be in any order.
           We&apos;ll match exercises against your library automatically and add anything new.
@@ -633,7 +633,7 @@ export function ImportWizard({
         )}
       </div>
 
-      <div className="border border-steel/20 bg-surface/40 p-6">
+      <div className="border border-steel/20 bg-surface/40 rounded-token-lg p-6">
         <p className="font-body text-sm text-steel mb-4">
           Or upload a photo or screenshot of a program — from another app, a spreadsheet, or a
           handwritten sheet — and AI will read it into the same review pipeline as above. Convert a
@@ -652,7 +652,7 @@ export function ImportWizard({
         />
       </div>
 
-      <div className="border border-steel/20 bg-surface/40 p-6">
+      <div className="border border-steel/20 bg-surface/40 rounded-token-lg p-6">
         <p className="font-body text-sm text-steel mb-3">
           Or describe the program you want and AI will write a full draft — same review pipeline as
           above, and it prefers exercises already in your library. Nothing is created until you confirm.

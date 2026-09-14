@@ -73,7 +73,7 @@ export function NewProgramForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Strength Block 1"
-          className="w-full h-11 mt-1 bg-surface border border-steel/30 text-chalk px-3 font-body focus:outline-none focus:border-rust"
+          className="w-full h-11 mt-1 bg-surface border border-steel/30 text-chalk placeholder:text-steel/50 px-3 font-body focus:outline-none focus:border-rust"
         />
       </div>
 

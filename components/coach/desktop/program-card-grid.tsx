@@ -166,7 +166,7 @@ function ProgramCard({
   const titleSize = size === "small" ? "text-sm" : size === "medium" ? "text-base" : "text-lg";
 
   return (
-    <div className="border border-steel/20 bg-surface/40 flex flex-col overflow-hidden group">
+    <div className="border border-steel/20 bg-surface/40 rounded-token-lg flex flex-col overflow-hidden group">
       <div className={`relative ${IMAGE_HEIGHT[size]} bg-graphite shrink-0`}>
         {signedUrl ? (
           // eslint-disable-next-line @next/next/no-img-element

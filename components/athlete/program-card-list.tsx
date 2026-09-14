@@ -61,7 +61,7 @@ function ProgramCard({
   return (
     <Link
       href={`/groups/${groupId}/programs/${program.id}`}
-      className="border border-steel/20 bg-surface/40 flex flex-col overflow-hidden active:bg-surface/60 transition-colors"
+      className="border border-steel/20 bg-surface/40 rounded-token-lg flex flex-col overflow-hidden active:bg-surface/60 transition-colors"
     >
       <div className="relative h-24 bg-graphite shrink-0">
         {signedUrl ? (

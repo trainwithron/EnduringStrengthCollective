@@ -1,11 +1,7 @@
 import Link from "next/link";
 import type { HeroFlag } from "@/lib/coach-hero-priority";
 import type { HeroEmptyState } from "@/lib/dashboard-data";
-
-const TIER_LABEL: Record<"mild" | "strong", string> = {
-  mild: "hasn't logged in a while",
-  strong: "has gone quiet — worth a personal check-in",
-};
+import { QUIET_TIER_LABEL as TIER_LABEL } from "@/lib/quiet-client-tier";
 
 // AI Assistant Slice 1 (lib/matched-load-trend.ts) — states the verified
 // fact (RPE has moved a specific direction at a matched-or-favorable

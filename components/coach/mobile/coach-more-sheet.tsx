@@ -149,7 +149,7 @@ export function CoachMoreSheet({
           Display Mode
         </a>
         <div className="px-5 py-1.5">
-          <ViewModeToggle targetMode="mobile" label="Client-Facing Mode" />
+          <ViewModeToggle targetMode="mobile" label="Client-Facing Mode" groupId={groupId} />
         </div>
         {isPlatformAdmin && (
           <>

@@ -48,7 +48,7 @@ export async function CoachMobileHome({ groupId, groupName }: { groupId: string;
 
         <div className="px-5 pb-5 flex items-center gap-2">
           <ViewAsClientEntryPoint />
-          <ViewModeToggle targetMode="desktop" label="Desktop Mode" variant="button" />
+          <ViewModeToggle targetMode="desktop" label="Desktop Mode" variant="button" groupId={groupId} />
         </div>
 
         <section className="px-5">

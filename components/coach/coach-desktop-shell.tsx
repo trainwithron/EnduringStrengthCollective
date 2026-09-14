@@ -540,7 +540,13 @@ export function CoachDesktopShell({
               >
                 <MonitorPlay className="w-4 h-4" strokeWidth={2.25} />
               </a>
-              <ViewModeToggle targetMode="mobile" label="Client-Facing Mode" collapsed />
+              <ViewModeToggle
+                targetMode="mobile"
+                label="Client-Facing Mode"
+                title="Client-Facing Mode — preview your own generic client shell (not a specific client's data; for that, use View as Client)"
+                collapsed
+                groupId={groupId}
+              />
               {isPlatformAdmin && (
                 <>
                   <Link

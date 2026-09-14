@@ -17,6 +17,16 @@
 
 export type QuietTier = "none" | "mild" | "strong";
 
+// Shared wording so every surface that flags a quiet client (Dashboard
+// hero, Calendar's Needs Attention box, Client Profile's own banner)
+// says the same thing about the same tier — previously each surface
+// wrote its own copy next to its own ad-hoc quiet-detection math, which
+// is how Calendar's box ended up disagreeing with everywhere else.
+export const QUIET_TIER_LABEL: Record<"mild" | "strong", string> = {
+  mild: "hasn't logged in a while",
+  strong: "has gone quiet — worth a personal check-in",
+};
+
 const FREEFORM_MILD_DAYS = 7;
 const FREEFORM_STRONG_DAYS = 14;
 

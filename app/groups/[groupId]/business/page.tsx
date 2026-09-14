@@ -241,45 +241,45 @@ export default async function BusinessDashboardPage(
         />
       </div>
       <div className="grid grid-cols-4 gap-3 mb-8">
-        <div className="border border-steel/20 p-3">
+        <div className="border border-steel/20 rounded-token-lg p-3">
           <p className="font-display text-2xl leading-none">${realIncomeThisMonth.toLocaleString()}</p>
           <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">Income this month</p>
         </div>
-        <div className="border border-steel/20 p-3">
+        <div className="border border-steel/20 rounded-token-lg p-3">
           <p className="font-display text-2xl leading-none">{uniqueAthleteIds.size}</p>
           <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">Roster size</p>
           {newThisMonth > 0 && (
             <p className="font-body text-[10px] text-positive mt-0.5">+{newThisMonth} this month</p>
           )}
         </div>
-        <div className="border border-steel/20 p-3">
+        <div className="border border-steel/20 rounded-token-lg p-3">
           <p className="font-display text-2xl leading-none">{payingClientsCount}</p>
           <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">
             Paying <SwappableTerm termKey="client" form="plural" />
           </p>
         </div>
-        <div className="border border-steel/20 p-3">
+        <div className="border border-steel/20 rounded-token-lg p-3">
           <p className="font-display text-2xl leading-none">{totalOutstandingCredits}</p>
           <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">
             Outstanding credits
           </p>
         </div>
-        <div className="border border-steel/20 p-3">
+        <div className="border border-steel/20 rounded-token-lg p-3">
           <p className="font-display text-2xl leading-none">{bookingsThisMonthCount ?? 0}</p>
           <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">Sessions this month</p>
         </div>
-        <div className="border border-steel/20 p-3">
+        <div className="border border-steel/20 rounded-token-lg p-3">
           <p className="font-display text-2xl leading-none">{totalReferralClicks}</p>
           <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">Referral clicks</p>
         </div>
-        <div className="border border-steel/20 p-3">
+        <div className="border border-steel/20 rounded-token-lg p-3">
           <p className="font-display text-2xl leading-none">{totalProShopClicks}</p>
           <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">Pro Shop clicks</p>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-6 mb-8">
-        <div className="border border-steel/20 p-4">
+        <div className="border border-steel/20 rounded-token-lg p-4">
           <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
             <SwappableTerm termKey="client" form="singular" className="capitalize" /> growth (last 6 months)
           </h2>
@@ -297,7 +297,7 @@ export default async function BusinessDashboardPage(
           </div>
         </div>
 
-        <div className="border border-steel/20 p-4">
+        <div className="border border-steel/20 rounded-token-lg p-4">
           <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
             Engagement (last 14 days)
           </h2>

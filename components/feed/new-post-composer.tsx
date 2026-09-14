@@ -8,6 +8,15 @@ import type { FeedChannel } from "@/lib/types";
 import { useMentionAutocomplete } from "@/lib/use-mention-autocomplete";
 import { notifyPush } from "@/lib/push-notify";
 
+// The generic "form check / win / shoutout" copy reads oddly on Team
+// Chat, which is plain conversation, not activity-sharing — and flatly
+// wrong on Announcements, which only a coach can post in anyway.
+function placeholderForChannel(channel: FeedChannel): string {
+  if (channel === "team_chat") return "Message the team — @ to tag someone";
+  if (channel === "announcements") return "Post an announcement — @ to tag someone";
+  return "Share a form check, a win, or a shoutout — @ to tag someone";
+}
+
 export function NewPostComposer({
   groupId,
   raised,
@@ -163,7 +172,7 @@ export function NewPostComposer({
             setBody(e.target.value);
             setMentionQuery(detectMentionQuery(e.target.value));
           }}
-          placeholder="Share a form check, a win, or a shoutout — @ to tag someone"
+          placeholder={placeholderForChannel(defaultChannel)}
           rows={3}
           className="w-full bg-graphite border border-steel/30 text-chalk px-3 py-2 font-body focus:outline-none focus:border-rust resize-none"
         />

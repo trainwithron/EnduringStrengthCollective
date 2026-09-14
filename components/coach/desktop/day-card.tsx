@@ -363,7 +363,7 @@ export function DayCard({
   }
 
   return (
-    <div className="border border-steel/20 bg-surface/40 flex flex-col">
+    <div className="border border-steel/20 bg-surface/40 rounded-token-lg flex flex-col">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-steel/20 bg-surface">
         <GripVertical className="w-4 h-4 text-steel shrink-0 cursor-grab" aria-hidden="true" />
         <div className="flex-1 min-w-0 flex flex-col">

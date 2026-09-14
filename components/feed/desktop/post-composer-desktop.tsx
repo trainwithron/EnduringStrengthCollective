@@ -8,6 +8,15 @@ import type { FeedChannel } from "@/lib/types";
 import { useMentionAutocomplete } from "@/lib/use-mention-autocomplete";
 import { notifyPush } from "@/lib/push-notify";
 
+// The generic "form check / win / shoutout" copy reads oddly on Team
+// Chat, which is plain conversation, not activity-sharing — and flatly
+// wrong on Announcements, which only a coach can post in anyway.
+function placeholderForChannel(channel: FeedChannel): string {
+  if (channel === "team_chat") return "Message the team — @ to tag someone";
+  if (channel === "announcements") return "Post an announcement — @ to tag someone";
+  return "Share a form check, a win, or a shoutout — @ to tag someone";
+}
+
 // Same posting logic as the mobile FAB+sheet composer
 // (components/feed/new-post-composer.tsx) — just an always-visible inline
 // box instead of a floating trigger + full-screen sheet, which reads as a
@@ -123,14 +132,14 @@ export function PostComposerDesktop({
   if (!canPostHere) return null;
 
   return (
-    <div className="border border-steel/20 bg-surface/40 p-4 mb-6">
+    <div className="border border-steel/20 bg-surface/40 rounded-token-lg p-4 mb-6">
       <textarea
         value={body}
         onChange={(e) => {
           setBody(e.target.value);
           setMentionQuery(detectMentionQuery(e.target.value));
         }}
-        placeholder="Share a form check, a win, or a shoutout — @ to tag someone"
+        placeholder={placeholderForChannel(defaultChannel)}
         rows={3}
         className="w-full bg-graphite border border-steel/30 text-chalk px-3 py-2 font-body text-sm focus:outline-none focus:border-rust resize-none"
       />

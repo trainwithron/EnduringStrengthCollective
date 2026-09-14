@@ -17,7 +17,7 @@ export function StatHeroTile({
   detail?: string;
 }) {
   return (
-    <div className="border border-rust/40 bg-rust/5 p-5 flex flex-col justify-center h-full">
+    <div className="border border-rust/40 bg-rust/5 rounded-token-lg p-5 flex flex-col justify-center h-full">
       <p className="font-body text-[10px] text-rust uppercase tracking-wide font-bold mb-2">{label}</p>
       <p className="font-display font-bold text-5xl leading-none text-chalk">{value}</p>
       {detail && <p className="font-body text-xs text-steel mt-2">{detail}</p>}

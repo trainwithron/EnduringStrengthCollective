@@ -4,15 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { Trash2 } from "lucide-react";
-import type { FeedChannel } from "@/lib/types";
-
-const CHANNEL_LABELS: Record<FeedChannel, string> = {
-  announcements: "Announcements",
-  form_checks: "Form Checks",
-  pr_board: "PR Board",
-  general: "General",
-  team_chat: "Team Chat",
-};
+import { FEED_CHANNEL_LABELS as CHANNEL_LABELS, type FeedChannel } from "@/lib/types";
 
 // Org owner/admin only — a real, irreversible wipe of every post (and,
 // via cascade, every comment) in the currently-open channel. Deliberately

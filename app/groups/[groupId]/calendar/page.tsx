@@ -14,6 +14,7 @@ import { computeScheduledDates } from "@/lib/program-schedule";
 import { ScheduleClientPicker } from "@/components/coach/schedule-client-picker";
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { getEffectiveAthlete } from "@/lib/acting-as";
+import { computeQuietTier, QUIET_TIER_LABEL } from "@/lib/quiet-client-tier";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
@@ -784,12 +785,28 @@ export default async function CoachCalendarPage(
   for (const log of recentLogRows ?? []) {
     if (!lastLogByAthlete.has(log.athlete_id)) lastLogByAthlete.set(log.athlete_id, log.created_at);
   }
-  const quietClients = clients.filter((c) => {
-    const last = lastLogByAthlete.get(c.profileId);
-    if (!last) return true;
-    const daysSince = (Date.now() - new Date(last).getTime()) / (1000 * 60 * 60 * 24);
-    return daysSince >= 7;
-  });
+  // Same frequency-normalized computeQuietTier used by the Dashboard hero
+  // and the Client Profile banner — this box used to flag "quiet" off a
+  // flat 7-calendar-day rule of its own, which could disagree with the
+  // real, per-athlete-schedule verdict shown everywhere else in the app.
+  const sharedActiveTrainingDays =
+    (activePrograms ?? []).find((p) => !p.athlete_id)?.training_days ?? null;
+  const personalTrainingDaysByAthlete = new Map<string, number[] | null>(
+    (activePrograms ?? []).filter((p) => p.athlete_id).map((p) => [p.athlete_id as string, p.training_days])
+  );
+  const nowForQuietTier = new Date();
+  const quietClients = clients
+    .map((c) => {
+      const last = lastLogByAthlete.get(c.profileId);
+      const trainingDays = personalTrainingDaysByAthlete.get(c.profileId) ?? sharedActiveTrainingDays;
+      const tier = computeQuietTier({
+        lastLoggedAt: last ? new Date(last) : null,
+        now: nowForQuietTier,
+        trainingDays,
+      });
+      return { ...c, tier };
+    })
+    .filter((c) => c.tier !== "none");
 
   const timezone = coachProfile?.timezone ?? DEFAULT_COACH_TIMEZONE;
 
@@ -947,7 +964,7 @@ export default async function CoachCalendarPage(
             programsWithNoWorkouts.length > 0 ||
             clientsWithNoProgram.length > 0 ||
             quietClients.length > 0) && (
-            <div className="mb-6 border border-rust/30 bg-rust/5 p-3">
+            <div className="mb-6 border border-rust/30 bg-rust/5 rounded-token-lg p-3">
               <h2 className="font-display uppercase text-sm tracking-wide text-rust mb-2">
                 Needs attention
               </h2>
@@ -987,7 +1004,7 @@ export default async function CoachCalendarPage(
                     href={`/groups/${params.groupId}/athletes/${c.profileId}`}
                     className="block font-body text-xs text-chalk active:text-rust"
                   >
-                    {c.fullName} hasn&apos;t logged a workout in 7+ days
+                    {c.fullName} {QUIET_TIER_LABEL[c.tier as "mild" | "strong"]}
                   </Link>
                 ))}
               </div>

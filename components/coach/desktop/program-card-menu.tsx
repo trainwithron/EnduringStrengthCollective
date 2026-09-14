@@ -103,13 +103,18 @@ export function ProgramCardMenu({
     function handleScroll() {
       setView(null);
     }
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setView(null);
+    }
     if (view) {
       document.addEventListener("mousedown", handleClickOutside);
       window.addEventListener("scroll", handleScroll, true);
+      document.addEventListener("keydown", handleKeyDown);
     }
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
       window.removeEventListener("scroll", handleScroll, true);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [view]);
 

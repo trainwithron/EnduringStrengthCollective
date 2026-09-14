@@ -73,7 +73,7 @@ export function AiExtractionGuide() {
   }
 
   return (
-    <div className="border border-steel/20 bg-surface/40 mt-6">
+    <div className="border border-steel/20 bg-surface/40 rounded-token-lg mt-6">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

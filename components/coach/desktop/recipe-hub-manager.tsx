@@ -238,7 +238,7 @@ function RecipeCard({
   }
 
   return (
-    <div className="border border-steel/20 bg-surface/40">
+    <div className="border border-steel/20 bg-surface/40 rounded-token-lg">
       <div className="flex items-center justify-between gap-3 px-4 py-3">
         <button type="button" onClick={onToggle} className="flex-1 flex items-center gap-3 min-w-0 text-left">
           {expanded ? (

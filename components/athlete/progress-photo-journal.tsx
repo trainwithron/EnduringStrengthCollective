@@ -159,7 +159,7 @@ export function ProgressPhotoJournal({ athleteId, groupId }: { athleteId: string
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
           {photos.map((photo) => (
-            <div key={photo.id} className="border border-steel/20 bg-surface/40">
+            <div key={photo.id} className="border border-steel/20 bg-surface/40 rounded-token-lg overflow-hidden">
               {photo.signedUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={photo.signedUrl} alt="" className="w-full aspect-square object-cover" />

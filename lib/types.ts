@@ -171,6 +171,18 @@ export interface BuilderDay {
 
 export type FeedChannel = "announcements" | "form_checks" | "pr_board" | "general" | "team_chat";
 
+// One shared label set for every surface that names a channel — used to
+// live only inside clear-channel-button.tsx; the post composers wrote
+// the same "Share a form check..." placeholder regardless of channel,
+// which read as wrong on Team Chat specifically.
+export const FEED_CHANNEL_LABELS: Record<FeedChannel, string> = {
+  announcements: "Announcements",
+  form_checks: "Form Checks",
+  pr_board: "PR Board",
+  general: "General",
+  team_chat: "Team Chat",
+};
+
 export interface FeedPost {
   id: string;
   groupId: string;
