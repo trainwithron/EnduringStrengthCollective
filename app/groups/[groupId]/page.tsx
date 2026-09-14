@@ -414,7 +414,7 @@ export default async function GroupHubPage(
     }
   }
 
-  const orgTheme = await getViewerOrgTheme();
+  const orgTheme = await getViewerOrgTheme(params.groupId);
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">

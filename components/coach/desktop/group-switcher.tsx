@@ -7,6 +7,19 @@ import { ChevronDown, Plus, Search, Pencil } from "lucide-react";
 
 type GroupKind = "one_on_one" | "social" | "team";
 
+// A coach who owns/admins more than one organization has more than one
+// row in organization_memberships — looking that table up by profile_id
+// alone is ambiguous. Anchoring on the group actually being viewed's own
+// organization_id is the only way to get the org that's actually relevant
+// here, not an arbitrary other one of the coach's organizations.
+async function getCurrentOrgId(
+  supabase: ReturnType<typeof createBrowserClient>,
+  groupId: string
+): Promise<string | null> {
+  const { data } = await supabase.from("groups").select("organization_id").eq("id", groupId).maybeSingle();
+  return data?.organization_id ?? null;
+}
+
 const GROUP_KIND_LABELS: Record<GroupKind, string> = {
   one_on_one: "1-on-1",
   social: "Social",
@@ -61,12 +74,16 @@ export function GroupSwitcher({
       } = await supabase.auth.getUser();
       if (!user) return;
 
+      const currentOrgId = await getCurrentOrgId(supabase, groupId);
       const [{ data: membership }, { data: coachedRows }] = await Promise.all([
-        supabase
-          .from("organization_memberships")
-          .select("organization_id, role")
-          .eq("profile_id", user.id)
-          .maybeSingle(),
+        currentOrgId
+          ? supabase
+              .from("organization_memberships")
+              .select("organization_id, role")
+              .eq("organization_id", currentOrgId)
+              .eq("profile_id", user.id)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
         supabase
           .from("group_memberships")
           .select("groups ( id, name, focus_tag, group_kind )")
@@ -201,11 +218,15 @@ export function GroupSwitcher({
       return;
     }
 
-    const { data: membership } = await supabase
-      .from("organization_memberships")
-      .select("organization_id")
-      .eq("profile_id", user.id)
-      .maybeSingle();
+    const currentOrgId = await getCurrentOrgId(supabase, groupId);
+    const { data: membership } = currentOrgId
+      ? await supabase
+          .from("organization_memberships")
+          .select("organization_id")
+          .eq("organization_id", currentOrgId)
+          .eq("profile_id", user.id)
+          .maybeSingle()
+      : { data: null };
     if (!membership) {
       setCreating(false);
       setError("Couldn't find your organization — try again.");

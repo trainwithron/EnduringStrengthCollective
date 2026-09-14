@@ -130,6 +130,7 @@ export function CoachDesktopShell({
   const [openSupportCount, setOpenSupportCount] = useState(0);
   const [teamMode, setTeamMode] = useState(false);
   const [groupKind, setGroupKind] = useState<"one_on_one" | "social" | "team" | null>(null);
+  const [orgName, setOrgName] = useState<string | null>(null);
   // Concept 8 "Familiar" shell redesign (coach_desktop_shell_identity_
   // redesign.md) — the rail + list panel need the viewer's own id for
   // the pinned Needs Attention strip's fetch.
@@ -148,10 +149,15 @@ export function CoachDesktopShell({
     let cancelled = false;
     async function run() {
       const supabase = createBrowserClient();
-      const { data } = await supabase.from("groups").select("team_mode, group_kind").eq("id", groupId).maybeSingle();
+      const { data } = await supabase
+        .from("groups")
+        .select("team_mode, group_kind, organizations ( name )")
+        .eq("id", groupId)
+        .maybeSingle();
       if (!cancelled) {
         setTeamMode(data?.team_mode ?? false);
         setGroupKind((data?.group_kind as "one_on_one" | "social" | "team" | null) ?? "team");
+        setOrgName((data as any)?.organizations?.name ?? null);
       }
     }
     run();
@@ -595,7 +601,7 @@ export function CoachDesktopShell({
   );
 
   return (
-    <TerminologyProvider>
+    <TerminologyProvider groupId={groupId}>
     <div className="min-h-screen bg-graphite text-chalk font-body">
       {/* Persistent top bar — always visible regardless of sidebar state,
           on every viewport. Houses the mobile nav toggle and the "View as
@@ -614,7 +620,24 @@ export function CoachDesktopShell({
             label is easy to miss when your eyes are on the main content,
             and picking up someone else's client/program by mistake is a
             real risk this exists to head off. */}
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          {/* "You're in: org -> group" — a coach who administers more than
+              one organization otherwise has no reliable way to tell which
+              org's data/branding a page belongs to just by looking, which
+              is exactly the confusion that led to the org-scoping bug this
+              indicator exists to guard against going forward. Only renders
+              once the org name has loaded, so it never flashes empty. */}
+          {orgName && (
+            <>
+              <span
+                className="hidden sm:inline font-body text-xs md:text-sm text-steel truncate max-w-[10rem] md:max-w-[16rem]"
+                title={orgName}
+              >
+                {orgName}
+              </span>
+              <ChevronRight className="hidden sm:inline w-3.5 h-3.5 text-steel/50 shrink-0" />
+            </>
+          )}
           <p className="font-display font-bold text-lg md:text-2xl uppercase tracking-wide truncate">
             {groupName}
           </p>

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
-import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError } from "@/lib/anthropic-client";
+import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError, AiTruncatedError } from "@/lib/anthropic-client";
 import type { ParsedImportRow } from "@/lib/workout-import-parser";
 
 // Generates a full draft program from a coach's plain-English description
@@ -104,7 +104,12 @@ export async function POST(request: Request) {
       userText:
         `Coach's exercise library (prefer these exact names where they fit):\n${libraryNames.join(", ") || "(empty — invent sensible exercise names)"}\n\n` +
         `Program description: ${prompt.trim()}`,
-      maxTokens: 8192,
+      // 8192 truncated mid-JSON on a routine request (8 weeks x 3 days,
+      // ~130+ exercise rows) — a program's row count scales with
+      // duration x frequency x exercises/day, easily exceeding a budget
+      // sized for a single day's worth of content. 16384 still wasn't
+      // enough for the same request.
+      maxTokens: 32000,
     });
 
     const parsed = JSON.parse(extractJson(text));
@@ -142,6 +147,15 @@ export async function POST(request: Request) {
   } catch (err) {
     if (err instanceof AiNotConfiguredError) {
       return NextResponse.json({ error: err.message }, { status: 503 });
+    }
+    if (err instanceof AiTruncatedError) {
+      return NextResponse.json(
+        {
+          error:
+            "That description generated too much content for one request. Try a shorter duration, fewer days per week, or fewer exercises per day — or split a long program into phases and generate each separately.",
+        },
+        { status: 502 }
+      );
     }
     const message = err instanceof Error ? err.message : "Unknown error";
     return NextResponse.json({ error: `Couldn't generate a program: ${message}` }, { status: 502 });

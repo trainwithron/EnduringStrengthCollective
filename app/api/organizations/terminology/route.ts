@@ -18,23 +18,44 @@ export async function PATCH(request: Request) {
   const body = await request.json().catch(() => null);
   const key = body?.key as TermKey | undefined;
   const override = (body?.override ?? null) as TermOverride | null;
+  const groupId = body?.groupId as string | undefined;
   if (!key) {
     return NextResponse.json({ error: "Missing key." }, { status: 400 });
   }
 
-  const { data: membership } = await supabase
-    .from("organization_memberships")
-    .select("organization_id")
-    .eq("profile_id", user.id)
-    .maybeSingle();
-  if (!membership) {
+  // Scoped to the group the coach was actually looking at when they made
+  // this change, not a blind "whichever org this profile belongs to"
+  // lookup — a coach who owns/admins more than one organization has more
+  // than one row in organization_memberships, and an unscoped lookup here
+  // would silently patch the wrong org's vocabulary. Falls back to the
+  // old behavior if no groupId was sent (defensive; the client always
+  // sends one now).
+  let organizationId: string | null = null;
+  if (groupId) {
+    const { data: group } = await supabase
+      .from("groups")
+      .select("organization_id")
+      .eq("id", groupId)
+      .maybeSingle();
+    organizationId = group?.organization_id ?? null;
+  }
+  if (!organizationId) {
+    const { data: membership } = await supabase
+      .from("organization_memberships")
+      .select("organization_id")
+      .eq("profile_id", user.id)
+      .limit(1)
+      .maybeSingle();
+    organizationId = membership?.organization_id ?? null;
+  }
+  if (!organizationId) {
     return NextResponse.json({ error: "No organization found." }, { status: 404 });
   }
 
   const { data: org } = await supabase
     .from("organizations")
     .select("terminology_overrides")
-    .eq("id", membership.organization_id)
+    .eq("id", organizationId)
     .maybeSingle();
   if (!org) {
     return NextResponse.json({ error: "Organization not found." }, { status: 404 });
@@ -48,7 +69,7 @@ export async function PATCH(request: Request) {
   const { error } = await supabase
     .from("organizations")
     .update({ terminology_overrides: next })
-    .eq("id", membership.organization_id);
+    .eq("id", organizationId);
 
   if (error) {
     return NextResponse.json(

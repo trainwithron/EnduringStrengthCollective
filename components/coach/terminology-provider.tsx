@@ -19,7 +19,19 @@ const TerminologyContext = createContext<TerminologyContextValue>({
 // live state instead of each re-fetching independently. Wraps
 // CoachDesktopShell and CoachHomeShell — the two shells every coach page
 // renders inside.
-export function TerminologyProvider({ children }: { children: React.ReactNode }) {
+export function TerminologyProvider({
+  children,
+  groupId,
+}: {
+  children: React.ReactNode;
+  // Anchors which organization's vocabulary to load. A coach who
+  // owns/admins more than one organization has more than one row in
+  // organization_memberships, so a blind profile_id-only lookup would
+  // resolve to an arbitrary other org's wording instead of the one for
+  // the group actually being viewed. Omit only where there's genuinely
+  // no current group yet (e.g. a brand-new coach's first Home visit).
+  groupId?: string;
+}) {
   const [overrides, setOverrides] = useState<TerminologyOverrides>({});
 
   useEffect(() => {
@@ -30,11 +42,30 @@ export function TerminologyProvider({ children }: { children: React.ReactNode })
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
-      const { data: membership } = await supabase
-        .from("organization_memberships")
-        .select("organization_id")
-        .eq("profile_id", user.id)
-        .maybeSingle();
+
+      let organizationId: string | null = null;
+      if (groupId) {
+        const { data: group } = await supabase
+          .from("groups")
+          .select("organization_id")
+          .eq("id", groupId)
+          .maybeSingle();
+        organizationId = group?.organization_id ?? null;
+      }
+
+      const { data: membership } = organizationId
+        ? await supabase
+            .from("organization_memberships")
+            .select("organization_id")
+            .eq("organization_id", organizationId)
+            .eq("profile_id", user.id)
+            .maybeSingle()
+        : await supabase
+            .from("organization_memberships")
+            .select("organization_id")
+            .eq("profile_id", user.id)
+            .limit(1)
+            .maybeSingle();
       if (!membership) return;
       const { data: org } = await supabase
         .from("organizations")
@@ -49,7 +80,7 @@ export function TerminologyProvider({ children }: { children: React.ReactNode })
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [groupId]);
 
   function setOverride(key: TermKey, override: TermOverride | null) {
     // Optimistic — every SwappableTerm on the page updates immediately;
@@ -64,7 +95,7 @@ export function TerminologyProvider({ children }: { children: React.ReactNode })
     fetch("/api/organizations/terminology", {
       method: "PATCH",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ key, override }),
+      body: JSON.stringify({ key, override, groupId }),
     }).catch(() => {});
   }
 

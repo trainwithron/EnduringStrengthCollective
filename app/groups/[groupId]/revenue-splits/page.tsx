@@ -35,16 +35,21 @@ export default async function RevenueSplitsPage(
 
   const { data: group } = await supabase
     .from("groups")
-    .select("name")
+    .select("name, organization_id")
     .eq("id", params.groupId)
     .single();
 
-  const { data: orgMembership } = await supabase
-    .from("organization_memberships")
-    .select("organization_id, role")
-    .eq("profile_id", user.id)
-    .limit(1)
-    .maybeSingle();
+  // Scoped to THIS group's own organization — see branding/page.tsx for
+  // why a blind profile-only lookup breaks for a coach in more than one
+  // organization.
+  const { data: orgMembership } = group?.organization_id
+    ? await supabase
+        .from("organization_memberships")
+        .select("organization_id, role")
+        .eq("organization_id", group.organization_id)
+        .eq("profile_id", user.id)
+        .maybeSingle()
+    : { data: null };
 
   if (!orgMembership) {
     return (

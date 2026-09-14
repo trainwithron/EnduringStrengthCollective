@@ -44,16 +44,23 @@ export default async function BrandingPage(
 
   const { data: group } = await supabase
     .from("groups")
-    .select("name")
+    .select("name, organization_id")
     .eq("id", params.groupId)
     .single();
 
-  const { data: orgMembership } = await supabase
-    .from("organization_memberships")
-    .select("organization_id, role")
-    .eq("profile_id", user.id)
-    .limit(1)
-    .maybeSingle();
+  // Scoped to THIS group's own organization, not a blind "whichever org
+  // this profile happens to belong to" lookup — a coach who owns/admins
+  // more than one organization (e.g. running several client orgs) has
+  // more than one row in organization_memberships, and an unscoped
+  // lookup here would silently show the wrong org's Team page.
+  const { data: orgMembership } = group?.organization_id
+    ? await supabase
+        .from("organization_memberships")
+        .select("organization_id, role")
+        .eq("organization_id", group.organization_id)
+        .eq("profile_id", user.id)
+        .maybeSingle()
+    : { data: null };
 
   if (!orgMembership) {
     return (

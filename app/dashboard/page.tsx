@@ -57,22 +57,27 @@ export default async function CoachHomePage() {
     );
   }
 
-  const { data: orgMembership } = await supabase
+  // A coach can own/admin more than one organization (e.g. running
+  // several client orgs at once) — fetching every row here, not just
+  // one, so Home aggregates groups across ALL of them rather than
+  // silently collapsing to just the directly-coached groups the moment
+  // there's more than one org membership.
+  const { data: orgMemberships } = await supabase
     .from("organization_memberships")
     .select("organization_id, role")
-    .eq("profile_id", user.id)
-    .maybeSingle();
+    .eq("profile_id", user.id);
 
-  const { data: org } = orgMembership
+  const primaryOrgMembership = orgMemberships?.[0] ?? null;
+  const { data: org } = primaryOrgMembership
     ? await supabase
         .from("organizations")
         .select("name, display_name")
-        .eq("id", orgMembership.organization_id)
+        .eq("id", primaryOrgMembership.organization_id)
         .maybeSingle()
     : { data: null };
 
   // Same merge shape GroupSwitcher already uses: every group this coach
-  // coaches, plus every group in the org if they're an owner/admin.
+  // coaches, plus every group in each org where they're an owner/admin.
   const byId = new Map<string, GroupRow>();
 
   const { data: coachedRows } = await supabase
@@ -85,11 +90,14 @@ export default async function CoachHomePage() {
     if (g) byId.set(g.id, g);
   }
 
-  if (orgMembership && (orgMembership.role === "owner" || orgMembership.role === "admin")) {
+  const adminOrgIds = (orgMemberships ?? [])
+    .filter((m) => m.role === "owner" || m.role === "admin")
+    .map((m) => m.organization_id);
+  if (adminOrgIds.length > 0) {
     const { data: allGroups } = await supabase
       .from("groups")
       .select("id, name, focus_tag, group_kind")
-      .eq("organization_id", orgMembership.organization_id)
+      .in("organization_id", adminOrgIds)
       .order("name");
     for (const g of allGroups ?? []) byId.set(g.id, g as GroupRow);
   }

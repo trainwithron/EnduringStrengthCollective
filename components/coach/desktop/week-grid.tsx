@@ -192,9 +192,10 @@ export function WeekGrid({
         <button
           type="button"
           onClick={() => setDaysCondensed((v) => !v)}
+          title="Toggles each day card's own display density — separate from the Week toggle above, which shows or hides this week's days entirely."
           className="font-body text-xs text-steel active:text-rust transition-colors shrink-0"
         >
-          {daysCondensed ? "Expand days" : "Collapse days"}
+          {daysCondensed ? "Full view" : "Compact view"}
         </button>
         <button
           type="button"

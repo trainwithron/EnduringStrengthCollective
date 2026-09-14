@@ -15,4 +15,9 @@ export const CARDIO_PRESETS: CardioPreset[] = [
   { key: "alacticCapacity", label: "Alactic Capacity", workSeconds: 17, restSeconds: 35, rounds: 10 },
   { key: "glycolytic", label: "Glycolytic", workSeconds: 45, restSeconds: 90, rounds: 6 },
   { key: "aerobic", label: "Aerobic (intervals)", workSeconds: 180, restSeconds: 90, rounds: 4 },
+  // High school football's real work:rest ratio is ~1:4 (7s play, 25s
+  // between snaps — no TV timeouts, faster tempo than NCAA's ~1:6 or the
+  // NFL's ~1:8), and none of the presets above match it. 12 rounds is
+  // one series-plus. See football_program_design_and_template memory.
+  { key: "hsFootballPlaySim", label: "HS Football Play Sim", workSeconds: 7, restSeconds: 25, rounds: 12 },
 ];

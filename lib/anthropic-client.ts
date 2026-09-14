@@ -32,6 +32,19 @@ export class AiNotConfiguredError extends Error {
   }
 }
 
+// Distinct from a genuinely malformed response: the model was still
+// mid-output when it hit maxTokens, so the caller's JSON literally ends
+// with an unterminated string/array rather than being wrong. Worth
+// surfacing separately so a caller building structured JSON (a program,
+// a meal plan) can tell a coach "this was too big, ask for less" instead
+// of a raw JSON.parse error pointing at a byte offset.
+export class AiTruncatedError extends Error {
+  constructor() {
+    super("Claude's response was cut off before finishing — the request was too large for the configured token limit.");
+    this.name = "AiTruncatedError";
+  }
+}
+
 // Returns Claude's raw text response. Callers that need structured data
 // ask for JSON in the prompt and parse the result themselves — Claude
 // reliably follows a "respond with only a JSON array, no other text"
@@ -76,6 +89,9 @@ export async function callClaude({
   }
 
   const data = await response.json();
+  if (data.stop_reason === "max_tokens") {
+    throw new AiTruncatedError();
+  }
   const textBlock = (data.content ?? []).find((b: any) => b.type === "text");
   if (!textBlock?.text) {
     throw new Error("Claude returned no text content.");

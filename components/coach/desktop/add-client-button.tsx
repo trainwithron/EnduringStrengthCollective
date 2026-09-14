@@ -95,8 +95,26 @@ export function AddClientButton({
       return;
     }
 
+    // Scoped to THIS group's own organization — a coach who owns/admins
+    // more than one organization has more than one row in
+    // organization_memberships, and a blind profile_id-only lookup would
+    // resolve to an arbitrary other org instead of this one.
+    const { data: currentGroup } = await supabase
+      .from("groups")
+      .select("organization_id")
+      .eq("id", groupId)
+      .maybeSingle();
+    const currentOrgId = currentGroup?.organization_id ?? null;
+
     const [{ data: membership }, { data: coachedRows }] = await Promise.all([
-      supabase.from("organization_memberships").select("organization_id, role").eq("profile_id", user.id).maybeSingle(),
+      currentOrgId
+        ? supabase
+            .from("organization_memberships")
+            .select("organization_id, role")
+            .eq("organization_id", currentOrgId)
+            .eq("profile_id", user.id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
       supabase.from("group_memberships").select("groups ( id, name )").eq("profile_id", user.id).eq("role", "coach"),
     ]);
 
@@ -146,11 +164,19 @@ export function AddClientButton({
       setDestinationError("Couldn't create the group — try again.");
       return null;
     }
-    const { data: membership } = await supabase
-      .from("organization_memberships")
+    const { data: currentGroupForCreate } = await supabase
+      .from("groups")
       .select("organization_id")
-      .eq("profile_id", user.id)
+      .eq("id", groupId)
       .maybeSingle();
+    const { data: membership } = currentGroupForCreate?.organization_id
+      ? await supabase
+          .from("organization_memberships")
+          .select("organization_id")
+          .eq("organization_id", currentGroupForCreate.organization_id)
+          .eq("profile_id", user.id)
+          .maybeSingle()
+      : { data: null };
     if (!membership) {
       setDestinationError("Couldn't find your organization — try again.");
       return null;
