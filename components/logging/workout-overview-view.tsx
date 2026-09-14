@@ -118,7 +118,7 @@ export function WorkoutOverviewView({
         )}
       </div>
 
-      {showTabBar && <BottomTabBar groupId={groupId} activeOverride="workout" />}
+      {showTabBar && <BottomTabBar groupId={groupId} activeOverride="home" />}
     </main>
   );
 }

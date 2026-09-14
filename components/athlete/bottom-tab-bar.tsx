@@ -3,17 +3,18 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Dumbbell, MessagesSquare, Settings, Apple } from "lucide-react";
+import { Home, CalendarDays, MessagesSquare, Settings, Apple } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 
-// "calendar" stays a valid override value even though it's no longer a
-// rendered tab (Home's Day/Week/Month switcher absorbed it — see
-// [[athlete_home_calendar_redesign]]) — the still-reachable booking
-// pages (app/groups/[groupId]/calendar/**) pass it as their
-// activeOverride, and simply highlighting nothing is the honest,
-// zero-risk outcome for a page that isn't one of the 5 real tabs
-// anymore, without having to touch that separate booking flow here.
-type TabKey = "home" | "workout" | "feed" | "calendar" | "nutrition" | "settings";
+// Home/Workout merge (mobile_home_workout_tab_merge_idea.md, locked
+// 2026-09-14): Home itself is now today's workout — a hero CTA at the
+// top of the Day view, with the existing widgets below it — so
+// "workout" is no longer its own destination. That frees a slot,
+// letting Calendar (previously absorbed into Home's own Day/Week/Month
+// switcher) come back out as a real top-level tab, alongside Nutrition
+// getting promoted the same way. Final locked order: Home / Calendar /
+// Feed / Nutrition / Settings.
+type TabKey = "home" | "feed" | "calendar" | "nutrition" | "settings";
 
 // The session page (`/sessions/[sessionId]`) has no groupId in its URL, so
 // it can't be matched by pathname here — it passes `activeOverride`
@@ -70,7 +71,7 @@ export function BottomTabBar({
       ? "home"
       : pathname.startsWith(`/groups/${groupId}/workouts`) ||
         pathname.startsWith(`/groups/${groupId}/today`)
-      ? "workout"
+      ? "home"
       : pathname.startsWith(`/groups/${groupId}/feed`)
       ? "feed"
       : pathname.startsWith(`/groups/${groupId}/calendar`) || pathname.includes("/calendar")
@@ -83,7 +84,7 @@ export function BottomTabBar({
 
   const tabs: { key: TabKey; label: string; href: string; icon: typeof Home }[] = [
     { key: "home", label: "Home", href: `/groups/${groupId}`, icon: Home },
-    { key: "workout", label: "Workout", href: `/groups/${groupId}/today`, icon: Dumbbell },
+    { key: "calendar", label: "Calendar", href: `/groups/${groupId}/calendar`, icon: CalendarDays },
     ...(hideFeed
       ? []
       : [{ key: "feed" as const, label: "Feed", href: `/groups/${groupId}/feed`, icon: MessagesSquare }]),

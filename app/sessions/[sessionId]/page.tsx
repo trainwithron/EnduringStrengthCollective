@@ -9,6 +9,7 @@ import { CoachLoggedBadge } from "@/components/coach-logged-badge";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import type { SessionExerciseEntry } from "@/lib/types";
 import { findCorrelatingWeightSuggestion, resolveWeightSuggestion } from "@/lib/set-suggestions";
+import { findAthleteVisibleCoachNoteForExercise } from "@/lib/exercise-note-history";
 import { parseNumericReps } from "@/lib/program-card-visuals";
 import { computePriorBest } from "@/lib/obstacle-unlock";
 import { computeVolumeHistory } from "@/lib/exercise-volume-history";
@@ -398,6 +399,25 @@ export default async function SessionPage(
 
   const isOwnSession = session.athlete_id === user.id;
 
+  // Swipe-card carousel's coach-note-first callout (mobile_home_workout_
+  // tab_merge_idea.md) — only ever the athlete's own opted-in notes;
+  // RLS also enforces this independently, so a coach viewing this page
+  // (in-person logging, View as Client) simply gets none, falling back
+  // to the generic tip like any other exercise with no shared note.
+  const coachNoteByExerciseName: Record<string, string | null> = {};
+  if (isOwnSession) {
+    await Promise.all(
+      Array.from(new Set(exercises.map((ex) => ex.exerciseName))).map(async (name) => {
+        const note = await findAthleteVisibleCoachNoteForExercise(supabase, {
+          athleteId: session.athlete_id,
+          groupId: session.group_id,
+          exerciseName: name,
+        });
+        coachNoteByExerciseName[name] = note?.body ?? null;
+      })
+    );
+  }
+
   // Pending-task gating (custom_shape_theming_idea.md) — a real due habit
   // or an unanswered wellness check-in becomes the unlock key for this
   // rest period's mini-game/trivia, rather than a nudge running alongside
@@ -512,10 +532,11 @@ export default async function SessionPage(
         gamificationEnabled={gamificationEnabled}
         pendingGateTask={pendingGateTask}
         todayDate={todayKey}
+        coachNoteByExerciseName={coachNoteByExerciseName}
       />
 
       {isOwnSession && (
-        <BottomTabBar groupId={session.group_id} activeOverride="workout" />
+        <BottomTabBar groupId={session.group_id} activeOverride="home" />
       )}
     </main>
   );

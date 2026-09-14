@@ -33,3 +33,35 @@ export async function findMostRecentCoachNoteForExercise(
 
   return withDates[0] ?? null;
 }
+
+// The athlete-facing counterpart — same shape, but only ever returns a
+// note the coach explicitly marked `visible_to_athlete` (RLS enforces
+// this independently; the extra .eq here just keeps the query's own
+// intent explicit rather than relying on RLS to silently filter rows).
+// Used by the swipe-card carousel's expanded-card callout
+// (swipe_card_logging_and_spotter_nudge_idea.md's "coach note first"
+// rule) — falls back to a generic tip when this returns null.
+export async function findAthleteVisibleCoachNoteForExercise(
+  supabase: any,
+  { athleteId, groupId, exerciseName }: { athleteId: string; groupId: string; exerciseName: string }
+): Promise<CarriedForwardNote | null> {
+  const { data: rows } = await supabase
+    .from("session_exercise_coach_notes")
+    .select(
+      "body, session_exercises!inner ( exercise_name, athlete_sessions!inner ( athlete_id, completed_at ) )"
+    )
+    .eq("group_id", groupId)
+    .eq("visible_to_athlete", true)
+    .eq("session_exercises.exercise_name", exerciseName)
+    .eq("session_exercises.athlete_sessions.athlete_id", athleteId);
+
+  const withDates = ((rows ?? []) as any[])
+    .filter((row) => row.body && row.body.trim())
+    .map((row) => ({
+      body: row.body as string,
+      date: row.session_exercises.athlete_sessions.completed_at as string,
+    }))
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  return withDates[0] ?? null;
+}

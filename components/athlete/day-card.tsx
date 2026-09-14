@@ -44,6 +44,7 @@ export function DayCard({
         dateLabel={dateLabel}
         isToday={isToday}
         workout={workout}
+        macros={isToday ? macros : null}
         canBook={canBook}
         wellnessCheckin={isToday ? wellnessCheckin ?? null : null}
       />
@@ -66,6 +67,7 @@ function WorkoutSection({
   dateLabel,
   isToday,
   workout,
+  macros,
   canBook,
   wellnessCheckin,
 }: {
@@ -74,6 +76,7 @@ function WorkoutSection({
   dateLabel: string;
   isToday: boolean;
   workout: DayWorkoutInfo;
+  macros?: TodayMacros | null;
   canBook: boolean;
   wellnessCheckin?: WellnessCheckinValues | null;
 }) {
@@ -117,21 +120,55 @@ function WorkoutSection({
   }
 
   if (workout.status === "rest") {
+    // No scheduled workout today — the hero falls through to the one
+    // guaranteed baseline action instead of a dead-end (mobile_home_
+    // workout_tab_merge_idea.md's rest-day fallback). Real macro targets
+    // when this athlete has any set; the booking link stays alongside it
+    // rather than replacing it, since both can be true on the same rest
+    // day. A recap/preview of yesterday/tomorrow was floated in the same
+    // design pass but deliberately deferred — it needs an actual layout
+    // pass to confirm it fits without reading as cluttered, not a guess.
+    const hasMacros = macros && (macros.calories != null || macros.proteinG != null);
     return (
       <div className="border border-steel/20 p-4">
         <p className="font-body text-xs text-steel uppercase tracking-wide">
           {dateLabel}
           {readinessChip}
         </p>
-        {canBook ? (
+        <p className="font-display font-bold text-lg uppercase leading-none mt-1">Rest day</p>
+
+        {hasMacros ? (
+          <div className="grid grid-cols-4 gap-2 text-center mt-3">
+            <div>
+              <p className="font-display text-lg leading-none">{macros!.calories ?? "--"}</p>
+              <p className="font-body text-[10px] text-steel uppercase mt-1">Kcal</p>
+            </div>
+            <div>
+              <p className="font-display text-lg leading-none">{macros!.proteinG ?? "--"}</p>
+              <p className="font-body text-[10px] text-steel uppercase mt-1">Protein</p>
+            </div>
+            <div>
+              <p className="font-display text-lg leading-none">{macros!.carbsG ?? "--"}</p>
+              <p className="font-body text-[10px] text-steel uppercase mt-1">Carbs</p>
+            </div>
+            <div>
+              <p className="font-display text-lg leading-none">{macros!.fatG ?? "--"}</p>
+              <p className="font-body text-[10px] text-steel uppercase mt-1">Fat</p>
+            </div>
+          </div>
+        ) : (
+          <p className="font-body text-sm text-steel mt-2">
+            No macro targets set for today yet.
+          </p>
+        )}
+
+        {canBook && (
           <Link
             href={`/groups/${groupId}/calendar/${dateKey}`}
-            className="font-body text-sm text-rust mt-2 inline-block"
+            className="font-body text-sm text-rust mt-3 inline-block"
           >
-            Rest day — book a session with your coach &rarr;
+            Book a session with your coach &rarr;
           </Link>
-        ) : (
-          <p className="font-body text-sm text-steel mt-2">Rest day.</p>
         )}
       </div>
     );

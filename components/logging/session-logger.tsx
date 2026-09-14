@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
-import { ExerciseCard } from "./exercise-card";
+import { ExerciseSwipeCarousel } from "./exercise-swipe-carousel";
 import { CompleteWorkoutButton } from "@/components/session/complete-workout-button";
 import { RestTimerBar, type PendingGateTask } from "@/components/session/rest-timer-bar";
 
@@ -22,6 +22,7 @@ export function SessionLogger({
   gamificationEnabled,
   pendingGateTask,
   todayDate,
+  coachNoteByExerciseName,
 }: {
   sessionId: string;
   isCompleted: boolean;
@@ -37,6 +38,11 @@ export function SessionLogger({
   gamificationEnabled: boolean;
   pendingGateTask?: PendingGateTask | null;
   todayDate?: string;
+  // The swipe-card carousel's coach-note-first callout — keyed by
+  // exercise name, only ever populated with a note the coach explicitly
+  // marked visible_to_athlete (see lib/exercise-note-history.ts). Optional
+  // so nothing breaks for any call site that hasn't been updated yet.
+  coachNoteByExerciseName?: Record<string, string | null>;
 }) {
   const [exercises, setExercises] = useState(initialExercises);
   const [pendingRestPrompt, setPendingRestPrompt] = useState<{
@@ -196,30 +202,26 @@ export function SessionLogger({
         />
       )}
       <section className="px-5 pt-4">
-      <div className="space-y-6">
-        {exercises.map((exercise) => (
-          <ExerciseCard
-            key={exercise.id}
-            exercise={exercise}
-            lastTime={lastTimeByExercise[exercise.exerciseName]}
-            ladder={ladderByExercise[exercise.exerciseName]}
-            readOnly={isCompleted}
-            onSetChange={(setId, patch) => handleSetChange(exercise.id, setId, patch)}
-            onSetAdded={(set) => handleSetAdded(exercise.id, set)}
-            onRenamed={(name) => handleRenamed(exercise.id, name)}
-            onTrackedFieldsChange={(fields) => handleTrackedFieldsChange(exercise.id, fields)}
-            onDelete={() => handleDeleteExercise(exercise.id)}
-            deleting={deletingId === exercise.id}
-            sessionId={sessionId}
-            groupId={groupId}
-            athleteId={athleteId}
-            viewerId={viewerId}
-            canUpload={canUploadVideo}
-            onSetCompleted={handleSetCompleted}
-            gamificationEnabled={gamificationEnabled}
-          />
-        ))}
-      </div>
+      <ExerciseSwipeCarousel
+        exercises={exercises}
+        lastTimeByExercise={lastTimeByExercise}
+        ladderByExercise={ladderByExercise}
+        coachNoteByExerciseName={coachNoteByExerciseName ?? {}}
+        readOnly={isCompleted}
+        onSetChange={handleSetChange}
+        onSetAdded={handleSetAdded}
+        onRenamed={handleRenamed}
+        onTrackedFieldsChange={handleTrackedFieldsChange}
+        onDelete={handleDeleteExercise}
+        deletingId={deletingId}
+        sessionId={sessionId}
+        groupId={groupId}
+        athleteId={athleteId}
+        viewerId={viewerId}
+        canUploadVideo={canUploadVideo}
+        onSetCompleted={handleSetCompleted}
+        gamificationEnabled={gamificationEnabled}
+      />
 
       {!isCompleted && (
         <div className="mt-6 pb-4">

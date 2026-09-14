@@ -21,6 +21,10 @@ export interface RecapExercise {
   sets: RecapSetEntry[];
   isPr: boolean;
   coachNote: string;
+  // The swipe-card carousel's "coach note first" callout only ever shows
+  // a note the coach explicitly opted into sharing (mobile_home_workout_
+  // tab_merge_idea.md) — this recap page is where that opt-in lives.
+  visibleToAthlete: boolean;
 }
 
 export interface SessionRecap {
@@ -86,7 +90,7 @@ export async function getSessionRecap(
     exerciseIds.length > 0
       ? supabase
           .from("session_exercise_coach_notes")
-          .select("session_exercise_id, body")
+          .select("session_exercise_id, body, visible_to_athlete")
           .in("session_exercise_id", exerciseIds)
       : Promise.resolve({ data: [] }),
   ]);
@@ -112,8 +116,10 @@ export async function getSessionRecap(
   }
 
   const noteByExercise = new Map<string, string>();
+  const noteVisibilityByExercise = new Map<string, boolean>();
   for (const row of (noteRows ?? []) as any[]) {
     noteByExercise.set(row.session_exercise_id, row.body ?? "");
+    noteVisibilityByExercise.set(row.session_exercise_id, !!row.visible_to_athlete);
   }
 
   const prNames = new Set<string>(workoutLog?.new_prs ?? []);
@@ -125,6 +131,7 @@ export async function getSessionRecap(
     sets: setsByExercise.get(ex.id) ?? [],
     isPr: prNames.has(ex.exercise_name),
     coachNote: noteByExercise.get(ex.id) ?? "",
+    visibleToAthlete: noteVisibilityByExercise.get(ex.id) ?? false,
   }));
 
   return {

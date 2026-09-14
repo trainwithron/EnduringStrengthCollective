@@ -30,6 +30,7 @@ export function RecapExerciseRow({ exercise, groupId }: { exercise: RecapExercis
   const [expanded, setExpanded] = useState(false);
   const [note, setNote] = useState(exercise.coachNote);
   const [saving, setSaving] = useState(false);
+  const [visibleToAthlete, setVisibleToAthlete] = useState(exercise.visibleToAthlete);
 
   async function handleNoteBlur() {
     if (note === exercise.coachNote) return;
@@ -42,6 +43,26 @@ export function RecapExerciseRow({ exercise, groupId }: { exercise: RecapExercis
         { onConflict: "session_exercise_id" }
       );
     setSaving(false);
+  }
+
+  // Immediate-persist, same convention as every other toggle in this app
+  // — the checkbox's own on-screen state is the source of truth, so a
+  // stale note body never accidentally overwrites what's already saved.
+  async function handleVisibilityChange(next: boolean) {
+    setVisibleToAthlete(next);
+    const supabase = createBrowserClient();
+    await supabase
+      .from("session_exercise_coach_notes")
+      .upsert(
+        {
+          session_exercise_id: exercise.sessionExerciseId,
+          group_id: groupId,
+          body: note,
+          visible_to_athlete: next,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "session_exercise_id" }
+      );
   }
 
   const fields = orderTrackedFields(exercise.trackedFields);
@@ -101,10 +122,21 @@ export function RecapExerciseRow({ exercise, groupId }: { exercise: RecapExercis
               value={note}
               onChange={(e) => setNote(e.target.value)}
               onBlur={handleNoteBlur}
-              placeholder="Coach-only — never visible to the athlete"
+              placeholder="Coach-only by default"
               disabled={saving}
               className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust disabled:opacity-60"
             />
+            <label className="flex items-center gap-2 mt-2">
+              <input
+                type="checkbox"
+                checked={visibleToAthlete}
+                onChange={(e) => handleVisibilityChange(e.target.checked)}
+                className="accent-rust"
+              />
+              <span className="font-body text-[11px] text-steel">
+                Show to client next time they do this exercise
+              </span>
+            </label>
           </div>
         </div>
       )}

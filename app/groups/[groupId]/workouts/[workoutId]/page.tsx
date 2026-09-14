@@ -124,7 +124,7 @@ export default async function WorkoutOverviewPage(
                 This workout unlocks on {formatShortDate(scheduledDate!)}.
               </p>
             </div>
-            <BottomTabBar groupId={params.groupId} activeOverride="workout" />
+            <BottomTabBar groupId={params.groupId} activeOverride="home" />
           </main>
         );
       }
