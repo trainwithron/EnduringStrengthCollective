@@ -1,5 +1,7 @@
 "use client";
 
+import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 
 export interface RailIcon {
@@ -24,40 +26,70 @@ export interface RailIcon {
 export function ShellRail({ icons, footer }: { icons: RailIcon[]; footer?: React.ReactNode }) {
   return (
     <aside className="hidden lg:flex w-16 shrink-0 flex-col items-center border-r border-steel/20 bg-graphite sticky top-14 h-[calc(100vh-56px)] py-2 gap-1">
-      {/* No overflow-y-auto here on purpose — a real bounded icon set
-          (~11 max) never needs scrolling in practice, and giving this
-          wrapper any overflow value clips the hover-tooltip spans below,
-          which position themselves via left-full outside this column's
-          own width. */}
       <div className="flex-1 w-full flex flex-col items-center gap-1">
-        {icons.map((item) => {
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.key}
-              href={item.href}
-              title={item.label}
-              className={`group relative w-11 h-11 flex items-center justify-center transition-colors ${
-                item.active ? "bg-rust/15 text-rust" : "text-steel active:text-chalk"
-              }`}
-            >
-              <Icon className="w-5 h-5" strokeWidth={2.25} />
-              {(item.badge ?? 0) > 0 && (
-                <span className="absolute top-1 right-1.5 w-2 h-2 rounded-full bg-rust" />
-              )}
-              {/* Icon-only rail + "a lot of settings" (Ron's own framing)
-                  is a real discoverability risk — a fast, styled label
-                  beats waiting on the browser's native title tooltip.
-                  Hidden until hover so it never competes with the list
-                  panel at rest. */}
-              <span className="pointer-events-none absolute left-full ml-2 whitespace-nowrap bg-surface border border-steel/30 text-chalk font-body text-xs px-2 py-1 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-100 z-20">
-                {item.label}
-              </span>
-            </Link>
-          );
-        })}
+        {icons.map((item) => (
+          <RailIconButton key={item.key} item={item} />
+        ))}
       </div>
       {footer && <div className="w-full border-t border-steel/20 pt-2 flex flex-col items-center gap-1">{footer}</div>}
     </aside>
+  );
+}
+
+// Real bug fix (2026-09-14, overnight audit): the tooltip below used to
+// be a plain absolute-positioned span inside this link, relying on
+// group-hover — but this rail and the adjacent resizable list panel
+// (shell-list-panel.tsx) are BOTH `position: sticky`, each creating its
+// own stacking context. The tooltip's z-index could only ever win inside
+// the rail's own context; the list panel, a later DOM sibling with no
+// competing z-index, painted over it by default regardless (same root
+// cause as the download-app-button modal bug fixed earlier). Fixed the
+// same way: a portal straight onto <body>, escaping every ancestor's
+// stacking context — with the icon's own position computed on hover
+// since a portaled element can no longer rely on CSS `left-full` against
+// its original parent.
+function RailIconButton({ item }: { item: RailIcon }) {
+  const Icon = item.icon;
+  const linkRef = useRef<HTMLAnchorElement>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number } | null>(null);
+
+  function showTooltip() {
+    const rect = linkRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setTooltipPos({ top: rect.top + rect.height / 2, left: rect.right + 8 });
+  }
+
+  function hideTooltip() {
+    setTooltipPos(null);
+  }
+
+  return (
+    <Link
+      ref={linkRef}
+      href={item.href}
+      title={item.label}
+      onMouseEnter={showTooltip}
+      onMouseLeave={hideTooltip}
+      className={`relative w-11 h-11 flex items-center justify-center transition-colors ${
+        item.active ? "bg-rust/15 text-rust" : "text-steel active:text-chalk"
+      }`}
+    >
+      <Icon className="w-5 h-5" strokeWidth={2.25} />
+      {(item.badge ?? 0) > 0 && <span className="absolute top-1 right-1.5 w-2 h-2 rounded-full bg-rust" />}
+      {/* Icon-only rail + "a lot of settings" (Ron's own framing) is a
+          real discoverability risk — a fast, styled label beats waiting
+          on the browser's native title tooltip. */}
+      {tooltipPos &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <span
+            style={{ top: tooltipPos.top, left: tooltipPos.left, transform: "translateY(-50%)" }}
+            className="fixed pointer-events-none whitespace-nowrap bg-surface border border-steel/30 text-chalk font-body text-xs px-2 py-1 z-[100]"
+          >
+            {item.label}
+          </span>,
+          document.body
+        )}
+    </Link>
   );
 }
