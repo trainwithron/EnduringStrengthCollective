@@ -8,6 +8,11 @@ import { PrListToggle } from "@/components/share/pr-list-toggle";
 import { ShareWorkoutButton } from "@/components/share/share-workout-button";
 import { CustomizeSharePanel } from "@/components/share/customize-share-panel";
 import { VolumeLiftRig } from "@/components/share/volume-lift-rig";
+import { ScenicBackground } from "@/components/share/scenic-background";
+import { HumorArchetypeCard } from "@/components/share/humor-archetype-card";
+import { pickScenicBackground } from "@/lib/scenic-backgrounds";
+import { pickHumorArchetype } from "@/lib/humor-archetypes";
+import { pickShareCardStyle } from "@/lib/share-card-style";
 
 // Deliberately public — no auth check. Every completed workout gets a
 // shareable card now, not just PRs, so a client can post it (and tag the
@@ -74,18 +79,77 @@ export default async function ShareWorkoutPage(
       ? `${shared.athleteName} just hit a new PR! 🎉`
       : `${shared.athleteName} just finished a workout! 💪`;
 
+  // Card style rotation (post_workout_card_v1_bevel_and_animation.md) —
+  // seeded per post, same mechanism as the volume-equivalence jokes, so
+  // a share's visual flavor is stable on reload but varies workout to
+  // workout. Deliberately only varies the HERO treatment (the group/
+  // headline/athlete area) — every style keeps the exact same stats,
+  // lifts, PRs, and streak below it, so a coach's real information is
+  // never hidden just because a particular card happened to roll
+  // "humor" this time.
+  const scenicAvailable =
+    (shared.workoutCardBackgroundMode === "custom" && !!shared.workoutCardBackgroundUrl) ||
+    shared.workoutCardBackgroundMode === "default_rotation";
+  const cardStyle = pickShareCardStyle(params.postId, scenicAvailable);
+  const scenicBackground = cardStyle === "scenic" ? pickScenicBackground(params.postId) : null;
+  const humorArchetype = cardStyle === "humor" ? pickHumorArchetype(params.postId) : null;
+  const headline = shared.celebratePrs.length > 0 ? "New PR 🎉" : "Workout Complete 💪";
+
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body flex items-center justify-center px-6 py-16">
-      <div className="relative w-full max-w-sm rounded-[22px] border border-chalk/[0.06] bg-gradient-to-b from-[#2E2B28] to-surface pt-8 pb-7 px-7 text-center shadow-[0_1px_0_rgba(237,232,224,.05)_inset,0_22px_44px_-18px_rgba(0,0,0,.65),0_2px_10px_rgba(0,0,0,.35)] before:content-[''] before:absolute before:inset-0 before:rounded-[22px] before:shadow-[0_1px_0_rgba(237,232,224,.08)_inset] before:pointer-events-none">
-        <p className="font-display uppercase text-xs tracking-[0.2em] text-rust">
-          {shared.groupName}
-        </p>
+      <div className="relative w-full max-w-sm rounded-[22px] overflow-hidden border border-chalk/[0.06] bg-gradient-to-b from-[#2E2B28] to-surface shadow-[0_1px_0_rgba(237,232,224,.05)_inset,0_22px_44px_-18px_rgba(0,0,0,.65),0_2px_10px_rgba(0,0,0,.35)] before:content-[''] before:absolute before:inset-0 before:rounded-[22px] before:shadow-[0_1px_0_rgba(237,232,224,.08)_inset] before:pointer-events-none">
+        {cardStyle === "scenic" ? (
+          <div className="relative h-[180px] px-7 pt-8 pb-5 flex flex-col justify-end text-center">
+            <div className="absolute inset-0">
+              {shared.workoutCardBackgroundMode === "custom" && shared.workoutCardBackgroundUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL
+                <img
+                  src={shared.workoutCardBackgroundUrl}
+                  alt=""
+                  className="absolute inset-0 w-full h-full object-cover"
+                />
+              ) : (
+                <ScenicBackground background={scenicBackground!.key} />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-graphite via-graphite/40 to-transparent" />
+            </div>
+            <div className="relative">
+              <p className="font-display uppercase text-xs tracking-[0.2em] text-rust">
+                {shared.groupName}
+              </p>
+              <h1 className="font-display font-bold text-3xl uppercase leading-tight mt-2 drop-shadow-[0_2px_6px_rgba(0,0,0,.6)]">
+                {headline}
+              </h1>
+              <p className="font-body text-lg mt-1">{shared.athleteName}</p>
+            </div>
+          </div>
+        ) : cardStyle === "humor" ? (
+          <div className="px-7 pt-6 text-center">
+            <p className="font-display uppercase text-xs tracking-[0.2em] text-rust">
+              {shared.groupName}
+            </p>
+            <div className="w-[130px] h-[147px] mx-auto mt-3">
+              <HumorArchetypeCard archetype={humorArchetype!} avatarUrl={shared.athleteAvatarUrl} />
+            </div>
+            <p className="font-display font-bold text-2xl uppercase leading-tight mt-1">{headline}</p>
+            <p className="font-body text-lg mt-1">{shared.athleteName}</p>
+            <p className="font-body text-xs text-steel mt-1">
+              {humorArchetype!.caption} — {humorArchetype!.subcaption}
+            </p>
+          </div>
+        ) : (
+          <div className="px-7 pt-8 text-center">
+            <p className="font-display uppercase text-xs tracking-[0.2em] text-rust">
+              {shared.groupName}
+            </p>
+            <h1 className="font-display font-bold text-3xl uppercase leading-tight mt-4">
+              {headline}
+            </h1>
+            <p className="font-body text-lg mt-2">{shared.athleteName}</p>
+          </div>
+        )}
 
-        <h1 className="font-display font-bold text-3xl uppercase leading-tight mt-4">
-          {shared.celebratePrs.length > 0 ? "New PR 🎉" : "Workout Complete 💪"}
-        </h1>
-        <p className="font-body text-lg mt-2">{shared.athleteName}</p>
-
+        <div className="px-7 pb-7">
         <div className="mt-8 pt-[22px] pb-5 border-t border-b border-steel/20">
           {shared.totalVolume != null ? (
             <>
@@ -209,6 +273,7 @@ export default async function ShareWorkoutPage(
             Continue to Team Feed &rarr;
           </Link>
         )}
+        </div>
       </div>
     </main>
   );
