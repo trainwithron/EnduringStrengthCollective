@@ -4,6 +4,9 @@ import { useState } from "react";
 import type { GeneratedMeal } from "@/lib/meal-engine";
 import { MealCheckoffList, type FoodLogEntry } from "./meal-checkoff-list";
 import { QuickLogFoodButton } from "./quick-log-food-button";
+import { BarcodeScanButton } from "./barcode-scan-button";
+import { PhotoLogFoodButton } from "./photo-log-food-button";
+import type { RecentFoodLogOption } from "@/lib/recent-food-logs";
 
 // Wires the checkoff list + quick-log entry point + a running "logged so
 // far today" total into one section for the athlete's Nutrition page
@@ -15,12 +18,14 @@ export function FoodLogSection({
   logDate,
   meals,
   initialEntries,
+  recents,
 }: {
   athleteId: string;
   groupId: string;
   logDate: string;
   meals: GeneratedMeal[];
   initialEntries: FoodLogEntry[];
+  recents: RecentFoodLogOption[];
 }) {
   const [quickLogEntries, setQuickLogEntries] = useState(initialEntries.filter((e) => !e.mealSlot));
   const [allEntries, setAllEntries] = useState(initialEntries);
@@ -70,12 +75,17 @@ export function FoodLogSection({
         onEntryLogged={handleMealEntryLogged}
       />
 
-      <QuickLogFoodButton
-        athleteId={athleteId}
-        groupId={groupId}
-        logDate={logDate}
-        onLogged={handleQuickLogged}
-      />
+      <div className="space-y-2">
+        <QuickLogFoodButton
+          athleteId={athleteId}
+          groupId={groupId}
+          logDate={logDate}
+          recents={recents}
+          onLogged={handleQuickLogged}
+        />
+        <BarcodeScanButton athleteId={athleteId} groupId={groupId} logDate={logDate} onLogged={handleQuickLogged} />
+        <PhotoLogFoodButton athleteId={athleteId} groupId={groupId} logDate={logDate} onLogged={handleQuickLogged} />
+      </div>
 
       {quickLogEntries.length > 0 && (
         <div className="space-y-1.5">

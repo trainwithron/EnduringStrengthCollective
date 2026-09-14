@@ -14,7 +14,7 @@ export async function fetchCustomRecipes(coachId: string): Promise<Recipe[]> {
   const { data } = await supabase
     .from("recipes")
     .select(
-      "id, name, slot, archetypes, keywords, recipe_ingredients ( id, sort_order, label, role, protein_per_100g, carbs_per_100g, fat_per_100g, fixed_display_text )"
+      "id, name, slot, archetypes, keywords, recipe_ingredients ( id, sort_order, label, role, protein_per_100g, carbs_per_100g, fat_per_100g, fixed_display_text, usda_fdc_id )"
     )
     .eq("created_by", coachId);
 
@@ -30,6 +30,7 @@ export async function fetchCustomRecipes(coachId: string): Promise<Recipe[]> {
         carbsPer100g: i.carbs_per_100g,
         fatPer100g: i.fat_per_100g,
         fixedDisplayText: i.fixed_display_text,
+        usdaFdcId: i.usda_fdc_id,
       }));
 
     const recipe: Recipe = {

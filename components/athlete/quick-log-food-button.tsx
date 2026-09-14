@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { FreeTextFoodLog, type FoodLogEntry } from "./meal-checkoff-list";
+import { RecentFoodChips } from "./recent-food-chips";
+import type { RecentFoodLogOption } from "@/lib/recent-food-logs";
 
 // Standalone entry point for anything not tied to a planned meal — a
 // snack, eating out, or just skipping the checkoff list entirely and
@@ -14,11 +16,13 @@ export function QuickLogFoodButton({
   athleteId,
   groupId,
   logDate,
+  recents,
   onLogged,
 }: {
   athleteId: string;
   groupId: string;
   logDate: string;
+  recents: RecentFoodLogOption[];
   onLogged: (entry: FoodLogEntry) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -29,6 +33,16 @@ export function QuickLogFoodButton({
         <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">
           Log something else
         </p>
+        <RecentFoodChips
+          athleteId={athleteId}
+          groupId={groupId}
+          logDate={logDate}
+          recents={recents}
+          onLogged={(entry) => {
+            onLogged(entry);
+            setOpen(false);
+          }}
+        />
         <FreeTextFoodLog
           athleteId={athleteId}
           groupId={groupId}

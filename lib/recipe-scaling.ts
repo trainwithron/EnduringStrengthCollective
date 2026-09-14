@@ -20,6 +20,10 @@ export interface RecipeIngredientDef {
   // Only meaningful when role === "fixed" — a static line with no macro
   // math, e.g. "1-2 cups steamed vegetables".
   fixedDisplayText: string | null;
+  // Real USDA FoodData Central id this ingredient maps to — lets the
+  // Key-12 micronutrient grid multiply this ingredient's scaled grams by
+  // real per-100g nutrient values. Null until a coach maps it.
+  usdaFdcId?: number | null;
 }
 
 export interface ScaledIngredientLine {
@@ -29,6 +33,7 @@ export interface ScaledIngredientLine {
   grams: number | null; // null for fixed ingredients
   displayText: string;
   fixedDisplayText: string | null;
+  usdaFdcId?: number | null;
 }
 
 export interface MacroTarget {
@@ -81,6 +86,7 @@ export function scaleRecipe(
         grams: null,
         displayText: ing.fixedDisplayText ? `${ing.label}: ${ing.fixedDisplayText}` : ing.label,
         fixedDisplayText: ing.fixedDisplayText,
+        usdaFdcId: ing.usdaFdcId ?? null,
       };
     }
 
@@ -95,6 +101,7 @@ export function scaleRecipe(
       grams,
       displayText: `${ing.label}: ${grams}g (~${gramsToOz(grams)} oz)`,
       fixedDisplayText: null,
+      usdaFdcId: ing.usdaFdcId ?? null,
     };
   });
 }

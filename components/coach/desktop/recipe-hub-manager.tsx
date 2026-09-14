@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { ChevronDown, ChevronUp, Trash2, Plus } from "lucide-react";
 import type { IngredientRole } from "@/lib/recipe-scaling";
+import { UsdaFoodPicker } from "./usda-food-picker";
 
 export interface RecipeIngredientRow {
   id: string;
@@ -15,6 +16,8 @@ export interface RecipeIngredientRow {
   carbsPer100g: number;
   fatPer100g: number;
   fixedDisplayText: string | null;
+  usdaFdcId: number | null;
+  usdaDescription?: string | null;
 }
 
 export interface RecipeRow {
@@ -196,7 +199,7 @@ function RecipeCard({
           fat_per_100g: 0,
           fixed_display_text: "",
         })
-        .select("id, sort_order, label, role, protein_per_100g, carbs_per_100g, fat_per_100g, fixed_display_text")
+        .select("id, sort_order, label, role, protein_per_100g, carbs_per_100g, fat_per_100g, fixed_display_text, usda_fdc_id")
         .single();
 
       if (!newRow) return;
@@ -213,6 +216,7 @@ function RecipeCard({
             carbsPer100g: newRow.carbs_per_100g,
             fatPer100g: newRow.fat_per_100g,
             fixedDisplayText: newRow.fixed_display_text,
+            usdaFdcId: newRow.usda_fdc_id,
           },
         ],
       });
@@ -478,6 +482,27 @@ function IngredientEditor({
             />
           </label>
         </div>
+      )}
+
+      {ingredient.role !== "fixed" && (
+        <label className="block mt-2">
+          <span className="font-body text-[11px] text-steel">
+            Real nutrition data — maps this to a real USDA food so the athlete&apos;s Key nutrients
+            grid can include it
+          </span>
+          <div className="mt-1">
+            <UsdaFoodPicker
+              currentFdcId={ingredient.usdaFdcId}
+              currentDescription={ingredient.usdaDescription ?? null}
+              onPicked={(fdcId, description) =>
+                persist(
+                  { usda_fdc_id: fdcId },
+                  { usdaFdcId: fdcId, usdaDescription: description }
+                )
+              }
+            />
+          </div>
+        </label>
       )}
     </div>
   );

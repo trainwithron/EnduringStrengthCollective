@@ -18,6 +18,10 @@ import { FoodLogSection } from "@/components/athlete/food-log-section";
 import { computeAdherenceDays } from "@/lib/food-log-adherence";
 import type { GeneratedMeal } from "@/lib/meal-engine";
 import type { FoodLogEntry } from "@/components/athlete/meal-checkoff-list";
+import { computeTodaysMicronutrients } from "@/lib/todays-micronutrients";
+import { Key12NutrientGrid } from "@/components/athlete/key12-nutrient-grid";
+import { NutritionYouthModeToggle } from "@/components/coach/desktop/nutrition-youth-mode-toggle";
+import { dedupeRecentFoodLogs } from "@/lib/recent-food-logs";
 
 export default async function NutritionPage(
   props: {
@@ -52,7 +56,7 @@ export default async function NutritionPage(
   if (membership?.role === "coach" && !isActingAsOther) {
     const { data: group } = await supabase
       .from("groups")
-      .select("name")
+      .select("name, nutrition_youth_mode")
       .eq("id", params.groupId)
       .single();
 
@@ -73,11 +77,14 @@ export default async function NutritionPage(
 
     return (
       <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="nutrition">
-        <div className="pb-6 border-b border-steel/20 mb-6">
-          <h1 className="font-display font-bold text-3xl uppercase leading-none">Meal Plans</h1>
-          <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
-            Build a check-in-based macro & meal plan for a specific client.
-          </p>
+        <div className="pb-6 border-b border-steel/20 mb-6 flex items-end justify-between gap-4">
+          <div>
+            <h1 className="font-display font-bold text-3xl uppercase leading-none">Meal Plans</h1>
+            <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
+              Build a check-in-based macro & meal plan for a specific client.
+            </p>
+          </div>
+          <NutritionYouthModeToggle groupId={params.groupId} initialEnabled={group?.nutrition_youth_mode ?? false} />
         </div>
 
         <div className="grid grid-cols-[220px_1fr] gap-8 items-start">
@@ -138,6 +145,13 @@ export default async function NutritionPage(
     .maybeSingle();
   const macrosEnabled = (viewerMembership?.client_tier ?? null) !== "group";
 
+  const { data: groupRow } = await supabase
+    .from("groups")
+    .select("nutrition_youth_mode")
+    .eq("id", params.groupId)
+    .maybeSingle();
+  const youthMode = groupRow?.nutrition_youth_mode ?? false;
+
   const [
     { data: todayMacroRow },
     { data: todayMealPlan },
@@ -145,6 +159,7 @@ export default async function NutritionPage(
     { data: macroHistory },
     { data: latestCheckin },
     { data: todayFoodLogRows },
+    { data: recentFoodLogRows },
   ] = await Promise.all([
     macrosEnabled
       ? supabase
@@ -193,6 +208,16 @@ export default async function NutritionPage(
           .eq("athlete_id", athleteId)
           .eq("log_date", todayKey)
       : Promise.resolve({ data: [] }),
+    macrosEnabled
+      ? supabase
+          .from("food_log_entries")
+          .select("description, calories, protein_g, carbs_g, fat_g, created_at")
+          .eq("athlete_id", athleteId)
+          .neq("status", "skipped")
+          .not("description", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(40)
+      : Promise.resolve({ data: [] }),
   ]);
 
   const todayFoodLog: FoodLogEntry[] = (todayFoodLogRows ?? []).map((r) => ({
@@ -207,6 +232,18 @@ export default async function NutritionPage(
   }));
   const todayMeals: GeneratedMeal[] = ((todayMealPlan?.meals as any) ?? []) as GeneratedMeal[];
 
+  const recentFoodOptions = dedupeRecentFoodLogs(
+    (recentFoodLogRows ?? []).map((r) => ({
+      description: r.description ?? "",
+      calories: r.calories,
+      proteinG: r.protein_g,
+      carbsG: r.carbs_g,
+      fatG: r.fat_g,
+      createdAt: r.created_at,
+    })),
+    8
+  );
+
   const todayMacros = macrosEnabled
     ? resolveDayMacroTarget(
         todayMacroRow ?? null,
@@ -214,6 +251,10 @@ export default async function NutritionPage(
         (todayMealPlan?.meals as any) ?? null
       )
     : null;
+
+  const micronutrients = macrosEnabled
+    ? await computeTodaysMicronutrients(supabase, todayMeals)
+    : { totals: {}, coveredIngredientCount: 0, totalIngredientCount: 0, hasAnyData: false };
 
   const weightTrendPoints = (weightLogs ?? []).map((w) => ({ date: w.logged_date, value: w.weight }));
   const calorieTrendPoints = (macroHistory ?? [])
@@ -240,28 +281,58 @@ export default async function NutritionPage(
               Today&apos;s targets
             </p>
             {todayMacros && (todayMacros.calories != null || todayMacros.proteinG != null) ? (
-              <div className="grid grid-cols-4 gap-2 text-center">
+              youthMode ? (
+                // Youth/Team mode: protein-first, no calorie-deficit framing —
+                // real disordered-eating-safety design decision, see
+                // calorie_tracking_ux_research_and_plan.md.
                 <div>
-                  <p className="font-display text-xl leading-none">{todayMacros.calories ?? "--"}</p>
-                  <p className="font-body text-[10px] text-steel uppercase mt-1">Kcal</p>
+                  <div className="text-center pb-3 mb-3 border-b border-steel/15">
+                    <p className="font-display text-4xl leading-none">{todayMacros.proteinG ?? "--"}g</p>
+                    <p className="font-body text-xs text-steel uppercase mt-1">Protein target</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-center">
+                    <div>
+                      <p className="font-display text-lg leading-none">{todayMacros.carbsG ?? "--"}</p>
+                      <p className="font-body text-[10px] text-steel uppercase mt-1">Carbs</p>
+                    </div>
+                    <div>
+                      <p className="font-display text-lg leading-none">{todayMacros.fatG ?? "--"}</p>
+                      <p className="font-body text-[10px] text-steel uppercase mt-1">Fat</p>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-display text-xl leading-none">{todayMacros.proteinG ?? "--"}</p>
-                  <p className="font-body text-[10px] text-steel uppercase mt-1">Protein</p>
+              ) : (
+                <div className="grid grid-cols-4 gap-2 text-center">
+                  <div>
+                    <p className="font-display text-xl leading-none">{todayMacros.calories ?? "--"}</p>
+                    <p className="font-body text-[10px] text-steel uppercase mt-1">Kcal</p>
+                  </div>
+                  <div>
+                    <p className="font-display text-xl leading-none">{todayMacros.proteinG ?? "--"}</p>
+                    <p className="font-body text-[10px] text-steel uppercase mt-1">Protein</p>
+                  </div>
+                  <div>
+                    <p className="font-display text-xl leading-none">{todayMacros.carbsG ?? "--"}</p>
+                    <p className="font-body text-[10px] text-steel uppercase mt-1">Carbs</p>
+                  </div>
+                  <div>
+                    <p className="font-display text-xl leading-none">{todayMacros.fatG ?? "--"}</p>
+                    <p className="font-body text-[10px] text-steel uppercase mt-1">Fat</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-display text-xl leading-none">{todayMacros.carbsG ?? "--"}</p>
-                  <p className="font-body text-[10px] text-steel uppercase mt-1">Carbs</p>
-                </div>
-                <div>
-                  <p className="font-display text-xl leading-none">{todayMacros.fatG ?? "--"}</p>
-                  <p className="font-body text-[10px] text-steel uppercase mt-1">Fat</p>
-                </div>
-              </div>
+              )
             ) : (
               <p className="font-body text-sm text-steel">No targets set for today yet.</p>
             )}
           </section>
+
+          {micronutrients.hasAnyData && (
+            <Key12NutrientGrid
+              totals={micronutrients.totals}
+              coveredIngredientCount={micronutrients.coveredIngredientCount}
+              totalIngredientCount={micronutrients.totalIngredientCount}
+            />
+          )}
 
           <section>
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
@@ -273,6 +344,7 @@ export default async function NutritionPage(
               logDate={todayKey}
               meals={todayMeals}
               initialEntries={todayFoodLog}
+              recents={recentFoodOptions}
             />
           </section>
 
