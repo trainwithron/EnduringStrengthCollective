@@ -1,0 +1,12 @@
+-- Visual design audit finding (2026-09-14, Ron's own direct word): a
+-- live DOM scan found zero elements anywhere with any border-radius —
+-- lib/theme.ts's DEFAULT_ORG_THEME.buttonShape default flipped from
+-- "sharp" to "rounded" to match. But that TS constant only ever applies
+-- when organizations.button_shape is genuinely null (lib/org-theme-server.ts's
+-- `org.button_shape ?? DEFAULT_ORG_THEME.buttonShape`) — this column has
+-- always had a real, non-null 'sharp' default at the DB level, so every
+-- existing org row already carries an explicit 'sharp' value and the TS
+-- flip alone changes nothing for any of them. This brings the DB default
+-- in line so any future insert path (not just org-creation.ts, which
+-- already passes the value explicitly) gets the same new default.
+alter table public.organizations alter column button_shape set default 'rounded';

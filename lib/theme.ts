@@ -81,7 +81,13 @@ export interface OrgTheme {
 }
 
 export const DEFAULT_ORG_THEME: OrgTheme = {
-  buttonShape: "sharp",
+  // Was "sharp" — a live DOM audit of production found zero elements
+  // anywhere with any border-radius/box-shadow, since this one setting
+  // zeroes out the entire radius scale platform-wide (radiusScaleFor
+  // above). "Rounded" was already a fully-built, Settings-exposed
+  // option; it just wasn't the default. Flipped 2026-09-14 per Ron's own
+  // direct word, following a design audit's "soulless"/"Soviet" finding.
+  buttonShape: "rounded",
   accentColor: DEFAULT_ACCENT_COLOR,
   backgroundColor: DEFAULT_BACKGROUND_COLOR,
   textColor: DEFAULT_TEXT_COLOR,

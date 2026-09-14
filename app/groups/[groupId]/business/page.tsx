@@ -5,6 +5,7 @@ import { ClientRateEditor } from "@/components/coach/desktop/client-rate-editor"
 import { SwappableTerm } from "@/components/coach/swappable-term";
 import { getCoachDashboardData } from "@/lib/dashboard-data";
 import { DashboardHero } from "@/components/coach/desktop/dashboard-hero";
+import { StatHeroTile } from "@/components/coach/desktop/stat-hero-tile";
 import {
   computeEstimatedMRR,
   computeEngagement,
@@ -226,54 +227,54 @@ export default async function BusinessDashboardPage(
         </p>
       </div>
 
-      <div className="grid grid-cols-4 gap-4 mb-8">
-        <div className="border border-steel/20 p-4">
-          <p className="font-display text-3xl leading-none">${realIncomeThisMonth.toLocaleString()}</p>
-          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Income this month</p>
-          <p className="font-body text-[11px] text-steel mt-0.5">Real, from purchased packages</p>
+      {/* MRR is the hero: recurring revenue is the actual "is this
+          business healthy right now" number — a single month's income
+          can spike from a one-time credit purchase, but MRR is the
+          number that persists. The other 7 metrics stay real and
+          visible, just clearly secondary (smaller, no accent, 4-across
+          so the last row doesn't leave an odd single tile stranded). */}
+      <div className="mb-4">
+        <StatHeroTile
+          label={realMRR > 0 ? "MRR" : "Estimated MRR"}
+          value={`$${(realMRR > 0 ? realMRR : estimatedMRR).toLocaleString()}`}
+          detail={realMRR > 0 ? "From active subscriptions — the clearest signal of business health" : "From rates set below — set up packages for a real number"}
+        />
+      </div>
+      <div className="grid grid-cols-4 gap-3 mb-8">
+        <div className="border border-steel/20 p-3">
+          <p className="font-display text-2xl leading-none">${realIncomeThisMonth.toLocaleString()}</p>
+          <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">Income this month</p>
         </div>
-        <div className="border border-steel/20 p-4">
-          <p className="font-display text-3xl leading-none">
-            ${(realMRR > 0 ? realMRR : estimatedMRR).toLocaleString()}
-          </p>
-          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">
-            {realMRR > 0 ? "MRR" : "Estimated MRR"}
-          </p>
-          <p className="font-body text-[11px] text-steel mt-0.5">
-            {realMRR > 0 ? "From active subscriptions" : "From rates set below"}
-          </p>
-        </div>
-        <div className="border border-steel/20 p-4">
-          <p className="font-display text-3xl leading-none">{uniqueAthleteIds.size}</p>
-          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Roster size</p>
+        <div className="border border-steel/20 p-3">
+          <p className="font-display text-2xl leading-none">{uniqueAthleteIds.size}</p>
+          <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">Roster size</p>
           {newThisMonth > 0 && (
-            <p className="font-body text-[11px] text-positive mt-0.5">+{newThisMonth} this month</p>
+            <p className="font-body text-[10px] text-positive mt-0.5">+{newThisMonth} this month</p>
           )}
         </div>
-        <div className="border border-steel/20 p-4">
-          <p className="font-display text-3xl leading-none">{payingClientsCount}</p>
-          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">
+        <div className="border border-steel/20 p-3">
+          <p className="font-display text-2xl leading-none">{payingClientsCount}</p>
+          <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">
             Paying <SwappableTerm termKey="client" form="plural" />
           </p>
-          <p className="font-body text-[11px] text-steel mt-0.5">Active subscription or unused credits</p>
         </div>
-        <div className="border border-steel/20 p-4">
-          <p className="font-display text-3xl leading-none">{totalOutstandingCredits}</p>
-          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">
-            Outstanding session credits
+        <div className="border border-steel/20 p-3">
+          <p className="font-display text-2xl leading-none">{totalOutstandingCredits}</p>
+          <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">
+            Outstanding credits
           </p>
         </div>
-        <div className="border border-steel/20 p-4">
-          <p className="font-display text-3xl leading-none">{bookingsThisMonthCount ?? 0}</p>
-          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Sessions this month</p>
+        <div className="border border-steel/20 p-3">
+          <p className="font-display text-2xl leading-none">{bookingsThisMonthCount ?? 0}</p>
+          <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">Sessions this month</p>
         </div>
-        <div className="border border-steel/20 p-4">
-          <p className="font-display text-3xl leading-none">{totalReferralClicks}</p>
-          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Referral clicks</p>
+        <div className="border border-steel/20 p-3">
+          <p className="font-display text-2xl leading-none">{totalReferralClicks}</p>
+          <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">Referral clicks</p>
         </div>
-        <div className="border border-steel/20 p-4">
-          <p className="font-display text-3xl leading-none">{totalProShopClicks}</p>
-          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Pro Shop clicks</p>
+        <div className="border border-steel/20 p-3">
+          <p className="font-display text-2xl leading-none">{totalProShopClicks}</p>
+          <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">Pro Shop clicks</p>
         </div>
       </div>
 
