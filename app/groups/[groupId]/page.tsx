@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { GroupHubHeader } from "@/components/group/group-hub-header";
 import { RosterList } from "@/components/group/roster-list";
@@ -189,6 +190,19 @@ export default async function GroupHubPage(
   // below, which this branch never needs.
   if (isCoach && showMobileView && !isActingAsOther) {
     return <CoachMobileHome groupId={params.groupId} groupName={group.name} />;
+  }
+
+  // A desktop coach, not acting as anyone, landing on this bare group-hub
+  // URL — an orphaned path from before /dashboard existed as the real
+  // Home (home_dashboard_merge_and_pulse_tabs_redesign.md). Nothing in
+  // the app links here for this exact case anymore (mobile coaches are
+  // caught by the branch above; the "Client-Facing Mode" toggle also
+  // forces that same mobile branch via a cookie override), but a stale
+  // bookmark or old link could still land here — send it to the real
+  // Home instead of rendering the stale, unshell'd fallback that used to
+  // live below.
+  if (isCoach && !showMobileView && !isActingAsOther) {
+    redirect("/dashboard");
   }
 
   // "Today" here means this group's coach's real wall-clock day, not the

@@ -3,20 +3,19 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachHomeShell } from "@/components/coach/coach-home-shell";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
-import { HomeClientCard, type HomeClientCardData } from "@/components/coach/desktop/home-client-card";
-import { HomeGroupCard, type HomeGroupCardData } from "@/components/coach/desktop/home-group-card";
+import type { HomeClientCardData } from "@/components/coach/desktop/home-client-card";
+import type { HomeGroupCardData } from "@/components/coach/desktop/home-group-card";
 import { NeedsReplyPanel, type NeedsReplyThread } from "@/components/coach/desktop/needs-reply-panel";
 import { MarkAllSeenButton } from "@/components/coach/desktop/mark-all-seen-button";
 import { findThreadsNeedingReply } from "@/lib/notification-priority";
 import { getCoachDashboardData } from "@/lib/dashboard-data";
 import { DashboardHero } from "@/components/coach/desktop/dashboard-hero";
 import { TeamPulseCard } from "@/components/coach/desktop/team-pulse-card";
+import { PulseTabs } from "@/components/coach/desktop/pulse-tabs";
 import { DashboardStatTiles } from "@/components/coach/desktop/dashboard-stat-tiles";
 import { DashboardTodayPanel } from "@/components/coach/desktop/dashboard-today-panel";
 import { DashboardWeekNarrative } from "@/components/coach/desktop/dashboard-week-narrative";
 import { DashboardAutoRefresh } from "@/components/coach/desktop/dashboard-auto-refresh";
-import { RosterSection } from "@/components/coach/desktop/roster-section";
-import { SwappableTerm } from "@/components/coach/swappable-term";
 import { DashboardTileGrid } from "@/components/coach/desktop/dashboard-tile-grid";
 import {
   CollectiveIntelligencePanel,
@@ -354,15 +353,24 @@ export default async function CoachHomePage() {
         <MarkAllSeenButton groupIds={allGroupIds} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-6">
-        <div className="lg:col-span-2">
-          <DashboardHero flag={dashboardData.heroFlag} emptyState={dashboardData.heroEmptyState} />
-        </div>
-        <div className="space-y-3">
-          {dashboardData.teamPulses.map((team) => (
-            <TeamPulseCard key={team.groupId} team={team} />
-          ))}
-        </div>
+      <div className="mb-6">
+        <DashboardHero flag={dashboardData.heroFlag} emptyState={dashboardData.heroEmptyState} />
+      </div>
+
+      {/* Replaces the old team-mode-only Team Pulse side column
+          (home_dashboard_merge_and_pulse_tabs_redesign.md) — every
+          relationship type gets the same pulse treatment now, not just
+          team-kind groups. This also fully covers the roster, so the
+          separate "Roster" tile lower on this page (same data,
+          collapsed-and-buried) was removed rather than showing the same
+          clients/groups twice on one page. */}
+      <div className="mb-6">
+        <PulseTabs
+          clientCards={clientCards}
+          teamPulses={dashboardData.teamPulses}
+          teamCards={teamCards}
+          socialCards={socialCards}
+        />
       </div>
 
       <CollectiveIntelligencePanel items={collectiveIntelligenceItems} hasRunToday={!!todaysBriefing} />
@@ -389,54 +397,6 @@ export default async function CoachHomePage() {
             key: "today",
             label: "Today",
             node: <DashboardTodayPanel bookings={dashboardData.todayBookings} />,
-          },
-          {
-            key: "roster",
-            label: "Roster",
-            node: (
-              <div className="space-y-3">
-                <RosterSection
-                  title={<>1-on-1 <SwappableTerm termKey="client" form="plural" className="capitalize" /></>}
-                  summary={clientCards.length === 0 ? "No clients yet" : `${clientCards.length} client${clientCards.length === 1 ? "" : "s"}`}
-                  needsAttentionCount={clientCards.filter((c) => c.quietTier).length}
-                >
-                  {clientCards.length === 0 ? (
-                    <p className="font-body text-sm text-steel">No 1-on-1 clients yet.</p>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {clientCards.map((c) => (
-                        <HomeClientCard key={c.athleteId} client={c} />
-                      ))}
-                    </div>
-                  )}
-                </RosterSection>
-
-                <RosterSection
-                  title={<SwappableTerm termKey="group" form="plural" className="capitalize" />}
-                  summary={teamCards.length === 0 ? "No groups yet" : `${teamCards.length} group${teamCards.length === 1 ? "" : "s"}`}
-                >
-                  {teamCards.length === 0 ? (
-                    <p className="font-body text-sm text-steel">No groups yet.</p>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {teamCards.map((g) => (
-                        <HomeGroupCard key={g.id} group={g} />
-                      ))}
-                    </div>
-                  )}
-                </RosterSection>
-
-                {socialCards.length > 0 && (
-                  <RosterSection title="Social Groups" summary={`${socialCards.length} group${socialCards.length === 1 ? "" : "s"}`}>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {socialCards.map((g) => (
-                        <HomeGroupCard key={g.id} group={g} />
-                      ))}
-                    </div>
-                  </RosterSection>
-                )}
-              </div>
-            ),
           },
         ]}
       />
