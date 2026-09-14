@@ -4,6 +4,9 @@ import { useMemo, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
 import { ExerciseSwipeCarousel } from "./exercise-swipe-carousel";
+import { ExerciseVerticalCarousel } from "./exercise-vertical-carousel";
+import { SwipeDirectionDiscovery } from "./swipe-direction-discovery";
+import type { SwipeDirection } from "@/components/athlete/swipe-direction-setting";
 import { CompleteWorkoutButton } from "@/components/session/complete-workout-button";
 import { RestTimerBar, type PendingGateTask } from "@/components/session/rest-timer-bar";
 
@@ -23,6 +26,7 @@ export function SessionLogger({
   pendingGateTask,
   todayDate,
   coachNoteByExerciseName,
+  exerciseSwipeDirection,
 }: {
   sessionId: string;
   isCompleted: boolean;
@@ -43,8 +47,23 @@ export function SessionLogger({
   // marked visible_to_athlete (see lib/exercise-note-history.ts). Optional
   // so nothing breaks for any call site that hasn't been updated yet.
   coachNoteByExerciseName?: Record<string, string | null>;
+  // Athlete-facing preference (swipe_card_logging_and_spotter_nudge_idea.md,
+  // resolved 2026-09-14) — null means "not yet chosen," which is what
+  // gates the first-run discovery prompt below. Optional/defaults to
+  // horizontal (today's original behavior) for any call site that hasn't
+  // been updated to pass it.
+  exerciseSwipeDirection?: SwipeDirection | null;
 }) {
   const [exercises, setExercises] = useState(initialExercises);
+  const [swipeDirection, setSwipeDirection] = useState<SwipeDirection | null>(
+    exerciseSwipeDirection ?? "horizontal"
+  );
+  // Only the athlete's own live session gets the discovery prompt — a
+  // coach logging a client's session in-person (viewerId !== athleteId)
+  // sees neither the prompt nor a reason to change what the client
+  // already prefers.
+  const isOwnSession = viewerId === athleteId;
+  const showDiscovery = isOwnSession && !isCompleted && exerciseSwipeDirection == null;
   const [pendingRestPrompt, setPendingRestPrompt] = useState<{
     defaultSeconds: number;
     isPrescribed: boolean;
@@ -202,26 +221,55 @@ export function SessionLogger({
         />
       )}
       <section className="px-5 pt-4">
-      <ExerciseSwipeCarousel
-        exercises={exercises}
-        lastTimeByExercise={lastTimeByExercise}
-        ladderByExercise={ladderByExercise}
-        coachNoteByExerciseName={coachNoteByExerciseName ?? {}}
-        readOnly={isCompleted}
-        onSetChange={handleSetChange}
-        onSetAdded={handleSetAdded}
-        onRenamed={handleRenamed}
-        onTrackedFieldsChange={handleTrackedFieldsChange}
-        onDelete={handleDeleteExercise}
-        deletingId={deletingId}
-        sessionId={sessionId}
-        groupId={groupId}
-        athleteId={athleteId}
-        viewerId={viewerId}
-        canUploadVideo={canUploadVideo}
-        onSetCompleted={handleSetCompleted}
-        gamificationEnabled={gamificationEnabled}
-      />
+      {showDiscovery && (
+        <SwipeDirectionDiscovery
+          athleteId={athleteId}
+          onChosen={(direction) => setSwipeDirection(direction)}
+        />
+      )}
+      {swipeDirection === "vertical" ? (
+        <ExerciseVerticalCarousel
+          exercises={exercises}
+          lastTimeByExercise={lastTimeByExercise}
+          ladderByExercise={ladderByExercise}
+          coachNoteByExerciseName={coachNoteByExerciseName ?? {}}
+          readOnly={isCompleted}
+          onSetChange={handleSetChange}
+          onSetAdded={handleSetAdded}
+          onRenamed={handleRenamed}
+          onTrackedFieldsChange={handleTrackedFieldsChange}
+          onDelete={handleDeleteExercise}
+          deletingId={deletingId}
+          sessionId={sessionId}
+          groupId={groupId}
+          athleteId={athleteId}
+          viewerId={viewerId}
+          canUploadVideo={canUploadVideo}
+          onSetCompleted={handleSetCompleted}
+          gamificationEnabled={gamificationEnabled}
+        />
+      ) : (
+        <ExerciseSwipeCarousel
+          exercises={exercises}
+          lastTimeByExercise={lastTimeByExercise}
+          ladderByExercise={ladderByExercise}
+          coachNoteByExerciseName={coachNoteByExerciseName ?? {}}
+          readOnly={isCompleted}
+          onSetChange={handleSetChange}
+          onSetAdded={handleSetAdded}
+          onRenamed={handleRenamed}
+          onTrackedFieldsChange={handleTrackedFieldsChange}
+          onDelete={handleDeleteExercise}
+          deletingId={deletingId}
+          sessionId={sessionId}
+          groupId={groupId}
+          athleteId={athleteId}
+          viewerId={viewerId}
+          canUploadVideo={canUploadVideo}
+          onSetCompleted={handleSetCompleted}
+          gamificationEnabled={gamificationEnabled}
+        />
+      )}
 
       {!isCompleted && (
         <div className="mt-6 pb-4">

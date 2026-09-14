@@ -12,6 +12,7 @@ import { WearablePlaceholder } from "@/components/athlete/wearable-placeholder";
 import { PackagePicker, type PackageOption } from "@/components/athlete/package-picker";
 import { ManageBillingLink } from "@/components/athlete/manage-billing-link";
 import { ProfileDetailsEditor } from "@/components/athlete/profile-details-editor";
+import { SwipeDirectionSetting } from "@/components/athlete/swipe-direction-setting";
 import { ExportDataButton } from "@/components/athlete/export-data-button";
 import { DeleteAccountButton } from "@/components/athlete/delete-account-button";
 import { GamificationToggle } from "@/components/coach/gamification-toggle";
@@ -51,7 +52,7 @@ export default async function SettingsPage(
   ] = await Promise.all([
       supabase
         .from("profiles")
-        .select("full_name, avatar_url")
+        .select("full_name, avatar_url, exercise_swipe_direction")
         .eq("id", athleteId)
         .single(),
       supabase
@@ -185,6 +186,18 @@ export default async function SettingsPage(
             />
           </div>
         </SettingsGroup>
+
+        {!isCoach && (
+          <SettingsGroup label="Workout Logging">
+            <SwipeDirectionSetting
+              athleteId={athleteId}
+              label="Swipe direction"
+              initialDirection={
+                (profile?.exercise_swipe_direction as "vertical" | "horizontal" | null) ?? null
+              }
+            />
+          </SettingsGroup>
+        )}
 
         <SettingsGroup label="Messages">
           <Link href={`/groups/${params.groupId}/messages`} className="font-body text-sm font-bold text-rust">

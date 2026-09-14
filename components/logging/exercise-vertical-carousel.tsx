@@ -1,29 +1,27 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, List, X } from "lucide-react";
 import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
 import type { TrackedField } from "@/lib/exercise-fields";
 import { ExerciseCard } from "./exercise-card";
 import { ExerciseNoteCallout } from "./exercise-note-callout";
 
-// Replaces the old scroll-past exercise list with a snap-to-card
-// carousel (mobile_home_workout_tab_merge_idea.md /
-// swipe_card_logging_and_spotter_nudge_idea.md) — one exercise per
-// full-width card, swipe to advance, snap-stop rather than momentum
-// scroll. Each card starts collapsed (the compact set grid, exactly as
-// the old list rendered it) and can expand for more room — real estate
-// the coach-note/tip callout below uses, not decoration.
-function vibrateTick() {
-  try {
-    navigator.vibrate?.(15);
-  } catch {
-    // Vibration API unsupported/blocked — the scrubber still works
-    // (just silently) without it.
-  }
-}
-
-export function ExerciseSwipeCarousel({
+// Vertical-swipe variant of the exercise logging carousel
+// (swipe_card_logging_and_spotter_nudge_idea.md, resolved 2026-09-14:
+// swipe direction is now an athlete-facing preference, not a fixed
+// decision — see exercise-swipe-carousel.tsx for the horizontal
+// variant). Same data/mutation props and per-card content as that
+// file, swiped up/down instead of left/right — closer to a feed-scroll
+// feel, still a hard snap-stop per card rather than free momentum
+// scroll.
+//
+// The horizontal mode's dot-row drag-scrubber doesn't map onto a
+// vertical gesture, so this gets its own quick-nav affordance instead:
+// a "zoom out" toggle that collapses to a plain vertical list of every
+// exercise in its existing collapsed state — tap any item to jump
+// straight into it, expanded.
+export function ExerciseVerticalCarousel({
   exercises,
   lastTimeByExercise,
   ladderByExercise,
@@ -64,26 +62,25 @@ export function ExerciseSwipeCarousel({
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [overviewOpen, setOverviewOpen] = useState(false);
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const dotsRef = useRef<HTMLDivElement>(null);
-  const scrubIndexRef = useRef<number | null>(null);
 
   function scrollToIndex(index: number) {
     const scroller = scrollerRef.current;
     if (!scroller) return;
     const slide = scroller.children[index] as HTMLElement | undefined;
-    slide?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+    slide?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
   function handleScroll() {
     const scroller = scrollerRef.current;
     if (!scroller) return;
-    const center = scroller.scrollLeft + scroller.clientWidth / 2;
+    const center = scroller.scrollTop + scroller.clientHeight / 2;
     let closest = 0;
     let closestDist = Infinity;
     Array.from(scroller.children).forEach((child, i) => {
       const el = child as HTMLElement;
-      const childCenter = el.offsetLeft + el.clientWidth / 2;
+      const childCenter = el.offsetTop + el.clientHeight / 2;
       const dist = Math.abs(childCenter - center);
       if (dist < closestDist) {
         closestDist = dist;
@@ -93,92 +90,82 @@ export function ExerciseSwipeCarousel({
     setActiveIndex(closest);
   }
 
-  // Dragging anywhere across the dot row jumps directly to whichever
-  // exercise the pointer is currently closest to — a real scrubber, not
-  // just per-dot taps — with a haptic tick each time the drag crosses
-  // into a new dot's zone. Pointer capture (same fix as
-  // exercise-set-grid.tsx's swipe-to-fill) keeps the drag tracking even
-  // once the finger moves off the row's own narrow height.
-  //
-  // Measures each dot's REAL rendered center rather than dividing the
-  // row's bounding box evenly by count — the dots sit center-clustered
-  // via justify-center (not edge-to-edge across the full row), and the
-  // active dot is wider than the rest, so an even division doesn't
-  // actually line up with where the dots render; verified live that an
-  // even-division version was consistently one dot off.
-  function handleScrubMove(clientX: number) {
-    const row = dotsRef.current;
-    if (!row) return;
-    let closest = 0;
-    let closestDist = Infinity;
-    Array.from(row.children).forEach((child, i) => {
-      const rect = (child as HTMLElement).getBoundingClientRect();
-      const center = rect.left + rect.width / 2;
-      const dist = Math.abs(clientX - center);
-      if (dist < closestDist) {
-        closestDist = dist;
-        closest = i;
-      }
-    });
-    if (closest !== scrubIndexRef.current) {
-      scrubIndexRef.current = closest;
-      vibrateTick();
-      scrollToIndex(closest);
-    }
+  function jumpToExerciseExpanded(index: number) {
+    const exercise = exercises[index];
+    if (!exercise) return;
+    setOverviewOpen(false);
+    setExpandedId(exercise.id);
+    // The carousel only remounts into view once overviewOpen flips back
+    // to false — wait a frame so scrollToIndex has a real element to
+    // measure/scroll to.
+    requestAnimationFrame(() => scrollToIndex(index));
   }
 
   if (exercises.length === 0) return null;
 
-  return (
-    <div>
-      {/* Position dots double as a drag-to-scrub quick-jump — a coach's
-          day plan is usually short enough (2-6 exercises) that this
-          reads as a real nav aid, not clutter. */}
-      {exercises.length > 1 && (
-        <div
-          ref={dotsRef}
-          className="flex items-center justify-center gap-1.5 mb-3 py-2 touch-none"
-          onPointerDown={(e) => {
-            scrubIndexRef.current = null;
-            try {
-              e.currentTarget.setPointerCapture(e.pointerId);
-            } catch {
-              // Pointer capture unsupported/blocked — falls back to
-              // requiring the finger to stay over the row.
-            }
-            handleScrubMove(e.clientX);
-          }}
-          onPointerMove={(e) => {
-            if (e.buttons === 0) return;
-            handleScrubMove(e.clientX);
-          }}
-          onPointerUp={(e) => {
-            scrubIndexRef.current = null;
-            try {
-              e.currentTarget.releasePointerCapture(e.pointerId);
-            } catch {
-              // No-op if it was never captured.
-            }
-          }}
-        >
-          {exercises.map((ex, i) => (
+  if (overviewOpen) {
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <p className="font-body text-[11px] text-steel uppercase tracking-wide">All exercises</p>
+          <button
+            type="button"
+            onClick={() => setOverviewOpen(false)}
+            className="flex items-center gap-1 font-body text-[11px] text-steel uppercase tracking-wide active:text-rust transition-colors"
+          >
+            Close
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        <div className="flex flex-col gap-2">
+          {exercises.map((exercise, i) => (
             <button
-              key={ex.id}
+              key={exercise.id}
               type="button"
-              aria-label={`Go to ${ex.exerciseName}`}
-              onClick={() => scrollToIndex(i)}
-              className={`h-1.5 rounded-full transition-all pointer-events-none ${
-                i === activeIndex ? "w-6 bg-rust" : "w-1.5 bg-steel/30"
-              }`}
-            />
+              onClick={() => jumpToExerciseExpanded(i)}
+              className="text-left border border-steel/20 bg-surface/20 p-3 active:border-rust transition-colors"
+            >
+              <p className="font-body text-[11px] text-steel uppercase tracking-wide">
+                Exercise {i + 1} of {exercises.length}
+              </p>
+              <p className="font-body text-sm text-chalk mt-0.5">{exercise.exerciseName}</p>
+            </button>
           ))}
         </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {exercises.length > 1 && (
+        <>
+          <div className="flex items-center justify-center gap-1.5 mb-2">
+            {exercises.map((ex, i) => (
+              <span
+                key={ex.id}
+                className={`h-1.5 rounded-full transition-all ${
+                  i === activeIndex ? "w-6 bg-rust" : "w-1.5 bg-steel/30"
+                }`}
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setOverviewOpen(true)}
+            aria-label="See all exercises"
+            className="w-full flex items-center justify-center gap-1.5 mb-3 font-body text-[11px] text-steel uppercase tracking-wide active:text-rust transition-colors"
+          >
+            <List className="w-3.5 h-3.5" />
+            See all {exercises.length} exercises
+          </button>
+        </>
       )}
 
       <div
         ref={scrollerRef}
         onScroll={handleScroll}
-        className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth -mx-5 px-5 gap-4"
+        className="flex flex-col overflow-y-auto snap-y snap-mandatory scroll-smooth gap-4 h-[65vh]"
         style={{ scrollbarWidth: "none" }}
       >
         {exercises.map((exercise) => {
@@ -186,7 +173,7 @@ export function ExerciseSwipeCarousel({
           return (
             <div
               key={exercise.id}
-              className="snap-center shrink-0 w-full border border-steel/20 bg-surface/20 p-4"
+              className="snap-center shrink-0 border border-steel/20 bg-surface/20 p-4"
             >
               <div className="flex items-center justify-between gap-2 mb-2">
                 <p className="font-body text-[11px] text-steel uppercase tracking-wide">

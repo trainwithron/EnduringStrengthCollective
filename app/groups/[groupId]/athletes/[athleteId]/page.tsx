@@ -4,6 +4,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { AthleteNotesEditor } from "@/components/coach/athlete-notes-editor";
 import { SessionCreditsControl } from "@/components/coach/session-credits-control";
+import { SwipeDirectionSetting } from "@/components/athlete/swipe-direction-setting";
 import { GoalConfirmationControl } from "@/components/coach/goal-confirmation-control";
 import { PackageAssignmentControl } from "@/components/coach/package-assignment-control";
 import { PrivateFromOrgToggle } from "@/components/coach/private-from-org-toggle";
@@ -64,7 +65,9 @@ export default async function AthleteProfilePage(
 
   const { data: athleteMembership } = await supabase
     .from("group_memberships")
-    .select("joined_at, client_tier, private_from_org, profiles ( id, full_name, avatar_url )")
+    .select(
+      "joined_at, client_tier, private_from_org, profiles ( id, full_name, avatar_url, exercise_swipe_direction )"
+    )
     .eq("group_id", params.groupId)
     .eq("profile_id", params.athleteId)
     .maybeSingle();
@@ -878,6 +881,17 @@ export default async function AthleteProfilePage(
               athleteId={params.athleteId}
               groupId={params.groupId}
               initialBalance={creditsRow?.balance ?? 0}
+            />
+          </section>
+
+          <section>
+            <SwipeDirectionSetting
+              athleteId={params.athleteId}
+              label="Exercise logging (set on their behalf)"
+              mode="coach"
+              initialDirection={
+                (profile?.exercise_swipe_direction as "vertical" | "horizontal" | null) ?? null
+              }
             />
           </section>
 

@@ -399,6 +399,21 @@ export default async function SessionPage(
 
   const isOwnSession = session.athlete_id === user.id;
 
+  // Swipe-direction preference (swipe_card_logging_and_spotter_nudge_idea.md,
+  // resolved 2026-09-14) — null gates the first-run discovery prompt in
+  // SessionLogger. Only fetched for the athlete's own session; a coach
+  // logging in-person never needs it (SessionLogger also gates the
+  // prompt on viewerId === athleteId independently).
+  let exerciseSwipeDirection: "vertical" | "horizontal" | null = null;
+  if (isOwnSession) {
+    const { data: swipeProfile } = await supabase
+      .from("profiles")
+      .select("exercise_swipe_direction")
+      .eq("id", session.athlete_id)
+      .maybeSingle();
+    exerciseSwipeDirection = (swipeProfile?.exercise_swipe_direction as "vertical" | "horizontal" | null) ?? null;
+  }
+
   // Swipe-card carousel's coach-note-first callout (mobile_home_workout_
   // tab_merge_idea.md) — only ever the athlete's own opted-in notes;
   // RLS also enforces this independently, so a coach viewing this page
@@ -533,6 +548,7 @@ export default async function SessionPage(
         pendingGateTask={pendingGateTask}
         todayDate={todayKey}
         coachNoteByExerciseName={coachNoteByExerciseName}
+        exerciseSwipeDirection={exerciseSwipeDirection}
       />
 
       {isOwnSession && (
