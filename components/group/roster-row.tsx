@@ -5,25 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { RosterMember } from "@/lib/types";
-
-function statusLabel(lastWorkoutAt: string | null): {
-  text: string;
-  dotClass: string;
-} {
-  if (!lastWorkoutAt) {
-    return { text: "No logs yet", dotClass: "bg-steel" };
-  }
-
-  const daysSince = Math.floor(
-    (Date.now() - new Date(lastWorkoutAt).getTime()) / (1000 * 60 * 60 * 24)
-  );
-
-  if (daysSince === 0) return { text: "Logged today", dotClass: "bg-moss" };
-  if (daysSince === 1) return { text: "Logged yesterday", dotClass: "bg-steel" };
-  if (daysSince <= 3)
-    return { text: `${daysSince} days quiet`, dotClass: "bg-steel" };
-  return { text: `${daysSince} days quiet`, dotClass: "bg-rust" };
-}
+import { clientActivityStatus } from "@/lib/client-activity-status";
 
 export function RosterRow({
   member,
@@ -44,7 +26,7 @@ export function RosterRow({
   const [removed, setRemoved] = useState(false);
   const router = useRouter();
 
-  const status = statusLabel(member.lastWorkoutAt);
+  const status = clientActivityStatus(member.lastWorkoutAt);
   const initials = member.fullName
     .split(" ")
     .map((p) => Array.from(p)[0] ?? "")

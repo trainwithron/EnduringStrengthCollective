@@ -1,32 +1,6 @@
 import Link from "next/link";
-
-// Status-dot logic ported (not shared) from client-card-grid.tsx, same
-// convention already used elsewhere in this app for small per-card
-// display helpers.
-function daysSinceOf(lastWorkoutAt: string | null): number {
-  if (!lastWorkoutAt) return Infinity;
-  return Math.floor((Date.now() - new Date(lastWorkoutAt).getTime()) / (1000 * 60 * 60 * 24));
-}
-
-function statusLabel(lastWorkoutAt: string | null): { text: string; dotClass: string } {
-  if (!lastWorkoutAt) {
-    return { text: "No logs yet", dotClass: "bg-steel" };
-  }
-  const daysSince = daysSinceOf(lastWorkoutAt);
-  if (daysSince === 0) return { text: "Logged today", dotClass: "bg-moss" };
-  if (daysSince === 1) return { text: "Logged yesterday", dotClass: "bg-steel" };
-  if (daysSince <= 3) return { text: `${daysSince} days quiet`, dotClass: "bg-steel" };
-  return { text: `${daysSince} days quiet`, dotClass: "bg-rust" };
-}
-
-function initialsOf(name: string) {
-  return name
-    .split(" ")
-    .map((p) => Array.from(p)[0] ?? "")
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
+import { clientActivityStatus } from "@/lib/client-activity-status";
+import { initialsOf } from "@/lib/initials";
 
 export interface HomeClientCardData {
   groupId: string;
@@ -51,7 +25,7 @@ export interface HomeClientCardData {
 // their group dashboard (components/coach/desktop/home-group-card.tsx) —
 // only this per-client destination changed.
 export function HomeClientCard({ client }: { client: HomeClientCardData }) {
-  const status = statusLabel(client.lastWorkoutAt);
+  const status = clientActivityStatus(client.lastWorkoutAt);
   return (
     <Link
       href={`/groups/${client.groupId}/athletes/${client.athleteId}`}

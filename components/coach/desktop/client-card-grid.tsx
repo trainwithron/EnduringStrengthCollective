@@ -7,6 +7,8 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { CardSizeToggle } from "@/components/coach/desktop/card-size-toggle";
 import { readCardSize, writeCardSize, type CardSize } from "@/lib/card-size";
 import { isLowReadiness } from "@/lib/wellness";
+import { daysSinceOf, clientActivityStatus } from "@/lib/client-activity-status";
+import { initialsOf } from "@/lib/initials";
 import { getIntegrityRollupForGroup, type AthleteIntegrityResult } from "@/lib/session-integrity-data";
 import type { RosterMember, ClientTier } from "@/lib/types";
 import { MoreVertical, ChevronLeft, ChevronRight } from "lucide-react";
@@ -38,31 +40,6 @@ const GOAL_LABELS: Record<NonNullable<NutritionPhase>, string> = {
   cut: "Cut",
   bulk: "Bulk",
 };
-
-function daysSinceOf(lastWorkoutAt: string | null): number {
-  if (!lastWorkoutAt) return Infinity;
-  return Math.floor((Date.now() - new Date(lastWorkoutAt).getTime()) / (1000 * 60 * 60 * 24));
-}
-
-function statusLabel(lastWorkoutAt: string | null): { text: string; dotClass: string } {
-  if (!lastWorkoutAt) {
-    return { text: "No logs yet", dotClass: "bg-steel" };
-  }
-  const daysSince = daysSinceOf(lastWorkoutAt);
-  if (daysSince === 0) return { text: "Logged today", dotClass: "bg-moss" };
-  if (daysSince === 1) return { text: "Logged yesterday", dotClass: "bg-steel" };
-  if (daysSince <= 3) return { text: `${daysSince} days quiet`, dotClass: "bg-steel" };
-  return { text: `${daysSince} days quiet`, dotClass: "bg-rust" };
-}
-
-function initialsOf(name: string) {
-  return name
-    .split(" ")
-    .map((p) => Array.from(p)[0] ?? "")
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
 
 type SortMode = "attention" | "name";
 
@@ -433,7 +410,7 @@ export function ClientCardGrid({
       ) : (
         <div className={`grid ${GRID_CLASS[size]}`}>
           {pageRows.map((member) => {
-            const status = statusLabel(member.lastWorkoutAt);
+            const status = clientActivityStatus(member.lastWorkoutAt);
             const credits = creditsByAthleteId.get(member.profileId) ?? 0;
             return (
               <div

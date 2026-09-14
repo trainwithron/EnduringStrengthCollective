@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { daysSinceOf, clientActivityStatus } from "@/lib/client-activity-status";
+import { initialsOf } from "@/lib/initials";
 
 interface MiniRosterMember {
   athleteId: string;
@@ -10,34 +12,18 @@ interface MiniRosterMember {
   lastWorkoutAt: string | null;
 }
 
-function daysSinceOf(lastWorkoutAt: string | null): number {
-  if (!lastWorkoutAt) return Infinity;
-  return Math.floor((Date.now() - new Date(lastWorkoutAt).getTime()) / 86400000);
-}
-
-function statusDotClass(lastWorkoutAt: string | null): string {
-  const days = daysSinceOf(lastWorkoutAt);
-  if (days === Infinity) return "bg-steel";
-  if (days <= 1) return "bg-moss";
-  if (days <= 3) return "bg-steel";
-  return "bg-rust";
-}
-
-function initialsOf(name: string): string {
-  return name
-    .split(" ")
-    .map((p) => Array.from(p)[0] ?? "")
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
-
 // The list panel's default view (coach_desktop_shell_identity_
 // redesign.md) — a compact roster, not the full Clients page's card
 // grid (that already has pagination/integrity/nutrition data it doesn't
-// need at 220-560px wide). Same "needs attention first" sort
-// comparator as client-card-grid.tsx, reimplemented at this smaller
-// scope rather than importing that heavier component.
+// need at 220-560px wide). Same "needs attention first" sort comparator
+// as client-card-grid.tsx. Previously reimplemented locally rather than
+// importing (client-card-grid.tsx was a heavier component to pull in) —
+// now imports the same lib/client-activity-status.ts helper
+// client-card-grid.tsx and home-client-card.tsx use, since that's a
+// lean pure-logic module, not the heavier component; a codebase audit
+// caught this local copy had quietly drifted (day-1 showed "moss" here
+// but "steel" everywhere else) once it stopped being updated alongside
+// the other two.
 export function RosterMiniList({ groupId }: { groupId: string }) {
   const [members, setMembers] = useState<MiniRosterMember[] | null>(null);
 
@@ -100,9 +86,9 @@ export function RosterMiniList({ groupId }: { groupId: string }) {
           <span className="relative shrink-0 w-7 h-7 rounded-full bg-surface border border-steel/30 flex items-center justify-center font-body text-[10px] text-steel">
             {initialsOf(m.fullName)}
             <span
-              className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-graphite ${statusDotClass(
-                m.lastWorkoutAt
-              )}`}
+              className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-graphite ${
+                clientActivityStatus(m.lastWorkoutAt).dotClass
+              }`}
             />
           </span>
           <span className="font-body text-sm text-chalk truncate">{m.fullName}</span>
