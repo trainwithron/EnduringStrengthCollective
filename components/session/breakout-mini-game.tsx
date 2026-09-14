@@ -29,6 +29,17 @@ const STEEL = "#908B7E";
 // custom_shape_theming_idea.md) — "ball speed increases the longer it
 // survives," driven by the shared difficulty ramp against real elapsed
 // rest time. Drag/touch the paddle to steer.
+//
+// Physics loop runs via requestAnimationFrame driving a ref-held game
+// state, with the canvas drawn imperatively inside that same callback —
+// not the old setInterval+setState loop, which forced a full React
+// re-render every 30ms for as long as the game panel was open (see
+// rest_timer_minigame_performance_investigation.md). A time-accumulator
+// steps the pure `stepBreakoutGame` reducer at the exact same fixed
+// 30ms cadence as before regardless of the browser's actual frame rate,
+// so difficulty ramp/ball speed feel identical to the prior version.
+// React state is reserved for score/status only — the two things the
+// JSX actually needs to react to.
 export function BreakoutMiniGame({
   onClose,
   startedAtMs,
@@ -38,49 +49,91 @@ export function BreakoutMiniGame({
   startedAtMs: number;
   durationSeconds: number;
 }) {
-  const [gameState, setGameState] = useState<BreakoutState>(() => createBreakoutGame());
+  const gameRef = useRef<BreakoutState>(createBreakoutGame());
+  const [score, setScore] = useState(0);
+  const [status, setStatus] = useState<"playing" | "over">("playing");
   const [highScore, setHighScore] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const paddleTargetRef = useRef(BOARD_WIDTH / 2);
+  const rafRef = useRef<number | null>(null);
+  const accumulatorRef = useRef(0);
+  const lastFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
     setHighScore(readGameHighScore(GAME_KEY));
   }, []);
 
-  useEffect(() => {
-    if (gameState.status === "over") return;
-    const interval = setInterval(() => {
-      const progress = computeDifficultyProgress(Date.now() - startedAtMs, durationSeconds * 1000);
-      const speedMultiplier = computeDifficultyMultiplier(progress, 1, 2.2);
-      setGameState((prev) => stepBreakoutGame(prev, paddleTargetRef.current, speedMultiplier));
-    }, TICK_MS);
-    return () => clearInterval(interval);
-  }, [gameState.status, startedAtMs, durationSeconds]);
-
-  useEffect(() => {
-    if (gameState.status === "over") {
-      setHighScore(recordGameHighScore(GAME_KEY, gameState.score));
-    }
-  }, [gameState.status, gameState.score]);
-
-  useEffect(() => {
+  function draw(state: BreakoutState) {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
     ctx.fillStyle = GRAPHITE;
     ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
     ctx.fillStyle = STEEL;
-    for (const b of gameState.bricks) {
+    for (const b of state.bricks) {
       if (!b.alive) continue;
       ctx.fillRect(b.col * BRICK_WIDTH + 1, BRICK_TOP + b.row * BRICK_HEIGHT + 1, BRICK_WIDTH - 2, BRICK_HEIGHT - 2);
     }
     ctx.fillStyle = RUST;
-    ctx.fillRect(gameState.paddleX - PADDLE_WIDTH / 2, PADDLE_Y, PADDLE_WIDTH, PADDLE_HEIGHT);
+    ctx.fillRect(state.paddleX - PADDLE_WIDTH / 2, PADDLE_Y, PADDLE_WIDTH, PADDLE_HEIGHT);
     ctx.fillStyle = CHALK;
     ctx.beginPath();
-    ctx.arc(gameState.ballX, gameState.ballY, BALL_RADIUS, 0, Math.PI * 2);
+    ctx.arc(state.ballX, state.ballY, BALL_RADIUS, 0, Math.PI * 2);
     ctx.fill();
-  }, [gameState]);
+  }
+
+  useEffect(() => {
+    if (status === "over") {
+      draw(gameRef.current);
+      return;
+    }
+
+    lastFrameRef.current = null;
+    accumulatorRef.current = 0;
+
+    function frame(now: number) {
+      if (lastFrameRef.current == null) lastFrameRef.current = now;
+      const dt = now - lastFrameRef.current;
+      lastFrameRef.current = now;
+      // Clamp a huge dt (tab backgrounded, then foregrounded) so the
+      // fixed-timestep loop below doesn't try to catch up hundreds of
+      // ticks at once.
+      accumulatorRef.current = Math.min(accumulatorRef.current + dt, TICK_MS * 10);
+
+      let stepped = false;
+      while (accumulatorRef.current >= TICK_MS) {
+        const progress = computeDifficultyProgress(Date.now() - startedAtMs, durationSeconds * 1000);
+        const speedMultiplier = computeDifficultyMultiplier(progress, 1, 2.2);
+        gameRef.current = stepBreakoutGame(gameRef.current, paddleTargetRef.current, speedMultiplier);
+        accumulatorRef.current -= TICK_MS;
+        stepped = true;
+        if (gameRef.current.status === "over") break;
+      }
+
+      draw(gameRef.current);
+
+      if (stepped) {
+        setScore(gameRef.current.score);
+        if (gameRef.current.status === "over") {
+          setStatus("over");
+          return; // don't schedule another frame — the effect re-runs when status changes
+        }
+      }
+
+      rafRef.current = requestAnimationFrame(frame);
+    }
+
+    rafRef.current = requestAnimationFrame(frame);
+    return () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    };
+  }, [status, startedAtMs, durationSeconds]);
+
+  useEffect(() => {
+    if (status === "over") {
+      setHighScore(recordGameHighScore(GAME_KEY, gameRef.current.score));
+    }
+  }, [status]);
 
   function updatePaddleFromClientX(clientX: number, rect: DOMRect) {
     const scale = BOARD_WIDTH / rect.width;
@@ -92,15 +145,17 @@ export function BreakoutMiniGame({
   }
 
   function handleRestart() {
-    setGameState(createBreakoutGame());
+    gameRef.current = createBreakoutGame();
     paddleTargetRef.current = BOARD_WIDTH / 2;
+    setScore(0);
+    setStatus("playing");
   }
 
   return (
     <div className="mt-2 p-3 border border-steel/20 bg-graphite/60 flex flex-col items-center gap-2">
       <div className="w-full flex items-center justify-between font-body text-xs text-steel">
         <span>
-          Score: <span className="text-chalk">{gameState.score}</span> · Best:{" "}
+          Score: <span className="text-chalk">{score}</span> · Best:{" "}
           <span className="text-chalk">{highScore}</span>
         </span>
         <button type="button" onClick={onClose} className="text-steel active:text-rust transition-colors">
@@ -119,9 +174,9 @@ export function BreakoutMiniGame({
           className="max-w-full"
           style={{ width: BOARD_WIDTH, height: BOARD_HEIGHT }}
           role="img"
-          aria-label={`Brick breaker mini-game, score ${gameState.score}`}
+          aria-label={`Brick breaker mini-game, score ${score}`}
         />
-        {gameState.status === "over" && (
+        {status === "over" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-graphite/80">
             <p className="font-display text-chalk uppercase text-sm">Game over</p>
             <button

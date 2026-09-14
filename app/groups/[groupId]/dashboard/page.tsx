@@ -2,17 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
-import { computeScheduledDates } from "@/lib/program-schedule";
-import {
-  computeProgramEndingSuggestions,
-  computeMacrosMissingSuggestions,
-  computeSuggestedReminderDate,
-  type AthleteProgramInfo,
-  type AthleteMacroInfo,
-  type ReminderRule,
-} from "@/lib/coaching-suggestions";
+import { getNeedsAttentionItems } from "@/lib/needs-attention-data";
 import { SuggestionSettings } from "@/components/coach/desktop/suggestion-settings";
-import { NeedsAttentionPanel, type NeedsAttentionItem } from "@/components/coach/desktop/needs-attention-panel";
+import { NeedsAttentionPanel } from "@/components/coach/desktop/needs-attention-panel";
 import { WorkoutSummaryCard } from "@/components/feed/workout-summary-card";
 import type { FeedPost } from "@/lib/types";
 
@@ -219,217 +211,24 @@ export default async function CoachDashboardPage(
   const recentActivity = timeline.slice(0, 25);
 
   // "Needs attention": athletes whose active program is about to run out
-  // with nothing lined up after it. Computed fresh from each group's real
-  // program schedule, not stored — same read-time-derivation approach as
-  // everywhere else this app computes calendar dates.
+  // with nothing lined up after it, or has no macros set for next week.
+  // Extracted into lib/needs-attention-data.ts so the coach-desktop-shell's
+  // pinned strip can reuse the exact same computation.
+  const needsAttentionItems = await getNeedsAttentionItems(supabase, { coachId: user.id, groupIds });
+
+  // Re-fetched here (a cheap single-row lookup) purely to seed the
+  // SuggestionSettings display below — getNeedsAttentionItems reads these
+  // same values internally but doesn't return them, since every other
+  // caller (the shell's pinned strip) only needs the computed items.
   const { data: prefsRow } = await supabase
     .from("coach_preferences")
     .select("suggestion_mode, suggestion_lead_days, suggestion_lead_mode, suggestion_lead_weekday")
     .eq("coach_id", user.id)
     .maybeSingle();
-
   const suggestionMode = (prefsRow?.suggestion_mode ?? "list") as "list" | "auto_add";
   const suggestionLeadDays = prefsRow?.suggestion_lead_days ?? 3;
   const suggestionLeadMode = (prefsRow?.suggestion_lead_mode ?? "days_before") as "days_before" | "weekday_before";
   const suggestionLeadWeekday = prefsRow?.suggestion_lead_weekday ?? 5;
-  const reminderRule: ReminderRule =
-    suggestionLeadMode === "weekday_before"
-      ? { mode: "weekday_before", weekday: suggestionLeadWeekday }
-      : { mode: "days_before", days: suggestionLeadDays };
-
-  const today = new Date();
-
-  // Every athlete across every group this coach runs, once — reused below
-  // for both suggestion types instead of re-querying per check.
-  const { data: allAthleteRows } =
-    groupIds.length > 0
-      ? await supabase
-          .from("group_memberships")
-          .select("profile_id, group_id, client_tier, profiles ( full_name )")
-          .in("group_id", groupIds)
-          .eq("role", "athlete")
-      : { data: [] };
-
-  const allAthletes = (allAthleteRows ?? []).map((a: any) => ({
-    athleteId: a.profile_id as string,
-    athleteName: (a.profiles?.full_name ?? "A client") as string,
-    groupId: a.group_id as string,
-    groupName: groupNameById.get(a.group_id) ?? "Group",
-    clientTier: a.client_tier as "one_on_one" | "online" | "group" | null,
-  }));
-
-  const athleteInfos: AthleteProgramInfo[] = [];
-
-  for (const groupId of groupIds) {
-    const { data: activeProgram } = await supabase
-      .from("programs")
-      .select("id, start_date, training_days")
-      .eq("group_id", groupId)
-      .eq("is_active", true)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (!activeProgram?.start_date || !activeProgram.training_days?.length) continue;
-
-    const { data: workoutRows } = await supabase
-      .from("workouts")
-      .select("id")
-      .eq("program_id", activeProgram.id)
-      .order("week_number", { ascending: true })
-      .order("day_index", { ascending: true });
-
-    if (!workoutRows || workoutRows.length === 0) continue;
-
-    const scheduleMap = computeScheduledDates(
-      activeProgram.start_date,
-      activeProgram.training_days,
-      workoutRows
-    );
-    const dates = Array.from(scheduleMap.values());
-    if (dates.length === 0) continue;
-    const programEndDate = new Date(Math.max(...dates.map((d) => d.getTime())));
-
-    for (const a of allAthletes.filter((a) => a.groupId === groupId)) {
-      athleteInfos.push({ ...a, programEndDate });
-    }
-  }
-
-  const rawSuggestions = computeProgramEndingSuggestions(athleteInfos, today, reminderRule);
-
-  // Macro suggestions: does each (non-group-tier) athlete have any macro
-  // target set for the coming week?
-  const nextWeekStart = new Date(today);
-  nextWeekStart.setDate(today.getDate() + 1);
-  const nextWeekEnd = new Date(today);
-  nextWeekEnd.setDate(today.getDate() + 7);
-  const macroEligibleAthletes = allAthletes.filter((a) => a.clientTier !== "group");
-  const macroEligibleIds = macroEligibleAthletes.map((a) => a.athleteId);
-
-  const { data: macroRows } =
-    macroEligibleIds.length > 0
-      ? await supabase
-          .from("daily_macros")
-          .select("athlete_id, log_date")
-          .in("athlete_id", macroEligibleIds)
-          .gte("log_date", dateKey(nextWeekStart))
-          .lte("log_date", dateKey(nextWeekEnd))
-          .not("calories", "is", null)
-      : { data: [] };
-
-  const macroDaysCountByAthlete = new Map<string, number>();
-  for (const row of macroRows ?? []) {
-    macroDaysCountByAthlete.set(row.athlete_id, (macroDaysCountByAthlete.get(row.athlete_id) ?? 0) + 1);
-  }
-
-  const macroInfos: AthleteMacroInfo[] = macroEligibleAthletes.map((a) => ({
-    ...a,
-    daysWithMacrosNextWeek: macroDaysCountByAthlete.get(a.athleteId) ?? 0,
-  }));
-
-  const rawMacroSuggestions = computeMacrosMissingSuggestions(macroInfos);
-
-  // Dedupe against anything already on the calendar for this athlete, per
-  // suggestion kind (an athlete can legitimately have both a "program
-  // ending" and a "macros missing" suggestion active at once, each with
-  // its own independent handled/dismissed state) — a dedicated
-  // trigger_key column distinguishes the two, backed by a real unique
-  // index (coach_id, linked_athlete_id, trigger_key) rather than a
-  // fragile title substring.
-  const athleteIdsInPlay = Array.from(
-    new Set([...rawSuggestions.map((s) => s.athleteId), ...rawMacroSuggestions.map((s) => s.athleteId)])
-  );
-  const { data: existingSuggestionEvents } =
-    athleteIdsInPlay.length > 0
-      ? await supabase
-          .from("calendar_events")
-          .select("linked_athlete_id, trigger_key")
-          .eq("coach_id", user.id)
-          .eq("event_type", "suggestion")
-          .in("linked_athlete_id", athleteIdsInPlay)
-      : { data: [] };
-
-  const programEndingHandled = new Set(
-    (existingSuggestionEvents ?? [])
-      .filter((r) => r.trigger_key === "program_ending")
-      .map((r) => r.linked_athlete_id)
-  );
-  const macrosHandled = new Set(
-    (existingSuggestionEvents ?? [])
-      .filter((r) => r.trigger_key === "macros_missing")
-      .map((r) => r.linked_athlete_id)
-  );
-
-  const activeSuggestions = rawSuggestions.filter((s) => !programEndingHandled.has(s.athleteId));
-  const activeMacroSuggestions = rawMacroSuggestions.filter((s) => !macrosHandled.has(s.athleteId));
-
-  const needsAttentionItems: NeedsAttentionItem[] = [];
-
-  for (const s of activeSuggestions) {
-    const suggestedDate = computeSuggestedReminderDate(s.programEndDate, reminderRule, today);
-    const suggestedDateKey = dateKey(suggestedDate);
-
-    if (suggestionMode === "auto_add") {
-      // Upsert with ignoreDuplicates, not insert — the unique index on
-      // (coach_id, linked_athlete_id, trigger_key) makes this atomic, so
-      // two concurrent page loads can't both create a row the way a
-      // plain check-then-insert could.
-      await supabase.from("calendar_events").upsert(
-        {
-          coach_id: user.id,
-          title: s.title,
-          event_date: suggestedDateKey,
-          event_type: "suggestion",
-          trigger_key: "program_ending",
-          linked_athlete_id: s.athleteId,
-          linked_group_id: s.groupId,
-          status: "active",
-        },
-        { onConflict: "coach_id,linked_athlete_id,trigger_key", ignoreDuplicates: true }
-      );
-    }
-
-    needsAttentionItems.push({
-      athleteId: s.athleteId,
-      groupId: s.groupId,
-      title: s.title,
-      triggerKey: "program_ending",
-      suggestedDateKey,
-      alreadyOnCalendar: suggestionMode === "auto_add",
-    });
-  }
-
-  // Macro suggestions land today by default (no lead-day math the way
-  // program-ending has an actual deadline to count back from — "next
-  // week has nothing set" is actionable any day).
-  for (const s of activeMacroSuggestions) {
-    const suggestedDateKey = dateKey(today);
-
-    if (suggestionMode === "auto_add") {
-      await supabase.from("calendar_events").upsert(
-        {
-          coach_id: user.id,
-          title: s.title,
-          event_date: suggestedDateKey,
-          event_type: "suggestion",
-          trigger_key: "macros_missing",
-          linked_athlete_id: s.athleteId,
-          linked_group_id: s.groupId,
-          status: "active",
-        },
-        { onConflict: "coach_id,linked_athlete_id,trigger_key", ignoreDuplicates: true }
-      );
-    }
-
-    needsAttentionItems.push({
-      athleteId: s.athleteId,
-      groupId: s.groupId,
-      title: s.title,
-      triggerKey: "macros_missing",
-      suggestedDateKey,
-      alreadyOnCalendar: suggestionMode === "auto_add",
-    });
-  }
 
   const TYPE_LABEL: Record<ActivityItem["type"], string> = {
     comment: "Comment",
@@ -478,7 +277,14 @@ export default async function CoachDashboardPage(
         initialLeadWeekday={suggestionLeadWeekday}
       />
 
-      <NeedsAttentionPanel coachId={user.id} items={needsAttentionItems} />
+      {/* The coach-desktop-shell's own pinned strip (coach_desktop_shell_
+          identity_redesign.md) already shows this exact panel for the
+          current group on every page, including this one — rendering it
+          again here would be a literal duplicate in the default (non-
+          scopeAll) view. Only show it inline when the coach has
+          explicitly asked for the cross-group picture, which the
+          shell's single-group strip can't provide. */}
+      {scopeAll && <NeedsAttentionPanel coachId={user.id} items={needsAttentionItems} />}
 
       <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
         Recent activity

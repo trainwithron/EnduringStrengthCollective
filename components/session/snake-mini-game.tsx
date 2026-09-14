@@ -25,6 +25,14 @@ const GRAPHITE = "#1C1B1A";
 // rest-timer-bar.tsx). Never pauses, extends, or gates that countdown —
 // it just fills the same dead time with something to do. The caller is
 // responsible for actually unmounting this when the rest period ends.
+//
+// requestAnimationFrame + a ref-held game state, same pattern as
+// breakout-mini-game.tsx — see that file's header comment and
+// rest_timer_minigame_performance_investigation.md for why. The tick
+// interval itself is still variable (it ramps down as difficulty
+// climbs) — a time-accumulator against the currently-computed tick
+// length reproduces the old self-scheduling setTimeout's exact
+// continuously-ramping feel without a per-tick React re-render.
 export function SnakeMiniGame({
   onClose,
   startedAtMs,
@@ -34,45 +42,22 @@ export function SnakeMiniGame({
   startedAtMs: number;
   durationSeconds: number;
 }) {
-  const [gameState, setGameState] = useState<SnakeGameState>(() => createSnakeGame(GRID_SIZE));
+  const gameRef = useRef<SnakeGameState>(createSnakeGame(GRID_SIZE));
+  const [score, setScore] = useState(0);
+  const [status, setStatus] = useState<"playing" | "over">("playing");
   const [highScore, setHighScore] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pendingDirectionRef = useRef<Direction | null>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
-  const gameStateRef = useRef(gameState);
-  gameStateRef.current = gameState;
+  const rafRef = useRef<number | null>(null);
+  const accumulatorRef = useRef(0);
+  const lastFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
     setHighScore(readSnakeHighScore());
   }, []);
 
-  // Self-scheduling via setTimeout rather than a fixed setInterval, so
-  // the tick delay can keep ramping continuously against real elapsed
-  // rest time (the shared difficulty engine) instead of only updating
-  // when this effect happens to re-run.
-  useEffect(() => {
-    if (gameState.status === "over") return;
-    let timeoutId: ReturnType<typeof setTimeout>;
-    function scheduleNext() {
-      const progress = computeDifficultyProgress(Date.now() - startedAtMs, durationSeconds * 1000);
-      const tickMs = computeDifficultyMultiplier(progress, TICK_MS_START, TICK_MS_MIN);
-      timeoutId = setTimeout(() => {
-        setGameState((prev) => stepSnakeGame(prev, pendingDirectionRef.current));
-        pendingDirectionRef.current = null;
-        scheduleNext();
-      }, tickMs);
-    }
-    scheduleNext();
-    return () => clearTimeout(timeoutId);
-  }, [gameState.status, startedAtMs, durationSeconds]);
-
-  useEffect(() => {
-    if (gameState.status === "over") {
-      setHighScore(recordSnakeScore(gameState.score));
-    }
-  }, [gameState.status, gameState.score]);
-
-  useEffect(() => {
+  function draw(state: SnakeGameState) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -80,22 +65,76 @@ export function SnakeMiniGame({
     ctx.fillStyle = GRAPHITE;
     ctx.fillRect(0, 0, CANVAS_PX, CANVAS_PX);
     ctx.fillStyle = RUST;
-    for (const segment of gameState.snake) {
+    for (const segment of state.snake) {
       ctx.fillRect(segment.x * CELL_PX + 1, segment.y * CELL_PX + 1, CELL_PX - 2, CELL_PX - 2);
     }
-    if (gameState.food.x >= 0) {
+    if (state.food.x >= 0) {
       ctx.fillStyle = CHALK;
       ctx.beginPath();
       ctx.arc(
-        gameState.food.x * CELL_PX + CELL_PX / 2,
-        gameState.food.y * CELL_PX + CELL_PX / 2,
+        state.food.x * CELL_PX + CELL_PX / 2,
+        state.food.y * CELL_PX + CELL_PX / 2,
         CELL_PX / 2 - 2,
         0,
         Math.PI * 2
       );
       ctx.fill();
     }
-  }, [gameState]);
+  }
+
+  useEffect(() => {
+    if (status === "over") {
+      draw(gameRef.current);
+      return;
+    }
+
+    lastFrameRef.current = null;
+    accumulatorRef.current = 0;
+
+    function frame(now: number) {
+      if (lastFrameRef.current == null) lastFrameRef.current = now;
+      const dt = now - lastFrameRef.current;
+      lastFrameRef.current = now;
+      const progress = computeDifficultyProgress(Date.now() - startedAtMs, durationSeconds * 1000);
+      // Note: this ramps DOWN (faster ticks as the window closes), unlike
+      // every other game's speed/gap multiplier which ramps up — same
+      // direction the original self-scheduling setTimeout used.
+      const tickMs = computeDifficultyMultiplier(progress, TICK_MS_START, TICK_MS_MIN);
+      accumulatorRef.current = Math.min(accumulatorRef.current + dt, tickMs * 10);
+
+      let stepped = false;
+      while (accumulatorRef.current >= tickMs) {
+        gameRef.current = stepSnakeGame(gameRef.current, pendingDirectionRef.current);
+        pendingDirectionRef.current = null;
+        accumulatorRef.current -= tickMs;
+        stepped = true;
+        if (gameRef.current.status === "over") break;
+      }
+
+      draw(gameRef.current);
+
+      if (stepped) {
+        setScore(gameRef.current.score);
+        if (gameRef.current.status === "over") {
+          setStatus("over");
+          return;
+        }
+      }
+
+      rafRef.current = requestAnimationFrame(frame);
+    }
+
+    rafRef.current = requestAnimationFrame(frame);
+    return () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    };
+  }, [status, startedAtMs, durationSeconds]);
+
+  useEffect(() => {
+    if (status === "over") {
+      setHighScore(recordSnakeScore(gameRef.current.score));
+    }
+  }, [status]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -137,15 +176,17 @@ export function SnakeMiniGame({
   }
 
   function handleRestart() {
-    setGameState(createSnakeGame(GRID_SIZE));
+    gameRef.current = createSnakeGame(GRID_SIZE);
     pendingDirectionRef.current = null;
+    setScore(0);
+    setStatus("playing");
   }
 
   return (
     <div className="mt-2 p-3 border border-steel/20 bg-graphite/60 flex flex-col items-center gap-2">
       <div className="w-full flex items-center justify-between font-body text-xs text-steel">
         <span>
-          Score: <span className="text-chalk">{gameState.score}</span> · Best:{" "}
+          Score: <span className="text-chalk">{score}</span> · Best:{" "}
           <span className="text-chalk">{highScore}</span>
         </span>
         <button type="button" onClick={onClose} className="text-steel active:text-rust transition-colors">
@@ -165,9 +206,9 @@ export function SnakeMiniGame({
           className="max-w-full"
           style={{ width: CANVAS_PX, height: CANVAS_PX }}
           role="img"
-          aria-label={`Snake mini-game, score ${gameState.score}`}
+          aria-label={`Snake mini-game, score ${score}`}
         />
-        {gameState.status === "over" && (
+        {status === "over" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-graphite/80">
             <p className="font-display text-chalk uppercase text-sm">Game over</p>
             <button

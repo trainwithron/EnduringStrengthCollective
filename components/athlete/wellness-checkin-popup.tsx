@@ -97,7 +97,7 @@ export function WellnessCheckinPopup({
     <div
       role="dialog"
       aria-label="Wellness check-in"
-      className="fixed inset-0 z-40 bg-graphite/95 flex items-center justify-center p-6"
+      className="fixed inset-0 z-40 bg-graphite flex items-center justify-center p-6"
     >
       <div className="w-full max-w-sm">
         <WellnessCheckinWidget

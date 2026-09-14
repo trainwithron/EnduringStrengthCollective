@@ -26,6 +26,10 @@ const STEEL = "#908B7E";
 // Rest-timer mini-game library, lane-dodge entry (Phase 4,
 // custom_shape_theming_idea.md) — swipe/tap left-right to switch lanes;
 // fall speed and obstacle density ramp against real elapsed rest time.
+//
+// requestAnimationFrame + a ref-held game state, same pattern as
+// breakout-mini-game.tsx — see that file's header comment and
+// rest_timer_minigame_performance_investigation.md for why.
 export function LaneDodgeMiniGame({
   onClose,
   startedAtMs,
@@ -35,35 +39,22 @@ export function LaneDodgeMiniGame({
   startedAtMs: number;
   durationSeconds: number;
 }) {
-  const [gameState, setGameState] = useState<LaneDodgeState>(() => createLaneDodgeGame());
+  const gameRef = useRef<LaneDodgeState>(createLaneDodgeGame());
+  const [score, setScore] = useState(0);
+  const [status, setStatus] = useState<"playing" | "over">("playing");
   const [highScore, setHighScore] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const laneChangeRef = useRef<-1 | 1 | null>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const accumulatorRef = useRef(0);
+  const lastFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
     setHighScore(readGameHighScore(GAME_KEY));
   }, []);
 
-  useEffect(() => {
-    if (gameState.status === "over") return;
-    const interval = setInterval(() => {
-      const progress = computeDifficultyProgress(Date.now() - startedAtMs, durationSeconds * 1000);
-      const scrollSpeed = computeDifficultyMultiplier(progress, 3, 8);
-      const spawnGapPx = computeDifficultyMultiplier(progress, 160, 80);
-      setGameState((prev) => stepLaneDodgeGame(prev, laneChangeRef.current, scrollSpeed, spawnGapPx));
-      laneChangeRef.current = null;
-    }, TICK_MS);
-    return () => clearInterval(interval);
-  }, [gameState.status, startedAtMs, durationSeconds]);
-
-  useEffect(() => {
-    if (gameState.status === "over") {
-      setHighScore(recordGameHighScore(GAME_KEY, gameState.score));
-    }
-  }, [gameState.status, gameState.score]);
-
-  useEffect(() => {
+  function draw(state: LaneDodgeState) {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
@@ -77,12 +68,64 @@ export function LaneDodgeMiniGame({
       ctx.stroke();
     }
     ctx.fillStyle = STEEL;
-    for (const o of gameState.obstacles) {
+    for (const o of state.obstacles) {
       ctx.fillRect(o.lane * LANE_WIDTH + 4, o.y, LANE_WIDTH - 8, OBSTACLE_HEIGHT);
     }
     ctx.fillStyle = RUST;
-    ctx.fillRect(gameState.playerLane * LANE_WIDTH + 4, PLAYER_Y, LANE_WIDTH - 8, PLAYER_HEIGHT);
-  }, [gameState]);
+    ctx.fillRect(state.playerLane * LANE_WIDTH + 4, PLAYER_Y, LANE_WIDTH - 8, PLAYER_HEIGHT);
+  }
+
+  useEffect(() => {
+    if (status === "over") {
+      draw(gameRef.current);
+      return;
+    }
+
+    lastFrameRef.current = null;
+    accumulatorRef.current = 0;
+
+    function frame(now: number) {
+      if (lastFrameRef.current == null) lastFrameRef.current = now;
+      const dt = now - lastFrameRef.current;
+      lastFrameRef.current = now;
+      accumulatorRef.current = Math.min(accumulatorRef.current + dt, TICK_MS * 10);
+
+      let stepped = false;
+      while (accumulatorRef.current >= TICK_MS) {
+        const progress = computeDifficultyProgress(Date.now() - startedAtMs, durationSeconds * 1000);
+        const scrollSpeed = computeDifficultyMultiplier(progress, 3, 8);
+        const spawnGapPx = computeDifficultyMultiplier(progress, 160, 80);
+        gameRef.current = stepLaneDodgeGame(gameRef.current, laneChangeRef.current, scrollSpeed, spawnGapPx);
+        laneChangeRef.current = null;
+        accumulatorRef.current -= TICK_MS;
+        stepped = true;
+        if (gameRef.current.status === "over") break;
+      }
+
+      draw(gameRef.current);
+
+      if (stepped) {
+        setScore(gameRef.current.score);
+        if (gameRef.current.status === "over") {
+          setStatus("over");
+          return;
+        }
+      }
+
+      rafRef.current = requestAnimationFrame(frame);
+    }
+
+    rafRef.current = requestAnimationFrame(frame);
+    return () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    };
+  }, [status, startedAtMs, durationSeconds]);
+
+  useEffect(() => {
+    if (status === "over") {
+      setHighScore(recordGameHighScore(GAME_KEY, gameRef.current.score));
+    }
+  }, [status]);
 
   function handleTouchStart(e: React.TouchEvent) {
     const t = e.touches[0];
@@ -100,15 +143,17 @@ export function LaneDodgeMiniGame({
   }
 
   function handleRestart() {
-    setGameState(createLaneDodgeGame());
+    gameRef.current = createLaneDodgeGame();
     laneChangeRef.current = null;
+    setScore(0);
+    setStatus("playing");
   }
 
   return (
     <div className="mt-2 p-3 border border-steel/20 bg-graphite/60 flex flex-col items-center gap-2">
       <div className="w-full flex items-center justify-between font-body text-xs text-steel">
         <span>
-          Score: <span className="text-chalk">{gameState.score}</span> · Best:{" "}
+          Score: <span className="text-chalk">{score}</span> · Best:{" "}
           <span className="text-chalk">{highScore}</span>
         </span>
         <button type="button" onClick={onClose} className="text-steel active:text-rust transition-colors">
@@ -123,9 +168,9 @@ export function LaneDodgeMiniGame({
           className="max-w-full"
           style={{ width: BOARD_WIDTH, height: BOARD_HEIGHT }}
           role="img"
-          aria-label={`Lane dodge mini-game, score ${gameState.score}`}
+          aria-label={`Lane dodge mini-game, score ${score}`}
         />
-        {gameState.status === "over" && (
+        {status === "over" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-graphite/80">
             <p className="font-display text-chalk uppercase text-sm">Game over</p>
             <button

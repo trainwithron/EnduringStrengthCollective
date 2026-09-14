@@ -29,10 +29,17 @@ export default async function AdminOrganizationsPage() {
     .select("id, name, slug, created_at, owner_id, profiles!organizations_owner_id_fkey ( full_name )")
     .order("created_at", { ascending: false });
 
-  const { data: groupCounts } = await supabase.from("groups").select("organization_id");
+  const { data: groupCounts } = await supabase
+    .from("groups")
+    .select("id, organization_id, created_at")
+    .order("created_at", { ascending: true });
   const groupCountByOrg = new Map<string, number>();
+  const firstGroupByOrg = new Map<string, string>();
   for (const g of groupCounts ?? []) {
     groupCountByOrg.set(g.organization_id, (groupCountByOrg.get(g.organization_id) ?? 0) + 1);
+    if (!firstGroupByOrg.has(g.organization_id)) {
+      firstGroupByOrg.set(g.organization_id, g.id);
+    }
   }
 
   return (
@@ -54,18 +61,32 @@ export default async function AdminOrganizationsPage() {
         </div>
 
         <div className="divide-y divide-steel/15">
-          {(orgs ?? []).map((org) => (
-            <div key={org.id} className="py-3 flex items-center justify-between gap-4">
-              <div>
-                <p className="font-body text-sm font-medium">{org.name}</p>
-                <p className="font-body text-xs text-steel">
-                  /{org.slug} · Owner: {(org.profiles as any)?.full_name ?? "Unknown"} ·{" "}
-                  {groupCountByOrg.get(org.id) ?? 0} group{groupCountByOrg.get(org.id) === 1 ? "" : "s"} ·
-                  Created {new Date(org.created_at).toLocaleDateString()}
-                </p>
+          {(orgs ?? []).map((org) => {
+            const firstGroupId = firstGroupByOrg.get(org.id);
+            const row = (
+              <div className="py-3 flex items-center justify-between gap-4">
+                <div>
+                  <p className="font-body text-sm font-medium">{org.name}</p>
+                  <p className="font-body text-xs text-steel">
+                    /{org.slug} · Owner: {(org.profiles as any)?.full_name ?? "Unknown"} ·{" "}
+                    {groupCountByOrg.get(org.id) ?? 0} group{groupCountByOrg.get(org.id) === 1 ? "" : "s"} ·
+                    Created {new Date(org.created_at).toLocaleDateString()}
+                  </p>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+            return firstGroupId ? (
+              <Link
+                key={org.id}
+                href={`/groups/${firstGroupId}/branding`}
+                className="block hover:bg-steel/5"
+              >
+                {row}
+              </Link>
+            ) : (
+              <div key={org.id}>{row}</div>
+            );
+          })}
           {(orgs ?? []).length === 0 && (
             <p className="font-body text-sm text-steel py-3">No organizations yet.</p>
           )}

@@ -61,7 +61,7 @@ export function AutoCategorizeButton({
 
   if (open) {
     return (
-      <div className="fixed inset-0 z-40 bg-graphite/95 flex items-center justify-center p-6">
+      <div className="fixed inset-0 z-40 bg-graphite flex items-center justify-center p-6">
         <div className="bg-surface border border-steel/30 w-full max-w-2xl max-h-[80vh] flex flex-col">
           <div className="p-4 border-b border-steel/20">
             <h2 className="font-display uppercase text-lg tracking-wide">Auto-categorize</h2>

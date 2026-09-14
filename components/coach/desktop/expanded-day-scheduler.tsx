@@ -115,7 +115,7 @@ export function ExpandedDayScheduler({
   ].sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-6">
+    <div className="fixed inset-0 z-50 bg-graphite flex items-center justify-center p-6">
       <div className="bg-graphite border border-rust/40 w-full max-w-2xl max-h-[85vh] overflow-y-auto shadow-2xl">
         <div className="p-5 border-b border-steel/20 flex items-start justify-between gap-4">
           <div>

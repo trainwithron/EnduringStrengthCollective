@@ -7,8 +7,6 @@ import {
   Dumbbell,
   ChevronDown,
   ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   CalendarDays,
   MessagesSquare,
   Users,
@@ -39,6 +37,8 @@ import { ViewModeToggle } from "@/components/coach/view-mode-toggle";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { TerminologyProvider } from "@/components/coach/terminology-provider";
 import { SwappableTerm } from "@/components/coach/swappable-term";
+import { ShellRail, type RailIcon } from "@/components/coach/desktop/shell-rail";
+import { ShellListPanel, type SectionSubLink } from "@/components/coach/desktop/shell-list-panel";
 
 function NavBadge({ count, collapsed }: { count: number; collapsed?: boolean }) {
   if (count <= 0) return null;
@@ -54,9 +54,6 @@ function NavBadge({ count, collapsed }: { count: number; collapsed?: boolean }) 
   );
 }
 
-const SIDEBAR_WIDTH = 240;
-const SIDEBAR_WIDTH_COLLAPSED = 68;
-const COLLAPSE_STORAGE_KEY = "coach-sidebar-collapsed";
 
 type Active =
   | "home"
@@ -133,6 +130,10 @@ export function CoachDesktopShell({
   const [openSupportCount, setOpenSupportCount] = useState(0);
   const [teamMode, setTeamMode] = useState(false);
   const [groupKind, setGroupKind] = useState<"one_on_one" | "social" | "team" | null>(null);
+  // Concept 8 "Familiar" shell redesign (coach_desktop_shell_identity_
+  // redesign.md) — the rail + list panel need the viewer's own id for
+  // the pinned Needs Attention strip's fetch.
+  const [coachId, setCoachId] = useState<string | null>(null);
 
   // Team (position groups/depth chart) is an opt-in feature for coaches
   // running an actual team sport — most individual-training coaches never
@@ -170,6 +171,7 @@ export function CoachDesktopShell({
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
+      if (!cancelled) setCoachId(user.id);
       const { data } = await supabase
         .from("profiles")
         .select("is_platform_admin")
@@ -190,16 +192,6 @@ export function CoachDesktopShell({
     };
   }, []);
 
-  // Collapse state persists across visits — a coach who prefers the icon
-  // rail shouldn't have to re-collapse it every page load.
-  useEffect(() => {
-    try {
-      if (window.localStorage.getItem(COLLAPSE_STORAGE_KEY) === "1") setCollapsed(true);
-    } catch {
-      // Storage unavailable (private browsing, etc.) — default expanded.
-    }
-  }, []);
-
   // Remembers the last group this coach actually looked at, so the
   // cross-group Home dashboard (app/dashboard/page.tsx) can default its
   // own sidebar to somewhere real instead of showing no nav at all.
@@ -214,18 +206,6 @@ export function CoachDesktopShell({
       // Non-fatal — Home just falls back to its minimal shell.
     }
   }, [groupId, groupName]);
-
-  function toggleCollapsed() {
-    setCollapsed((prev) => {
-      const next = !prev;
-      try {
-        window.localStorage.setItem(COLLAPSE_STORAGE_KEY, next ? "1" : "0");
-      } catch {
-        // Ignore — the toggle still works for this session.
-      }
-      return next;
-    });
-  }
 
   // Organization branding (button shape, colors, fonts, logo) is now
   // applied once at the app root (app/layout.tsx) as CSS custom
@@ -431,6 +411,45 @@ export function CoachDesktopShell({
 
   const groupHasActiveChild = (group: NavGroup) => group.items.some((i) => i.key === active);
 
+  // Concept 8 "Familiar" shell redesign — resolves this feature's own
+  // flagged open gap ("rail icon-to-destination map is placeholder")
+  // with a real IA: one rail icon per real top-level destination this
+  // shell's own `nav` array already defines, reusing its hrefs/icons/
+  // badges verbatim rather than inventing a parallel structure. A group
+  // (Programming, Business, etc.) becomes one icon pointing at its first
+  // item; every group's other items stay reachable via the small
+  // section sub-nav the list panel renders when that section is active.
+  const railIcons: RailIcon[] = nav.map((entry) => {
+    if (!isGroup(entry)) {
+      return {
+        key: entry.key,
+        label: entry.label,
+        href: entry.href,
+        icon: entry.icon,
+        active: active === entry.key,
+        badge: entry.badge,
+      };
+    }
+    const first = entry.items[0];
+    return {
+      key: `group:${entry.label}`,
+      label: entry.label,
+      href: first.href,
+      icon: entry.icon,
+      active: groupHasActiveChild(entry),
+    };
+  });
+
+  const activeGroup = nav.find((entry): entry is NavGroup => isGroup(entry) && groupHasActiveChild(entry));
+  const sectionLabel = activeGroup?.label ?? null;
+  const sectionSubLinks: SectionSubLink[] =
+    activeGroup?.items.map((item) => ({
+      key: item.key,
+      label: item.label,
+      href: item.href,
+      active: active === item.key,
+    })) ?? [];
+
   function renderLeaf(item: NavLeaf, { indented = false }: { indented?: boolean } = {}) {
     const isActive = active === item.key;
     const Icon = item.icon;
@@ -591,15 +610,6 @@ export function CoachDesktopShell({
         >
           <Menu className="w-5 h-5" />
         </button>
-        <button
-          type="button"
-          onClick={toggleCollapsed}
-          className="hidden lg:flex w-9 h-9 items-center justify-center text-steel shrink-0"
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {collapsed ? <ChevronsRight className="w-4 h-4" /> : <ChevronsLeft className="w-4 h-4" />}
-        </button>
         {/* Always visible, not just on mobile — the sidebar's own name
             label is easy to miss when your eyes are on the main content,
             and picking up someone else's client/program by mistake is a
@@ -635,14 +645,64 @@ export function CoachDesktopShell({
       </header>
 
       <div className="flex">
-        {/* Desktop / tablet sidebar — always in-flow, width animates
-            between the full and icon-rail states. */}
-        <aside
-          className="hidden lg:flex shrink-0 border-r border-steel/20 flex-col sticky top-14 h-[calc(100vh-56px)] transition-[width] duration-150"
-          style={{ width: collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH }}
-        >
-          {sidebarContent}
-        </aside>
+        {/* Concept 8 "Familiar" shell redesign — Discord/YouTube-inspired
+            icon rail (always 64px, never collapses) + a resizable/
+            collapsible list panel (roster, pinned Needs Attention strip,
+            picture-in-picture Business mini-dashboard). Desktop/tablet
+            only — mobile keeps the existing off-canvas drawer below,
+            unchanged, since this redesign is explicitly scoped to the
+            desktop shell. */}
+        <ShellRail
+          icons={[
+            { key: "home", label: "Home", href: "/dashboard", icon: Home, active: active === "home" },
+            ...railIcons,
+          ]}
+          footer={
+            <>
+              <a
+                href={`/groups/${groupId}/display`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Display Mode"
+                className="w-11 h-11 flex items-center justify-center text-steel active:text-chalk"
+              >
+                <MonitorPlay className="w-4 h-4" strokeWidth={2.25} />
+              </a>
+              <ViewModeToggle targetMode="mobile" label="Client-Facing Mode" collapsed />
+              {isPlatformAdmin && (
+                <>
+                  <Link
+                    href="/admin/organizations"
+                    title="Organizations"
+                    className="w-11 h-11 flex items-center justify-center text-steel active:text-chalk"
+                  >
+                    <Building2 className="w-4 h-4" strokeWidth={2.25} />
+                  </Link>
+                  <Link
+                    href="/admin/support"
+                    title="Support Inbox"
+                    className="relative w-11 h-11 flex items-center justify-center text-steel active:text-chalk"
+                  >
+                    <HeartHandshake className="w-4 h-4" strokeWidth={2.25} />
+                    <NavBadge count={openSupportCount} collapsed />
+                  </Link>
+                </>
+              )}
+              <DownloadAppButton collapsed />
+              <div className="w-11 flex items-center justify-center">
+                <SignOutButton />
+              </div>
+            </>
+          }
+        />
+        {coachId && (
+          <ShellListPanel
+            coachId={coachId}
+            groupId={groupId}
+            sectionLabel={sectionLabel}
+            sectionSubLinks={sectionSubLinks}
+          />
+        )}
 
         {/* Mobile off-canvas drawer — hidden by default so the sidebar
             never eats half the screen on a phone; opened via the hamburger

@@ -44,6 +44,19 @@ function useSwipeGesture(onAccept: () => void, enabled: boolean) {
       if (!enabled) return;
       startX.current = e.clientX;
       fired.current = false;
+      // Without this, a real finger drag routinely moves off this
+      // narrow input within a frame or two — the browser then delivers
+      // pointermove to whatever's now underneath instead of here, and
+      // the swipe silently stops tracking (reads as "unresponsive,"
+      // not a rendering perf issue). Capturing the pointer keeps every
+      // subsequent move event targeted at this element regardless of
+      // where the finger actually is on screen.
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        // Pointer capture unsupported/blocked — the gesture still works
+        // whenever the finger happens to stay over the element.
+      }
     },
     onPointerMove: (e: React.PointerEvent) => {
       if (!enabled || startX.current == null || fired.current) return;
@@ -52,8 +65,13 @@ function useSwipeGesture(onAccept: () => void, enabled: boolean) {
         onAccept();
       }
     },
-    onPointerUp: () => {
+    onPointerUp: (e: React.PointerEvent) => {
       startX.current = null;
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {
+        // No-op if it was never captured.
+      }
     },
   };
 }
@@ -404,6 +422,18 @@ export function ExerciseSetGrid({
         onPointerDown={(e) => {
           dragStartX.current = e.clientX;
           dragFired.current = false;
+          // Same fix as the per-cell swipe gesture above — a 20px-wide
+          // handle is trivially easy to drag a finger off of within a
+          // frame or two; without capture, the drag loses tracking the
+          // instant that happens and never crosses the threshold, which
+          // reads as the gesture just not working rather than a
+          // rendering slowdown.
+          try {
+            e.currentTarget.setPointerCapture(e.pointerId);
+          } catch {
+            // Pointer capture unsupported/blocked — falls back to
+            // requiring the finger to stay over the handle.
+          }
         }}
         onPointerMove={(e) => {
           if (dragStartX.current == null || dragFired.current) return;
@@ -411,6 +441,13 @@ export function ExerciseSetGrid({
             dragFired.current = true;
             vibrateConfirm();
             handlePropagateRow(field);
+          }
+        }}
+        onPointerUp={(e) => {
+          try {
+            e.currentTarget.releasePointerCapture(e.pointerId);
+          } catch {
+            // No-op if it was never captured.
           }
         }}
         onClick={() => {

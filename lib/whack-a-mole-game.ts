@@ -43,9 +43,15 @@ export function stepWhackAMoleTick(
 
   const elapsedMs = state.elapsedMs + tickMs;
   const stillUp = state.moles.filter((m) => m.expiresAtMs > elapsedMs);
-  const misses = state.misses + (state.moles.length - stillUp.length);
+  const expiredCount = state.moles.length - stillUp.length;
+  const misses = state.misses + expiredCount;
 
-  let moles = stillUp;
+  // Keep the same array reference when nothing actually expired — most
+  // ticks land in the gap between spawns with nothing changing at all,
+  // and the caller (whack-a-mole-mini-game.tsx) relies on this to skip
+  // a React re-render via reference equality instead of forcing one on
+  // every single tick the way the old setInterval+setState loop did.
+  let moles = expiredCount > 0 ? stillUp : state.moles;
   let lastSpawnMs = state.lastSpawnMs;
   if (elapsedMs - lastSpawnMs >= spawnIntervalMs) {
     const occupied = new Set(moles.map((m) => m.holeIndex));

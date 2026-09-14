@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Smartphone, X, Copy, Check } from "lucide-react";
 
 // A coach building programs is sitting at a desktop, not their phone — the
@@ -68,8 +69,20 @@ export function DownloadAppButton({
         </button>
       )}
 
-      {open && (
-        <div className="fixed inset-0 z-50 bg-graphite/80 flex items-center justify-center px-6">
+      {open && typeof document !== "undefined" && createPortal(
+        // Rendered via a portal straight onto <body> — this button lives
+        // inside the coach-desktop-shell's rail footer, and the rail is
+        // `position: sticky` (so it can stay pinned while its own
+        // content scrolls). A sticky ancestor creates a new stacking
+        // context, which silently traps this modal's own z-index inside
+        // it — despite `position: fixed` correctly sizing/placing the
+        // box across the whole viewport, paint order still lost to
+        // later-painted page content outside the rail (confirmed via
+        // document.elementFromPoint returning the page behind it, not
+        // the modal, at a point inside the modal's own reported rect).
+        // A portal is the standard fix: it escapes the DOM tree (and
+        // therefore every ancestor's stacking context) entirely.
+        <div className="fixed inset-0 z-50 bg-graphite flex items-center justify-center px-6">
           <div className="bg-surface border border-steel/30 max-w-md w-full p-6 relative">
             <button
               type="button"
@@ -130,7 +143,8 @@ export function DownloadAppButton({
               browser tab.
             </p>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

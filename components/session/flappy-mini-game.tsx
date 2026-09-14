@@ -26,6 +26,10 @@ const STEEL = "#908B7E";
 // gap width) ramps against real elapsed rest time via the shared
 // lib/rest-timer-difficulty.ts engine, not its own internal clock, so
 // closing and reopening the game panel doesn't reset the ramp.
+//
+// requestAnimationFrame + a ref-held game state, same pattern as
+// breakout-mini-game.tsx — see that file's header comment and
+// rest_timer_minigame_performance_investigation.md for why.
 export function FlappyMiniGame({
   onClose,
   startedAtMs,
@@ -35,36 +39,21 @@ export function FlappyMiniGame({
   startedAtMs: number;
   durationSeconds: number;
 }) {
-  const [gameState, setGameState] = useState<FlappyGameState>(() => createFlappyGame());
+  const gameRef = useRef<FlappyGameState>(createFlappyGame());
+  const [score, setScore] = useState(0);
+  const [status, setStatus] = useState<"playing" | "over">("playing");
   const [highScore, setHighScore] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const flapRequestedRef = useRef(false);
-  const gameStateRef = useRef(gameState);
-  gameStateRef.current = gameState;
+  const rafRef = useRef<number | null>(null);
+  const accumulatorRef = useRef(0);
+  const lastFrameRef = useRef<number | null>(null);
 
   useEffect(() => {
     setHighScore(readGameHighScore(GAME_KEY));
   }, []);
 
-  useEffect(() => {
-    if (gameState.status === "over") return;
-    const interval = setInterval(() => {
-      const progress = computeDifficultyProgress(Date.now() - startedAtMs, durationSeconds * 1000);
-      const scrollSpeed = computeDifficultyMultiplier(progress, 2, 5);
-      const gapHeight = computeDifficultyMultiplier(progress, 150, 90);
-      setGameState((prev) => stepFlappyGame(prev, flapRequestedRef.current, scrollSpeed, gapHeight));
-      flapRequestedRef.current = false;
-    }, TICK_MS);
-    return () => clearInterval(interval);
-  }, [gameState.status, startedAtMs, durationSeconds]);
-
-  useEffect(() => {
-    if (gameState.status === "over") {
-      setHighScore(recordGameHighScore(GAME_KEY, gameState.score));
-    }
-  }, [gameState.status, gameState.score]);
-
-  useEffect(() => {
+  function draw(state: FlappyGameState) {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
@@ -73,31 +62,85 @@ export function FlappyMiniGame({
     ctx.fillStyle = GRAPHITE;
     ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
     ctx.fillStyle = STEEL;
-    for (const pipe of gameState.pipes) {
+    for (const pipe of state.pipes) {
       const gapTop = pipe.gapCenter - gapHeight / 2;
       ctx.fillRect(pipe.x, 0, PIPE_WIDTH, Math.max(0, gapTop));
       ctx.fillRect(pipe.x, gapTop + gapHeight, PIPE_WIDTH, BOARD_HEIGHT);
     }
     ctx.fillStyle = RUST;
     ctx.beginPath();
-    ctx.arc(BIRD_X, gameState.birdY, BIRD_RADIUS, 0, Math.PI * 2);
+    ctx.arc(BIRD_X, state.birdY, BIRD_RADIUS, 0, Math.PI * 2);
     ctx.fill();
-  }, [gameState, startedAtMs, durationSeconds]);
+  }
+
+  useEffect(() => {
+    if (status === "over") {
+      draw(gameRef.current);
+      return;
+    }
+
+    lastFrameRef.current = null;
+    accumulatorRef.current = 0;
+
+    function frame(now: number) {
+      if (lastFrameRef.current == null) lastFrameRef.current = now;
+      const dt = now - lastFrameRef.current;
+      lastFrameRef.current = now;
+      accumulatorRef.current = Math.min(accumulatorRef.current + dt, TICK_MS * 10);
+
+      let stepped = false;
+      while (accumulatorRef.current >= TICK_MS) {
+        const progress = computeDifficultyProgress(Date.now() - startedAtMs, durationSeconds * 1000);
+        const scrollSpeed = computeDifficultyMultiplier(progress, 2, 5);
+        const gapHeight = computeDifficultyMultiplier(progress, 150, 90);
+        gameRef.current = stepFlappyGame(gameRef.current, flapRequestedRef.current, scrollSpeed, gapHeight);
+        flapRequestedRef.current = false;
+        accumulatorRef.current -= TICK_MS;
+        stepped = true;
+        if (gameRef.current.status === "over") break;
+      }
+
+      draw(gameRef.current);
+
+      if (stepped) {
+        setScore(gameRef.current.score);
+        if (gameRef.current.status === "over") {
+          setStatus("over");
+          return;
+        }
+      }
+
+      rafRef.current = requestAnimationFrame(frame);
+    }
+
+    rafRef.current = requestAnimationFrame(frame);
+    return () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    };
+  }, [status, startedAtMs, durationSeconds]);
+
+  useEffect(() => {
+    if (status === "over") {
+      setHighScore(recordGameHighScore(GAME_KEY, gameRef.current.score));
+    }
+  }, [status]);
 
   function handleFlap() {
     flapRequestedRef.current = true;
   }
 
   function handleRestart() {
-    setGameState(createFlappyGame());
+    gameRef.current = createFlappyGame();
     flapRequestedRef.current = false;
+    setScore(0);
+    setStatus("playing");
   }
 
   return (
     <div className="mt-2 p-3 border border-steel/20 bg-graphite/60 flex flex-col items-center gap-2">
       <div className="w-full flex items-center justify-between font-body text-xs text-steel">
         <span>
-          Score: <span className="text-chalk">{gameState.score}</span> · Best:{" "}
+          Score: <span className="text-chalk">{score}</span> · Best:{" "}
           <span className="text-chalk">{highScore}</span>
         </span>
         <button type="button" onClick={onClose} className="text-steel active:text-rust transition-colors">
@@ -112,9 +155,9 @@ export function FlappyMiniGame({
           className="max-w-full"
           style={{ width: BOARD_WIDTH, height: BOARD_HEIGHT }}
           role="img"
-          aria-label={`Flappy mini-game, score ${gameState.score}`}
+          aria-label={`Flappy mini-game, score ${score}`}
         />
-        {gameState.status === "over" && (
+        {status === "over" && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-graphite/80">
             <p className="font-display text-chalk uppercase text-sm">Game over</p>
             <button

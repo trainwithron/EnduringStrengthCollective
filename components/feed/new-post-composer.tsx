@@ -148,7 +148,7 @@ export function NewPostComposer({
   }
 
   return (
-    <div className="fixed inset-0 bg-graphite/95 z-40 flex items-end">
+    <div className="fixed inset-0 bg-graphite z-40 flex items-end">
       <div className="w-full bg-surface p-5 pb-8">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-display uppercase text-lg">New post</h2>
