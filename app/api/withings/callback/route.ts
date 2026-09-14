@@ -1,8 +1,45 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { exchangeWithingsCode } from "@/lib/withings";
+import { exchangeWithingsCode, fetchWithingsWeight } from "@/lib/withings";
+
+const BACKFILL_WINDOW_DAYS = 90;
+
+function daysAgoIso(days: number) {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
+// One-time historical pull for a brand-new connection — the identical
+// gap already fixed for Oura (app/api/oura/callback/route.ts): the
+// daily cron sync only ever looks at the trailing week, so a brand-new
+// connection with real weight history got none of it until it aged
+// into that rolling window. Same after()-scheduled, best-effort pattern.
+async function backfillHistory(connectionId: string, accessToken: string) {
+  const serviceRole = createServiceRoleClient();
+  const startDate = daysAgoIso(BACKFILL_WINDOW_DAYS);
+  const endDate = new Date().toISOString().slice(0, 10);
+
+  try {
+    const weight = await fetchWithingsWeight(accessToken, startDate, endDate);
+    if (weight.length > 0) {
+      const rows = weight.map((p) => ({
+        connection_id: connectionId,
+        metric_date: p.date,
+        metric_type: "weight" as const,
+        value: p.value,
+      }));
+      const { error } = await serviceRole
+        .from("wearable_daily_metrics")
+        .upsert(rows, { onConflict: "connection_id,metric_date,metric_type" });
+      if (error) throw error;
+    }
+  } catch (err) {
+    console.error(`Withings historical backfill failed for connection ${connectionId}:`, err);
+  }
+}
 
 // Withings redirects back here after the user approves (or denies)
 // access. Mirrors app/api/oura/callback/route.ts exactly, including the
@@ -40,6 +77,17 @@ export async function GET(request: Request) {
     const tokens = await exchangeWithingsCode(code);
     const serviceRole = createServiceRoleClient();
 
+    // Checked before the upsert below so a reconnect/re-auth of an
+    // existing connection never re-triggers the backfill — only a
+    // genuinely new connection should.
+    const { data: existingConnection } = await serviceRole
+      .from("wearable_connections")
+      .select("id")
+      .eq("profile_id", user.id)
+      .eq("provider", "withings")
+      .maybeSingle();
+    const isNewConnection = !existingConnection;
+
     const { data: connection, error: connectionError } = await serviceRole
       .from("wearable_connections")
       .upsert(
@@ -66,6 +114,10 @@ export async function GET(request: Request) {
       { onConflict: "connection_id" }
     );
     if (tokenError) throw tokenError;
+
+    if (isNewConnection) {
+      after(() => backfillHistory(connection.id, tokens.accessToken));
+    }
 
     const response = NextResponse.redirect(settingsUrl);
     response.cookies.delete("withings_oauth_state");

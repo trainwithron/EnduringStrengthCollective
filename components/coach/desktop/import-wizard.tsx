@@ -80,6 +80,12 @@ interface PendingImport {
   resolutions: Map<string, { exerciseName: string; trackedFields: TrackedField[] }>;
   autoNewExercises: string[]; // matched nothing at all — unambiguous, never gated
   fuzzyMatches: PendingFuzzyMatch[]; // may be empty
+  // Only set for an AI-generated program (ai_program_builder_
+  // conversational_learning_idea.md) — the model's own real reasoning
+  // captured at generation time, saved so the "Ask the AI why" chat has
+  // something grounded to answer from later, instead of reconstructing
+  // (and risking confabulating) a reason after the fact.
+  sequencingNotes: string | null;
 }
 
 export function ImportWizard({
@@ -166,7 +172,12 @@ export function ImportWizard({
   // sharing a word) — those pause here for the coach to look at instead
   // of silently landing in a real program, which is what the "nothing to
   // confirm" copy claimed but the old flow didn't actually do.
-  function prepareImport(parsed: ParsedImportRow[], programName: string, description: string) {
+  function prepareImport(
+    parsed: ParsedImportRow[],
+    programName: string,
+    description: string,
+    sequencingNotes: string | null = null
+  ) {
     setStatusLabel("Matching exercises…");
 
     const resolutions = new Map<string, { exerciseName: string; trackedFields: TrackedField[] }>();
@@ -217,6 +228,7 @@ export function ImportWizard({
       resolutions,
       autoNewExercises,
       fuzzyMatches,
+      sequencingNotes,
     };
 
     if (fuzzyMatches.length === 0) {
@@ -253,7 +265,7 @@ export function ImportWizard({
     processingRef.current = true;
 
     const supabase = createBrowserClient();
-    const { parsed, programName, description, fuzzyMatches, autoNewExercises } = importData;
+    const { parsed, programName, description, fuzzyMatches, autoNewExercises, sequencingNotes } = importData;
     const resolutions = new Map(importData.resolutions);
 
     const createdExercises: string[] = [...autoNewExercises];
@@ -307,6 +319,7 @@ export function ImportWizard({
         start_date: startDate,
         training_days: trainingDays,
         visibility_window: "day",
+        ai_sequencing_notes: sequencingNotes,
       })
       .select("id")
       .single();
@@ -422,7 +435,12 @@ export function ImportWizard({
         return;
       }
 
-      prepareImport(data.rows, data.programName, `AI-generated from: "${aiPrompt.trim()}"`);
+      prepareImport(
+        data.rows,
+        data.programName,
+        `AI-generated from: "${aiPrompt.trim()}"`,
+        data.sequencingNotes ?? null
+      );
     } catch (err) {
       setStatus("error");
       setError(err instanceof Error ? err.message : "Couldn't generate a program — try again.");

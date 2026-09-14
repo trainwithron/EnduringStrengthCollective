@@ -4,7 +4,7 @@ import { dateKeyInZone, getGroupCoachTimezone, nowInZone } from "./timezone";
 
 export type TodaysWorkoutResult =
   | { status: "ready"; workoutId: string }
-  | { status: "locked"; unlocksOn: Date }
+  | { status: "locked"; unlocksOn: Date; workoutId: string }
   | { status: "done" }
   | { status: "no-program" };
 
@@ -118,7 +118,7 @@ export async function getTodaysWorkoutId(
     if (!next) return { status: "done" };
     const scheduledDate = scheduledDateByDayId.get(next.id);
     if (isLocked(scheduledDate, now, program.visibility_window)) {
-      return { status: "locked", unlocksOn: scheduledDate! };
+      return { status: "locked", unlocksOn: scheduledDate!, workoutId: next.id };
     }
     return { status: "ready", workoutId: next.id };
   }

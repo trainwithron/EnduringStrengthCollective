@@ -66,10 +66,34 @@ export default async function LogForClientPage(
 
   if (!activeProgram) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">
-          This group doesn&apos;t have an active program yet.
-        </p>
+      <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
+        <header className="px-5 pt-8 pb-6 border-b border-steel/20">
+          <Link
+            href={`/groups/${params.groupId}/athletes/${params.athleteId}`}
+            className="font-body text-xs text-steel uppercase tracking-wide"
+          >
+            &larr; Back to profile
+          </Link>
+          <p className="font-body text-xs text-rust uppercase tracking-wide mt-3">
+            Logging for {athleteProfile?.full_name ?? "this client"}
+          </p>
+          <h1 className="font-display font-bold text-3xl leading-tight mt-3 uppercase">
+            No active program yet
+          </h1>
+        </header>
+        <section className="px-5 pt-6">
+          <p className="font-body text-sm text-steel mb-4">
+            This group doesn&apos;t have an active program yet — assign one from{" "}
+            {athleteProfile?.full_name ?? "this client"}&apos;s profile before logging an
+            in-person session.
+          </p>
+          <Link
+            href={`/groups/${params.groupId}/athletes/${params.athleteId}`}
+            className="inline-block h-11 px-5 leading-[2.75rem] bg-rust text-graphite font-body font-bold text-sm text-center"
+          >
+            Go to profile &rarr;
+          </Link>
+        </section>
       </main>
     );
   }

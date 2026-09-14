@@ -18,7 +18,7 @@ export async function getSharedWorkout(postId: string) {
     .select(
       `
       id, post_type, created_at, group_id, broadcast_level, author_id, shared_exercise_names,
-      profiles!posts_author_id_fkey ( full_name ),
+      profiles!posts_author_id_fkey ( full_name, avatar_url ),
       workout_logs ( session_id, new_prs, total_volume, total_sets_completed )
     `
     )
@@ -31,9 +31,22 @@ export async function getSharedWorkout(postId: string) {
 
   const { data: group } = await supabase
     .from("groups")
-    .select("name")
+    .select("name, organization_id")
     .eq("id", post.group_id)
     .maybeSingle();
+
+  // Post-workout card v2 (post_workout_card_v1_bevel_and_animation.md) —
+  // the org's configured workout-card background, if any. Read here
+  // (not a separate query in the page) since this is the one place both
+  // consumers of this shared data (the public share page and the in-feed
+  // expanded card) already fetch group-scoped context.
+  const { data: org } = group?.organization_id
+    ? await supabase
+        .from("organizations")
+        .select("workout_card_background_mode, workout_card_background_url")
+        .eq("id", group.organization_id)
+        .maybeSingle()
+    : { data: null };
 
   const broadcastLevel: "full" | "prs_only" | "checkin_only" = post.broadcast_level ?? "full";
   const newPrs: string[] = broadcastLevel === "checkin_only" ? [] : workoutLog.new_prs ?? [];
@@ -318,7 +331,10 @@ export async function getSharedWorkout(postId: string) {
     authorId: post.author_id as string,
     groupId: post.group_id,
     athleteName: (post.profiles as any)?.full_name ?? "An athlete",
+    athleteAvatarUrl: (post.profiles as any)?.avatar_url ?? null,
     groupName: group?.name ?? "The Enduring Strength Collective",
+    workoutCardBackgroundMode: (org?.workout_card_background_mode as "default_rotation" | "custom" | null) ?? "default_rotation",
+    workoutCardBackgroundUrl: org?.workout_card_background_url ?? null,
     broadcastLevel,
     totalVolume: broadcastLevel === "full" ? workoutLog.total_volume ?? 0 : null,
     totalSetsCompleted: broadcastLevel === "full" ? workoutLog.total_sets_completed ?? 0 : null,

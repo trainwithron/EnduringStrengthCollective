@@ -53,7 +53,7 @@ export default async function ProgramDetailPage(
 
   const { data: program } = await supabase
     .from("programs")
-    .select("id, name, description, start_date, training_days, visibility_window")
+    .select("id, name, description, start_date, training_days, visibility_window, ai_sequencing_notes")
     .eq("id", params.programId)
     .eq("group_id", params.groupId)
     .single();
@@ -78,6 +78,7 @@ export default async function ProgramDetailPage(
         programId={params.programId}
         programName={program.name}
         programDescription={program.description}
+        aiSequencingNotes={program.ai_sequencing_notes}
         coachId={user.id}
         startDate={program.start_date}
         trainingDays={program.training_days}
@@ -233,6 +234,7 @@ async function CoachProgramBuilder({
   programId,
   programName,
   programDescription,
+  aiSequencingNotes,
   coachId,
   startDate,
   trainingDays,
@@ -242,6 +244,7 @@ async function CoachProgramBuilder({
   programId: string;
   programName: string;
   programDescription: string | null;
+  aiSequencingNotes: string | null;
   coachId: string;
   startDate: string | null;
   trainingDays: number[] | null;
@@ -380,6 +383,7 @@ async function CoachProgramBuilder({
         groupId={groupId}
         programName={programName}
         programDescription={programDescription}
+        aiSequencingNotes={aiSequencingNotes}
         initialDays={days}
         exerciseLibrary={exerciseLibrary}
         movementPatterns={movementPatterns}

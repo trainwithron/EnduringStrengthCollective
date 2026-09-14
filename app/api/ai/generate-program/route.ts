@@ -20,6 +20,11 @@ fences, no explanation:
 
 {
   "programName": string,        // short, e.g. "12-Week Strength Block"
+  "sequencingNotes": string,    // 1-3 sentences on the real methodology reasons behind how you
+                                  // ordered/sequenced this program (e.g. why certain work comes early
+                                  // vs. late in a session, how weeks progress) — this is saved and
+                                  // shown back to the coach later if they ask "why did you do that",
+                                  // so it must reflect your ACTUAL reasoning, not a generic summary
   "rows": [
     {
       "week": string,          // e.g. "Week 1"
@@ -45,6 +50,9 @@ Rules:
 - One row per exercise per day, not one row per set (a 3x8 exercise is ONE row with sets=3, reps="8").
 - Vary the program sensibly week to week (progressive overload, or the specific progression scheme
   described) rather than repeating the exact same week verbatim.
+- If this coach has standing preferences listed below (learned from past corrections), apply any whose
+  stated condition matches this program — these come from a real coach explicitly correcting a past
+  program, so treat them as real methodology requirements, not suggestions.
 - Respond with ONLY the JSON object described. No leading or trailing text.`;
 
 function isValidRow(row: any): row is ParsedImportRow {
@@ -98,11 +106,28 @@ export async function POST(request: Request) {
     .limit(300);
   const libraryNames = (libraryRows ?? []).map((r) => r.name);
 
+  // Learned from past corrections via the "Ask the AI why" chat
+  // (ai_program_builder_conversational_learning_idea.md) — plain prompt
+  // injection, same pattern as the library names above. A coach's total
+  // rule count is realistically tens, not thousands, so the full list
+  // fits directly here every time; no retrieval layer needed.
+  const { data: prefRows } = await supabase
+    .from("coach_program_preferences")
+    .select("condition_text, preference_text")
+    .eq("coach_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(100);
+  const preferencesText =
+    prefRows && prefRows.length > 0
+      ? prefRows.map((p) => `- When ${p.condition_text}: ${p.preference_text}`).join("\n")
+      : "(none yet)";
+
   try {
     const text = await callClaude({
       system: SYSTEM_PROMPT,
       userText:
         `Coach's exercise library (prefer these exact names where they fit):\n${libraryNames.join(", ") || "(empty — invent sensible exercise names)"}\n\n` +
+        `This coach's standing preferences, learned from past corrections:\n${preferencesText}\n\n` +
         `Program description: ${prompt.trim()}`,
       // 8192 truncated mid-JSON on a routine request (8 weeks x 3 days,
       // ~130+ exercise rows) — a program's row count scales with
@@ -142,8 +167,12 @@ export async function POST(request: Request) {
     const programName = typeof parsed.programName === "string" && parsed.programName.trim()
       ? parsed.programName.trim()
       : "AI-Generated Program";
+    const sequencingNotes =
+      typeof parsed.sequencingNotes === "string" && parsed.sequencingNotes.trim()
+        ? parsed.sequencingNotes.trim()
+        : null;
 
-    return NextResponse.json({ rows, programName });
+    return NextResponse.json({ rows, programName, sequencingNotes });
   } catch (err) {
     if (err instanceof AiNotConfiguredError) {
       return NextResponse.json({ error: err.message }, { status: 503 });

@@ -7,6 +7,7 @@ import { getSharedWorkout } from "@/lib/shared-workout";
 import { PrListToggle } from "@/components/share/pr-list-toggle";
 import { ShareWorkoutButton } from "@/components/share/share-workout-button";
 import { CustomizeSharePanel } from "@/components/share/customize-share-panel";
+import { VolumeLiftRig } from "@/components/share/volume-lift-rig";
 
 // Deliberately public — no auth check. Every completed workout gets a
 // shareable card now, not just PRs, so a client can post it (and tag the
@@ -75,7 +76,7 @@ export default async function ShareWorkoutPage(
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body flex items-center justify-center px-6 py-16">
-      <div className="w-full max-w-sm border border-rust/40 bg-surface/40 p-8 text-center">
+      <div className="relative w-full max-w-sm rounded-[22px] border border-chalk/[0.06] bg-gradient-to-b from-[#2E2B28] to-surface pt-8 pb-7 px-7 text-center shadow-[0_1px_0_rgba(237,232,224,.05)_inset,0_22px_44px_-18px_rgba(0,0,0,.65),0_2px_10px_rgba(0,0,0,.35)] before:content-[''] before:absolute before:inset-0 before:rounded-[22px] before:shadow-[0_1px_0_rgba(237,232,224,.08)_inset] before:pointer-events-none">
         <p className="font-display uppercase text-xs tracking-[0.2em] text-rust">
           {shared.groupName}
         </p>
@@ -85,22 +86,25 @@ export default async function ShareWorkoutPage(
         </h1>
         <p className="font-body text-lg mt-2">{shared.athleteName}</p>
 
-        <div className="mt-8 pb-6 border-b border-steel/20">
+        <div className="mt-8 pt-[22px] pb-5 border-t border-b border-steel/20">
           {shared.totalVolume != null ? (
             <>
-              <p className="font-display text-5xl leading-none">
+              <p className="font-display text-5xl leading-none [font-variant-numeric:tabular-nums]">
                 {Math.round(shared.totalVolume).toLocaleString()}
               </p>
               <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">
                 lbs total volume &middot; {shared.totalSetsCompleted} sets
               </p>
               {volumeEquivalence && (
-                <p className="font-body text-sm text-rust mt-2">{volumeEquivalence.text}</p>
+                <>
+                  <VolumeLiftRig emoji={volumeEquivalence.emoji} />
+                  <p className="font-body text-sm text-rust -mt-1">{volumeEquivalence.text}</p>
+                </>
               )}
               {shared.weekStreak >= 2 && (
-                <p className="font-body text-sm text-rust mt-1">
+                <span className="inline-flex items-center gap-1.5 mt-3 px-3 py-1 bg-rust/[0.14] border border-rust/30 rounded-full font-body text-xs font-semibold text-rust">
                   🔥 {shared.weekStreak} week streak
-                </p>
+                </span>
               )}
             </>
           ) : (
@@ -136,11 +140,14 @@ export default async function ShareWorkoutPage(
             <p className="font-body text-xs text-steel uppercase tracking-wide mb-3">
               Top lifts today
             </p>
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {shared.topLifts.map((lift) => (
-                <div key={lift.name} className="flex items-center justify-between">
+                <div
+                  key={lift.name}
+                  className="flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-chalk/[0.03]"
+                >
                   <span className="font-display text-base uppercase">{lift.name}</span>
-                  <span className="font-body text-sm text-steel">
+                  <span className="font-body text-sm text-steel [font-variant-numeric:tabular-nums]">
                     {lift.weight} lbs &times; {lift.reps}
                   </span>
                 </div>

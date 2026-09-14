@@ -5,9 +5,10 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { BrandingForm } from "@/components/coach/desktop/branding-form";
 import { InviteCoachForm } from "@/components/coach/desktop/invite-coach-form";
 import { TransferOwnershipButton } from "@/components/coach/desktop/transfer-ownership-button";
+import { WorkoutCardBackgroundSettings } from "@/components/coach/desktop/workout-card-background-settings";
 import type { ButtonShape, DisplayFont, BodyFont } from "@/lib/theme";
 
-type OrgTab = "team" | "branding";
+type OrgTab = "team" | "branding" | "workout-card";
 
 export default async function BrandingPage(
   props: {
@@ -17,7 +18,12 @@ export default async function BrandingPage(
 ) {
   const params = await props.params;
   const searchParams = await props.searchParams;
-  const tab: OrgTab = searchParams.tab === "branding" ? "branding" : "team";
+  const tab: OrgTab =
+    searchParams.tab === "branding"
+      ? "branding"
+      : searchParams.tab === "workout-card"
+        ? "workout-card"
+        : "team";
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -75,7 +81,7 @@ export default async function BrandingPage(
   const { data: org } = await supabase
     .from("organizations")
     .select(
-      "id, slug, name, owner_id, created_at, button_shape, accent_color, background_color, text_color, font_display, font_body, logo_url, app_icon_url"
+      "id, slug, name, owner_id, created_at, button_shape, accent_color, background_color, text_color, font_display, font_body, logo_url, app_icon_url, workout_card_background_mode, workout_card_background_url"
     )
     .eq("id", orgMembership.organization_id)
     .maybeSingle();
@@ -124,6 +130,14 @@ export default async function BrandingPage(
           }`}
         >
           Branding
+        </Link>
+        <Link
+          href={`${basePath}?tab=workout-card`}
+          className={`h-9 px-4 flex items-center font-body text-sm border ${
+            tab === "workout-card" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
+          }`}
+        >
+          Workout Card
         </Link>
       </div>
 
@@ -175,7 +189,11 @@ export default async function BrandingPage(
             </Link>
           </p>
         </div>
-      ) : isOwner ? (
+      ) : !isOwner ? (
+        <p className="font-body text-sm text-steel">
+          Only {org?.name ?? "the organization"}&apos;s owner can change branding.
+        </p>
+      ) : tab === "branding" ? (
         <BrandingForm
           organizationId={orgMembership.organization_id}
           initialButtonShape={(org?.button_shape as ButtonShape) ?? "sharp"}
@@ -188,9 +206,11 @@ export default async function BrandingPage(
           initialAppIconUrl={org?.app_icon_url ?? null}
         />
       ) : (
-        <p className="font-body text-sm text-steel">
-          Only {org?.name ?? "the organization"}&apos;s owner can change branding.
-        </p>
+        <WorkoutCardBackgroundSettings
+          organizationId={orgMembership.organization_id}
+          initialMode={(org?.workout_card_background_mode as "default_rotation" | "custom") ?? "default_rotation"}
+          initialUrl={org?.workout_card_background_url ?? null}
+        />
       )}
     </CoachDesktopShell>
   );

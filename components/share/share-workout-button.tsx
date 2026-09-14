@@ -41,7 +41,7 @@ export function ShareWorkoutButton({
       <button
         type="button"
         onClick={handleShare}
-        className="w-full h-12 flex items-center justify-center gap-2 bg-rust text-graphite font-display uppercase text-sm font-bold active:bg-rust/80 transition-colors"
+        className="w-full h-12 flex items-center justify-center gap-2 bg-rust text-graphite font-display uppercase text-sm font-bold active:bg-rust/80 transition-colors rounded-[14px] shadow-[0_8px_18px_-8px_rgba(210,112,59,.55)]"
       >
         <Share2 className="w-4 h-4" />
         {copied ? "Link copied!" : "Share"}

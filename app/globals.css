@@ -104,6 +104,54 @@
   }
 }
 
+/* Post-workout share card's animated volume-equivalence rig
+   (post_workout_card_v1_bevel_and_animation.md) — one generic bar+plates
+   "lift" loop, any of volume-equivalence.ts's ~30 reference-object emojis
+   dropped onto the plate, no per-object art needed. */
+@keyframes share-card-lift {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  45% {
+    transform: translateY(-13px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-13px) rotate(1.5deg);
+  }
+  55% {
+    transform: translateY(-13px) rotate(-1.5deg);
+  }
+}
+
+.share-card-lift-rig {
+  animation: share-card-lift 1.5s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+  transform-origin: center bottom;
+}
+
+@keyframes share-card-spark {
+  0%,
+  40% {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+  50% {
+    opacity: 1;
+    transform: translate(-50%, -2px);
+  }
+  62% {
+    opacity: 0;
+    transform: translate(-50%, -10px);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.share-card-spark {
+  animation: share-card-spark 1.5s ease-in-out infinite;
+}
+
 :root {
   /* Space-separated R G B (not hex) — required so Tailwind's
      rgb(var(--x) / <alpha-value>) pattern in tailwind.config.ts can

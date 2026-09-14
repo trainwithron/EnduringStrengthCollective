@@ -1,8 +1,84 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { exchangeOuraCode } from "@/lib/oura";
+import { exchangeOuraCode, fetchOuraDailyMetrics } from "@/lib/oura";
+
+// How far back a brand-new connection backfills. Oura's API will serve
+// further back than this, but 90 days is enough real history to give
+// the burnout/ACWR math and the Programming Spotter genuine signal
+// immediately, without the backfill itself becoming a slow, rate-limit-
+// risking fetch on every new connection.
+const BACKFILL_WINDOW_DAYS = 90;
+
+function daysAgoIso(days: number) {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
+// One-time historical pull for a brand-new connection — without this, a
+// coach or athlete connecting a ring with a year of real history was
+// treated identically to someone who bought it yesterday, since the
+// daily cron sync (app/api/oura/sync/route.ts) only ever looks at the
+// trailing week. Scheduled via next/server's after() so it runs to
+// completion on Vercel without delaying the redirect back to Settings —
+// a bare un-awaited promise isn't reliable here, since the serverless
+// function can be frozen the moment the response is sent.
+async function backfillHistory(connectionId: string, accessToken: string) {
+  const serviceRole = createServiceRoleClient();
+  const startDate = daysAgoIso(BACKFILL_WINDOW_DAYS);
+  const endDate = new Date().toISOString().slice(0, 10);
+
+  try {
+    const { steps, sleepScore, hrvBalance, restingHeartRate } = await fetchOuraDailyMetrics(
+      accessToken,
+      startDate,
+      endDate
+    );
+
+    const rows = [
+      ...steps.map((p) => ({
+        connection_id: connectionId,
+        metric_date: p.date,
+        metric_type: "steps" as const,
+        value: p.value,
+      })),
+      ...sleepScore.map((p) => ({
+        connection_id: connectionId,
+        metric_date: p.date,
+        metric_type: "sleep_score" as const,
+        value: p.value,
+      })),
+      ...hrvBalance.map((p) => ({
+        connection_id: connectionId,
+        metric_date: p.date,
+        metric_type: "hrv_balance" as const,
+        value: p.value,
+      })),
+      ...restingHeartRate.map((p) => ({
+        connection_id: connectionId,
+        metric_date: p.date,
+        metric_type: "resting_heart_rate" as const,
+        value: p.value,
+      })),
+    ];
+
+    if (rows.length > 0) {
+      const { error } = await serviceRole
+        .from("wearable_daily_metrics")
+        .upsert(rows, { onConflict: "connection_id,metric_date,metric_type" });
+      if (error) throw error;
+    }
+  } catch (err) {
+    // Never surface this to the user — they've already been redirected
+    // back to Settings by the time this runs, and the connection itself
+    // is already saved and working; a failed backfill just means the
+    // regular 7-day cron sync remains the only source of data until the
+    // next successful run. Logged for later investigation only.
+    console.error(`Oura historical backfill failed for connection ${connectionId}:`, err);
+  }
+}
 
 // Oura redirects back here after the user approves (or denies) access.
 // The session cookie set by /api/oura/connect's redirect is still the
@@ -41,6 +117,18 @@ export async function GET(request: Request) {
     const tokens = await exchangeOuraCode(code);
     const serviceRole = createServiceRoleClient();
 
+    // Checked before the upsert below specifically so this can tell a
+    // brand-new connection from a reconnect/re-auth of an existing one —
+    // the historical backfill should only ever run once, the first time,
+    // not every time a token gets refreshed via this same route.
+    const { data: existingConnection } = await serviceRole
+      .from("wearable_connections")
+      .select("id")
+      .eq("profile_id", user.id)
+      .eq("provider", "oura")
+      .maybeSingle();
+    const isNewConnection = !existingConnection;
+
     const { data: connection, error: connectionError } = await serviceRole
       .from("wearable_connections")
       .upsert(
@@ -67,6 +155,10 @@ export async function GET(request: Request) {
       { onConflict: "connection_id" }
     );
     if (tokenError) throw tokenError;
+
+    if (isNewConnection) {
+      after(() => backfillHistory(connection.id, tokens.accessToken));
+    }
 
     const response = NextResponse.redirect(settingsUrl);
     response.cookies.delete("oura_oauth_state");

@@ -11,12 +11,14 @@ import type { MovementPatternOption } from "../exercise-builder-card";
 import { ProgramCardMenu } from "./program-card-menu";
 import { SaveToast } from "./save-toast";
 import { flashSaved, flashSaveError } from "@/lib/save-toast";
+import { ProgramChatPanel } from "./program-chat-panel";
 
 export function ProgramBuilderDesktop({
   programId,
   groupId,
   programName,
   programDescription,
+  aiSequencingNotes,
   initialDays,
   exerciseLibrary,
   movementPatterns,
@@ -28,6 +30,10 @@ export function ProgramBuilderDesktop({
   groupId: string;
   programName: string;
   programDescription: string | null;
+  // Only set for an AI-generated program — the "Ask the AI" why/correct
+  // chat is grounded in this program's own captured generation notes, so
+  // it only makes sense to offer where those notes actually exist.
+  aiSequencingNotes: string | null;
   initialDays: BuilderDay[];
   exerciseLibrary: string[];
   movementPatterns: MovementPatternOption[];
@@ -177,6 +183,12 @@ export function ProgramBuilderDesktop({
           )}
         </div>
       </div>
+
+      {aiSequencingNotes && (
+        <div className="mb-6">
+          <ProgramChatPanel programId={programId} groupId={groupId} programName={name} />
+        </div>
+      )}
 
       <div className="mb-6 border border-steel/20">
         <ProgramScheduleSettings
