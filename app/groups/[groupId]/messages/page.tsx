@@ -4,6 +4,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
+import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 
@@ -131,18 +132,15 @@ export default async function MessagesPage(props: { params: Promise<{ groupId: s
     }
 
     return (
-      <main className="min-h-screen bg-graphite text-chalk font-body pb-28">
-        <header className="px-5 pt-8 pb-6 border-b border-steel/20">
-          <Link
-            href={`/groups/${params.groupId}`}
-            className="font-body text-xs text-steel uppercase tracking-wide"
-          >
-            &larr; Back to group
-          </Link>
-          <h1 className="font-display font-bold text-3xl uppercase leading-none mt-3">Messages</h1>
-        </header>
-        {list}
-        <BottomTabBar groupId={params.groupId} activeOverride="settings" />
+      <main className="min-h-screen bg-graphite text-chalk font-body">
+        <CoachMobileShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} activeOverride="messages">
+          <div className="pb-24">
+            <header className="px-5 pt-8 pb-6 border-b border-steel/20">
+              <h1 className="font-display font-bold text-3xl uppercase leading-none">Messages</h1>
+            </header>
+            {list}
+          </div>
+        </CoachMobileShell>
       </main>
     );
   }

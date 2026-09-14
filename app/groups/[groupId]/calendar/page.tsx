@@ -7,6 +7,7 @@ import { CalendarGrid, type CalendarEventEntry } from "@/components/coach/deskto
 import { CalendarClientList } from "@/components/coach/desktop/calendar-client-list";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
+import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { computeScheduledDates } from "@/lib/program-schedule";
@@ -109,11 +110,15 @@ export default async function CoachCalendarPage(
   // while acting as a client — that's the coach's own tool, not part of
   // the client's real experience.
   if (showMobileView && isCoach && !isActingAsOther) {
-    const { data: clientMemberships } = await supabase
-      .from("group_memberships")
-      .select("profile_id, profiles ( full_name )")
-      .eq("group_id", params.groupId)
-      .eq("role", "athlete");
+    const [{ data: clientMemberships }, { data: coachGroup }] = await Promise.all([
+      supabase
+        .from("group_memberships")
+        .select("profile_id, profiles ( full_name )")
+        .eq("group_id", params.groupId)
+        .eq("role", "athlete"),
+      supabase.from("groups").select("name").eq("id", params.groupId).maybeSingle(),
+    ]);
+    const coachGroupName = coachGroup?.name ?? "Coaching";
 
     const clientIds = (clientMemberships ?? []).map((m: any) => m.profile_id);
     const { data: creditRows } = await supabase
@@ -131,76 +136,101 @@ export default async function CoachCalendarPage(
       }))
       .sort((a, b) => a.fullName.localeCompare(b.fullName));
 
-    if (searchParams.scheduleFor) {
-      const selected = scheduleClients.find((c) => c.id === searchParams.scheduleFor);
-      if (!selected) {
-        return (
-          <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
-            <ScheduleClientPicker groupId={params.groupId} clients={scheduleClients} />
-            <p className="font-body text-sm text-steel px-5 pt-6">Client not found.</p>
-            <BottomTabBar groupId={params.groupId} activeOverride="calendar" />
-          </main>
-        );
-      }
-
-      const today = new Date();
-      const year = today.getFullYear();
-      const monthIndex = today.getMonth();
-      const firstOfMonth = new Date(year, monthIndex, 1);
-      const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-      const leadingBlanks = firstOfMonth.getDay();
-      const cells: (Date | null)[] = [
-        ...Array.from({ length: leadingBlanks }, () => null),
-        ...Array.from({ length: daysInMonth }, (_, i) => new Date(year, monthIndex, i + 1)),
-      ];
-
-      function isSameDayLocal(a: Date, b: Date): boolean {
-        return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-      }
-
+    if (!searchParams.scheduleFor) {
+      // No client picked yet — this is the coach's own real destination
+      // for the Calendar tab (coach_mobile_app_redesign_plan.md); falling
+      // through to the athlete booking-calendar rendering further below
+      // would show a real client an "assign yourself a program" empty
+      // state that makes no sense for the coach viewing it.
       return (
-        <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
-          <ScheduleClientPicker groupId={params.groupId} clients={scheduleClients} selectedId={selected.id} />
-          <div className="px-5 pt-4">
-            <p className="font-body text-sm text-chalk">
-              {selected.fullName} —{" "}
-              <span className="text-steel">
-                {selected.balance} {selected.balance === 1 ? "credit" : "credits"} left
-              </span>
-            </p>
-            <p className="font-body text-xs text-steel mt-1">Tap a date to see and book open sessions.</p>
-          </div>
-          <div className="grid grid-cols-7 gap-px bg-steel/15 mt-4 mx-5 border border-steel/15">
-            {WEEKDAY_LABELS.map((label) => (
-              <div
-                key={label}
-                className="bg-graphite text-center font-body text-[10px] text-steel uppercase tracking-wide py-1.5"
-              >
-                {label}
-              </div>
-            ))}
-            {cells.map((date, i) => {
-              if (!date) return <div key={i} className="bg-graphite min-h-[56px]" />;
-              const isToday = isSameDayLocal(date, today);
-              return (
-                <Link
-                  key={i}
-                  href={`/groups/${params.groupId}/calendar/${dateKey(date)}?client=${selected.id}`}
-                  className={`bg-graphite min-h-[56px] p-1.5 flex flex-col ${
-                    isToday ? "ring-1 ring-inset ring-rust" : ""
-                  }`}
-                >
-                  <span className={`font-body text-[10px] ${isToday ? "text-rust font-bold" : "text-steel"}`}>
-                    {date.getDate()}
-                  </span>
-                </Link>
-              );
-            })}
-          </div>
-          <BottomTabBar groupId={params.groupId} activeOverride="calendar" />
+        <main className="min-h-screen bg-graphite text-chalk font-body">
+          <CoachMobileShell groupId={params.groupId} groupName={coachGroupName} activeOverride="calendar">
+            <header className="px-5 pt-8 pb-4">
+              <h1 className="font-display font-bold text-3xl leading-none uppercase">Calendar</h1>
+            </header>
+            <div className="px-5 pb-24">
+              <ScheduleClientPicker groupId={params.groupId} clients={scheduleClients} />
+              <p className="font-body text-sm text-steel mt-4">Pick a client to see and book their sessions.</p>
+            </div>
+          </CoachMobileShell>
         </main>
       );
     }
+
+    const selected = scheduleClients.find((c) => c.id === searchParams.scheduleFor);
+    if (!selected) {
+      return (
+        <main className="min-h-screen bg-graphite text-chalk font-body">
+          <CoachMobileShell groupId={params.groupId} groupName={coachGroupName} activeOverride="calendar">
+            <div className="px-5 pt-8 pb-24">
+              <ScheduleClientPicker groupId={params.groupId} clients={scheduleClients} />
+              <p className="font-body text-sm text-steel pt-6">Client not found.</p>
+            </div>
+          </CoachMobileShell>
+        </main>
+      );
+    }
+
+    const today = new Date();
+    const year = today.getFullYear();
+    const monthIndex = today.getMonth();
+    const firstOfMonth = new Date(year, monthIndex, 1);
+    const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+    const leadingBlanks = firstOfMonth.getDay();
+    const cells: (Date | null)[] = [
+      ...Array.from({ length: leadingBlanks }, () => null),
+      ...Array.from({ length: daysInMonth }, (_, i) => new Date(year, monthIndex, i + 1)),
+    ];
+
+    function isSameDayLocal(a: Date, b: Date): boolean {
+      return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    }
+
+    return (
+      <main className="min-h-screen bg-graphite text-chalk font-body">
+        <CoachMobileShell groupId={params.groupId} groupName={coachGroupName} activeOverride="calendar">
+          <div className="pb-24">
+            <ScheduleClientPicker groupId={params.groupId} clients={scheduleClients} selectedId={selected.id} />
+            <div className="px-5 pt-4">
+              <p className="font-body text-sm text-chalk">
+                {selected.fullName} —{" "}
+                <span className="text-steel">
+                  {selected.balance} {selected.balance === 1 ? "credit" : "credits"} left
+                </span>
+              </p>
+              <p className="font-body text-xs text-steel mt-1">Tap a date to see and book open sessions.</p>
+            </div>
+            <div className="grid grid-cols-7 gap-px bg-steel/15 mt-4 mx-5 border border-steel/15">
+              {WEEKDAY_LABELS.map((label) => (
+                <div
+                  key={label}
+                  className="bg-graphite text-center font-body text-[10px] text-steel uppercase tracking-wide py-1.5"
+                >
+                  {label}
+                </div>
+              ))}
+              {cells.map((date, i) => {
+                if (!date) return <div key={i} className="bg-graphite min-h-[56px]" />;
+                const isToday = isSameDayLocal(date, today);
+                return (
+                  <Link
+                    key={i}
+                    href={`/groups/${params.groupId}/calendar/${dateKey(date)}?client=${selected.id}`}
+                    className={`bg-graphite min-h-[56px] p-1.5 flex flex-col ${
+                      isToday ? "ring-1 ring-inset ring-rust" : ""
+                    }`}
+                  >
+                    <span className={`font-body text-[10px] ${isToday ? "text-rust font-bold" : "text-steel"}`}>
+                      {date.getDate()}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        </CoachMobileShell>
+      </main>
+    );
   }
 
   if (showMobileView) {

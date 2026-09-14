@@ -9,6 +9,7 @@ import { SwipeDirectionDiscovery } from "./swipe-direction-discovery";
 import type { SwipeDirection } from "@/components/athlete/swipe-direction-setting";
 import { CompleteWorkoutButton } from "@/components/session/complete-workout-button";
 import { RestTimerBar, type PendingGateTask } from "@/components/session/rest-timer-bar";
+import { QuickAddNlButton } from "./quick-add-nl-button";
 
 export function SessionLogger({
   sessionId,
@@ -298,13 +299,28 @@ export function SessionLogger({
               </button>
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => setAddingExercise(true)}
-              className="w-full h-11 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors"
-            >
-              + Add exercise
-            </button>
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => setAddingExercise(true)}
+                className="w-full h-11 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors"
+              >
+                + Add exercise
+              </button>
+              {/* Coach mobile app's NL quick-add (coach_mobile_app_
+                  redesign_plan.md) — a coach driving someone else's
+                  in-person session only; an athlete logging their own
+                  session keeps the plain manual add above. */}
+              {!isOwnSession && (
+                <QuickAddNlButton
+                  sessionId={sessionId}
+                  nextExerciseOrder={
+                    exercises.length > 0 ? Math.max(...exercises.map((e) => e.exerciseOrder)) + 1 : 0
+                  }
+                  onAdded={(entries) => setExercises((prev) => [...prev, ...entries])}
+                />
+              )}
+            </div>
           )}
         </div>
       )}

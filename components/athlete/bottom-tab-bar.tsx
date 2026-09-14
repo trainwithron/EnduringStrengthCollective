@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, CalendarDays, MessagesSquare, Settings, Apple } from "lucide-react";
+import { Home, CalendarDays, MessagesSquare, Settings, Apple, Users, Menu } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 
 // Home/Workout merge (mobile_home_workout_tab_merge_idea.md, locked
@@ -14,7 +14,14 @@ import { createBrowserClient } from "@/lib/supabase/client";
 // switcher) come back out as a real top-level tab, alongside Nutrition
 // getting promoted the same way. Final locked order: Home / Calendar /
 // Feed / Nutrition / Settings.
-type TabKey = "home" | "feed" | "calendar" | "nutrition" | "settings";
+//
+// Coach variant (coach_mobile_app_redesign_plan.md, locked 2026-09-14):
+// Home / Roster / Messages / Calendar / More — reuses this same
+// component with `variant="coach"` rather than a sibling component,
+// since the active-state/optimistic-highlight machinery below is
+// identical either way. "More" isn't a route (it opens a bottom sheet),
+// so it's driven by `onMoreClick` instead of an href.
+type TabKey = "home" | "feed" | "calendar" | "nutrition" | "settings" | "roster" | "messages" | "more";
 
 // The session page (`/sessions/[sessionId]`) has no groupId in its URL, so
 // it can't be matched by pathname here — it passes `activeOverride`
@@ -22,9 +29,13 @@ type TabKey = "home" | "feed" | "calendar" | "nutrition" | "settings";
 export function BottomTabBar({
   groupId,
   activeOverride,
+  variant = "athlete",
+  onMoreClick,
 }: {
   groupId: string;
   activeOverride?: TabKey;
+  variant?: "athlete" | "coach";
+  onMoreClick?: () => void;
 }) {
   const pathname = usePathname();
 
@@ -34,6 +45,7 @@ export function BottomTabBar({
   // exists rather than needing a personal group per client.
   const [hideFeed, setHideFeed] = useState(false);
   useEffect(() => {
+    if (variant === "coach") return;
     let cancelled = false;
     async function run() {
       const supabase = createBrowserClient();
@@ -53,7 +65,7 @@ export function BottomTabBar({
     return () => {
       cancelled = true;
     };
-  }, [groupId]);
+  }, [groupId, variant]);
 
   // Every one of these destinations is server-rendered on demand, so a tap
   // costs a round trip before the new route commits and `pathname` updates.
@@ -65,9 +77,8 @@ export function BottomTabBar({
     setPendingTab(null);
   }, [pathname]);
 
-  const resolvedActive: TabKey =
-    activeOverride ??
-    (pathname === `/groups/${groupId}`
+  const resolvedActiveAthlete: TabKey =
+    pathname === `/groups/${groupId}`
       ? "home"
       : pathname.startsWith(`/groups/${groupId}/workouts`) ||
         pathname.startsWith(`/groups/${groupId}/today`)
@@ -80,9 +91,23 @@ export function BottomTabBar({
       ? "settings"
       : pathname.startsWith(`/groups/${groupId}/nutrition`)
       ? "nutrition"
-      : "home");
+      : "home";
 
-  const tabs: { key: TabKey; label: string; href: string; icon: typeof Home }[] = [
+  // The coach variant covers ~40 existing coach routes — rather than
+  // reimplement that whole pathname map here, every coach page that
+  // renders this bar already knows its own section (the `active` prop
+  // CoachDesktopShell already takes) and passes it in as activeOverride.
+  const resolvedActiveCoach: TabKey = pathname.startsWith(`/groups/${groupId}/clients`)
+    ? "roster"
+    : pathname.startsWith(`/groups/${groupId}/messages`)
+    ? "messages"
+    : pathname.startsWith(`/groups/${groupId}/calendar`)
+    ? "calendar"
+    : "home";
+
+  const resolvedActive = variant === "coach" ? resolvedActiveCoach : resolvedActiveAthlete;
+
+  const athleteTabs: { key: TabKey; label: string; href: string; icon: typeof Home }[] = [
     { key: "home", label: "Home", href: `/groups/${groupId}`, icon: Home },
     { key: "calendar", label: "Calendar", href: `/groups/${groupId}/calendar`, icon: CalendarDays },
     ...(hideFeed
@@ -91,6 +116,16 @@ export function BottomTabBar({
     { key: "nutrition", label: "Nutrition", href: `/groups/${groupId}/nutrition`, icon: Apple },
     { key: "settings", label: "Settings", href: `/groups/${groupId}/settings`, icon: Settings },
   ];
+
+  const coachTabs: { key: TabKey; label: string; href: string | null; icon: typeof Home }[] = [
+    { key: "home", label: "Home", href: `/groups/${groupId}`, icon: Home },
+    { key: "roster", label: "Roster", href: `/groups/${groupId}/clients`, icon: Users },
+    { key: "messages", label: "Messages", href: `/groups/${groupId}/messages`, icon: MessagesSquare },
+    { key: "calendar", label: "Calendar", href: `/groups/${groupId}/calendar`, icon: CalendarDays },
+    { key: "more", label: "More", href: null, icon: Menu },
+  ];
+
+  const tabs = variant === "coach" ? coachTabs : athleteTabs;
 
   // A tapped tab wins over the (still-stale) pathname until the route
   // commits; `activeOverride` still wins over both, since a page that
@@ -102,13 +137,8 @@ export function BottomTabBar({
       {tabs.map((tab) => {
         const isActive = active === tab.key;
         const Icon = tab.icon;
-        return (
-          <Link
-            key={tab.key}
-            href={tab.href}
-            onClick={() => setPendingTab(tab.key)}
-            className="flex-1 flex flex-col items-center justify-center gap-0.5 active:opacity-60 transition-opacity"
-          >
+        const content = (
+          <>
             <Icon
               className={`w-5 h-5 ${isActive ? "text-rust" : "text-steel"}`}
               strokeWidth={2.5}
@@ -120,6 +150,28 @@ export function BottomTabBar({
             >
               {tab.label}
             </span>
+          </>
+        );
+        if (tab.href === null) {
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={onMoreClick}
+              className="flex-1 flex flex-col items-center justify-center gap-0.5 active:opacity-60 transition-opacity"
+            >
+              {content}
+            </button>
+          );
+        }
+        return (
+          <Link
+            key={tab.key}
+            href={tab.href}
+            onClick={() => setPendingTab(tab.key)}
+            className="flex-1 flex flex-col items-center justify-center gap-0.5 active:opacity-60 transition-opacity"
+          >
+            {content}
           </Link>
         );
       })}

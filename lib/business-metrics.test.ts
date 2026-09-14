@@ -4,6 +4,7 @@ import {
   computeEngagement,
   computeMonthlyGrowth,
   computeRealIncomeThisMonth,
+  computeRealIncomeInRange,
   computeRealMRR,
   computeActivePayingClients,
 } from "./business-metrics";
@@ -71,6 +72,34 @@ describe("computeRealIncomeThisMonth", () => {
 
   it("returns 0 for no events this month", () => {
     expect(computeRealIncomeThisMonth([], "2026-09")).toBe(0);
+  });
+});
+
+describe("computeRealIncomeInRange", () => {
+  it("sums only events within the inclusive date range", () => {
+    const total = computeRealIncomeInRange(
+      [
+        { amountCents: 10000, createdAtDateKey: "2026-09-14" },
+        { amountCents: 5000, createdAtDateKey: "2026-09-10" },
+        { amountCents: 9999, createdAtDateKey: "2026-09-08" },
+      ],
+      "2026-09-10",
+      "2026-09-14"
+    );
+    expect(total).toBe(150);
+  });
+
+  it("includes both boundary dates", () => {
+    const total = computeRealIncomeInRange(
+      [{ amountCents: 100, createdAtDateKey: "2026-09-14" }],
+      "2026-09-14",
+      "2026-09-14"
+    );
+    expect(total).toBe(1);
+  });
+
+  it("returns 0 for an empty range", () => {
+    expect(computeRealIncomeInRange([], "2026-09-01", "2026-09-30")).toBe(0);
   });
 });
 

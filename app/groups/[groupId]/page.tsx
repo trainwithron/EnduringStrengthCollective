@@ -15,8 +15,7 @@ import { ProgramCardList } from "@/components/athlete/program-card-list";
 import { computeProgramCardVisuals } from "@/lib/program-card-data";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
-import { ViewAsClientEntryPoint } from "@/components/athlete/view-as-client-entry-point";
-import { ViewModeToggle } from "@/components/coach/view-mode-toggle";
+import { CoachMobileHome } from "@/components/coach/mobile/coach-mobile-home";
 import { isHabitDueOn } from "@/lib/habits";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { getEffectiveAthlete } from "@/lib/acting-as";
@@ -182,6 +181,15 @@ export default async function GroupHubPage(
   // Client" should see exactly what that client would see, same
   // discipline already applied to Feed/Calendar/Resources/Tools.
   const renderAsCoach = isActingAsOther ? false : isCoach;
+
+  // Coach on mobile, not acting as anyone — the real logging-first Home
+  // (coach_mobile_app_redesign_plan.md), not the athlete-style Day/Week/
+  // Month view a coach used to see here with a roster appended below.
+  // Short-circuits before any of the athlete-specific scheduling work
+  // below, which this branch never needs.
+  if (isCoach && showMobileView && !isActingAsOther) {
+    return <CoachMobileHome groupId={params.groupId} groupName={group.name} />;
+  }
 
   // "Today" here means this group's coach's real wall-clock day, not the
   // server's own UTC clock — see lib/timezone.ts. Otherwise a workout's
@@ -420,12 +428,6 @@ export default async function GroupHubPage(
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
       {isActingAsOther && (
         <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
-      )}
-      {isCoach && showMobileView && !isActingAsOther && (
-        <div className="px-5 pt-4 flex items-center justify-between gap-3">
-          <ViewAsClientEntryPoint />
-          <ViewModeToggle targetMode="desktop" label="Desktop Mode" variant="button" />
-        </div>
       )}
       <GroupHubHeader
         name={group.name}

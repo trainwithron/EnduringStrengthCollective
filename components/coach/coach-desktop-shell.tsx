@@ -5,7 +5,6 @@ import Link from "next/link";
 import {
   LayoutGrid,
   Dumbbell,
-  ChevronDown,
   ChevronRight,
   CalendarDays,
   MessagesSquare,
@@ -18,8 +17,6 @@ import {
   ChefHat,
   Salad,
   ClipboardList,
-  Menu,
-  X,
   Building2,
   Layers,
   Home,
@@ -31,7 +28,6 @@ import {
 } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
-import { GroupSwitcher } from "@/components/coach/desktop/group-switcher";
 import { ViewAsClientButton } from "@/components/coach/desktop/view-as-client-button";
 import { ViewModeToggle } from "@/components/coach/view-mode-toggle";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -39,6 +35,8 @@ import { TerminologyProvider } from "@/components/coach/terminology-provider";
 import { SwappableTerm } from "@/components/coach/swappable-term";
 import { ShellRail, type RailIcon } from "@/components/coach/desktop/shell-rail";
 import { ShellListPanel, type SectionSubLink } from "@/components/coach/desktop/shell-list-panel";
+import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
+import { CoachMoreSheet } from "@/components/coach/mobile/coach-more-sheet";
 
 function NavBadge({ count, collapsed }: { count: number; collapsed?: boolean }) {
   if (count <= 0) return null;
@@ -117,11 +115,6 @@ export function CoachDesktopShell({
   active: Active;
   children: React.ReactNode;
 }) {
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
-    Business: true,
-    Programming: true,
-  });
-  const [collapsed, setCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [feedUnread, setFeedUnread] = useState(0);
   const [clientsUnread, setClientsUnread] = useState(0);
@@ -447,6 +440,14 @@ export function CoachDesktopShell({
   });
 
   const activeGroup = nav.find((entry): entry is NavGroup => isGroup(entry) && groupHasActiveChild(entry));
+
+  // Coach mobile tab bar (coach_mobile_app_redesign_plan.md) — the three
+  // sections that are real bottom tabs light their own tab; everything
+  // else reached through this shell (Dashboard, Build, Business, Engage)
+  // is, by definition, reached through the "More" sheet, so it lights
+  // "More" instead of nothing.
+  const mobileTabOverride =
+    active === "clients" ? "roster" : active === "messages" ? "messages" : active === "calendar" ? "calendar" : "more";
   const sectionLabel = activeGroup?.label ?? null;
   const sectionSubLinks: SectionSubLink[] =
     activeGroup?.items.map((item) => ({
@@ -456,150 +457,6 @@ export function CoachDesktopShell({
       active: active === item.key,
     })) ?? [];
 
-  function renderLeaf(item: NavLeaf, { indented = false }: { indented?: boolean } = {}) {
-    const isActive = active === item.key;
-    const Icon = item.icon;
-    if (collapsed) {
-      return (
-        <Link
-          key={item.key}
-          href={item.href}
-          title={item.label}
-          className={`relative flex items-center justify-center h-11 mx-2 my-0.5 transition-colors ${
-            isActive ? "text-rust bg-rust/10" : "text-steel active:text-chalk"
-          }`}
-        >
-          <Icon className="w-4 h-4 shrink-0" strokeWidth={2.25} />
-          <NavBadge count={item.badge ?? 0} collapsed />
-        </Link>
-      );
-    }
-    return (
-      <Link
-        key={item.key}
-        href={item.href}
-        className={`flex items-center gap-3 h-11 font-body text-sm transition-colors ${
-          indented ? "pl-11 pr-5 h-10" : "px-5"
-        } ${isActive ? "text-rust bg-rust/10 border-r-2 border-rust" : "text-steel active:text-chalk"}`}
-      >
-        <Icon className={`shrink-0 ${indented ? "w-3.5 h-3.5" : "w-4 h-4"}`} strokeWidth={2.25} />
-        {item.termKey ? (
-          <span onClick={(e) => e.preventDefault()}>
-            <SwappableTerm termKey={item.termKey} form={item.termForm ?? "singular"} className="capitalize" />
-          </span>
-        ) : (
-          item.label
-        )}
-        <NavBadge count={item.badge ?? 0} />
-      </Link>
-    );
-  }
-
-  function renderNav() {
-    return nav.map((entry) => {
-      if (!isGroup(entry)) return renderLeaf(entry);
-
-      const open = openGroups[entry.label] ?? true;
-      const hasActive = groupHasActiveChild(entry);
-
-      if (collapsed) {
-        // No room for a submenu in the icon rail — each item in the group
-        // gets its own icon directly, flattened, rather than trying to fit
-        // a flyout in this pass.
-        return (
-          <div key={entry.label}>
-            {entry.items.map((item) => renderLeaf(item))}
-          </div>
-        );
-      }
-
-      return (
-        <div key={entry.label}>
-          <button
-            type="button"
-            onClick={() => setOpenGroups((prev) => ({ ...prev, [entry.label]: !open }))}
-            className={`w-full flex items-center gap-3 px-5 h-11 font-body text-sm transition-colors ${
-              hasActive && !open ? "text-rust bg-rust/10 border-r-2 border-rust" : "text-steel active:text-chalk"
-            }`}
-          >
-            {open ? (
-              <ChevronDown className="w-4 h-4 shrink-0" strokeWidth={2.25} />
-            ) : (
-              <ChevronRight className="w-4 h-4 shrink-0" strokeWidth={2.25} />
-            )}
-            {entry.label}
-          </button>
-          {open && <div>{entry.items.map((item) => renderLeaf(item, { indented: true }))}</div>}
-        </div>
-      );
-    });
-  }
-
-  const sidebarContent = (
-    <>
-      <Link
-        href="/dashboard"
-        title="Home"
-        className={`flex items-center gap-3 h-11 font-body text-sm border-b border-steel/20 transition-colors ${
-          collapsed ? "justify-center" : "px-5"
-        } ${active === "home" ? "text-rust bg-rust/10" : "text-steel active:text-chalk"}`}
-      >
-        <Home className="w-4 h-4 shrink-0" strokeWidth={2.25} />
-        {!collapsed && "Home"}
-      </Link>
-      <GroupSwitcher groupId={groupId} groupName={groupName} collapsed={collapsed} />
-      <nav className="flex-1 py-3 overflow-y-auto">{renderNav()}</nav>
-      <div className={`border-t border-steel/20 py-2 ${collapsed ? "px-2" : "px-5"}`}>
-        <a
-          href={`/groups/${groupId}/display`}
-          target="_blank"
-          rel="noopener noreferrer"
-          title="Display Mode"
-          className={`flex items-center gap-2 font-body text-xs text-steel active:text-chalk ${
-            collapsed ? "justify-center" : ""
-          }`}
-        >
-          <MonitorPlay className="w-3.5 h-3.5 shrink-0" strokeWidth={2.25} />
-          {!collapsed && "Display Mode"}
-        </a>
-      </div>
-      <div className={`border-t border-steel/20 py-2 ${collapsed ? "px-2" : "px-5"}`}>
-        <ViewModeToggle targetMode="mobile" label="Client-Facing Mode" collapsed={collapsed} />
-      </div>
-      {isPlatformAdmin && (
-        <div className={`border-t border-steel/20 py-2 ${collapsed ? "px-2" : "px-5"} space-y-2`}>
-          <Link
-            href="/admin/organizations"
-            title="Organizations"
-            className={`flex items-center gap-2 font-body text-xs text-steel active:text-chalk ${
-              collapsed ? "justify-center" : ""
-            }`}
-          >
-            <Building2 className="w-3.5 h-3.5 shrink-0" strokeWidth={2.25} />
-            {!collapsed && "Organizations"}
-          </Link>
-          <Link
-            href="/admin/support"
-            title="Support Inbox"
-            className={`relative flex items-center gap-2 font-body text-xs text-steel active:text-chalk ${
-              collapsed ? "justify-center" : ""
-            }`}
-          >
-            <HeartHandshake className="w-3.5 h-3.5 shrink-0" strokeWidth={2.25} />
-            {!collapsed && "Support Inbox"}
-            <NavBadge count={openSupportCount} collapsed={collapsed} />
-          </Link>
-        </div>
-      )}
-      <div className="border-t border-steel/20 py-2">
-        <DownloadAppButton collapsed={collapsed} />
-      </div>
-      <div className={`border-t border-steel/20 py-4 ${collapsed ? "px-2" : "px-5"}`}>
-        <SignOutButton />
-      </div>
-    </>
-  );
-
   return (
     <TerminologyProvider groupId={groupId}>
     <div className="min-h-screen bg-graphite text-chalk font-body">
@@ -608,14 +465,6 @@ export function CoachDesktopShell({
           Client" jump, since both need to stay reachable without scrolling
           or hunting through the sidebar. */}
       <header className="sticky top-0 z-30 h-14 flex items-center gap-3 px-3 md:px-4 border-b border-steel/20 bg-graphite">
-        <button
-          type="button"
-          onClick={() => setMobileNavOpen(true)}
-          className="lg:hidden w-9 h-9 flex items-center justify-center text-chalk shrink-0"
-          aria-label="Open navigation"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
         {/* Always visible, not just on mobile — the sidebar's own name
             label is easy to miss when your eyes are on the main content,
             and picking up someone else's client/program by mistake is a
@@ -727,35 +576,24 @@ export function CoachDesktopShell({
           />
         )}
 
-        {/* Mobile off-canvas drawer — hidden by default so the sidebar
-            never eats half the screen on a phone; opened via the hamburger
-            in the top bar above. */}
-        {mobileNavOpen && (
-          <div className="lg:hidden fixed inset-0 z-40 flex">
-            <div
-              className="absolute inset-0 bg-graphite/80"
-              onClick={() => setMobileNavOpen(false)}
-              aria-hidden="true"
-            />
-            <aside
-              className="relative w-[280px] max-w-[85vw] h-full bg-graphite border-r border-steel/20 flex flex-col"
-            >
-              <div className="flex items-center justify-end px-3 h-14 border-b border-steel/20">
-                <button
-                  type="button"
-                  onClick={() => setMobileNavOpen(false)}
-                  className="w-9 h-9 flex items-center justify-center text-steel"
-                  aria-label="Close navigation"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              {sidebarContent}
-            </aside>
-          </div>
-        )}
+        {/* Coach mobile tab bar (coach_mobile_app_redesign_plan.md) —
+            replaces the old off-canvas drawer as the primary mobile nav;
+            "More" opens the reorganized CoachMoreSheet below instead of
+            the full legacy sidebarContent list. Desktop/tablet keeps the
+            rail + list panel above, unchanged. */}
+        <div className="lg:hidden">
+          <BottomTabBar
+            groupId={groupId}
+            variant="coach"
+            activeOverride={mobileTabOverride}
+            onMoreClick={() => setMobileNavOpen(true)}
+          />
+          {mobileNavOpen && (
+            <CoachMoreSheet groupId={groupId} groupName={groupName} onClose={() => setMobileNavOpen(false)} />
+          )}
+        </div>
 
-        <main className="flex-1 min-w-0 px-4 py-6 md:px-10 md:py-8 max-w-[1400px]">{children}</main>
+        <main className="flex-1 min-w-0 px-4 pt-6 pb-24 md:px-10 md:pt-8 lg:pb-8 max-w-[1400px]">{children}</main>
       </div>
     </div>
     </TerminologyProvider>

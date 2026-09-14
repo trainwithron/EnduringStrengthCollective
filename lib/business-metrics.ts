@@ -61,6 +61,21 @@ export function computeRealIncomeThisMonth(events: RealIncomeEvent[], monthKey: 
   return cents / 100;
 }
 
+// Generic version for an arbitrary inclusive date range ("YYYY-MM-DD"
+// keys sort lexicographically) — used by the coach mobile Home's
+// "today's revenue" complication, which needs today/this-week figures
+// a plain month-prefix match can't produce.
+export function computeRealIncomeInRange(
+  events: RealIncomeEvent[],
+  startDateKeyInclusive: string,
+  endDateKeyInclusive: string
+): number {
+  const cents = events
+    .filter((e) => e.createdAtDateKey >= startDateKeyInclusive && e.createdAtDateKey <= endDateKeyInclusive)
+    .reduce((sum, e) => sum + e.amountCents, 0);
+  return cents / 100;
+}
+
 export interface ActiveSubscription {
   priceCents: number | null;
   status: "active" | "past_due" | "canceled" | "incomplete";
