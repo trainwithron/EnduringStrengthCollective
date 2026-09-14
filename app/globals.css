@@ -171,3 +171,17 @@ body::before {
 .bg-rust.text-graphite {
   border-radius: var(--btn-radius, 0px);
 }
+
+/* Visual design audit finding (2026-09-14, Ron's own direct word):
+   Settings screens specifically still read as "clunky, just built" —
+   the button-shape fix above only ever reached filled CTA buttons; every
+   card/panel/input in the app (bg-surface, used across ~136 files) cast
+   zero shadow and sat perfectly flush on the graphite ground, with
+   nothing to separate a surface from its background. A real two-layer
+   dark-mode shadow (a tight near-black contact shadow plus a soft,
+   larger ambient one) gives every one of those surfaces real depth in
+   one place, the same way the radius fix propagated from one shared
+   class instead of a per-component pass. */
+.bg-surface {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 20px -6px rgb(0 0 0 / 0.55);
+}
