@@ -239,23 +239,27 @@ export default async function CoachCalendarPage(
     // not one `athlete_id = X or athlete_id is null` filter, since both
     // could be simultaneously active and .maybeSingle() would error on
     // more than one row.
-    const { data: personalProgram } = await supabase
-      .from("programs")
-      .select("id, start_date, training_days")
-      .eq("group_id", params.groupId)
-      .eq("athlete_id", athleteId)
-      .eq("is_active", true)
-      .maybeSingle();
-
-    const { data: sharedProgram } = personalProgram
-      ? { data: null }
-      : await supabase
-          .from("programs")
-          .select("id, start_date, training_days")
-          .eq("group_id", params.groupId)
-          .is("athlete_id", null)
-          .eq("is_active", true)
-          .maybeSingle();
+    // Both queries run unconditionally in parallel rather than fetching
+    // shared only when personal comes back empty — at most one extra,
+    // cheap row fetched in the common case, but it removes a real
+    // sequential round trip from every athlete's calendar load.
+    const [{ data: personalProgram }, { data: sharedProgramRaw }] = await Promise.all([
+      supabase
+        .from("programs")
+        .select("id, start_date, training_days")
+        .eq("group_id", params.groupId)
+        .eq("athlete_id", athleteId)
+        .eq("is_active", true)
+        .maybeSingle(),
+      supabase
+        .from("programs")
+        .select("id, start_date, training_days")
+        .eq("group_id", params.groupId)
+        .is("athlete_id", null)
+        .eq("is_active", true)
+        .maybeSingle(),
+    ]);
+    const sharedProgram = personalProgram ? null : sharedProgramRaw;
 
     const program = personalProgram ?? sharedProgram;
     const programHasSchedule = !!(program?.start_date && program.training_days?.length);
@@ -271,17 +275,29 @@ export default async function CoachCalendarPage(
     // plotted) rather than bouncing into that program's own calendar page
     // and dead-ending there. A client can still browse and book a session
     // with their coach here regardless of whether anything's assigned.
-    const { data: coachMembership } = await supabase
-      .from("group_memberships")
-      .select("profile_id")
-      .eq("group_id", params.groupId)
-      .eq("role", "coach")
-      .limit(1)
-      .maybeSingle();
+    // creditsRow only needs athleteId/groupId — genuinely independent of
+    // coachMembership, so it runs alongside it instead of after. Its
+    // display is already gated on `coachMembership` truthy at render
+    // time, so computing it regardless changes nothing visible.
+    const [{ data: coachMembership }, { data: creditsRow }] = await Promise.all([
+      supabase
+        .from("group_memberships")
+        .select("profile_id")
+        .eq("group_id", params.groupId)
+        .eq("role", "coach")
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("session_credits")
+        .select("balance")
+        .eq("athlete_id", athleteId)
+        .eq("group_id", params.groupId)
+        .maybeSingle(),
+    ]);
+    const creditBalance = creditsRow?.balance ?? 0;
 
     let hasAvailability = false;
     let upcomingBookings: { id: string; start_at: string }[] = [];
-    let creditBalance = 0;
 
     if (coachMembership) {
       const { count } = await supabase
@@ -301,14 +317,6 @@ export default async function CoachCalendarPage(
           .order("start_at", { ascending: true });
         upcomingBookings = bookingRows ?? [];
       }
-
-      const { data: creditsRow } = await supabase
-        .from("session_credits")
-        .select("balance")
-        .eq("athlete_id", athleteId)
-        .eq("group_id", params.groupId)
-        .maybeSingle();
-      creditBalance = creditsRow?.balance ?? 0;
     }
 
     const today = new Date();
@@ -599,18 +607,80 @@ export default async function CoachCalendarPage(
   const rangeStart = view === "week" ? weekStart : firstOfMonth;
   const rangeEnd = view === "week" ? weekEnd : new Date(year, monthIndex + 1, 1);
 
-  // Every confirmed booking this coach has in the visible range, across
-  // every client — the actual "what does my schedule look like" view,
-  // distinct from Availability (which just configures the recurring
-  // hours).
-  const { data: bookingRows } = await supabase
-    .from("bookings")
-    .select("id, start_at, athlete_id, profiles!bookings_athlete_id_fkey ( full_name )")
-    .eq("coach_id", user.id)
-    .eq("status", "confirmed")
-    .gte("start_at", rangeStart.toISOString())
-    .lt("start_at", rangeEnd.toISOString())
-    .order("start_at", { ascending: true });
+  // Every one of these 8 queries is independent of the others — none
+  // reads a result another produces — so they run as one batch instead
+  // of 8 sequential round trips. This is the real fix for this page's
+  // measured multi-second load: each round trip pays a real network
+  // cost, and this page had grown to pay it 8+ times in a row.
+  const [
+    { data: bookingRows },
+    { data: eventRows },
+    { data: memberships },
+    { data: activePrograms },
+    { data: recentLogRows },
+    { data: coachProfile },
+    { data: windowRows },
+    { data: exceptionRows },
+  ] = await Promise.all([
+    // Every confirmed booking this coach has in the visible range,
+    // across every client — the actual "what does my schedule look
+    // like" view, distinct from Availability (which just configures
+    // the recurring hours).
+    supabase
+      .from("bookings")
+      .select("id, start_at, athlete_id, profiles!bookings_athlete_id_fkey ( full_name )")
+      .eq("coach_id", user.id)
+      .eq("status", "confirmed")
+      .gte("start_at", rangeStart.toISOString())
+      .lt("start_at", rangeEnd.toISOString())
+      .order("start_at", { ascending: true }),
+    // Custom events + acted-on suggestions this coach has on the
+    // calendar in the visible range — same coach-wide-not-group-scoped
+    // model as bookings above.
+    supabase
+      .from("calendar_events")
+      .select("id, title, event_date, event_time, event_type, status")
+      .eq("coach_id", user.id)
+      .neq("status", "dismissed")
+      .gte("event_date", dateKey(rangeStart))
+      .lt("event_date", dateKey(rangeEnd))
+      .order("event_time", { ascending: true }),
+    // Quick-jump roster — each client's own habits/macros/workout-
+    // override calendar lives on their profile, this is just a fast
+    // way in.
+    supabase
+      .from("group_memberships")
+      .select("profile_id, profiles ( full_name, avatar_url )")
+      .eq("group_id", params.groupId)
+      .eq("role", "athlete"),
+    // Every active program in this group — shared and every client's
+    // personal one — overlaid onto this same calendar so there's no
+    // separate "view this program as a calendar" page to hunt down.
+    supabase
+      .from("programs")
+      .select("id, name, athlete_id, start_date, training_days")
+      .eq("group_id", params.groupId)
+      .eq("is_active", true),
+    // Clients quiet 7+ days (or never logged) — same "needs attention"
+    // idea already used on the Clients page, surfaced here too since
+    // this is the coach's daily planning view.
+    supabase
+      .from("workout_logs")
+      .select("athlete_id, created_at")
+      .eq("group_id", params.groupId)
+      .order("created_at", { ascending: false }),
+    supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle(),
+    supabase
+      .from("coach_availability_windows")
+      .select("id, weekday, start_time, end_time, slot_duration_minutes")
+      .eq("coach_id", user.id)
+      .order("weekday", { ascending: true })
+      .order("start_time", { ascending: true }),
+    supabase
+      .from("coach_availability_exceptions")
+      .select("kind, start_at, end_at, weekday, start_time, end_time")
+      .eq("coach_id", user.id),
+  ]);
 
   const bookingsByDateKey = new Map<string, { time: string; name: string }[]>();
   for (const b of (bookingRows ?? []) as any[]) {
@@ -621,18 +691,6 @@ export default async function CoachCalendarPage(
     if (!bookingsByDateKey.has(key)) bookingsByDateKey.set(key, []);
     bookingsByDateKey.get(key)!.push({ time, name });
   }
-
-  // Custom events + acted-on suggestions this coach has on the calendar
-  // in the visible range — same coach-wide-not-group-scoped model as
-  // bookings above.
-  const { data: eventRows } = await supabase
-    .from("calendar_events")
-    .select("id, title, event_date, event_time, event_type, status")
-    .eq("coach_id", user.id)
-    .neq("status", "dismissed")
-    .gte("event_date", dateKey(rangeStart))
-    .lt("event_date", dateKey(rangeEnd))
-    .order("event_time", { ascending: true });
 
   const eventsByDateKey = new Map<string, CalendarEventEntry[]>();
   for (const e of eventRows ?? []) {
@@ -645,14 +703,6 @@ export default async function CoachCalendarPage(
       status: e.status,
     });
   }
-
-  // Quick-jump roster — each client's own habits/macros/workout-override
-  // calendar lives on their profile, this is just a fast way in.
-  const { data: memberships } = await supabase
-    .from("group_memberships")
-    .select("profile_id, profiles ( full_name, avatar_url )")
-    .eq("group_id", params.groupId)
-    .eq("role", "athlete");
 
   const clientIds = (memberships ?? []).map((m: any) => m.profile_id);
   const { data: creditRows } = await supabase
@@ -671,32 +721,36 @@ export default async function CoachCalendarPage(
     }))
     .sort((a, b) => a.fullName.localeCompare(b.fullName));
 
-  // Every active program in this group — shared and every client's
-  // personal one — overlaid onto this same calendar so there's no
-  // separate "view this program as a calendar" page to hunt down. A
-  // program with no start_date/training_days set contributes nothing to
-  // the grid but still surfaces below as something that needs attention.
-  const { data: activePrograms } = await supabase
-    .from("programs")
-    .select("id, name, athlete_id, start_date, training_days")
-    .eq("group_id", params.groupId)
-    .eq("is_active", true);
-
   const athleteNameById = new Map(clients.map((c) => [c.profileId, c.fullName]));
   const workoutsByDateKey = new Map<string, { title: string; athleteName: string | null }[]>();
   const programsMissingSchedule: { id: string; name: string; athleteName: string | null }[] = [];
   const programsWithNoWorkouts: { id: string; name: string; athleteName: string | null }[] = [];
 
+  // Real N+1 fixed: this used to fire one "workouts" query per active
+  // program, sequentially, inside the loop below — a group with a dozen
+  // active programs paid a dozen extra round trips on every calendar
+  // load. One batched query covers every program's workouts at once.
+  const activeProgramIds = (activePrograms ?? []).map((p) => p.id);
+  const { data: allProgramWorkouts } = activeProgramIds.length
+    ? await supabase
+        .from("workouts")
+        .select("id, title, week_number, day_index, program_id")
+        .in("program_id", activeProgramIds)
+        .order("week_number", { ascending: true })
+        .order("day_index", { ascending: true })
+    : { data: [] as { id: string; title: string; week_number: number; day_index: number; program_id: string }[] };
+  const workoutsByProgramId = new Map<string, typeof allProgramWorkouts>();
+  for (const w of allProgramWorkouts ?? []) {
+    const list = workoutsByProgramId.get(w.program_id) ?? [];
+    list.push(w);
+    workoutsByProgramId.set(w.program_id, list);
+  }
+
   for (const p of activePrograms ?? []) {
     const athleteName = p.athlete_id ? athleteNameById.get(p.athlete_id) ?? null : null;
-    const { data: programWorkouts } = await supabase
-      .from("workouts")
-      .select("id, title, week_number, day_index")
-      .eq("program_id", p.id)
-      .order("week_number", { ascending: true })
-      .order("day_index", { ascending: true });
+    const programWorkouts = workoutsByProgramId.get(p.id) ?? [];
 
-    if ((programWorkouts ?? []).length === 0) {
+    if (programWorkouts.length === 0) {
       programsWithNoWorkouts.push({ id: p.id, name: p.name, athleteName });
       continue;
     }
@@ -706,8 +760,8 @@ export default async function CoachCalendarPage(
       continue;
     }
 
-    const scheduledDateByDayId = computeScheduledDates(p.start_date, p.training_days, programWorkouts!);
-    for (const w of programWorkouts!) {
+    const scheduledDateByDayId = computeScheduledDates(p.start_date, p.training_days, programWorkouts);
+    for (const w of programWorkouts) {
       const d = scheduledDateByDayId.get(w.id);
       if (!d) continue;
       const k = dateKey(d);
@@ -726,14 +780,6 @@ export default async function CoachCalendarPage(
     ? []
     : clients.filter((c) => !athleteIdsWithPersonalProgram.has(c.profileId));
 
-  // Clients quiet 7+ days (or never logged) — same "needs attention" idea
-  // already used on the Clients page, surfaced here too since this is the
-  // coach's daily planning view.
-  const { data: recentLogRows } = await supabase
-    .from("workout_logs")
-    .select("athlete_id, created_at")
-    .eq("group_id", params.groupId)
-    .order("created_at", { ascending: false });
   const lastLogByAthlete = new Map<string, string>();
   for (const log of recentLogRows ?? []) {
     if (!lastLogByAthlete.has(log.athlete_id)) lastLogByAthlete.set(log.athlete_id, log.created_at);
@@ -745,19 +791,7 @@ export default async function CoachCalendarPage(
     return daysSince >= 7;
   });
 
-  const { data: coachProfile } = await supabase
-    .from("profiles")
-    .select("timezone")
-    .eq("id", user.id)
-    .maybeSingle();
   const timezone = coachProfile?.timezone ?? DEFAULT_COACH_TIMEZONE;
-
-  const { data: windowRows } = await supabase
-    .from("coach_availability_windows")
-    .select("id, weekday, start_time, end_time, slot_duration_minutes")
-    .eq("coach_id", user.id)
-    .order("weekday", { ascending: true })
-    .order("start_time", { ascending: true });
 
   const availabilityWindows = (windowRows ?? []).map((w) => ({
     id: w.id,
@@ -767,10 +801,6 @@ export default async function CoachCalendarPage(
     slotDurationMinutes: w.slot_duration_minutes,
   }));
 
-  const { data: exceptionRows } = await supabase
-    .from("coach_availability_exceptions")
-    .select("kind, start_at, end_at, weekday, start_time, end_time")
-    .eq("coach_id", user.id);
   const blockedRanges = (exceptionRows ?? []).map((e) => ({
     kind: e.kind as "one_off" | "recurring",
     startAt: e.start_at,

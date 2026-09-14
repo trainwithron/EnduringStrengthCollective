@@ -46,12 +46,229 @@ export default async function AthleteProfilePage(
     redirect("/login");
   }
 
-  const { data: membership } = await supabase
-    .from("group_memberships")
-    .select("role")
-    .eq("group_id", params.groupId)
-    .eq("profile_id", user.id)
-    .maybeSingle();
+  // Wave 1 — every one of these 23 queries depends only on `params`/
+  // `user.id`, not on each other, so they run as one batch instead of
+  // 23 sequential round trips. This page had grown to the worst
+  // sequential-query count in the whole app (a client profile a coach
+  // opens constantly, right before/after logging a session); this is
+  // the real fix, same pattern already proven on the Calendar and
+  // session-logging pages. `existingPlan` can't join this batch — it's
+  // gated on `macrosEnabled`, which itself depends on this batch's own
+  // `athleteMembership` result — so it moves to wave 2 below.
+  const [
+    { data: membership },
+    { data: athleteMembership },
+    { data: group },
+    { data: personalProgram },
+    { data: sharedProgramRaw },
+    { data: allLogs },
+    { data: noteRow },
+    { data: creditsRow },
+    { data: nutritionPhaseRow },
+    { data: latestGoalRow },
+    { data: sharedPhotoRows },
+    { data: intake },
+    { data: profileDetails },
+    { data: privatePackageRows },
+    { data: habitRows },
+    { data: weightLogs },
+    { data: exerciseHistoryRows },
+    { data: calorieRows },
+    { data: ouraConnection },
+    { data: withingsConnection },
+    { data: wellnessRows },
+    { data: trainingMaxRows },
+    { data: latestConfirmedEventGoal },
+  ] = await Promise.all([
+    supabase
+      .from("group_memberships")
+      .select("role")
+      .eq("group_id", params.groupId)
+      .eq("profile_id", user.id)
+      .maybeSingle(),
+    supabase
+      .from("group_memberships")
+      .select(
+        "joined_at, client_tier, private_from_org, profiles ( id, full_name, avatar_url, exercise_swipe_direction )"
+      )
+      .eq("group_id", params.groupId)
+      .eq("profile_id", params.athleteId)
+      .maybeSingle(),
+    supabase.from("groups").select("name").eq("id", params.groupId).single(),
+    // This client's own personal program wins over the group's shared
+    // one — same precedence as lib/todays-workout.ts. Both queries run
+    // unconditionally rather than fetching shared only when personal
+    // comes back empty — at most one extra, cheap row in the common
+    // case, in exchange for removing a real sequential round trip.
+    supabase
+      .from("programs")
+      .select("id, name")
+      .eq("group_id", params.groupId)
+      .eq("athlete_id", params.athleteId)
+      .eq("is_active", true)
+      .maybeSingle(),
+    supabase
+      .from("programs")
+      .select("id, name")
+      .eq("group_id", params.groupId)
+      .is("athlete_id", null)
+      .eq("is_active", true)
+      .maybeSingle(),
+    // Stats (total count, volume, PRs) need every logged workout to
+    // stay accurate, and the displayed history below is just the first
+    // 50 of this same, already-descending-ordered list — one query
+    // serves both instead of fetching workout_logs twice.
+    supabase
+      .from("workout_logs")
+      .select(
+        "id, session_id, total_volume, total_sets_completed, new_prs, created_at, logged_by_coach, workouts ( title, week_number, day_index )"
+      )
+      .eq("athlete_id", params.athleteId)
+      .eq("group_id", params.groupId)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("athlete_notes")
+      .select("id, body")
+      .eq("athlete_id", params.athleteId)
+      .eq("group_id", params.groupId)
+      .maybeSingle(),
+    supabase
+      .from("session_credits")
+      .select("balance")
+      .eq("athlete_id", params.athleteId)
+      .eq("group_id", params.groupId)
+      .maybeSingle(),
+    supabase
+      .from("nutrition_phases")
+      .select("phase, started_at")
+      .eq("athlete_id", params.athleteId)
+      .eq("group_id", params.groupId)
+      .maybeSingle(),
+    // Goal-date-aware nutrition/programming — the client always
+    // proposes, the coach confirms. Only the most recent goal matters
+    // here — an older one is history, shown on the client's own /goal
+    // page, not repeated on this profile.
+    supabase
+      .from("client_goals")
+      .select("id, goal_type, custom_label, target_date, priority_note, status")
+      .eq("athlete_id", params.athleteId)
+      .eq("group_id", params.groupId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    // Transformation Cards — only the specific photos this athlete has
+    // explicitly chosen to share, never the full private journal. RLS
+    // already enforces this, this query just matches that same filter.
+    supabase
+      .from("progress_photos")
+      .select("id, storage_path, taken_date")
+      .eq("athlete_id", params.athleteId)
+      .eq("group_id", params.groupId)
+      .eq("shared_with_coach", true)
+      .order("taken_date", { ascending: false }),
+    supabase
+      .from("client_intake")
+      .select("date_of_birth, par_q_answers, waiver_accepted, waiver_signed_name, completed_at")
+      .eq("athlete_id", params.athleteId)
+      .maybeSingle(),
+    // Self-reported by the athlete in their own Settings — RLS already
+    // scopes this to "self or a coach who actually coaches them."
+    supabase
+      .from("athlete_profile_details")
+      .select("bio, birthday, phone, emergency_contact_name, emergency_contact_phone")
+      .eq("athlete_id", params.athleteId)
+      .maybeSingle(),
+    // Published packages need no assignment — every client already
+    // sees them — so only private ones are relevant to assign here.
+    supabase
+      .from("coach_packages")
+      .select("id, name, sessions_per_week, rate_cents, sessions_granted")
+      .eq("group_id", params.groupId)
+      .eq("is_active", true)
+      .eq("is_public", false)
+      .order("sessions_per_week", { ascending: true }),
+    supabase
+      .from("client_habits")
+      .select("id, title, weekdays")
+      .eq("athlete_id", params.athleteId)
+      .eq("group_id", params.groupId)
+      .eq("active", true),
+    supabase
+      .from("body_weight_logs")
+      .select("id, logged_date, weight")
+      .eq("athlete_id", params.athleteId)
+      .eq("group_id", params.groupId)
+      .order("logged_date", { ascending: false })
+      .limit(20),
+    // Every real logged set for this client, grouped into a per-
+    // exercise trend — no separate schema, every set already carries
+    // its own completed_at timestamp. Capped generously (500 rows)
+    // rather than unbounded, same caution as the workout-history list.
+    supabase
+      .from("set_logs")
+      .select(
+        "weight, completed_at, session_exercises!inner ( exercise_name, session_id, athlete_sessions!inner ( athlete_id, group_id ) )"
+      )
+      .eq("session_exercises.athlete_sessions.athlete_id", params.athleteId)
+      .eq("session_exercises.athlete_sessions.group_id", params.groupId)
+      .eq("status", "completed")
+      .not("weight", "is", null)
+      .order("completed_at", { ascending: true })
+      .limit(500),
+    // Coach-set calorie targets over time — deliberately the target,
+    // not actual intake, since nothing in this app logs what a client
+    // really ate.
+    supabase
+      .from("daily_macros")
+      .select("log_date, calories")
+      .eq("athlete_id", params.athleteId)
+      .eq("group_id", params.groupId)
+      .not("calories", "is", null)
+      .order("log_date", { ascending: true }),
+    supabase
+      .from("wearable_connections")
+      .select("id")
+      .eq("profile_id", params.athleteId)
+      .eq("provider", "oura")
+      .maybeSingle(),
+    supabase
+      .from("wearable_connections")
+      .select("id")
+      .eq("profile_id", params.athleteId)
+      .eq("provider", "withings")
+      .maybeSingle(),
+    supabase
+      .from("wellness_checkins")
+      .select("log_date, sleep_quality, soreness, energy")
+      .eq("athlete_id", params.athleteId)
+      .eq("group_id", params.groupId)
+      .gte("log_date", (() => {
+        const d = new Date();
+        d.setDate(d.getDate() - 30);
+        return d.toISOString().slice(0, 10);
+      })())
+      .order("log_date", { ascending: true }),
+    // AI Program Builder methodology grounding — real, persisted
+    // training maxes, auto-estimated from logged sets. Read-only here.
+    supabase
+      .from("athlete_training_maxes")
+      .select("exercise_name, estimated_max, updated_at")
+      .eq("athlete_id", params.athleteId)
+      .order("updated_at", { ascending: false }),
+    // Peaking & Tapering — the shared event_window object, read here
+    // just to surface a real "you're in taper" notice.
+    supabase
+      .from("client_goals")
+      .select("status, target_date, event_type, event_expected_duration_minutes, event_priority, weight_class_flag")
+      .eq("athlete_id", params.athleteId)
+      .eq("group_id", params.groupId)
+      .eq("status", "confirmed")
+      .not("target_date", "is", null)
+      .not("event_type", "is", null)
+      .order("confirmed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
   if (membership?.role !== "coach") {
     return (
@@ -62,15 +279,6 @@ export default async function AthleteProfilePage(
       </main>
     );
   }
-
-  const { data: athleteMembership } = await supabase
-    .from("group_memberships")
-    .select(
-      "joined_at, client_tier, private_from_org, profiles ( id, full_name, avatar_url, exercise_swipe_direction )"
-    )
-    .eq("group_id", params.groupId)
-    .eq("profile_id", params.athleteId)
-    .maybeSingle();
 
   if (!athleteMembership) {
     return (
@@ -87,55 +295,153 @@ export default async function AthleteProfilePage(
   // group-tier clients don't get macro/meal-plan programming at all.
   const macrosEnabled = athleteMembership.client_tier !== "group";
 
-  const { data: group } = await supabase
-    .from("groups")
-    .select("name")
-    .eq("id", params.groupId)
-    .single();
-
-  // This client's own personal program wins over the group's shared one —
-  // same precedence as lib/todays-workout.ts.
-  const { data: personalProgram } = await supabase
-    .from("programs")
-    .select("id, name")
-    .eq("group_id", params.groupId)
-    .eq("athlete_id", params.athleteId)
-    .eq("is_active", true)
-    .maybeSingle();
-
-  const { data: sharedProgram } = personalProgram
-    ? { data: null }
-    : await supabase
-        .from("programs")
-        .select("id, name")
-        .eq("group_id", params.groupId)
-        .is("athlete_id", null)
-        .eq("is_active", true)
-        .maybeSingle();
-
+  const sharedProgram = personalProgram ? null : sharedProgramRaw;
   const activeProgram = personalProgram ?? sharedProgram;
+  const isMinor = !!intake?.date_of_birth && isUnder13(intake.date_of_birth, new Date());
+  const todayKeyForWave2 = new Date().toISOString().slice(0, 10);
 
-  // Compact flag banner (coach_dashboard_redesign_scoping.md's visual
-  // identity extension — Client Profile gets tiles + this banner, no
-  // hero card). A separate lightweight query rather than widening the
-  // personalProgram/sharedProgram select above, since training_days
-  // isn't otherwise used anywhere else those two rows feed into.
-  const { data: activeProgramSchedule } = activeProgram
-    ? await supabase.from("programs").select("training_days").eq("id", activeProgram.id).maybeSingle()
-    : { data: null };
+  // Wave 2 — each of these depends on a wave-1 result (or a pure JS
+  // value derived from one), but not on each other, so they run as one
+  // more batch instead of ~8 more sequential round trips.
+  const [
+    { data: activeProgramSchedule },
+    { data: minorConsentRow },
+    { data: assignmentRows },
+    { data: habitLogRows },
+    signedPhotoResults,
+    nutritionTrendInputs,
+    { data: wearableMetrics },
+    { data: withingsMetrics },
+    { data: existingPlan },
+  ] = await Promise.all([
+    activeProgram
+      ? supabase.from("programs").select("training_days").eq("id", activeProgram.id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    isMinor
+      ? supabase
+          .from("minor_consent")
+          .select("verified, method, notes, verified_at")
+          .eq("athlete_id", params.athleteId)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase
+      .from("package_assignments")
+      .select("coach_package_id")
+      .eq("athlete_id", params.athleteId)
+      .in("coach_package_id", (privatePackageRows ?? []).map((p) => p.id)),
+    supabase
+      .from("habit_logs")
+      .select("habit_id, log_date, completed_at")
+      .in("habit_id", (habitRows ?? []).map((h) => h.id))
+      .gte(
+        "log_date",
+        (() => {
+          const d = new Date();
+          d.setDate(d.getDate() - 6);
+          return d.toISOString().slice(0, 10);
+        })()
+      )
+      .lte("log_date", todayKeyForWave2),
+    Promise.all(
+      (sharedPhotoRows ?? []).map(async (p) => {
+        const { data: signed } = await supabase.storage
+          .from("progress-photos")
+          .createSignedUrl(p.storage_path, 3600);
+        return { id: p.id, takenDate: p.taken_date, signedUrl: signed?.signedUrl ?? null };
+      })
+    ),
+    // Category 2 (Milestone Celebrations) — a live "does the trend
+    // actually match the tagged goal" read, computed fresh on every
+    // page load. Only queried when a phase is actually tagged.
+    nutritionPhaseRow?.phase
+      ? (async () => {
+          const sixWeeksAgo = new Date();
+          sixWeeksAgo.setDate(sixWeeksAgo.getDate() - 42);
+          const sixWeeksAgoKey = sixWeeksAgo.toISOString().slice(0, 10);
+          const [{ data: macroRows }, { data: weightRowsForTrend }] = await Promise.all([
+            supabase
+              .from("daily_macros")
+              .select("log_date, calories")
+              .eq("athlete_id", params.athleteId)
+              .eq("group_id", params.groupId)
+              .gte("log_date", sixWeeksAgoKey),
+            supabase
+              .from("body_weight_logs")
+              .select("logged_date, weight")
+              .eq("athlete_id", params.athleteId)
+              .eq("group_id", params.groupId)
+              .gte("logged_date", sixWeeksAgoKey),
+          ]);
+          return { macroRows, weightRowsForTrend };
+        })()
+      : Promise.resolve({ macroRows: null, weightRowsForTrend: null }),
+    ouraConnection
+      ? supabase
+          .from("wearable_daily_metrics")
+          .select("metric_date, metric_type, value")
+          .eq("connection_id", ouraConnection.id)
+          .gte(
+            "metric_date",
+            (() => {
+              const d = new Date();
+              d.setDate(d.getDate() - 30);
+              return d.toISOString().slice(0, 10);
+            })()
+          )
+      : Promise.resolve({ data: null }),
+    withingsConnection
+      ? supabase
+          .from("wearable_daily_metrics")
+          .select("metric_date, value")
+          .eq("connection_id", withingsConnection.id)
+          .eq("metric_type", "weight")
+          .gte(
+            "metric_date",
+            (() => {
+              const d = new Date();
+              d.setDate(d.getDate() - 30);
+              return d.toISOString().slice(0, 10);
+            })()
+          )
+      : Promise.resolve({ data: null }),
+    macrosEnabled
+      ? supabase
+          .from("meal_plans")
+          .select("archetype, meal_count, include_snack, carb_cycling, rationale, macros, meals")
+          .eq("athlete_id", params.athleteId)
+          .eq("log_date", todayKeyForWave2)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
 
-  // Stats (total count, volume, PRs) need every logged workout to stay
-  // accurate, and the displayed history below is just the first 50 of
-  // this same, already-descending-ordered list — one query serves both
-  // instead of fetching workout_logs twice with overlapping filters.
-  const { data: allLogs } = await supabase
-    .from("workout_logs")
-    .select(
-      "id, session_id, total_volume, total_sets_completed, new_prs, created_at, logged_by_coach, workouts ( title, week_number, day_index )"
-    )
-    .eq("athlete_id", params.athleteId)
-    .eq("group_id", params.groupId)
-    .order("created_at", { ascending: false });
+  const sharedPhotos = signedPhotoResults;
+  let nutritionTrendAlignment: {
+    trend: string;
+    aligned: boolean;
+    calorieChangePct: number;
+    weightChangePct: number;
+  } | null = null;
+  if (nutritionPhaseRow?.phase) {
+    const calorieSeries = (nutritionTrendInputs.macroRows ?? [])
+      .filter((r) => r.calories != null)
+      .map((r) => ({ date: r.log_date as string, value: r.calories as number }));
+    const weightSeries = (nutritionTrendInputs.weightRowsForTrend ?? []).map((r) => ({
+      date: r.logged_date as string,
+      value: r.weight as number,
+    }));
+    const classification = classifyNutritionTrend(calorieSeries, weightSeries, new Date());
+    if (classification) {
+      nutritionTrendAlignment = {
+        trend: classification.trend,
+        aligned: isTrendAligned(classification, nutritionPhaseRow.phase as NutritionPhase),
+        calorieChangePct: classification.calorieChangePct,
+        weightChangePct: classification.weightChangePct,
+      };
+    }
+  }
+
+  const parQAnswers = (intake?.par_q_answers as { question: string; answer: boolean }[]) ?? [];
+  const assignedPackageIds = (assignmentRows ?? []).map((a) => a.coach_package_id);
 
   const totalCompleted = allLogs?.length ?? 0;
   const totalVolume = (allLogs ?? []).reduce((sum, l) => sum + (l.total_volume ?? 0), 0);
@@ -151,148 +457,6 @@ export default async function AthleteProfilePage(
   const RECENT_LOGS_LIMIT = 50;
   const workoutLogs = (allLogs ?? []).slice(0, RECENT_LOGS_LIMIT);
 
-  const { data: noteRow } = await supabase
-    .from("athlete_notes")
-    .select("id, body")
-    .eq("athlete_id", params.athleteId)
-    .eq("group_id", params.groupId)
-    .maybeSingle();
-
-  const { data: creditsRow } = await supabase
-    .from("session_credits")
-    .select("balance")
-    .eq("athlete_id", params.athleteId)
-    .eq("group_id", params.groupId)
-    .maybeSingle();
-
-  const { data: nutritionPhaseRow } = await supabase
-    .from("nutrition_phases")
-    .select("phase, started_at")
-    .eq("athlete_id", params.athleteId)
-    .eq("group_id", params.groupId)
-    .maybeSingle();
-
-  // Goal-date-aware nutrition/programming — the client always proposes,
-  // the coach confirms (goal_date_aware_nutrition_and_programming_idea.md).
-  // Only the most recent goal matters here — an older one is history,
-  // shown on the client's own /goal page, not repeated on this profile.
-  const { data: latestGoalRow } = await supabase
-    .from("client_goals")
-    .select("id, goal_type, custom_label, target_date, priority_note, status")
-    .eq("athlete_id", params.athleteId)
-    .eq("group_id", params.groupId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  // Transformation Cards — only the specific photos this athlete has
-  // explicitly chosen to share, never the full private journal. RLS
-  // already enforces this (progress_photos_select_own_or_shared), this
-  // query just matches that same filter explicitly.
-  const { data: sharedPhotoRows } = await supabase
-    .from("progress_photos")
-    .select("id, storage_path, taken_date")
-    .eq("athlete_id", params.athleteId)
-    .eq("group_id", params.groupId)
-    .eq("shared_with_coach", true)
-    .order("taken_date", { ascending: false });
-  const sharedPhotos = await Promise.all(
-    (sharedPhotoRows ?? []).map(async (p) => {
-      const { data: signed } = await supabase.storage
-        .from("progress-photos")
-        .createSignedUrl(p.storage_path, 3600);
-      return { id: p.id, takenDate: p.taken_date, signedUrl: signed?.signedUrl ?? null };
-    })
-  );
-
-  // Category 2 (Milestone Celebrations) — a live "does the trend
-  // actually match the tagged goal" read, computed fresh on every page
-  // load rather than waiting for the weekly cron. Only queried when a
-  // phase is actually tagged, since there's nothing to classify
-  // otherwise.
-  let nutritionTrendAlignment: {
-    trend: string;
-    aligned: boolean;
-    calorieChangePct: number;
-    weightChangePct: number;
-  } | null = null;
-  if (nutritionPhaseRow?.phase) {
-    const sixWeeksAgo = new Date();
-    sixWeeksAgo.setDate(sixWeeksAgo.getDate() - 42);
-    const [{ data: macroRows }, { data: weightRowsForTrend }] = await Promise.all([
-      supabase
-        .from("daily_macros")
-        .select("log_date, calories")
-        .eq("athlete_id", params.athleteId)
-        .eq("group_id", params.groupId)
-        .gte("log_date", sixWeeksAgo.toISOString().slice(0, 10)),
-      supabase
-        .from("body_weight_logs")
-        .select("logged_date, weight")
-        .eq("athlete_id", params.athleteId)
-        .eq("group_id", params.groupId)
-        .gte("logged_date", sixWeeksAgo.toISOString().slice(0, 10)),
-    ]);
-    const calorieSeries = (macroRows ?? [])
-      .filter((r) => r.calories != null)
-      .map((r) => ({ date: r.log_date as string, value: r.calories as number }));
-    const weightSeries = (weightRowsForTrend ?? []).map((r) => ({
-      date: r.logged_date as string,
-      value: r.weight as number,
-    }));
-    const classification = classifyNutritionTrend(calorieSeries, weightSeries, new Date());
-    if (classification) {
-      nutritionTrendAlignment = {
-        trend: classification.trend,
-        aligned: isTrendAligned(classification, nutritionPhaseRow.phase as NutritionPhase),
-        calorieChangePct: classification.calorieChangePct,
-        weightChangePct: classification.weightChangePct,
-      };
-    }
-  }
-
-  const { data: intake } = await supabase
-    .from("client_intake")
-    .select("date_of_birth, par_q_answers, waiver_accepted, waiver_signed_name, completed_at")
-    .eq("athlete_id", params.athleteId)
-    .maybeSingle();
-  const isMinor = !!intake?.date_of_birth && isUnder13(intake.date_of_birth, new Date());
-  const parQAnswers = (intake?.par_q_answers as { question: string; answer: boolean }[]) ?? [];
-
-  const { data: minorConsentRow } = isMinor
-    ? await supabase
-        .from("minor_consent")
-        .select("verified, method, notes, verified_at")
-        .eq("athlete_id", params.athleteId)
-        .maybeSingle()
-    : { data: null };
-
-  // Self-reported by the athlete in their own Settings — RLS already
-  // scopes this to "self or a coach who actually coaches them," so no
-  // extra filtering needed here.
-  const { data: profileDetails } = await supabase
-    .from("athlete_profile_details")
-    .select("bio, birthday, phone, emergency_contact_name, emergency_contact_phone")
-    .eq("athlete_id", params.athleteId)
-    .maybeSingle();
-
-  // Published packages need no assignment — every client already sees
-  // them — so only private ones are relevant to assign from this page.
-  const { data: privatePackageRows } = await supabase
-    .from("coach_packages")
-    .select("id, name, sessions_per_week, rate_cents, sessions_granted")
-    .eq("group_id", params.groupId)
-    .eq("is_active", true)
-    .eq("is_public", false)
-    .order("sessions_per_week", { ascending: true });
-
-  const { data: assignmentRows } = await supabase
-    .from("package_assignments")
-    .select("coach_package_id")
-    .eq("athlete_id", params.athleteId)
-    .in("coach_package_id", (privatePackageRows ?? []).map((p) => p.id));
-  const assignedPackageIds = (assignmentRows ?? []).map((a) => a.coach_package_id);
-
   // Last-7-days habit compliance — the one piece of this that's actually
   // measurable today. Macro targets are coach-set but nothing logs what
   // the athlete actually ate yet, so this deliberately reports "days with
@@ -307,20 +471,8 @@ export default async function AthleteProfilePage(
     return d;
   });
 
-  const { data: habitRows } = await supabase
-    .from("client_habits")
-    .select("id, title, weekdays")
-    .eq("athlete_id", params.athleteId)
-    .eq("group_id", params.groupId)
-    .eq("active", true);
   const activeHabits = habitRows ?? [];
 
-  const { data: habitLogRows } = await supabase
-    .from("habit_logs")
-    .select("habit_id, log_date, completed_at")
-    .in("habit_id", activeHabits.map((h) => h.id))
-    .gte("log_date", weekStartKey)
-    .lte("log_date", todayKey);
   const completedSet = new Set(
     (habitLogRows ?? []).filter((l) => l.completed_at).map((l) => `${l.habit_id}:${l.log_date}`)
   );
@@ -335,14 +487,6 @@ export default async function AthleteProfilePage(
   const totalHabitsDue = habitCompliance.reduce((sum, h) => sum + h.due, 0);
   const totalHabitsCompleted = habitCompliance.reduce((sum, h) => sum + h.completed, 0);
 
-  const { data: weightLogs } = await supabase
-    .from("body_weight_logs")
-    .select("id, logged_date, weight")
-    .eq("athlete_id", params.athleteId)
-    .eq("group_id", params.groupId)
-    .order("logged_date", { ascending: false })
-    .limit(20);
-
   const weightTrend = computeWeeklyWeightTrend(
     (weightLogs ?? []).map((w) => ({ loggedDate: w.logged_date, weight: w.weight })),
     todayKey
@@ -355,18 +499,6 @@ export default async function AthleteProfilePage(
   // first time they're logged, with no setup needed. Capped generously
   // (500 rows) rather than unbounded, same caution as the workout-history
   // list above.
-  const { data: exerciseHistoryRows } = await supabase
-    .from("set_logs")
-    .select(
-      "weight, completed_at, session_exercises!inner ( exercise_name, session_id, athlete_sessions!inner ( athlete_id, group_id ) )"
-    )
-    .eq("session_exercises.athlete_sessions.athlete_id", params.athleteId)
-    .eq("session_exercises.athlete_sessions.group_id", params.groupId)
-    .eq("status", "completed")
-    .not("weight", "is", null)
-    .order("completed_at", { ascending: true })
-    .limit(500);
-
   const progressionByExercise = new Map<string, Map<string, number>>();
   for (const row of (exerciseHistoryRows ?? []) as any[]) {
     const name = row.session_exercises.exercise_name;
@@ -394,13 +526,6 @@ export default async function AthleteProfilePage(
   // day (upserted, never duplicated) — clearing a day via the new "Clear
   // this day" control removes it here too, so a coach testing numbers
   // doesn't leave a fake point behind.
-  const { data: calorieRows } = await supabase
-    .from("daily_macros")
-    .select("log_date, calories")
-    .eq("athlete_id", params.athleteId)
-    .eq("group_id", params.groupId)
-    .not("calories", "is", null)
-    .order("log_date", { ascending: true });
   const calorieTrend = (calorieRows ?? []).map((r) => ({ date: r.log_date, value: r.calories as number }));
   // Same rows as above, just the last-7-days slice — one query serves
   // both instead of a second round trip against the same table/filter.
@@ -414,29 +539,6 @@ export default async function AthleteProfilePage(
     return d.toISOString().slice(0, 10);
   })();
 
-  const [{ data: ouraConnection }, { data: withingsConnection }] = await Promise.all([
-    supabase
-      .from("wearable_connections")
-      .select("id")
-      .eq("profile_id", params.athleteId)
-      .eq("provider", "oura")
-      .maybeSingle(),
-    supabase
-      .from("wearable_connections")
-      .select("id")
-      .eq("profile_id", params.athleteId)
-      .eq("provider", "withings")
-      .maybeSingle(),
-  ]);
-
-  const { data: wearableMetrics } = ouraConnection
-    ? await supabase
-        .from("wearable_daily_metrics")
-        .select("metric_date, metric_type, value")
-        .eq("connection_id", ouraConnection.id)
-        .gte("metric_date", thirtyDaysAgoKey)
-    : { data: null };
-
   const stepsTrend = (wearableMetrics ?? [])
     .filter((m) => m.metric_type === "steps")
     .map((m) => ({ date: m.metric_date, value: m.value }));
@@ -444,48 +546,7 @@ export default async function AthleteProfilePage(
     .filter((m) => m.metric_type === "sleep_score")
     .map((m) => ({ date: m.metric_date, value: m.value }));
 
-  const { data: withingsMetrics } = withingsConnection
-    ? await supabase
-        .from("wearable_daily_metrics")
-        .select("metric_date, value")
-        .eq("connection_id", withingsConnection.id)
-        .eq("metric_type", "weight")
-        .gte("metric_date", thirtyDaysAgoKey)
-    : { data: null };
-
   const withingsWeightTrend = (withingsMetrics ?? []).map((m) => ({ date: m.metric_date, value: m.value }));
-
-  const { data: wellnessRows } = await supabase
-    .from("wellness_checkins")
-    .select("log_date, sleep_quality, soreness, energy")
-    .eq("athlete_id", params.athleteId)
-    .eq("group_id", params.groupId)
-    .gte("log_date", thirtyDaysAgoKey)
-    .order("log_date", { ascending: true });
-
-  // AI Program Builder methodology grounding — real, persisted training
-  // maxes, auto-estimated from logged sets (lib/rpe-training-max.ts).
-  // Read-only here: the trigger on set_logs is the only writer.
-  const { data: trainingMaxRows } = await supabase
-    .from("athlete_training_maxes")
-    .select("exercise_name, estimated_max, updated_at")
-    .eq("athlete_id", params.athleteId)
-    .order("updated_at", { ascending: false });
-
-  // Peaking & Tapering — the shared event_window object, read here just
-  // to surface a real "you're in taper" notice; nothing else in this app
-  // scales a program's actual volume from it yet.
-  const { data: latestConfirmedEventGoal } = await supabase
-    .from("client_goals")
-    .select("status, target_date, event_type, event_expected_duration_minutes, event_priority, weight_class_flag")
-    .eq("athlete_id", params.athleteId)
-    .eq("group_id", params.groupId)
-    .eq("status", "confirmed")
-    .not("target_date", "is", null)
-    .not("event_type", "is", null)
-    .order("confirmed_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
 
   const eventWindow = latestConfirmedEventGoal
     ? deriveEventWindow({
@@ -506,15 +567,6 @@ export default async function AthleteProfilePage(
   const sleepQualityTrend = (wellnessRows ?? []).map((r) => ({ date: r.log_date, value: r.sleep_quality }));
   const sorenessTrend = (wellnessRows ?? []).map((r) => ({ date: r.log_date, value: r.soreness }));
   const energyTrend = (wellnessRows ?? []).map((r) => ({ date: r.log_date, value: r.energy }));
-
-  const { data: existingPlan } = macrosEnabled
-    ? await supabase
-        .from("meal_plans")
-        .select("archetype, meal_count, include_snack, carb_cycling, rationale, macros, meals")
-        .eq("athlete_id", params.athleteId)
-        .eq("log_date", todayKey)
-        .maybeSingle()
-    : { data: null };
 
   const initials = (profile?.full_name ?? "?")
     .split(" ")

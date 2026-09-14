@@ -45,17 +45,69 @@ export default async function SessionPage(
     );
   }
 
-  const { data: sessionExercises } = await supabase
-    .from("session_exercises")
-    .select(
-      `
+  const isOwnSession = session.athlete_id === user.id;
+
+  // None of these 6 depend on `sessionExercises` (or on each other) — only
+  // on fields `session` already has — so they run as one batch alongside
+  // the exercises fetch itself, instead of each paying its own sequential
+  // round trip later in the file where they used to live.
+  const [
+    { data: sessionExercises },
+    { data: coachMembership },
+    { data: groupRow },
+    { data: viewerMembership },
+    { data: swipeProfile },
+    { data: workoutLogForShare },
+  ] = await Promise.all([
+    supabase
+      .from("session_exercises")
+      .select(
+        `
       id, exercise_name, exercise_order, is_swapped, is_added, movement_pattern_id, tracked_fields, group_workout_exercise_id,
       group_workout_exercises ( notes ),
       set_logs ( id, set_order, weight, reps, rpe, rir, tempo, time_seconds, height, distance, rest_seconds, pace, status, weight_confirmed )
     `
-    )
-    .eq("session_id", params.sessionId)
-    .order("exercise_order", { ascending: true });
+      )
+      .eq("session_id", params.sessionId)
+      .order("exercise_order", { ascending: true }),
+    // Exercise video/YouTube is attached on the coach's shared exercise
+    // library, keyed by name — same lookup as the workout overview page.
+    supabase
+      .from("group_memberships")
+      .select("profile_id")
+      .eq("group_id", session.group_id)
+      .eq("role", "coach")
+      .limit(1)
+      .maybeSingle(),
+    // Per-group on/off preference for the gamified-logging thread.
+    supabase.from("groups").select("gamification_enabled").eq("id", session.group_id).maybeSingle(),
+    // Video upload/feedback visibility — RLS enforces the real boundary
+    // regardless, this just decides what the UI offers.
+    supabase
+      .from("group_memberships")
+      .select("role")
+      .eq("group_id", session.group_id)
+      .eq("profile_id", user.id)
+      .maybeSingle(),
+    // Swipe-direction preference — only ever needed for the athlete's own
+    // session (SessionLogger also gates the prompt on viewerId === athleteId
+    // independently), so this stays a genuine no-op query for a coach
+    // logging in-person rather than adding a real round trip for them.
+    isOwnSession
+      ? supabase.from("profiles").select("exercise_swipe_direction").eq("id", session.athlete_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    // A completed session's shareable card — only meaningful once
+    // completed, so this stays a no-op for an in-progress session.
+    session.status === "completed"
+      ? supabase.from("workout_logs").select("id, posts ( id )").eq("session_id", params.sessionId).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const gamificationEnabled = groupRow?.gamification_enabled ?? true;
+  const viewerIsCoach = viewerMembership?.role === "coach";
+  const canUploadVideo = isOwnSession || viewerIsCoach;
+  const exerciseSwipeDirection: "vertical" | "horizontal" | null =
+    (swipeProfile?.exercise_swipe_direction as "vertical" | "horizontal" | null) ?? null;
+  const sharePostId: string | null = (workoutLogForShare?.posts as any)?.id ?? null;
 
   // Prescribed values for the "extra" fields (RPE, RIR, tempo, etc.) —
   // shown as a placeholder hint during logging, never pre-committed into
@@ -220,25 +272,6 @@ export default async function SessionPage(
     historyByExerciseName.set(name, list);
   }
 
-  // Exercise video/YouTube is attached on the coach's shared exercise
-  // library, keyed by name — same lookup as the workout overview page.
-  const { data: coachMembership } = await supabase
-    .from("group_memberships")
-    .select("profile_id")
-    .eq("group_id", session.group_id)
-    .eq("role", "coach")
-    .limit(1)
-    .maybeSingle();
-
-  // Per-group on/off preference for the gamified-logging thread (Phase 1:
-  // the obstacle-unlock mechanic) — same reasoning as optional RPE/RIR.
-  const { data: groupRow } = await supabase
-    .from("groups")
-    .select("gamification_enabled")
-    .eq("id", session.group_id)
-    .maybeSingle();
-  const gamificationEnabled = groupRow?.gamification_enabled ?? true;
-
   const mediaByName = new Map<
     string,
     { videoPath: string | null; youtubeUrl: string | null; equipmentType: string | null }
@@ -397,23 +430,6 @@ export default async function SessionPage(
     }
   }
 
-  const isOwnSession = session.athlete_id === user.id;
-
-  // Swipe-direction preference (swipe_card_logging_and_spotter_nudge_idea.md,
-  // resolved 2026-09-14) — null gates the first-run discovery prompt in
-  // SessionLogger. Only fetched for the athlete's own session; a coach
-  // logging in-person never needs it (SessionLogger also gates the
-  // prompt on viewerId === athleteId independently).
-  let exerciseSwipeDirection: "vertical" | "horizontal" | null = null;
-  if (isOwnSession) {
-    const { data: swipeProfile } = await supabase
-      .from("profiles")
-      .select("exercise_swipe_direction")
-      .eq("id", session.athlete_id)
-      .maybeSingle();
-    exerciseSwipeDirection = (swipeProfile?.exercise_swipe_direction as "vertical" | "horizontal" | null) ?? null;
-  }
-
   // Swipe-card carousel's coach-note-first callout (mobile_home_workout_
   // tab_merge_idea.md) — only ever the athlete's own opted-in notes;
   // RLS also enforces this independently, so a coach viewing this page
@@ -474,33 +490,6 @@ export default async function SessionPage(
     if (!pendingGateTask && !wellnessRow) {
       pendingGateTask = { kind: "wellness" };
     }
-  }
-
-  // Video upload/feedback is visible to the session's own athlete and to
-  // the group's coach (e.g. logging or reviewing in person) — not a
-  // random third party who happens to reach this URL; RLS enforces the
-  // real boundary regardless, this just decides what the UI offers.
-  const { data: viewerMembership } = await supabase
-    .from("group_memberships")
-    .select("role")
-    .eq("group_id", session.group_id)
-    .eq("profile_id", user.id)
-    .maybeSingle();
-  const viewerIsCoach = viewerMembership?.role === "coach";
-  const canUploadVideo = isOwnSession || viewerIsCoach;
-
-  // A completed session that generated a shareable card can always be
-  // revisited — not just right after finishing — so the athlete can grab
-  // the link again later instead of it only being reachable the one time
-  // it flashed by right after completion.
-  let sharePostId: string | null = null;
-  if (session.status === "completed") {
-    const { data: workoutLog } = await supabase
-      .from("workout_logs")
-      .select("id, posts ( id )")
-      .eq("session_id", params.sessionId)
-      .maybeSingle();
-    sharePostId = (workoutLog?.posts as any)?.id ?? null;
   }
 
   const backHref = session.workout_id
