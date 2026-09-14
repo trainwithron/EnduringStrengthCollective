@@ -5,7 +5,15 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { classifyExerciseCategory, type ExerciseCategory } from "@/lib/exercise-category-classifier";
 import type { LibraryExerciseRow } from "./exercise-library-list";
 
-const CATEGORIES: ExerciseCategory[] = ["Push", "Pull", "Legs", "Core", "Full Body", "Cardio", "Mobility"];
+const CATEGORIES: ExerciseCategory[] = [
+  "Push",
+  "Pull",
+  "Legs",
+  "Core",
+  "Cardio/Mobility",
+  "Plyometric/Sprint",
+  "Other/Custom",
+];
 
 // A one-time batch pass over every currently-uncategorized exercise —
 // suggests a category for each via the keyword classifier, but writes

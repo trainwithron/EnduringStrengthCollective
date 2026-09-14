@@ -1,8 +1,10 @@
-// Keyword-based suggestion for exercise_library.category (the same 7
-// values the Exercise Library page already uses — see
-// supabase/migrations/0031_exercise_library_category.sql). This is a
-// SUGGESTION engine, never an auto-assigner: every call site that uses
-// it must let the coach confirm or override before anything is written.
+// Keyword-based suggestion for exercise_library.category — the locked
+// seven-value set (Movement Pattern Ladders seed, 2026-09-14; see
+// supabase/migrations/0161_movement_pattern_ladders_seed_schema.sql,
+// which replaced the older Push/Pull/Legs/Core/Full Body/Cardio/Mobility
+// set this file used to reference). This is a SUGGESTION engine, never
+// an auto-assigner: every call site that uses it must let the coach
+// confirm or override before anything is written.
 //
 // Matching is substring-anywhere, not whole-word/first-token — a coach's
 // real exercise names carry a lot of modifiers ("Ipsilateral Split
@@ -10,7 +12,14 @@
 // Squat"), and the category should resolve off the core movement word
 // no matter where it sits in the name or how much else surrounds it.
 
-export type ExerciseCategory = "Push" | "Pull" | "Legs" | "Core" | "Full Body" | "Cardio" | "Mobility";
+export type ExerciseCategory =
+  | "Push"
+  | "Pull"
+  | "Legs"
+  | "Core"
+  | "Cardio/Mobility"
+  | "Plyometric/Sprint"
+  | "Other/Custom";
 
 interface KeywordRule {
   keyword: string;
@@ -81,45 +90,64 @@ const KEYWORD_RULES: KeywordRule[] = [
   { keyword: "wood chop", category: "Core" },
   { keyword: "woodchop", category: "Core" },
 
-  { keyword: "rowing machine", category: "Cardio" },
-  { keyword: "row erg", category: "Cardio" },
-  { keyword: "indoor row", category: "Cardio" },
-  { keyword: "jump rope", category: "Cardio" },
-  { keyword: "jumping jack", category: "Cardio" },
-  { keyword: "battle rope", category: "Cardio" },
-  { keyword: "assault bike", category: "Cardio" },
-  { keyword: "stair climber", category: "Cardio" },
-  { keyword: "high knee", category: "Cardio" },
+  { keyword: "box jump", category: "Plyometric/Sprint" },
+  { keyword: "depth jump", category: "Plyometric/Sprint" },
+  { keyword: "broad jump", category: "Plyometric/Sprint" },
+  { keyword: "squat jump", category: "Plyometric/Sprint" },
+  { keyword: "jump lunge", category: "Plyometric/Sprint" },
+  { keyword: "skater bound", category: "Plyometric/Sprint" },
+  { keyword: "40-yard dash", category: "Plyometric/Sprint" },
+  { keyword: "40 yard dash", category: "Plyometric/Sprint" },
+  { keyword: "pro agility", category: "Plyometric/Sprint" },
+  { keyword: "3-cone", category: "Plyometric/Sprint" },
+  { keyword: "shuttle", category: "Plyometric/Sprint" },
 
-  { keyword: "foam roll", category: "Mobility" },
-  { keyword: "cat-cow", category: "Mobility" },
-  { keyword: "cat cow", category: "Mobility" },
-  { keyword: "hip circle", category: "Mobility" },
-  { keyword: "world's greatest stretch", category: "Mobility" },
-  { keyword: "dynamic warm", category: "Mobility" },
-  { keyword: "band walk", category: "Mobility" },
-  // "___ Stretch" for a specific body part must resolve to Mobility, not
-  // to that part's usual strength-training category — listed here,
+  { keyword: "rowing machine", category: "Cardio/Mobility" },
+  { keyword: "row erg", category: "Cardio/Mobility" },
+  { keyword: "indoor row", category: "Cardio/Mobility" },
+  { keyword: "jump rope", category: "Cardio/Mobility" },
+  { keyword: "jumping jack", category: "Cardio/Mobility" },
+  { keyword: "battle rope", category: "Cardio/Mobility" },
+  { keyword: "assault bike", category: "Cardio/Mobility" },
+  { keyword: "stair climber", category: "Cardio/Mobility" },
+  { keyword: "high knee", category: "Cardio/Mobility" },
+
+  { keyword: "foam roll", category: "Cardio/Mobility" },
+  { keyword: "cat-cow", category: "Cardio/Mobility" },
+  { keyword: "cat cow", category: "Cardio/Mobility" },
+  { keyword: "hip circle", category: "Cardio/Mobility" },
+  { keyword: "world's greatest stretch", category: "Cardio/Mobility" },
+  { keyword: "dynamic warm", category: "Cardio/Mobility" },
+  { keyword: "band walk", category: "Cardio/Mobility" },
+  { keyword: "hip car", category: "Cardio/Mobility" },
+  { keyword: "shoulder car", category: "Cardio/Mobility" },
+  // "___ Stretch" for a specific body part must resolve to Cardio/Mobility,
+  // not to that part's usual strength-training category — listed here,
   // ahead of the single-word "hamstring"/"quad"/"glute"/"calf" (Legs)
   // rules further down, so e.g. "Hamstring Stretch" doesn't get
   // misfiled as a Legs strength exercise.
-  { keyword: "hamstring stretch", category: "Mobility" },
-  { keyword: "quad stretch", category: "Mobility" },
-  { keyword: "calf stretch", category: "Mobility" },
-  { keyword: "glute stretch", category: "Mobility" },
-  { keyword: "hip stretch", category: "Mobility" },
-  { keyword: "shoulder stretch", category: "Mobility" },
-  { keyword: "chest stretch", category: "Mobility" },
+  { keyword: "hamstring stretch", category: "Cardio/Mobility" },
+  { keyword: "quad stretch", category: "Cardio/Mobility" },
+  { keyword: "calf stretch", category: "Cardio/Mobility" },
+  { keyword: "glute stretch", category: "Cardio/Mobility" },
+  { keyword: "hip stretch", category: "Cardio/Mobility" },
+  { keyword: "shoulder stretch", category: "Cardio/Mobility" },
+  { keyword: "chest stretch", category: "Cardio/Mobility" },
+  // Carries default to Cardio/Mobility, matching the seed set's own
+  // choice (Farmers Carry, Suitcase Carry, Sandbag Bear Hug Carry are
+  // all tagged Cardio/Mobility there) — there's no dedicated "Carry"
+  // bucket in the locked seven-value set.
+  { keyword: "farmer's carry", category: "Cardio/Mobility" },
+  { keyword: "farmers carry", category: "Cardio/Mobility" },
+  { keyword: "suitcase carry", category: "Cardio/Mobility" },
+  { keyword: "carry", category: "Cardio/Mobility" },
 
-  { keyword: "clean and jerk", category: "Full Body" },
-  { keyword: "turkish get-up", category: "Full Body" },
-  { keyword: "turkish get up", category: "Full Body" },
-  { keyword: "get-up", category: "Full Body" },
-  { keyword: "farmer's carry", category: "Full Body" },
-  { keyword: "farmers carry", category: "Full Body" },
-  { keyword: "man maker", category: "Full Body" },
-  { keyword: "wall ball", category: "Full Body" },
-  { keyword: "full body", category: "Full Body" },
+  { keyword: "clean and jerk", category: "Other/Custom" },
+  { keyword: "turkish get-up", category: "Other/Custom" },
+  { keyword: "turkish get up", category: "Other/Custom" },
+  { keyword: "get-up", category: "Other/Custom" },
+  { keyword: "man maker", category: "Other/Custom" },
+  { keyword: "wall ball", category: "Other/Custom" },
 
   // ---- Single, still-decisive movement nouns ----
   // Deadlift is a judgment call, documented here rather than left
@@ -166,24 +194,26 @@ const KEYWORD_RULES: KeywordRule[] = [
   { keyword: "abs", category: "Core" },
   { keyword: "core", category: "Core" },
 
-  { keyword: "sprint", category: "Cardio" },
-  { keyword: "burpee", category: "Cardio" },
-  { keyword: "sled", category: "Cardio" },
-  { keyword: "bike", category: "Cardio" },
-  { keyword: "cycling", category: "Cardio" },
-  { keyword: "elliptical", category: "Cardio" },
-  { keyword: "jog", category: "Cardio" },
-  { keyword: "run", category: "Cardio" },
+  { keyword: "sprint", category: "Plyometric/Sprint" },
+  { keyword: "bound", category: "Plyometric/Sprint" },
+  { keyword: "plyo", category: "Plyometric/Sprint" },
+  { keyword: "skip", category: "Plyometric/Sprint" },
 
-  { keyword: "stretch", category: "Mobility" },
-  { keyword: "mobility", category: "Mobility" },
-  { keyword: "yoga", category: "Mobility" },
+  { keyword: "burpee", category: "Cardio/Mobility" },
+  { keyword: "sled", category: "Cardio/Mobility" },
+  { keyword: "bike", category: "Cardio/Mobility" },
+  { keyword: "cycling", category: "Cardio/Mobility" },
+  { keyword: "elliptical", category: "Cardio/Mobility" },
+  { keyword: "jog", category: "Cardio/Mobility" },
+  { keyword: "run", category: "Cardio/Mobility" },
+  { keyword: "stretch", category: "Cardio/Mobility" },
+  { keyword: "mobility", category: "Cardio/Mobility" },
+  { keyword: "yoga", category: "Cardio/Mobility" },
 
-  { keyword: "clean", category: "Full Body" },
-  { keyword: "snatch", category: "Full Body" },
-  { keyword: "thruster", category: "Full Body" },
-  { keyword: "carry", category: "Full Body" },
-  { keyword: "complex", category: "Full Body" },
+  { keyword: "clean", category: "Other/Custom" },
+  { keyword: "snatch", category: "Other/Custom" },
+  { keyword: "thruster", category: "Other/Custom" },
+  { keyword: "complex", category: "Other/Custom" },
 ];
 
 export function classifyExerciseCategory(name: string): ExerciseCategory | null {

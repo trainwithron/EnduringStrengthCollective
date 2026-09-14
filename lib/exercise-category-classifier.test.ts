@@ -7,9 +7,9 @@ describe("classifyExerciseCategory", () => {
     expect(classifyExerciseCategory("Pull-Up")).toBe("Pull");
     expect(classifyExerciseCategory("Bench Press")).toBe("Push");
     expect(classifyExerciseCategory("Plank")).toBe("Core");
-    expect(classifyExerciseCategory("Treadmill Sprint")).toBe("Cardio");
-    expect(classifyExerciseCategory("Hip Flexor Stretch")).toBe("Mobility");
-    expect(classifyExerciseCategory("Turkish Get-Up")).toBe("Full Body");
+    expect(classifyExerciseCategory("Treadmill Sprint")).toBe("Plyometric/Sprint");
+    expect(classifyExerciseCategory("Hip Flexor Stretch")).toBe("Cardio/Mobility");
+    expect(classifyExerciseCategory("Turkish Get-Up")).toBe("Other/Custom");
   });
 
   it("resolves off the core movement word regardless of modifiers surrounding it", () => {
@@ -28,7 +28,7 @@ describe("classifyExerciseCategory", () => {
     expect(classifyExerciseCategory("Leg Curl")).toBe("Legs");
     expect(classifyExerciseCategory("Seated Leg Extension")).toBe("Legs");
     // "Rowing Machine" must not fall to the generic Pull "row" rule.
-    expect(classifyExerciseCategory("30 Minute Rowing Machine")).toBe("Cardio");
+    expect(classifyExerciseCategory("30 Minute Rowing Machine")).toBe("Cardio/Mobility");
   });
 
   it("does not let a short substring inside an unrelated word misfire", () => {
@@ -38,9 +38,9 @@ describe("classifyExerciseCategory", () => {
     expect(classifyExerciseCategory("Lat Raise")).toBe("Push");
   });
 
-  it("resolves body-part stretches to Mobility, not that part's strength category", () => {
-    expect(classifyExerciseCategory("Hamstring Stretch")).toBe("Mobility");
-    expect(classifyExerciseCategory("Calf Stretch")).toBe("Mobility");
+  it("resolves body-part stretches to Cardio/Mobility, not that part's strength category", () => {
+    expect(classifyExerciseCategory("Hamstring Stretch")).toBe("Cardio/Mobility");
+    expect(classifyExerciseCategory("Calf Stretch")).toBe("Cardio/Mobility");
   });
 
   it("documents the deadlift judgment call: Legs, not Pull, matching this app's own Upper/Lower volume-split convention", () => {

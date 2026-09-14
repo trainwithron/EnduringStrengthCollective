@@ -14,6 +14,10 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { TrendChart } from "@/components/coach/desktop/trend-chart";
 import { resolveDayMacroTarget } from "@/lib/todays-macros";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
+import { FoodLogSection } from "@/components/athlete/food-log-section";
+import { computeAdherenceDays } from "@/lib/food-log-adherence";
+import type { GeneratedMeal } from "@/lib/meal-engine";
+import type { FoodLogEntry } from "@/components/athlete/meal-checkoff-list";
 
 export default async function NutritionPage(
   props: {
@@ -140,6 +144,7 @@ export default async function NutritionPage(
     { data: weightLogs },
     { data: macroHistory },
     { data: latestCheckin },
+    { data: todayFoodLogRows },
   ] = await Promise.all([
     macrosEnabled
       ? supabase
@@ -181,7 +186,26 @@ export default async function NutritionPage(
           .limit(1)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    macrosEnabled
+      ? supabase
+          .from("food_log_entries")
+          .select("id, meal_slot, status, description, calories, protein_g, carbs_g, fat_g")
+          .eq("athlete_id", athleteId)
+          .eq("log_date", todayKey)
+      : Promise.resolve({ data: [] }),
   ]);
+
+  const todayFoodLog: FoodLogEntry[] = (todayFoodLogRows ?? []).map((r) => ({
+    id: r.id,
+    mealSlot: r.meal_slot,
+    status: r.status as FoodLogEntry["status"],
+    description: r.description,
+    calories: r.calories,
+    proteinG: r.protein_g,
+    carbsG: r.carbs_g,
+    fatG: r.fat_g,
+  }));
+  const todayMeals: GeneratedMeal[] = ((todayMealPlan?.meals as any) ?? []) as GeneratedMeal[];
 
   const todayMacros = macrosEnabled
     ? resolveDayMacroTarget(
@@ -237,6 +261,19 @@ export default async function NutritionPage(
             ) : (
               <p className="font-body text-sm text-steel">No targets set for today yet.</p>
             )}
+          </section>
+
+          <section>
+            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+              Today&apos;s meals
+            </h2>
+            <FoodLogSection
+              athleteId={athleteId}
+              groupId={params.groupId}
+              logDate={todayKey}
+              meals={todayMeals}
+              initialEntries={todayFoodLog}
+            />
           </section>
 
           <section>
@@ -313,6 +350,7 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
     { data: wellnessRows },
     { data: lastCheckinRow },
     { data: pendingSuggestionRows },
+    { data: foodLogDateRows },
   ] = await Promise.all([
     supabase
       .from("body_weight_logs")
@@ -357,6 +395,12 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
       .eq("group_id", groupId)
       .eq("status", "pending")
       .order("generated_at", { ascending: false }),
+    supabase
+      .from("food_log_entries")
+      .select("log_date")
+      .eq("athlete_id", athleteId)
+      .neq("status", "skipped")
+      .gte("log_date", sevenDaysAgoKey),
   ]);
 
   const weightTrend = computeWeeklyWeightTrend(
@@ -383,6 +427,14 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
       ) / wellnessRows.length;
     defaultRecoveryRating = Math.min(5, Math.max(1, Math.round(avgReadiness)));
   }
+
+  // Real adherence, derived from actual food_log_entries instead of the
+  // old plain manual 1-7 entry — same "compute a real default, stay
+  // fully editable" pattern as defaultRecoveryRating above.
+  const defaultAdherenceDays = computeAdherenceDays(
+    (foodLogDateRows ?? []).map((r) => r.log_date),
+    todayKey
+  );
 
   const lastCheckin = lastCheckinRow
     ? {
@@ -425,6 +477,7 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
         lastWeekAvgWeight={weightTrend.previousAvg}
         defaultCurrentCalories={recentMacroRow?.calories ?? null}
         defaultRecoveryRating={defaultRecoveryRating}
+        defaultAdherenceDays={defaultAdherenceDays}
         lastCheckin={lastCheckin}
       />
       <div className="pt-6 border-t border-steel/20">

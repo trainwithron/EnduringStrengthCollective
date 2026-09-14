@@ -29,9 +29,10 @@ function todayIso(): string {
 // tool) against a specific client's real data instead of manually
 // re-entering it: this week's/last week's average weight comes from
 // body_weight_logs (weightTrend), a default recovery rating from the
-// week's average wellness check-ins. Adherence stays a manual 1-7 entry
-// — there's no per-meal food logging in this app to derive it from,
-// same as the source tool always assumed.
+// week's average wellness check-ins, and — now that real food logging
+// exists (calorie_tracking_ux_research_and_plan.md) — a default
+// adherence-days count derived from real food_log_entries instead of
+// the old plain manual guess. All three stay fully editable.
 export function WeeklyCheckinPanel({
   athleteId,
   groupId,
@@ -39,6 +40,7 @@ export function WeeklyCheckinPanel({
   lastWeekAvgWeight,
   defaultCurrentCalories,
   defaultRecoveryRating,
+  defaultAdherenceDays,
   lastCheckin,
 }: {
   athleteId: string;
@@ -47,6 +49,7 @@ export function WeeklyCheckinPanel({
   lastWeekAvgWeight: number | null;
   defaultCurrentCalories: number | null;
   defaultRecoveryRating: number | null;
+  defaultAdherenceDays?: number | null;
   lastCheckin: {
     phase: NutritionPhase;
     consecutiveSurplusSpikes: number;
@@ -63,7 +66,9 @@ export function WeeklyCheckinPanel({
   const [currentCalories, setCurrentCalories] = useState(
     defaultCurrentCalories != null ? String(defaultCurrentCalories) : ""
   );
-  const [adherenceDays, setAdherenceDays] = useState("7");
+  const [adherenceDays, setAdherenceDays] = useState(
+    defaultAdherenceDays != null ? String(defaultAdherenceDays) : "7"
+  );
   const [recoveryRating, setRecoveryRating] = useState(
     defaultRecoveryRating != null ? String(defaultRecoveryRating) : "3"
   );
@@ -218,6 +223,11 @@ export function WeeklyCheckinPanel({
             onChange={(e) => setAdherenceDays(e.target.value)}
             className="h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
           />
+          {defaultAdherenceDays != null && (
+            <span className="font-body text-[10px] text-steel">
+              From real logged days this week — still editable.
+            </span>
+          )}
         </label>
 
         <label className="flex flex-col gap-1">

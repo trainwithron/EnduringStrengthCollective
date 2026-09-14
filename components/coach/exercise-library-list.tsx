@@ -18,7 +18,11 @@ export interface LibraryExerciseRow {
   equipmentType: EquipmentType | null;
 }
 
-const CATEGORIES = ["Push", "Pull", "Legs", "Core", "Full Body", "Cardio", "Mobility"] as const;
+// Locked seven-value set (Movement Pattern Ladders seed, 2026-09-14) —
+// feeds the program-card visual split bar (lib/program-card-visuals.ts's
+// bucketCategorySplit), so this list and that bucketing logic must stay
+// in sync.
+const CATEGORIES = ["Push", "Pull", "Legs", "Core", "Cardio/Mobility", "Plyometric/Sprint", "Other/Custom"] as const;
 const CATEGORY_ORDER = [...CATEGORIES, "Uncategorized"];
 
 // Labels, not raw enum values — shown in the Exercise Library's per-row
