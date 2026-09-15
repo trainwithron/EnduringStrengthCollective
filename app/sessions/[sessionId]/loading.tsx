@@ -5,7 +5,7 @@ import { LoadingTip } from "@/components/ui/loading-tip";
 // frozen screen is most likely to make someone tap twice.
 export default function SessionLoading() {
   return (
-    <main className="min-h-screen bg-graphite pb-32">
+    <main data-loading-fallback className="min-h-screen bg-graphite pb-32">
       <SkeletonPageHeader />
 
       <div className="px-5 pt-4 space-y-6">

@@ -6,7 +6,7 @@ import { LoadingTip } from "@/components/ui/loading-tip";
 // one where painting something immediately matters most.
 export default function WorkoutOverviewLoading() {
   return (
-    <main className="min-h-screen bg-graphite pb-32">
+    <main data-loading-fallback className="min-h-screen bg-graphite pb-32">
       <SkeletonPageHeader />
 
       <div className="px-5 pt-6 space-y-6">

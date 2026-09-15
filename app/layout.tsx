@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AddToHomeScreenPrompt } from "@/components/add-to-home-screen-prompt";
 import { PwaContextCookie } from "@/components/pwa-context-cookie";
+import { LoadingWatchdog } from "@/components/ui/loading-watchdog";
 import { getViewerOrgTheme } from "@/lib/org-theme-server";
 import { orgThemeToCssVars } from "@/lib/theme";
 
@@ -47,6 +48,7 @@ export default async function RootLayout({
       <body className="font-body bg-graphite text-chalk min-h-screen">
         <PwaContextCookie />
         <AddToHomeScreenPrompt />
+        <LoadingWatchdog />
         {children}
       </body>
     </html>

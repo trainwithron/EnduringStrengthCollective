@@ -3,7 +3,7 @@ import { LoadingTip } from "@/components/ui/loading-tip";
 
 export default function FeedLoading() {
   return (
-    <main className="min-h-screen bg-graphite pb-28">
+    <main data-loading-fallback className="min-h-screen bg-graphite pb-28">
       <SkeletonPageHeader />
 
       {/* Channel tab strip */}
