@@ -385,7 +385,11 @@ export async function gatherCandidateSignals(
               trend.direction === "fatigue"
                 ? `${athlete.fullName}'s RPE on ${exerciseName} rose from ${trend.rpeStart} to ${trend.rpeEnd} across ${trend.sessionCount} sessions at the same or lower weight (${trend.weightStart} to ${trend.weightEnd} lbs).`
                 : `${athlete.fullName}'s RPE on ${exerciseName} fell from ${trend.rpeStart} to ${trend.rpeEnd} across ${trend.sessionCount} sessions at the same or higher weight (${trend.weightStart} to ${trend.weightEnd} lbs).`,
-            numericValues: [...nameNumbers, trend.rpeStart, trend.rpeEnd, trend.sessionCount, trend.weightStart, trend.weightEnd],
+            // The exercise name is embedded verbatim in the description
+            // above too, same as the athlete's name — real exercise
+            // names can contain digits ("1-Arm Row", "90/90 Hip Switch"),
+            // so its own numbers need the same allow-listing.
+            numericValues: [...nameNumbers, ...extractNumbers(exerciseName), trend.rpeStart, trend.rpeEnd, trend.sessionCount, trend.weightStart, trend.weightEnd],
             isStrongQuietTier: false,
           });
         }
