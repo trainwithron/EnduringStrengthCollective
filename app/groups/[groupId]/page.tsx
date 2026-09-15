@@ -17,6 +17,8 @@ import { computeProgramCardVisuals } from "@/lib/program-card-data";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { CoachMobileHome } from "@/components/coach/mobile/coach-mobile-home";
+import { TheSpotRail } from "@/components/coach/mobile/the-spot-rail";
+import { computeVisibleSpotWidgetOrder, type SpotWidgetKey } from "@/lib/spot-widgets";
 import { isHabitDueOn } from "@/lib/habits";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { getEffectiveAthlete } from "@/lib/acting-as";
@@ -453,10 +455,79 @@ export default async function GroupHubPage(
 
   const orgTheme = await getViewerOrgTheme(params.groupId);
 
+  // "The Spot" (coach_only_widget_hub_the_spot.md) — a coach-only widget
+  // rail on top of the true-mirror View-As-Client screen. Only ever
+  // computed while genuinely acting as someone — a real athlete, or a
+  // coach not currently impersonating anyone, pays nothing extra here.
+  let spotVisibleWidgets: SpotWidgetKey[] = [];
+  let spotHiddenWidgets: SpotWidgetKey[] = [];
+  let spotCredits = { balance: 0, activeSubscriptionRenewsAt: null as string | null };
+  let spotWaiver = { required: false, completed: false };
+  let spotSupport: { openCount: number; openRequests: { id: string; subject: string; createdAt: string }[] } = {
+    openCount: 0,
+    openRequests: [],
+  };
+  if (isActingAsOther && athleteId && user) {
+    const [{ data: layoutRow }, { data: creditsRow }, { data: subRow }, { data: intakeProfile }, { data: intakeRow }] =
+      await Promise.all([
+        supabase
+          .from("coach_dashboard_layout")
+          .select("spot_hidden_widgets, spot_widget_order")
+          .eq("coach_id", user.id)
+          .maybeSingle(),
+        supabase
+          .from("session_credits")
+          .select("balance")
+          .eq("athlete_id", athleteId)
+          .eq("group_id", params.groupId)
+          .maybeSingle(),
+        supabase
+          .from("membership_subscriptions")
+          .select("current_period_end")
+          .eq("athlete_id", athleteId)
+          .eq("group_id", params.groupId)
+          .eq("status", "active")
+          .maybeSingle(),
+        supabase.from("profiles").select("intake_required").eq("id", athleteId).maybeSingle(),
+        supabase.from("client_intake").select("completed_at").eq("athlete_id", athleteId).maybeSingle(),
+      ]);
+
+    spotHiddenWidgets = (layoutRow?.spot_hidden_widgets ?? []) as SpotWidgetKey[];
+    spotVisibleWidgets = computeVisibleSpotWidgetOrder(layoutRow?.spot_widget_order ?? [], spotHiddenWidgets);
+    spotCredits = { balance: creditsRow?.balance ?? 0, activeSubscriptionRenewsAt: subRow?.current_period_end ?? null };
+    spotWaiver = { required: intakeProfile?.intake_required ?? false, completed: !!intakeRow?.completed_at };
+
+    // Coach-wide, not client-specific — this group's own organization,
+    // not every org the coach happens to belong to.
+    if (group.organization_id) {
+      const { data: openRequests } = await supabase
+        .from("support_requests")
+        .select("id, subject, created_at")
+        .eq("organization_id", group.organization_id)
+        .eq("status", "open")
+        .order("created_at", { ascending: false })
+        .limit(5);
+      spotSupport = {
+        openCount: (openRequests ?? []).length,
+        openRequests: (openRequests ?? []).map((r) => ({ id: r.id, subject: r.subject, createdAt: r.created_at })),
+      };
+    }
+  }
+
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
       {isActingAsOther && (
         <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
+      )}
+      {isActingAsOther && (
+        <TheSpotRail
+          groupId={params.groupId}
+          visibleWidgets={spotVisibleWidgets}
+          hiddenWidgets={spotHiddenWidgets}
+          credits={spotCredits}
+          waiver={spotWaiver}
+          support={spotSupport}
+        />
       )}
       <GroupHubHeader
         name={group.name}

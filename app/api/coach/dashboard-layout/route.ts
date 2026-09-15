@@ -19,11 +19,18 @@ export async function PATCH(request: Request) {
   const hiddenTiles = Array.isArray(body?.hiddenTiles) ? body.hiddenTiles : undefined;
   const tileMetricOverrides =
     body?.tileMetricOverrides && typeof body.tileMetricOverrides === "object" ? body.tileMetricOverrides : undefined;
+  // "The Spot" widget rail (coach_only_widget_hub_the_spot.md) — a second,
+  // independent show/hide/reorder preference living on this same
+  // per-coach row, not the Home dashboard's own tiles above.
+  const spotWidgetOrder = Array.isArray(body?.spotWidgetOrder) ? body.spotWidgetOrder : undefined;
+  const spotHiddenWidgets = Array.isArray(body?.spotHiddenWidgets) ? body.spotHiddenWidgets : undefined;
 
   const patch: Record<string, unknown> = { coach_id: user.id, updated_at: new Date().toISOString() };
   if (tileOrder) patch.tile_order = tileOrder;
   if (hiddenTiles) patch.hidden_tiles = hiddenTiles;
   if (tileMetricOverrides) patch.tile_metric_overrides = tileMetricOverrides;
+  if (spotWidgetOrder) patch.spot_widget_order = spotWidgetOrder;
+  if (spotHiddenWidgets) patch.spot_hidden_widgets = spotHiddenWidgets;
 
   const { error } = await supabase.from("coach_dashboard_layout").upsert(patch, { onConflict: "coach_id" });
 
