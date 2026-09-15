@@ -116,7 +116,7 @@ export default async function NewProgramPage(
 
       {method === "blank" ? (
         <div className="max-w-lg">
-          <NewProgramForm groupId={params.groupId} createdBy={user.id} />
+          <NewProgramForm groupId={params.groupId} createdBy={user.id} athleteId={athleteId} />
         </div>
       ) : (
         <>
