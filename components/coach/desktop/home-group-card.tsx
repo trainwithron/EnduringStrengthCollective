@@ -6,6 +6,9 @@ export interface HomeGroupCardData {
   focusTag: string | null;
   memberCount: number;
   hasUnseenActivity: boolean;
+  // Set only when the viewing coach administers more than one
+  // organization — see the matching field on HomeClientCardData.
+  orgName?: string | null;
 }
 
 // Team/social groups keep their own identity front and center (unlike
@@ -22,6 +25,11 @@ export function HomeGroupCard({ group }: { group: HomeGroupCardData }) {
         <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-rust" />
       )}
       <p className="font-body text-sm text-chalk truncate">{group.name}</p>
+      {group.orgName && (
+        <p className="font-body text-[10px] text-steel/70 uppercase tracking-wide truncate">
+          {group.orgName}
+        </p>
+      )}
       <p className="font-body text-xs text-steel">
         {group.memberCount} {group.memberCount === 1 ? "member" : "members"}
         {group.focusTag && ` · ${group.focusTag}`}

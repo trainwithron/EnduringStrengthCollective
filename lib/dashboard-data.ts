@@ -15,11 +15,17 @@ import { computeHabitCompliance, computeCompliancePct } from "./habits";
 export interface DashboardGroupInfo {
   id: string;
   name: string;
+  // Null for a coach who only administers one organization — callers
+  // only need to render this when it's actually ambiguous which org an
+  // item belongs to (see coach_desktop_shell's own "You're in: org >
+  // group" indicator for the same one-org-is-invisible convention).
+  orgName?: string | null;
 }
 
 export interface TeamPulseResult {
   groupId: string;
   groupName: string;
+  orgName: string | null;
   pulse: number | null;
 }
 
@@ -60,7 +66,7 @@ export interface HeroEmptyState {
 }
 
 export interface CoachDashboardData {
-  heroFlag: (HeroFlag & { href: string }) | null;
+  heroFlag: (HeroFlag & { href: string; orgName: string | null }) | null;
   heroEmptyState: HeroEmptyState | null;
   teamPulses: TeamPulseResult[];
   statTiles: DashboardStatTiles;
@@ -93,6 +99,7 @@ export async function getCoachDashboardData(
   const { coachId, teamGroups, allGroups, tileMetricOverrides = {} } = params;
   const allGroupIds = allGroups.map((g) => g.id);
   const groupNameById = new Map(allGroups.map((g) => [g.id, g.name]));
+  const orgNameByGroupId = new Map(allGroups.map((g) => [g.id, g.orgName ?? null]));
   const now = new Date();
   const todayKey = todayKeyOf(now);
   const sevenDaysAgoKey = daysAgoKey(7);
@@ -448,7 +455,10 @@ export async function getCoachDashboardData(
     }
   }
 
-  const heroFlag = selectHeroFlag(heroFlags) as (HeroFlag & { href: string }) | null;
+  const selectedHeroFlag = selectHeroFlag(heroFlags) as (HeroFlag & { href: string }) | null;
+  const heroFlag = selectedHeroFlag
+    ? { ...selectedHeroFlag, orgName: orgNameByGroupId.get(selectedHeroFlag.groupId) ?? null }
+    : null;
 
   // Empty-state rotation when nothing real is flagged — recent PR/streak
   // celebration first, then a positive compliance reframe, then just
@@ -501,7 +511,7 @@ export async function getCoachDashboardData(
   const teamPulses: TeamPulseResult[] = teamGroups.map((group) => {
     const groupAthletes = athletes.filter((a) => a.groupId === group.id);
     if (groupAthletes.length === 0) {
-      return { groupId: group.id, groupName: group.name, pulse: null };
+      return { groupId: group.id, groupName: group.name, orgName: group.orgName ?? null, pulse: null };
     }
 
     const readinessValues = groupAthletes
@@ -528,6 +538,7 @@ export async function getCoachDashboardData(
     return {
       groupId: group.id,
       groupName: group.name,
+      orgName: group.orgName ?? null,
       pulse: computeTeamPulse({ avgReadinessToday, pctActiveThisWeek: engagement.pct, habitCompliancePct }),
     };
   });

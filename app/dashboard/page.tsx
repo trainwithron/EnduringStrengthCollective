@@ -28,6 +28,7 @@ interface GroupRow {
   name: string;
   focus_tag: string | null;
   group_kind: string | null;
+  organization_id: string | null;
 }
 
 export default async function CoachHomePage() {
@@ -81,7 +82,7 @@ export default async function CoachHomePage() {
 
   const { data: coachedRows } = await supabase
     .from("group_memberships")
-    .select("groups ( id, name, focus_tag, group_kind )")
+    .select("groups ( id, name, focus_tag, group_kind, organization_id )")
     .eq("profile_id", user.id)
     .eq("role", "coach");
   for (const row of coachedRows ?? []) {
@@ -93,13 +94,33 @@ export default async function CoachHomePage() {
     .filter((m) => m.role === "owner" || m.role === "admin")
     .map((m) => m.organization_id);
   if (adminOrgIds.length > 0) {
-    const { data: allGroups } = await supabase
+    const { data: allGroupRows } = await supabase
       .from("groups")
-      .select("id, name, focus_tag, group_kind")
+      .select("id, name, focus_tag, group_kind, organization_id")
       .in("organization_id", adminOrgIds)
       .order("name");
-    for (const g of allGroups ?? []) byId.set(g.id, g as GroupRow);
+    for (const g of allGroupRows ?? []) byId.set(g.id, g as GroupRow);
   }
+
+  // A coach who administers more than one organization needs each group's
+  // items on Home labeled with which org they're from — otherwise a
+  // pinned flag, a Team Pulse card, or a client card is indistinguishable
+  // from one belonging to a completely different org, even though Home
+  // correctly aggregates across all of them. Invisible (empty map) for
+  // the common single-org coach.
+  const distinctOrgIds = [...new Set([...byId.values()].map((g) => g.organization_id).filter((id): id is string => !!id))];
+  const orgNameById = new Map<string, string>();
+  if (distinctOrgIds.length > 1) {
+    const { data: orgRows } = await supabase
+      .from("organizations")
+      .select("id, name, display_name")
+      .in("id", distinctOrgIds);
+    for (const o of orgRows ?? []) {
+      orgNameById.set(o.id, o.display_name || o.name);
+    }
+  }
+  const orgNameByGroupId = (organizationId: string | null): string | null =>
+    organizationId ? orgNameById.get(organizationId) ?? null : null;
 
   const allGroups = [...byId.values()];
   const soloGroups = allGroups.filter((g) => g.group_kind === "one_on_one");
@@ -126,8 +147,8 @@ export default async function CoachHomePage() {
   // lib/team-pulse.ts / lib/quiet-client-tier.ts / lib/coach-hero-priority.ts.
   const dashboardData = await getCoachDashboardData(supabase, {
     coachId: user.id,
-    teamGroups: teamGroups.map((g) => ({ id: g.id, name: g.name })),
-    allGroups: allGroups.map((g) => ({ id: g.id, name: g.name })),
+    teamGroups: teamGroups.map((g) => ({ id: g.id, name: g.name, orgName: orgNameByGroupId(g.organization_id) })),
+    allGroups: allGroups.map((g) => ({ id: g.id, name: g.name, orgName: orgNameByGroupId(g.organization_id) })),
     tileMetricOverrides,
   });
 
@@ -309,6 +330,7 @@ export default async function CoachHomePage() {
         lastWorkoutAt: lastLogByAthlete.get(row.profile_id) ?? null,
         hasUnseenActivity: unseenByGroup.get(row.group_id) ?? false,
         quietTier: tier === "mild" || tier === "strong" ? tier : undefined,
+        orgName: orgNameByGroupId(byId.get(row.group_id)?.organization_id ?? null),
       };
     });
 
@@ -326,12 +348,14 @@ export default async function CoachHomePage() {
     focusTag: g.focus_tag,
     memberCount: memberCountByGroup.get(g.id) ?? 0,
     hasUnseenActivity: unseenByGroup.get(g.id) ?? false,
+    orgName: orgNameByGroupId(g.organization_id),
   }));
   const socialCards: HomeGroupCardData[] = socialGroups.map((g) => ({
     id: g.id,
     name: g.name,
     focusTag: g.focus_tag,
     memberCount: memberCountByGroup.get(g.id) ?? 0,
+    orgName: orgNameByGroupId(g.organization_id),
     hasUnseenActivity: unseenByGroup.get(g.id) ?? false,
   }));
 

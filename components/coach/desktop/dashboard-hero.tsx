@@ -30,11 +30,22 @@ function sentenceFor(flag: HeroFlag): string {
 // clear CTA (coach_dashboard_redesign_scoping.md). Falls back to a
 // rotating empty state when nothing real is flagged; never a blank "all
 // clear" with nothing to look at.
-export function DashboardHero({ flag, emptyState }: { flag: (HeroFlag & { href: string }) | null; emptyState: HeroEmptyState | null }) {
+export function DashboardHero({
+  flag,
+  emptyState,
+}: {
+  flag: (HeroFlag & { href: string; orgName: string | null }) | null;
+  emptyState: HeroEmptyState | null;
+}) {
   if (flag) {
     return (
       <div className="border border-rust/40 bg-rust/5 p-5">
-        <p className="font-body text-[10px] text-rust uppercase tracking-wide font-bold mb-2">Right now</p>
+        <div className="flex items-center gap-2 mb-2">
+          <p className="font-body text-[10px] text-rust uppercase tracking-wide font-bold">Right now</p>
+          {flag.orgName && (
+            <p className="font-body text-[10px] text-steel uppercase tracking-wide">— {flag.orgName}</p>
+          )}
+        </div>
         <p className="font-body text-lg text-chalk mb-3">{sentenceFor(flag)}</p>
         <Link href={flag.href} className="font-body text-sm text-rust font-medium">
           View {flag.athleteName.split(" ")[0]}&apos;s profile →

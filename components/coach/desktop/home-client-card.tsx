@@ -15,6 +15,10 @@ export interface HomeClientCardData {
   // different questions ("how recently" vs. "relative to their own
   // schedule").
   quietTier?: "mild" | "strong";
+  // Set only when the viewing coach administers more than one
+  // organization — otherwise every card would already obviously belong
+  // to "the" org, and labeling it would just be noise.
+  orgName?: string | null;
 }
 
 // A 1-on-1 client's "group" is invisible bookkeeping — this card shows
@@ -44,6 +48,11 @@ export function HomeClientCard({ client }: { client: HomeClientCardData }) {
       )}
       <div className="min-w-0">
         <p className="font-body text-sm text-chalk truncate">{client.fullName}</p>
+        {client.orgName && (
+          <p className="font-body text-[10px] text-steel/70 uppercase tracking-wide truncate">
+            {client.orgName}
+          </p>
+        )}
         <p className="font-body text-xs text-steel flex items-center gap-1.5">
           <span className={`w-1.5 h-1.5 rounded-full ${status.dotClass}`} />
           {status.text}

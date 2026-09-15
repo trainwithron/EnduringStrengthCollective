@@ -84,18 +84,19 @@ export default async function GroupHubPage(
   const athleteId = effective?.athleteId;
   const isActingAsOther = effective?.isActingAsOther ?? false;
 
-  // These five only need params.groupId or the viewer's own id — none
+  // These four only need params.groupId or the viewer's own id — none
   // depends on another's result — so they fire as one round trip instead
-  // of five sequential ones. This is the athlete's landing page; every
-  // visit pays for this.
+  // of four sequential ones. This is the athlete's landing page; every
+  // visit pays for this. Notifications used to be a fifth entry here, but
+  // it now needs this group's own organization_id first (see below), so
+  // it's fetched separately once that's known.
   const [
     { data: group, error: groupError },
     { data: memberships },
     { data: recentLogs },
     { data: programs },
-    { data: notificationRows },
   ] = await Promise.all([
-    supabase.from("groups").select("id, name, description").eq("id", params.groupId).single(),
+    supabase.from("groups").select("id, name, description, organization_id").eq("id", params.groupId).single(),
     // Roster with role + most recent completed workout timestamp.
     supabase
       .from("group_memberships")
@@ -126,15 +127,27 @@ export default async function GroupHubPage(
       .eq("is_active", true)
       .or(`athlete_id.is.null,athlete_id.eq.${athleteId ?? ""}`)
       .order("created_at", { ascending: false }),
-    user
-      ? supabase
-          .from("notifications")
-          .select("id, type, body, link_path, read_at, created_at")
-          .eq("profile_id", user.id)
-          .order("created_at", { ascending: false })
-          .limit(20)
-      : Promise.resolve({ data: [] }),
   ]);
+
+  // Scoped to the CURRENT group specifically, not a blind "every
+  // notification this profile has ever received" — a coach who owns/
+  // admins more than one organization would otherwise see notifications
+  // from a completely different org's clients mixed into whichever
+  // group's page they happen to have open. Ron's own direct call on the
+  // scope question: current group/org only, not aggregated across every
+  // org he administers — "as the owner of the software, I do not need
+  // to see the notifications for every organization."
+  let notificationRows: { id: string; type: string; body: string; link_path: string | null; read_at: string | null; created_at: string }[] = [];
+  if (user) {
+    const { data } = await supabase
+      .from("notifications")
+      .select("id, type, body, link_path, read_at, created_at")
+      .eq("profile_id", user.id)
+      .eq("group_id", params.groupId)
+      .order("created_at", { ascending: false })
+      .limit(20);
+    notificationRows = data ?? [];
+  }
 
   if (groupError || !group) {
     return (
@@ -189,7 +202,9 @@ export default async function GroupHubPage(
   // Short-circuits before any of the athlete-specific scheduling work
   // below, which this branch never needs.
   if (isCoach && showMobileView && !isActingAsOther) {
-    return <CoachMobileHome groupId={params.groupId} groupName={group.name} />;
+    // isCoach only derives true via a roster match on user?.id above, so a
+    // real user is guaranteed here even though TS can't see that far.
+    return <CoachMobileHome groupId={params.groupId} groupName={group.name} coachId={user!.id} />;
   }
 
   // A desktop coach, not acting as anyone, landing on this bare group-hub

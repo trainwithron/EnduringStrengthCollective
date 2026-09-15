@@ -19,7 +19,9 @@ export function TeamPulseCard({ team }: { team: TeamPulseResult }) {
       className="flex items-center justify-between border border-steel/30 bg-surface p-4 hover:border-rust/50 transition-colors"
     >
       <div>
-        <p className="font-body text-xs text-steel uppercase tracking-wide">Team Pulse</p>
+        <p className="font-body text-xs text-steel uppercase tracking-wide">
+          Team Pulse{team.orgName && ` — ${team.orgName}`}
+        </p>
         <p className="font-body text-sm text-chalk mt-1">{team.groupName}</p>
       </div>
       <p className={`font-display font-bold text-3xl leading-none ${team.pulse != null ? pulseColor(team.pulse) : "text-steel"}`}>
