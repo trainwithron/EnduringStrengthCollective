@@ -27,14 +27,34 @@ export function RecapAndUpNext({
   nextWorkout,
   carriedForwardNotes,
   groupId,
+  coachId,
 }: {
   recap: SessionRecap;
   nextWorkout: NextWorkout | null;
   carriedForwardNotes: Record<string, { body: string; date: string }>;
   groupId: string;
+  coachId: string;
 }) {
   const [showNext, setShowNext] = useState(false);
   const [sessionNote, setSessionNote] = useState(recap.sessionNote);
+  const [showTrainingMaxOnPr, setShowTrainingMaxOnPr] = useState(recap.showTrainingMaxOnPr);
+  const [savingTmPref, setSavingTmPref] = useState(false);
+
+  // training_max_pr_card_visibility_idea.md — immediate-persist toggle,
+  // same convention as every other coach_preferences control
+  // (suggestion-settings.tsx). Defaults on; this just lets a coach turn
+  // the note off if they'd rather the recap stay focused on the PR
+  // itself.
+  async function toggleTrainingMaxPref() {
+    const next = !showTrainingMaxOnPr;
+    setShowTrainingMaxOnPr(next);
+    setSavingTmPref(true);
+    const supabase = createBrowserClient();
+    await supabase
+      .from("coach_preferences")
+      .upsert({ coach_id: coachId, show_training_max_on_pr: next }, { onConflict: "coach_id" });
+    setSavingTmPref(false);
+  }
   const [sessionNoteOpen, setSessionNoteOpen] = useState(false);
   const [exercises, setExercises] = useState(nextWorkout?.exercises ?? []);
   const [swapTarget, setSwapTarget] = useState<{ id: string; name: string } | null>(null);
@@ -150,9 +170,25 @@ export function RecapAndUpNext({
                 </div>
               </div>
 
+              {recap.prCount > 0 && (
+                <button
+                  type="button"
+                  onClick={toggleTrainingMaxPref}
+                  disabled={savingTmPref}
+                  className="font-body text-[11px] text-steel underline underline-offset-2 mt-2 disabled:opacity-50"
+                >
+                  {showTrainingMaxOnPr ? "Hide training-max note on PRs" : "Show training-max note on PRs"}
+                </button>
+              )}
+
               <div className="space-y-2 mt-5">
                 {recap.exercises.map((ex) => (
-                  <RecapExerciseRow key={ex.sessionExerciseId} exercise={ex} groupId={groupId} />
+                  <RecapExerciseRow
+                    key={ex.sessionExerciseId}
+                    exercise={ex}
+                    groupId={groupId}
+                    showTrainingMaxOnPr={showTrainingMaxOnPr}
+                  />
                 ))}
               </div>
 

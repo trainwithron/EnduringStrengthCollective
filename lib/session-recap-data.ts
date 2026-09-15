@@ -25,6 +25,16 @@ export interface RecapExercise {
   // a note the coach explicitly opted into sharing (mobile_home_workout_
   // tab_merge_idea.md) — this recap page is where that opt-in lives.
   visibleToAthlete: boolean;
+  // training_max_pr_card_visibility_idea.md — the persisted, RPE-aware
+  // training-max estimate (athlete_training_maxes, migration 0155) was
+  // already auto-updating on every set logged, just invisible. True only
+  // when one of THIS session's own sets is the exact set that set the
+  // athlete's current stored estimate for this exercise (matched on
+  // weight+reps, not just "a PR happened around the same time") — a real
+  // correlation, not an assumption the two always coincide.
+  trainingMaxBumped: boolean;
+  trainingMaxEstimate: number | null;
+  trainingMaxAssumedEffort: boolean;
 }
 
 export interface SessionRecap {
@@ -33,6 +43,7 @@ export interface SessionRecap {
   athleteId: string;
   athleteName: string;
   workoutTitle: string;
+  showTrainingMaxOnPr: boolean;
   workoutId: string | null;
   completedAt: string | null;
   durationSeconds: number | null;
@@ -49,9 +60,10 @@ export interface SessionRecap {
 // the real per-set breakdown and the two new coach-only note tables.
 export async function getSessionRecap(
   supabase: any,
-  sessionId: string
+  sessionId: string,
+  viewingCoachId: string
 ): Promise<SessionRecap | null> {
-  const [{ data: session }, { data: workoutLog }, { data: sessionNoteRow }] = await Promise.all([
+  const [{ data: session }, { data: workoutLog }, { data: sessionNoteRow }, { data: coachPrefRow }] = await Promise.all([
     supabase
       .from("athlete_sessions")
       .select(
@@ -65,9 +77,18 @@ export async function getSessionRecap(
       .eq("session_id", sessionId)
       .maybeSingle(),
     supabase.from("session_coach_notes").select("body").eq("session_id", sessionId).maybeSingle(),
+    supabase
+      .from("coach_preferences")
+      .select("show_training_max_on_pr")
+      .eq("coach_id", viewingCoachId)
+      .maybeSingle(),
   ]);
 
   if (!session) return null;
+
+  // Defaults true (matches the column's own db default) whenever this
+  // coach has never touched the toggle — no row yet is not "off."
+  const showTrainingMaxOnPr = coachPrefRow?.show_training_max_on_pr ?? true;
 
   const { data: sessionExercises } = await supabase
     .from("session_exercises")
@@ -124,15 +145,58 @@ export async function getSessionRecap(
 
   const prNames = new Set<string>(workoutLog?.new_prs ?? []);
 
-  const exercises: RecapExercise[] = (sessionExercises ?? []).map((ex: any) => ({
-    sessionExerciseId: ex.id,
-    exerciseName: ex.exercise_name,
-    trackedFields: orderTrackedFields((ex.tracked_fields ?? []) as TrackedField[]),
-    sets: setsByExercise.get(ex.id) ?? [],
-    isPr: prNames.has(ex.exercise_name),
-    coachNote: noteByExercise.get(ex.id) ?? "",
-    visibleToAthlete: noteVisibilityByExercise.get(ex.id) ?? false,
-  }));
+  // Only worth asking for exercises that actually PR'd this session —
+  // the training-max estimate can only ever be "bumped by this session"
+  // for one of those.
+  const prExerciseNames = (sessionExercises ?? [])
+    .map((ex: any) => ex.exercise_name as string)
+    .filter((name: string) => prNames.has(name));
+
+  const { data: trainingMaxRows } =
+    showTrainingMaxOnPr && prExerciseNames.length > 0
+      ? await supabase
+          .from("athlete_training_maxes")
+          .select("exercise_name, estimated_max, source_weight, source_reps, source_rpe_assumed")
+          .eq("athlete_id", session.athlete_id)
+          .in("exercise_name", prExerciseNames)
+      : { data: [] as any[] };
+
+  const trainingMaxByExercise = new Map<
+    string,
+    { estimate: number; sourceWeight: number; sourceReps: number; assumed: boolean }
+  >();
+  for (const row of (trainingMaxRows ?? []) as any[]) {
+    trainingMaxByExercise.set(row.exercise_name, {
+      estimate: row.estimated_max,
+      sourceWeight: row.source_weight,
+      sourceReps: row.source_reps,
+      assumed: !!row.source_rpe_assumed,
+    });
+  }
+
+  const exercises: RecapExercise[] = (sessionExercises ?? []).map((ex: any) => {
+    const sets = setsByExercise.get(ex.id) ?? [];
+    const tm = trainingMaxByExercise.get(ex.exercise_name);
+    // Real correlation, not an assumption the PR and the training-max
+    // bump are the same event: only true when one of THIS session's own
+    // completed sets is the exact set (weight + reps) currently on
+    // record as having set the estimate.
+    const bumpedByThisSession =
+      !!tm && sets.some((s) => s.weight === tm.sourceWeight && s.reps === tm.sourceReps);
+
+    return {
+      sessionExerciseId: ex.id,
+      exerciseName: ex.exercise_name,
+      trackedFields: orderTrackedFields((ex.tracked_fields ?? []) as TrackedField[]),
+      sets,
+      isPr: prNames.has(ex.exercise_name),
+      coachNote: noteByExercise.get(ex.id) ?? "",
+      visibleToAthlete: noteVisibilityByExercise.get(ex.id) ?? false,
+      trainingMaxBumped: bumpedByThisSession,
+      trainingMaxEstimate: bumpedByThisSession ? tm!.estimate : null,
+      trainingMaxAssumedEffort: bumpedByThisSession ? tm!.assumed : false,
+    };
+  });
 
   return {
     sessionId,
@@ -140,6 +204,7 @@ export async function getSessionRecap(
     athleteId: session.athlete_id,
     athleteName: session.profiles?.full_name ?? "Athlete",
     workoutTitle: session.workouts?.title ?? "Workout",
+    showTrainingMaxOnPr,
     workoutId: session.workout_id,
     completedAt: session.completed_at,
     durationSeconds: session.duration_seconds,

@@ -65,7 +65,12 @@ fences, no explanation:
       "sets": number,          // integer, minimum 1
       "reps": string | null,   // e.g. "8", "8-10", "AMRAP" — null only for pure time-based work
       "weight": number | null, // leave null unless the description gives you a real number/percentage
-                                 // to compute from (e.g. "start at 70% of a 225 squat" -> 157)
+                                 // to compute from — either stated directly in the description (e.g.
+                                 // "start at 70% of a 225 squat" -> 157), OR a percentage of a NAMED
+                                 // athlete's real training max listed below (e.g. "5/3/1 for Sarah,
+                                 // week 1" with Sarah's Back Squat max listed as 225 -> compute 65/75/85%
+                                 // of 225 for that week's sets). Never invent a training-max number that
+                                 // isn't either stated in the description or listed below.
       "rpe": number | null,
       "rest": string | null,
       "timeSeconds": number | null
@@ -196,12 +201,52 @@ export async function POST(request: Request) {
       ? prefRows.map((p) => `- When ${p.condition_text}: ${p.preference_text}`).join("\n")
       : "(none yet)";
 
+  // Gap A (spotter_gap_audit_and_ai_quality_bar_research_sept15.md): the
+  // real, persisted, RPE-aware training-max estimate (lib/rpe-training-
+  // max.ts, athlete_training_maxes) already exists but never reached this
+  // prompt — every percentage-based ask ("write a 5/3/1 block for Sarah")
+  // had no real number to compute from and either left weights null or
+  // invented one. This route has no single athleteId (a generated draft
+  // isn't assigned to a specific client until the review step) — so
+  // rather than requiring one, every athlete on this roster's real
+  // current maxes are listed by name, same "dump the coach's own real
+  // data as context, let the model use what's relevant" pattern already
+  // used for the exercise library and learned preferences above.
+  const { data: athleteRows } = await supabase
+    .from("group_memberships")
+    .select("profile_id, profiles ( full_name )")
+    .eq("group_id", groupId)
+    .eq("role", "athlete");
+  const athleteIds = (athleteRows ?? []).map((r) => r.profile_id);
+  const { data: trainingMaxRows } =
+    athleteIds.length > 0
+      ? await supabase
+          .from("athlete_training_maxes")
+          .select("athlete_id, exercise_name, estimated_max")
+          .in("athlete_id", athleteIds)
+      : { data: [] as { athlete_id: string; exercise_name: string; estimated_max: number }[] };
+  const nameByAthleteId = new Map(
+    (athleteRows ?? []).map((r: any) => [r.profile_id, r.profiles?.full_name ?? "Client"])
+  );
+  const maxesByAthlete = new Map<string, string[]>();
+  for (const row of trainingMaxRows ?? []) {
+    const name = nameByAthleteId.get(row.athlete_id) ?? "Client";
+    const list = maxesByAthlete.get(name) ?? [];
+    list.push(`${row.exercise_name}: ${row.estimated_max}`);
+    maxesByAthlete.set(name, list);
+  }
+  const trainingMaxesText =
+    maxesByAthlete.size > 0
+      ? [...maxesByAthlete.entries()].map(([name, lifts]) => `- ${name} — ${lifts.join(", ")}`).join("\n")
+      : "(no logged sets yet for anyone on this roster)";
+
   try {
     const text = await callClaude({
       system: buildSystemPrompt(hasInjuryContext),
       userText:
         `Coach's exercise library (prefer these exact names where they fit):\n${libraryNames.join(", ") || "(empty — invent sensible exercise names)"}\n\n` +
         `This coach's standing preferences, learned from past corrections:\n${preferencesText}\n\n` +
+        `Real current training maxes for this roster (RPE-estimated from actual logged sets — only use one of these if the description names that specific athlete or is clearly for them):\n${trainingMaxesText}\n\n` +
         (injuryContextText ? `Athlete injury/health context:\n${injuryContextText}\n\n` : "") +
         `Program description: ${prompt.trim()}`,
       // 8192 truncated mid-JSON on a routine request (8 weeks x 3 days,

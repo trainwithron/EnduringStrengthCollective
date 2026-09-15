@@ -22,6 +22,8 @@ import { computeTodaysMicronutrients } from "@/lib/todays-micronutrients";
 import { Key12NutrientGrid } from "@/components/athlete/key12-nutrient-grid";
 import { NutritionYouthModeToggle } from "@/components/coach/desktop/nutrition-youth-mode-toggle";
 import { dedupeRecentFoodLogs } from "@/lib/recent-food-logs";
+import { detectStaleMealPlan } from "@/lib/nutrition-spotter";
+import { NutritionSpotterPanel } from "@/components/coach/desktop/nutrition-spotter-panel";
 
 export default async function NutritionPage(
   props: {
@@ -452,7 +454,7 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
       .gte("log_date", sevenDaysAgoKey),
     supabase
       .from("nutrition_checkins")
-      .select("phase, consecutive_surplus_spikes, dietary_restrictions, adjustment_pct")
+      .select("phase, consecutive_surplus_spikes, dietary_restrictions, adjustment_pct, new_calories")
       .eq("athlete_id", athleteId)
       .eq("group_id", groupId)
       .order("created_at", { ascending: false })
@@ -517,6 +519,16 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
       }
     : null;
 
+  // nutrition_spotter_scoping_sept15.md — real, currently-invisible gap:
+  // nothing compares an already-saved plan's own calories against the
+  // most recent CONFIRMED check-in's real target. Only checkable when
+  // both a plan and a check-in exist; a plan with no check-in yet, or a
+  // check-in with no saved plan yet, has nothing to flag as "mismatched."
+  const staleMealPlan =
+    existingPlan && lastCheckinRow
+      ? detectStaleMealPlan(existingPlan.macros as any, lastCheckinRow.new_calories)
+      : null;
+
   const pendingSuggestions = (pendingSuggestionRows ?? []).map((s) => ({
     id: s.id,
     phase: s.phase,
@@ -537,6 +549,7 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
 
   return (
     <div className="space-y-8">
+      {staleMealPlan && <NutritionSpotterPanel result={staleMealPlan} />}
       <NutritionCheckinSuggestionsList
         athleteId={athleteId}
         groupId={groupId}
