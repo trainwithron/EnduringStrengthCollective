@@ -433,13 +433,27 @@ export default async function CoachHomePage() {
   // real group list so a stale/forged cookie can never point Home's nav
   // at a group they don't actually have access to; falls back to the
   // minimal shell before that cookie exists at all (a brand-new coach).
+  //
+  // Explicitly excludes one-on-one groups — a real bug Ron hit live: a
+  // 1-on-1 client's relationship IS a groups row named after them
+  // (stale_client_name_header_bug.md's own root cause), so a coach whose
+  // last stop before Home was a client's profile fed that client's own
+  // identity into CoachDesktopShell here — which, correctly for every
+  // OTHER one of its 32 call sites, rendered the "you're in {client}'s
+  // workspace" banner AND the "{client} [Client]" breadcrumb chip
+  // directly over Home's real cross-org dashboard. Home is never
+  // single-group-scoped by design, so it should never inherit a client's
+  // identity at all — falling back to the minimal CoachHomeShell (same
+  // as the "no last_group cookie yet" case) is the correct behavior here,
+  // not a degraded one.
   const lastGroupCookie = (await cookies()).get("last_group")?.value;
   let lastGroup: { id: string; name: string } | null = null;
   if (lastGroupCookie) {
     try {
       const parsed = JSON.parse(decodeURIComponent(lastGroupCookie));
-      if (parsed?.id && allGroups.some((g) => g.id === parsed.id)) {
-        lastGroup = { id: parsed.id, name: parsed.name ?? "Group" };
+      const match = allGroups.find((g) => g.id === parsed?.id && g.group_kind !== "one_on_one");
+      if (match) {
+        lastGroup = { id: match.id, name: parsed.name ?? match.name ?? "Group" };
       }
     } catch {
       // Malformed cookie — fall through to the minimal shell.

@@ -8,9 +8,17 @@ import { detectTrainingIntent } from "@/lib/training-intent";
 export function NewProgramForm({
   groupId,
   createdBy,
+  athleteId,
 }: {
   groupId: string;
   createdBy: string;
+  // Personal-program mode (injury_pain_science_research_and_ai_gap_
+  // sept15.md's "Build with AI" entry point also preserves this on the
+  // "Start blank" tab) — real bug found during the same-night regression
+  // pass: this form never received it, so switching to "Start blank"
+  // from a client context silently created a shared program while the
+  // page above it still said "Building a personal program for X."
+  athleteId?: string | null;
 }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -34,6 +42,7 @@ export function NewProgramForm({
         name: trimmedName,
         description: description.trim() || null,
         created_by: createdBy,
+        athlete_id: athleteId ?? null,
         training_intent: detectTrainingIntent(trimmedName),
       })
       .select("id")
@@ -45,17 +54,20 @@ export function NewProgramForm({
       return;
     }
 
-    // Only one *shared* program is ever active per group — a new program
-    // defaults to active (its own column default), so every other shared
-    // program in the group needs to step down in the same action. Scoped
-    // to athlete_id is null so creating a new shared program can never
-    // deactivate a client's personal assigned program by accident.
-    await supabase
+    // Single-active-program rule, scoped correctly (same split as
+    // lib/program-duplication.ts and import-wizard.tsx's own deactivate
+    // query): a personal program only steps down this same client's
+    // other personal programs; a shared program only steps down other
+    // shared ones — never crosses that line in either direction.
+    let deactivateQuery = supabase
       .from("programs")
       .update({ is_active: false })
       .eq("group_id", groupId)
-      .is("athlete_id", null)
       .neq("id", program.id);
+    deactivateQuery = athleteId
+      ? deactivateQuery.eq("athlete_id", athleteId)
+      : deactivateQuery.is("athlete_id", null);
+    await deactivateQuery;
 
     // The program page itself is the inline builder now — "+ Add Week"
     // right there creates the first day.
