@@ -1,12 +1,11 @@
 import { SkeletonBlock, SkeletonText, SkeletonPageHeader } from "@/components/ui/skeleton";
 import { LoadingTip } from "@/components/ui/loading-tip";
-import { LoadingWatchdog } from "@/components/ui/loading-watchdog";
 
 // Opened mid-workout, often on gym wifi/cellular — the one place where a
 // frozen screen is most likely to make someone tap twice.
 export default function SessionLoading() {
   return (
-    <main className="min-h-screen bg-graphite pb-32">
+    <main data-loading-fallback className="min-h-screen bg-graphite pb-32">
       <SkeletonPageHeader />
 
       <div className="px-5 pt-4 space-y-6">
@@ -22,7 +21,6 @@ export default function SessionLoading() {
         ))}
         <LoadingTip />
       </div>
-      <LoadingWatchdog />
     </main>
   );
 }

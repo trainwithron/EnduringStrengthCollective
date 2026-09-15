@@ -1,13 +1,12 @@
 import { SkeletonBlock, SkeletonText, SkeletonPageHeader } from "@/components/ui/skeleton";
 import { LoadingTip } from "@/components/ui/loading-tip";
-import { LoadingWatchdog } from "@/components/ui/loading-watchdog";
 
 // The heaviest athlete page (template + overrides + media + progression
 // goals + last-time lookups), and the one opened most often — so it's the
 // one where painting something immediately matters most.
 export default function WorkoutOverviewLoading() {
   return (
-    <main className="min-h-screen bg-graphite pb-32">
+    <main data-loading-fallback className="min-h-screen bg-graphite pb-32">
       <SkeletonPageHeader />
 
       <div className="px-5 pt-6 space-y-6">
@@ -24,7 +23,6 @@ export default function WorkoutOverviewLoading() {
         ))}
         <LoadingTip />
       </div>
-      <LoadingWatchdog />
     </main>
   );
 }

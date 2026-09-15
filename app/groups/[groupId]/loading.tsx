@@ -1,6 +1,5 @@
 import { SkeletonBlock } from "@/components/ui/skeleton";
 import { LoadingTip } from "@/components/ui/loading-tip";
-import { LoadingWatchdog } from "@/components/ui/loading-watchdog";
 
 // Fallback skeleton for every route under /groups/[groupId] that doesn't
 // define its own. Deliberately neutral: this segment contains both the
@@ -10,7 +9,7 @@ import { LoadingWatchdog } from "@/components/ui/loading-watchdog";
 // assumptions.
 export default function GroupLoading() {
   return (
-    <main className="min-h-screen bg-graphite px-5 pt-8">
+    <main data-loading-fallback className="min-h-screen bg-graphite px-5 pt-8">
       <SkeletonBlock className="h-8 w-56" />
       <SkeletonBlock className="h-3 w-40 mt-3" />
       <div className="mt-8 space-y-3">
@@ -21,7 +20,6 @@ export default function GroupLoading() {
       <div className="mt-8">
         <LoadingTip />
       </div>
-      <LoadingWatchdog />
     </main>
   );
 }

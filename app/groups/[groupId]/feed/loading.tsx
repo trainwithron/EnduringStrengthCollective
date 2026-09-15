@@ -1,10 +1,9 @@
 import { SkeletonBlock, SkeletonText, SkeletonPageHeader } from "@/components/ui/skeleton";
 import { LoadingTip } from "@/components/ui/loading-tip";
-import { LoadingWatchdog } from "@/components/ui/loading-watchdog";
 
 export default function FeedLoading() {
   return (
-    <main className="min-h-screen bg-graphite pb-28">
+    <main data-loading-fallback className="min-h-screen bg-graphite pb-28">
       <SkeletonPageHeader />
 
       {/* Channel tab strip */}
@@ -33,7 +32,6 @@ export default function FeedLoading() {
       <div className="px-5 pt-4">
         <LoadingTip />
       </div>
-      <LoadingWatchdog />
     </main>
   );
 }
