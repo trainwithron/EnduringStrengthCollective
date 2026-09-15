@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { ExerciseMediaPicker } from "./exercise-media-picker";
 import { AutoCategorizeButton } from "./auto-categorize-button";
@@ -8,7 +9,7 @@ import { classifyExerciseCategory } from "@/lib/exercise-category-classifier";
 import { classifyEquipmentType, type EquipmentType } from "@/lib/equipment-classifier";
 import { BiomechTagPicker, type BiomechTagOption, type BiomechTagSelection } from "./biomech-tag-picker";
 import { generateBiomechBreakdown } from "@/lib/biomech-breakdown";
-import { Trash2 } from "lucide-react";
+import { Trash2, Trophy } from "lucide-react";
 
 export interface LibraryExerciseRow {
   id: string;
@@ -43,11 +44,13 @@ const EQUIPMENT_TYPES: { value: EquipmentType; label: string }[] = [
 ];
 
 export function ExerciseLibraryList({
+  groupId,
   coachId,
   initialExercises,
   biomechVocabulary,
   initialBiomechTagsByExercise,
 }: {
+  groupId: string;
   coachId: string;
   initialExercises: LibraryExerciseRow[];
   biomechVocabulary: BiomechTagOption[];
@@ -406,6 +409,13 @@ export function ExerciseLibraryList({
                           </option>
                         ))}
                       </select>
+                      <Link
+                        href={`/groups/${groupId}/games/${ex.id}`}
+                        aria-label={`Leaderboard for ${ex.name}`}
+                        className="w-8 h-8 flex items-center justify-center text-steel active:text-rust transition-colors"
+                      >
+                        <Trophy className="w-4 h-4" />
+                      </Link>
                       <button
                         type="button"
                         onClick={() => setExpandedId((prev) => (prev === ex.id ? null : ex.id))}

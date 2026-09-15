@@ -139,6 +139,7 @@ export default async function ExerciseLibraryPage(
       </div>
 
       <ExerciseLibraryTabs
+        groupId={params.groupId}
         coachId={user.id}
         initialExercises={exercises}
         initialPatterns={patternsWithLadder}
