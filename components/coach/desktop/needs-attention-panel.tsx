@@ -115,16 +115,26 @@ export function NeedsAttentionPanel({
       <p className="font-body text-xs text-chalk font-medium uppercase tracking-wide mb-2">
         Needs attention
       </p>
+      {/* v3_visual_polish_mockup_sept15.md — real layout bug, not a style
+          opinion: this panel renders both in wide contexts (the full
+          Dashboard/Programs page) and, via NeedsAttentionStrip, inside
+          the resizable list-panel sidebar (220-560px wide). The old
+          layout put the title and its 3 action buttons in ONE flex row
+          fighting for the same horizontal space — at the sidebar's real
+          width that left barely any room for the text, so a name like
+          "Sim Athlete 4 — Went Quiet (Strong)" wrapped 5+ lines deep and
+          the buttons overflowed the column. Stacking the message above
+          its own actions row (which wraps via flex-wrap instead of
+          overflowing) fixes every context this component renders in,
+          fixed once here rather than three separate times. */}
       <div className="divide-y divide-steel/15">
         {items.map((item) => (
-          <div key={keyOf(item)} className="py-2.5 flex items-center justify-between gap-3">
-            <span className="font-body text-sm">{item.title}</span>
+          <div key={keyOf(item)} className="py-2.5 space-y-1.5">
+            <p className="font-body text-sm leading-snug">{item.title}</p>
             {item.alreadyOnCalendar ? (
-              <span className="font-body text-xs text-steel shrink-0">
-                Added to your calendar
-              </span>
+              <p className="font-body text-xs text-steel">Added to your calendar</p>
             ) : (
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center flex-wrap gap-2">
                 {notifyStatus[keyOf(item)] && (
                   <span className="font-body text-[11px] text-steel">{notifyStatus[keyOf(item)]}</span>
                 )}
