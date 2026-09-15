@@ -148,6 +148,64 @@ describe("resolveProgressionTarget", () => {
     });
   });
 
+  // dup_gzclp_build_spec_sept15.md, step 1 of the build order — proves
+  // GZCLP's T2 and T3 tiers are expressible through the EXISTING
+  // double_progression model via config alone (a degenerate 10/10 range
+  // for T2, a real 15/25 range for T3), zero new code. Validates the
+  // spec's central claim before any GZCLP-specific code (T1's new
+  // progression model) gets built.
+  describe("double_progression config as GZCLP T2 (fixed 3x10, gate on hitting the target)", () => {
+    const t2Config = { repRangeLow: 10, repRangeHigh: 10, weightIncrement: 5, unit: "lbs" as const };
+
+    it("bumps weight once all 3 sets hit the 10-rep target", () => {
+      const result = resolveProgressionTarget({
+        model: "double_progression",
+        config: t2Config,
+        occurrenceIndex: 2,
+        referenceLog: null,
+        previousOccurrenceLog: { weight: 135, reps: 10 },
+      });
+      expect(result).toEqual({ weight: 140, reps: 10 });
+    });
+
+    it("never targets more than 10 reps — a degenerate range can't climb", () => {
+      const result = resolveProgressionTarget({
+        model: "double_progression",
+        config: t2Config,
+        occurrenceIndex: 2,
+        referenceLog: null,
+        previousOccurrenceLog: { weight: 135, reps: 10 },
+      });
+      expect(result.reps).toBe(10);
+    });
+  });
+
+  describe("double_progression config as GZCLP T3 (AMRAP 3x15+, climb reps to 25 before bumping weight)", () => {
+    const t3Config = { repRangeLow: 15, repRangeHigh: 25, weightIncrement: 10, unit: "lbs" as const };
+
+    it("holds weight and climbs reps by 1 while under the 25-rep ceiling", () => {
+      const result = resolveProgressionTarget({
+        model: "double_progression",
+        config: t3Config,
+        occurrenceIndex: 2,
+        referenceLog: null,
+        previousOccurrenceLog: { weight: 95, reps: 18 },
+      });
+      expect(result).toEqual({ weight: 95, reps: 19 });
+    });
+
+    it("bumps weight and resets to 15 once the AMRAP set reaches 25", () => {
+      const result = resolveProgressionTarget({
+        model: "double_progression",
+        config: t3Config,
+        occurrenceIndex: 2,
+        referenceLog: null,
+        previousOccurrenceLog: { weight: 95, reps: 25 },
+      });
+      expect(result).toEqual({ weight: 105, reps: 15 });
+    });
+  });
+
   it("returns nulls for an unrecognized model", () => {
     const result = resolveProgressionTarget({
       model: "unknown" as any,

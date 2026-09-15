@@ -34,6 +34,7 @@ import { defaultTrainingDaysForCount } from "@/lib/program-schedule";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { detectTrainingIntent } from "@/lib/training-intent";
 import { hasFlaggedMusculoskeletalConcern } from "@/lib/athlete-injury-flag";
+import { generateDupProgram, DUP_WEEKLY_SCHEME } from "@/lib/dup-generator";
 
 type Status = "idle" | "working" | "reviewing" | "done" | "error";
 
@@ -483,6 +484,67 @@ export function ImportWizard({
     router.refresh();
   }
 
+  // dup_gzclp_build_spec_sept15.md — DUP Path A, deterministic (no LLM),
+  // so this only needs the athlete's own persisted training maxes, not a
+  // server round trip. Only offered in personal-program mode (a real
+  // athleteId) since the % scheme needs one specific athlete's numbers
+  // to compute from — never invented, same "only use a listed number"
+  // discipline the AI-generate path already follows.
+  const [dupTrainingMaxes, setDupTrainingMaxes] = useState<
+    { exerciseName: string; trainingMax: number }[]
+  >([]);
+  const [dupSelected, setDupSelected] = useState<Set<string>>(new Set());
+  const [dupWeeks, setDupWeeks] = useState(4);
+
+  useEffect(() => {
+    if (!athleteId) return;
+    let cancelled = false;
+    async function run() {
+      const supabase = createBrowserClient();
+      const { data } = await supabase
+        .from("athlete_training_maxes")
+        .select("exercise_name, estimated_max")
+        .eq("athlete_id", athleteId)
+        .order("exercise_name");
+      if (cancelled) return;
+      const rows = (data ?? []).map((r) => ({
+        exerciseName: r.exercise_name as string,
+        trainingMax: r.estimated_max as number,
+      }));
+      setDupTrainingMaxes(rows);
+      setDupSelected(new Set(rows.map((r) => r.exerciseName)));
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [athleteId]);
+
+  function toggleDupLift(name: string) {
+    setDupSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
+
+  function handleDupGenerate() {
+    if (processingRef.current) return;
+    const lifts = dupTrainingMaxes.filter((l) => dupSelected.has(l.exerciseName));
+    if (lifts.length === 0) return;
+    processingRef.current = true;
+    setStatus("working");
+    setError(null);
+    setStatusLabel("Building the DUP block…");
+    const rows = generateDupProgram({ lifts, weeksToGenerate: dupWeeks });
+    prepareImport(
+      rows,
+      `${dupWeeks}-Week DUP Block`,
+      `Daily Undulating Periodization, ${dupWeeks} weeks — generated from ${athleteName ?? "this client"}'s current training maxes (${lifts.map((l) => l.exerciseName).join(", ")}).`
+    );
+  }
+
   const [aiPrompt, setAiPrompt] = useState("");
 
   async function handleAiGenerate() {
@@ -811,6 +873,57 @@ export function ImportWizard({
           Generate program
         </button>
       </div>
+
+      {athleteId && dupTrainingMaxes.length > 0 && (
+        <div className="border border-steel/20 bg-surface/40 rounded-token-lg p-6">
+          <p className="font-body text-sm text-steel mb-1">
+            Or generate a Daily Undulating Periodization (DUP) block for{" "}
+            <span className="text-chalk">{athleteName ?? "this client"}</span> — deterministic, no
+            AI involved, computed straight from their current training maxes below.
+          </p>
+          <p className="font-body text-[11px] text-steel/70 mb-4">
+            Every training day covers every lift you select, rotating through{" "}
+            {DUP_WEEKLY_SCHEME.map((s) => `${s.label} (${s.reps} @ ~${Math.round(s.percentOfTrainingMax * 100)}%)`).join(
+              " → "
+            )}
+            {" "}each week. A defensible default scheme, not the one official DUP — adjust freely
+            after it&apos;s created.
+          </p>
+          <div className="space-y-1.5 mb-4">
+            {dupTrainingMaxes.map((lift) => (
+              <label key={lift.exerciseName} className="flex items-center gap-2 font-body text-sm text-chalk">
+                <input
+                  type="checkbox"
+                  checked={dupSelected.has(lift.exerciseName)}
+                  onChange={() => toggleDupLift(lift.exerciseName)}
+                />
+                {lift.exerciseName}{" "}
+                <span className="text-[11px] text-steel">({lift.trainingMax} lb training max)</span>
+              </label>
+            ))}
+          </div>
+          <label className="flex items-center gap-2 font-body text-xs text-steel mb-4">
+            Weeks
+            <input
+              type="number"
+              min={1}
+              max={16}
+              value={dupWeeks}
+              onChange={(e) => setDupWeeks(Math.max(1, Math.min(16, Number(e.target.value) || 1)))}
+              disabled={status === "working"}
+              className="w-16 bg-graphite border border-steel/30 text-chalk px-2 py-1 font-body text-xs focus:outline-none focus:border-rust disabled:opacity-40"
+            />
+          </label>
+          <button
+            type="button"
+            onClick={handleDupGenerate}
+            disabled={status === "working" || dupSelected.size === 0}
+            className="h-9 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
+          >
+            Generate DUP block
+          </button>
+        </div>
+      )}
     </div>
   );
 }
