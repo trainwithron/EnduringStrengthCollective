@@ -57,6 +57,15 @@ export default async function LogWorkoutForClientPage(
     );
   }
 
+  // gym_owner_multi_trainer_session_tracking_real_prospect.md — only
+  // fetched for the coach-logged path; an athlete's own self-started
+  // session never spends a credit, so it has no use for session types.
+  const { data: typeRows } = await supabase
+    .from("session_types")
+    .select("id, name, credit_cost")
+    .eq("coach_id", user.id)
+    .order("created_at", { ascending: true });
+
   return (
     <WorkoutOverviewView
       data={data}
@@ -66,6 +75,7 @@ export default async function LogWorkoutForClientPage(
       backHref={`/groups/${params.groupId}/athletes/${params.athleteId}/log`}
       loggingForName={athleteProfile?.full_name ?? "this client"}
       loggedByCoach
+      sessionTypes={(typeRows ?? []).map((t) => ({ id: t.id, name: t.name, creditCost: t.credit_cost }))}
     />
   );
 }

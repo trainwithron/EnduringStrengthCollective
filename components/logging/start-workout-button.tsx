@@ -32,6 +32,7 @@ export function StartWorkoutButton({
   athleteId,
   exercises,
   loggedByCoach,
+  sessionTypes,
 }: {
   workoutId: string;
   groupId: string;
@@ -42,9 +43,17 @@ export function StartWorkoutButton({
   // through to workout_logs on completion so it can be badged in their
   // history instead of silently looking like their own entry.
   loggedByCoach?: boolean;
+  // gym_owner_multi_trainer_session_tracking_real_prospect.md — only
+  // meaningful for the coach-logged path (an athlete's own session never
+  // spends a credit). Undefined/empty renders no picker at all, and the
+  // session gets no session_type_id — complete_workout_session() already
+  // treats that as the implicit default 1-credit training session, so a
+  // coach who never creates a type sees nothing different here.
+  sessionTypes?: { id: string; name: string; creditCost: number }[];
 }) {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sessionTypeId, setSessionTypeId] = useState<string>("");
   const router = useRouter();
 
   async function handleStart() {
@@ -59,6 +68,7 @@ export function StartWorkoutButton({
         group_id: groupId,
         athlete_id: athleteId,
         logged_by_coach: loggedByCoach ?? false,
+        session_type_id: sessionTypeId || null,
       })
       .select("id")
       .single();
@@ -135,6 +145,23 @@ export function StartWorkoutButton({
 
   return (
     <div>
+      {loggedByCoach && sessionTypes && sessionTypes.length > 0 && (
+        <div className="mb-2 flex items-center gap-2 justify-center">
+          <label className="font-body text-[11px] text-steel uppercase tracking-wide">Session type</label>
+          <select
+            value={sessionTypeId}
+            onChange={(e) => setSessionTypeId(e.target.value)}
+            className="h-8 bg-surface border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"
+          >
+            <option value="">Training session (1 credit)</option>
+            {sessionTypes.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name} ({t.creditCost} {t.creditCost === 1 ? "credit" : "credits"})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       {error && (
         <p className="font-body text-xs text-rust mb-2 text-center" role="alert">
           {error}

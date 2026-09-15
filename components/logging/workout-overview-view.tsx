@@ -21,6 +21,7 @@ export function WorkoutOverviewView({
   loggingForName,
   loggedByCoach,
   actingAs,
+  sessionTypes,
 }: {
   data: WorkoutOverviewData;
   groupId: string;
@@ -30,6 +31,7 @@ export function WorkoutOverviewView({
   loggingForName?: string;
   loggedByCoach?: boolean;
   actingAs?: { fullName: string; groupId: string };
+  sessionTypes?: { id: string; name: string; creditCost: number }[];
 }) {
   const { workout, exercises, dayNotes, lastTimeByExercise, videoUrlByExerciseId, goalByExerciseId, existingSession } =
     data;
@@ -104,6 +106,7 @@ export function WorkoutOverviewView({
             groupId={groupId}
             athleteId={athleteId}
             loggedByCoach={loggedByCoach}
+            sessionTypes={sessionTypes}
             exercises={exercises.map((ex) => ({
               id: ex.id,
               exerciseName: ex.exerciseName,
