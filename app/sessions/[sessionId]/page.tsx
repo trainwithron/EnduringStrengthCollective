@@ -6,6 +6,7 @@ import type { PendingGateTask } from "@/components/session/rest-timer-bar";
 import { isHabitDueOn } from "@/lib/habits";
 import { DEFAULT_TRACKED_FIELDS } from "@/lib/exercise-fields";
 import { CoachLoggedBadge } from "@/components/coach-logged-badge";
+import { SendToClientButton } from "@/components/session/send-to-client-button";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import type { SessionExerciseEntry } from "@/lib/types";
 import { findCorrelatingWeightSuggestion, resolveWeightSuggestion } from "@/lib/set-suggestions";
@@ -511,6 +512,18 @@ export default async function SessionPage(
         <h1 className="font-display font-bold text-3xl leading-none mt-1 uppercase">
           {(session as any).workouts?.title ?? "Workout"}
         </h1>
+        {/* Coach-only, mid-logging escape hatch — Ron's own real scenario:
+            ran out of time in person and needed a quick way to hand the
+            rest off. The client can already resume this exact session
+            the moment they open it themselves (existingSession handles
+            that); this just makes sure they know to. */}
+        {session.logged_by_coach && !isOwnSession && session.status !== "completed" && (
+          <SendToClientButton
+            athleteId={session.athlete_id}
+            sessionId={session.id}
+            workoutTitle={(session as any).workouts?.title ?? "Workout"}
+          />
+        )}
         {sharePostId && (
           <Link
             href={`/share/${sharePostId}`}
