@@ -6,6 +6,7 @@ import { getNeedsAttentionItems } from "@/lib/needs-attention-data";
 import { SuggestionSettings } from "@/components/coach/desktop/suggestion-settings";
 import { NeedsAttentionPanel } from "@/components/coach/desktop/needs-attention-panel";
 import { RosterSection } from "@/components/coach/desktop/roster-section";
+import { AddClientButton } from "@/components/coach/desktop/add-client-button";
 import { WorkoutSummaryCard } from "@/components/feed/workout-summary-card";
 import type { FeedPost } from "@/lib/types";
 
@@ -284,7 +285,28 @@ export default async function CoachDashboardPage(
       </h2>
 
       {recentActivity.length === 0 ? (
-        <p className="font-body text-sm text-steel py-6">Nothing yet — activity will show up here.</p>
+        // v3_visual_polish_mockup_sept15.md's follow-up "Dashboard Empty
+        // State & Business Tiles" mockup (the more specific, later-
+        // approved spec for this exact card) — a real quiet-but-present
+        // state with an actual next action, not bare gray placeholder
+        // text and not just a passive icon+sentence.
+        <div className="relative overflow-hidden p-5 mt-3.5 rounded-token-lg border border-rust/20 bg-[linear-gradient(160deg,rgb(var(--rust)/0.08),transparent_60%)]">
+          <div className="w-9 h-9 rounded-token-md flex items-center justify-center bg-rust/[0.14] text-lg mb-3.5">
+            👋
+          </div>
+          <p className="font-display uppercase text-base tracking-wide text-chalk">
+            Quiet right now
+          </p>
+          <p className="font-body text-xs text-steel mt-1 mb-4 max-w-[38ch]">
+            Nothing needs your attention yet — real activity from your roster will show up here as
+            it happens.
+          </p>
+          <AddClientButton
+            groupId={params.groupId}
+            groupName={group?.name ?? "This group"}
+            createdBy={user.id}
+          />
+        </div>
       ) : (
         <div className="divide-y divide-steel/15 max-w-2xl border border-steel/15">
           {recentActivity.map((entry) =>
@@ -337,6 +359,7 @@ export default async function CoachDashboardPage(
               : "Show as a list to review"
           }
           defaultExpanded={!prefsRow}
+          variant="glow"
         >
           <SuggestionSettings
             coachId={user.id}
