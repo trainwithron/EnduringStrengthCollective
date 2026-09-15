@@ -26,7 +26,15 @@ function condensedSummary(exercise: RecapExercise): string {
 // (same expand/collapse-to-header-row interaction as the program
 // builder's day cards, components/coach/desktop/day-card.tsx), with a
 // coach-only note field that appears once expanded.
-export function RecapExerciseRow({ exercise, groupId }: { exercise: RecapExercise; groupId: string }) {
+export function RecapExerciseRow({
+  exercise,
+  groupId,
+  showTrainingMaxOnPr,
+}: {
+  exercise: RecapExercise;
+  groupId: string;
+  showTrainingMaxOnPr: boolean;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [note, setNote] = useState(exercise.coachNote);
   const [saving, setSaving] = useState(false);
@@ -83,6 +91,13 @@ export function RecapExerciseRow({ exercise, groupId }: { exercise: RecapExercis
           {expanded ? <ChevronUp className="w-4 h-4 text-steel" /> : <ChevronDown className="w-4 h-4 text-steel" />}
         </span>
       </button>
+
+      {exercise.isPr && showTrainingMaxOnPr && exercise.trainingMaxBumped && (
+        <p className="font-body text-[11px] text-rust px-4 pb-2 -mt-1">
+          Also bumped their training-max estimate to {exercise.trainingMaxEstimate} lb
+          {exercise.trainingMaxAssumedEffort ? " (assumed near-max effort — no RPE logged on this set)" : ""}.
+        </p>
+      )}
 
       {expanded && (
         <div className="px-4 pb-4 space-y-3">

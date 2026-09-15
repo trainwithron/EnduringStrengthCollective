@@ -56,7 +56,7 @@ export default async function SessionRecapPage(props: { params: Promise<{ sessio
     );
   }
 
-  const recap = await getSessionRecap(supabase, params.sessionId);
+  const recap = await getSessionRecap(supabase, params.sessionId, user.id);
   if (!recap) {
     return (
       <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
@@ -152,6 +152,7 @@ export default async function SessionRecapPage(props: { params: Promise<{ sessio
       }
       carriedForwardNotes={Object.fromEntries(carriedForwardNoteByExerciseName)}
       groupId={session.group_id}
+      coachId={user.id}
     />
   );
 }
