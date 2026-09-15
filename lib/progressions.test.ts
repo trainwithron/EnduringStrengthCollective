@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveProgressionTarget } from "./progressions";
+import { resolveProgressionTarget, resolveGzclpT1Target, type GzclpT1Occurrence } from "./progressions";
 
 describe("resolveProgressionTarget", () => {
   it("returns null weight/reps for the reference occurrence (index 1)", () => {
@@ -203,6 +203,114 @@ describe("resolveProgressionTarget", () => {
         previousOccurrenceLog: { weight: 95, reps: 25 },
       });
       expect(result).toEqual({ weight: 105, reps: 15 });
+    });
+  });
+
+  // dup_gzclp_build_spec_sept15.md, step 3 of the build order — the one
+  // genuinely new piece of code the spec required: GZCLP's T1 3-stage
+  // cascade, replayed across full occurrence history (not just the
+  // immediately-previous point, unlike the other 3 models above).
+  describe("resolveGzclpT1Target", () => {
+    const config = { startingWeight: 135, weightIncrement: 5, unit: "lbs" as const, deloadPercent: 10 };
+
+    it("occurrence 1 starts at Stage 1 (5x3+) with the configured starting weight", () => {
+      const result = resolveGzclpT1Target({ config, occurrenceIndex: 1, history: [] });
+      expect(result).toEqual({ weight: 135, reps: 3, stage: 1, stageLabel: "5x3+" });
+    });
+
+    it("hitting the Stage 1 AMRAP minimum adds weight and stays at Stage 1", () => {
+      const history: GzclpT1Occurrence[] = [{ occurrenceIndex: 1, amrapReps: 3 }];
+      const result = resolveGzclpT1Target({ config, occurrenceIndex: 2, history });
+      expect(result).toEqual({ weight: 140, reps: 3, stage: 1, stageLabel: "5x3+" });
+    });
+
+    it("missing the Stage 1 minimum drops to Stage 2 at the SAME weight (not a deload)", () => {
+      const history: GzclpT1Occurrence[] = [{ occurrenceIndex: 1, amrapReps: 2 }];
+      const result = resolveGzclpT1Target({ config, occurrenceIndex: 2, history });
+      expect(result).toEqual({ weight: 135, reps: 2, stage: 2, stageLabel: "6x2+" });
+    });
+
+    it("keeps compounding weight across consecutive Stage 1 successes", () => {
+      const history: GzclpT1Occurrence[] = [
+        { occurrenceIndex: 1, amrapReps: 3 },
+        { occurrenceIndex: 2, amrapReps: 4 },
+      ];
+      const result = resolveGzclpT1Target({ config, occurrenceIndex: 3, history });
+      expect(result).toEqual({ weight: 145, reps: 3, stage: 1, stageLabel: "5x3+" });
+    });
+
+    it("only resets weight after failing Stage 3 specifically, not after 3 failures at one scheme", () => {
+      const history: GzclpT1Occurrence[] = [
+        { occurrenceIndex: 1, amrapReps: 2 }, // fail Stage 1 (need 3) -> Stage 2, still 135
+        { occurrenceIndex: 2, amrapReps: 1 }, // fail Stage 2 (need 2) -> Stage 3, still 135
+        { occurrenceIndex: 3, amrapReps: 0 }, // fail Stage 3 (need 1) -> deload 10%, back to Stage 1
+      ];
+      const result = resolveGzclpT1Target({ config, occurrenceIndex: 4, history });
+      expect(result).toEqual({ weight: 121.5, reps: 3, stage: 1, stageLabel: "5x3+" });
+    });
+
+    it("succeeding at Stage 3 adds weight and stays at Stage 3, rather than resetting", () => {
+      const history: GzclpT1Occurrence[] = [
+        { occurrenceIndex: 1, amrapReps: 2 }, // fail -> Stage 2
+        { occurrenceIndex: 2, amrapReps: 1 }, // fail -> Stage 3
+        { occurrenceIndex: 3, amrapReps: 1 }, // pass Stage 3 (need 1) -> weight up, stays Stage 3
+      ];
+      const result = resolveGzclpT1Target({ config, occurrenceIndex: 4, history });
+      expect(result).toEqual({ weight: 140, reps: 1, stage: 3, stageLabel: "10x1+" });
+    });
+
+    it("skips occurrences with no logged AMRAP result rather than treating them as a failure", () => {
+      const history: GzclpT1Occurrence[] = [
+        { occurrenceIndex: 1, amrapReps: 3 }, // pass -> 140
+        { occurrenceIndex: 2, amrapReps: null }, // never logged — ignored, not a fail
+      ];
+      const result = resolveGzclpT1Target({ config, occurrenceIndex: 3, history });
+      expect(result).toEqual({ weight: 140, reps: 3, stage: 1, stageLabel: "5x3+" });
+    });
+  });
+
+  // dup_gzclp_build_spec_sept15.md, step 4 — DUP Path B: identical wave
+  // math to the "wave model" tests above, but the reference is external
+  // (a training max) rather than the athlete's own first logged set, so
+  // occurrence 1 gets a real computed target too, not null.
+  describe("wave_from_training_max model", () => {
+    const config = {
+      weightDeltas: [-10, 0, 5],
+      repsPattern: [10, 5, 7],
+      unit: "percent" as const,
+    };
+
+    it("computes a real target at occurrence 1 (unlike plain wave, which returns null there)", () => {
+      const result = resolveProgressionTarget({
+        model: "wave_from_training_max",
+        config,
+        occurrenceIndex: 1,
+        referenceLog: { weight: 300, reps: 1 },
+        previousOccurrenceLog: null,
+      });
+      expect(result).toEqual({ weight: 270, reps: 10 });
+    });
+
+    it("cycles the same weightDeltas/repsPattern rotation as plain wave", () => {
+      const result = resolveProgressionTarget({
+        model: "wave_from_training_max",
+        config,
+        occurrenceIndex: 2,
+        referenceLog: { weight: 300, reps: 1 },
+        previousOccurrenceLog: null,
+      });
+      expect(result).toEqual({ weight: 300, reps: 5 });
+    });
+
+    it("returns nulls with no training max to reference from", () => {
+      const result = resolveProgressionTarget({
+        model: "wave_from_training_max",
+        config,
+        occurrenceIndex: 1,
+        referenceLog: null,
+        previousOccurrenceLog: null,
+      });
+      expect(result).toEqual({ weight: null, reps: null });
     });
   });
 

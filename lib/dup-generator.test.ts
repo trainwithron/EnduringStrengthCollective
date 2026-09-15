@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { generateDupProgram, DUP_WEEKLY_SCHEME } from "./dup-generator";
+import { generateDupProgram, generateDupSelfUpdatingProgram, DUP_WEEKLY_SCHEME } from "./dup-generator";
+import { resolveProgressionTarget } from "./progressions";
 
 describe("generateDupProgram", () => {
   it("produces 3 days x every lift for each requested week", () => {
@@ -58,5 +59,56 @@ describe("generateDupProgram", () => {
     expect(generateDupProgram({ lifts: [{ exerciseName: "Back Squat", trainingMax: 300 }], weeksToGenerate: 0 })).toEqual(
       []
     );
+  });
+});
+
+// dup_gzclp_build_spec_sept15.md step 4 — DUP Path B
+describe("generateDupSelfUpdatingProgram", () => {
+  it("never bakes a weight into the shell, not even week 1 (unlike Path A)", () => {
+    const { rows } = generateDupSelfUpdatingProgram({
+      lifts: [{ exerciseName: "Back Squat", trainingMax: 300 }],
+      weeksToGenerate: 2,
+    });
+    expect(rows.every((r) => r.weight === null)).toBe(true);
+  });
+
+  it("produces one wave_from_training_max rule per lift", () => {
+    const { progressionRules } = generateDupSelfUpdatingProgram({
+      lifts: [
+        { exerciseName: "Back Squat", trainingMax: 300 },
+        { exerciseName: "Bench Press", trainingMax: 200 },
+      ],
+      weeksToGenerate: 1,
+    });
+    expect(progressionRules).toHaveLength(2);
+    expect(progressionRules.every((r) => r.model === "wave_from_training_max" && r.tierLabel === "DUP")).toBe(true);
+  });
+
+  it("its rule's weightDeltas/repsPattern reproduce Path A's exact percentages when fed through the real progression engine", () => {
+    const { progressionRules } = generateDupSelfUpdatingProgram({
+      lifts: [{ exerciseName: "Back Squat", trainingMax: 300 }],
+      weeksToGenerate: 1,
+    });
+    const config = progressionRules[0].config;
+    // Occurrence 1, referenced against the same training max Path A would use directly.
+    const day1 = resolveProgressionTarget({
+      model: "wave_from_training_max",
+      config,
+      occurrenceIndex: 1,
+      referenceLog: { weight: 300, reps: 1 },
+      previousOccurrenceLog: null,
+    });
+    // Path A's Day 1 (Hypertrophy, 70%): 300 * 0.7 = 210
+    expect(day1).toEqual({ weight: 210, reps: 11 });
+
+    const day2 = resolveProgressionTarget({
+      model: "wave_from_training_max",
+      config,
+      occurrenceIndex: 2,
+      referenceLog: { weight: 300, reps: 1 },
+      previousOccurrenceLog: null,
+    });
+    // Path A's Day 2 (Strength, 87.5%): 300 * 0.875 = 262.5
+    expect(day2).toEqual({ weight: 262.5, reps: 4 });
   });
 });

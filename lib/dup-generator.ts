@@ -1,4 +1,5 @@
 import type { ParsedImportRow } from "./workout-import-parser";
+import type { WaveConfig } from "./progressions";
 
 // dup_gzclp_build_spec_sept15.md, step 2 of the build order — DUP Path
 // A: a pure, deterministic generator (no LLM call) producing the exact
@@ -22,12 +23,17 @@ export interface DupSessionScheme {
   // (athlete_training_maxes.estimated_max) this session's weight is
   // computed from.
   percentOfTrainingMax: number;
+  // A single representative rep count for this day, for Path B's
+  // dynamic wave_from_training_max config (lib/progressions.ts) — the
+  // progression engine's repsPattern needs a real number per occurrence,
+  // not the descriptive range shown in the static template.
+  repsTarget: number;
 }
 
 export const DUP_WEEKLY_SCHEME: DupSessionScheme[] = [
-  { label: "Hypertrophy", sets: 4, reps: "10-12", percentOfTrainingMax: 0.7 },
-  { label: "Strength", sets: 4, reps: "3-5", percentOfTrainingMax: 0.875 },
-  { label: "Power / Moderate", sets: 3, reps: "6-8", percentOfTrainingMax: 0.775 },
+  { label: "Hypertrophy", sets: 4, reps: "10-12", percentOfTrainingMax: 0.7, repsTarget: 11 },
+  { label: "Strength", sets: 4, reps: "3-5", percentOfTrainingMax: 0.875, repsTarget: 4 },
+  { label: "Power / Moderate", sets: 3, reps: "6-8", percentOfTrainingMax: 0.775, repsTarget: 7 },
 ];
 
 export interface DupLiftInput {
@@ -77,4 +83,64 @@ export function generateDupProgram({
   }
 
   return rows;
+}
+
+export interface DupProgressionRule {
+  exerciseName: string;
+  model: "wave_from_training_max";
+  config: WaveConfig;
+  tierLabel: string;
+}
+
+export interface DupSelfUpdatingResult {
+  rows: ParsedImportRow[];
+  progressionRules: DupProgressionRule[];
+}
+
+// dup_gzclp_build_spec_sept15.md §2.3 Path B — same 3-day rotation as
+// Path A above, but no weight is ever baked into the shell (every row
+// gets weight: null, even week 1). Instead, one wave_from_training_max
+// exercise_progressions rule per lift drives every occurrence forever,
+// reading the athlete's CURRENT training max fresh each time — no
+// "regenerate to pick up a new PR" step, unlike Path A. Reuses the
+// exact same DUP_WEEKLY_SCHEME numbers as Path A so the two paths never
+// silently disagree about what "DUP" means in this app.
+export function generateDupSelfUpdatingProgram({
+  lifts,
+  weeksToGenerate,
+}: {
+  lifts: DupLiftInput[];
+  weeksToGenerate: number;
+}): DupSelfUpdatingResult {
+  const rows: ParsedImportRow[] = [];
+
+  for (let week = 1; week <= weeksToGenerate; week++) {
+    DUP_WEEKLY_SCHEME.forEach((scheme, dayIndex) => {
+      for (const lift of lifts) {
+        rows.push({
+          week: String(week),
+          day: `Day ${dayIndex + 1} — ${scheme.label}`,
+          exerciseName: lift.exerciseName,
+          sets: scheme.sets,
+          reps: scheme.reps,
+          weight: null,
+          rpe: null,
+          rest: null,
+          timeSeconds: null,
+        });
+      }
+    });
+  }
+
+  const weightDeltas = DUP_WEEKLY_SCHEME.map((s) => Math.round((s.percentOfTrainingMax - 1) * 1000) / 10);
+  const repsPattern = DUP_WEEKLY_SCHEME.map((s) => s.repsTarget);
+
+  const progressionRules: DupProgressionRule[] = lifts.map((lift) => ({
+    exerciseName: lift.exerciseName,
+    model: "wave_from_training_max",
+    config: { weightDeltas, repsPattern, unit: "percent" },
+    tierLabel: "DUP",
+  }));
+
+  return { rows, progressionRules };
 }
