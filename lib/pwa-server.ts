@@ -22,6 +22,22 @@ async function isMobileUserAgent(): Promise<boolean> {
   return /android|iphone|ipad|ipod|mobile/i.test(ua);
 }
 
+// Real device signal only, deliberately ignoring VIEW_OVERRIDE_COOKIE —
+// for the one or two pages (like /dashboard) that have exactly ONE
+// layout and it's a fixed desktop sidebar, not a genuine dual-shell page
+// the way /groups/[groupId] is. The sticky override's whole meaning is
+// "which of these two valid shells do you want," which is a category
+// error to apply somewhere only one shell exists at all: a coach who
+// flipped "Desktop Mode" on to preview their OWN group hub would
+// otherwise also get stuck seeing a broken, unusable sidebar on a page
+// that was never built to render on a phone either way. Use
+// prefersAthleteStyleView() for anywhere a real mobile-style alternative
+// actually exists; use this where it doesn't.
+export async function isRealMobileDevice(): Promise<boolean> {
+  const [standalone, mobile] = await Promise.all([isPwaStandalone(), isMobileUserAgent()]);
+  return standalone || mobile;
+}
+
 // The coach's own manual, sticky shell choice (see lib/pwa.ts for why
 // this lives in its own cookie, separate from PWA_STANDALONE_COOKIE).
 // null means "no explicit choice yet — auto-detect".
