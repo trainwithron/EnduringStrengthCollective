@@ -15,6 +15,15 @@ interface ClientOption {
 // same set-by-set logging UI the athlete uses, tagged coach-logged) and
 // "Calendar" already live. Lets a coach pick a client and confirm things
 // look right on their end without hunting through Clients → their row.
+//
+// Deliberately NOT labeled "View as Client" (mobile_view_as_client_
+// coach_impersonation_idea.md's real thing, components/athlete/
+// view-as-client-picker.tsx) — that flow drops a coach into a client's
+// actual mobile experience via a session cookie, with a persistent
+// banner and real write-attribution. This is a plain profile-page
+// shortcut; sharing that name with the real impersonation flow read as
+// the same feature on two surfaces when it isn't, flagged and renamed
+// rather than left to confuse a coach moving between mobile and desktop.
 export function ViewAsClientButton({ groupId }: { groupId: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -73,11 +82,11 @@ export function ViewAsClientButton({ groupId }: { groupId: string }) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        aria-label="View as Client"
+        aria-label="Go to a client's profile"
         className="flex items-center gap-1.5 h-9 px-2.5 md:px-3 border border-steel/30 text-chalk active:border-rust active:text-rust transition-colors"
       >
         <Eye className="w-4 h-4 shrink-0" strokeWidth={2.25} />
-        <span className="font-body text-sm hidden sm:inline">View as Client</span>
+        <span className="font-body text-sm hidden sm:inline">Client Profile</span>
         <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
