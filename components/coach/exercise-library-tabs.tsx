@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ExerciseLibraryList, type LibraryExerciseRow } from "./exercise-library-list";
+import type { BiomechTagOption, BiomechTagSelection } from "./biomech-tag-picker";
 import { MovementPatternList } from "./movement-pattern-list";
 import { NewMovementPatternForm } from "./new-movement-pattern-form";
 import type { MovementPlane } from "./movement-pattern-row";
@@ -22,11 +23,15 @@ export function ExerciseLibraryTabs({
   initialExercises,
   initialPatterns,
   exerciseLibrary,
+  biomechVocabulary,
+  initialBiomechTagsByExercise,
 }: {
   coachId: string;
   initialExercises: LibraryExerciseRow[];
   initialPatterns: PatternWithLadder[];
   exerciseLibrary: string[];
+  biomechVocabulary: BiomechTagOption[];
+  initialBiomechTagsByExercise: Record<string, BiomechTagSelection[]>;
 }) {
   const [tab, setTab] = useState<Tab>("exercises");
 
@@ -80,7 +85,12 @@ export function ExerciseLibraryTabs({
       </div>
 
       {tab === "exercises" && (
-        <ExerciseLibraryList coachId={coachId} initialExercises={initialExercises} />
+        <ExerciseLibraryList
+          coachId={coachId}
+          initialExercises={initialExercises}
+          biomechVocabulary={biomechVocabulary}
+          initialBiomechTagsByExercise={initialBiomechTagsByExercise}
+        />
       )}
       {tab === "patterns" && (
         <div>
