@@ -590,14 +590,7 @@ export function CoachDesktopShell({
           that can both be true at once — a coach acting-as-client
           inside a one-on-one group's own shell — and each being
           separately `sticky top-14` would overlap instead of stacking. */}
-      {/* Home (app/dashboard/page.tsx) passes groupId/groupName from a
-          non-authoritative "last visited group" cookie, purely for nav
-          convenience — its body is intentionally never scoped to a
-          single group. Rendering these banners there would show "You're
-          in {client}'s workspace" (or "Viewing as {client}") over the
-          full cross-org roster, the exact stale-context contradiction
-          this shell exists to prevent everywhere else. */}
-      {active !== "home" && (groupKind === "one_on_one" || actingAsName) && (
+      {(groupKind === "one_on_one" || actingAsName) && (
         <div className="sticky top-14 z-20">
           {groupKind === "one_on_one" && (
             <div className="flex items-center justify-between gap-3 px-3 md:px-4 py-1.5 bg-rust/10 border-b border-rust/30">
