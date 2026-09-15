@@ -35,6 +35,12 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { TerminologyProvider } from "@/components/coach/terminology-provider";
 import { SwappableTerm } from "@/components/coach/swappable-term";
 import { ShellRail, type RailIcon } from "@/components/coach/desktop/shell-rail";
+import { ClientsRailWidget } from "@/components/coach/desktop/rail-widgets/clients-rail-widget";
+import { MessagesRailWidget } from "@/components/coach/desktop/rail-widgets/messages-rail-widget";
+import { FeedRailWidget } from "@/components/coach/desktop/rail-widgets/feed-rail-widget";
+import { CalendarRailWidget } from "@/components/coach/desktop/rail-widgets/calendar-rail-widget";
+import { TeamRailWidget } from "@/components/coach/desktop/rail-widgets/team-rail-widget";
+import { BusinessRailWidget } from "@/components/coach/desktop/rail-widgets/business-rail-widget";
 import { ShellListPanel, type SectionSubLink } from "@/components/coach/desktop/shell-list-panel";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CoachMoreSheet } from "@/components/coach/mobile/coach-more-sheet";
@@ -457,6 +463,19 @@ export function CoachDesktopShell({
   // (Programming, Business, etc.) becomes one icon pointing at its first
   // item; every group's other items stay reachable via the small
   // section sub-nav the list panel renders when that section is active.
+  // Hover rail widgets (hover_expand_rail_widgets_idea.md) — a
+  // glanceable popover per icon, decided per-icon by Ron directly: no
+  // widget at all for Programming (his own call, no obvious glanceable
+  // metric there) or any icon not named below, matching the confirmed
+  // spec exactly rather than guessing one onto every icon.
+  const flatWidgetByKey: Partial<Record<Active, React.ReactNode>> = {
+    clients: <ClientsRailWidget groupId={groupId} />,
+    messages: <MessagesRailWidget groupId={groupId} />,
+    feed: <FeedRailWidget groupId={groupId} />,
+    calendar: <CalendarRailWidget groupId={groupId} />,
+    "team-performance": <TeamRailWidget groupId={groupId} />,
+  };
+
   const railIcons: RailIcon[] = nav.map((entry) => {
     if (!isGroup(entry)) {
       return {
@@ -466,6 +485,7 @@ export function CoachDesktopShell({
         icon: entry.icon,
         active: active === entry.key,
         badge: entry.badge,
+        popover: flatWidgetByKey[entry.key],
       };
     }
     const first = entry.items[0];
@@ -475,6 +495,7 @@ export function CoachDesktopShell({
       href: first.href,
       icon: entry.icon,
       active: groupHasActiveChild(entry),
+      popover: entry.label === "Business" ? <BusinessRailWidget groupId={groupId} /> : undefined,
     };
   });
 

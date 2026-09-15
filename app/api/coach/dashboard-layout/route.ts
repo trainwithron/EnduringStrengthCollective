@@ -24,6 +24,9 @@ export async function PATCH(request: Request) {
   // per-coach row, not the Home dashboard's own tiles above.
   const spotWidgetOrder = Array.isArray(body?.spotWidgetOrder) ? body.spotWidgetOrder : undefined;
   const spotHiddenWidgets = Array.isArray(body?.spotHiddenWidgets) ? body.spotHiddenWidgets : undefined;
+  // Hover rail widgets (hover_expand_rail_widgets_idea.md) — the
+  // Business icon's popover shows the coach's own top-3 picked metrics.
+  const businessWidgetMetrics = Array.isArray(body?.businessWidgetMetrics) ? body.businessWidgetMetrics : undefined;
 
   const patch: Record<string, unknown> = { coach_id: user.id, updated_at: new Date().toISOString() };
   if (tileOrder) patch.tile_order = tileOrder;
@@ -31,6 +34,7 @@ export async function PATCH(request: Request) {
   if (tileMetricOverrides) patch.tile_metric_overrides = tileMetricOverrides;
   if (spotWidgetOrder) patch.spot_widget_order = spotWidgetOrder;
   if (spotHiddenWidgets) patch.spot_hidden_widgets = spotHiddenWidgets;
+  if (businessWidgetMetrics) patch.business_widget_metrics = businessWidgetMetrics;
 
   const { error } = await supabase.from("coach_dashboard_layout").upsert(patch, { onConflict: "coach_id" });
 
