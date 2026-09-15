@@ -50,11 +50,16 @@ export function writeListPanelCollapsed(collapsed: boolean): void {
   }
 }
 
-export type ListPanelView = "roster" | "business";
+// calendar_workout_scheduling_and_adjustable_workspace_idea.md item 4 —
+// extended from the original roster/business pair to let a coach pick
+// what fills the panel more broadly, not just "roster vs. money."
+export type ListPanelView = "roster" | "business" | "calendar" | "program";
+const VALID_VIEWS: ListPanelView[] = ["roster", "business", "calendar", "program"];
 
 export function readListPanelView(): ListPanelView {
   try {
-    return window.localStorage.getItem(VIEW_KEY) === "business" ? "business" : "roster";
+    const raw = window.localStorage.getItem(VIEW_KEY);
+    return (VALID_VIEWS as string[]).includes(raw ?? "") ? (raw as ListPanelView) : "roster";
   } catch {
     return "roster";
   }

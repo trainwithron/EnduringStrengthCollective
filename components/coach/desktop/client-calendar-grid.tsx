@@ -2,10 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { createBrowserClient } from "@/lib/supabase/client";
 import { AssignWorkoutForm, type WorkoutOption } from "./assign-workout-form";
 import { DailyMacrosForm } from "./daily-macros-form";
 import { DayHabitsPanel } from "./day-habits-panel";
 import { DaySchedulePanel } from "./day-schedule-panel";
+import { WORKOUT_DAY_DRAG_MIME, type DraggedWorkoutDay } from "./draggable-workout-day";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
@@ -53,9 +56,37 @@ export function ClientCalendarGrid({
   latestBodyWeight: number | null;
 }) {
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
+  const [assigning, setAssigning] = useState<string | null>(null);
+  const router = useRouter();
 
   function toggle(key: string) {
     setExpandedKey((current) => (current === key ? null : key));
+  }
+
+  async function handleDropWorkout(dateKey: string, workout: DraggedWorkoutDay) {
+    setAssigning(dateKey);
+    const supabase = createBrowserClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) {
+      // Same upsert AssignWorkoutForm's own "Save" button already does —
+      // one drop is equivalent to picking this workout from that
+      // dropdown and saving, just faster.
+      await supabase.from("workout_assignments").upsert(
+        {
+          athlete_id: athleteId,
+          group_id: groupId,
+          scheduled_date: dateKey,
+          workout_id: workout.workoutId,
+          created_by: user.id,
+        },
+        { onConflict: "athlete_id,scheduled_date" }
+      );
+    }
+    setAssigning(null);
+    router.refresh();
   }
 
   return (
@@ -88,9 +119,27 @@ export function ClientCalendarGrid({
                     key={key}
                     type="button"
                     onClick={() => toggle(key)}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDragOverKey(key);
+                    }}
+                    onDragLeave={() => setDragOverKey((k) => (k === key ? null : k))}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragOverKey(null);
+                      const raw = e.dataTransfer.getData(WORKOUT_DAY_DRAG_MIME);
+                      if (!raw) return;
+                      try {
+                        handleDropWorkout(key, JSON.parse(raw) as DraggedWorkoutDay);
+                      } catch {
+                        // Malformed drag payload — ignore rather than crash the grid.
+                      }
+                    }}
                     className={`bg-graphite min-h-[92px] p-1.5 flex flex-col gap-0.5 text-left hover:bg-surface/40 transition-colors ${
                       d.isToday ? "ring-1 ring-inset ring-rust" : ""
-                    } ${isExpanded ? "bg-surface/50 ring-1 ring-inset ring-chalk/30" : ""}`}
+                    } ${isExpanded ? "bg-surface/50 ring-1 ring-inset ring-chalk/30" : ""} ${
+                      dragOverKey === key ? "ring-2 ring-inset ring-rust bg-rust/10" : ""
+                    } ${assigning === key ? "opacity-50" : ""}`}
                   >
                     <div className="flex items-center justify-between">
                       <span

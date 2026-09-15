@@ -18,6 +18,8 @@ import {
 import { NeedsAttentionStrip } from "./needs-attention-strip";
 import { RosterMiniList } from "./roster-mini-list";
 import { BusinessMiniDashboard } from "./business-mini-dashboard";
+import { CalendarMiniView } from "./calendar-mini-view";
+import { ProgramMiniView } from "./program-mini-view";
 
 export interface SectionSubLink {
   key: string;
@@ -147,11 +149,11 @@ export function ShellListPanel({
           </div>
         )}
 
-        <div className="flex items-center gap-1 mb-2">
+        <div className="grid grid-cols-2 gap-1 mb-2">
           <button
             type="button"
             onClick={() => selectView("roster")}
-            className={`flex-1 h-7 font-body text-[11px] uppercase tracking-wide border ${
+            className={`h-7 font-body text-[11px] uppercase tracking-wide border ${
               view === "roster" ? "border-rust text-rust bg-rust/10" : "border-steel/30 text-steel"
             }`}
           >
@@ -160,16 +162,39 @@ export function ShellListPanel({
           <button
             type="button"
             onClick={() => selectView("business")}
-            className={`flex-1 h-7 font-body text-[11px] uppercase tracking-wide border ${
+            className={`h-7 font-body text-[11px] uppercase tracking-wide border ${
               view === "business" ? "border-rust text-rust bg-rust/10" : "border-steel/30 text-steel"
             }`}
             title="Pin the Business mini-dashboard"
           >
             💰 Business
           </button>
+          <button
+            type="button"
+            onClick={() => selectView("calendar")}
+            className={`h-7 font-body text-[11px] uppercase tracking-wide border ${
+              view === "calendar" ? "border-rust text-rust bg-rust/10" : "border-steel/30 text-steel"
+            }`}
+            title="Pin the Calendar mini-view"
+          >
+            📅 Calendar
+          </button>
+          <button
+            type="button"
+            onClick={() => selectView("program")}
+            className={`h-7 font-body text-[11px] uppercase tracking-wide border ${
+              view === "program" ? "border-rust text-rust bg-rust/10" : "border-steel/30 text-steel"
+            }`}
+            title="Pin a condensed Program Builder view"
+          >
+            🏋 Program
+          </button>
         </div>
 
-        {view === "roster" ? <RosterMiniList groupId={groupId} /> : <BusinessMiniDashboard groupId={groupId} />}
+        {view === "roster" && <RosterMiniList groupId={groupId} />}
+        {view === "business" && <BusinessMiniDashboard groupId={groupId} />}
+        {view === "calendar" && <CalendarMiniView groupId={groupId} />}
+        {view === "program" && <ProgramMiniView groupId={groupId} />}
       </div>
 
       {/* Drag-to-resize edge + full-collapse tab (item 3-4). */}

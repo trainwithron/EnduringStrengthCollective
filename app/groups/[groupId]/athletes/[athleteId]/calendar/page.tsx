@@ -5,6 +5,7 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { HabitManager, type ClientHabit } from "@/components/coach/desktop/habit-manager";
 import { BulkMacroRangeForm } from "@/components/coach/desktop/bulk-macro-range-form";
 import { ClientCalendarGrid, type DayCellData } from "@/components/coach/desktop/client-calendar-grid";
+import { ProgramDayDragList } from "@/components/coach/desktop/program-day-drag-list";
 import type { WorkoutOption } from "@/components/coach/desktop/assign-workout-form";
 import { computeScheduledDates } from "@/lib/program-schedule";
 import { isHabitDueOn } from "@/lib/habits";
@@ -359,6 +360,7 @@ export default async function ClientCalendarPage(
         </div>
 
         <div className="space-y-6">
+          <ProgramDayDragList options={workoutOptions} />
           <HabitManager athleteId={params.athleteId} groupId={params.groupId} initialHabits={habits} />
           {macrosEnabled && (
             <BulkMacroRangeForm
