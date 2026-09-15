@@ -9,7 +9,7 @@ import { AiExtractionGuide } from "@/components/coach/desktop/ai-extraction-guid
 export default async function NewProgramPage(
   props: {
     params: Promise<{ groupId: string }>;
-    searchParams: Promise<{ method?: string }>;
+    searchParams: Promise<{ method?: string; athleteId?: string }>;
   }
 ) {
   const params = await props.params;
@@ -54,6 +54,24 @@ export default async function NewProgramPage(
   // convention (e.g. the group Dashboard's ?scope=all tabs).
   const method = searchParams.method === "ai" ? "ai" : "blank";
 
+  // "Build with AI for this client" (injury_pain_science_research_and_
+  // ai_gap_sept15.md) — reached from ClientProgrammingMenu with a real
+  // athleteId; verified against this group's own roster rather than
+  // trusted at face value, same discipline as the API route's own check.
+  let athleteName: string | null = null;
+  if (searchParams.athleteId) {
+    const { data: athleteMembership } = await supabase
+      .from("group_memberships")
+      .select("role, profiles ( full_name )")
+      .eq("group_id", params.groupId)
+      .eq("profile_id", searchParams.athleteId)
+      .maybeSingle();
+    if (athleteMembership?.role === "athlete") {
+      athleteName = (athleteMembership.profiles as any)?.full_name ?? "this client";
+    }
+  }
+  const athleteId = athleteName ? searchParams.athleteId! : null;
+
   const { data: libraryRows } =
     method === "ai"
       ? await supabase.from("exercise_library").select("name").eq("created_by", user.id).order("name")
@@ -70,11 +88,16 @@ export default async function NewProgramPage(
         <p className="font-body text-sm text-steel mt-2">
           A program is a training block — you&apos;ll add workouts to it next.
         </p>
+        {athleteId && (
+          <p className="font-body text-xs text-rust mt-2">
+            Building a personal program for <span className="font-medium">{athleteName}</span>.
+          </p>
+        )}
       </div>
 
       <div className="flex gap-2 mb-6">
         <Link
-          href={`/groups/${params.groupId}/programs/new`}
+          href={`/groups/${params.groupId}/programs/new${athleteId ? `?athleteId=${athleteId}` : ""}`}
           className={`h-9 px-3.5 flex items-center font-body text-sm border ${
             method === "blank" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
           }`}
@@ -82,7 +105,7 @@ export default async function NewProgramPage(
           Start blank
         </Link>
         <Link
-          href={`/groups/${params.groupId}/programs/new?method=ai`}
+          href={`/groups/${params.groupId}/programs/new?method=ai${athleteId ? `&athleteId=${athleteId}` : ""}`}
           className={`h-9 px-3.5 flex items-center font-body text-sm border ${
             method === "ai" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
           }`}
@@ -105,6 +128,8 @@ export default async function NewProgramPage(
           <ImportWizard
             coachId={user.id}
             groupId={params.groupId}
+            athleteId={athleteId}
+            athleteName={athleteName}
             initialLibrary={libraryRows ?? []}
             initialAliases={(aliasRows ?? []).map((a) => ({ rawName: a.raw_name, exerciseName: a.exercise_name }))}
           />

@@ -168,6 +168,17 @@ export function ClientProgrammingMenu({
               </button>
               <button
                 type="button"
+                onClick={() =>
+                  router.push(
+                    `/groups/${groupId}/programs/new?method=ai&athleteId=${athleteId}`
+                  )
+                }
+                className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50"
+              >
+                Build with AI
+              </button>
+              <button
+                type="button"
                 onClick={() => {
                   setView("assigned");
                   loadAssignedPrograms();

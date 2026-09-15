@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as XLSX from "xlsx";
 import * as cptable from "xlsx/dist/cpexcel.full.mjs";
@@ -33,6 +33,7 @@ import { DEFAULT_TRACKED_FIELDS, type TrackedField } from "@/lib/exercise-fields
 import { defaultTrainingDaysForCount } from "@/lib/program-schedule";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { detectTrainingIntent } from "@/lib/training-intent";
+import { hasFlaggedMusculoskeletalConcern } from "@/lib/athlete-injury-flag";
 
 type Status = "idle" | "working" | "reviewing" | "done" | "error";
 
@@ -68,6 +69,12 @@ interface ImportSummary {
   createdExercises: string[];
   fuzzyMatches: { rawName: string; matchedTo: string; score: number }[];
   schedule: { trainingDays: number[]; startDate: string } | null;
+  // Only set for an AI-generated program built for a specific flagged
+  // client (injury_pain_science_research_and_ai_gap_sept15.md) — the
+  // model's own required self-disclosure of how it handled the flagged
+  // concern, surfaced here so the coach's review is actually informed by
+  // it before they commit, not buried in a field nobody looks at.
+  injuryConsiderations: string | null;
 }
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -87,16 +94,26 @@ interface PendingImport {
   // something grounded to answer from later, instead of reconstructing
   // (and risking confabulating) a reason after the fact.
   sequencingNotes: string | null;
+  injuryConsiderations: string | null;
 }
 
 export function ImportWizard({
   coachId,
   groupId,
+  athleteId,
+  athleteName,
   initialLibrary,
   initialAliases,
 }: {
   coachId: string;
   groupId: string;
+  // Personal-program mode (injury_pain_science_research_and_ai_gap_
+  // sept15.md) — set only when reached from a specific client's
+  // profile via "Build with AI for this client." Undefined for the
+  // plain group-level "New Program" flow, which is completely
+  // unaffected by anything in this pass.
+  athleteId?: string | null;
+  athleteName?: string | null;
   initialLibrary: LibraryExercise[];
   initialAliases: AliasEntry[];
 }) {
@@ -114,6 +131,46 @@ export function ImportWizard({
   // that window before a second call slips through and builds a second,
   // duplicate program from the same file).
   const processingRef = useRef(false);
+
+  // One-time flagged-injury notice (injury_pain_science_research_and_
+  // ai_gap_sept15.md) — Ron's own real constraint: most clients report
+  // *some* PAR-Q+ history, so re-showing this on every generation would
+  // become noise fast (same discipline as the 3-item coach-briefing
+  // cap). Shown once per (coach, athlete), dismissible, persisted —
+  // never re-appears once acknowledged, even after this component
+  // remounts on a later visit.
+  const [showInjuryBanner, setShowInjuryBanner] = useState(false);
+  useEffect(() => {
+    if (!athleteId) return;
+    let cancelled = false;
+    async function run() {
+      const supabase = createBrowserClient();
+      const [{ data: intakeRow }, { data: ackRow }] = await Promise.all([
+        supabase.from("client_intake").select("par_q_answers").eq("athlete_id", athleteId).maybeSingle(),
+        supabase
+          .from("athlete_injury_flag_acknowledgements")
+          .select("athlete_id")
+          .eq("coach_id", coachId)
+          .eq("athlete_id", athleteId)
+          .maybeSingle(),
+      ]);
+      const flagged = hasFlaggedMusculoskeletalConcern((intakeRow?.par_q_answers as any[]) ?? []);
+      if (!cancelled) setShowInjuryBanner(flagged && !ackRow);
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [athleteId, coachId]);
+
+  async function dismissInjuryBanner() {
+    setShowInjuryBanner(false);
+    if (!athleteId) return;
+    const supabase = createBrowserClient();
+    await supabase
+      .from("athlete_injury_flag_acknowledgements")
+      .upsert({ coach_id: coachId, athlete_id: athleteId }, { onConflict: "coach_id,athlete_id" });
+  }
 
   async function handleFile(file: File) {
     if (processingRef.current) return;
@@ -177,7 +234,8 @@ export function ImportWizard({
     parsed: ParsedImportRow[],
     programName: string,
     description: string,
-    sequencingNotes: string | null = null
+    sequencingNotes: string | null = null,
+    injuryConsiderations: string | null = null
   ) {
     setStatusLabel("Matching exercises…");
 
@@ -230,6 +288,7 @@ export function ImportWizard({
       autoNewExercises,
       fuzzyMatches,
       sequencingNotes,
+      injuryConsiderations,
     };
 
     if (fuzzyMatches.length === 0) {
@@ -266,7 +325,8 @@ export function ImportWizard({
     processingRef.current = true;
 
     const supabase = createBrowserClient();
-    const { parsed, programName, description, fuzzyMatches, autoNewExercises, sequencingNotes } = importData;
+    const { parsed, programName, description, fuzzyMatches, autoNewExercises, sequencingNotes, injuryConsiderations } =
+      importData;
     const resolutions = new Map(importData.resolutions);
 
     const createdExercises: string[] = [...autoNewExercises];
@@ -314,6 +374,10 @@ export function ImportWizard({
       .insert({
         group_id: groupId,
         created_by: coachId,
+        // Personal-program mode (injury_pain_science_research_and_ai_
+        // gap_sept15.md) — null for the plain group-level flow,
+        // completely unchanged from before this pass.
+        athlete_id: athleteId ?? null,
         name: programName || "Imported Program",
         description,
         is_active: true,
@@ -334,15 +398,20 @@ export function ImportWizard({
       return;
     }
 
-    // Only one *shared* program is ever active per group — same rule and
-    // same athlete_id-is-null scoping as the plain "New Program" form, so
-    // this can never deactivate a client's personal assigned program.
-    await supabase
+    // Single-active-program rule, scoped correctly (same split as
+    // lib/program-duplication.ts's own deactivate query): a personal
+    // program only steps down this same client's other personal
+    // programs; a shared program only steps down other shared ones —
+    // never crosses that line in either direction.
+    let deactivateQuery = supabase
       .from("programs")
       .update({ is_active: false })
       .eq("group_id", groupId)
-      .is("athlete_id", null)
       .neq("id", programRow.id);
+    deactivateQuery = athleteId
+      ? deactivateQuery.eq("athlete_id", athleteId)
+      : deactivateQuery.is("athlete_id", null);
+    await deactivateQuery;
 
     for (const week of weeks) {
       for (let dayIndex = 0; dayIndex < week.days.length; dayIndex++) {
@@ -404,6 +473,7 @@ export function ImportWizard({
       fuzzyMatches: fuzzyMatches
         .filter((f) => !f.useRaw)
         .map((f) => ({ rawName: f.rawName, matchedTo: f.matchedTo, score: f.score })),
+      injuryConsiderations,
     });
     setDoneHref(`/groups/${groupId}/programs/${programRow.id}`);
     setPending(null);
@@ -426,7 +496,7 @@ export function ImportWizard({
       const res = await fetch("/api/ai/generate-program", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ prompt: aiPrompt, groupId }),
+        body: JSON.stringify({ prompt: aiPrompt, groupId, athleteId: athleteId ?? undefined }),
       });
       const data = await res.json();
 
@@ -441,7 +511,8 @@ export function ImportWizard({
         data.rows,
         data.programName,
         `AI-generated from: "${aiPrompt.trim()}"`,
-        data.sequencingNotes ?? null
+        data.sequencingNotes ?? null,
+        data.injuryConsiderations ?? null
       );
     } catch (err) {
       setStatus("error");
@@ -554,6 +625,14 @@ export function ImportWizard({
           {summary.weekCount === 1 ? "" : "s"} — {summary.matchedCount} exercise
           {summary.matchedCount === 1 ? "" : "s"} matched your existing library.
         </p>
+        {summary.injuryConsiderations && (
+          <div className="mb-4 border border-rust/40 bg-rust/5 p-3">
+            <p className="font-body text-xs text-rust font-medium mb-1">
+              How this handled {athleteName ?? "this client"}&apos;s flagged health/injury concern:
+            </p>
+            <p className="font-body text-xs text-chalk leading-snug">{summary.injuryConsiderations}</p>
+          </div>
+        )}
         {summary.schedule ? (
           <p className="font-body text-xs text-steel mb-4">
             Set as the active program, starting today and training{" "}
@@ -616,6 +695,21 @@ export function ImportWizard({
 
   return (
     <div className="max-w-2xl space-y-4">
+      {showInjuryBanner && (
+        <div className="border border-rust/40 bg-rust/5 p-4 flex items-start justify-between gap-4">
+          <p className="font-body text-sm text-rust">
+            <span className="font-medium">{athleteName ?? "This client"} has a flagged health/injury
+            concern</span> on their intake screening — review anything generated for them closely.
+          </p>
+          <button
+            type="button"
+            onClick={dismissInjuryBanner}
+            className="shrink-0 font-body text-xs text-rust underline underline-offset-2"
+          >
+            Got it
+          </button>
+        </div>
+      )}
       <div className="border border-steel/20 bg-surface/40 rounded-token-lg p-6">
         <p className="font-body text-sm text-steel mb-4">
           Upload a spreadsheet export (.csv or .xlsx) — columns and headers can be in any order.

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError, AiTruncatedError } from "@/lib/anthropic-client";
 import type { ParsedImportRow } from "@/lib/workout-import-parser";
+import { hasFlaggedMusculoskeletalConcern } from "@/lib/athlete-injury-flag";
 
 // Generates a full draft program from a coach's plain-English description
 // — "the bones" of an AI program builder, deliberately built as a
@@ -14,7 +15,34 @@ import type { ParsedImportRow } from "@/lib/workout-import-parser";
 // the machine-learning sense — it's the same grounded-generation
 // approach as the AI photo importer, just fed the coach's real exercise
 // list as context so it prefers reusing what they already have.
-const SYSTEM_PROMPT = `You are an experienced strength & conditioning coach writing a training program
+const INJURY_JSON_FIELD = `,
+  "injuryConsiderations": string  // REQUIRED whenever an athlete injury/health context is given below.
+                                    // State specifically what you avoided, substituted, or modified
+                                    // because of it, OR — if the context gave you a flag but no real
+                                    // detail (e.g. just "a PAR-Q+ musculoskeletal flag, no further
+                                    // detail from the coach") — say plainly that there wasn't enough
+                                    // detail to target specific exclusions, and that the coach should
+                                    // review this program closely with that in mind. Never fabricate a
+                                    // specific injury detail that wasn't given to you.`;
+
+// Grounded in a real, RCT-backed clinical model (Silbernagel et al. 2007)
+// rather than an invented rule — the one concrete, programmable piece of
+// evidence from the injury/pain-science research pass. Deliberately does
+// NOT assert "avoid spinal flexion under load" or any other single
+// exercise/movement as categorically unsafe — that specific claim is
+// genuinely contested in the literature (JOSPT 2020 systematic review
+// found no clear causal link between lumbar flexion and back-pain risk),
+// so this system prompt never bakes it in as settled fact.
+const PAIN_MONITORING_GUIDANCE = `If you reference how the client should judge pain/discomfort during or after a
+flagged movement, ground it in this real clinical model rather than inventing your own rule: mild discomfort up to
+about 5 out of 10 during or shortly after training is generally an acceptable signal to keep going, PROVIDED it
+settles back to baseline by the next morning and does not get worse week over week. Sharp, sudden, or worsening
+pain is never acceptable — that always means stop and the coach should follow up. Do not assert that any single
+movement pattern (e.g. spinal flexion) is categorically unsafe — that specific claim is genuinely contested in the
+current literature, not settled fact.`;
+
+function buildSystemPrompt(hasInjuryContext: boolean): string {
+  return `You are an experienced strength & conditioning coach writing a training program
 from a plain-English description. Respond with ONLY a JSON object shaped exactly like this — no markdown
 fences, no explanation:
 
@@ -24,7 +52,9 @@ fences, no explanation:
                                   // ordered/sequenced this program (e.g. why certain work comes early
                                   // vs. late in a session, how weeks progress) — this is saved and
                                   // shown back to the coach later if they ask "why did you do that",
-                                  // so it must reflect your ACTUAL reasoning, not a generic summary
+                                  // so it must reflect your ACTUAL reasoning, not a generic summary${
+                                    hasInjuryContext ? INJURY_JSON_FIELD : ""
+                                  }
   "rows": [
     {
       "week": string,          // e.g. "Week 1"
@@ -52,8 +82,18 @@ Rules:
   described) rather than repeating the exact same week verbatim.
 - If this coach has standing preferences listed below (learned from past corrections), apply any whose
   stated condition matches this program — these come from a real coach explicitly correcting a past
-  program, so treat them as real methodology requirements, not suggestions.
+  program, so treat them as real methodology requirements, not suggestions.${
+    hasInjuryContext
+      ? `
+- This program is for a specific client with a flagged injury/health concern, given to you below. Treat it as
+  a HARD CONSTRAINT, not optional context: avoid or substantially modify any exercise that could reasonably
+  aggravate the stated area. When you must exclude something the description otherwise implies (e.g. an
+  overhead-press-focused block for a shoulder concern), substitute a safer regression and say so in
+  injuryConsiderations rather than silently dropping it. ${PAIN_MONITORING_GUIDANCE}`
+      : ""
+  }
 - Respond with ONLY the JSON object described. No leading or trailing text.`;
+}
 
 function isValidRow(row: any): row is ParsedImportRow {
   return (
@@ -80,7 +120,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { prompt, groupId } = await request.json();
+  const { prompt, groupId, athleteId } = await request.json();
   if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
     return NextResponse.json({ error: "Describe the program you want first." }, { status: 400 });
   }
@@ -97,6 +137,40 @@ export async function POST(request: Request) {
   if (membership?.role !== "coach") {
     return NextResponse.json({ error: "Only coaches can generate programs." }, { status: 403 });
   }
+
+  // Injury-awareness (injury_pain_science_research_and_ai_gap_sept15.md)
+  // — real gap this closes: until now, nothing about a specific client's
+  // stated injury/health history ever reached generation at all. Only
+  // trusted when the athlete is actually a real athlete in this same
+  // group (never take an arbitrary id at face value for a coach-only
+  // action like this).
+  let injuryContextText: string | null = null;
+  if (typeof athleteId === "string" && athleteId) {
+    const { data: athleteMembership } = await supabase
+      .from("group_memberships")
+      .select("role")
+      .eq("group_id", groupId)
+      .eq("profile_id", athleteId)
+      .maybeSingle();
+    if (athleteMembership?.role === "athlete") {
+      const [{ data: intakeRow }, { data: noteRow }] = await Promise.all([
+        supabase.from("client_intake").select("par_q_answers").eq("athlete_id", athleteId).maybeSingle(),
+        supabase.from("athlete_notes").select("body").eq("athlete_id", athleteId).eq("group_id", groupId).maybeSingle(),
+      ]);
+      const flagged = hasFlaggedMusculoskeletalConcern((intakeRow?.par_q_answers as any[]) ?? []);
+      const noteText = noteRow?.body?.trim() || null;
+      if (flagged || noteText) {
+        injuryContextText =
+          `This client has flagged a musculoskeletal/health concern on their intake screening` +
+          (flagged ? " (PAR-Q+: yes to the bone/joint/soft-tissue question)" : "") +
+          `.\n` +
+          (noteText
+            ? `The coach's own note about this client: "${noteText}"`
+            : `No further detail was provided by the coach — treat this as a general caution, not a specific exclusion you can target.`);
+      }
+    }
+  }
+  const hasInjuryContext = injuryContextText !== null;
 
   const { data: libraryRows } = await supabase
     .from("exercise_library")
@@ -124,10 +198,11 @@ export async function POST(request: Request) {
 
   try {
     const text = await callClaude({
-      system: SYSTEM_PROMPT,
+      system: buildSystemPrompt(hasInjuryContext),
       userText:
         `Coach's exercise library (prefer these exact names where they fit):\n${libraryNames.join(", ") || "(empty — invent sensible exercise names)"}\n\n` +
         `This coach's standing preferences, learned from past corrections:\n${preferencesText}\n\n` +
+        (injuryContextText ? `Athlete injury/health context:\n${injuryContextText}\n\n` : "") +
         `Program description: ${prompt.trim()}`,
       // 8192 truncated mid-JSON on a routine request (8 weeks x 3 days,
       // ~130+ exercise rows) — a program's row count scales with
@@ -141,6 +216,24 @@ export async function POST(request: Request) {
     if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.rows)) {
       return NextResponse.json(
         { error: "AI response wasn't in the expected shape — try rephrasing your description." },
+        { status: 502 }
+      );
+    }
+
+    // The output-side guard (injury_pain_science_research_and_ai_gap_
+    // sept15.md) — same "reject non-compliant output, never silently
+    // pass it through" philosophy as coach-briefing-numeral-guard.ts,
+    // scoped honestly: this checks that the model actually ENGAGED with
+    // the flagged constraint, not that the resulting program is
+    // clinically correct (nothing in this codebase, or a keyword guard,
+    // could verify that without the LLM classifier already flagged
+    // elsewhere as a separate, materially bigger, deferred project).
+    if (hasInjuryContext && (typeof parsed.injuryConsiderations !== "string" || !parsed.injuryConsiderations.trim())) {
+      return NextResponse.json(
+        {
+          error:
+            "This client has a flagged health/injury concern, and the AI's response didn't address it — try again, or add more detail to their coach notes first.",
+        },
         { status: 502 }
       );
     }
@@ -171,8 +264,12 @@ export async function POST(request: Request) {
       typeof parsed.sequencingNotes === "string" && parsed.sequencingNotes.trim()
         ? parsed.sequencingNotes.trim()
         : null;
+    const injuryConsiderations =
+      typeof parsed.injuryConsiderations === "string" && parsed.injuryConsiderations.trim()
+        ? parsed.injuryConsiderations.trim()
+        : null;
 
-    return NextResponse.json({ rows, programName, sequencingNotes });
+    return NextResponse.json({ rows, programName, sequencingNotes, injuryConsiderations });
   } catch (err) {
     if (err instanceof AiNotConfiguredError) {
       return NextResponse.json({ error: err.message }, { status: 503 });
