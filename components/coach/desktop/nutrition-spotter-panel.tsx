@@ -9,7 +9,12 @@ import type { StaleMealPlanResult } from "@/lib/nutrition-spotter";
 export function NutritionSpotterPanel({ result }: { result: StaleMealPlanResult }) {
   if (!result.isStale || result.planCalories === null) return null;
 
-  const direction = result.planCalories > result.targetCalories ? "higher" : "lower";
+  // The sentence below describes the CHECK-IN's target relative to the
+  // plan ("the check-in set X kcal — N kcal {direction} than the plan"),
+  // so this must compare targetCalories against planCalories, not the
+  // reverse — inverted originally, which made the panel tell a coach to
+  // move the plan the wrong direction.
+  const direction = result.targetCalories > result.planCalories ? "higher" : "lower";
 
   return (
     <div className="border border-rust/40 bg-rust/5 p-4">
