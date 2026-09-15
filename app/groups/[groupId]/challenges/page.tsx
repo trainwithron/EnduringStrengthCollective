@@ -6,6 +6,8 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ChallengeCreator } from "@/components/coach/desktop/challenge-creator";
 import { estimatedRevenueCents, formatCents } from "@/lib/challenges";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
+import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
+import { getEffectiveAthlete } from "@/lib/acting-as";
 
 export default async function ChallengesPage(
   props: {
@@ -38,7 +40,24 @@ export default async function ChallengesPage(
   }
 
   const isCoach = membership.role === "coach";
-  const showMobileView = !isCoach || await prefersAthleteStyleView();
+  // Consolidating the same acting-as check every other "group-wide" page
+  // already has (stale_client_name_header_bug.md, root cause #2) —
+  // Challenges/Engage was the one exception where this wasn't checked at
+  // all, so a coach standing in a client's mobile experience saw their
+  // OWN coach view here instead of that client's.
+  const effective = await getEffectiveAthlete(params.groupId, user.id);
+  const isActingAsOther = effective.isActingAsOther;
+  const showMobileView = isActingAsOther || !isCoach || await prefersAthleteStyleView();
+
+  let actingAsFullName: string | null = null;
+  if (isActingAsOther) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", effective.athleteId)
+      .maybeSingle();
+    actingAsFullName = profile?.full_name ?? "Client";
+  }
 
   if (isCoach && !showMobileView) {
     const { data: group } = await supabase
@@ -146,11 +165,14 @@ export default async function ChallengesPage(
   const { data: myParticipantRows } = await supabase
     .from("challenge_participants")
     .select("challenge_id")
-    .eq("profile_id", user.id);
+    .eq("profile_id", effective.athleteId);
   const joinedChallengeIds = new Set((myParticipantRows ?? []).map((p) => p.challenge_id));
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
+      {isActingAsOther && (
+        <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
+      )}
       <header className="px-5 pt-8 pb-6 border-b border-steel/20">
         <h1 className="font-display font-bold text-3xl leading-none uppercase">Challenges</h1>
         <p className="font-body text-sm text-steel mt-2 max-w-[60ch]">

@@ -671,8 +671,9 @@ export default async function AthleteProfilePage(
           <Link
             href={`/groups/${params.groupId}/athletes/${params.athleteId}/calendar`}
             className="inline-flex items-center h-9 font-body text-xs text-rust border border-rust px-3"
+            title="This client's own calendar — habits, macros, and workout-schedule overrides, separate from the group-wide booking calendar"
           >
-            Calendar
+            This client&apos;s calendar
           </Link>
           <VideoCheckinRecorder athleteId={params.athleteId} groupId={params.groupId} coachId={user.id} />
           <Link
