@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { checkAndNotifyLowSessionBalance } from "@/lib/notify-low-session-balance";
 
 export function SessionCreditsControl({
   athleteId,
@@ -31,6 +32,9 @@ export function SessionCreditsControl({
       })
       .then(({ data: newBalance }) => {
         if (typeof newBalance === "number") setBalance(newBalance);
+        // Only a real spend is worth checking — an increase (a manual
+        // top-up) never needs the low-balance staircase.
+        if (delta < 0) checkAndNotifyLowSessionBalance(athleteId, groupId);
       });
   }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { ExerciseMediaPicker } from "./exercise-media-picker";
 import { AutoCategorizeButton } from "./auto-categorize-button";
@@ -8,7 +9,7 @@ import { classifyExerciseCategory } from "@/lib/exercise-category-classifier";
 import { classifyEquipmentType, type EquipmentType } from "@/lib/equipment-classifier";
 import { BiomechTagPicker, type BiomechTagOption, type BiomechTagSelection } from "./biomech-tag-picker";
 import { generateBiomechBreakdown } from "@/lib/biomech-breakdown";
-import { Trash2 } from "lucide-react";
+import { Trash2, Trophy } from "lucide-react";
 
 export interface LibraryExerciseRow {
   id: string;
@@ -18,6 +19,7 @@ export interface LibraryExerciseRow {
   tier: "A" | "B" | "C" | null;
   category: string | null;
   equipmentType: EquipmentType | null;
+  description: string | null;
 }
 
 // Locked seven-value set (Movement Pattern Ladders seed, 2026-09-14) —
@@ -42,11 +44,13 @@ const EQUIPMENT_TYPES: { value: EquipmentType; label: string }[] = [
 ];
 
 export function ExerciseLibraryList({
+  groupId,
   coachId,
   initialExercises,
   biomechVocabulary,
   initialBiomechTagsByExercise,
 }: {
+  groupId: string;
   coachId: string;
   initialExercises: LibraryExerciseRow[];
   biomechVocabulary: BiomechTagOption[];
@@ -173,7 +177,7 @@ export function ExerciseLibraryList({
         category: newCategory || null,
         equipment_type: newEquipmentType || null,
       })
-      .select("id, name, video_path, youtube_url, category, equipment_type")
+      .select("id, name, video_path, youtube_url, category, equipment_type, description")
       .single();
 
     if (data) {
@@ -203,6 +207,7 @@ export function ExerciseLibraryList({
           tier: null,
           category: data.category,
           equipmentType: data.equipment_type,
+          description: data.description,
         },
       ]);
       setTagsByExercise((prev) => ({ ...prev, [data.name]: newTags }));
@@ -228,6 +233,13 @@ export function ExerciseLibraryList({
     setExercises((prev) => prev.map((e) => (e.id === id ? { ...e, equipmentType: value } : e)));
     const supabase = createBrowserClient();
     await supabase.from("exercise_library").update({ equipment_type: value }).eq("id", id);
+  }
+
+  async function handleDescriptionChange(id: string, description: string) {
+    const value = description.trim() || null;
+    setExercises((prev) => prev.map((e) => (e.id === id ? { ...e, description: value } : e)));
+    const supabase = createBrowserClient();
+    await supabase.from("exercise_library").update({ description: value }).eq("id", id);
   }
 
   async function handleDelete(id: string) {
@@ -357,6 +369,9 @@ export function ExerciseLibraryList({
                     <div className="flex items-center gap-3">
                       <div className="flex-1 min-w-0">
                         <span className="font-body font-medium text-[15px]">{ex.name}</span>
+                        {ex.description && (
+                          <p className="font-body text-[11px] text-steel truncate">{ex.description}</p>
+                        )}
                         {breakdown && (
                           <p className="font-body text-[11px] text-steel truncate">{breakdown.summary}</p>
                         )}
@@ -394,6 +409,13 @@ export function ExerciseLibraryList({
                           </option>
                         ))}
                       </select>
+                      <Link
+                        href={`/groups/${groupId}/games/${ex.id}`}
+                        aria-label={`Leaderboard for ${ex.name}`}
+                        className="w-8 h-8 flex items-center justify-center text-steel active:text-rust transition-colors"
+                      >
+                        <Trophy className="w-4 h-4" />
+                      </Link>
                       <button
                         type="button"
                         onClick={() => setExpandedId((prev) => (prev === ex.id ? null : ex.id))}
@@ -413,6 +435,18 @@ export function ExerciseLibraryList({
 
                     {expandedId === ex.id && (
                       <div className="mt-3 max-w-2xl space-y-4">
+                        <div>
+                          <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">
+                            Description / instructions
+                          </p>
+                          <textarea
+                            defaultValue={ex.description ?? ""}
+                            onBlur={(e) => handleDescriptionChange(ex.id, e.target.value)}
+                            placeholder="How it's done, rules, setup — shown to any coach browsing this exercise."
+                            rows={3}
+                            className="w-full bg-surface border border-steel/30 text-chalk px-3 py-2 font-body text-sm focus:outline-none focus:border-rust"
+                          />
+                        </div>
                         <ExerciseMediaPicker
                           exerciseName={ex.name}
                           videoPath={ex.videoPath}

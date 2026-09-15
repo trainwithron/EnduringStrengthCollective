@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase/server";
+import { isRealMobileDevice } from "@/lib/pwa-server";
 import { CoachHomeShell } from "@/components/coach/coach-home-shell";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import type { HomeClientCardData } from "@/components/coach/desktop/home-client-card";
@@ -40,20 +41,51 @@ export default async function CoachHomePage() {
     redirect("/login");
   }
 
-  const { data: isCoachAnywhere } = await supabase
+  const { data: coachedGroupRows } = await supabase
     .from("group_memberships")
     .select("group_id")
     .eq("profile_id", user.id)
-    .eq("role", "coach")
-    .limit(1)
-    .maybeSingle();
+    .eq("role", "coach");
 
-  if (!isCoachAnywhere) {
+  if (!coachedGroupRows || coachedGroupRows.length === 0) {
     return (
       <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
         <p className="font-body text-steel text-center">Only coaches have a home dashboard.</p>
       </main>
     );
+  }
+
+  // /dashboard is a desktop-only surface — the coach mobile app is
+  // deliberately minimal (client-facing logging only), and
+  // app/login/page.tsx already sends a mobile coach straight to their
+  // group hub, never here. But nothing bounced a coach BACK to that same
+  // destination if they reached /dashboard some other way (a stale
+  // bookmark, an old tab, tapping "Home" in the desktop sidebar's nav
+  // while on a phone) — this page had no mobile gate of its own at all,
+  // so both possible shells below (CoachDesktopShell and CoachHomeShell)
+  // are fixed-width sidebar layouts with zero responsive behavior.
+  //
+  // Deliberately uses isRealMobileDevice(), NOT prefersAthleteStyleView()
+  // — the sticky "Desktop Mode" override exists so a coach can preview
+  // /groups/[groupId]'s own genuine dual-shell design; /dashboard has
+  // only one shell, ever, so honoring that override here would strand a
+  // coach who once tapped "Desktop Mode" (to preview their group hub) on
+  // this exact same broken sidebar with no way back short of manually
+  // clearing a cookie. Real device signal always wins here.
+  if (await isRealMobileDevice()) {
+    const lastGroupCookie = (await cookies()).get("last_group")?.value;
+    let target = coachedGroupRows[0].group_id;
+    if (lastGroupCookie) {
+      try {
+        const parsed = JSON.parse(decodeURIComponent(lastGroupCookie));
+        if (parsed?.id && coachedGroupRows.some((g) => g.group_id === parsed.id)) {
+          target = parsed.id;
+        }
+      } catch {
+        // Malformed cookie — keep the fallback.
+      }
+    }
+    redirect(`/groups/${target}`);
   }
 
   // A coach can own/admin more than one organization (e.g. running

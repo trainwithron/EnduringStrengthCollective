@@ -19,6 +19,7 @@ interface PatternWithLadder {
 type Tab = "exercises" | "patterns" | "one-rep-max" | "macro-calculator";
 
 export function ExerciseLibraryTabs({
+  groupId,
   coachId,
   initialExercises,
   initialPatterns,
@@ -26,6 +27,7 @@ export function ExerciseLibraryTabs({
   biomechVocabulary,
   initialBiomechTagsByExercise,
 }: {
+  groupId: string;
   coachId: string;
   initialExercises: LibraryExerciseRow[];
   initialPatterns: PatternWithLadder[];
@@ -86,6 +88,7 @@ export function ExerciseLibraryTabs({
 
       {tab === "exercises" && (
         <ExerciseLibraryList
+          groupId={groupId}
           coachId={coachId}
           initialExercises={initialExercises}
           biomechVocabulary={biomechVocabulary}

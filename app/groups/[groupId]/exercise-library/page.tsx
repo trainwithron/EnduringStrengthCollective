@@ -44,7 +44,7 @@ export default async function ExerciseLibraryPage(
 
   const { data: libraryRows } = await supabase
     .from("exercise_library")
-    .select("id, name, video_path, youtube_url, category, equipment_type")
+    .select("id, name, video_path, youtube_url, category, equipment_type, description")
     .eq("created_by", user.id)
     .order("name");
 
@@ -66,6 +66,7 @@ export default async function ExerciseLibraryPage(
     tier: tierByName.get(r.name) ?? null,
     category: r.category as string | null,
     equipmentType: r.equipment_type as EquipmentType | null,
+    description: r.description as string | null,
   }));
 
   const { data: patterns } = await supabase
@@ -138,6 +139,7 @@ export default async function ExerciseLibraryPage(
       </div>
 
       <ExerciseLibraryTabs
+        groupId={params.groupId}
         coachId={user.id}
         initialExercises={exercises}
         initialPatterns={patternsWithLadder}
