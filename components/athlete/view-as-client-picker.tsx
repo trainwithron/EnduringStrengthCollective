@@ -4,11 +4,17 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { X, Search, Dumbbell } from "lucide-react";
+import { clientActivityStatus } from "@/lib/client-activity-status";
+import { computeQuietTier, QUIET_TIER_LABEL } from "@/lib/quiet-client-tier";
+import { initialsOf } from "@/lib/initials";
 
 interface ClientOption {
   id: string;
   fullName: string;
   groupId: string;
+  avatarUrl: string | null;
+  lastWorkoutAt: string | null;
+  trainingDays: number[] | null;
 }
 
 interface CoachedGroupOption {
@@ -59,21 +65,61 @@ export function ViewAsClientPicker({ onClose }: { onClose: () => void }) {
 
       const { data } = await supabase
         .from("group_memberships")
-        .select("group_id, profile_id, profiles ( id, full_name )")
+        .select("group_id, profile_id, profiles ( id, full_name, avatar_url )")
         .in("group_id", groupIds)
         .eq("role", "athlete");
 
       if (cancelled) return;
       const seen = new Set<string>();
-      const options: ClientOption[] = [];
+      const rows: { id: string; fullName: string; groupId: string; avatarUrl: string | null }[] = [];
       for (const row of (data ?? []) as any[]) {
         const id = row.profiles?.id;
         if (!id || seen.has(id)) continue;
         seen.add(id);
-        options.push({ id, fullName: row.profiles?.full_name ?? "Client", groupId: row.group_id });
+        rows.push({
+          id,
+          fullName: row.profiles?.full_name ?? "Client",
+          groupId: row.group_id,
+          avatarUrl: row.profiles?.avatar_url ?? null,
+        });
       }
+
+      // Same live-glance data the mobile roster's own cards already show
+      // (coach-roster-mobile.tsx) — reusing that established pattern
+      // rather than inventing new fields for this grid.
+      const athleteIds = rows.map((r) => r.id);
+      const [{ data: logRows }, { data: programRows }] =
+        athleteIds.length > 0
+          ? await Promise.all([
+              supabase
+                .from("workout_logs")
+                .select("athlete_id, created_at")
+                .in("athlete_id", athleteIds)
+                .order("created_at", { ascending: false }),
+              supabase
+                .from("programs")
+                .select("athlete_id, training_days")
+                .eq("is_active", true)
+                .in("athlete_id", athleteIds),
+            ])
+          : [{ data: [] }, { data: [] }];
+
+      const lastByAthlete = new Map<string, string>();
+      for (const row of logRows ?? []) {
+        if (!lastByAthlete.has(row.athlete_id)) lastByAthlete.set(row.athlete_id, row.created_at);
+      }
+      const trainingDaysByAthlete = new Map<string, number[] | null>();
+      for (const row of programRows ?? []) {
+        trainingDaysByAthlete.set(row.athlete_id, row.training_days ?? null);
+      }
+
+      const options: ClientOption[] = rows.map((r) => ({
+        ...r,
+        lastWorkoutAt: lastByAthlete.get(r.id) ?? null,
+        trainingDays: trainingDaysByAthlete.get(r.id) ?? null,
+      }));
       options.sort((a, b) => a.fullName.localeCompare(b.fullName));
-      setClients(options);
+      if (!cancelled) setClients(options);
     }
     run();
     return () => {
@@ -185,24 +231,52 @@ export function ViewAsClientPicker({ onClose }: { onClose: () => void }) {
         />
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto px-3 pb-6">
         {clients === null && (
-          <p className="font-body text-sm text-steel px-5 py-4">Loading…</p>
+          <p className="font-body text-sm text-steel px-2 py-4">Loading…</p>
         )}
         {clients?.length === 0 && (
-          <p className="font-body text-sm text-steel px-5 py-4">No clients yet.</p>
+          <p className="font-body text-sm text-steel px-2 py-4">No clients yet.</p>
         )}
-        {filtered.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            disabled={switching}
-            onClick={() => selectClient(c)}
-            className="w-full text-left px-5 py-4 border-b border-steel/10 font-body text-base disabled:opacity-50 active:bg-surface/60"
-          >
-            {c.fullName}
-          </button>
-        ))}
+        {/* Grid of live client cards — replaces the old flat name list,
+            per Ron's own "just replaces the list" framing. Same
+            glanceable-status data coach-roster-mobile.tsx's own rows
+            already show (activity dot + quiet-tier label), not new
+            fields, so a coach who's used that roster already recognizes
+            what these mean at a glance. */}
+        <div className="grid grid-cols-2 gap-2.5 pt-3">
+          {filtered.map((c) => {
+            const status = clientActivityStatus(c.lastWorkoutAt);
+            const tier = computeQuietTier({
+              lastLoggedAt: c.lastWorkoutAt ? new Date(c.lastWorkoutAt) : null,
+              now: new Date(),
+              trainingDays: c.trainingDays,
+            });
+            return (
+              <button
+                key={c.id}
+                type="button"
+                disabled={switching}
+                onClick={() => selectClient(c)}
+                className="min-w-0 flex flex-col items-center gap-2 p-3 border border-steel/20 rounded-token-lg disabled:opacity-50 active:bg-surface/60 active:border-rust/50 transition-colors"
+              >
+                {c.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={c.avatarUrl} alt="" className="w-12 h-12 rounded-full object-cover" />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-graphite border border-steel/30 flex items-center justify-center">
+                    <span className="font-display text-sm text-chalk">{initialsOf(c.fullName)}</span>
+                  </div>
+                )}
+                <p className="font-body text-sm text-chalk truncate w-full min-w-0 text-center">{c.fullName}</p>
+                <p className="w-full min-w-0 font-body text-[11px] text-steel flex items-center justify-center gap-1.5">
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${status.dotClass}`} />
+                  <span className="truncate min-w-0">{tier !== "none" ? QUIET_TIER_LABEL[tier] : status.text}</span>
+                </p>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
