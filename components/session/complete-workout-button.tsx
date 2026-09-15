@@ -5,6 +5,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { notifyPush } from "@/lib/push-notify";
 import { isHighPriorityClient } from "@/lib/notification-priority";
+import { checkAndNotifyLowSessionBalance } from "@/lib/notify-low-session-balance";
 
 // This project has no generated Supabase Database type, so a fresh RPC's
 // result falls back to an untyped shape — spelled out explicitly here
@@ -22,6 +23,11 @@ interface CompleteWorkoutResult {
   // group's new all-time-best weight, distinct from newPrs (a personal
   // best) — an exercise can be both at once.
   new_records: string[];
+  // gym_owner_multi_trainer_session_tracking_real_prospect.md — true
+  // only when this was a coach-logged (in-person/walk-in) session AND a
+  // session_credits row already existed to spend from. An athlete's own
+  // self-completed workout never sets this.
+  credit_consumed: boolean;
 }
 
 export function CompleteWorkoutButton({
@@ -103,6 +109,10 @@ export function CompleteWorkoutButton({
       setError("Couldn't complete this workout — try again.");
       setSubmitting(false);
       return;
+    }
+
+    if (result.credit_consumed) {
+      checkAndNotifyLowSessionBalance(result.athlete_id, result.group_id);
     }
 
     const [{ data: athleteProfile }, { data: athleteMembership }] = await Promise.all([

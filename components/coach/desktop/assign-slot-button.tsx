@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { checkAndNotifyLowSessionBalance } from "@/lib/notify-low-session-balance";
 
 export function AssignSlotButton({
   coachId,
@@ -48,6 +49,7 @@ export function AssignSlotButton({
       return;
     }
 
+    checkAndNotifyLowSessionBalance(athleteId, groupId);
     router.refresh();
   }
 
