@@ -13,8 +13,46 @@ import {
   type BodyFont,
 } from "@/lib/theme";
 import { OrgImageUpload } from "./org-image-upload";
+import { contrastRatio, passesAA, nearestPassingColor, AA_NORMAL_TEXT_RATIO, AA_LARGE_OR_COMPONENT_RATIO } from "@/lib/color-contrast";
 
 const SHAPES: ButtonShape[] = ["sharp", "rounded", "pill"];
+
+// Live, warn-not-block contrast check for one color pair
+// (wcag_contrast_foolproofing_idea.md) — never blocks saving; a coach's
+// own brand call still wins, this just makes "these two are basically
+// the same color" visible instead of silently shippable.
+function ContrastCheckRow({
+  label,
+  ratio,
+  minRatio,
+  onUseSuggested,
+}: {
+  label: string;
+  ratio: number | null;
+  minRatio: number;
+  onUseSuggested?: () => void;
+}) {
+  const passes = passesAA(ratio, minRatio === AA_NORMAL_TEXT_RATIO ? "normal" : "large");
+  return (
+    <div className="flex items-center justify-between gap-3 py-1.5">
+      <span className="font-body text-xs text-steel">{label}</span>
+      <div className="flex items-center gap-2">
+        <span className={`font-body text-xs ${passes ? "text-moss" : "text-rust"}`}>
+          {ratio === null ? "—" : `${ratio.toFixed(2)}:1`} {passes ? "· Passes AA" : `· Needs ${minRatio}:1`}
+        </span>
+        {!passes && onUseSuggested && (
+          <button
+            type="button"
+            onClick={onUseSuggested}
+            className="font-body text-xs text-rust underline underline-offset-2"
+          >
+            Use closer color
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function Section({
   title,
@@ -62,6 +100,15 @@ export function BrandingForm({
   const [textColor, setTextColor] = useState(initialTextColor);
   const [fontDisplay, setFontDisplay] = useState<DisplayFont>(initialFontDisplay);
   const [fontBody, setFontBody] = useState<BodyFont>(initialFontBody);
+
+  // Cheap enough (a handful of float ops) to recompute on every render —
+  // no debounce needed, matches the spec's "live as the picker drags"
+  // requirement. Text-vs-accent isn't a rendered pair anywhere today, but
+  // it's a real check for a coach who uses text color as a label on an
+  // accent-filled surface elsewhere in the app.
+  const textOnBackgroundRatio = contrastRatio(textColor, backgroundColor);
+  const accentOnBackgroundRatio = contrastRatio(accentColor, backgroundColor);
+  const textOnAccentRatio = contrastRatio(textColor, accentColor);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -199,6 +246,36 @@ export function BrandingForm({
               />
             </div>
           </label>
+        </div>
+
+        <div className="mt-4 pt-3 border-t border-steel/20 divide-y divide-steel/10">
+          <ContrastCheckRow
+            label="Text on background"
+            ratio={textOnBackgroundRatio}
+            minRatio={AA_NORMAL_TEXT_RATIO}
+            onUseSuggested={() => {
+              const suggestion = nearestPassingColor(textColor, backgroundColor, AA_NORMAL_TEXT_RATIO);
+              if (suggestion) handleTextColorChange(suggestion);
+            }}
+          />
+          <ContrastCheckRow
+            label="Accent on background"
+            ratio={accentOnBackgroundRatio}
+            minRatio={AA_LARGE_OR_COMPONENT_RATIO}
+            onUseSuggested={() => {
+              const suggestion = nearestPassingColor(accentColor, backgroundColor, AA_LARGE_OR_COMPONENT_RATIO);
+              if (suggestion) handleAccentChange(suggestion);
+            }}
+          />
+          <ContrastCheckRow
+            label="Text on accent"
+            ratio={textOnAccentRatio}
+            minRatio={AA_LARGE_OR_COMPONENT_RATIO}
+            onUseSuggested={() => {
+              const suggestion = nearestPassingColor(textColor, accentColor, AA_LARGE_OR_COMPONENT_RATIO);
+              if (suggestion) handleTextColorChange(suggestion);
+            }}
+          />
         </div>
       </Section>
 
