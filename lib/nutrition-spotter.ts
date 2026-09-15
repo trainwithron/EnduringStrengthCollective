@@ -60,3 +60,146 @@ export function detectStaleMealPlan(
     diffKcal,
   };
 }
+
+// nutrition_spotter_scoping_sept15.md's three remaining checks — same
+// deterministic, no-LLM, "flag, never auto-fix" discipline as check #2
+// above and Programming Spotter's own governing pattern.
+
+// Check #1 — macro-sum mismatch. lib/meal-plan-assignment.ts's
+// MealEntryPayload carries its own proteinTarget/carbsTarget/fatTarget
+// per meal, computed once at generation time via buildMealSpecs'
+// largest-remainder distribute() — which by construction always sums
+// back to the day's total at the moment of generation. Real drift is
+// still possible afterward: a plan's meal_count can change without a
+// full regeneration, or an older/manually-edited row can predate that
+// guarantee. This is the same "catch a structural problem regardless of
+// how it got there" spirit as Programming Spotter, not an assumption
+// that drift is common.
+export interface MacroSumMismatchResult {
+  isMismatched: boolean;
+  summedProtein: number;
+  summedCarbs: number;
+  summedFat: number;
+  targetProtein: number;
+  targetCarbs: number;
+  targetFat: number;
+}
+
+// 5g tolerance — largest-remainder rounding can be off by a gram or two
+// per macro even when nothing is actually wrong.
+const MACRO_SUM_TOLERANCE_G = 5;
+
+export function detectMacroSumMismatch(
+  mealEntries: { proteinTarget: number; carbsTarget: number; fatTarget: number }[],
+  dailyTarget: { protein: number; carbs: number; fats: number }
+): MacroSumMismatchResult {
+  const summedProtein = mealEntries.reduce((sum, m) => sum + m.proteinTarget, 0);
+  const summedCarbs = mealEntries.reduce((sum, m) => sum + m.carbsTarget, 0);
+  const summedFat = mealEntries.reduce((sum, m) => sum + m.fatTarget, 0);
+  const isMismatched =
+    Math.abs(summedProtein - dailyTarget.protein) > MACRO_SUM_TOLERANCE_G ||
+    Math.abs(summedCarbs - dailyTarget.carbs) > MACRO_SUM_TOLERANCE_G ||
+    Math.abs(summedFat - dailyTarget.fats) > MACRO_SUM_TOLERANCE_G;
+  return {
+    isMismatched,
+    summedProtein,
+    summedCarbs,
+    summedFat,
+    targetProtein: dailyTarget.protein,
+    targetCarbs: dailyTarget.carbs,
+    targetFat: dailyTarget.fats,
+  };
+}
+
+// Check #3 — a restricted ingredient slipping into an already-assigned
+// meal. generateMealOptions() already screens a coach's typed dietary-
+// restrictions text against each recipe's own keyword list at
+// generation time — this runs the same ban-list logic in reverse,
+// against whatever was actually saved, so a plan assigned before a
+// restriction was added (or edited by hand) still gets caught.
+export interface RestrictedIngredientSlip {
+  mealId: string;
+  mealTitle: string;
+  recipeName: string | null;
+  matchedRestriction: string;
+}
+
+// Mirrors generateMealOptions' own exclusion in lib/meal-engine.ts — a
+// diet-style label ("vegan", "keto") isn't an ingredient to ban, and
+// checking for the literal word inside ingredient text would never
+// usefully match anyway.
+const ARCHETYPE_LABELS = ["vegan", "plant-based", "carnivore", "keto", "paleo"];
+
+export function detectRestrictedIngredientSlips(
+  mealEntries: {
+    mealId: string;
+    title: string;
+    recipes?: { recipeName: string | null; ingredients: string[] }[];
+  }[],
+  dietaryRestrictionsText: string | null | undefined
+): RestrictedIngredientSlip[] {
+  const bans = (dietaryRestrictionsText ?? "")
+    .toLowerCase()
+    .split(/[,/]/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 3 && !ARCHETYPE_LABELS.includes(s));
+  if (bans.length === 0) return [];
+
+  // A restriction is very often typed as a plural ("peanuts", "eggs")
+  // while a recipe names the singular ingredient ("Peanut Butter",
+  // "Egg Whites") — plain substring matching alone misses that real,
+  // common case. Also checking the singularized stem catches it without
+  // a full stemming library.
+  function stem(word: string): string {
+    return word.endsWith("s") && word.length > 3 ? word.slice(0, -1) : word;
+  }
+
+  const slips: RestrictedIngredientSlip[] = [];
+  for (const meal of mealEntries) {
+    for (const recipe of meal.recipes ?? []) {
+      const text = recipe.ingredients.join(" ").replace(/<[^>]+>/g, " ").toLowerCase();
+      for (const ban of bans) {
+        const banStem = stem(ban);
+        if (text.includes(ban) || (banStem !== ban && text.includes(banStem))) {
+          slips.push({ mealId: meal.mealId, mealTitle: meal.title, recipeName: recipe.recipeName, matchedRestriction: ban });
+        }
+      }
+    }
+  }
+  return slips;
+}
+
+// Check #4 — protein meaningfully under baseline, sustained rather than
+// a one-off day. Compares real LOGGED protein (food_log_entries.
+// protein_g, not a typed-in target) against lib/macros.ts's own
+// estimateProteinFromBodyWeight — the same 1g/lb baseline
+// computeCheckIn's macro split already locks to, independent of
+// whatever target a coach may have set on a specific plan.
+export interface ProteinTooLowResult {
+  isLow: boolean;
+  avgLoggedProtein: number;
+  targetProtein: number;
+  daysBelowTarget: number;
+  daysWithData: number;
+}
+
+const PROTEIN_LOW_THRESHOLD_FRACTION = 0.8; // "meaningfully under" = >20% under baseline
+const MIN_DAYS_FOR_SUSTAINED = 3; // needs at least this many logged days to judge a pattern
+const SUSTAINED_FRACTION = 0.7; // "sustained" = most (not necessarily every) day in the window
+
+export function detectProteinTooLow(
+  loggedProteinByDay: number[],
+  targetProtein: number
+): ProteinTooLowResult {
+  const daysWithData = loggedProteinByDay.length;
+  if (daysWithData === 0 || targetProtein <= 0) {
+    return { isLow: false, avgLoggedProtein: 0, targetProtein, daysBelowTarget: 0, daysWithData };
+  }
+  const threshold = targetProtein * PROTEIN_LOW_THRESHOLD_FRACTION;
+  const daysBelowTarget = loggedProteinByDay.filter((p) => p < threshold).length;
+  const avgLoggedProtein = Math.round(
+    loggedProteinByDay.reduce((sum, p) => sum + p, 0) / daysWithData
+  );
+  const isLow = daysWithData >= MIN_DAYS_FOR_SUSTAINED && daysBelowTarget / daysWithData >= SUSTAINED_FRACTION;
+  return { isLow, avgLoggedProtein, targetProtein, daysBelowTarget, daysWithData };
+}

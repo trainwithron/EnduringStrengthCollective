@@ -22,8 +22,14 @@ import { computeTodaysMicronutrients } from "@/lib/todays-micronutrients";
 import { Key12NutrientGrid } from "@/components/athlete/key12-nutrient-grid";
 import { NutritionYouthModeToggle } from "@/components/coach/desktop/nutrition-youth-mode-toggle";
 import { dedupeRecentFoodLogs } from "@/lib/recent-food-logs";
-import { detectStaleMealPlan } from "@/lib/nutrition-spotter";
-import { NutritionSpotterPanel } from "@/components/coach/desktop/nutrition-spotter-panel";
+import {
+  detectStaleMealPlan,
+  detectMacroSumMismatch,
+  detectRestrictedIngredientSlips,
+  detectProteinTooLow,
+} from "@/lib/nutrition-spotter";
+import { NutritionSpotterPanel, type NutritionSpotterFinding } from "@/components/coach/desktop/nutrition-spotter-panel";
+import { estimateProteinFromBodyWeight } from "@/lib/macros";
 
 export default async function NutritionPage(
   props: {
@@ -471,7 +477,7 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
       .order("generated_at", { ascending: false }),
     supabase
       .from("food_log_entries")
-      .select("log_date")
+      .select("log_date, protein_g")
       .eq("athlete_id", athleteId)
       .neq("status", "skipped")
       .gte("log_date", sevenDaysAgoKey),
@@ -529,6 +535,86 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
       ? detectStaleMealPlan(existingPlan.macros as any, lastCheckinRow.new_calories)
       : null;
 
+  // nutrition_spotter_scoping_sept15.md's three remaining checks — same
+  // deterministic, no-LLM approach as the stale-plan check above.
+  const nutritionSpotterFindings: NutritionSpotterFinding[] = [];
+
+  if (staleMealPlan?.isStale && staleMealPlan.planCalories !== null) {
+    const direction = staleMealPlan.targetCalories > staleMealPlan.planCalories ? "higher" : "lower";
+    nutritionSpotterFindings.push({
+      id: "stale-plan",
+      message: `Today's saved meal plan targets ${staleMealPlan.planCalories} kcal, but the most recent check-in set ${staleMealPlan.targetCalories} kcal — ${staleMealPlan.diffKcal} kcal ${direction} than the plan. Worth regenerating the plan to match, or confirming this gap is intentional.`,
+    });
+  }
+
+  interface PlanMealEntry {
+    mealId: string;
+    title: string;
+    proteinTarget: number;
+    carbsTarget: number;
+    fatTarget: number;
+    recipes?: { recipeName: string | null; ingredients: string[] }[];
+  }
+  const planMacros = existingPlan?.macros as
+    | {
+        daily?: { protein: number; carbs: number; fats: number };
+        train?: { protein: number; carbs: number; fats: number };
+        rest?: { protein: number; carbs: number; fats: number };
+      }
+    | undefined;
+  const planMeals = existingPlan?.meals as
+    | { daily?: PlanMealEntry[]; train?: PlanMealEntry[]; rest?: PlanMealEntry[] }
+    | undefined;
+
+  if (planMacros && planMeals) {
+    const buckets: { key: "daily" | "train" | "rest"; label: string }[] = planMacros.daily
+      ? [{ key: "daily", label: "day" }]
+      : [
+          { key: "train", label: "training day" },
+          { key: "rest", label: "rest day" },
+        ];
+    for (const b of buckets) {
+      const bucketMacros = (planMacros as any)[b.key];
+      const bucketMeals = (planMeals as any)[b.key];
+      if (!bucketMacros || !Array.isArray(bucketMeals) || bucketMeals.length === 0) continue;
+      const result = detectMacroSumMismatch(bucketMeals, bucketMacros);
+      if (result.isMismatched) {
+        nutritionSpotterFindings.push({
+          id: `macro-sum-${b.key}`,
+          message: `Today's ${b.label} meals sum to ${result.summedProtein}g protein / ${result.summedCarbs}g carbs / ${result.summedFat}g fat, but the plan's own target is ${result.targetProtein}g / ${result.targetCarbs}g / ${result.targetFat}g — worth checking what changed.`,
+        });
+      }
+    }
+
+    if (lastCheckinRow?.dietary_restrictions) {
+      const allMealEntries = [
+        ...((planMeals as any).daily ?? []),
+        ...((planMeals as any).train ?? []),
+        ...((planMeals as any).rest ?? []),
+      ];
+      const slips = detectRestrictedIngredientSlips(allMealEntries, lastCheckinRow.dietary_restrictions);
+      for (const slip of slips) {
+        nutritionSpotterFindings.push({
+          id: `restricted-${slip.mealId}-${slip.matchedRestriction}`,
+          message: `${slip.recipeName ?? slip.mealTitle} may contain "${slip.matchedRestriction}" — flagged as a dietary restriction for this client.`,
+        });
+      }
+    }
+  }
+
+  const proteinByDay = new Map<string, number>();
+  for (const row of foodLogDateRows ?? []) {
+    proteinByDay.set(row.log_date, (proteinByDay.get(row.log_date) ?? 0) + ((row as any).protein_g ?? 0));
+  }
+  const targetProtein = weightLogs?.[0]?.weight ? estimateProteinFromBodyWeight(weightLogs[0].weight) : 0;
+  const proteinTooLow = detectProteinTooLow([...proteinByDay.values()], targetProtein);
+  if (proteinTooLow.isLow) {
+    nutritionSpotterFindings.push({
+      id: "protein-too-low",
+      message: `Logged protein has averaged ${proteinTooLow.avgLoggedProtein}g/day over the last ${proteinTooLow.daysWithData} logged days — meaningfully under the ~${proteinTooLow.targetProtein}g/day baseline for their current body weight (${proteinTooLow.daysBelowTarget} of ${proteinTooLow.daysWithData} days under).`,
+    });
+  }
+
   const pendingSuggestions = (pendingSuggestionRows ?? []).map((s) => ({
     id: s.id,
     phase: s.phase,
@@ -549,7 +635,7 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
 
   return (
     <div className="space-y-8">
-      {staleMealPlan && <NutritionSpotterPanel result={staleMealPlan} />}
+      <NutritionSpotterPanel findings={nutritionSpotterFindings} />
       <NutritionCheckinSuggestionsList
         athleteId={athleteId}
         groupId={groupId}
