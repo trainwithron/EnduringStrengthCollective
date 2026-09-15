@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
+import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { GoalProposalForm } from "@/components/athlete/goal-proposal-form";
 import { GOAL_TYPE_LABELS } from "@/lib/goal-types";
 import type { GoalType } from "@/lib/goal-reversal";
@@ -46,13 +48,22 @@ export default async function GoalPage(props: { params: Promise<{ groupId: strin
   }
 
   return (
-    <main className="min-h-screen bg-graphite text-chalk font-body pb-24 px-5 pt-8">
-      <h1 className="font-display font-bold text-2xl uppercase mb-1">My Goal</h1>
-      <p className="font-body text-sm text-steel mb-6">
-        Set what you&apos;re actually working toward — your coach sees it and confirms it before it changes
-        anything.
-      </p>
+    <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
+      <header className="px-5 pt-8 pb-6 border-b border-steel/20">
+        <Link
+          href={`/groups/${params.groupId}/settings`}
+          className="font-body text-xs text-steel uppercase tracking-wide"
+        >
+          &larr; Back to settings
+        </Link>
+        <h1 className="font-display font-bold text-3xl leading-none mt-3 uppercase">My Goal</h1>
+        <p className="font-body text-sm text-steel mt-2 max-w-[60ch]">
+          Set what you&apos;re actually working toward — your coach sees it and confirms it before it changes
+          anything.
+        </p>
+      </header>
 
+      <section className="px-5 pt-6">
       {current && (
         <div className="border border-steel/20 p-4 mb-6">
           <p className="font-body text-[10px] text-steel uppercase tracking-wide font-bold mb-1">
@@ -88,6 +99,9 @@ export default async function GoalPage(props: { params: Promise<{ groupId: strin
           </div>
         </div>
       )}
+      </section>
+
+      <BottomTabBar groupId={params.groupId} activeOverride="settings" />
     </main>
   );
 }
