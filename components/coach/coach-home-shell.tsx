@@ -3,6 +3,7 @@ import { Home } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
 import { TerminologyProvider } from "@/components/coach/terminology-provider";
+import { ExitDesktopModeButton } from "@/components/coach/exit-desktop-mode-button";
 
 // A dedicated, minimal shell for the one cross-group page in the app —
 // not a retrofit of CoachDesktopShell, which has a lot of group-keyed
@@ -29,6 +30,7 @@ export function CoachHomeShell({ orgName, children }: { orgName: string; childre
           </Link>
         </nav>
         <div className="border-t border-steel/20 p-3 space-y-2">
+          <ExitDesktopModeButton />
           <DownloadAppButton />
           <SignOutButton />
         </div>
