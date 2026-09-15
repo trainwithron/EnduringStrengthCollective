@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { BuilderDay } from "@/lib/types";
+import type { AliasEntry } from "@/lib/exercise-matching";
 import { WeekGrid } from "./week-grid";
 import { ProgramScheduleSettings } from "../program-schedule-settings";
 import { computeScheduledDates, type VisibilityWindow } from "@/lib/program-schedule";
@@ -12,6 +13,8 @@ import { ProgramCardMenu } from "./program-card-menu";
 import { SaveToast } from "./save-toast";
 import { flashSaved, flashSaveError } from "@/lib/save-toast";
 import { ProgramChatPanel } from "./program-chat-panel";
+import { TrainingIntentSelector } from "../training-intent-selector";
+import { REST_TEMPO_SUGGESTIONS, type TrainingIntent } from "@/lib/training-intent";
 
 export function ProgramBuilderDesktop({
   programId,
@@ -21,10 +24,13 @@ export function ProgramBuilderDesktop({
   aiSequencingNotes,
   initialDays,
   exerciseLibrary,
+  exerciseAliases,
+  exerciseTierByName,
   movementPatterns,
   initialStartDate,
   initialTrainingDays,
   initialVisibilityWindow,
+  initialTrainingIntent,
 }: {
   programId: string;
   groupId: string;
@@ -36,16 +42,25 @@ export function ProgramBuilderDesktop({
   aiSequencingNotes: string | null;
   initialDays: BuilderDay[];
   exerciseLibrary: string[];
+  exerciseAliases: AliasEntry[];
+  // Same A/B/C class each exercise's own row already resolves by name
+  // (movement-pattern ladder tier) — surfaced in the exercise search
+  // dropdown too, so picking a suggested name and seeing its tier are the
+  // same moment instead of two separate lookups.
+  exerciseTierByName: Record<string, "A" | "B" | "C" | null>;
   movementPatterns: MovementPatternOption[];
   initialStartDate: string | null;
   initialTrainingDays: number[] | null;
   initialVisibilityWindow: VisibilityWindow;
+  initialTrainingIntent: TrainingIntent | null;
 }) {
   const [name, setName] = useState(programName);
   const [lastSavedName, setLastSavedName] = useState(programName);
   const [days, setDays] = useState<BuilderDay[]>(initialDays);
   const [startDate, setStartDate] = useState(initialStartDate);
   const [trainingDays, setTrainingDays] = useState(initialTrainingDays);
+  const [trainingIntent, setTrainingIntent] = useState(initialTrainingIntent);
+  const restSuggestions = trainingIntent ? REST_TEMPO_SUGGESTIONS[trainingIntent] : undefined;
   // Guards handleAddWeek against a real race: it computes the next week
   // number off the `days` closure, stale until this component re-renders
   // with the new array. A fast double-click on "+ Add Week" would
@@ -58,7 +73,11 @@ export function ProgramBuilderDesktop({
     const ordered = days
       .slice()
       .sort((a, b) => a.weekNumber - b.weekNumber || a.dayIndex - b.dayIndex);
-    return computeScheduledDates(startDate, trainingDays, ordered);
+    return computeScheduledDates(
+      startDate,
+      trainingDays,
+      ordered.map((d) => ({ id: d.id, scheduledDate: d.scheduledDate }))
+    );
   }, [days, startDate, trainingDays]);
 
   const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(() => {
@@ -111,6 +130,7 @@ export function ProgramBuilderDesktop({
           weekNumber: newRow.week_number,
           dayIndex: newRow.day_index,
           items: [],
+          scheduledDate: null,
         },
       ]);
       setExpandedWeeks((prev) => new Set(prev).add(nextWeek));
@@ -182,6 +202,13 @@ export function ProgramBuilderDesktop({
             </Link>
           )}
         </div>
+        <div className="flex flex-wrap gap-4 mt-4">
+          <TrainingIntentSelector
+            programId={programId}
+            initialIntent={trainingIntent}
+            onChange={setTrainingIntent}
+          />
+        </div>
       </div>
 
       {aiSequencingNotes && (
@@ -216,7 +243,10 @@ export function ProgramBuilderDesktop({
             programId={programId}
             groupId={groupId}
             exerciseLibrary={exerciseLibrary}
+            exerciseAliases={exerciseAliases}
+            exerciseTierByName={exerciseTierByName}
             movementPatterns={movementPatterns}
+            restSuggestions={restSuggestions}
             expanded={expandedWeeks.has(wn)}
             scheduledDateByDayId={scheduledDateByDayId}
             existingWeekNumbers={weekNumbers}

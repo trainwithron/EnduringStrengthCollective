@@ -8,6 +8,8 @@ import { DuplicateWeekPanel } from "./duplicate-week-panel";
 import { BulkEditDayPanel } from "./bulk-edit-day-panel";
 import { TARGET_PROP, type TrackedField } from "@/lib/exercise-fields";
 import type { MovementPatternOption } from "../exercise-builder-card";
+import type { AliasEntry } from "@/lib/exercise-matching";
+import type { RestTempoSuggestion } from "@/lib/training-intent";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { flashSaved, flashSaveError } from "@/lib/save-toast";
 
@@ -17,7 +19,10 @@ export function WeekGrid({
   programId,
   groupId,
   exerciseLibrary,
+  exerciseAliases,
+  exerciseTierByName,
   movementPatterns,
+  restSuggestions,
   expanded,
   scheduledDateByDayId,
   existingWeekNumbers,
@@ -31,7 +36,10 @@ export function WeekGrid({
   programId: string;
   groupId: string;
   exerciseLibrary: string[];
+  exerciseAliases: AliasEntry[];
+  exerciseTierByName: Record<string, "A" | "B" | "C" | null>;
   movementPatterns: MovementPatternOption[];
+  restSuggestions?: RestTempoSuggestion[];
   expanded: boolean;
   scheduledDateByDayId?: Map<string, Date>;
   existingWeekNumbers: number[];
@@ -44,6 +52,29 @@ export function WeekGrid({
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [daysCondensed, setDaysCondensed] = useState(false);
+  // Real accordion, not just per-day toggles: expanding a day auto-
+  // collapses whichever other day in this week was expanded
+  // (coach_mobile_v2_feature_spec.md item 3, "a day can collapse to a
+  // compact strip when moving between days"). Collapsing a day manually
+  // (without expanding another) never affects its siblings.
+  const [collapsedDayIds, setCollapsedDayIds] = useState<Set<string>>(new Set());
+
+  function handleToggleDayCollapse(dayId: string) {
+    setCollapsedDayIds((prev) => {
+      if (prev.has(dayId)) {
+        // Expanding this day — every other day in the week (whether it
+        // was already collapsed or was the one previously expanded)
+        // ends up collapsed; only the day being opened stays expanded.
+        const next = new Set(days.map((d) => d.id));
+        next.delete(dayId);
+        return next;
+      }
+      // Simple manual collapse — no effect on siblings.
+      const next = new Set(prev);
+      next.add(dayId);
+      return next;
+    });
+  }
   // Guards handleAddDay against a real race: it computes day_index off the
   // `days` closure, stale until the parent re-renders with the new array.
   // A fast double-click on "+ Day" would otherwise insert two workouts
@@ -141,6 +172,7 @@ export function WeekGrid({
           weekNumber: newRow.week_number,
           dayIndex: newRow.day_index,
           items: [],
+          scheduledDate: null,
         },
       ]);
       flashSaved();
@@ -250,8 +282,13 @@ export function WeekGrid({
                   scheduledDate={scheduledDateByDayId?.get(day.id)}
                   groupId={groupId}
                   exerciseLibrary={exerciseLibrary}
+                  exerciseAliases={exerciseAliases}
+                  exerciseTierByName={exerciseTierByName}
                   movementPatterns={movementPatterns}
+                  restSuggestions={restSuggestions}
                   condensed={daysCondensed}
+                  collapsed={collapsedDayIds.has(day.id)}
+                  onToggleCollapse={() => handleToggleDayCollapse(day.id)}
                   onUpdate={(patch) =>
                     onDaysChange(days.map((d) => (d.id === day.id ? { ...d, ...patch } : d)))
                   }

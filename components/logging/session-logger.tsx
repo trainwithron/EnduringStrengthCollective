@@ -10,6 +10,7 @@ import type { SwipeDirection } from "@/components/athlete/swipe-direction-settin
 import { CompleteWorkoutButton } from "@/components/session/complete-workout-button";
 import { RestTimerBar, type PendingGateTask } from "@/components/session/rest-timer-bar";
 import { QuickAddNlButton } from "./quick-add-nl-button";
+import { SessionProgressStrip } from "./session-progress-strip";
 
 export function SessionLogger({
   sessionId,
@@ -56,6 +57,11 @@ export function SessionLogger({
   exerciseSwipeDirection?: SwipeDirection | null;
 }) {
   const [exercises, setExercises] = useState(initialExercises);
+  // Mirrors whichever carousel variant is active's own scroll-position
+  // state (coach_mobile_v2_feature_spec.md item 4) — built once here so
+  // the pinned-strip/next-preview logic never has to live inside either
+  // carousel component itself.
+  const [activeExerciseIndex, setActiveExerciseIndex] = useState(0);
   const [swipeDirection, setSwipeDirection] = useState<SwipeDirection | null>(
     exerciseSwipeDirection ?? "horizontal"
   );
@@ -228,6 +234,7 @@ export function SessionLogger({
           onChosen={(direction) => setSwipeDirection(direction)}
         />
       )}
+      <SessionProgressStrip exercises={exercises} activeIndex={activeExerciseIndex} />
       {swipeDirection === "vertical" ? (
         <ExerciseVerticalCarousel
           exercises={exercises}
@@ -248,6 +255,7 @@ export function SessionLogger({
           canUploadVideo={canUploadVideo}
           onSetCompleted={handleSetCompleted}
           gamificationEnabled={gamificationEnabled}
+          onActiveIndexChange={setActiveExerciseIndex}
         />
       ) : (
         <ExerciseSwipeCarousel
@@ -269,6 +277,7 @@ export function SessionLogger({
           canUploadVideo={canUploadVideo}
           onSetCompleted={handleSetCompleted}
           gamificationEnabled={gamificationEnabled}
+          onActiveIndexChange={setActiveExerciseIndex}
         />
       )}
 

@@ -1,17 +1,19 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { QuickViewBubble } from "./quick-view-bubble";
-import type { DueRosterEntry } from "@/lib/todays-due-roster";
+import { NeedsAttentionPanel, type NeedsAttentionItem } from "../desktop/needs-attention-panel";
 
-// The 3 preset complications on the coach mobile Home (coach_mobile_
-// app_redesign_plan.md) — real numbers, real inline action where the
-// action is simple enough (logging a client straight from the bubble),
-// "go deeper" for the rest. Preset, not configurable — a calmer version
-// than the desktop rail's own eventual per-tile widgets.
+// coach_mobile_v2_feature_spec.md item 2 — a swipeable row of exactly
+// two complications (deliberately capped, not the desktop rail's own
+// eventual per-tile widget system): Needs Attention (inline assign/
+// dismiss, reusing the same NeedsAttentionPanel + its real handlers
+// verbatim rather than re-deriving them) and a Business glance. Used to
+// show Next Session/Sessions Remaining too, but those duplicate the
+// "Due today" hero block already above this row on the same screen —
+// dropped rather than kept redundant.
 function Tile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="border border-steel/20 p-3">
+    <div className="border border-steel/20 p-3 w-40 shrink-0 snap-start">
       <p className="font-body text-[10px] text-steel uppercase tracking-wide">{label}</p>
       <p className="font-display text-lg leading-none mt-1 truncate">{value}</p>
     </div>
@@ -29,110 +31,52 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 export function CoachHomeComplications({
   groupId,
+  coachId,
   revenueToday,
   revenueWeek,
   mrr,
-  dueRoster,
+  activeClientCount,
+  needsAttentionItems,
 }: {
   groupId: string;
+  coachId: string;
   revenueToday: number;
   revenueWeek: number;
   mrr: number;
-  dueRoster: DueRosterEntry[];
+  activeClientCount: number;
+  needsAttentionItems: NeedsAttentionItem[];
 }) {
-  const router = useRouter();
-  const next = dueRoster[0] ?? null;
-
-  function logNow(entry: DueRosterEntry) {
-    router.push(`/groups/${groupId}/athletes/${entry.athleteId}/log/${entry.workoutId}`);
-  }
-
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div className="flex overflow-x-auto snap-x snap-mandatory gap-2 pb-1">
       <QuickViewBubble
-        title="Revenue"
+        title="Needs Attention"
+        deeperHref={`/groups/${groupId}/dashboard`}
+        deeperLabel="Open full Dashboard"
+        trigger={<Tile label="Needs attention" value={String(needsAttentionItems.length)} />}
+      >
+        {() =>
+          needsAttentionItems.length === 0 ? (
+            <p className="font-body text-sm text-steel">Nothing needs a look right now.</p>
+          ) : (
+            <NeedsAttentionPanel coachId={coachId} items={needsAttentionItems} />
+          )
+        }
+      </QuickViewBubble>
+
+      <QuickViewBubble
+        title="Business"
         deeperHref={`/groups/${groupId}/business`}
         deeperLabel="Open full Business dashboard"
-        trigger={<Tile label="Today" value={`$${Math.round(revenueToday)}`} />}
+        trigger={<Tile label="MRR" value={`$${Math.round(mrr)}`} />}
       >
         {() => (
-          <div className="grid grid-cols-3 gap-3 text-center">
+          <div className="grid grid-cols-2 gap-3 text-center">
+            <Stat label="MRR" value={`$${Math.round(mrr)}`} />
+            <Stat label="Active clients" value={String(activeClientCount)} />
             <Stat label="Today" value={`$${Math.round(revenueToday)}`} />
             <Stat label="This week" value={`$${Math.round(revenueWeek)}`} />
-            <Stat label="MRR" value={`$${Math.round(mrr)}`} />
           </div>
         )}
-      </QuickViewBubble>
-
-      <QuickViewBubble
-        title="Next Session"
-        deeperHref={
-          next
-            ? `/groups/${groupId}/athletes/${next.athleteId}/log/${next.workoutId}`
-            : `/groups/${groupId}/clients`
-        }
-        deeperLabel={next ? "Open full logging screen" : "Open Roster"}
-        trigger={<Tile label="Next" value={next ? next.fullName : "None due"} />}
-      >
-        {(close) =>
-          next ? (
-            <div className="space-y-3">
-              <div>
-                <p className="font-body text-sm text-chalk">{next.fullName}</p>
-                <p className="font-body text-xs text-steel">{next.workoutTitle ?? "Workout"}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  close();
-                  logNow(next);
-                }}
-                className="h-9 px-4 bg-rust text-graphite font-body text-xs font-medium"
-              >
-                Log now
-              </button>
-            </div>
-          ) : (
-            <p className="font-body text-sm text-steel">No one due right now.</p>
-          )
-        }
-      </QuickViewBubble>
-
-      <QuickViewBubble
-        title="Sessions Remaining"
-        deeperHref={`/groups/${groupId}/clients`}
-        deeperLabel="Open Roster"
-        trigger={<Tile label="Remaining" value={String(dueRoster.length)} />}
-      >
-        {(close) =>
-          dueRoster.length === 0 ? (
-            <p className="font-body text-sm text-steel">Everyone&apos;s logged for today.</p>
-          ) : (
-            <div className="space-y-2">
-              {dueRoster.map((entry) => (
-                <div
-                  key={entry.athleteId}
-                  className="flex items-center justify-between gap-2 border-b border-steel/15 pb-2 last:border-b-0"
-                >
-                  <div className="min-w-0">
-                    <p className="font-body text-sm text-chalk truncate">{entry.fullName}</p>
-                    <p className="font-body text-[11px] text-steel truncate">{entry.workoutTitle ?? "Workout"}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      close();
-                      logNow(entry);
-                    }}
-                    className="h-8 px-3 border border-steel/30 text-steel font-body text-xs shrink-0"
-                  >
-                    Log
-                  </button>
-                </div>
-              ))}
-            </div>
-          )
-        }
       </QuickViewBubble>
     </div>
   );

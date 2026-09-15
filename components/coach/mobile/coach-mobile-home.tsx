@@ -9,6 +9,7 @@ import { ViewModeToggle } from "@/components/coach/view-mode-toggle";
 import { TodayWidget, type TodayMacros } from "@/components/athlete/today-widget";
 import { CoachHomeComplications } from "./coach-home-complications";
 import { CoachMobileShell } from "./coach-mobile-shell";
+import { getNeedsAttentionItems } from "@/lib/needs-attention-data";
 
 // The coach mobile Home (coach_mobile_app_redesign_plan.md, locked
 // 2026-09-14) — replaces the old pattern of a coach on mobile seeing
@@ -16,18 +17,28 @@ import { CoachMobileShell } from "./coach-mobile-shell";
 // appended below it. Real job, per Ron's own framing: "primarily for
 // in-person logging and minor changes." Leads with "Log a session"
 // (who's due today), not a dashboard.
-export async function CoachMobileHome({ groupId, groupName }: { groupId: string; groupName: string }) {
+export async function CoachMobileHome({
+  groupId,
+  groupName,
+  coachId,
+}: {
+  groupId: string;
+  groupName: string;
+  coachId: string;
+}) {
   const supabase = await createServerClient();
   const timezone = await getGroupCoachTimezone(supabase, groupId);
   const todayKey = dateKeyInZone(timezone);
   const weekAgoKey = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-  const [dueRoster, { data: purchaseRows }, { data: subRows }, { data: rosterRows }] = await Promise.all([
-    getTodaysDueRoster(supabase, { groupId }),
-    supabase.from("credit_purchases").select("amount_cents, created_at").eq("group_id", groupId),
-    supabase.from("membership_subscriptions").select("price_cents, status").eq("group_id", groupId),
-    supabase.from("group_memberships").select("profile_id, profiles ( full_name )").eq("group_id", groupId).eq("role", "athlete"),
-  ]);
+  const [dueRoster, { data: purchaseRows }, { data: subRows }, { data: rosterRows }, needsAttentionItems] =
+    await Promise.all([
+      getTodaysDueRoster(supabase, { groupId }),
+      supabase.from("credit_purchases").select("amount_cents, created_at").eq("group_id", groupId),
+      supabase.from("membership_subscriptions").select("price_cents, status").eq("group_id", groupId),
+      supabase.from("group_memberships").select("profile_id, profiles ( full_name )").eq("group_id", groupId).eq("role", "athlete"),
+      getNeedsAttentionItems(supabase, { coachId, groupIds: [groupId] }),
+    ]);
 
   const incomeEvents = (purchaseRows ?? []).map((p) => ({
     amountCents: p.amount_cents,
@@ -203,10 +214,12 @@ export async function CoachMobileHome({ groupId, groupName }: { groupId: string;
         <section className="px-5 pb-8">
           <CoachHomeComplications
             groupId={groupId}
+            coachId={coachId}
             revenueToday={revenueToday}
             revenueWeek={revenueWeek}
             mrr={mrr}
-            dueRoster={dueRoster}
+            activeClientCount={(rosterRows ?? []).length}
+            needsAttentionItems={needsAttentionItems}
           />
         </section>
       </CoachMobileShell>

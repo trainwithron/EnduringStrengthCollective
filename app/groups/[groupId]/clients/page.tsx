@@ -4,6 +4,9 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ClientCardGrid } from "@/components/coach/desktop/client-card-grid";
 import { AddClientButton } from "@/components/coach/desktop/add-client-button";
 import { SwappableTerm } from "@/components/coach/swappable-term";
+import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
+import { CoachRosterMobile } from "@/components/coach/mobile/coach-roster-mobile";
+import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import type { RosterMember } from "@/lib/types";
 import {
   classifyNutritionTrend,
@@ -103,6 +106,33 @@ export default async function ClientsPage(
 
   const coaches = roster.filter((m) => m.role === "coach");
   const athletes = roster.filter((m) => m.role === "athlete");
+
+  // coach_mobile_v2_feature_spec.md item 1 — mobile gets the A-Z/
+  // needs-attention roster instead of the desktop card grid. Short-
+  // circuits before the phase-alignment summary below, which is
+  // desktop-only and would otherwise cost extra per-athlete queries
+  // this branch never uses — same pattern app/groups/[groupId]/page.tsx
+  // already uses to skip its own desktop-only work.
+  if (await prefersAthleteStyleView()) {
+    return (
+      <CoachMobileShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} activeOverride="roster">
+        <div className="min-h-screen bg-graphite text-chalk font-body pb-24 px-5 pt-8">
+          <div className="flex items-center justify-between gap-3 mb-5">
+            <div>
+              <h1 className="font-display font-bold text-2xl uppercase leading-none">
+                <SwappableTerm termKey="client" form="plural" className="capitalize" />
+              </h1>
+              <p className="font-body text-sm text-steel mt-1">
+                {athletes.length} {athletes.length === 1 ? "client" : "clients"}
+              </p>
+            </div>
+            <AddClientButton groupId={params.groupId} groupName={group?.name ?? "This group"} createdBy={user.id} />
+          </div>
+          <CoachRosterMobile groupId={params.groupId} members={athletes} />
+        </div>
+      </CoachMobileShell>
+    );
+  }
 
   // Category 2 (Milestone Celebrations) — Ron's own framing: the
   // platform should be able to "intuit what you're doing by your trend

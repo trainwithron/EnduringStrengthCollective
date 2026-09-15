@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, List, X } from "lucide-react";
 import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
 import type { TrackedField } from "@/lib/exercise-fields";
@@ -40,6 +40,7 @@ export function ExerciseVerticalCarousel({
   canUploadVideo,
   onSetCompleted,
   gamificationEnabled,
+  onActiveIndexChange,
 }: {
   exercises: SessionExerciseEntry[];
   lastTimeByExercise: Record<string, { weight: number; reps: number }>;
@@ -59,8 +60,17 @@ export function ExerciseVerticalCarousel({
   canUploadVideo: boolean;
   onSetCompleted: (set: SetLogEntry) => void;
   gamificationEnabled: boolean;
+  // Same shared-strip mirror as exercise-swipe-carousel.tsx — kept
+  // identical between both variants so the pinned-strip/next-preview
+  // logic lives once, above whichever carousel is actually active.
+  onActiveIndexChange?: (index: number) => void;
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    onActiveIndexChange?.(activeIndex);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeIndex]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [overviewOpen, setOverviewOpen] = useState(false);
   const scrollerRef = useRef<HTMLDivElement>(null);

@@ -13,8 +13,9 @@ import {
   type TrackedField,
 } from "@/lib/exercise-fields";
 import { parseQuickEntry } from "@/lib/quick-entry";
-import { matchExercise } from "@/lib/exercise-matching";
+import { matchExercise, type AliasEntry } from "@/lib/exercise-matching";
 import { ExerciseBuilderCard, type MovementPatternOption } from "../exercise-builder-card";
+import type { RestTempoSuggestion } from "@/lib/training-intent";
 import { TextNoteCard } from "../text-note-card";
 import { BulkEditDayPanel } from "./bulk-edit-day-panel";
 import { formatShortDate } from "@/lib/program-schedule";
@@ -43,8 +44,13 @@ export function DayCard({
   scheduledDate,
   groupId,
   exerciseLibrary,
+  exerciseAliases,
+  exerciseTierByName,
   movementPatterns,
+  restSuggestions,
   condensed = false,
+  collapsed,
+  onToggleCollapse,
   onUpdate,
   onItemsChange,
   onDeleted,
@@ -53,12 +59,24 @@ export function DayCard({
   scheduledDate?: Date;
   groupId: string;
   exerciseLibrary: string[];
+  exerciseAliases: AliasEntry[];
+  exerciseTierByName: Record<string, "A" | "B" | "C" | null>;
   movementPatterns: MovementPatternOption[];
+  restSuggestions?: RestTempoSuggestion[];
   // Week-level "Collapse days" toggle — shows each exercise as one
   // condensed line (name + sets×reps) instead of the full editable grid.
   // Distinct from the day's own header chevron below, which hides the
   // exercise list entirely.
   condensed?: boolean;
+  // Owned by WeekGrid, not this component — expanding one day auto-
+  // collapses whichever other day in the week was expanded
+  // (coach_mobile_v2_feature_spec.md item 3: "a day can collapse to a
+  // compact strip when moving between days"). Collapsing a day
+  // manually still has no effect on its siblings; only expanding one
+  // does, so this stays a real accordion, not a hidden single-day-only
+  // mode.
+  collapsed: boolean;
+  onToggleCollapse: () => void;
   onUpdate: (patch: Partial<Pick<BuilderDay, "title">>) => void;
   onItemsChange: (items: BuilderItem[]) => void;
   onDeleted: () => void;
@@ -67,10 +85,6 @@ export function DayCard({
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Desktop has room to spare, so collapse just hides the exercise list
-  // instead of shrinking to a vertical strip (that was built specifically
-  // for cramped mobile horizontal scrolling).
-  const [collapsed, setCollapsed] = useState(false);
   // Guards handleAddExercise/handleAddNote against a real race: both
   // compute the next order off the `day.items` closure, stale until the
   // parent re-renders with the new array. A fast double-click on
@@ -400,7 +414,7 @@ export function DayCard({
         </button>
         <button
           type="button"
-          onClick={() => setCollapsed((v) => !v)}
+          onClick={onToggleCollapse}
           aria-label={collapsed ? "Expand day" : "Collapse day"}
           className="w-6 h-6 flex items-center justify-center text-steel active:text-rust transition-colors shrink-0"
         >
@@ -485,7 +499,13 @@ export function DayCard({
             </div>
           )}
 
-          <div className="flex-1 p-3 space-y-3">
+          {/* coach_mobile_v2_feature_spec.md item 3 — a horizontal
+              swipeable carousel instead of a vertical stack. Container/IA
+              change only: ExerciseBuilderCard itself, and the existing
+              drag-and-drop reorder wiring below, are untouched — dragging
+              across a horizontal row works the same as it did down a
+              vertical one. */}
+          <div className="flex-1 p-3 flex overflow-x-auto snap-x snap-mandatory gap-3">
             {(() => {
               const sortedItems = day.items.slice().sort((a, b) => a.order - b.order);
               return sortedItems.map((item, index) => (
@@ -496,15 +516,23 @@ export function DayCard({
                   onDragEnd={() => setDraggedItemId(null)}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={() => handleDrop(item.id)}
-                  className={draggedItemId === item.id ? "opacity-50" : ""}
+                  className={`snap-center shrink-0 w-full ${draggedItemId === item.id ? "opacity-50" : ""}`}
                 >
+                  {sortedItems.length > 1 && (
+                    <p className="font-body text-[10px] text-steel uppercase tracking-wide text-center mb-1.5">
+                      {index + 1} of {sortedItems.length}
+                    </p>
+                  )}
                   {item.kind === "exercise" ? (
                     <ExerciseBuilderCard
                       exercise={item}
                       workoutId={day.id}
                       groupId={groupId}
                       exerciseLibrary={exerciseLibrary}
+                      exerciseAliases={exerciseAliases}
+                      exerciseTierByName={exerciseTierByName}
                       movementPatterns={movementPatterns}
+                      restSuggestions={restSuggestions}
                       canMoveUp={index > 0}
                       canMoveDown={index < sortedItems.length - 1}
                       onMoveUp={() => moveItem(sortedItems, index, -1)}

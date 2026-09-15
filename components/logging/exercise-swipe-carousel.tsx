@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
 import type { TrackedField } from "@/lib/exercise-fields";
@@ -42,6 +42,7 @@ export function ExerciseSwipeCarousel({
   canUploadVideo,
   onSetCompleted,
   gamificationEnabled,
+  onActiveIndexChange,
 }: {
   exercises: SessionExerciseEntry[];
   lastTimeByExercise: Record<string, { weight: number; reps: number }>;
@@ -61,8 +62,21 @@ export function ExerciseSwipeCarousel({
   canUploadVideo: boolean;
   onSetCompleted: (set: SetLogEntry) => void;
   gamificationEnabled: boolean;
+  // SessionLogger mirrors this into its own state to drive the shared
+  // pinned-strip/next-exercise preview (SessionProgressStrip) above both
+  // carousel variants — this component's own scroll/scrub mechanics are
+  // otherwise completely untouched.
+  onActiveIndexChange?: (index: number) => void;
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    onActiveIndexChange?.(activeIndex);
+    // onActiveIndexChange is a fresh closure every render (SessionLogger
+    // passes setActiveIndex inline) — only activeIndex itself should
+    // retrigger this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeIndex]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const scrollerRef = useRef<HTMLDivElement>(null);
   const dotsRef = useRef<HTMLDivElement>(null);
