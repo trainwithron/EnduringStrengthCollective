@@ -884,8 +884,21 @@ export default async function CoachCalendarPage(
       </div>
 
       <CalendarPageTabs coachId={user.id} initialWindows={availabilityWindows}>
-      <div className="grid grid-cols-[1fr_260px] gap-8 items-start">
-        <div>
+      {/* mobile_must_fit_screen_standing_rule — this two-column layout
+          (a fixed 260px "Needs attention"/"Clients" rail beside the
+          grid) is desktop-shaped and never had a narrow-viewport
+          breakpoint; a coach who lands here on a real phone (the
+          "Desktop Mode" override, or just a wide-enough tablet width
+          below lg) got the 260px column pushed off the right edge of
+          the screen entirely, because CSS Grid's bare `1fr` track
+          defaults to `minmax(auto, 1fr)` — its own min-content width
+          (the 7-day calendar grid) can grow past its fair share and
+          shove a fixed sibling column off-screen. min-w-0 on the first
+          column defuses that regardless of breakpoint; grid-cols-1
+          below lg stacks the two columns instead of forcing them
+          side-by-side at a width that was never going to fit both. */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-8 items-start">
+        <div className="min-w-0">
           <div className="flex items-center gap-1 mb-4">
             <Link
               href={monthViewHref}
