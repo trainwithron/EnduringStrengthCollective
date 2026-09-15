@@ -34,6 +34,8 @@ import { defaultTrainingDaysForCount } from "@/lib/program-schedule";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { detectTrainingIntent } from "@/lib/training-intent";
 import { hasFlaggedMusculoskeletalConcern } from "@/lib/athlete-injury-flag";
+import { generateDupProgram, generateDupSelfUpdatingProgram, DUP_WEEKLY_SCHEME } from "@/lib/dup-generator";
+import { generateGzclpProgram, type GzclpLiftInput, type GzclpProgressionRule } from "@/lib/gzclp-generator";
 
 type Status = "idle" | "working" | "reviewing" | "done" | "error";
 
@@ -95,6 +97,11 @@ interface PendingImport {
   // (and risking confabulating) a reason after the fact.
   sequencingNotes: string | null;
   injuryConsiderations: string | null;
+  // Only set for a GZCLP-generated program — inserted into
+  // exercise_progressions right after the program row exists, so weeks
+  // 2+ compute dynamically instead of needing weeks of precomputed
+  // weights (dup_gzclp_build_spec_sept15.md §1.3).
+  progressionRules?: GzclpProgressionRule[];
 }
 
 export function ImportWizard({
@@ -235,7 +242,8 @@ export function ImportWizard({
     programName: string,
     description: string,
     sequencingNotes: string | null = null,
-    injuryConsiderations: string | null = null
+    injuryConsiderations: string | null = null,
+    progressionRules?: GzclpProgressionRule[]
   ) {
     setStatusLabel("Matching exercises…");
 
@@ -289,6 +297,7 @@ export function ImportWizard({
       fuzzyMatches,
       sequencingNotes,
       injuryConsiderations,
+      progressionRules,
     };
 
     if (fuzzyMatches.length === 0) {
@@ -398,6 +407,24 @@ export function ImportWizard({
       return;
     }
 
+    // dup_gzclp_build_spec_sept15.md §1.3 point 2 — a thin post-write
+    // step alongside finalizeImport rather than a new pipeline: only
+    // present for a GZCLP-generated program, so every other import path
+    // (CSV/photo/AI-generate/DUP) is completely unaffected.
+    if (importData.progressionRules && importData.progressionRules.length > 0) {
+      await supabase.from("exercise_progressions").insert(
+        importData.progressionRules.map((rule) => ({
+          program_id: programRow.id,
+          group_id: groupId,
+          exercise_name: rule.exerciseName,
+          model: rule.model,
+          config: rule.config,
+          tier_label: rule.tierLabel,
+          created_by: coachId,
+        }))
+      );
+    }
+
     // Single-active-program rule, scoped correctly (same split as
     // lib/program-duplication.ts's own deactivate query): a personal
     // program only steps down this same client's other personal
@@ -481,6 +508,126 @@ export function ImportWizard({
     processingRef.current = false;
     setFinalizing(false);
     router.refresh();
+  }
+
+  // dup_gzclp_build_spec_sept15.md — DUP Path A, deterministic (no LLM),
+  // so this only needs the athlete's own persisted training maxes, not a
+  // server round trip. Only offered in personal-program mode (a real
+  // athleteId) since the % scheme needs one specific athlete's numbers
+  // to compute from — never invented, same "only use a listed number"
+  // discipline the AI-generate path already follows.
+  const [dupTrainingMaxes, setDupTrainingMaxes] = useState<
+    { exerciseName: string; trainingMax: number }[]
+  >([]);
+  const [dupSelected, setDupSelected] = useState<Set<string>>(new Set());
+  const [dupWeeks, setDupWeeks] = useState(4);
+  // dup_gzclp_build_spec_sept15.md §2.3 — Path A (default) bakes real
+  // weights into the shell from today's training max, a snapshot that
+  // needs a manual regenerate to pick up a later PR. Path B never bakes
+  // a weight in at all; every occurrence reads the athlete's CURRENT
+  // training max live, forever, at the cost of needing a training-max
+  // row to exist before the very first session (Path A only needs it at
+  // generation time).
+  const [dupSelfUpdating, setDupSelfUpdating] = useState(false);
+
+  useEffect(() => {
+    if (!athleteId) return;
+    let cancelled = false;
+    async function run() {
+      const supabase = createBrowserClient();
+      const { data } = await supabase
+        .from("athlete_training_maxes")
+        .select("exercise_name, estimated_max")
+        .eq("athlete_id", athleteId)
+        .order("exercise_name");
+      if (cancelled) return;
+      const rows = (data ?? []).map((r) => ({
+        exerciseName: r.exercise_name as string,
+        trainingMax: r.estimated_max as number,
+      }));
+      setDupTrainingMaxes(rows);
+      setDupSelected(new Set(rows.map((r) => r.exerciseName)));
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [athleteId]);
+
+  function toggleDupLift(name: string) {
+    setDupSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
+
+  function handleDupGenerate() {
+    if (processingRef.current) return;
+    const lifts = dupTrainingMaxes.filter((l) => dupSelected.has(l.exerciseName));
+    if (lifts.length === 0) return;
+    processingRef.current = true;
+    setStatus("working");
+    setError(null);
+    setStatusLabel("Building the DUP block…");
+
+    if (dupSelfUpdating) {
+      const { rows, progressionRules } = generateDupSelfUpdatingProgram({ lifts, weeksToGenerate: dupWeeks });
+      prepareImport(
+        rows,
+        `${dupWeeks}-Week DUP Block (self-updating)`,
+        `Daily Undulating Periodization, ${dupWeeks} weeks — every session's weight is computed live from ${athleteName ?? "this client"}'s current training max (${lifts.map((l) => l.exerciseName).join(", ")}), self-updating on new PRs, never a fixed snapshot.`,
+        null,
+        null,
+        progressionRules
+      );
+      return;
+    }
+
+    const rows = generateDupProgram({ lifts, weeksToGenerate: dupWeeks });
+    prepareImport(
+      rows,
+      `${dupWeeks}-Week DUP Block`,
+      `Daily Undulating Periodization, ${dupWeeks} weeks — generated from ${athleteName ?? "this client"}'s current training maxes (${lifts.map((l) => l.exerciseName).join(", ")}).`
+    );
+  }
+
+  // GZCLP — same real training-max data source as the DUP panel above,
+  // just a different consumption shape: 4 named slots in the canonical
+  // T1/T2 pairing order (dup_gzclp_build_spec_sept15.md §1.3 point 5).
+  const [gzclpLiftNames, setGzclpLiftNames] = useState<[string, string, string, string]>(["", "", "", ""]);
+  const [gzclpT2Weights, setGzclpT2Weights] = useState<[string, string, string, string]>(["", "", "", ""]);
+  // §1.5 point 3's flagged real risk: estimated_max is a theoretical
+  // true max, real GZCLP starts more conservatively — ~85% is a common
+  // practical convention, presented here as an editable default, never
+  // silently asserted as fact.
+  const [gzclpStartPercent, setGzclpStartPercent] = useState(85);
+  const [gzclpWeeks, setGzclpWeeks] = useState(12);
+
+  function handleGzclpGenerate() {
+    if (processingRef.current) return;
+    if (gzclpLiftNames.some((n) => !n) || gzclpT2Weights.some((w) => !w || Number(w) <= 0)) return;
+
+    const lifts = gzclpLiftNames.map((name, i) => {
+      const tm = dupTrainingMaxes.find((l) => l.exerciseName === name);
+      const t1StartingWeight = tm ? Math.round((tm.trainingMax * gzclpStartPercent) / 100 / 5) * 5 : 0;
+      return { exerciseName: name, t1StartingWeight, t2StartingWeight: Number(gzclpT2Weights[i]) };
+    }) as [GzclpLiftInput, GzclpLiftInput, GzclpLiftInput, GzclpLiftInput];
+
+    processingRef.current = true;
+    setStatus("working");
+    setError(null);
+    setStatusLabel("Building the GZCLP shell…");
+    const { rows, progressionRules } = generateGzclpProgram({ lifts, weeksToGenerate: gzclpWeeks });
+    prepareImport(
+      rows,
+      `${gzclpWeeks}-Week GZCLP`,
+      `GZCLP-style tier programming, ${gzclpWeeks} weeks — Week 1 T1 weights set at ${gzclpStartPercent}% of ${athleteName ?? "this client"}'s current training max; T1 auto-progresses through the real 5x3+/6x2+/10x1+ stage cascade from week 2 on.`,
+      null,
+      null,
+      progressionRules
+    );
   }
 
   const [aiPrompt, setAiPrompt] = useState("");
@@ -811,6 +958,183 @@ export function ImportWizard({
           Generate program
         </button>
       </div>
+
+      {athleteId && dupTrainingMaxes.length > 0 && (
+        <div className="border border-steel/20 bg-surface/40 rounded-token-lg p-6">
+          <p className="font-body text-sm text-steel mb-1">
+            Or generate a Daily Undulating Periodization (DUP) block for{" "}
+            <span className="text-chalk">{athleteName ?? "this client"}</span> — deterministic, no
+            AI involved, computed straight from their current training maxes below.
+          </p>
+          <p className="font-body text-[11px] text-steel/70 mb-4">
+            Every training day covers every lift you select, rotating through{" "}
+            {DUP_WEEKLY_SCHEME.map((s) => `${s.label} (${s.reps} @ ~${Math.round(s.percentOfTrainingMax * 100)}%)`).join(
+              " → "
+            )}
+            {" "}each week. A defensible default scheme, not the one official DUP — adjust freely
+            after it&apos;s created.
+          </p>
+          <div className="space-y-1.5 mb-4">
+            {dupTrainingMaxes.map((lift) => (
+              <label key={lift.exerciseName} className="flex items-center gap-2 font-body text-sm text-chalk">
+                <input
+                  type="checkbox"
+                  checked={dupSelected.has(lift.exerciseName)}
+                  onChange={() => toggleDupLift(lift.exerciseName)}
+                />
+                {lift.exerciseName}{" "}
+                <span className="text-[11px] text-steel">({lift.trainingMax} lb training max)</span>
+              </label>
+            ))}
+          </div>
+          <label className="flex items-center gap-2 font-body text-xs text-steel mb-3">
+            Weeks
+            <input
+              type="number"
+              min={1}
+              max={16}
+              value={dupWeeks}
+              onChange={(e) => setDupWeeks(Math.max(1, Math.min(16, Number(e.target.value) || 1)))}
+              disabled={status === "working"}
+              className="w-16 bg-graphite border border-steel/30 text-chalk px-2 py-1 font-body text-xs focus:outline-none focus:border-rust disabled:opacity-40"
+            />
+          </label>
+          <label className="flex items-start gap-2 font-body text-xs text-steel mb-4">
+            <input
+              type="checkbox"
+              checked={dupSelfUpdating}
+              onChange={(e) => setDupSelfUpdating(e.target.checked)}
+              disabled={status === "working"}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="text-chalk">Make this self-updating</span> — never bakes in a
+              weight; every session reads {athleteName ?? "this client"}&apos;s CURRENT training
+              max live, forever, instead of a snapshot from today that needs a manual regenerate
+              to reflect a later PR.
+            </span>
+          </label>
+          <button
+            type="button"
+            onClick={handleDupGenerate}
+            disabled={status === "working" || dupSelected.size === 0}
+            className="h-9 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
+          >
+            Generate DUP block
+          </button>
+        </div>
+      )}
+
+      {athleteId && (
+        <div className="border border-steel/20 bg-surface/40 rounded-token-lg p-6">
+          <p className="font-body text-sm text-steel mb-1">
+            Or generate a GZCLP-style tier block for{" "}
+            <span className="text-chalk">{athleteName ?? "this client"}</span> — 4 main lifts, each
+            playing a main (T1, auto-progressing 5x3+/6x2+/10x1+ off their real performance) and
+            secondary (T2, fixed 3x10) role across a 4-day week.
+          </p>
+          {dupTrainingMaxes.length < 4 ? (
+            <p className="font-body text-xs text-steel mt-3">
+              Needs a real training max on record for 4 main lifts —{" "}
+              {athleteName ?? "this client"} only has {dupTrainingMaxes.length} logged so far. Log a
+              few real sets for the other lifts first.
+            </p>
+          ) : (
+            <>
+              <p className="font-body text-[11px] text-steel/70 mb-4">
+                T1 starting weight (week 1 only — every week after is computed live from real logged
+                performance, never precomputed) comes from{" "}
+                <label className="inline-flex items-center gap-1">
+                  <input
+                    type="number"
+                    min={50}
+                    max={100}
+                    value={gzclpStartPercent}
+                    onChange={(e) => setGzclpStartPercent(Math.max(50, Math.min(100, Number(e.target.value) || 85)))}
+                    disabled={status === "working"}
+                    className="w-12 bg-graphite border border-steel/30 text-chalk px-1 py-0.5 font-body text-[11px] focus:outline-none focus:border-rust disabled:opacity-40"
+                  />
+                  %
+                </label>{" "}
+                of their current training max — a defensible starting point, not the one official
+                number; adjust before generating if you know better for this athlete.
+              </p>
+              <div className="space-y-2 mb-4">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <select
+                      value={gzclpLiftNames[i]}
+                      disabled={status === "working"}
+                      onChange={(e) =>
+                        setGzclpLiftNames((prev) => {
+                          const next = [...prev] as typeof prev;
+                          next[i] = e.target.value;
+                          return next;
+                        })
+                      }
+                      className="bg-graphite border border-steel/30 text-chalk px-2 py-1.5 font-body text-xs focus:outline-none focus:border-rust disabled:opacity-40 flex-1"
+                    >
+                      <option value="">Select a lift…</option>
+                      {dupTrainingMaxes.map((l) => (
+                        <option key={l.exerciseName} value={l.exerciseName}>
+                          {l.exerciseName} ({l.trainingMax} lb training max)
+                        </option>
+                      ))}
+                    </select>
+                    <label className="flex items-center gap-1.5 font-body text-[11px] text-steel">
+                      T2 start
+                      <input
+                        type="number"
+                        min={0}
+                        value={gzclpT2Weights[i]}
+                        disabled={status === "working"}
+                        onChange={(e) =>
+                          setGzclpT2Weights((prev) => {
+                            const next = [...prev] as typeof prev;
+                            next[i] = e.target.value;
+                            return next;
+                          })
+                        }
+                        placeholder="lb"
+                        className="w-16 bg-graphite border border-steel/30 text-chalk px-2 py-1 font-body text-xs focus:outline-none focus:border-rust disabled:opacity-40"
+                      />
+                    </label>
+                  </div>
+                ))}
+              </div>
+              <p className="font-body text-[11px] text-steel/70 mb-4">
+                Lifts 1+2 pair together (each is the other&apos;s T2), same for lifts 3+4 — the
+                standard squat/bench + press/deadlift split, whatever you actually name them.
+              </p>
+              <label className="flex items-center gap-2 font-body text-xs text-steel mb-4">
+                Weeks
+                <input
+                  type="number"
+                  min={1}
+                  max={16}
+                  value={gzclpWeeks}
+                  onChange={(e) => setGzclpWeeks(Math.max(1, Math.min(16, Number(e.target.value) || 1)))}
+                  disabled={status === "working"}
+                  className="w-16 bg-graphite border border-steel/30 text-chalk px-2 py-1 font-body text-xs focus:outline-none focus:border-rust disabled:opacity-40"
+                />
+              </label>
+              <button
+                type="button"
+                onClick={handleGzclpGenerate}
+                disabled={
+                  status === "working" ||
+                  gzclpLiftNames.some((n) => !n) ||
+                  gzclpT2Weights.some((w) => !w || Number(w) <= 0) ||
+                  new Set(gzclpLiftNames).size !== 4
+                }
+                className="h-9 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
+              >
+                Generate GZCLP shell
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

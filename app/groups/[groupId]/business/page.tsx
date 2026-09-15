@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
@@ -136,6 +137,17 @@ export default async function BusinessDashboardPage(
   const safeGroupIds = groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"];
   const monthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
 
+  // v3_visual_polish_mockup_sept15.md's "Dashboard Empty State & Business
+  // Tiles" mockup — a true zero (no packages ever configured) needs to
+  // read differently from a real "$0 this period" (packages exist, just
+  // no purchases yet). Package existence, not the period's totals, is
+  // the real "has billing even been set up" signal.
+  const { count: packageCount } = await supabase
+    .from("coach_packages")
+    .select("id", { count: "exact", head: true })
+    .eq("coach_id", user.id);
+  const hasBillingSetUp = (packageCount ?? 0) > 0;
+
   const { data: purchaseRows } = await supabase
     .from("credit_purchases")
     .select("athlete_id, amount_cents, created_at")
@@ -241,10 +253,18 @@ export default async function BusinessDashboardPage(
         />
       </div>
       <div className="grid grid-cols-4 gap-3 mb-8">
-        <div className="border border-steel/20 rounded-token-lg p-3">
-          <p className="font-display text-2xl leading-none">${realIncomeThisMonth.toLocaleString()}</p>
-          <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">Income this month</p>
-        </div>
+        {hasBillingSetUp ? (
+          <div className="border border-steel/20 rounded-token-lg p-3">
+            <p className="font-display text-2xl leading-none">${realIncomeThisMonth.toLocaleString()}</p>
+            <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">Income this month</p>
+          </div>
+        ) : (
+          <div className="border border-steel/20 rounded-token-lg p-3 opacity-60">
+            <p className="font-display text-2xl leading-none text-steel">—</p>
+            <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">Income this month</p>
+            <p className="font-body text-[10px] text-steel mt-0.5">No billing yet</p>
+          </div>
+        )}
         <div className="border border-steel/20 rounded-token-lg p-3">
           <p className="font-display text-2xl leading-none">{uniqueAthleteIds.size}</p>
           <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">Roster size</p>
@@ -252,12 +272,25 @@ export default async function BusinessDashboardPage(
             <p className="font-body text-[10px] text-positive mt-0.5">+{newThisMonth} this month</p>
           )}
         </div>
-        <div className="border border-steel/20 rounded-token-lg p-3">
-          <p className="font-display text-2xl leading-none">{payingClientsCount}</p>
-          <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">
-            Paying <SwappableTerm termKey="client" form="plural" />
-          </p>
-        </div>
+        {hasBillingSetUp ? (
+          <div className="border border-steel/20 rounded-token-lg p-3">
+            <p className="font-display text-2xl leading-none">{payingClientsCount}</p>
+            <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">
+              Paying <SwappableTerm termKey="client" form="plural" />
+            </p>
+          </div>
+        ) : (
+          <Link
+            href={`/groups/${params.groupId}/business/packages`}
+            className="rounded-token-lg p-3 bg-surface border border-rust/30 shadow-[0_0_0_1px_rgb(var(--rust)/0.15),0_0_16px_rgb(var(--rust)/0.12)] block"
+          >
+            <p className="font-display text-2xl leading-none">{payingClientsCount}</p>
+            <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">
+              Paying <SwappableTerm termKey="client" form="plural" />
+            </p>
+            <p className="font-body text-[10px] text-rust mt-0.5">Add a package &rarr;</p>
+          </Link>
+        )}
         <div className="border border-steel/20 rounded-token-lg p-3">
           <p className="font-display text-2xl leading-none">{totalOutstandingCredits}</p>
           <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">
