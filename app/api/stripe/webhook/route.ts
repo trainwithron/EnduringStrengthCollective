@@ -306,22 +306,53 @@ export async function POST(request: Request) {
       }
 
       case "customer.subscription.updated":
-      case "customer.subscription.deleted": {
+      case "customer.subscription.deleted":
+      // subscription_pause_mechanics_research.md — these two never
+      // reached this switch at all before. A paused subscription's
+      // status IS 'paused' on the subscription object itself for both,
+      // so no special-case logic is needed beyond the two extra case
+      // labels: the same status/upsert path below already reads it
+      // correctly once the CHECK constraint and the cast below both
+      // accept 'paused' (migration 0179).
+      case "customer.subscription.paused":
+      case "customer.subscription.resumed": {
         const subscription = event.data.object as Stripe.Subscription;
         const athleteId = subscription.metadata?.athlete_id;
         const groupId = subscription.metadata?.group_id;
         if (!athleteId || !groupId) break;
 
-        const status =
+        // Was an unchecked cast — Stripe's real Status type is wider
+        // than our column ever supported (trialing, unpaid,
+        // incomplete_expired, or any future value), and a value outside
+        // our CHECK would either silently masquerade as one of ours or
+        // throw on the upsert; per billing_payments_oversight_check.md a
+        // thrown/discarded upsert error leaves the row reading whatever
+        // it read before, which for a genuinely paused subscription
+        // meant 'active' — the exact MRR overstatement this fixes.
+        // Explicit allow-list, skip the write entirely for anything else
+        // rather than guessing.
+        const KNOWN_STATUSES = ["active", "past_due", "canceled", "incomplete", "paused"] as const;
+        type KnownStatus = (typeof KNOWN_STATUSES)[number];
+        const status: KnownStatus | null =
           event.type === "customer.subscription.deleted"
             ? "canceled"
-            : (subscription.status as "active" | "past_due" | "canceled" | "incomplete");
+            : (KNOWN_STATUSES as readonly string[]).includes(subscription.status)
+              ? (subscription.status as KnownStatus)
+              : null;
+        if (!status) break;
 
         // current_period_end moved off the subscription object onto each
         // subscription item in newer Stripe API versions — this app only
         // ever creates a single-item subscription (one Price per
         // membership), so the first item's period end is the right one.
         const periodEndUnix = subscription.items.data[0]?.current_period_end;
+
+        // pause_collection.resumes_at belongs to a DIFFERENT pause
+        // mechanism (one that never sets status to 'paused' at all, per
+        // Stripe's own docs) — read defensively in case it's ever present
+        // alongside a real 'paused' status, but never fabricated when
+        // absent. Null on every other event type, including resume.
+        const resumesAtUnix = subscription.pause_collection?.resumes_at ?? null;
 
         await supabase.from("membership_subscriptions").upsert(
           {
@@ -331,6 +362,9 @@ export async function POST(request: Request) {
             status,
             current_period_end: periodEndUnix
               ? new Date(periodEndUnix * 1000).toISOString()
+              : null,
+            paused_until: resumesAtUnix
+              ? new Date(resumesAtUnix * 1000).toISOString().slice(0, 10)
               : null,
             updated_at: new Date().toISOString(),
           },

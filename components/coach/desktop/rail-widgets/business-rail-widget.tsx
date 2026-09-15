@@ -95,7 +95,7 @@ export function BusinessRailWidget({ groupId }: { groupId: string }) {
       const realMRR = computeRealMRR(
         (subRows ?? []).map((s) => ({
           priceCents: s.price_cents,
-          status: s.status as "active" | "past_due" | "canceled" | "incomplete",
+          status: s.status as "active" | "past_due" | "canceled" | "incomplete" | "paused",
         }))
       );
       const estimatedMRR = computeEstimatedMRR((memberRows ?? []).map((m) => ({ monthlyRate: m.monthly_rate })));

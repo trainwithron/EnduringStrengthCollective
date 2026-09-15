@@ -78,12 +78,28 @@ export function computeRealIncomeInRange(
 
 export interface ActiveSubscription {
   priceCents: number | null;
-  status: "active" | "past_due" | "canceled" | "incomplete";
+  status: "active" | "past_due" | "canceled" | "incomplete" | "paused";
 }
 
+// subscription_pause_mechanics_research.md — a paused member was
+// previously indistinguishable from an active one (the status column
+// couldn't even hold 'paused'), so this filter already excluded them by
+// accident of always reading 'active'. Now that a subscription can
+// genuinely read 'paused' (migration 0179), this filter is the real
+// fix: still active-only, paused correctly falls out.
 export function computeRealMRR(subs: ActiveSubscription[]): number {
   const cents = subs
     .filter((s) => s.status === "active")
+    .reduce((sum, s) => sum + (s.priceCents ?? 0), 0);
+  return cents / 100;
+}
+
+// Paused revenue shouldn't just vanish from what a coach sees — a
+// paused member is money coming back, not money lost, so it's surfaced
+// as its own figure rather than silently dropped out of MRR.
+export function computeRealPausedMRR(subs: ActiveSubscription[]): number {
+  const cents = subs
+    .filter((s) => s.status === "paused")
     .reduce((sum, s) => sum + (s.priceCents ?? 0), 0);
   return cents / 100;
 }

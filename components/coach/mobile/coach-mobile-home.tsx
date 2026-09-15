@@ -49,7 +49,7 @@ export async function CoachMobileHome({
   const mrr = computeRealMRR(
     (subRows ?? []).map((s) => ({
       priceCents: s.price_cents,
-      status: s.status as "active" | "past_due" | "canceled" | "incomplete",
+      status: s.status as "active" | "past_due" | "canceled" | "incomplete" | "paused",
     }))
   );
 

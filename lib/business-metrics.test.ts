@@ -6,6 +6,7 @@ import {
   computeRealIncomeThisMonth,
   computeRealIncomeInRange,
   computeRealMRR,
+  computeRealPausedMRR,
   computeActivePayingClients,
 } from "./business-metrics";
 
@@ -116,6 +117,30 @@ describe("computeRealMRR", () => {
 
   it("treats a null priceCents as 0 rather than throwing", () => {
     expect(computeRealMRR([{ priceCents: null, status: "active" }])).toBe(0);
+  });
+
+  it("excludes paused subscriptions from MRR", () => {
+    const mrr = computeRealMRR([
+      { priceCents: 9500, status: "active" },
+      { priceCents: 12000, status: "paused" },
+    ]);
+    expect(mrr).toBe(95);
+  });
+});
+
+describe("computeRealPausedMRR", () => {
+  it("sums only paused subscriptions", () => {
+    const paused = computeRealPausedMRR([
+      { priceCents: 9500, status: "active" },
+      { priceCents: 12000, status: "paused" },
+      { priceCents: 8000, status: "paused" },
+      { priceCents: 7000, status: "canceled" },
+    ]);
+    expect(paused).toBe(200);
+  });
+
+  it("returns 0 when nobody is paused", () => {
+    expect(computeRealPausedMRR([{ priceCents: 9500, status: "active" }])).toBe(0);
   });
 });
 

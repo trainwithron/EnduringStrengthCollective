@@ -13,6 +13,7 @@ import {
   computeMonthlyGrowth,
   computeRealIncomeThisMonth,
   computeRealMRR,
+  computeRealPausedMRR,
   computeActivePayingClients,
 } from "@/lib/business-metrics";
 
@@ -165,12 +166,15 @@ export default async function BusinessDashboardPage(
     })),
     monthKey
   );
-  const realMRR = computeRealMRR(
-    (subscriptionRows ?? []).map((s) => ({
-      priceCents: s.price_cents,
-      status: s.status as "active" | "past_due" | "canceled" | "incomplete",
-    }))
-  );
+  const subscriptionsForMRR = (subscriptionRows ?? []).map((s) => ({
+    priceCents: s.price_cents,
+    status: s.status as "active" | "past_due" | "canceled" | "incomplete" | "paused",
+  }));
+  const realMRR = computeRealMRR(subscriptionsForMRR);
+  // subscription_pause_mechanics_research.md — a paused member's revenue
+  // shouldn't just vanish from what a coach sees once it's correctly
+  // excluded from MRR above; surfaced as its own line instead.
+  const pausedMRR = computeRealPausedMRR(subscriptionsForMRR);
 
   const athleteIdsWithPurchase = new Set((purchaseRows ?? []).map((p) => p.athlete_id));
   const athleteIdsWithActiveSub = new Set(
@@ -251,6 +255,11 @@ export default async function BusinessDashboardPage(
           value={`$${(realMRR > 0 ? realMRR : estimatedMRR).toLocaleString()}`}
           detail={realMRR > 0 ? "From active subscriptions — the clearest signal of business health" : "From rates set below — set up packages for a real number"}
         />
+        {pausedMRR > 0 && (
+          <p className="font-body text-xs text-steel mt-2">
+            +${pausedMRR.toLocaleString()}/mo paused — not counted above, but not lost either.
+          </p>
+        )}
       </div>
       <div className="grid grid-cols-4 gap-3 mb-8">
         {hasBillingSetUp ? (
