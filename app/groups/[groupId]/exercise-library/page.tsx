@@ -86,6 +86,41 @@ export default async function ExerciseLibraryPage(
 
   const exerciseLibrary = exercises.map((e) => e.name);
 
+  // corrective_exercise_biomechanical_tagging_idea.md — the vocabulary
+  // is a small (~60-row), fully-shared reference set, fetched once here
+  // rather than per-row; the actual tags are looked up only for this
+  // coach's own exercise names (the join key), not the whole platform's.
+  const [{ data: biomechTagRows }, { data: exerciseTagRows }] = await Promise.all([
+    supabase
+      .from("biomech_tags")
+      .select("id, kind, key, label, joint, description")
+      .order("kind", { ascending: true })
+      .order("joint", { ascending: true })
+      .order("label", { ascending: true }),
+    exerciseLibrary.length > 0
+      ? supabase
+          .from("exercise_biomech_tags")
+          .select("exercise_name, tag_id, role")
+          .in("exercise_name", exerciseLibrary)
+      : Promise.resolve({ data: [] as { exercise_name: string; tag_id: string; role: string }[] }),
+  ]);
+
+  const biomechVocabulary = (biomechTagRows ?? []).map((t) => ({
+    id: t.id,
+    kind: t.kind as "joint_action" | "stabilization",
+    key: t.key,
+    label: t.label,
+    joint: t.joint,
+    description: t.description,
+  }));
+
+  const initialBiomechTagsByExercise: Record<string, { tagId: string; role: "prime_mover" | "stabilizer_demand" }[]> = {};
+  for (const row of exerciseTagRows ?? []) {
+    const list = initialBiomechTagsByExercise[row.exercise_name] ?? [];
+    list.push({ tagId: row.tag_id, role: row.role as "prime_mover" | "stabilizer_demand" });
+    initialBiomechTagsByExercise[row.exercise_name] = list;
+  }
+
   return (
     <CoachDesktopShell
       groupId={params.groupId}
@@ -107,6 +142,8 @@ export default async function ExerciseLibraryPage(
         initialExercises={exercises}
         initialPatterns={patternsWithLadder}
         exerciseLibrary={exerciseLibrary}
+        biomechVocabulary={biomechVocabulary}
+        initialBiomechTagsByExercise={initialBiomechTagsByExercise}
       />
     </CoachDesktopShell>
   );

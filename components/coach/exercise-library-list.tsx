@@ -6,6 +6,8 @@ import { ExerciseMediaPicker } from "./exercise-media-picker";
 import { AutoCategorizeButton } from "./auto-categorize-button";
 import { classifyExerciseCategory } from "@/lib/exercise-category-classifier";
 import { classifyEquipmentType, type EquipmentType } from "@/lib/equipment-classifier";
+import { BiomechTagPicker, type BiomechTagOption, type BiomechTagSelection } from "./biomech-tag-picker";
+import { generateBiomechBreakdown } from "@/lib/biomech-breakdown";
 import { Trash2 } from "lucide-react";
 
 export interface LibraryExerciseRow {
@@ -42,9 +44,15 @@ const EQUIPMENT_TYPES: { value: EquipmentType; label: string }[] = [
 export function ExerciseLibraryList({
   coachId,
   initialExercises,
+  biomechVocabulary,
+  initialBiomechTagsByExercise,
 }: {
   coachId: string;
   initialExercises: LibraryExerciseRow[];
+  biomechVocabulary: BiomechTagOption[];
+  // Keyed by exercise name (the tagging layer's real join key), not id —
+  // shared across every coach's own copy of the same-named exercise.
+  initialBiomechTagsByExercise: Record<string, BiomechTagSelection[]>;
 }) {
   const [exercises, setExercises] = useState(initialExercises);
   const [search, setSearch] = useState("");
@@ -58,6 +66,66 @@ export function ExerciseLibraryList({
   const [equipmentAutoSuggested, setEquipmentAutoSuggested] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // The "required for new exercises going forward" rule
+  // (corrective_exercise_biomechanical_tagging_idea.md) — held locally
+  // until the exercise is actually created, since there's no row/id to
+  // attach tags to yet. Existing exercises (256 of them, predating this
+  // feature) are never blocked by this — only a brand-new one.
+  const [newTags, setNewTags] = useState<BiomechTagSelection[]>([]);
+  const [tagsByExercise, setTagsByExercise] =
+    useState<Record<string, BiomechTagSelection[]>>(initialBiomechTagsByExercise);
+
+  function toggleNewTag(tagId: string) {
+    setNewTags((prev) =>
+      prev.some((t) => t.tagId === tagId)
+        ? prev.filter((t) => t.tagId !== tagId)
+        : [...prev, { tagId, role: "prime_mover" }]
+    );
+  }
+  function setNewTagRole(tagId: string, role: BiomechTagSelection["role"]) {
+    setNewTags((prev) => prev.map((t) => (t.tagId === tagId ? { ...t, role } : t)));
+  }
+
+  async function toggleExistingTag(exerciseName: string, tagId: string) {
+    const current = tagsByExercise[exerciseName] ?? [];
+    const already = current.some((t) => t.tagId === tagId);
+    const supabase = createBrowserClient();
+    if (already) {
+      setTagsByExercise((prev) => ({
+        ...prev,
+        [exerciseName]: (prev[exerciseName] ?? []).filter((t) => t.tagId !== tagId),
+      }));
+      await supabase
+        .from("exercise_biomech_tags")
+        .delete()
+        .eq("exercise_name", exerciseName)
+        .eq("tag_id", tagId);
+    } else {
+      setTagsByExercise((prev) => ({
+        ...prev,
+        [exerciseName]: [...(prev[exerciseName] ?? []), { tagId, role: "prime_mover" }],
+      }));
+      await supabase
+        .from("exercise_biomech_tags")
+        .upsert(
+          { exercise_name: exerciseName, tag_id: tagId, role: "prime_mover", created_by: coachId },
+          { onConflict: "exercise_name,tag_id", ignoreDuplicates: true }
+        );
+    }
+  }
+
+  async function setExistingTagRole(exerciseName: string, tagId: string, role: BiomechTagSelection["role"]) {
+    setTagsByExercise((prev) => ({
+      ...prev,
+      [exerciseName]: (prev[exerciseName] ?? []).map((t) => (t.tagId === tagId ? { ...t, role } : t)),
+    }));
+    const supabase = createBrowserClient();
+    await supabase
+      .from("exercise_biomech_tags")
+      .update({ role })
+      .eq("exercise_name", exerciseName)
+      .eq("tag_id", tagId);
+  }
 
   function handleNewNameChange(value: string) {
     setNewName(value);
@@ -90,7 +158,11 @@ export function ExerciseLibraryList({
 
   async function handleAdd() {
     const trimmed = newName.trim();
-    if (!trimmed) return;
+    // Required for new exercises going forward — an app-layer rule, not
+    // a DB constraint (tags key off the name string, not a FK from
+    // exercise_library, so there's nothing to make NOT NULL without
+    // breaking the 256 exercises that predate this feature).
+    if (!trimmed || newTags.length === 0) return;
     setSubmitting(true);
     const supabase = createBrowserClient();
     const { data } = await supabase
@@ -105,6 +177,22 @@ export function ExerciseLibraryList({
       .single();
 
     if (data) {
+      // Independent of the exercise_library row above — tags key off
+      // the name, not the new row's id, so this can run regardless of
+      // whether another coach already tagged the same exercise name.
+      // Upsert with ignoreDuplicates rather than a plain insert, so that
+      // coincidence (two coaches independently creating the same new
+      // exercise name) can't surface as a write error here.
+      await supabase.from("exercise_biomech_tags").upsert(
+        newTags.map((t) => ({
+          exercise_name: trimmed,
+          tag_id: t.tagId,
+          role: t.role,
+          created_by: coachId,
+        })),
+        { onConflict: "exercise_name,tag_id", ignoreDuplicates: true }
+      );
+
       setExercises((prev) => [
         ...prev,
         {
@@ -117,9 +205,11 @@ export function ExerciseLibraryList({
           equipmentType: data.equipment_type,
         },
       ]);
+      setTagsByExercise((prev) => ({ ...prev, [data.name]: newTags }));
       setNewName("");
       setNewCategory("");
       setNewEquipmentType("");
+      setNewTags([]);
       setCategoryAutoSuggested(true);
       setEquipmentAutoSuggested(true);
     }
@@ -209,12 +299,37 @@ export function ExerciseLibraryList({
         <button
           type="button"
           onClick={handleAdd}
-          disabled={submitting}
+          disabled={submitting || !newName.trim() || newTags.length === 0}
+          title={newTags.length === 0 ? "Add at least one biomechanical tag below first" : undefined}
           className="h-10 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
         >
           Add
         </button>
       </div>
+
+      {newName.trim() && (
+        <div className="mb-6 max-w-3xl">
+          <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">
+            Biomechanical tags — required for a new exercise
+          </p>
+          <p className="font-body text-[11px] text-steel mb-2">
+            {newTags.length === 0
+              ? "Hidden from clients, used for corrective-exercise selection."
+              : generateBiomechBreakdown(
+                  newTags.map((t) => ({
+                    ...biomechVocabulary.find((v) => v.id === t.tagId)!,
+                    role: t.role,
+                  }))
+                ).summary}
+          </p>
+          <BiomechTagPicker
+            vocabulary={biomechVocabulary}
+            selected={newTags}
+            onToggle={toggleNewTag}
+            onRoleChange={setNewTagRole}
+          />
+        </div>
+      )}
 
       {visible.length === 0 ? (
         <p className="font-body text-sm text-steel py-6">No exercises match.</p>
@@ -226,10 +341,26 @@ export function ExerciseLibraryList({
                 {group.category}
               </h3>
               <div className="divide-y divide-steel/15">
-                {group.items.map((ex) => (
+                {group.items.map((ex) => {
+                  const exTags = tagsByExercise[ex.name] ?? [];
+                  const breakdown =
+                    exTags.length > 0
+                      ? generateBiomechBreakdown(
+                          exTags.map((t) => ({
+                            ...biomechVocabulary.find((v) => v.id === t.tagId)!,
+                            role: t.role,
+                          }))
+                        )
+                      : null;
+                  return (
                   <div key={ex.id} className="py-3">
                     <div className="flex items-center gap-3">
-                      <span className="font-body font-medium text-[15px] flex-1">{ex.name}</span>
+                      <div className="flex-1 min-w-0">
+                        <span className="font-body font-medium text-[15px]">{ex.name}</span>
+                        {breakdown && (
+                          <p className="font-body text-[11px] text-steel truncate">{breakdown.summary}</p>
+                        )}
+                      </div>
                       {ex.tier && (
                         <span className="h-6 w-6 flex items-center justify-center border border-steel/30 font-body text-[11px] text-steel">
                           {ex.tier}
@@ -268,7 +399,7 @@ export function ExerciseLibraryList({
                         onClick={() => setExpandedId((prev) => (prev === ex.id ? null : ex.id))}
                         className="font-body text-xs text-rust"
                       >
-                        {expandedId === ex.id ? "Close" : "Edit media"}
+                        {expandedId === ex.id ? "Close" : "Edit"}
                       </button>
                       <button
                         type="button"
@@ -281,7 +412,7 @@ export function ExerciseLibraryList({
                     </div>
 
                     {expandedId === ex.id && (
-                      <div className="mt-3 max-w-md">
+                      <div className="mt-3 max-w-2xl space-y-4">
                         <ExerciseMediaPicker
                           exerciseName={ex.name}
                           videoPath={ex.videoPath}
@@ -292,10 +423,25 @@ export function ExerciseLibraryList({
                             )
                           }
                         />
+                        <div>
+                          <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">
+                            Biomechanical tags
+                          </p>
+                          <p className="font-body text-[11px] text-steel mb-2">
+                            {breakdown?.summary ?? "No biomechanical tags added yet."}
+                          </p>
+                          <BiomechTagPicker
+                            vocabulary={biomechVocabulary}
+                            selected={exTags}
+                            onToggle={(tagId) => toggleExistingTag(ex.name, tagId)}
+                            onRoleChange={(tagId, role) => setExistingTagRole(ex.name, tagId, role)}
+                          />
+                        </div>
                       </div>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))}
