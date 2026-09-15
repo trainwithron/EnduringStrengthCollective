@@ -109,6 +109,67 @@ export function matchExercise(
   return { exerciseName: null, confidence: "none", score: best?.score ?? 0 };
 }
 
+export interface RankedMatch {
+  exerciseName: string;
+  score: number; // 0-1
+  isAlias: boolean;
+}
+
+// Below FUZZY_THRESHOLD is too weak to silently auto-accept (matchExercise's
+// job), but still worth surfacing as an option for a coach to visually scan
+// and pick from — a human reviewing 3 ranked candidates tolerates more noise
+// than a fully automated single accept does. Below this floor, a candidate
+// is unrelated enough (near-zero token overlap) that showing it just adds
+// noise to the list rather than a plausible near-miss.
+const CANDIDATE_THRESHOLD = 0.15;
+
+// Ranked top-N candidates for a free-text query — the "type a description,
+// get the 2-3 most likely matches" input, as opposed to matchExercise's
+// single best-guess for an unattended import pipeline. Same normalization/
+// scoring underneath, just returning the ranked list instead of collapsing
+// to one result. Deliberately does NOT hard-merge near-miss terms (e.g.
+// "ipsilateral" vs "alternating" describe different things — load
+// placement vs. rep sequencing) — ranking naturally surfaces the real
+// nearest matches and lets the coach disambiguate, rather than the matcher
+// guessing which one word they meant.
+export function matchTopN(
+  rawName: string,
+  library: LibraryExercise[],
+  aliases: AliasEntry[],
+  n = 3
+): RankedMatch[] {
+  const normalizedRaw = normalizeName(rawName);
+  if (!normalizedRaw) return [];
+
+  const results: RankedMatch[] = [];
+  const seen = new Set<string>();
+
+  const alias = aliases.find((a) => normalizeName(a.rawName) === normalizedRaw);
+  if (alias) {
+    results.push({ exerciseName: alias.exerciseName, score: 1, isAlias: true });
+    seen.add(alias.exerciseName);
+  }
+
+  const exact = library.find((l) => normalizeName(l.name) === normalizedRaw);
+  if (exact && !seen.has(exact.name)) {
+    results.push({ exerciseName: exact.name, score: 1, isAlias: false });
+    seen.add(exact.name);
+  }
+
+  const ranked = library
+    .filter((l) => !seen.has(l.name))
+    .map((l) => ({ name: l.name, score: jaccard(normalizedRaw, normalizeName(l.name)) }))
+    .filter((r) => r.score >= CANDIDATE_THRESHOLD)
+    .sort((a, b) => b.score - a.score);
+
+  for (const r of ranked) {
+    if (results.length >= n) break;
+    results.push({ exerciseName: r.name, score: r.score, isAlias: false });
+  }
+
+  return results.slice(0, n);
+}
+
 export function confidenceBucket(confidence: MatchConfidence): "green" | "yellow" | "red" {
   if (confidence === "exact" || confidence === "alias") return "green";
   if (confidence === "fuzzy") return "yellow";

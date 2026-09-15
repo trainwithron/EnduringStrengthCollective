@@ -32,6 +32,7 @@ import {
 import { DEFAULT_TRACKED_FIELDS, type TrackedField } from "@/lib/exercise-fields";
 import { defaultTrainingDaysForCount } from "@/lib/program-schedule";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
+import { detectTrainingIntent } from "@/lib/training-intent";
 
 type Status = "idle" | "working" | "reviewing" | "done" | "error";
 
@@ -320,6 +321,7 @@ export function ImportWizard({
         training_days: trainingDays,
         visibility_window: "day",
         ai_sequencing_notes: sequencingNotes,
+        training_intent: detectTrainingIntent(programName || "Imported Program"),
       })
       .select("id")
       .single();

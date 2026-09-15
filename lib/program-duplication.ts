@@ -37,7 +37,7 @@ export async function duplicateProgram(
 ): Promise<{ programId: string } | { error: string }> {
   const { data: sourceProgram } = await supabase
     .from("programs")
-    .select("name, description, start_date, training_days, visibility_window")
+    .select("name, description, start_date, training_days, visibility_window, training_intent")
     .eq("id", sourceProgramId)
     .single();
 
@@ -66,6 +66,7 @@ export async function duplicateProgram(
       start_date: startDate ?? sourceProgram.start_date,
       training_days: sourceProgram.training_days,
       visibility_window: sourceProgram.visibility_window,
+      training_intent: sourceProgram.training_intent,
     })
     .select("id")
     .single();

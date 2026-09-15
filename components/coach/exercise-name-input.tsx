@@ -2,17 +2,31 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { matchTopN, type AliasEntry } from "@/lib/exercise-matching";
 
 export function ExerciseNameInput({
   value,
   onChange,
   onCommit,
   suggestions,
+  aliases = [],
+  tierByName,
 }: {
   value: string;
   onChange: (value: string) => void;
   onCommit?: (value: string) => void;
   suggestions: string[];
+  // Learned raw-name -> real-name aliases (the same self-learning table the
+  // CSV/photo importer already writes to) — optional so existing callers
+  // that don't have this loaded yet still work, just without alias-aware
+  // ranking until they thread it through.
+  aliases?: AliasEntry[];
+  // Same A/B/C movement-pattern-ladder tier every exercise row already
+  // resolves by name elsewhere — search and tier-picking become one
+  // moment instead of two: a coach sees a suggestion is already a known
+  // Tier-A lift without leaving the search field. Optional/undefined for
+  // callers (the ladder-editing screen itself) that don't need it.
+  tierByName?: Record<string, "A" | "B" | "C" | null>;
 }) {
   const [focused, setFocused] = useState(false);
   const [position, setPosition] = useState<{ top: number; left: number; width: number } | null>(null);
@@ -23,12 +37,17 @@ export function ExerciseNameInput({
   // both fire in the same tick, before this component re-renders.
   const suggestionClickedRef = useRef(false);
 
-  const trimmed = value.trim().toLowerCase();
-  const filtered = (
-    trimmed
-      ? suggestions.filter((s) => s.toLowerCase().includes(trimmed))
-      : suggestions
-  ).slice(0, 6);
+  const trimmed = value.trim();
+  // With real input, rank by the same order-invariant/synonym-aware matcher
+  // the CSV/photo importer already uses — "ipsilateral lunge" or "alt
+  // lunge" now finds the real candidates instead of requiring the exact
+  // substring/word-order the library entry happens to use. Empty input
+  // keeps the plain alphabetical browse-everything list, unrelated to
+  // ranking.
+  const library = suggestions.map((name) => ({ name }));
+  const filtered = trimmed
+    ? matchTopN(trimmed, library, aliases, 3).map((r) => r.exerciseName)
+    : suggestions.slice(0, 6);
 
   const showDropdown = focused && filtered.length > 0;
 
@@ -85,21 +104,29 @@ export function ExerciseNameInput({
             style={{ position: "fixed", top: position.top, left: position.left, width: position.width }}
             className="z-50 bg-surface border border-steel/30 max-h-48 overflow-y-auto shadow-lg"
           >
-            {filtered.map((name) => (
-              <button
-                key={name}
-                type="button"
-                onMouseDown={() => {
-                  suggestionClickedRef.current = true;
-                  onChange(name);
-                  onCommit?.(name);
-                  setFocused(false);
-                }}
-                className="block w-full text-left px-3 h-9 font-body text-sm text-chalk active:bg-graphite"
-              >
-                {name}
-              </button>
-            ))}
+            {filtered.map((name) => {
+              const tier = tierByName?.[name];
+              return (
+                <button
+                  key={name}
+                  type="button"
+                  onMouseDown={() => {
+                    suggestionClickedRef.current = true;
+                    onChange(name);
+                    onCommit?.(name);
+                    setFocused(false);
+                  }}
+                  className="w-full flex items-center justify-between gap-2 text-left px-3 h-9 font-body text-sm text-chalk active:bg-graphite"
+                >
+                  <span className="truncate">{name}</span>
+                  {tier && (
+                    <span className="shrink-0 w-4 h-4 flex items-center justify-center border border-steel/40 text-steel text-[10px] font-bold">
+                      {tier}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>,
           document.body
         )}

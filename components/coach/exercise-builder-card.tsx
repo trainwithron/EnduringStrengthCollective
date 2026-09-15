@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { ExerciseNameInput } from "./exercise-name-input";
+import type { AliasEntry } from "@/lib/exercise-matching";
 import { ExerciseMediaPicker } from "./exercise-media-picker";
 import type { BuilderExercise, ExerciseSetTarget } from "@/lib/types";
 import {
@@ -18,6 +19,7 @@ import {
 import { ChevronDown, ChevronUp, Copy, GripVertical, Trash2 } from "lucide-react";
 import { flashSaved, flashSaveError } from "@/lib/save-toast";
 import { CARDIO_PRESETS, type CardioPreset } from "@/lib/cardio-presets";
+import type { RestTempoSuggestion } from "@/lib/training-intent";
 
 export interface MovementPatternOption {
   id: string;
@@ -85,7 +87,10 @@ export function ExerciseBuilderCard({
   workoutId,
   groupId,
   exerciseLibrary,
+  exerciseAliases,
+  exerciseTierByName,
   movementPatterns,
+  restSuggestions,
   canMoveUp,
   canMoveDown,
   onMoveUp,
@@ -100,7 +105,15 @@ export function ExerciseBuilderCard({
   workoutId: string;
   groupId: string;
   exerciseLibrary: string[];
+  exerciseAliases: AliasEntry[];
+  exerciseTierByName?: Record<string, "A" | "B" | "C" | null>;
   movementPatterns: MovementPatternOption[];
+  // The program's own training-intent-derived rest/tempo reference
+  // (training-intent.ts) — undefined/empty for a program with no
+  // recognized intent, or one of the intents deliberately withheld
+  // pending a real sourced number. Tap-to-fill only; never applied
+  // without the coach clicking a specific suggestion.
+  restSuggestions?: RestTempoSuggestion[];
   canMoveUp: boolean;
   canMoveDown: boolean;
   onMoveUp: () => void;
@@ -123,6 +136,7 @@ export function ExerciseBuilderCard({
   const [showDetails, setShowDetails] = useState(false);
   const [addFieldOpen, setAddFieldOpen] = useState(false);
   const [presetMenuOpen, setPresetMenuOpen] = useState(false);
+  const [restMenuOpen, setRestMenuOpen] = useState(false);
   const [presetBusy, setPresetBusy] = useState(false);
   const [notesDraft, setNotesDraft] = useState(exercise.notes ?? "");
   const [busy, setBusy] = useState(false);
@@ -466,6 +480,53 @@ export function ExerciseBuilderCard({
     }
   }
 
+  // Training-intent rest tap-to-fill — same one-click preset pattern as
+  // the cardio Energy System presets above, scoped to rest only: adds
+  // "rest" to this exercise's own tracked fields if it isn't already
+  // there, then fills every existing set's rest target. Never touches
+  // round count, reps, weight, or tempo — unlike the cardio preset, this
+  // never changes what the exercise is tracking beyond adding rest.
+  async function applyRestSuggestion(suggestion: RestTempoSuggestion) {
+    if (presetBusy) return;
+    setPresetBusy(true);
+    try {
+      const supabase = createBrowserClient();
+      let nextFields = exercise.trackedFields;
+      if (!nextFields.includes("rest")) {
+        nextFields = orderTrackedFields([...nextFields, "rest"]);
+        const { error: fieldsError } = await supabase
+          .from("group_workout_exercises")
+          .update({ tracked_fields: nextFields })
+          .eq("id", exercise.id);
+        if (fieldsError) {
+          flashSaveError("Couldn't apply that rest suggestion — try again.");
+          return;
+        }
+      }
+
+      const setIds = exercise.sets.map((s) => s.id);
+      if (setIds.length > 0) {
+        const { error } = await supabase
+          .from("group_workout_exercise_sets")
+          .update({ target_rest_seconds: suggestion.restSeconds })
+          .in("id", setIds);
+        if (error) {
+          flashSaveError("Couldn't apply that rest suggestion — try again.");
+          return;
+        }
+      }
+
+      onFieldsAndSetsChange(
+        nextFields,
+        exercise.sets.map((s) => ({ ...s, targetRestSeconds: suggestion.restSeconds }))
+      );
+      setRestMenuOpen(false);
+      flashSaved();
+    } finally {
+      setPresetBusy(false);
+    }
+  }
+
   async function handleDelete() {
     const label = exercise.exerciseName.trim() || "this exercise";
     if (!window.confirm(`Delete ${label}? This removes its sets, notes, and video. Can't be undone.`)) {
@@ -593,6 +654,8 @@ export function ExerciseBuilderCard({
             onChange={setNameDraft}
             onCommit={handleNameCommit}
             suggestions={exerciseLibrary}
+            aliases={exerciseAliases}
+            tierByName={exerciseTierByName}
           />
         </div>
         <button
@@ -763,6 +826,37 @@ export function ExerciseBuilderCard({
             >
               🏃 Runner mode
             </button>
+
+            {restSuggestions && restSuggestions.length > 0 && (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setRestMenuOpen((v) => !v)}
+                  disabled={presetBusy}
+                  className="font-body text-xs text-steel active:text-rust transition-colors disabled:opacity-30"
+                >
+                  ⏱ Rest
+                </button>
+                {restMenuOpen && (
+                  <div className="absolute z-10 left-0 mt-1 bg-surface border border-steel/30 flex flex-col w-64">
+                    {restSuggestions.map((s) => (
+                      <button
+                        key={s.label}
+                        type="button"
+                        onClick={() => applyRestSuggestion(s)}
+                        disabled={presetBusy}
+                        className="text-left px-2.5 py-2 border-b border-steel/15 last:border-b-0 text-chalk font-body text-xs hover:bg-graphite/50 disabled:opacity-40"
+                      >
+                        <span className="block">
+                          {s.label} — {s.restSeconds}s
+                        </span>
+                        <span className="block text-steel text-[10px] mt-0.5">{s.source}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <button

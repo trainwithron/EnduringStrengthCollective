@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { detectTrainingIntent } from "@/lib/training-intent";
 
 export function NewProgramForm({
   groupId,
@@ -33,6 +34,7 @@ export function NewProgramForm({
         name: trimmedName,
         description: description.trim() || null,
         created_by: createdBy,
+        training_intent: detectTrainingIntent(trimmedName),
       })
       .select("id")
       .single();
