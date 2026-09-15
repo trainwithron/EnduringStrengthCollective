@@ -115,7 +115,7 @@ export default async function ClientCalendarPage(
   if (program) {
     const { data: workouts } = await supabase
       .from("workouts")
-      .select("id, title, week_number, day_index")
+      .select("id, title, week_number, day_index, scheduled_date")
       .eq("program_id", program.id)
       .order("week_number", { ascending: true })
       .order("day_index", { ascending: true });
@@ -124,7 +124,7 @@ export default async function ClientCalendarPage(
       const scheduledDateByDayId = computeScheduledDates(
         program.start_date,
         program.training_days,
-        workouts
+        workouts.map((w) => ({ id: w.id, scheduledDate: w.scheduled_date }))
       );
       for (const w of workouts) {
         const d = scheduledDateByDayId.get(w.id);

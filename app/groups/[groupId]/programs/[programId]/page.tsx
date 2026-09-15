@@ -18,6 +18,7 @@ import { gatherProgrammingSpotterFlags } from "@/lib/programming-spotter-gather"
 import { ProgrammingSpotterPanel } from "@/components/coach/desktop/programming-spotter-panel";
 import { Lock } from "lucide-react";
 import type { BuilderDay, BuilderExercise, BuilderNote } from "@/lib/types";
+import type { TrainingIntent } from "@/lib/training-intent";
 
 export default async function ProgramDetailPage(
   props: {
@@ -53,7 +54,7 @@ export default async function ProgramDetailPage(
 
   const { data: program } = await supabase
     .from("programs")
-    .select("id, name, description, start_date, training_days, visibility_window, ai_sequencing_notes")
+    .select("id, name, description, start_date, training_days, visibility_window, ai_sequencing_notes, training_intent")
     .eq("id", params.programId)
     .eq("group_id", params.groupId)
     .single();
@@ -83,13 +84,14 @@ export default async function ProgramDetailPage(
         startDate={program.start_date}
         trainingDays={program.training_days}
         visibilityWindow={program.visibility_window}
+        trainingIntent={program.training_intent as TrainingIntent | null}
       />
     );
   }
 
   const { data: workouts } = await supabase
     .from("workouts")
-    .select("id, title, week_number, day_index, group_workout_exercises(count)")
+    .select("id, title, week_number, day_index, scheduled_date, group_workout_exercises(count)")
     .eq("program_id", params.programId)
     .order("week_number", { ascending: true })
     .order("day_index", { ascending: true });
@@ -104,7 +106,11 @@ export default async function ProgramDetailPage(
 
   const scheduledDateByDayId =
     program.start_date && program.training_days && program.training_days.length > 0
-      ? computeScheduledDates(program.start_date, program.training_days, workouts ?? [])
+      ? computeScheduledDates(
+          program.start_date,
+          program.training_days,
+          (workouts ?? []).map((w) => ({ id: w.id, scheduledDate: w.scheduled_date }))
+        )
       : new Map<string, Date>();
   // This group's coach's real wall-clock day, not the server's own UTC
   // clock — see lib/timezone.ts. Otherwise a day's lock state here reads
@@ -239,6 +245,7 @@ async function CoachProgramBuilder({
   startDate,
   trainingDays,
   visibilityWindow,
+  trainingIntent,
 }: {
   groupId: string;
   programId: string;
@@ -249,6 +256,7 @@ async function CoachProgramBuilder({
   startDate: string | null;
   trainingDays: number[] | null;
   visibilityWindow: VisibilityWindow;
+  trainingIntent: TrainingIntent | null;
 }) {
   const supabase = await createServerClient();
 
@@ -262,7 +270,7 @@ async function CoachProgramBuilder({
     .from("workouts")
     .select(
       `
-      id, title, week_number, day_index,
+      id, title, week_number, day_index, scheduled_date,
       group_workout_exercises (
         id, exercise_name, exercise_order, movement_pattern_id, tracked_fields, notes,
         group_workout_exercise_sets ( id, set_order, target_reps, target_weight, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance, rep_min, rep_max )
@@ -284,6 +292,19 @@ async function CoachProgramBuilder({
     mediaByName.set(row.name, { videoPath: row.video_path, youtubeUrl: row.youtube_url });
   }
   const exerciseLibrary = Array.from(mediaByName.keys()).sort();
+
+  // Same self-learning table the CSV/photo importer already reads/writes —
+  // ranking in the Program Builder's own exercise field now benefits from
+  // corrections a coach has already taught the importer, instead of each
+  // entry point relearning independently.
+  const { data: aliasRows } = await supabase
+    .from("exercise_aliases")
+    .select("raw_name, exercise_name")
+    .eq("coach_id", coachId);
+  const exerciseAliases = (aliasRows ?? []).map((a) => ({
+    rawName: a.raw_name,
+    exerciseName: a.exercise_name,
+  }));
 
   const { data: patternRows } = await supabase
     .from("movement_patterns")
@@ -338,6 +359,7 @@ async function CoachProgramBuilder({
       weekNumber: w.week_number,
       dayIndex: w.day_index,
       items: [...exerciseItems, ...noteItems],
+      scheduledDate: w.scheduled_date,
     };
   });
 
@@ -349,7 +371,11 @@ async function CoachProgramBuilder({
   let dayProgress: { dayNumber: number; totalDays: number } | null = null;
   let totalVolumeLbs = 0;
   if (startDate && trainingDays && trainingDays.length > 0 && workoutRows && workoutRows.length > 0) {
-    const scheduledDateByDayId = computeScheduledDates(startDate, trainingDays, workoutRows);
+    const scheduledDateByDayId = computeScheduledDates(
+      startDate,
+      trainingDays,
+      workoutRows.map((w: any) => ({ id: w.id, scheduledDate: w.scheduled_date }))
+    );
     if (scheduledDateByDayId.size > 0) {
       const lastScheduledDate = [...scheduledDateByDayId.values()].reduce((max, d) => (d > max ? d : max));
       const timezone = await getGroupCoachTimezone(supabase, groupId);
@@ -386,10 +412,13 @@ async function CoachProgramBuilder({
         aiSequencingNotes={aiSequencingNotes}
         initialDays={days}
         exerciseLibrary={exerciseLibrary}
+        exerciseAliases={exerciseAliases}
+        exerciseTierByName={Object.fromEntries(tierByName)}
         movementPatterns={movementPatterns}
         initialStartDate={startDate}
         initialTrainingDays={trainingDays}
         initialVisibilityWindow={visibilityWindow}
+        initialTrainingIntent={trainingIntent}
       />
     </CoachDesktopShell>
   );

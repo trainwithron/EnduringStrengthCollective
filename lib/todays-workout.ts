@@ -69,7 +69,7 @@ export async function getTodaysWorkoutId(
 
   const { data: workouts } = await supabase
     .from("workouts")
-    .select("id")
+    .select("id, scheduled_date")
     .eq("program_id", program.id)
     .order("week_number", { ascending: true })
     .order("day_index", { ascending: true });
@@ -92,7 +92,7 @@ export async function getTodaysWorkoutId(
     const scheduledDateByDayId = computeScheduledDates(
       program.start_date,
       program.training_days,
-      workouts
+      workouts.map((w) => ({ id: w.id, scheduledDate: w.scheduled_date }))
     );
     const now = nowInZone(timezone);
 

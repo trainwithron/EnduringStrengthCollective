@@ -167,6 +167,11 @@ export interface BuilderDay {
   weekNumber: number;
   dayIndex: number;
   items: BuilderItem[];
+  // Explicit per-workout date override (calendar_workout_scheduling_and_
+  // adjustable_workspace_idea.md) — null for the overwhelmingly common
+  // case where this day's date is still derived sequentially by
+  // computeScheduledDates from the program's own start_date/training_days.
+  scheduledDate: string | null;
 }
 
 export type FeedChannel = "announcements" | "form_checks" | "pr_board" | "general" | "team_chat";

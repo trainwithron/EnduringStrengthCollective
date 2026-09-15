@@ -735,11 +735,20 @@ export default async function CoachCalendarPage(
   const { data: allProgramWorkouts } = activeProgramIds.length
     ? await supabase
         .from("workouts")
-        .select("id, title, week_number, day_index, program_id")
+        .select("id, title, week_number, day_index, program_id, scheduled_date")
         .in("program_id", activeProgramIds)
         .order("week_number", { ascending: true })
         .order("day_index", { ascending: true })
-    : { data: [] as { id: string; title: string; week_number: number; day_index: number; program_id: string }[] };
+    : {
+        data: [] as {
+          id: string;
+          title: string;
+          week_number: number;
+          day_index: number;
+          program_id: string;
+          scheduled_date: string | null;
+        }[],
+      };
   const workoutsByProgramId = new Map<string, typeof allProgramWorkouts>();
   for (const w of allProgramWorkouts ?? []) {
     const list = workoutsByProgramId.get(w.program_id) ?? [];
@@ -761,7 +770,11 @@ export default async function CoachCalendarPage(
       continue;
     }
 
-    const scheduledDateByDayId = computeScheduledDates(p.start_date, p.training_days, programWorkouts);
+    const scheduledDateByDayId = computeScheduledDates(
+      p.start_date,
+      p.training_days,
+      programWorkouts.map((w) => ({ id: w.id, scheduledDate: w.scheduled_date }))
+    );
     for (const w of programWorkouts) {
       const d = scheduledDateByDayId.get(w.id);
       if (!d) continue;

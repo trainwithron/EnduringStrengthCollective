@@ -1,21 +1,40 @@
 // Derives real calendar dates for a program's workouts on demand, from an
 // anchor start date + which weekdays are training days. Never persisted —
 // see the plan notes on why this is computed at read-time instead of
-// written into workouts.scheduled_date.
+// written into workouts.scheduled_date, EXCEPT for the explicit per-
+// workout override below (calendar_workout_scheduling_and_adjustable_
+// workspace_idea.md) — a coach who pins one specific workout to one
+// specific date (the 3x/month client example: day 1 -> the 6th, day 2 ->
+// the 15th) needs that to hold regardless of the program's own weekday
+// cadence, without shifting every other workout in the program.
 export function computeScheduledDates(
   startDate: string, // programs.start_date, "YYYY-MM-DD"
   trainingDays: number[], // programs.training_days, 0 (Sun) .. 6 (Sat)
-  workoutsInOrder: { id: string }[] // already ordered by week_number, day_index
+  workoutsInOrder: { id: string; scheduledDate?: string | null }[] // already ordered by week_number, day_index
 ): Map<string, Date> {
   const result = new Map<string, Date>();
-  if (workoutsInOrder.length === 0 || trainingDays.length === 0) return result;
+  if (workoutsInOrder.length === 0) return result;
+
+  // Explicitly-dated workouts are placed first and never consume a slot
+  // in the sequential weekday walk below — pinning one workout to a date
+  // must not push every later, still-sequential workout out by one.
+  const sequential: { id: string }[] = [];
+  for (const w of workoutsInOrder) {
+    if (w.scheduledDate) {
+      result.set(w.id, new Date(`${w.scheduledDate}T00:00:00`));
+    } else {
+      sequential.push({ id: w.id });
+    }
+  }
+
+  if (sequential.length === 0 || trainingDays.length === 0) return result;
 
   const trainingSet = new Set(trainingDays);
   const cursor = new Date(`${startDate}T00:00:00`);
   let i = 0;
-  while (i < workoutsInOrder.length) {
+  while (i < sequential.length) {
     if (trainingSet.has(cursor.getDay())) {
-      result.set(workoutsInOrder[i].id, new Date(cursor));
+      result.set(sequential[i].id, new Date(cursor));
       i++;
     }
     cursor.setDate(cursor.getDate() + 1);

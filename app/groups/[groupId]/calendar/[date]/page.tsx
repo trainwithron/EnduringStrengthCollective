@@ -6,6 +6,8 @@ import { generateSlotsForDate, formatSlotTime } from "@/lib/booking-slots";
 import { getBlockedRangesForDate } from "@/lib/availability-exceptions";
 import { zonedTimeToUtc, DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { AssignSlotButton } from "@/components/coach/desktop/assign-slot-button";
+import { AssignWorkoutToDateButton } from "@/components/coach/desktop/assign-workout-to-date-button";
+import { getActiveProgramForAthlete, getAllProgramWorkouts, getScheduledWorkouts, dateKeyOf } from "@/lib/athlete-day-schedule";
 import { BookSlotButton } from "@/components/athlete/book-slot-button";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { RescheduleSlotButton } from "@/components/athlete/reschedule-slot-button";
@@ -374,6 +376,11 @@ export default async function CoachDayDetailPage(
   // or the main calendar's sidebar.
   const clientId = searchParams.client;
   let selectedClient: { fullName: string; balance: number } | null = null;
+  // Day-click-to-assign (calendar_workout_scheduling_and_adjustable_
+  // workspace_idea.md item 1) — the selected client's program workouts,
+  // offered for pinning to this exact date. Empty when they have no
+  // active program at all (nothing to assign, not an error state).
+  let assignableWorkouts: { id: string; title: string; alreadyHere: boolean }[] = [];
 
   if (clientId) {
     const { data: clientMembership } = await supabase
@@ -396,6 +403,22 @@ export default async function CoachDayDetailPage(
         fullName: (clientMembership.profiles as any)?.full_name ?? "Client",
         balance: creditsRow?.balance ?? 0,
       };
+
+      const activeProgram = await getActiveProgramForAthlete(supabase, params.groupId, clientId);
+      if (activeProgram) {
+        const [allWorkouts, scheduledWorkouts] = await Promise.all([
+          getAllProgramWorkouts(supabase, activeProgram.id),
+          getScheduledWorkouts(supabase, activeProgram),
+        ]);
+        const scheduledDateKeyByWorkoutId = new Map(
+          scheduledWorkouts.map((w) => [w.workoutId, dateKeyOf(w.date)])
+        );
+        assignableWorkouts = allWorkouts.map((w) => ({
+          id: w.id,
+          title: w.title,
+          alreadyHere: scheduledDateKeyByWorkoutId.get(w.id) === params.date,
+        }));
+      }
     }
   }
 
@@ -434,6 +457,22 @@ export default async function CoachDayDetailPage(
           </p>
         )}
       </div>
+
+      {selectedClient && assignableWorkouts.length > 0 && (
+        <div className="mb-6 max-w-lg">
+          <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+            Assign a workout to this day
+          </h2>
+          <div className="divide-y divide-steel/15 border border-steel/20">
+            {assignableWorkouts.map((w) => (
+              <div key={w.id} className="py-2.5 px-3 flex items-center justify-between gap-3">
+                <span className="font-body text-sm text-chalk truncate">{w.title}</span>
+                <AssignWorkoutToDateButton workoutId={w.id} dateKey={params.date} alreadyHere={w.alreadyHere} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <DayHourGrid
         windows={windows.filter((w) => w.weekday === date.getDay())}

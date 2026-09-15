@@ -85,14 +85,18 @@ export async function getNeedsAttentionItems(
 
     const { data: workoutRows } = await supabase
       .from("workouts")
-      .select("id")
+      .select("id, scheduled_date")
       .eq("program_id", activeProgram.id)
       .order("week_number", { ascending: true })
       .order("day_index", { ascending: true });
 
     if (!workoutRows || workoutRows.length === 0) continue;
 
-    const scheduleMap = computeScheduledDates(activeProgram.start_date, activeProgram.training_days, workoutRows);
+    const scheduleMap = computeScheduledDates(
+      activeProgram.start_date,
+      activeProgram.training_days,
+      workoutRows.map((w: any) => ({ id: w.id, scheduledDate: w.scheduled_date }))
+    );
     const dates = Array.from(scheduleMap.values());
     if (dates.length === 0) continue;
     const programEndDate = new Date(Math.max(...dates.map((d) => d.getTime())));

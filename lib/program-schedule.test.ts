@@ -15,6 +15,36 @@ describe("computeScheduledDates", () => {
     expect(computeScheduledDates("2026-09-06", [1], []).size).toBe(0);
     expect(computeScheduledDates("2026-09-06", [], [{ id: "a" }]).size).toBe(0);
   });
+
+  it("honors an explicit per-workout scheduledDate override, verbatim", () => {
+    const workouts = [{ id: "a", scheduledDate: "2026-09-23" }];
+    const result = computeScheduledDates("2026-09-06", [1, 4], workouts);
+    expect(result.get("a")?.toISOString().slice(0, 10)).toBe("2026-09-23");
+  });
+
+  it("skips a dated workout's own slot without shifting the rest of the sequential walk", () => {
+    // Same 3 workouts as the base case above, but "b" is pinned to a
+    // specific date — "a" and "c" must land exactly where they would
+    // have if "b" didn't exist at all (no shift from the pin).
+    const workouts = [{ id: "a" }, { id: "b", scheduledDate: "2026-09-23" }, { id: "c" }];
+    const result = computeScheduledDates("2026-09-06", [1, 4], workouts);
+    expect(result.get("a")?.toISOString().slice(0, 10)).toBe("2026-09-07"); // Mon
+    expect(result.get("b")?.toISOString().slice(0, 10)).toBe("2026-09-23"); // the pin, verbatim
+    expect(result.get("c")?.toISOString().slice(0, 10)).toBe("2026-09-10"); // Thu — same as if b were absent
+  });
+
+  it("still resolves every dated workout even with an empty training-days array", () => {
+    // A pinned date needs no weekday cadence to fall back on at all.
+    const workouts = [{ id: "a", scheduledDate: "2026-09-23" }];
+    const result = computeScheduledDates("2026-09-06", [], workouts);
+    expect(result.get("a")?.toISOString().slice(0, 10)).toBe("2026-09-23");
+  });
+
+  it("ignores a null/empty scheduledDate exactly like a workout with no override", () => {
+    const workouts = [{ id: "a", scheduledDate: null }];
+    const result = computeScheduledDates("2026-09-06", [1], workouts);
+    expect(result.get("a")?.toISOString().slice(0, 10)).toBe("2026-09-07");
+  });
 });
 
 describe("defaultTrainingDaysForCount", () => {

@@ -497,6 +497,7 @@ export function DuplicateWeekPanel({
           weekNumber: workoutRow.week_number,
           dayIndex: workoutRow.day_index,
           items,
+          scheduledDate: null,
         });
       }
     }

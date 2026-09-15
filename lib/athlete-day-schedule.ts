@@ -66,13 +66,17 @@ export async function getScheduledWorkouts(
   if (!program.startDate || !program.trainingDays || program.trainingDays.length === 0) return [];
   const { data: workouts } = await supabase
     .from("workouts")
-    .select("id, title")
+    .select("id, title, scheduled_date")
     .eq("program_id", program.id)
     .order("week_number", { ascending: true })
     .order("day_index", { ascending: true });
   if (!workouts || workouts.length === 0) return [];
 
-  const dateByDayId = computeScheduledDates(program.startDate, program.trainingDays, workouts);
+  const dateByDayId = computeScheduledDates(
+    program.startDate,
+    program.trainingDays,
+    workouts.map((w) => ({ id: w.id, scheduledDate: w.scheduled_date }))
+  );
   const result: ScheduledWorkoutEntry[] = [];
   for (const w of workouts) {
     const date = dateByDayId.get(w.id);

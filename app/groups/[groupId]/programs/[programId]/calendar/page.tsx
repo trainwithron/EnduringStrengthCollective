@@ -140,7 +140,7 @@ export default async function ProgramCalendarPage(
 
   const { data: workouts } = await supabase
     .from("workouts")
-    .select("id, title, week_number, day_index, group_workout_exercises(count)")
+    .select("id, title, week_number, day_index, scheduled_date, group_workout_exercises(count)")
     .eq("program_id", params.programId)
     .order("week_number", { ascending: true })
     .order("day_index", { ascending: true });
@@ -148,7 +148,7 @@ export default async function ProgramCalendarPage(
   const scheduledDateByDayId = computeScheduledDates(
     program.start_date,
     program.training_days,
-    workouts ?? []
+    (workouts ?? []).map((w) => ({ id: w.id, scheduledDate: w.scheduled_date }))
   );
 
   let loggedIds = new Set<string>();

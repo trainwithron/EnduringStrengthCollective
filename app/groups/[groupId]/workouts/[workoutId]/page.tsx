@@ -103,7 +103,7 @@ export default async function WorkoutOverviewPage(
     if (program?.start_date && program.training_days && program.training_days.length > 0) {
       const { data: workouts } = await supabase
         .from("workouts")
-        .select("id")
+        .select("id, scheduled_date")
         .eq("program_id", data.workout.programId)
         .order("week_number", { ascending: true })
         .order("day_index", { ascending: true });
@@ -111,7 +111,7 @@ export default async function WorkoutOverviewPage(
       const scheduledDateByDayId = computeScheduledDates(
         program.start_date,
         program.training_days,
-        workouts ?? []
+        (workouts ?? []).map((w) => ({ id: w.id, scheduledDate: w.scheduled_date }))
       );
       const scheduledDate = scheduledDateByDayId.get(params.workoutId);
 
