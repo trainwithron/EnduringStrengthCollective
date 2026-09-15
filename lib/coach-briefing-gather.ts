@@ -14,6 +14,7 @@ import { detectMatchedLoadTrend, type ExerciseSessionPoint } from "./matched-loa
 import { computeHabitCompliance, computeCompliancePct } from "./habits";
 import { hasEstablishedBaseline } from "./coach-briefing-baseline";
 import { isOnCooldown, COOLDOWN_DAYS } from "./coach-briefing-cooldown";
+import { extractNumbers } from "./coach-briefing-numeral-guard";
 import { isSustainedHrvSuppression, SUSTAINED_SUPPRESSION_DAYS } from "./hrv-suppression";
 import { isGoalReversal, type GoalType } from "./goal-reversal";
 import { GOAL_TYPE_LABELS } from "./goal-types";
@@ -286,6 +287,19 @@ export async function gatherCandidateSignals(
       now
     );
 
+    // The numeral guard (coach-briefing-numeral-guard.ts) rejects ANY
+    // number in a model-written headline that isn't in the cited
+    // signal's own numericValues — including numbers that were never
+    // meant to be "the fact" but still legitimately appear in the
+    // description handed to the model: the athlete's own name (rare in
+    // production, but real for e.g. "Sim Athlete 4" in the synthetic
+    // sandbox) and, for several signal kinds below, a date. Extracting
+    // these once per athlete and folding them into every signal's
+    // numericValues keeps the guard exactly as strict as designed while
+    // no longer flagging a faithful restatement of a given fact as a
+    // hallucination.
+    const nameNumbers = extractNumbers(athlete.fullName);
+
     const readiness = readinessByAthlete.get(athlete.profileId);
     if (readiness != null && isLowReadiness({ sleepQuality: readiness, soreness: readiness, energy: readiness })) {
       pushIfEligible({
@@ -295,7 +309,10 @@ export async function gatherCandidateSignals(
         groupId: athlete.groupId,
         kind: "low_readiness",
         description: `${athlete.fullName} logged low readiness today (average ${readiness.toFixed(1)} of 5).`,
-        numericValues: [Number(readiness.toFixed(1))],
+        // "5" is the scale's own literal maximum, always present in the
+        // description regardless of the actual reading — must be
+        // allow-listed alongside the real reading itself.
+        numericValues: [...nameNumbers, Number(readiness.toFixed(1)), 5],
         isStrongQuietTier: false,
       });
     }
@@ -315,7 +332,7 @@ export async function gatherCandidateSignals(
           groupId: athlete.groupId,
           kind: "hrv_suppression",
           description: `${athlete.fullName}'s HRV balance has stayed below 50 for the last ${SUSTAINED_SUPPRESSION_DAYS} days in a row (recent readings: ${recentValues.join(", ")}).`,
-          numericValues: [50, SUSTAINED_SUPPRESSION_DAYS, ...recentValues],
+          numericValues: [...nameNumbers, 50, SUSTAINED_SUPPRESSION_DAYS, ...recentValues],
           isStrongQuietTier: false,
         });
       }
@@ -338,7 +355,11 @@ export async function gatherCandidateSignals(
           groupId: athlete.groupId,
           kind: "goal_reversal",
           description: `${athlete.fullName}'s new goal (${newLabel}) contradicts the goal confirmed on ${previous.confirmedAt.slice(0, 10)} (${previousLabel}) — worth a real conversation before anything changes.`,
-          numericValues: [],
+          // The confirmation date is real, given data, embedded verbatim
+          // in the description above — must be allow-listed the same way
+          // as every other cited value, or a faithful restatement of it
+          // gets rejected as a hallucinated number.
+          numericValues: [...nameNumbers, ...extractNumbers(previous.confirmedAt.slice(0, 10))],
           isStrongQuietTier: false,
         });
       }
@@ -364,7 +385,7 @@ export async function gatherCandidateSignals(
               trend.direction === "fatigue"
                 ? `${athlete.fullName}'s RPE on ${exerciseName} rose from ${trend.rpeStart} to ${trend.rpeEnd} across ${trend.sessionCount} sessions at the same or lower weight (${trend.weightStart} to ${trend.weightEnd} lbs).`
                 : `${athlete.fullName}'s RPE on ${exerciseName} fell from ${trend.rpeStart} to ${trend.rpeEnd} across ${trend.sessionCount} sessions at the same or higher weight (${trend.weightStart} to ${trend.weightEnd} lbs).`,
-            numericValues: [trend.rpeStart, trend.rpeEnd, trend.sessionCount, trend.weightStart, trend.weightEnd],
+            numericValues: [...nameNumbers, trend.rpeStart, trend.rpeEnd, trend.sessionCount, trend.weightStart, trend.weightEnd],
             isStrongQuietTier: false,
           });
         }
@@ -389,7 +410,10 @@ export async function gatherCandidateSignals(
         description: lastLoggedAtStr
           ? `${athlete.fullName} hasn't logged a workout since ${lastLoggedAtStr.slice(0, 10)}.`
           : `${athlete.fullName} has never logged a workout.`,
-        numericValues: [],
+        // The last-logged date, when present, is real given data embedded
+        // verbatim in the description above — same allow-list requirement
+        // as every other signal kind's numbers.
+        numericValues: lastLoggedAtStr ? [...nameNumbers, ...extractNumbers(lastLoggedAtStr.slice(0, 10))] : [...nameNumbers],
         isStrongQuietTier: tier === "strong",
       });
     }
@@ -411,7 +435,7 @@ export async function gatherCandidateSignals(
             groupId: athlete.groupId,
             kind: "missed_habits",
             description: `${athlete.fullName} has missed ${missedCount} habit${missedCount === 1 ? "" : "s"} this week (${pct}% compliance).`,
-            numericValues: [missedCount, pct],
+            numericValues: [...nameNumbers, missedCount, pct],
             isStrongQuietTier: false,
           });
         }
