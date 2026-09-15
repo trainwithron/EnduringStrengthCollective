@@ -10,7 +10,6 @@ import { MarkAllSeenButton } from "@/components/coach/desktop/mark-all-seen-butt
 import { findThreadsNeedingReply } from "@/lib/notification-priority";
 import { getCoachDashboardData } from "@/lib/dashboard-data";
 import { DashboardHero } from "@/components/coach/desktop/dashboard-hero";
-import { TeamPulseCard } from "@/components/coach/desktop/team-pulse-card";
 import { PulseTabs } from "@/components/coach/desktop/pulse-tabs";
 import { DashboardStatTiles } from "@/components/coach/desktop/dashboard-stat-tiles";
 import { DashboardTodayPanel } from "@/components/coach/desktop/dashboard-today-panel";
