@@ -5,6 +5,7 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { getNeedsAttentionItems } from "@/lib/needs-attention-data";
 import { SuggestionSettings } from "@/components/coach/desktop/suggestion-settings";
 import { NeedsAttentionPanel } from "@/components/coach/desktop/needs-attention-panel";
+import { RosterSection } from "@/components/coach/desktop/roster-section";
 import { WorkoutSummaryCard } from "@/components/feed/workout-summary-card";
 import type { FeedPost } from "@/lib/types";
 
@@ -269,14 +270,6 @@ export default async function CoachDashboardPage(
         )}
       </div>
 
-      <SuggestionSettings
-        coachId={user.id}
-        initialMode={suggestionMode}
-        initialLeadDays={suggestionLeadDays}
-        initialLeadMode={suggestionLeadMode}
-        initialLeadWeekday={suggestionLeadWeekday}
-      />
-
       {/* The coach-desktop-shell's own pinned strip (coach_desktop_shell_
           identity_redesign.md) already shows this exact panel for the
           current group on every page, including this one — rendering it
@@ -326,6 +319,34 @@ export default async function CoachDashboardPage(
           )}
         </div>
       )}
+
+      {/* Moved off the top of the page and made collapsible
+          (live_walkthrough_round2_findings.md) — this is a standing,
+          rarely-touched preference (one row per coach, set once), not
+          something that needs to greet a coach every time they open a
+          page whose whole point is recent activity. Expanded by default
+          only the very first time, before any real preference row
+          exists yet — the one moment a coach actually needs to see it
+          unprompted; collapsed on every visit after that. */}
+      <div className="mt-8 max-w-2xl">
+        <RosterSection
+          title="Suggestion Settings"
+          summary={
+            suggestionMode === "auto_add"
+              ? "Auto-add to calendar"
+              : "Show as a list to review"
+          }
+          defaultExpanded={!prefsRow}
+        >
+          <SuggestionSettings
+            coachId={user.id}
+            initialMode={suggestionMode}
+            initialLeadDays={suggestionLeadDays}
+            initialLeadMode={suggestionLeadMode}
+            initialLeadWeekday={suggestionLeadWeekday}
+          />
+        </RosterSection>
+      </div>
     </CoachDesktopShell>
   );
 }

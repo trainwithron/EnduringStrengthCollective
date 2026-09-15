@@ -4,7 +4,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 
-export function ChallengeCreator({ groupId }: { groupId: string }) {
+export function ChallengeCreator({
+  groupId,
+  programs,
+}: {
+  groupId: string;
+  programs: { id: string; name: string }[];
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -12,6 +18,7 @@ export function ChallengeCreator({ groupId }: { groupId: string }) {
   const [startDate, setStartDate] = useState("");
   const [durationWeeks, setDurationWeeks] = useState("6");
   const [entryFee, setEntryFee] = useState("49");
+  const [programId, setProgramId] = useState("");
   const [habits, setHabits] = useState<string[]>(["8,000 steps daily", "3 workouts this week"]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +64,7 @@ export function ChallengeCreator({ groupId }: { groupId: string }) {
         duration_weeks: parseInt(durationWeeks, 10) || 1,
         entry_fee_cents: Math.round((parseFloat(entryFee) || 0) * 100),
         status: "draft",
+        program_id: programId || null,
       })
       .select("id")
       .single();
@@ -165,6 +173,26 @@ export function ChallengeCreator({ groupId }: { groupId: string }) {
           </button>
         </div>
       </div>
+
+      {programs.length > 0 && (
+        <label className="block">
+          <span className="font-body text-[11px] text-steel uppercase tracking-wide">
+            Run alongside a program (optional)
+          </span>
+          <select
+            value={programId}
+            onChange={(e) => setProgramId(e.target.value)}
+            className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm mt-1"
+          >
+            <option value="">No program</option>
+            {programs.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       {error && (
         <p className="font-body text-xs text-rust" role="alert">

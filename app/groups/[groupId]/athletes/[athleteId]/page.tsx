@@ -14,6 +14,7 @@ import { MinorConsentControl } from "@/components/coach/minor-consent-control";
 import { NutritionPhaseControl } from "@/components/coach/nutrition-phase-control";
 import { VideoCheckinRecorder } from "@/components/coach/video-checkin-recorder";
 import { ParQAnswersPanel } from "@/components/coach/par-q-answers-panel";
+import { RosterSection } from "@/components/coach/desktop/roster-section";
 import { isUnder13 } from "@/lib/coppa";
 import { CoachLoggedBadge } from "@/components/coach-logged-badge";
 import { NutritionTools } from "@/components/coach/desktop/nutrition-tools";
@@ -441,6 +442,13 @@ export default async function AthleteProfilePage(
   }
 
   const parQAnswers = (intake?.par_q_answers as { question: string; answer: boolean }[]) ?? [];
+  const parQFlaggedCount = parQAnswers.filter((a) => a.answer).length;
+  const hasAboutInfo = !!(
+    profileDetails?.bio ||
+    profileDetails?.birthday ||
+    profileDetails?.phone ||
+    profileDetails?.emergency_contact_name
+  );
   const assignedPackageIds = (assignmentRows ?? []).map((a) => a.coach_package_id);
 
   const totalCompleted = allLogs?.length ?? 0;
@@ -678,28 +686,40 @@ export default async function AthleteProfilePage(
 
       <div className="grid grid-cols-[320px_1fr] gap-10 items-start">
         <div className="space-y-8">
-          {(profileDetails?.bio ||
-            profileDetails?.birthday ||
-            profileDetails?.phone ||
-            profileDetails?.emergency_contact_name) && (
-            <section>
-              <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">About</h2>
-              {profileDetails?.bio && (
-                <p className="font-body text-sm text-chalk mb-2">{profileDetails.bio}</p>
-              )}
-              <div className="font-body text-xs text-steel space-y-0.5">
-                {profileDetails?.birthday && (
-                  <p>Birthday: {new Date(`${profileDetails.birthday}T00:00:00`).toLocaleDateString()}</p>
+          {(hasAboutInfo || parQAnswers.length > 0) && (
+            <RosterSection
+              title="Personal Info"
+              summary={
+                parQFlaggedCount > 0
+                  ? `Bio, contact & health screening (${parQFlaggedCount} flagged)`
+                  : "Bio, contact & health screening"
+              }
+              needsAttentionCount={parQFlaggedCount}
+              defaultExpanded={parQFlaggedCount > 0}
+            >
+              <div className="space-y-4">
+                {hasAboutInfo && (
+                  <div>
+                    {profileDetails?.bio && (
+                      <p className="font-body text-sm text-chalk mb-2">{profileDetails.bio}</p>
+                    )}
+                    <div className="font-body text-xs text-steel space-y-0.5">
+                      {profileDetails?.birthday && (
+                        <p>Birthday: {new Date(`${profileDetails.birthday}T00:00:00`).toLocaleDateString()}</p>
+                      )}
+                      {profileDetails?.phone && <p>Phone: {profileDetails.phone}</p>}
+                      {profileDetails?.emergency_contact_name && (
+                        <p>
+                          Emergency contact: {profileDetails.emergency_contact_name}
+                          {profileDetails?.emergency_contact_phone && ` · ${profileDetails.emergency_contact_phone}`}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 )}
-                {profileDetails?.phone && <p>Phone: {profileDetails.phone}</p>}
-                {profileDetails?.emergency_contact_name && (
-                  <p>
-                    Emergency contact: {profileDetails.emergency_contact_name}
-                    {profileDetails?.emergency_contact_phone && ` · ${profileDetails.emergency_contact_phone}`}
-                  </p>
-                )}
+                {parQAnswers.length > 0 && <ParQAnswersPanel answers={parQAnswers} />}
               </div>
-            </section>
+            </RosterSection>
           )}
           <section>
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
@@ -810,10 +830,7 @@ export default async function AthleteProfilePage(
           )}
 
           {(wellnessRows ?? []).length > 0 && (
-            <section>
-              <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
-                Wellness
-              </h2>
+            <RosterSection title="Wellness" summary="Sleep, soreness & energy trends">
               <div className="space-y-4 pb-2">
                 <div>
                   <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
@@ -841,7 +858,7 @@ export default async function AthleteProfilePage(
                   />
                 </div>
               </div>
-            </section>
+            </RosterSection>
           )}
 
           {(trainingMaxRows ?? []).length > 0 && (
@@ -892,12 +909,6 @@ export default async function AthleteProfilePage(
                   </p>
                 )}
               </div>
-            </section>
-          )}
-
-          {parQAnswers.length > 0 && (
-            <section>
-              <ParQAnswersPanel answers={parQAnswers} />
             </section>
           )}
 

@@ -50,7 +50,7 @@ export default async function ChallengeDetailPage(
 
   const { data: challenge } = await supabase
     .from("challenges")
-    .select("id, coach_id, name, description, start_date, duration_weeks, entry_fee_cents, status")
+    .select("id, coach_id, name, description, start_date, duration_weeks, entry_fee_cents, status, program_id, programs ( name )")
     .eq("id", params.challengeId)
     .maybeSingle();
 
@@ -163,6 +163,14 @@ export default async function ChallengeDetailPage(
             Starts {new Date(challenge.start_date + "T00:00:00").toLocaleDateString()} &middot;{" "}
             {challenge.duration_weeks} weeks &middot; day {win.daysElapsed + 1} of {win.totalDays}
           </p>
+          {challenge.program_id && (challenge as any).programs?.name && (
+            <Link
+              href={`/groups/${params.groupId}/programs/${challenge.program_id}`}
+              className="font-body text-xs text-rust mt-1 inline-block"
+            >
+              Running alongside: {(challenge as any).programs.name} &rarr;
+            </Link>
+          )}
         </div>
 
         <div className="grid grid-cols-3 gap-4 mb-8">
@@ -245,6 +253,14 @@ export default async function ChallengeDetailPage(
         <h1 className="font-display font-bold text-3xl leading-none mt-3 uppercase">{challenge.name}</h1>
         {challenge.description && (
           <p className="font-body text-sm text-steel mt-2 max-w-[60ch]">{challenge.description}</p>
+        )}
+        {challenge.program_id && (challenge as any).programs?.name && (
+          <Link
+            href={`/groups/${params.groupId}/programs/${challenge.program_id}`}
+            className="font-body text-xs text-rust mt-2 inline-block"
+          >
+            Running alongside: {(challenge as any).programs.name} &rarr;
+          </Link>
         )}
         <p className="font-body text-xs text-steel mt-2">
           Day {win.daysElapsed + 1} of {win.totalDays}

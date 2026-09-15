@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { Plus, X } from "lucide-react";
+import { X } from "lucide-react";
 import type { AvailabilityWindow } from "@/lib/booking-slots";
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { CLIENT_DRAG_MIME, type DraggedClient } from "./draggable-client-name";
@@ -70,10 +69,6 @@ export function CalendarGrid({
   timezone?: string;
 }) {
   const router = useRouter();
-  const [addingFor, setAddingFor] = useState<string | null>(null);
-  const [title, setTitle] = useState("");
-  const [time, setTime] = useState("");
-  const [saving, setSaving] = useState(false);
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{ key: string; date: Date; client: DraggedClient } | null>(
     null
@@ -83,29 +78,6 @@ export function CalendarGrid({
   function dayHref(date: Date): string {
     const base = `/groups/${groupId}/calendar/${dateKey(date)}`;
     return selectedClientId ? `${base}?client=${selectedClientId}` : base;
-  }
-
-  async function handleAddEvent(key: string) {
-    if (!title.trim()) return;
-    setSaving(true);
-    const supabase = createBrowserClient();
-    const { data: userData } = await supabase.auth.getUser();
-    if (!userData.user) {
-      setSaving(false);
-      return;
-    }
-    await supabase.from("calendar_events").insert({
-      coach_id: userData.user.id,
-      title: title.trim(),
-      event_date: key,
-      event_time: time || null,
-      event_type: "custom",
-    });
-    setSaving(false);
-    setAddingFor(null);
-    setTitle("");
-    setTime("");
-    router.refresh();
   }
 
   async function handleDeleteEvent(id: string) {
@@ -121,7 +93,6 @@ export function CalendarGrid({
     if (!raw) return;
     try {
       const client = JSON.parse(raw) as DraggedClient;
-      setAddingFor(null);
       setDropTarget({ key, date, client });
     } catch {
       // Malformed drag payload — ignore rather than crash the grid.
@@ -148,44 +119,38 @@ export function CalendarGrid({
         const bookings = bookingsByDateKey.get(key) ?? [];
         const events = eventsByDateKey.get(key) ?? [];
         const workouts = workoutsByDateKey?.get(key) ?? [];
-        const isAdding = addingFor === key;
         const isDropTarget = dropTarget?.key === key;
         const bookingsShown = showAllBookings ? bookings : bookings.slice(0, 3);
 
         return (
           <div
             key={i}
+            role="link"
+            tabIndex={0}
+            onClick={() => router.push(dayHref(date))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") router.push(dayHref(date));
+            }}
             onDragOver={(e) => {
               e.preventDefault();
               setDragOverKey(key);
             }}
             onDragLeave={() => setDragOverKey((k) => (k === key ? null : k))}
             onDrop={(e) => handleDrop(e, key, date)}
-            className={`bg-graphite p-1.5 flex flex-col gap-0.5 relative group ${
+            className={`bg-graphite p-1.5 flex flex-col gap-0.5 relative group cursor-pointer hover:bg-surface/60 transition-colors ${
               isToday ? "ring-1 ring-inset ring-rust" : ""
             } ${dragOverKey === key ? "ring-2 ring-inset ring-rust bg-rust/10" : ""} ${
               isDropTarget ? "ring-2 ring-inset ring-rust" : ""
             }`}
             style={{ minHeight: cellMinHeightPx }}
           >
-            <div className="flex items-center justify-between">
-              <Link
-                href={dayHref(date)}
-                className={`font-body text-[10px] active:text-rust transition-colors ${
-                  isToday ? "text-rust font-bold" : "text-steel"
-                }`}
-              >
-                {date.getDate()}
-              </Link>
-              <button
-                type="button"
-                onClick={() => setAddingFor(isAdding ? null : key)}
-                aria-label="Add to calendar"
-                className="w-4 h-4 flex items-center justify-center text-steel opacity-0 group-hover:opacity-100 active:text-rust transition-opacity"
-              >
-                <Plus className="w-3 h-3" />
-              </button>
-            </div>
+            <span
+              className={`font-body text-[10px] ${
+                isToday ? "text-rust font-bold" : "text-steel"
+              }`}
+            >
+              {date.getDate()}
+            </span>
 
             {workouts.map((w, idx) => (
               <span key={`w-${idx}`} className="font-body text-[9px] text-positive leading-tight truncate">
@@ -216,7 +181,10 @@ export function CalendarGrid({
                 </span>
                 <button
                   type="button"
-                  onClick={() => handleDeleteEvent(e.id)}
+                  onClick={(evt) => {
+                    evt.stopPropagation();
+                    handleDeleteEvent(e.id);
+                  }}
                   aria-label={`Remove ${e.title}`}
                   className="shrink-0 opacity-0 group-hover:opacity-100"
                 >
@@ -227,46 +195,6 @@ export function CalendarGrid({
 
             {bookings.length === 0 && events.length === 0 && showAllBookings && (
               <span className="font-body text-[10px] text-steel">No sessions</span>
-            )}
-
-            {isAdding && (
-              <div className="absolute z-10 top-6 left-0 right-0 bg-surface border border-rust/40 p-2 space-y-1.5 shadow-lg">
-                <input
-                  type="text"
-                  autoFocus
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Event title"
-                  className="w-full h-7 bg-graphite border border-steel/30 text-chalk px-1.5 font-body text-[11px]"
-                />
-                <input
-                  type="time"
-                  value={time}
-                  onChange={(e) => setTime(e.target.value)}
-                  className="w-full h-7 bg-graphite border border-steel/30 text-chalk px-1.5 font-body text-[11px]"
-                />
-                <div className="flex gap-1">
-                  <button
-                    type="button"
-                    onClick={() => handleAddEvent(key)}
-                    disabled={saving}
-                    className="flex-1 h-6 bg-rust text-graphite font-body text-[10px] font-medium disabled:opacity-40"
-                  >
-                    {saving ? "Adding…" : "Add"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAddingFor(null);
-                      setTitle("");
-                      setTime("");
-                    }}
-                    className="h-6 px-2 border border-steel/30 text-steel font-body text-[10px]"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
             )}
 
           </div>

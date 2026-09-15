@@ -45,9 +45,106 @@ export function RecipeHubManager({
 }) {
   const [recipes, setRecipes] = useState(initialRecipes);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [description, setDescription] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
   const router = useRouter();
 
-  async function handleAddRecipe() {
+  // The primary path now (live_walkthrough_round2_findings.md) — describe
+  // it, AI proposes the structured recipe, coach can still tweak anything
+  // via the same RecipeCard editor below before it's used in a real meal
+  // plan. Replaces "+ New recipe → fill in every ingredient by hand" as
+  // the default entry point, not the editing capability itself.
+  async function handleGenerate() {
+    if (!description.trim() || generating) return;
+    setGenerating(true);
+    setGenError(null);
+
+    try {
+      const res = await fetch("/api/ai/parse-recipe", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ description: description.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setGenError(data.error ?? "Couldn't generate that recipe — try again.");
+        setGenerating(false);
+        return;
+      }
+
+      const supabase = createBrowserClient();
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) {
+        setGenError("Not signed in.");
+        setGenerating(false);
+        return;
+      }
+
+      const { data: newRecipe } = await supabase
+        .from("recipes")
+        .insert({
+          created_by: userData.user.id,
+          name: data.name,
+          slot: data.slot,
+          archetypes: data.archetypes.length > 0 ? data.archetypes : ["omnivore"],
+          keywords: data.keywords,
+        })
+        .select("id, name, slot, archetypes, keywords")
+        .single();
+
+      if (!newRecipe) {
+        setGenError("Couldn't save that recipe — try again.");
+        setGenerating(false);
+        return;
+      }
+
+      const { data: insertedIngredients } = await supabase
+        .from("recipe_ingredients")
+        .insert(
+          data.ingredients.map((ing: any, i: number) => ({
+            recipe_id: newRecipe.id,
+            sort_order: i,
+            label: ing.label,
+            role: ing.role,
+            protein_per_100g: ing.proteinPer100g,
+            carbs_per_100g: ing.carbsPer100g,
+            fat_per_100g: ing.fatPer100g,
+            fixed_display_text: ing.fixedDisplayText,
+          }))
+        )
+        .select("id, sort_order, label, role, protein_per_100g, carbs_per_100g, fat_per_100g, fixed_display_text");
+
+      setRecipes((prev) => [
+        {
+          ...newRecipe,
+          ingredients: (insertedIngredients ?? [])
+            .slice()
+            .sort((a, b) => a.sort_order - b.sort_order)
+            .map((i) => ({
+              id: i.id,
+              sortOrder: i.sort_order,
+              label: i.label,
+              role: i.role as IngredientRole,
+              proteinPer100g: i.protein_per_100g,
+              carbsPer100g: i.carbs_per_100g,
+              fatPer100g: i.fat_per_100g,
+              fixedDisplayText: i.fixed_display_text,
+              usdaFdcId: null,
+            })),
+        },
+        ...prev,
+      ]);
+      setExpandedId(newRecipe.id);
+      setDescription("");
+      setGenerating(false);
+    } catch (err) {
+      setGenError(err instanceof Error ? err.message : "Couldn't generate that recipe — try again.");
+      setGenerating(false);
+    }
+  }
+
+  async function handleAddBlankRecipe() {
     const supabase = createBrowserClient();
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return;
@@ -87,15 +184,40 @@ export function RecipeHubManager({
 
   return (
     <div>
-      <div className="flex justify-end mb-4">
-        <button
-          type="button"
-          onClick={handleAddRecipe}
-          className="h-9 px-4 bg-rust text-graphite font-body text-sm font-medium flex items-center gap-1.5"
-        >
-          <Plus className="w-4 h-4" />
-          New recipe
-        </button>
+      <div className="border border-steel/30 bg-surface p-4 mb-4">
+        <label className="font-body text-xs text-steel uppercase tracking-wide mb-2 block">
+          Describe a recipe
+        </label>
+        <textarea
+          rows={2}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="e.g. Grilled chicken breast with white rice and steamed broccoli, olive oil drizzled on top"
+          className="w-full bg-graphite border border-steel/30 text-chalk px-3 py-2 font-body text-sm resize-none focus:outline-none focus:border-rust"
+        />
+        {genError && (
+          <p className="font-body text-xs text-rust mt-2" role="alert">
+            {genError}
+          </p>
+        )}
+        <div className="flex items-center justify-between mt-2">
+          <button
+            type="button"
+            onClick={handleAddBlankRecipe}
+            className="font-body text-xs text-steel underline"
+          >
+            or start blank
+          </button>
+          <button
+            type="button"
+            onClick={handleGenerate}
+            disabled={generating || !description.trim()}
+            className="h-9 px-4 bg-rust text-graphite font-body text-sm font-medium flex items-center gap-1.5 disabled:opacity-40"
+          >
+            <Plus className="w-4 h-4" />
+            {generating ? "Generating…" : "Generate recipe"}
+          </button>
+        </div>
       </div>
 
       {recipes.length === 0 ? (

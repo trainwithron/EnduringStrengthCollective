@@ -7,6 +7,7 @@ import { getBlockedRangesForDate } from "@/lib/availability-exceptions";
 import { zonedTimeToUtc, DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { AssignSlotButton } from "@/components/coach/desktop/assign-slot-button";
 import { AssignWorkoutToDateButton } from "@/components/coach/desktop/assign-workout-to-date-button";
+import { AddDayEventForm } from "@/components/coach/desktop/add-day-event-form";
 import { getActiveProgramForAthlete, getAllProgramWorkouts, getScheduledWorkouts, dateKeyOf } from "@/lib/athlete-day-schedule";
 import { BookSlotButton } from "@/components/athlete/book-slot-button";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
@@ -484,6 +485,8 @@ export default async function CoachDayDetailPage(
         }))}
         events={(dayEventRows ?? []).map((e) => ({ id: e.id, time: e.event_time, title: e.title }))}
       />
+
+      <AddDayEventForm coachId={user.id} dateKey={params.date} />
 
       {dayEventRows && dayEventRows.length > 0 && (
         <div className="mb-6 max-w-lg">

@@ -49,9 +49,20 @@ export default async function ChallengesPage(
 
     const { data: challengeRows } = await supabase
       .from("challenges")
-      .select("id, name, status, start_date, duration_weeks, entry_fee_cents")
+      .select("id, name, status, start_date, duration_weeks, entry_fee_cents, program_id, programs ( name )")
       .eq("coach_id", user.id)
       .order("created_at", { ascending: false });
+
+    // Only shared (non-personal) active programs — the same set a
+    // challenge, which runs for a whole cohort at once, could sensibly
+    // bundle with.
+    const { data: programRows } = await supabase
+      .from("programs")
+      .select("id, name")
+      .eq("group_id", params.groupId)
+      .eq("is_active", true)
+      .is("athlete_id", null)
+      .order("name");
 
     const challengeIds = (challengeRows ?? []).map((c) => c.id);
     const { data: participantRows } = await supabase
@@ -74,7 +85,7 @@ export default async function ChallengesPage(
               is connected yet.
             </p>
           </div>
-          <ChallengeCreator groupId={params.groupId} />
+          <ChallengeCreator groupId={params.groupId} programs={programRows ?? []} />
         </div>
 
         {(challengeRows ?? []).length === 0 ? (
@@ -94,6 +105,7 @@ export default async function ChallengesPage(
                     <p className="font-body text-xs text-steel mt-0.5">
                       {c.status} &middot; starts {new Date(c.start_date + "T00:00:00").toLocaleDateString()} &middot;{" "}
                       {c.duration_weeks} weeks
+                      {(c as any).programs?.name && ` · ${(c as any).programs.name}`}
                     </p>
                   </div>
                   <div className="text-right shrink-0">
