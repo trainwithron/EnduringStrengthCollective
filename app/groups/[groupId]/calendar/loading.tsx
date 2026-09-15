@@ -1,4 +1,5 @@
 import { LoadingTip } from "@/components/ui/loading-tip";
+import { LoadingWatchdog } from "@/components/ui/loading-watchdog";
 
 // For an athlete this route resolves their active program and redirects to
 // its calendar; for a coach it renders the full scheduling grid. Neutral
@@ -10,6 +11,7 @@ export default function CalendarLoading() {
       <div className="max-w-sm text-center">
         <LoadingTip />
       </div>
+      <LoadingWatchdog />
     </main>
   );
 }

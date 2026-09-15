@@ -1,4 +1,5 @@
 import { LoadingTip } from "@/components/ui/loading-tip";
+import { LoadingWatchdog } from "@/components/ui/loading-watchdog";
 
 // /today resolves which workout is due and then redirects — there's no
 // content of its own to skeleton, so this says what's actually happening
@@ -10,6 +11,7 @@ export default function TodayLoading() {
       <div className="max-w-sm text-center">
         <LoadingTip />
       </div>
+      <LoadingWatchdog />
     </main>
   );
 }
