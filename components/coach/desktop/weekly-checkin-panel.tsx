@@ -13,6 +13,12 @@ import {
 } from "@/lib/nutrition-checkin";
 import { computeArchetypeMacros, detectDietArchetype } from "@/lib/macros";
 
+// Purely a display band for the slider below — the real min/max/step/
+// default (1-15%, default 5%) are untouched; this just marks where most
+// clients actually land within that full range.
+const TYPICAL_MIN_PCT = 3;
+const TYPICAL_MAX_PCT = 10;
+
 const PHASE_LABELS: Record<NutritionPhase, string> = {
   fat_loss: "Fat loss",
   hypertrophy: "Muscle building",
@@ -194,17 +200,33 @@ export function WeeklyCheckinPanel({
 
         <label className="flex flex-col gap-1 col-span-2">
           <span className="font-body text-[10px] text-steel uppercase tracking-wide">
-            Adjustment size — {adjustmentPct}% {phase === "reverse_diet" ? "increase" : "cut"}
+            Adjustment size — {adjustmentPct}% {phase === "reverse_diet" ? "increase" : "cut"}{" "}
+            <span className="normal-case text-steel/70">(typical: {TYPICAL_MIN_PCT}-{TYPICAL_MAX_PCT}%)</span>
           </span>
-          <input
-            type="range"
-            min={MIN_ADJUSTMENT_PCT}
-            max={MAX_ADJUSTMENT_PCT}
-            step={1}
-            value={adjustmentPct}
-            onChange={(e) => setAdjustmentPct(clampAdjustmentPct(Number(e.target.value)))}
-            className="w-full accent-rust"
-          />
+          {/* The full range (1-15%) covers real edge cases, but most
+              clients land in 3-10% — a bare slider gave that no visual
+              distinction at all, reading as if every value in range were
+              equally common. The shaded band marks where the track
+              represents that typical zone; min/max/step/default are
+              unchanged. */}
+          <div className="relative flex items-center h-4">
+            <div
+              className="absolute h-1.5 bg-rust/20 rounded-token pointer-events-none"
+              style={{
+                left: `${((TYPICAL_MIN_PCT - MIN_ADJUSTMENT_PCT) / (MAX_ADJUSTMENT_PCT - MIN_ADJUSTMENT_PCT)) * 100}%`,
+                width: `${((TYPICAL_MAX_PCT - TYPICAL_MIN_PCT) / (MAX_ADJUSTMENT_PCT - MIN_ADJUSTMENT_PCT)) * 100}%`,
+              }}
+            />
+            <input
+              type="range"
+              min={MIN_ADJUSTMENT_PCT}
+              max={MAX_ADJUSTMENT_PCT}
+              step={1}
+              value={adjustmentPct}
+              onChange={(e) => setAdjustmentPct(clampAdjustmentPct(Number(e.target.value)))}
+              className="relative w-full accent-rust"
+            />
+          </div>
           <span className="font-body text-[10px] text-steel">
             How big a planned calorie change to make when one&apos;s due — gentler for a client who
             needs a soft touch, bigger for one who can handle a real jump.
