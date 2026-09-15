@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase/server";
-import { isRealMobileDevice } from "@/lib/pwa-server";
+import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { CoachHomeShell } from "@/components/coach/coach-home-shell";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import type { HomeClientCardData } from "@/components/coach/desktop/home-client-card";
@@ -65,14 +65,22 @@ export default async function CoachHomePage() {
   // so both possible shells below (CoachDesktopShell and CoachHomeShell)
   // are fixed-width sidebar layouts with zero responsive behavior.
   //
-  // Deliberately uses isRealMobileDevice(), NOT prefersAthleteStyleView()
-  // — the sticky "Desktop Mode" override exists so a coach can preview
-  // /groups/[groupId]'s own genuine dual-shell design; /dashboard has
-  // only one shell, ever, so honoring that override here would strand a
-  // coach who once tapped "Desktop Mode" (to preview their group hub) on
-  // this exact same broken sidebar with no way back short of manually
-  // clearing a cookie. Real device signal always wins here.
-  if (await isRealMobileDevice()) {
+  // MUST use prefersAthleteStyleView() here, matching exactly what
+  // app/groups/[groupId]/page.tsx's own showMobileView uses — that page
+  // redirects a coach straight back to /dashboard whenever IT decides
+  // "not mobile" (its own orphaned-bare-URL fallback). An earlier version
+  // of this gate used a real-device-only check that ignores the sticky
+  // "Desktop Mode" override, on the theory that /dashboard has no mobile
+  // shell to opt into anyway — but that let the two pages disagree for a
+  // coach with a stuck desktop override on a real phone: this page would
+  // send them to /groups/{id} (real device says mobile), and that page
+  // would send them right back here (override says desktop) — an
+  // immediate, unrecoverable reload loop, confirmed live in production.
+  // Consistency between these two checks matters more than covering this
+  // one edge case perfectly; a coach with a stuck override sees the
+  // squeezed desktop shell again instead of a loop, which is the correct
+  // tradeoff (annoying beats broken).
+  if (await prefersAthleteStyleView()) {
     const lastGroupCookie = (await cookies()).get("last_group")?.value;
     let target = coachedGroupRows[0].group_id;
     if (lastGroupCookie) {
