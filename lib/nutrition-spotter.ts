@@ -203,3 +203,23 @@ export function detectProteinTooLow(
   const isLow = daysWithData >= MIN_DAYS_FOR_SUSTAINED && daysBelowTarget / daysWithData >= SUSTAINED_FRACTION;
   return { isLow, avgLoggedProtein, targetProtein, daysBelowTarget, daysWithData };
 }
+
+// Check #5 — coach_em_up_finley_funston_transcript.md's real client-
+// safety gap: a client marked currently injured whose most recent
+// check-in still has them in an active calorie deficit. The nutrition-
+// checkin engine's own injury floor (lib/nutrition-checkin.ts) already
+// prevents a NEW check-in from applying a fresh cut, but a check-in run
+// or saved BEFORE the coach flagged the injury could still be sitting
+// there unchanged — this catches that window. `fat_loss` is the only
+// phase that represents a deliberate, planned deficit in this app's own
+// model (reverse_diet/hypertrophy/maintenance never target one).
+export interface InjuredActiveDeficitResult {
+  isFlagged: boolean;
+}
+
+export function detectInjuredActiveDeficit(
+  isInjured: boolean,
+  currentPhase: "fat_loss" | "hypertrophy" | "maintenance" | "reverse_diet" | null
+): InjuredActiveDeficitResult {
+  return { isFlagged: isInjured && currentPhase === "fat_loss" };
+}

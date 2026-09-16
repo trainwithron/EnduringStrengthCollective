@@ -48,6 +48,9 @@ export function WeeklyCheckinPanel({
   defaultRecoveryRating,
   defaultAdherenceDays,
   lastCheckin,
+  isInjured,
+  maintenanceCalories,
+  injurySurplusPct,
 }: {
   athleteId: string;
   groupId: string;
@@ -62,6 +65,13 @@ export function WeeklyCheckinPanel({
     dietaryRestrictions: string;
     adjustmentPct: number;
   } | null;
+  // coach_em_up_finley_funston_transcript.md — real client-safety
+  // override. All optional/defaulted so every other caller of this
+  // component (there are none today, but the pattern matters) sees
+  // byte-identical behavior if it doesn't pass them.
+  isInjured?: boolean;
+  maintenanceCalories?: number | null;
+  injurySurplusPct?: number;
 }) {
   const [phase, setPhase] = useState<NutritionPhase>(lastCheckin?.phase ?? "fat_loss");
   const [adjustmentPct, setAdjustmentPct] = useState(lastCheckin?.adjustmentPct ?? DEFAULT_ADJUSTMENT_PCT);
@@ -106,6 +116,9 @@ export function WeeklyCheckinPanel({
       recoveryRating: Number(recoveryRating),
       consecutiveSurplusSpikes: lastCheckin?.consecutiveSurplusSpikes ?? 0,
       adjustmentPct,
+      isInjured,
+      maintenanceCalories,
+      injurySurplusPct,
     });
     setResult(engineResult);
     const archetype = detectDietArchetype(dietaryRestrictions);

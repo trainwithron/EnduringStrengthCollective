@@ -6,6 +6,7 @@ import { NutritionTools } from "@/components/coach/desktop/nutrition-tools";
 import { WeeklyCheckinPanel } from "@/components/coach/desktop/weekly-checkin-panel";
 import { NutritionCheckinSuggestionsList } from "@/components/coach/desktop/nutrition-checkin-suggestions-list";
 import { computeWeeklyWeightTrend } from "@/lib/weight-trend";
+import { computeBmr, computeTdee } from "@/lib/bmr-tdee";
 import { computeReadinessAverage } from "@/lib/wellness";
 import type { NutritionPhase } from "@/lib/nutrition-checkin";
 import { getEffectiveAthlete } from "@/lib/acting-as";
@@ -27,6 +28,7 @@ import {
   detectMacroSumMismatch,
   detectRestrictedIngredientSlips,
   detectProteinTooLow,
+  detectInjuredActiveDeficit,
 } from "@/lib/nutrition-spotter";
 import { NutritionSpotterPanel, type NutritionSpotterFinding } from "@/components/coach/desktop/nutrition-spotter-panel";
 import { estimateProteinFromBodyWeight } from "@/lib/macros";
@@ -168,6 +170,7 @@ export default async function NutritionPage(
     { data: latestCheckin },
     { data: todayFoodLogRows },
     { data: recentFoodLogRows },
+    { data: athleteInjuryStatus },
   ] = await Promise.all([
     macrosEnabled
       ? supabase
@@ -226,6 +229,7 @@ export default async function NutritionPage(
           .order("created_at", { ascending: false })
           .limit(40)
       : Promise.resolve({ data: [] }),
+    supabase.from("athlete_injury_status").select("is_injured").eq("athlete_id", athleteId).maybeSingle(),
   ]);
 
   const todayFoodLog: FoodLogEntry[] = (todayFoodLogRows ?? []).map((r) => ({
@@ -277,6 +281,31 @@ export default async function NutritionPage(
       <header className="px-5 pt-8 pb-6 border-b border-steel/20">
         <h1 className="font-display font-bold text-4xl leading-none uppercase">Nutrition</h1>
       </header>
+
+      {/* coach_em_up_finley_funston_transcript.md — real client-safety
+          nudge, not a silent target change. Self-contained (no separate
+          Resources-tab-articles infrastructure exists yet to route
+          through), linking to one real, credible source rather than
+          inventing content. */}
+      {athleteInjuryStatus?.is_injured && (
+        <div className="mx-5 mt-6 border border-rust/40 bg-rust/5 p-4">
+          <p className="font-body text-sm text-chalk font-medium mb-1">
+            Your coach has marked you as currently injured
+          </p>
+          <p className="font-body text-xs text-steel">
+            Your calorie target has been raised to at least maintenance while you recover —
+            undereating during an injury measurably slows healing.{" "}
+            <a
+              href="https://www.childrensmercy.org/departments-and-clinics/orthopedics/sports-medicine/nutrition-for-injury-recovery-in-athletes/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-rust underline underline-offset-2"
+            >
+              Why eating enough matters for recovery &rarr;
+            </a>
+          </p>
+        </div>
+      )}
 
       {!macrosEnabled ? (
         <p className="font-body text-sm text-steel px-5 pt-6 max-w-[50ch]">
@@ -431,6 +460,9 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
     { data: lastCheckinRow },
     { data: pendingSuggestionRows },
     { data: foodLogDateRows },
+    { data: injuryStatusRow },
+    { data: bmrProfileDetails },
+    { data: intakeDob },
   ] = await Promise.all([
     supabase
       .from("body_weight_logs")
@@ -481,6 +513,21 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
       .eq("athlete_id", athleteId)
       .neq("status", "skipped")
       .gte("log_date", sevenDaysAgoKey),
+    // coach_em_up_finley_funston_transcript.md — real client-safety gap:
+    // the check-in engine needs to know if this client is currently
+    // injured, to floor their calorie target at maintenance regardless
+    // of phase.
+    supabase
+      .from("athlete_injury_status")
+      .select("is_injured, surplus_pct")
+      .eq("athlete_id", athleteId)
+      .maybeSingle(),
+    supabase
+      .from("athlete_profile_details")
+      .select("height_cm, biological_sex, body_fat_pct")
+      .eq("athlete_id", athleteId)
+      .maybeSingle(),
+    supabase.from("client_intake").select("date_of_birth").eq("athlete_id", athleteId).maybeSingle(),
   ]);
 
   const weightTrend = computeWeeklyWeightTrend(
@@ -515,6 +562,32 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
     (foodLogDateRows ?? []).map((r) => r.log_date),
     todayKey
   );
+
+  // Same real computeBmr/computeTdee estimate used elsewhere in this app
+  // (daily-macros-form.tsx) — never a guessed number. Only computed when
+  // every real input actually exists.
+  let maintenanceCalories: number | null = null;
+  const latestWeightLbsForBmr = weightLogs?.[0]?.weight ?? null;
+  if (
+    latestWeightLbsForBmr != null &&
+    bmrProfileDetails?.height_cm != null &&
+    bmrProfileDetails?.biological_sex &&
+    intakeDob?.date_of_birth
+  ) {
+    const ageYears = Math.floor(
+      (Date.now() - new Date(intakeDob.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000)
+    );
+    const bmr = computeBmr({
+      weightKg: latestWeightLbsForBmr * 0.453592,
+      heightCm: bmrProfileDetails.height_cm,
+      age: ageYears,
+      sex: bmrProfileDetails.biological_sex as "male" | "female",
+      bodyFatPct: bmrProfileDetails.body_fat_pct ?? null,
+    });
+    maintenanceCalories = computeTdee(bmr, "moderate");
+  }
+  const isInjured = injuryStatusRow?.is_injured ?? false;
+  const injurySurplusPct = injuryStatusRow?.surplus_pct ?? 0;
 
   const lastCheckin = lastCheckinRow
     ? {
@@ -615,6 +688,14 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
     });
   }
 
+  const injuredActiveDeficit = detectInjuredActiveDeficit(isInjured, lastCheckinRow?.phase ?? null);
+  if (injuredActiveDeficit.isFlagged) {
+    nutritionSpotterFindings.push({
+      id: "injured-active-deficit",
+      message: `Marked as currently injured, but their most recent check-in still has them in a fat-loss phase. Run a new check-in to apply the maintenance floor, or confirm this is intentional.`,
+    });
+  }
+
   const pendingSuggestions = (pendingSuggestionRows ?? []).map((s) => ({
     id: s.id,
     phase: s.phase,
@@ -650,6 +731,9 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
         defaultRecoveryRating={defaultRecoveryRating}
         defaultAdherenceDays={defaultAdherenceDays}
         lastCheckin={lastCheckin}
+        isInjured={isInjured}
+        maintenanceCalories={maintenanceCalories}
+        injurySurplusPct={injurySurplusPct}
       />
       <div className="pt-6 border-t border-steel/20">
         <NutritionTools

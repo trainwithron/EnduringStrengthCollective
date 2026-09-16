@@ -5,6 +5,7 @@ import {
   detectMacroSumMismatch,
   detectRestrictedIngredientSlips,
   detectProteinTooLow,
+  detectInjuredActiveDeficit,
 } from "./nutrition-spotter";
 
 describe("extractPlanCalories", () => {
@@ -192,5 +193,27 @@ describe("detectProteinTooLow", () => {
   it("never flags with no logged data or no real target", () => {
     expect(detectProteinTooLow([], 180).isLow).toBe(false);
     expect(detectProteinTooLow([90, 90, 90], 0).isLow).toBe(false);
+  });
+});
+
+// Check #5 — coach_em_up_finley_funston_transcript.md's real client-
+// safety gap: injured + still in a fat-loss phase.
+describe("detectInjuredActiveDeficit", () => {
+  it("flags an injured client whose active phase is fat_loss", () => {
+    expect(detectInjuredActiveDeficit(true, "fat_loss").isFlagged).toBe(true);
+  });
+
+  it("does not flag an injured client on any non-deficit phase", () => {
+    expect(detectInjuredActiveDeficit(true, "maintenance").isFlagged).toBe(false);
+    expect(detectInjuredActiveDeficit(true, "hypertrophy").isFlagged).toBe(false);
+    expect(detectInjuredActiveDeficit(true, "reverse_diet").isFlagged).toBe(false);
+  });
+
+  it("does not flag a non-injured client regardless of phase", () => {
+    expect(detectInjuredActiveDeficit(false, "fat_loss").isFlagged).toBe(false);
+  });
+
+  it("does not flag when there's no check-in on record at all", () => {
+    expect(detectInjuredActiveDeficit(true, null).isFlagged).toBe(false);
   });
 });

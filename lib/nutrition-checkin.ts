@@ -92,6 +92,19 @@ export interface CheckInInput {
   // every existing caller that doesn't pass this sees byte-identical
   // behavior.
   adjustmentPct?: number;
+  // Real client-safety override, coach_em_up_finley_funston_transcript.md
+  // — undereating while injured measurably delays recovery, so a client
+  // flagged as currently injured gets their calorie target floored at
+  // maintenance (or a real coach-chosen 5-10% surplus), regardless of
+  // what phase/cut would otherwise be active. Both fields omitted (the
+  // default) means every existing caller sees byte-identical behavior —
+  // this only engages when a coach has actually set the flag AND a real
+  // maintenance number is available to floor against; never invents one.
+  isInjured?: boolean;
+  maintenanceCalories?: number | null;
+  // 0-10, coach's chosen surplus above maintenance while injured. Only
+  // meaningful when isInjured is true; ignored otherwise.
+  injurySurplusPct?: number;
 }
 
 export interface CheckInResult {
@@ -99,6 +112,10 @@ export interface CheckInResult {
   rationale: string;
   // Updated spike count to persist and feed into the *next* check-in.
   consecutiveSurplusSpikes: number;
+  // True only when the injury floor actually changed the phase-computed
+  // number — lets a caller show a real "this got adjusted for your
+  // safety" nudge instead of guessing from the rationale text.
+  injuryOverrideApplied: boolean;
 }
 
 export function runCheckInEngine(input: CheckInInput): CheckInResult {
@@ -177,5 +194,30 @@ export function runCheckInEngine(input: CheckInInput): CheckInResult {
     rationale = `Body mass stabilized within maintenance threshold.`;
   }
 
-  return { newCalories, rationale, consecutiveSurplusSpikes: spikes };
+  // Injury safety floor — applied LAST, after whatever the phase logic
+  // above computed, so it overrides any deficit regardless of which
+  // branch fired. Never lowers a number the phase logic already put
+  // above the floor (e.g. a hypertrophy surplus already exceeding
+  // maintenance stays untouched) — this only ever raises, never cuts.
+  let injuryOverrideApplied = false;
+  if (input.isInjured && input.maintenanceCalories != null && input.maintenanceCalories > 0) {
+    const surplusPct = Math.min(10, Math.max(0, input.injurySurplusPct ?? 0));
+    const floor = Math.round(input.maintenanceCalories * (1 + surplusPct / 100));
+    if (newCalories < floor) {
+      newCalories = floor;
+      injuryOverrideApplied = true;
+      rationale =
+        surplusPct > 0
+          ? `Marked as currently injured — floored calories at a ${surplusPct}% surplus above maintenance (${floor} kcal) to support recovery, overriding the normal ${phase.replace(
+              "_",
+              " "
+            )} adjustment. Undereating while injured measurably delays healing.`
+          : `Marked as currently injured — floored calories at maintenance (${floor} kcal) to support recovery, overriding the normal ${phase.replace(
+              "_",
+              " "
+            )} adjustment. Undereating while injured measurably delays healing.`;
+    }
+  }
+
+  return { newCalories, rationale, consecutiveSurplusSpikes: spikes, injuryOverrideApplied };
 }
