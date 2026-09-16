@@ -9,6 +9,8 @@ import { DailyMacrosForm } from "./daily-macros-form";
 import { DayHabitsPanel } from "./day-habits-panel";
 import { DaySchedulePanel } from "./day-schedule-panel";
 import { WORKOUT_DAY_DRAG_MIME, type DraggedWorkoutDay } from "./draggable-workout-day";
+import { MealSlotDropZones } from "./meal-slot-drop-zones";
+import type { MealSlot } from "@/lib/meal-engine";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
@@ -23,6 +25,7 @@ export interface DayCellData {
   workoutDone: boolean;
   macros: { calories: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null } | null;
   mealPlan: { mealCount: number; includeSnack: boolean } | null;
+  assignedMealsBySlot: Partial<Record<Exclude<MealSlot, "any">, string[]>>;
   bookingCount: number;
   cellDueHabits: { id: string; title: string; completed: boolean }[];
   panelDueHabits: { id: string; title: string; completed: boolean }[];
@@ -45,9 +48,11 @@ export function ClientCalendarGrid({
   macrosEnabled,
   workoutOptions,
   latestBodyWeight,
+  coachId,
 }: {
   groupId: string;
   athleteId: string;
+  coachId: string;
   backHref: string;
   weeks: (string | null)[][];
   cellData: Record<string, DayCellData>;
@@ -228,7 +233,7 @@ export function ClientCalendarGrid({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-6">
+                <div className="grid grid-cols-4 gap-6">
                   <section>
                     <h4 className="font-display uppercase text-xs tracking-wide text-steel mb-3">
                       Workout
@@ -273,6 +278,22 @@ export function ClientCalendarGrid({
                       </p>
                     )}
                   </section>
+
+                  {macrosEnabled && (
+                    <section>
+                      <h4 className="font-display uppercase text-xs tracking-wide text-steel mb-3">
+                        Meals
+                      </h4>
+                      <MealSlotDropZones
+                        key={`meals-${expandedData.dateKey}`}
+                        athleteId={athleteId}
+                        groupId={groupId}
+                        coachId={coachId}
+                        date={expandedData.dateKey}
+                        assignedBySlot={expandedData.assignedMealsBySlot}
+                      />
+                    </section>
+                  )}
 
                   <section>
                     <h4 className="font-display uppercase text-xs tracking-wide text-steel mb-3">

@@ -51,6 +51,43 @@ export function mealRecipeChoices(entry: MealEntryPayload): MealRecipeChoice[] {
   return [];
 }
 
+// The four meal-slot drop zones (training_block_aware_nutrition_and_
+// dragdrop_meal_planner_sept16.md) need "which recipe names sit in which
+// slot" for a saved day. Meal ids follow buildMealSpecs' own convention —
+// "1" is always breakfast, "snack" is always the snack, the LAST
+// non-snack id is dinner, and anything between is lunch — so this is
+// derived from ids, not from a stored slot field the payload doesn't
+// carry. Kept here, next to mergeMealIntoPlan, so the day page and the
+// month grid share one derivation instead of each guessing.
+export type DropZoneSlot = "breakfast" | "lunch" | "dinner" | "snack";
+
+export function assignedMealsBySlotFromMeals(
+  meals: Record<string, MealEntryPayload[]> | null | undefined
+): Partial<Record<DropZoneSlot, string[]>> {
+  const result: Partial<Record<DropZoneSlot, string[]>> = {};
+  if (!meals) return result;
+  for (const entries of Object.values(meals)) {
+    const nonSnackIds = entries.filter((e) => e.mealId !== "snack").map((e) => e.mealId);
+    const dinnerId = nonSnackIds.length > 1 ? nonSnackIds[nonSnackIds.length - 1] : null;
+    for (const entry of entries) {
+      const slot: DropZoneSlot =
+        entry.mealId === "snack"
+          ? "snack"
+          : entry.mealId === "1"
+            ? "breakfast"
+            : entry.mealId === dinnerId
+              ? "dinner"
+              : "lunch";
+      const names = mealRecipeChoices(entry)
+        .map((r) => r.recipeName)
+        .filter((n): n is string => !!n);
+      if (names.length === 0) continue;
+      result[slot] = [...(result[slot] ?? []), ...names];
+    }
+  }
+  return result;
+}
+
 export type MealPlanBucket = "daily" | "train" | "rest";
 
 export interface MealPlanRow {

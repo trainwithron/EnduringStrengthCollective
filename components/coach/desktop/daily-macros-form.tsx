@@ -6,6 +6,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { PROTEIN_G_PER_LB, estimateProteinFromBodyWeight, fillCarbsAndFat as computeCarbsAndFat } from "@/lib/macros";
 import { notifyPush } from "@/lib/push-notify";
 import { computeBmr, computeTdee, activityCategoryFromSteps, type BiologicalSex } from "@/lib/bmr-tdee";
+import type { MacroSuggestion } from "@/lib/nutrition-block-adjustment";
 
 // Goal-date-aware nutrition — feeds Smart Macro Fill its starting
 // calorie number from a real computed TDEE instead of a coach's manual
@@ -27,6 +28,7 @@ export function DailyMacrosForm({
   initial,
   latestBodyWeight,
   bmrInputs = null,
+  suggestion = null,
 }: {
   athleteId: string;
   groupId: string;
@@ -34,6 +36,10 @@ export function DailyMacrosForm({
   initial: { calories: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null };
   latestBodyWeight: number | null;
   bmrInputs?: BmrInputs | null;
+  // Training-block-aware suggestion (lib/nutrition-block-adjustment.ts) —
+  // a dismissible callout whose "Apply" fills the fields exactly the way
+  // suggestCaloriesFromTdee already does: fills, never auto-saves.
+  suggestion?: MacroSuggestion | null;
 }) {
   const [calories, setCalories] = useState(initial.calories?.toString() ?? "");
   const [protein, setProtein] = useState(initial.proteinG?.toString() ?? "");
@@ -46,7 +52,15 @@ export function DailyMacrosForm({
   // currently typed in the form — governs whether "Clear this day" shows
   // at all, since there's nothing to clear on a day nobody has saved yet.
   const [hasSavedEntry, setHasSavedEntry] = useState(initial.calories != null);
+  const [suggestionDismissed, setSuggestionDismissed] = useState(false);
   const router = useRouter();
+
+  function applySuggestion() {
+    if (!suggestion) return;
+    if (suggestion.suggestedCalories != null) setCalories(suggestion.suggestedCalories.toString());
+    if (suggestion.suggestedCarbsG != null) setCarbs(suggestion.suggestedCarbsG.toString());
+    setSuggestionDismissed(true);
+  }
 
   function handleBodyWeightChange(value: string) {
     setBodyWeight(value);
@@ -151,6 +165,29 @@ export function DailyMacrosForm({
 
   return (
     <div className="space-y-2">
+      {suggestion && !suggestionDismissed && (
+        <div className="border border-rust/40 bg-rust/5 p-2.5 space-y-1.5">
+          <p className="font-body text-xs text-chalk font-medium">{suggestion.headline}</p>
+          <p className="font-body text-[11px] text-steel leading-snug">{suggestion.rationale}</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={applySuggestion}
+              className="h-7 px-3 border border-rust text-rust font-body text-[11px] uppercase tracking-wide active:bg-rust active:text-graphite"
+            >
+              Apply
+            </button>
+            <button
+              type="button"
+              onClick={() => setSuggestionDismissed(true)}
+              className="h-7 px-3 border border-steel/30 text-steel font-body text-[11px] uppercase tracking-wide"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       <div>
         <label className="font-body text-[11px] text-steel uppercase tracking-wide">
           Calories

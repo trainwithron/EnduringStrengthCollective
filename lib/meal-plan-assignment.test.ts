@@ -4,6 +4,7 @@ import {
   getDatesForWeekdays,
   mergeMealIntoPlan,
   mealRecipeChoices,
+  assignedMealsBySlotFromMeals,
   type MealEntryPayload,
 } from "./meal-plan-assignment";
 
@@ -181,5 +182,64 @@ describe("mealRecipeChoices", () => {
       fatTarget: 15,
     };
     expect(mealRecipeChoices(entry)).toEqual([]);
+  });
+});
+
+describe("assignedMealsBySlotFromMeals", () => {
+  const entry = (mealId: string, recipeName: string): MealEntryPayload => ({
+    mealId,
+    title: mealId,
+    proteinTarget: 0,
+    carbsTarget: 0,
+    fatTarget: 0,
+    recipes: [{ recipeId: `r-${mealId}`, recipeName, ingredients: [] }],
+  });
+
+  it("maps a 3-meal + snack day onto the four drop-zone slots by meal id", () => {
+    const result = assignedMealsBySlotFromMeals({
+      daily: [entry("1", "Eggs"), entry("2", "Chicken Bowl"), entry("3", "Salmon"), entry("snack", "Yogurt")],
+    });
+    expect(result).toEqual({
+      breakfast: ["Eggs"],
+      lunch: ["Chicken Bowl"],
+      dinner: ["Salmon"],
+      snack: ["Yogurt"],
+    });
+  });
+
+  it("treats every middle meal of a 4-meal day as lunch and only the last as dinner", () => {
+    const result = assignedMealsBySlotFromMeals({
+      daily: [entry("1", "A"), entry("2", "B"), entry("3", "C"), entry("4", "D")],
+    });
+    expect(result).toEqual({ breakfast: ["A"], lunch: ["B", "C"], dinner: ["D"] });
+  });
+
+  it("puts a lone non-snack meal in breakfast, never dinner", () => {
+    expect(assignedMealsBySlotFromMeals({ daily: [entry("1", "Only")] })).toEqual({ breakfast: ["Only"] });
+  });
+
+  it("reads the legacy single-recipe payload shape too", () => {
+    const legacy: MealEntryPayload = {
+      mealId: "1",
+      title: "Meal 1",
+      proteinTarget: 0,
+      carbsTarget: 0,
+      fatTarget: 0,
+      recipeId: "old",
+      recipeName: "Oats",
+      ingredients: [],
+    };
+    expect(assignedMealsBySlotFromMeals({ daily: [legacy] })).toEqual({ breakfast: ["Oats"] });
+  });
+
+  it("returns an empty map for a missing or empty meals object", () => {
+    expect(assignedMealsBySlotFromMeals(null)).toEqual({});
+    expect(assignedMealsBySlotFromMeals(undefined)).toEqual({});
+    expect(assignedMealsBySlotFromMeals({})).toEqual({});
+  });
+
+  it("skips an entry with no named recipe", () => {
+    const empty: MealEntryPayload = { mealId: "1", title: "x", proteinTarget: 0, carbsTarget: 0, fatTarget: 0, recipes: [] };
+    expect(assignedMealsBySlotFromMeals({ daily: [empty] })).toEqual({});
   });
 });
