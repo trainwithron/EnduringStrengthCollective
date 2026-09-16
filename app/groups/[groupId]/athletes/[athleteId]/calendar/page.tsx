@@ -9,6 +9,8 @@ import { ProgramDayDragList } from "@/components/coach/desktop/program-day-drag-
 import type { WorkoutOption } from "@/components/coach/desktop/assign-workout-form";
 import { computeScheduledDates } from "@/lib/program-schedule";
 import { isHabitDueOn } from "@/lib/habits";
+import { RecipeLibraryRail } from "@/components/coach/desktop/recipe-library-rail";
+import { assignedMealsBySlotFromMeals, type MealEntryPayload } from "@/lib/meal-plan-assignment";
 
 function dateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
@@ -232,7 +234,7 @@ export default async function ClientCalendarPage(
   const { data: mealPlanRows } = macrosEnabled
     ? await supabase
         .from("meal_plans")
-        .select("log_date, meal_count, include_snack")
+        .select("log_date, meal_count, include_snack, meals")
         .eq("athlete_id", params.athleteId)
         .gte("log_date", rangeStart)
         .lte("log_date", rangeEnd)
@@ -298,6 +300,9 @@ export default async function ClientCalendarPage(
       mealPlan: mealPlanRow
         ? { mealCount: mealPlanRow.meal_count, includeSnack: mealPlanRow.include_snack }
         : null,
+      assignedMealsBySlot: assignedMealsBySlotFromMeals(
+        (mealPlanRow?.meals ?? null) as Record<string, MealEntryPayload[]> | null
+      ),
       bookingCount: bookingCountByDateKey.get(key) ?? 0,
       cellDueHabits,
       panelDueHabits,
@@ -356,11 +361,13 @@ export default async function ClientCalendarPage(
             macrosEnabled={macrosEnabled}
             workoutOptions={workoutOptions}
             latestBodyWeight={latestWeightRow?.weight ?? null}
+            coachId={user.id}
           />
         </div>
 
         <div className="space-y-6">
           <ProgramDayDragList options={workoutOptions} />
+          {macrosEnabled && <RecipeLibraryRail coachId={user.id} />}
           <HabitManager athleteId={params.athleteId} groupId={params.groupId} initialHabits={habits} />
           {macrosEnabled && (
             <BulkMacroRangeForm

@@ -6,8 +6,12 @@ import { AssignWorkoutForm, type WorkoutOption } from "@/components/coach/deskto
 import { DailyMacrosForm } from "@/components/coach/desktop/daily-macros-form";
 import { DayHabitsPanel } from "@/components/coach/desktop/day-habits-panel";
 import type { DueHabit } from "@/components/coach/desktop/habit-day-checklist";
+import { MealSlotDropZones } from "@/components/coach/desktop/meal-slot-drop-zones";
+import { RecipeLibraryRail } from "@/components/coach/desktop/recipe-library-rail";
 import { computeScheduledDates } from "@/lib/program-schedule";
 import { isHabitDueOn } from "@/lib/habits";
+import { gatherMacroSuggestion } from "@/lib/nutrition-block-adjustment-gather";
+import { assignedMealsBySlotFromMeals, type MealEntryPayload } from "@/lib/meal-plan-assignment";
 
 export default async function ClientCalendarDayPage(
   props: {
@@ -130,6 +134,23 @@ export default async function ClientCalendarDayPage(
     .eq("athlete_id", params.athleteId)
     .eq("log_date", params.date)
     .maybeSingle();
+
+  // Training-block-aware suggestion (taper freeze / volume-relative
+  // nudge) + this day's already-assigned meals, for the four drop zones.
+  const [suggestion, { data: mealPlanRow }] = await Promise.all([
+    macrosEnabled
+      ? gatherMacroSuggestion(supabase, { athleteId: params.athleteId, groupId: params.groupId, date: params.date })
+      : Promise.resolve(null),
+    supabase
+      .from("meal_plans")
+      .select("meals")
+      .eq("athlete_id", params.athleteId)
+      .eq("log_date", params.date)
+      .maybeSingle(),
+  ]);
+  const assignedBySlot = assignedMealsBySlotFromMeals(
+    (mealPlanRow?.meals ?? null) as Record<string, MealEntryPayload[]> | null
+  );
 
   const { data: latestWeightRow } = await supabase
     .from("body_weight_logs")
@@ -283,6 +304,7 @@ export default async function ClientCalendarDayPage(
               }}
               latestBodyWeight={latestWeightRow?.weight ?? null}
               bmrInputs={bmrInputs}
+              suggestion={suggestion}
             />
           ) : (
             <p className="font-body text-xs text-steel">
@@ -304,6 +326,24 @@ export default async function ClientCalendarDayPage(
           />
         </section>
       </div>
+
+      {macrosEnabled && (
+        <section className="border border-steel/20 p-4 mt-6">
+          <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
+            Meals
+          </h2>
+          <div className="grid grid-cols-[1fr_280px] gap-6 items-start">
+            <MealSlotDropZones
+              athleteId={params.athleteId}
+              groupId={params.groupId}
+              coachId={user.id}
+              date={params.date}
+              assignedBySlot={assignedBySlot}
+            />
+            <RecipeLibraryRail coachId={user.id} />
+          </div>
+        </section>
+      )}
 
       <section className="border border-steel/20 p-4 mt-6">
         <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
