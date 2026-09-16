@@ -8,17 +8,26 @@ import {
   detectRedundancy,
   detectFlatRepeat,
   detectMissingPatternCoverage,
+  detectBiomechRedundancy,
   type SpotterExerciseEntry,
   type SpotterCategory,
   type SpotterTier,
   type FlatRepeatEntry,
+  type BiomechTaggedEntry,
 } from "./programming-spotter";
 
 export interface SpotterFlag {
-  checkKind: "volume_concentration" | "redundancy" | "flat_repeat" | "missing_pattern";
+  checkKind: "volume_concentration" | "redundancy" | "flat_repeat" | "missing_pattern" | "biomech_redundancy";
   patternKey: string;
   headline: string;
 }
+
+// A > B > C > untiered, for the biomech-redundancy check's alternative-
+// exercise selection (biomechanical_redundancy_consolidation_spotter_
+// idea.md, Q2) — same ordering the ladder-picker's own tier field
+// already carries meaning for, just reused as a plain sort weight here
+// rather than a ranked ladder.
+const TIER_RANK: Record<string, number> = { A: 3, B: 2, C: 1 };
 
 const CATEGORY_LABELS: Record<string, string> = {
   Push: "Push",
@@ -56,14 +65,33 @@ export async function gatherProgrammingSpotterFlags(
 
   const exerciseNames = [...new Set(exerciseRows.map((e) => e.exercise_name as string))];
 
-  const [{ data: libraryRows }, { data: tierRows }] = await Promise.all([
+  const [{ data: libraryRows }, { data: tierRows }, { data: biomechTagRows }] = await Promise.all([
     supabase.from("exercise_library").select("name, category").eq("created_by", coachId).in("name", exerciseNames),
     supabase
       .from("movement_pattern_exercises")
       .select("exercise_name, movement_pattern_id, tier, movement_patterns!inner ( created_by )")
       .eq("movement_patterns.created_by", coachId)
       .in("exercise_name", exerciseNames),
+    // exercise_biomech_tags is a shared/collaborative tagging layer
+    // (any coach can tag any exercise name, see 0173_biomech_tags.sql's
+    // own RLS comment) — deliberately NOT coach-scoped here, unlike
+    // libraryRows/tierRows, since a tag someone else applied to a
+    // shared exercise name is still real biomechanical fact.
+    supabase
+      .from("exercise_biomech_tags")
+      .select("exercise_name, biomech_tags!inner ( key )")
+      .eq("role", "prime_mover")
+      .in("exercise_name", exerciseNames),
   ]);
+
+  const primeMoverTagsByName = new Map<string, string[]>();
+  for (const row of (biomechTagRows ?? []) as any[]) {
+    const tagKey = row.biomech_tags?.key;
+    if (!tagKey) continue;
+    const list = primeMoverTagsByName.get(row.exercise_name) ?? [];
+    list.push(tagKey);
+    primeMoverTagsByName.set(row.exercise_name, list);
+  }
 
   const categoryByName = new Map((libraryRows ?? []).map((r) => [r.name as string, r.category as SpotterCategory | null]));
   const tierByName = new Map<string, { movementPatternId: string; tier: SpotterTier | null }>();
@@ -81,6 +109,7 @@ export async function gatherProgrammingSpotterFlags(
 
   const entries: SpotterExerciseEntry[] = [];
   const flatRepeatEntries: FlatRepeatEntry[] = [];
+  const biomechEntries: BiomechTaggedEntry[] = [];
   const categoriesUsed = new Set<string>();
 
   for (const e of exerciseRows as any[]) {
@@ -121,6 +150,12 @@ export async function gatherProgrammingSpotterFlags(
       // stored setting) — the byte-identical-targets check itself is the
       // real signal here.
       hasProgressionModel: false,
+    });
+
+    biomechEntries.push({
+      exerciseName: e.exercise_name,
+      weekNumber: week,
+      primeMoverTagKeys: primeMoverTagsByName.get(e.exercise_name) ?? [],
     });
   }
 
@@ -171,6 +206,78 @@ export async function gatherProgrammingSpotterFlags(
       patternKey: f.category,
       headline: `"${programName}" reads as a full program, but ${CATEGORY_LABELS[f.category]} never shows up anywhere in it — worth a look?`,
     });
+  }
+
+  const biomechFlags = detectBiomechRedundancy(biomechEntries).filter(
+    (f) => !isDismissed("biomech_redundancy", f.tagKey)
+  );
+  if (biomechFlags.length > 0) {
+    const flaggedTagKeys = [...new Set(biomechFlags.map((f) => f.tagKey))];
+
+    // Selection lookup (Q2): among ANY exercise tagged prime_mover with a
+    // flagged tag key, narrow to the coach's own exercise_library, then
+    // rank by movement_pattern_exercises.tier (A > B > C > untiered),
+    // alphabetical tie-break. Deliberately two more small queries here
+    // rather than widening the coach-scoped libraryRows/tierRows fetch
+    // above — those are scoped to exerciseNames already IN the program,
+    // and a real alternative is by definition usually NOT already in it.
+    const { data: candidateTagRows } = await supabase
+      .from("exercise_biomech_tags")
+      .select("exercise_name, biomech_tags!inner ( key, label )")
+      .eq("role", "prime_mover")
+      .in("biomech_tags.key", flaggedTagKeys);
+
+    const candidateNamesByTag = new Map<string, Set<string>>();
+    const labelByTagKey = new Map<string, string>();
+    for (const row of (candidateTagRows ?? []) as any[]) {
+      const tagKey = row.biomech_tags?.key;
+      const label = row.biomech_tags?.label;
+      if (!tagKey) continue;
+      if (label) labelByTagKey.set(tagKey, label);
+      const names = candidateNamesByTag.get(tagKey) ?? new Set<string>();
+      names.add(row.exercise_name);
+      candidateNamesByTag.set(tagKey, names);
+    }
+
+    const allCandidateNames = [...new Set([...candidateNamesByTag.values()].flatMap((s) => [...s]))];
+    const [{ data: candidateLibraryRows }, { data: candidateTierRows }] = await Promise.all([
+      supabase.from("exercise_library").select("name").eq("created_by", coachId).in("name", allCandidateNames),
+      supabase
+        .from("movement_pattern_exercises")
+        .select("exercise_name, tier, movement_patterns!inner ( created_by )")
+        .eq("movement_patterns.created_by", coachId)
+        .in("exercise_name", allCandidateNames),
+    ]);
+
+    const coachOwnCandidateNames = new Set((candidateLibraryRows ?? []).map((r) => r.name as string));
+    const tierByCandidateName = new Map<string, SpotterTier | null>();
+    for (const row of (candidateTierRows ?? []) as any[]) {
+      if (!tierByCandidateName.has(row.exercise_name)) tierByCandidateName.set(row.exercise_name, row.tier);
+    }
+
+    function pickBestAlternative(tagKey: string, excludeNames: string[]): string | null {
+      const names = [...(candidateNamesByTag.get(tagKey) ?? [])].filter(
+        (n) => coachOwnCandidateNames.has(n) && !excludeNames.includes(n)
+      );
+      if (names.length === 0) return null;
+      names.sort((a, b) => {
+        const rankA = TIER_RANK[tierByCandidateName.get(a) ?? ""] ?? 0;
+        const rankB = TIER_RANK[tierByCandidateName.get(b) ?? ""] ?? 0;
+        if (rankA !== rankB) return rankB - rankA;
+        return a.localeCompare(b);
+      });
+      return names[0];
+    }
+
+    for (const f of biomechFlags) {
+      const alternative = pickBestAlternative(f.tagKey, f.exerciseNames);
+      const tagLabel = labelByTagKey.get(f.tagKey) ?? f.tagKey.replace(/_/g, " ");
+      const exerciseList = f.exerciseNames.join(", ");
+      const headline = alternative
+        ? `Week ${f.weekNumber}: ${exerciseList} all train ${tagLabel} — intentional specialization, or would ${alternative} for more total load cover the same ground?`
+        : `Week ${f.weekNumber}: ${exerciseList} all train ${tagLabel} — worth consolidating, or intentional?`;
+      flags.push({ checkKind: "biomech_redundancy", patternKey: f.tagKey, headline });
+    }
   }
 
   return flags;

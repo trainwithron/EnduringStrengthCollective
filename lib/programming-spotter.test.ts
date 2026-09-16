@@ -4,8 +4,10 @@ import {
   detectRedundancy,
   detectFlatRepeat,
   detectMissingPatternCoverage,
+  detectBiomechRedundancy,
   type SpotterExerciseEntry,
   type FlatRepeatEntry,
+  type BiomechTaggedEntry,
 } from "./programming-spotter";
 
 function entry(overrides: Partial<SpotterExerciseEntry>): SpotterExerciseEntry {
@@ -145,5 +147,93 @@ describe("detectMissingPatternCoverage", () => {
 
   it("does not flag a comprehensiveness-claim name that actually covers everything", () => {
     expect(detectMissingPatternCoverage("Total Body Strength", new Set(["Push", "Pull", "Legs"]))).toEqual([]);
+  });
+});
+
+function biomechEntry(overrides: Partial<BiomechTaggedEntry>): BiomechTaggedEntry {
+  return {
+    exerciseName: "Exercise",
+    weekNumber: 1,
+    primeMoverTagKeys: [],
+    ...overrides,
+  };
+}
+
+describe("detectBiomechRedundancy", () => {
+  it("fires on Ron's own rotator-cuff example — 3 differently-named exercises sharing one tag, no adjacency", () => {
+    const entries: BiomechTaggedEntry[] = [
+      biomechEntry({ exerciseName: "Overhead Y-Raise", weekNumber: 2, primeMoverTagKeys: ["shoulder_external_rotation"] }),
+      biomechEntry({ exerciseName: "Banded External Rotation", weekNumber: 2, primeMoverTagKeys: ["shoulder_external_rotation"] }),
+      biomechEntry({ exerciseName: "DB External Rotation", weekNumber: 2, primeMoverTagKeys: ["shoulder_external_rotation"] }),
+    ];
+    const flags = detectBiomechRedundancy(entries);
+    expect(flags).toEqual([
+      {
+        tagKey: "shoulder_external_rotation",
+        weekNumber: 2,
+        exerciseNames: ["Banded External Rotation", "DB External Rotation", "Overhead Y-Raise"],
+      },
+    ]);
+  });
+
+  it("stays quiet when only 2 exercises share the tag", () => {
+    const entries: BiomechTaggedEntry[] = [
+      biomechEntry({ exerciseName: "Overhead Y-Raise", primeMoverTagKeys: ["shoulder_external_rotation"] }),
+      biomechEntry({ exerciseName: "Banded External Rotation", primeMoverTagKeys: ["shoulder_external_rotation"] }),
+    ];
+    expect(detectBiomechRedundancy(entries)).toEqual([]);
+  });
+
+  it("does not count the same exercise name twice toward the threshold", () => {
+    const entries: BiomechTaggedEntry[] = [
+      biomechEntry({ exerciseName: "Overhead Y-Raise", primeMoverTagKeys: ["shoulder_external_rotation"] }),
+      biomechEntry({ exerciseName: "Overhead Y-Raise", primeMoverTagKeys: ["shoulder_external_rotation"] }),
+      biomechEntry({ exerciseName: "Banded External Rotation", primeMoverTagKeys: ["shoulder_external_rotation"] }),
+    ];
+    expect(detectBiomechRedundancy(entries)).toEqual([]);
+  });
+
+  it("never groups across different weeks", () => {
+    const entries: BiomechTaggedEntry[] = [
+      biomechEntry({ exerciseName: "A", weekNumber: 1, primeMoverTagKeys: ["hip_extension"] }),
+      biomechEntry({ exerciseName: "B", weekNumber: 2, primeMoverTagKeys: ["hip_extension"] }),
+      biomechEntry({ exerciseName: "C", weekNumber: 3, primeMoverTagKeys: ["hip_extension"] }),
+    ];
+    expect(detectBiomechRedundancy(entries)).toEqual([]);
+  });
+
+  it("never groups exercises sharing only DIFFERENT tags", () => {
+    const entries: BiomechTaggedEntry[] = [
+      biomechEntry({ exerciseName: "A", primeMoverTagKeys: ["hip_extension"] }),
+      biomechEntry({ exerciseName: "B", primeMoverTagKeys: ["hip_flexion"] }),
+      biomechEntry({ exerciseName: "C", primeMoverTagKeys: ["knee_extension"] }),
+    ];
+    expect(detectBiomechRedundancy(entries)).toEqual([]);
+  });
+
+  it("flags independently per tag when 3+ exercises share each of two different tags", () => {
+    const entries: BiomechTaggedEntry[] = [
+      biomechEntry({ exerciseName: "A", primeMoverTagKeys: ["hip_extension"] }),
+      biomechEntry({ exerciseName: "B", primeMoverTagKeys: ["hip_extension"] }),
+      biomechEntry({ exerciseName: "C", primeMoverTagKeys: ["hip_extension"] }),
+      biomechEntry({ exerciseName: "D", primeMoverTagKeys: ["knee_extension"] }),
+      biomechEntry({ exerciseName: "E", primeMoverTagKeys: ["knee_extension"] }),
+      biomechEntry({ exerciseName: "F", primeMoverTagKeys: ["knee_extension"] }),
+    ];
+    const flags = detectBiomechRedundancy(entries);
+    expect(flags).toHaveLength(2);
+    expect(flags.map((f) => f.tagKey).sort()).toEqual(["hip_extension", "knee_extension"]);
+  });
+
+  it("counts an exercise with multiple prime-mover tags toward each tag's own group", () => {
+    const entries: BiomechTaggedEntry[] = [
+      biomechEntry({ exerciseName: "Compound Lift", primeMoverTagKeys: ["hip_extension", "knee_extension"] }),
+      biomechEntry({ exerciseName: "B", primeMoverTagKeys: ["hip_extension"] }),
+      biomechEntry({ exerciseName: "C", primeMoverTagKeys: ["hip_extension"] }),
+    ];
+    const flags = detectBiomechRedundancy(entries);
+    expect(flags).toEqual([
+      { tagKey: "hip_extension", weekNumber: 1, exerciseNames: ["B", "C", "Compound Lift"] },
+    ]);
   });
 });

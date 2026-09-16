@@ -215,6 +215,56 @@ export function detectFlatRepeat(entries: FlatRepeatEntry[]): FlatRepeatFlag[] {
   return flags;
 }
 
+// Biomechanical-tag redundancy (biomechanical_redundancy_consolidation_
+// spotter_idea.md) — a harder, tag-level extension of detectRedundancy
+// above: three DIFFERENTLY-named, differently-equipped exercises (an
+// overhead Y-raise, a banded external rotation, a DB external rotation)
+// are mechanically redundant because they share the same prime-mover
+// joint-action tag, even though a name/category matcher (or the
+// slot-adjacency requirement above) would miss it entirely. No
+// adjacency requirement, by design — this is the actual point of the
+// extension. Joint-action `prime_mover` tags only, never stabilization-
+// axis tags (those are broad, cross-cutting demands nearly every
+// compound lift shares, e.g. anti_extension — counting them would
+// false-positive constantly). Reuses the redundancy check's own "3, not
+// 2" threshold (Baz-Valle et al. 2019 — no evidence 2 overlapping
+// exercises is itself a problem).
+export interface BiomechTaggedEntry {
+  exerciseName: string;
+  weekNumber: number;
+  primeMoverTagKeys: string[];
+}
+
+export interface BiomechRedundancyFlag {
+  tagKey: string;
+  weekNumber: number;
+  exerciseNames: string[];
+}
+
+const BIOMECH_REDUNDANCY_THRESHOLD = 3;
+
+export function detectBiomechRedundancy(entries: BiomechTaggedEntry[]): BiomechRedundancyFlag[] {
+  const namesByWeekTag = new Map<string, Set<string>>();
+  for (const e of entries) {
+    for (const tagKey of e.primeMoverTagKeys) {
+      const key = `${e.weekNumber}::${tagKey}`;
+      const names = namesByWeekTag.get(key) ?? new Set<string>();
+      names.add(e.exerciseName);
+      namesByWeekTag.set(key, names);
+    }
+  }
+
+  const flags: BiomechRedundancyFlag[] = [];
+  for (const [key, names] of namesByWeekTag) {
+    if (names.size < BIOMECH_REDUNDANCY_THRESHOLD) continue;
+    const separatorIndex = key.indexOf("::");
+    const weekNumber = Number(key.slice(0, separatorIndex));
+    const tagKey = key.slice(separatorIndex + 2);
+    flags.push({ tagKey, weekNumber, exerciseNames: [...names].sort() });
+  }
+  return flags;
+}
+
 // Missing-pattern coverage — deliberately scoped to this app's existing
 // 7-category system (exercise_library.category), not a new movement-
 // pattern taxonomy. Push/Pull/Legs are the three "training" categories
