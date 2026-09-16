@@ -28,6 +28,7 @@ import {
   Trophy,
   Wallet,
   Tag,
+  MessageCircle,
 } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
@@ -79,6 +80,7 @@ type Active =
   | "packages"
   | "waiver"
   | "support"
+  | "sms-settings"
   | "session-types"
   | "session-ledger"
   | "resources"
@@ -440,6 +442,7 @@ export function CoachDesktopShell({
         { key: "waiver", label: "Waiver", href: `/groups/${groupId}/business/waiver`, icon: ClipboardList },
         { key: "availability", label: "Availability", href: `/groups/${groupId}/availability`, icon: CalendarClock },
         { key: "support", label: "Support", href: `/groups/${groupId}/business/support`, icon: HeartHandshake },
+        { key: "sms-settings", label: "SMS Notifications", href: `/groups/${groupId}/business/sms-settings`, icon: MessageCircle },
         { key: "session-ledger", label: "Session Ledger", href: `/groups/${groupId}/business/session-ledger`, icon: Wallet },
         { key: "session-types", label: "Session Types", href: `/groups/${groupId}/business/session-types`, icon: Tag },
         { key: "branding", label: "Organization", href: `/groups/${groupId}/branding`, icon: Palette },

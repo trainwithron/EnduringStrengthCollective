@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendPushToProfile } from "@/lib/send-push";
+import { dispatchSms } from "@/lib/sms-dispatch";
 
 // acuity_replacement_gap_audit_sept16.md — the single clearest,
 // highest-value gap against Acuity: zero reminder/confirmation infra
@@ -36,13 +37,16 @@ export async function GET(request: Request) {
   // is required, or this silently returns zero rows instead of erroring.
   const { data: upcoming } = await supabase
     .from("bookings")
-    .select("id, athlete_id, group_id, start_at, profiles!bookings_coach_id_fkey ( full_name )")
+    .select(
+      "id, athlete_id, coach_id, group_id, start_at, profiles!bookings_coach_id_fkey ( full_name )"
+    )
     .eq("status", "confirmed")
     .is("reminder_sent_at", null)
     .gte("start_at", now.toISOString())
     .lte("start_at", windowEnd.toISOString());
 
   let sent = 0;
+  let smsSent = 0;
   for (const booking of upcoming ?? []) {
     const coachName = (booking as any).profiles?.full_name ?? "your coach";
     const when = new Date(booking.start_at).toLocaleTimeString(undefined, {
@@ -56,6 +60,26 @@ export async function GET(request: Request) {
       `Your session with ${coachName} starts at ${when}.`,
       `/groups/${booking.group_id}/calendar`
     );
+
+    // SMS mirror — a separate, opt-in channel a coach can turn on
+    // ON TOP of push (see lib/sms-dispatch.ts), not a replacement.
+    // Reuses this exact same query/window/dedup pass rather than a
+    // second cron: reminder_sent_at is one dedup guard for "the
+    // reminder moment happened," regardless of which channel(s) fired.
+    const { data: athleteDetails } = await supabase
+      .from("athlete_profile_details")
+      .select("phone")
+      .eq("athlete_id", booking.athlete_id)
+      .maybeSingle();
+    const smsResult = await dispatchSms(supabase, {
+      coachId: booking.coach_id,
+      recipientPhone: athleteDetails?.phone,
+      messageType: "session_reminder",
+      referenceId: booking.id,
+      body: `Reminder: your session with ${coachName} starts at ${when}.`,
+    });
+    if (smsResult.sent) smsSent += 1;
+
     // Mark as sent regardless of whether a real push subscription
     // existed to deliver to (count === 0) — the reminder "happened" for
     // this booking either way, and retrying every tick for a client
@@ -64,5 +88,5 @@ export async function GET(request: Request) {
     if (count > 0) sent += 1;
   }
 
-  return NextResponse.json({ checked: upcoming?.length ?? 0, sent });
+  return NextResponse.json({ checked: upcoming?.length ?? 0, sent, smsSent });
 }
