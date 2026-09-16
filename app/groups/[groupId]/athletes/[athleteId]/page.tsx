@@ -9,6 +9,7 @@ import { GoalConfirmationControl } from "@/components/coach/goal-confirmation-co
 import { PackageAssignmentControl } from "@/components/coach/package-assignment-control";
 import { PrivateFromOrgToggle } from "@/components/coach/private-from-org-toggle";
 import { ChangeClientGroupControl } from "@/components/coach/change-client-group-control";
+import { AddSocialOnlyMembershipControl } from "@/components/coach/add-social-only-membership-control";
 import { ClientProgrammingMenu } from "@/components/coach/client-programming-menu";
 import { MinorConsentControl } from "@/components/coach/minor-consent-control";
 import { GuardianShareButton } from "@/components/coach/guardian-share-button";
@@ -1078,6 +1079,14 @@ export default async function AthleteProfilePage(
               athleteName={profile?.full_name ?? "This client"}
               currentGroupId={params.groupId}
               currentGroupName={group?.name ?? "this group"}
+            />
+          </section>
+
+          <section>
+            <AddSocialOnlyMembershipControl
+              athleteId={params.athleteId}
+              athleteName={profile?.full_name ?? "This client"}
+              currentGroupId={params.groupId}
             />
           </section>
 

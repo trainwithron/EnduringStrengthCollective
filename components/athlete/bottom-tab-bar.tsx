@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, CalendarDays, MessagesSquare, Settings, Apple, Users, Menu } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { hasSocialTabAccess } from "@/lib/social-access";
 
 // Home/Workout merge (mobile_home_workout_tab_merge_idea.md, locked
 // 2026-09-14): Home itself is now today's workout — a hero CTA at the
@@ -39,10 +40,20 @@ export function BottomTabBar({
 }) {
   const pathname = usePathname();
 
-  // A 1-on-1 client (group_memberships.client_tier = 'one_on_one') has no
-  // team to see or be seen by — Team Feed (and everything social that
-  // hangs off it) is hidden for them, reusing the tier field that already
-  // exists rather than needing a personal group per client.
+  // social_only_group_membership_idea.md — real rewire, 2026-09-16:
+  // Feed used to hide based only on the CURRENT group's own
+  // client_tier, which never accounted for a client who could hold a
+  // second, different-kind membership elsewhere (a real 1-on-1 client
+  // added to a team group for social access only). The real signal is
+  // across ALL of this athlete's memberships, not just the one they
+  // happen to be viewing right now: do they have at least one
+  // membership that's either a genuine team/social group
+  // (group_kind !== 'one_on_one') or explicitly flagged
+  // membership_type = 'social_only'? A solo 1-on-1 client with no such
+  // membership never sees Feed; the moment a coach adds either kind,
+  // it appears — everywhere in the app, not just on whichever group's
+  // page they're currently on. Replaces the old single-group
+  // client_tier check entirely rather than running both.
   const [hideFeed, setHideFeed] = useState(false);
   useEffect(() => {
     if (variant === "coach") return;
@@ -55,17 +66,19 @@ export function BottomTabBar({
       if (!user) return;
       const { data } = await supabase
         .from("group_memberships")
-        .select("client_tier")
-        .eq("group_id", groupId)
-        .eq("profile_id", user.id)
-        .maybeSingle();
-      if (!cancelled) setHideFeed(data?.client_tier === "one_on_one");
+        .select("membership_type, groups ( group_kind )")
+        .eq("profile_id", user.id);
+      const memberships = (data ?? []).map((m: any) => ({
+        membershipType: m.membership_type as string | null,
+        groupKind: m.groups?.group_kind as string | null,
+      }));
+      if (!cancelled) setHideFeed(!hasSocialTabAccess(memberships));
     }
     run();
     return () => {
       cancelled = true;
     };
-  }, [groupId, variant]);
+  }, [variant]);
 
   // Every one of these destinations is server-rendered on demand, so a tap
   // costs a round trip before the new route commits and `pathname` updates.
