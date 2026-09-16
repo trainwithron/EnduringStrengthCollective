@@ -22,12 +22,23 @@ export default async function ChallengesPage(
 
   if (!user) redirect("/login");
 
-  const { data: membership } = await supabase
-    .from("group_memberships")
-    .select("role")
-    .eq("group_id", params.groupId)
-    .eq("profile_id", user.id)
-    .maybeSingle();
+  // Independent of each other — both only need groupId/user.id, batched
+  // per athlete_app_loading_time_investigation_sept14.md's census finding
+  // this file had zero Promise.all across 8+ sequential awaits.
+  const [{ data: membership }, effective] = await Promise.all([
+    supabase
+      .from("group_memberships")
+      .select("role")
+      .eq("group_id", params.groupId)
+      .eq("profile_id", user.id)
+      .maybeSingle(),
+    // Consolidating the same acting-as check every other "group-wide" page
+    // already has (stale_client_name_header_bug.md, root cause #2) —
+    // Challenges/Engage was the one exception where this wasn't checked at
+    // all, so a coach standing in a client's mobile experience saw their
+    // OWN coach view here instead of that client's.
+    getEffectiveAthlete(params.groupId, user.id),
+  ]);
 
   if (!membership) {
     return (
@@ -40,12 +51,6 @@ export default async function ChallengesPage(
   }
 
   const isCoach = membership.role === "coach";
-  // Consolidating the same acting-as check every other "group-wide" page
-  // already has (stale_client_name_header_bug.md, root cause #2) —
-  // Challenges/Engage was the one exception where this wasn't checked at
-  // all, so a coach standing in a client's mobile experience saw their
-  // OWN coach view here instead of that client's.
-  const effective = await getEffectiveAthlete(params.groupId, user.id);
   const isActingAsOther = effective.isActingAsOther;
   const showMobileView = isActingAsOther || !isCoach || await prefersAthleteStyleView();
 
@@ -60,28 +65,25 @@ export default async function ChallengesPage(
   }
 
   if (isCoach && !showMobileView) {
-    const { data: group } = await supabase
-      .from("groups")
-      .select("name")
-      .eq("id", params.groupId)
-      .single();
-
-    const { data: challengeRows } = await supabase
-      .from("challenges")
-      .select("id, name, status, start_date, duration_weeks, entry_fee_cents, program_id, programs ( name )")
-      .eq("coach_id", user.id)
-      .order("created_at", { ascending: false });
-
-    // Only shared (non-personal) active programs — the same set a
-    // challenge, which runs for a whole cohort at once, could sensibly
-    // bundle with.
-    const { data: programRows } = await supabase
-      .from("programs")
-      .select("id, name")
-      .eq("group_id", params.groupId)
-      .eq("is_active", true)
-      .is("athlete_id", null)
-      .order("name");
+    // Independent of each other — none needs another's result.
+    const [{ data: group }, { data: challengeRows }, { data: programRows }] = await Promise.all([
+      supabase.from("groups").select("name").eq("id", params.groupId).single(),
+      supabase
+        .from("challenges")
+        .select("id, name, status, start_date, duration_weeks, entry_fee_cents, program_id, programs ( name )")
+        .eq("coach_id", user.id)
+        .order("created_at", { ascending: false }),
+      // Only shared (non-personal) active programs — the same set a
+      // challenge, which runs for a whole cohort at once, could sensibly
+      // bundle with.
+      supabase
+        .from("programs")
+        .select("id, name")
+        .eq("group_id", params.groupId)
+        .eq("is_active", true)
+        .is("athlete_id", null)
+        .order("name"),
+    ]);
 
     const challengeIds = (challengeRows ?? []).map((c) => c.id);
     const { data: participantRows } = await supabase
@@ -143,15 +145,21 @@ export default async function ChallengesPage(
   }
 
   // Athlete branch: browse this coach's open challenges, plus anything
-  // already joined.
-  const { data: coachMembership } = await supabase
-    .from("group_memberships")
-    .select("profile_id")
-    .eq("group_id", params.groupId)
-    .eq("role", "coach")
-    .limit(1)
-    .maybeSingle();
+  // already joined. coachMembership/myParticipantRows are independent of
+  // each other (different tables, different keys) — batched; openChallenges
+  // genuinely depends on coachMembership's id, so it stays a second wave.
+  const [{ data: coachMembership }, { data: myParticipantRows }] = await Promise.all([
+    supabase
+      .from("group_memberships")
+      .select("profile_id")
+      .eq("group_id", params.groupId)
+      .eq("role", "coach")
+      .limit(1)
+      .maybeSingle(),
+    supabase.from("challenge_participants").select("challenge_id").eq("profile_id", effective.athleteId),
+  ]);
   const coachId = coachMembership?.profile_id;
+  const joinedChallengeIds = new Set((myParticipantRows ?? []).map((p) => p.challenge_id));
 
   const { data: openChallenges } = coachId
     ? await supabase
@@ -161,12 +169,6 @@ export default async function ChallengesPage(
         .neq("status", "draft")
         .order("start_date", { ascending: false })
     : { data: [] };
-
-  const { data: myParticipantRows } = await supabase
-    .from("challenge_participants")
-    .select("challenge_id")
-    .eq("profile_id", effective.athleteId);
-  const joinedChallengeIds = new Set((myParticipantRows ?? []).map((p) => p.challenge_id));
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">

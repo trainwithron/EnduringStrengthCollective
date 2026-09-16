@@ -70,12 +70,18 @@ export default async function FeedPage(
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: membership } = await supabase
-    .from("group_memberships")
-    .select("role, client_tier")
-    .eq("group_id", params.groupId)
-    .eq("profile_id", user?.id ?? "")
-    .maybeSingle();
+  // Independent of each other — both only need groupId/user.id, batched
+  // per athlete_app_loading_time_investigation_sept14.md's census finding
+  // this file had zero Promise.all across 8 sequential awaits.
+  const [{ data: membership }, effective] = await Promise.all([
+    supabase
+      .from("group_memberships")
+      .select("role, client_tier")
+      .eq("group_id", params.groupId)
+      .eq("profile_id", user?.id ?? "")
+      .maybeSingle(),
+    user ? getEffectiveAthlete(params.groupId, user.id) : Promise.resolve(null),
+  ]);
 
   const isCoach = membership?.role === "coach";
 
@@ -83,7 +89,6 @@ export default async function FeedPage(
   // own reactions, their own posting identity — not the coach's. `isCoach`
   // above still reflects the real signed-in user, so the desktop-shell
   // branch below stays correctly gated.
-  const effective = user ? await getEffectiveAthlete(params.groupId, user.id) : null;
   const isActingAsOther = effective?.isActingAsOther ?? false;
   const athleteId = effective?.athleteId ?? user?.id ?? null;
 
@@ -115,20 +120,34 @@ export default async function FeedPage(
     ? (searchParams.channel as FeedChannel)
     : "general";
 
-  const { data: viewerProfile } = athleteId
-    ? await supabase.from("profiles").select("full_name, feed_broadcast_level").eq("id", athleteId).maybeSingle()
-    : { data: null };
+  // Independent of each other — viewerProfile/posts/group only need
+  // athleteId/groupId/channel (all already resolved); the leaderboard and
+  // team_mode check only need groupId + the "general channel" gate, same
+  // gate the leaderboard already used, just batched instead of run
+  // sequentially after everything else.
+  const [{ data: viewerProfile }, { data: posts }, { data: group }, teamModeResult, leaderboard] = await Promise.all([
+    athleteId
+      ? supabase.from("profiles").select("full_name, feed_broadcast_level").eq("id", athleteId).maybeSingle()
+      : Promise.resolve({ data: null as { full_name: string; feed_broadcast_level: string } | null }),
+    supabase
+      .from("posts")
+      .select(POST_SELECT)
+      .eq("group_id", params.groupId)
+      .eq("channel", channel)
+      .order("pinned_at", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
+      .limit(30),
+    supabase.from("groups").select("name").eq("id", params.groupId).single(),
+    channel === "general"
+      ? supabase.from("groups").select("team_mode").eq("id", params.groupId).maybeSingle()
+      : Promise.resolve({ data: null as { team_mode: boolean } | null }),
+    // Leaderboard now lives at the top of General instead of its own nav
+    // tab — every post is a reminder it's there, per the ask ("every time
+    // anything gets posted, everyone can see the leaderboard").
+    channel === "general" ? getGroupLeaderboardRankings(supabase, params.groupId) : Promise.resolve(null),
+  ]);
   const feedBroadcastLevel =
     (viewerProfile?.feed_broadcast_level as "full" | "prs_only" | "checkin_only" | "private") ?? "full";
-
-  const { data: posts } = await supabase
-    .from("posts")
-    .select(POST_SELECT)
-    .eq("group_id", params.groupId)
-    .eq("channel", channel)
-    .order("pinned_at", { ascending: false, nullsFirst: false })
-    .order("created_at", { ascending: false })
-    .limit(30);
 
   let shaped: FeedPost[] = (posts ?? []).map((p: any) => mapPostRow(p, params.groupId, athleteId));
 
@@ -150,22 +169,13 @@ export default async function FeedPage(
     }
   }
 
-  // Leaderboard now lives at the top of General instead of its own nav
-  // tab — every post is a reminder it's there, per the ask ("every time
-  // anything gets posted, everyone can see the leaderboard").
-  const leaderboard = channel === "general" ? await getGroupLeaderboardRankings(supabase, params.groupId) : null;
   // Position-grouped rankings only cost a query for team_mode groups —
-  // the common case (team_mode off) skips this entirely.
+  // the common case (team_mode off) skips this entirely. team_mode was
+  // already fetched in the wave-2 batch above (teamModeResult), same
+  // "general channel only" gate the leaderboard itself uses.
   let positionGroups: Awaited<ReturnType<typeof getPositionLeaderboardRankings>> | null = null;
-  if (leaderboard) {
-    const { data: leaderboardGroup } = await supabase
-      .from("groups")
-      .select("team_mode")
-      .eq("id", params.groupId)
-      .maybeSingle();
-    if (leaderboardGroup?.team_mode) {
-      positionGroups = await getPositionLeaderboardRankings(supabase, params.groupId);
-    }
+  if (leaderboard && teamModeResult.data?.team_mode) {
+    positionGroups = await getPositionLeaderboardRankings(supabase, params.groupId);
   }
   const leaderboardCard = leaderboard && (
     <div className="border border-steel/20 p-4 mb-4">
@@ -180,12 +190,6 @@ export default async function FeedPage(
   );
 
   if (isCoach && !showMobileView) {
-    const { data: group } = await supabase
-      .from("groups")
-      .select("name")
-      .eq("id", params.groupId)
-      .single();
-
     return (
       <CoachDesktopShell
         groupId={params.groupId}

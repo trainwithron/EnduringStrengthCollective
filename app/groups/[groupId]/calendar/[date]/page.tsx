@@ -85,13 +85,28 @@ export default async function CoachDayDetailPage(
   // with no active program assigned (a client should always be able to
   // see and book their coach's open hours).
   if (membership.role === "athlete" || effective.isActingAsOther) {
-    const { data: coachMembership } = await supabase
-      .from("group_memberships")
-      .select("profile_id")
-      .eq("group_id", params.groupId)
-      .eq("role", "coach")
-      .limit(1)
-      .maybeSingle();
+    // Independent of each other — coachMembership only needs groupId,
+    // reschedulingBooking only needs athleteId + a searchParam — batched
+    // per athlete_app_loading_time_investigation_sept14.md's finding that
+    // this file had zero Promise.all across 19 sequential awaits.
+    const [{ data: coachMembership }, { data: reschedulingBooking }] = await Promise.all([
+      supabase
+        .from("group_memberships")
+        .select("profile_id")
+        .eq("group_id", params.groupId)
+        .eq("role", "coach")
+        .limit(1)
+        .maybeSingle(),
+      searchParams.reschedule
+        ? supabase
+            .from("bookings")
+            .select("id, start_at")
+            .eq("id", searchParams.reschedule)
+            .eq("athlete_id", athleteId)
+            .eq("status", "confirmed")
+            .maybeSingle()
+        : Promise.resolve({ data: null as { id: string; start_at: string } | null }),
+    ]);
 
     const date = new Date(`${params.date}T00:00:00`);
 
@@ -102,69 +117,50 @@ export default async function CoachDayDetailPage(
     let availablePackages: PackageOption[] = [];
 
     if (coachMembership) {
-      const { data: coachProfile } = await supabase
-        .from("profiles")
-        .select("timezone")
-        .eq("id", coachMembership.profile_id)
-        .maybeSingle();
+      // Wave 1: none of these five depend on each other — coachProfile's
+      // timezone is only needed by wave 2, not by any of the other four.
+      const [
+        { data: coachProfile },
+        { data: windowRows },
+        { data: creditsRow },
+        { data: subscriptionRow },
+        { data: packageRows },
+      ] = await Promise.all([
+        supabase.from("profiles").select("timezone").eq("id", coachMembership.profile_id).maybeSingle(),
+        supabase
+          .from("coach_availability_windows")
+          .select("weekday, start_time, end_time, slot_duration_minutes")
+          .eq("coach_id", coachMembership.profile_id),
+        supabase
+          .from("session_credits")
+          .select("balance")
+          .eq("athlete_id", athleteId)
+          .eq("group_id", params.groupId)
+          .maybeSingle(),
+        supabase
+          .from("membership_subscriptions")
+          .select("current_period_end")
+          .eq("athlete_id", athleteId)
+          .eq("group_id", params.groupId)
+          .eq("status", "active")
+          .maybeSingle(),
+        supabase
+          .from("coach_packages")
+          .select("id, name, sessions_per_week, billing_type, sessions_granted, rate_cents")
+          .eq("group_id", params.groupId)
+          .eq("is_active", true)
+          .order("sessions_per_week", { ascending: true }),
+      ]);
+
       const timezone = coachProfile?.timezone ?? DEFAULT_COACH_TIMEZONE;
-
-      const { data: windowRows } = await supabase
-        .from("coach_availability_windows")
-        .select("weekday, start_time, end_time, slot_duration_minutes")
-        .eq("coach_id", coachMembership.profile_id);
-
       const windows = (windowRows ?? []).map((w) => ({
         weekday: w.weekday,
         startTime: w.start_time,
         endTime: w.end_time,
         slotDurationMinutes: w.slot_duration_minutes,
       }));
-
-      const blockedRanges = await getBlockedRangesForDate(
-        supabase,
-        coachMembership.profile_id,
-        date,
-        timezone
-      );
-      slots = generateSlotsForDate(date, windows, blockedRanges, timezone);
-
-      const zonedDayStart = zonedTimeToUtc(params.date, "00:00", timezone);
-      const zonedDayEnd = new Date(zonedDayStart.getTime() + 24 * 60 * 60 * 1000);
-
-      const { data: bookingRows } = await supabase
-        .from("bookings")
-        .select("id, start_at, athlete_id, session_type, profiles!bookings_athlete_id_fkey ( full_name )")
-        .eq("coach_id", coachMembership.profile_id)
-        .eq("status", "confirmed")
-        .gte("start_at", zonedDayStart.toISOString())
-        .lt("start_at", zonedDayEnd.toISOString());
-
-      bookingsForDay = bookingRows ?? [];
-
-      const { data: creditsRow } = await supabase
-        .from("session_credits")
-        .select("balance")
-        .eq("athlete_id", athleteId)
-        .eq("group_id", params.groupId)
-        .maybeSingle();
       creditBalance = creditsRow?.balance ?? 0;
-
-      const { data: subscriptionRow } = await supabase
-        .from("membership_subscriptions")
-        .select("current_period_end")
-        .eq("athlete_id", athleteId)
-        .eq("group_id", params.groupId)
-        .eq("status", "active")
-        .maybeSingle();
       activeSubscription = subscriptionRow ? { currentPeriodEnd: subscriptionRow.current_period_end } : null;
-
-      const { data: packageRows } = await supabase
-        .from("coach_packages")
-        .select("id, name, sessions_per_week, billing_type, sessions_granted, rate_cents")
-        .eq("group_id", params.groupId)
-        .eq("is_active", true)
-        .order("sessions_per_week", { ascending: true });
       availablePackages = (packageRows ?? []).map((p) => ({
         id: p.id,
         name: p.name,
@@ -173,24 +169,30 @@ export default async function CoachDayDetailPage(
         sessionsGranted: p.sessions_granted,
         rateCents: p.rate_cents,
       }));
+
+      const zonedDayStart = zonedTimeToUtc(params.date, "00:00", timezone);
+      const zonedDayEnd = new Date(zonedDayStart.getTime() + 24 * 60 * 60 * 1000);
+
+      // Wave 2: both need timezone from wave 1, but not each other.
+      const [blockedRanges, { data: bookingRows }] = await Promise.all([
+        getBlockedRangesForDate(supabase, coachMembership.profile_id, date, timezone),
+        supabase
+          .from("bookings")
+          .select("id, start_at, athlete_id, session_type, profiles!bookings_athlete_id_fkey ( full_name )")
+          .eq("coach_id", coachMembership.profile_id)
+          .eq("status", "confirmed")
+          .gte("start_at", zonedDayStart.toISOString())
+          .lt("start_at", zonedDayEnd.toISOString()),
+      ]);
+
+      slots = generateSlotsForDate(date, windows, blockedRanges, timezone);
+      bookingsForDay = bookingRows ?? [];
     }
 
     const bookingByTime = new Map(
       bookingsForDay.map((b) => [new Date(b.start_at).getTime(), b])
     );
     const backHref = `/groups/${params.groupId}/calendar`;
-
-    let reschedulingBooking: { id: string; start_at: string } | null = null;
-    if (searchParams.reschedule) {
-      const { data: rb } = await supabase
-        .from("bookings")
-        .select("id, start_at")
-        .eq("id", searchParams.reschedule)
-        .eq("athlete_id", athleteId)
-        .eq("status", "confirmed")
-        .maybeSingle();
-      reschedulingBooking = rb;
-    }
 
     return (
       <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
@@ -309,26 +311,55 @@ export default async function CoachDayDetailPage(
     );
   }
 
-  const { data: group } = await supabase
-    .from("groups")
-    .select("name")
-    .eq("id", params.groupId)
-    .single();
-
   const date = new Date(`${params.date}T00:00:00`);
+  // Selected client to assign into an open slot — carried via ?client= so
+  // it survives the coach clicking through from either the client profile
+  // or the main calendar's sidebar.
+  const clientId = searchParams.client;
 
-  const { data: viewerProfile } = await supabase
-    .from("profiles")
-    .select("timezone")
-    .eq("id", user.id)
-    .maybeSingle();
+  // Wave 1: group, viewerProfile, windowRows, dayEventRows, and the
+  // clientId membership check are all independent of each other — none
+  // needs another's result. Same fix shape as performance_fix_region_
+  // and_query_batching.md; this file (calendar/[date]/page.tsx) was the
+  // primary suspect in athlete_app_loading_time_investigation_sept14.md
+  // (19 sequential awaits, zero Promise.all) and was never touched by
+  // that earlier pass.
+  const [
+    { data: group },
+    { data: viewerProfile },
+    { data: windowRows },
+    { data: dayEventRows },
+    { data: clientMembership },
+  ] = await Promise.all([
+    supabase.from("groups").select("name").eq("id", params.groupId).single(),
+    supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle(),
+    supabase
+      .from("coach_availability_windows")
+      .select("weekday, start_time, end_time, slot_duration_minutes")
+      .eq("coach_id", user.id),
+    // Custom to-dos/events for this exact date — folded into this day's
+    // hour-by-hour view so a coach sees everything they've got going on
+    // (not just bookable slots) in one place, matching what the month/
+    // week grid already surfaces per-cell.
+    supabase
+      .from("calendar_events")
+      .select("id, title, event_time")
+      .eq("coach_id", user.id)
+      .eq("event_date", params.date)
+      .neq("status", "dismissed")
+      .order("event_time", { ascending: true }),
+    clientId
+      ? supabase
+          .from("group_memberships")
+          .select("profiles ( full_name )")
+          .eq("group_id", params.groupId)
+          .eq("profile_id", clientId)
+          .eq("role", "athlete")
+          .maybeSingle()
+      : Promise.resolve({ data: null as { profiles: unknown } | null }),
+  ]);
+
   const timezone = viewerProfile?.timezone ?? DEFAULT_COACH_TIMEZONE;
-
-  const { data: windowRows } = await supabase
-    .from("coach_availability_windows")
-    .select("weekday, start_time, end_time, slot_duration_minutes")
-    .eq("coach_id", user.id);
-
   const windows = (windowRows ?? []).map((w) => ({
     weekday: w.weekday,
     startTime: w.start_time,
@@ -336,20 +367,28 @@ export default async function CoachDayDetailPage(
     slotDurationMinutes: w.slot_duration_minutes,
   }));
 
-  const blockedRanges = await getBlockedRangesForDate(supabase, user.id, date, timezone);
-  const slots = generateSlotsForDate(date, windows, blockedRanges, timezone);
-
   const zonedDayStart = zonedTimeToUtc(params.date, "00:00", timezone);
   const zonedDayEnd = new Date(zonedDayStart.getTime() + 24 * 60 * 60 * 1000);
 
-  const { data: bookingRows } = await supabase
-    .from("bookings")
-    .select("id, start_at, end_at, athlete_id, session_type, no_show, profiles!bookings_athlete_id_fkey ( full_name )")
-    .eq("coach_id", user.id)
-    .eq("status", "confirmed")
-    .gte("start_at", zonedDayStart.toISOString())
-    .lt("start_at", zonedDayEnd.toISOString());
+  // Wave 2: blockedRanges/bookingRows need wave 1's timezone but not each
+  // other; the credits/program lookups need only clientId (gated on
+  // clientMembership existing, resolved in wave 1) — all four independent.
+  const [blockedRanges, { data: bookingRows }, { data: creditsForClient }, activeProgram] = await Promise.all([
+    getBlockedRangesForDate(supabase, user.id, date, timezone),
+    supabase
+      .from("bookings")
+      .select("id, start_at, end_at, athlete_id, session_type, no_show, profiles!bookings_athlete_id_fkey ( full_name )")
+      .eq("coach_id", user.id)
+      .eq("status", "confirmed")
+      .gte("start_at", zonedDayStart.toISOString())
+      .lt("start_at", zonedDayEnd.toISOString()),
+    clientMembership
+      ? supabase.from("session_credits").select("balance").eq("athlete_id", clientId!).eq("group_id", params.groupId).maybeSingle()
+      : Promise.resolve({ data: null as { balance: number } | null }),
+    clientMembership ? getActiveProgramForAthlete(supabase, params.groupId, clientId!) : Promise.resolve(null),
+  ]);
 
+  const slots = generateSlotsForDate(date, windows, blockedRanges, timezone);
   const bookingByTime = new Map(
     (bookingRows ?? []).map((b) => [new Date(b.start_at).getTime(), b as any])
   );
@@ -359,6 +398,8 @@ export default async function CoachDayDetailPage(
   // offered a "Make video call" control for a client it will only
   // reject for. A missing/unconfirmed date of birth is NOT eligible,
   // same "requires positive confirmation" rule as the server-side check.
+  // Genuinely dependent on bookingRows (wave 2) — can't be batched
+  // earlier, it needs the athlete ids from those rows.
   const bookingAthleteIds = Array.from(new Set((bookingRows ?? []).map((b) => b.athlete_id)));
   const videoEligibleAthleteIds = new Set<string>();
   if (bookingAthleteIds.length > 0) {
@@ -373,10 +414,6 @@ export default async function CoachDayDetailPage(
     }
   }
 
-  // Selected client to assign into an open slot — carried via ?client= so
-  // it survives the coach clicking through from either the client profile
-  // or the main calendar's sidebar.
-  const clientId = searchParams.client;
   let selectedClient: { fullName: string; balance: number } | null = null;
   // Day-click-to-assign (calendar_workout_scheduling_and_adjustable_
   // workspace_idea.md item 1) — the selected client's program workouts,
@@ -384,59 +421,29 @@ export default async function CoachDayDetailPage(
   // active program at all (nothing to assign, not an error state).
   let assignableWorkouts: { id: string; title: string; alreadyHere: boolean }[] = [];
 
-  if (clientId) {
-    const { data: clientMembership } = await supabase
-      .from("group_memberships")
-      .select("profiles ( full_name )")
-      .eq("group_id", params.groupId)
-      .eq("profile_id", clientId)
-      .eq("role", "athlete")
-      .maybeSingle();
+  if (clientMembership) {
+    selectedClient = {
+      fullName: (clientMembership.profiles as any)?.full_name ?? "Client",
+      balance: creditsForClient?.balance ?? 0,
+    };
 
-    if (clientMembership) {
-      const { data: creditsRow } = await supabase
-        .from("session_credits")
-        .select("balance")
-        .eq("athlete_id", clientId)
-        .eq("group_id", params.groupId)
-        .maybeSingle();
-
-      selectedClient = {
-        fullName: (clientMembership.profiles as any)?.full_name ?? "Client",
-        balance: creditsRow?.balance ?? 0,
-      };
-
-      const activeProgram = await getActiveProgramForAthlete(supabase, params.groupId, clientId);
-      if (activeProgram) {
-        const [allWorkouts, scheduledWorkouts] = await Promise.all([
-          getAllProgramWorkouts(supabase, activeProgram.id),
-          getScheduledWorkouts(supabase, activeProgram),
-        ]);
-        const scheduledDateKeyByWorkoutId = new Map(
-          scheduledWorkouts.map((w) => [w.workoutId, dateKeyOf(w.date)])
-        );
-        assignableWorkouts = allWorkouts.map((w) => ({
-          id: w.id,
-          title: w.title,
-          alreadyHere: scheduledDateKeyByWorkoutId.get(w.id) === params.date,
-        }));
-      }
+    if (activeProgram) {
+      const [allWorkouts, scheduledWorkouts] = await Promise.all([
+        getAllProgramWorkouts(supabase, activeProgram.id),
+        getScheduledWorkouts(supabase, activeProgram),
+      ]);
+      const scheduledDateKeyByWorkoutId = new Map(
+        scheduledWorkouts.map((w) => [w.workoutId, dateKeyOf(w.date)])
+      );
+      assignableWorkouts = allWorkouts.map((w) => ({
+        id: w.id,
+        title: w.title,
+        alreadyHere: scheduledDateKeyByWorkoutId.get(w.id) === params.date,
+      }));
     }
   }
 
   const backHref = `/groups/${params.groupId}/calendar`;
-
-  // Custom to-dos/events for this exact date — folded into this day's
-  // hour-by-hour view so a coach sees everything they've got going on
-  // (not just bookable slots) in one place, matching what the month/week
-  // grid already surfaces per-cell.
-  const { data: dayEventRows } = await supabase
-    .from("calendar_events")
-    .select("id, title, event_time")
-    .eq("coach_id", user.id)
-    .eq("event_date", params.date)
-    .neq("status", "dismissed")
-    .order("event_time", { ascending: true });
 
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="calendar">
