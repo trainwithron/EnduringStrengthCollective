@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { notifyBookingConfirmed } from "@/lib/notify-booking-confirmed";
+import { mirrorGoogleCalendarEvent } from "@/lib/mirror-google-calendar-event";
 
 export function BookSlotButton({
   coachId,
@@ -31,7 +32,7 @@ export function BookSlotButton({
     // checks for any overlapping confirmed booking (not just an exact
     // start_at collision), inserts, then spends the credit — all in one
     // transaction, so nothing between the check and the write can race.
-    const { error: bookError } = await supabase.rpc("book_session", {
+    const { data: bookingId, error: bookError } = await supabase.rpc("book_session", {
       p_coach_id: coachId,
       p_athlete_id: athleteId,
       p_group_id: groupId,
@@ -53,6 +54,7 @@ export function BookSlotButton({
     }
 
     notifyBookingConfirmed(athleteId, groupId, startAt);
+    if (bookingId) mirrorGoogleCalendarEvent(bookingId);
     router.refresh();
   }
 

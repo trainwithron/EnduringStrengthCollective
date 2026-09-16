@@ -16,6 +16,7 @@ import { SwipeDirectionSetting } from "@/components/athlete/swipe-direction-sett
 import { ExportDataButton } from "@/components/athlete/export-data-button";
 import { DeleteAccountButton } from "@/components/athlete/delete-account-button";
 import { GamificationToggle } from "@/components/coach/gamification-toggle";
+import { GoogleCalendarConnection } from "@/components/coach/google-calendar-connection";
 
 export default async function SettingsPage(
   props: {
@@ -25,6 +26,7 @@ export default async function SettingsPage(
       withings_error?: string;
       garmin_error?: string;
       google_health_error?: string;
+      google_calendar_error?: string;
     }>;
   }
 ) {
@@ -54,6 +56,7 @@ export default async function SettingsPage(
     { data: withingsConnection },
     { data: garminConnection },
     { data: googleHealthConnection },
+    { data: googleCalendarConnection },
     { data: profileDetails },
     { data: group },
   ] = await Promise.all([
@@ -91,6 +94,11 @@ export default async function SettingsPage(
         .select("status")
         .eq("profile_id", athleteId)
         .eq("provider", "google_health")
+        .maybeSingle(),
+      supabase
+        .from("google_calendar_connections")
+        .select("status, personal_email")
+        .eq("coach_id", athleteId)
         .maybeSingle(),
       supabase
         .from("athlete_profile_details")
@@ -171,6 +179,15 @@ export default async function SettingsPage(
               <GamificationToggle
                 groupId={params.groupId}
                 initialEnabled={group?.gamification_enabled ?? true}
+              />
+            </div>
+            <div className="mt-4 pt-4 border-t border-steel/15">
+              <GoogleCalendarConnection
+                groupId={params.groupId}
+                connected={!!googleCalendarConnection}
+                status={(googleCalendarConnection?.status as "active" | "revoked" | "error" | undefined) ?? null}
+                personalEmail={googleCalendarConnection?.personal_email ?? null}
+                initialError={searchParams.google_calendar_error ?? null}
               />
             </div>
           </SettingsGroup>
