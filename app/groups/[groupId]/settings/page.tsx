@@ -20,7 +20,12 @@ import { GamificationToggle } from "@/components/coach/gamification-toggle";
 export default async function SettingsPage(
   props: {
     params: Promise<{ groupId: string }>;
-    searchParams: Promise<{ oura_error?: string; withings_error?: string }>;
+    searchParams: Promise<{
+      oura_error?: string;
+      withings_error?: string;
+      garmin_error?: string;
+      google_health_error?: string;
+    }>;
   }
 ) {
   const params = await props.params;
@@ -47,6 +52,8 @@ export default async function SettingsPage(
     { data: membership },
     { data: ouraConnection },
     { data: withingsConnection },
+    { data: garminConnection },
+    { data: googleHealthConnection },
     { data: profileDetails },
     { data: group },
   ] = await Promise.all([
@@ -72,6 +79,18 @@ export default async function SettingsPage(
         .select("status")
         .eq("profile_id", athleteId)
         .eq("provider", "withings")
+        .maybeSingle(),
+      supabase
+        .from("wearable_connections")
+        .select("status")
+        .eq("profile_id", athleteId)
+        .eq("provider", "garmin")
+        .maybeSingle(),
+      supabase
+        .from("wearable_connections")
+        .select("status")
+        .eq("profile_id", athleteId)
+        .eq("provider", "google_health")
         .maybeSingle(),
       supabase
         .from("athlete_profile_details")
@@ -183,6 +202,12 @@ export default async function SettingsPage(
               withingsConnected={!!withingsConnection}
               withingsStatus={(withingsConnection?.status as "active" | "revoked" | "error" | undefined) ?? null}
               withingsError={searchParams.withings_error ?? null}
+              garminConnected={!!garminConnection}
+              garminStatus={(garminConnection?.status as "active" | "revoked" | "error" | undefined) ?? null}
+              garminError={searchParams.garmin_error ?? null}
+              googleHealthConnected={!!googleHealthConnection}
+              googleHealthStatus={(googleHealthConnection?.status as "active" | "revoked" | "error" | undefined) ?? null}
+              googleHealthError={searchParams.google_health_error ?? null}
             />
           </div>
         </SettingsGroup>
