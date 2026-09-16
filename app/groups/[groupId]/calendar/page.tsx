@@ -145,6 +145,30 @@ export default async function CoachCalendarPage(
       // through to the athlete booking-calendar rendering further below
       // would show a real client an "assign yourself a program" empty
       // state that makes no sense for the coach viewing it.
+      //
+      // Real, live-confirmed gap: before a client is picked, this screen
+      // was just the dropdown + one line of helper text, then hundreds of
+      // pixels of dead space above the bottom nav. Same real data this
+      // page's own rail widget (calendar-rail-widget.tsx) already queries
+      // for "Today" — widened to the next 5 days and no longer date-
+      // gated — so the coach sees their real upcoming schedule across
+      // every client while deciding who to book, instead of a void.
+      const upcomingRangeEnd = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
+      const { data: upcomingBookingRows } = await supabase
+        .from("bookings")
+        .select("id, start_at, profiles!bookings_athlete_id_fkey ( full_name )")
+        .eq("coach_id", user.id)
+        .eq("status", "confirmed")
+        .gte("start_at", new Date().toISOString())
+        .lt("start_at", upcomingRangeEnd.toISOString())
+        .order("start_at", { ascending: true })
+        .limit(10);
+      const upcomingBookings = (upcomingBookingRows ?? []).map((b: any) => ({
+        id: b.id,
+        startAt: b.start_at as string,
+        athleteName: b.profiles?.full_name ?? "Client",
+      }));
+
       return (
         <main className="min-h-screen bg-graphite text-chalk font-body">
           <CoachMobileShell groupId={params.groupId} groupName={coachGroupName} activeOverride="calendar">
@@ -154,6 +178,26 @@ export default async function CoachCalendarPage(
             <div className="px-5 pb-24">
               <ScheduleClientPicker groupId={params.groupId} clients={scheduleClients} />
               <p className="font-body text-sm text-steel mt-4">Pick a client to see and book their sessions.</p>
+
+              <h2 className="font-body text-xs text-steel uppercase tracking-wide mt-8 mb-2">
+                Upcoming sessions
+              </h2>
+              {upcomingBookings.length === 0 ? (
+                <p className="font-body text-sm text-steel">Nothing booked in the next 5 days.</p>
+              ) : (
+                <div className="divide-y divide-steel/15 border-t border-steel/15">
+                  {upcomingBookings.map((b) => (
+                    <div key={b.id} className="py-2.5 flex items-center justify-between gap-3">
+                      <span className="font-body text-sm">{b.athleteName}</span>
+                      <span className="font-body text-xs text-steel shrink-0">
+                        {new Date(b.startAt).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
+                        {" · "}
+                        {new Date(b.startAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </CoachMobileShell>
         </main>
