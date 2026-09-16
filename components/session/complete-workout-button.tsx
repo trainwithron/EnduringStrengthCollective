@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { notifyPush } from "@/lib/push-notify";
 import { isHighPriorityClient } from "@/lib/notification-priority";
 import { checkAndNotifyLowSessionBalance } from "@/lib/notify-low-session-balance";
+import { notifyWebhookEvent } from "@/lib/notify-webhook-event";
 
 // This project has no generated Supabase Database type, so a fresh RPC's
 // result falls back to an untyped shape — spelled out explicitly here
@@ -113,6 +114,23 @@ export function CompleteWorkoutButton({
 
     if (result.credit_consumed) {
       checkAndNotifyLowSessionBalance(result.athlete_id, result.group_id);
+    }
+
+    // Zapier triggers (zapier_integration_queued_sept16.md) — fired for
+    // every completion, plus a separate pr_hit for a coach who only
+    // wants to hear about the PRs specifically, not every workout.
+    notifyWebhookEvent(result.group_id, "workout_completed", {
+      athleteId: result.athlete_id,
+      workoutLogId: result.workout_log_id,
+      totalVolume: result.total_volume,
+      totalSetsCompleted: result.total_sets_completed,
+    });
+    if ((result.new_prs ?? []).length > 0) {
+      notifyWebhookEvent(result.group_id, "pr_hit", {
+        athleteId: result.athlete_id,
+        workoutLogId: result.workout_log_id,
+        exercises: result.new_prs,
+      });
     }
 
     const [{ data: athleteProfile }, { data: athleteMembership }] = await Promise.all([

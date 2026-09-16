@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { toFriendlyAuthEmailError } from "@/lib/auth-email-error";
+import { dispatchWebhookEvent } from "@/lib/webhook-dispatch";
 
 export async function POST(request: Request) {
   const supabase = await createServerClient();
@@ -67,6 +68,16 @@ export async function POST(request: Request) {
       { status: 502 }
     );
   }
+
+  // Zapier's own "client_added" trigger (zapier_integration_queued_
+  // sept16.md) — this route already knows the real coach (the caller,
+  // already verified above) so it can dispatch directly rather than
+  // going through /api/webhooks/dispatch's group->coach resolution.
+  await dispatchWebhookEvent(serviceRole, {
+    coachId: user.id,
+    eventType: "client_added",
+    payload: { athleteId: newUserId, fullName: trimmedName, email: trimmedEmail, groupId },
+  });
 
   return NextResponse.json({ profileId: newUserId });
 }

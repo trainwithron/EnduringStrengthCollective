@@ -45,6 +45,10 @@
     {
       "path": "/api/cron/attendance-nudge-sms",
       "schedule": "0 17 * * *"
+    },
+    {
+      "path": "/api/cron/webhook-retry",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

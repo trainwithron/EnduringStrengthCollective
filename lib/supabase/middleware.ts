@@ -73,7 +73,15 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/cron/") ||
     // An uptime monitor hits this with no session at all, same gotcha as
     // the webhook/cron routes above.
-    pathname.startsWith("/api/health");
+    pathname.startsWith("/api/health") ||
+    // Zapier's platform calls these directly with no user session at
+    // all — the Bearer API-key check inside each route (lib/resolve-
+    // coach-from-api-key.ts) is the real auth, same gotcha as the
+    // Stripe webhook and cron routes above. /api/coach/api-key and
+    // /api/webhooks/dispatch are deliberately NOT included here — both
+    // are called from an already-signed-in browser session and should
+    // keep requiring one.
+    pathname.startsWith("/api/zapier/");
 
   if (!user && !isPublicPath) {
     const redirectUrl = new URL("/login", request.url);
