@@ -69,4 +69,15 @@ export async function checkAndNotifyLowSessionBalance(athleteId: string, groupId
   for (const profileId of recipients) {
     notifyPush(profileId, tier.title, tier.body(athleteName), url);
   }
+
+  // SMS mirror — a separate, opt-in channel each recipient (coach or
+  // org owner) can turn on independently via their own coach_sms_config;
+  // the route re-derives the tier and recipients itself rather than
+  // trusting anything computed here, so this call only needs to say
+  // which athlete/group changed.
+  fetch("/api/sms/low-credit-alert", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ athleteId, groupId }),
+  }).catch(() => {});
 }

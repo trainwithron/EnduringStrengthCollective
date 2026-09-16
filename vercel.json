@@ -45,6 +45,10 @@
     {
       "path": "/api/cron/google-calendar-sync",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/attendance-nudge-sms",
+      "schedule": "0 17 * * *"
     }
   ]
 }
