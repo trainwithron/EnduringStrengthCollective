@@ -15,6 +15,8 @@ import { ScheduleClientPicker } from "@/components/coach/schedule-client-picker"
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { computeQuietTier, QUIET_TIER_LABEL } from "@/lib/quiet-client-tier";
+import { gatherCalendarSpotterFindings } from "@/lib/calendar-spotter-gather";
+import { CalendarSpotterPanel } from "@/components/coach/desktop/calendar-spotter-panel";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
@@ -821,6 +823,8 @@ export default async function CoachCalendarPage(
     })
     .filter((c) => c.tier !== "none");
 
+  const calendarSpotterFindings = await gatherCalendarSpotterFindings(supabase, { groupId: params.groupId });
+
   const timezone = coachProfile?.timezone ?? DEFAULT_COACH_TIMEZONE;
 
   const availabilityWindows = (windowRows ?? []).map((w) => ({
@@ -882,6 +886,12 @@ export default async function CoachCalendarPage(
           Availability tab below.
         </p>
       </div>
+
+      {calendarSpotterFindings.length > 0 && (
+        <div className="mb-6">
+          <CalendarSpotterPanel findings={calendarSpotterFindings} />
+        </div>
+      )}
 
       <CalendarPageTabs coachId={user.id} initialWindows={availabilityWindows}>
       {/* mobile_must_fit_screen_standing_rule — this two-column layout

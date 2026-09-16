@@ -21,6 +21,7 @@ import { BookingVideoPanel } from "@/components/coach/desktop/booking-video-pane
 import type { PackageOption } from "@/components/athlete/package-picker";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { meetsMinimumAge } from "@/lib/coppa";
+import { MarkNoShowToggle } from "@/components/coach/mark-no-show-toggle";
 
 export default async function CoachDayDetailPage(
   props: {
@@ -343,7 +344,7 @@ export default async function CoachDayDetailPage(
 
   const { data: bookingRows } = await supabase
     .from("bookings")
-    .select("id, start_at, end_at, athlete_id, session_type, profiles!bookings_athlete_id_fkey ( full_name )")
+    .select("id, start_at, end_at, athlete_id, session_type, no_show, profiles!bookings_athlete_id_fkey ( full_name )")
     .eq("coach_id", user.id)
     .eq("status", "confirmed")
     .gte("start_at", zonedDayStart.toISOString())
@@ -524,7 +525,11 @@ export default async function CoachDayDetailPage(
                     <span className="font-body text-xs text-steel">
                       Booked — {(booking.profiles as any)?.full_name ?? "Client"}
                     </span>
-                    <CancelBookingButton bookingId={booking.id} />
+                    {start.getTime() < Date.now() ? (
+                      <MarkNoShowToggle bookingId={booking.id} initialNoShow={booking.no_show ?? false} />
+                    ) : (
+                      <CancelBookingButton bookingId={booking.id} />
+                    )}
                     {videoEligibleAthleteIds.has(booking.athlete_id) && (
                       <BookingVideoPanel bookingId={booking.id} initialSessionType={booking.session_type ?? "in_person"} />
                     )}
