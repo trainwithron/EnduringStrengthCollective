@@ -109,7 +109,13 @@ export async function CoachMobileHome({
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body">
       <CoachMobileShell groupId={groupId} groupName={groupName}>
-        <header className="px-5 pt-8 pb-4">
+        {/* pt-16 (not the usual pt-8) — the fixed Spot trigger button
+            (top-3, h-10, centered) sits on top of every mobile page; a
+            long/full-width group name here (unlike "Calendar"/
+            "Messages"/"Clients" elsewhere) reaches the button's
+            horizontal position, so this header needs real vertical
+            clearance to not render underneath it. */}
+        <header className="px-5 pt-16 pb-4">
           <h1 className="font-display font-bold text-3xl leading-none uppercase truncate">{groupName}</h1>
         </header>
 

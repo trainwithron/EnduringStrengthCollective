@@ -141,6 +141,7 @@ function RailIconButton({ item }: { item: RailIcon }) {
       ref={linkRef}
       href={item.href}
       title={item.popover ? undefined : item.label}
+      aria-label={item.label}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onClick={handleClick}
