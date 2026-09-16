@@ -3,6 +3,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getStripeClient, isStripeConfigured } from "@/lib/stripe";
 import { computeRevenueSplit, type CoachShare } from "@/lib/revenue-splits";
 import { duplicateProgram } from "@/lib/program-duplication";
+import { dispatchWebhookEvent } from "@/lib/webhook-dispatch";
 import type Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -36,6 +37,47 @@ async function assignLinkedProgramIfFirstEnrollment(
     destinationGroupId: groupId,
     createdBy: pkg.coach_id,
     athleteId,
+  });
+}
+
+// Zapier's "package_purchased" trigger — the one event this build's
+// real validated use case (a gym partner's session-credit
+// reconciliation) actually cares about. Fires on every real credit-
+// granting moment: a one-time pack, a brand-new subscription, and each
+// recurring invoice.paid renewal. Resolves the coach who actually owns
+// the package when one exists (the real seller), falling back to the
+// group's own coach for a purchase with no linked package.
+async function dispatchPackagePurchasedEvent(
+  supabase: SupabaseClient,
+  {
+    groupId,
+    coachPackageId,
+    athleteId,
+    creditsPurchased,
+    amountCents,
+  }: { groupId: string; coachPackageId: string | null; athleteId: string; creditsPurchased: number | null; amountCents: number }
+) {
+  let coachId: string | null = null;
+  if (coachPackageId) {
+    const { data: pkg } = await supabase.from("coach_packages").select("coach_id").eq("id", coachPackageId).maybeSingle();
+    coachId = pkg?.coach_id ?? null;
+  }
+  if (!coachId) {
+    const { data: coachRow } = await supabase
+      .from("group_memberships")
+      .select("profile_id")
+      .eq("group_id", groupId)
+      .eq("role", "coach")
+      .limit(1)
+      .maybeSingle();
+    coachId = coachRow?.profile_id ?? null;
+  }
+  if (!coachId) return;
+
+  await dispatchWebhookEvent(supabase, {
+    coachId,
+    eventType: "package_purchased",
+    payload: { athleteId, groupId, coachPackageId, creditsPurchased, amountCents },
   });
 }
 
@@ -196,6 +238,13 @@ export async function POST(request: Request) {
             groupId,
             alreadyEnrolled: (priorPurchaseCount ?? 0) > 0,
           });
+          await dispatchPackagePurchasedEvent(supabase, {
+            groupId,
+            coachPackageId,
+            athleteId,
+            creditsPurchased: credits,
+            amountCents: session.amount_total ?? 0,
+          });
         } else if (session.mode === "subscription" && typeof session.subscription === "string") {
           // Checked BEFORE the upsert below — an existing row here means
           // this athlete already had a subscription for this group
@@ -230,6 +279,13 @@ export async function POST(request: Request) {
             athleteId,
             groupId,
             alreadyEnrolled: !!existingSubscription,
+          });
+          await dispatchPackagePurchasedEvent(supabase, {
+            groupId,
+            coachPackageId,
+            athleteId,
+            creditsPurchased: null,
+            amountCents: session.amount_total ?? 0,
           });
         }
         break;
@@ -283,6 +339,13 @@ export async function POST(request: Request) {
         if (rpcError) throw rpcError;
 
         await createRevenueSplitTransfers(supabase, stripe, event.id, groupId, invoice.amount_paid ?? 0);
+        await dispatchPackagePurchasedEvent(supabase, {
+          groupId,
+          coachPackageId,
+          athleteId,
+          creditsPurchased: pkg.sessions_granted,
+          amountCents: invoice.amount_paid ?? 0,
+        });
         break;
       }
 
