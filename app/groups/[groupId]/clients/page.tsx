@@ -48,9 +48,23 @@ export default async function ClientsPage(
 
   const { data: group } = await supabase
     .from("groups")
-    .select("name")
+    .select("name, team_mode")
     .eq("id", params.groupId)
     .single();
+
+  // team_sports_expansion_scoping.md — the position picker/filter is
+  // real, buildable roster-scale infrastructure only for a team-mode
+  // group; every other group simply never fetches or shows it, same
+  // "invisible unless team_mode" convention the position-aware
+  // leaderboard already established.
+  const { data: positionRows } = group?.team_mode
+    ? await supabase
+        .from("group_positions")
+        .select("id, name")
+        .eq("group_id", params.groupId)
+        .order("sort_order", { ascending: true })
+    : { data: [] };
+  const positions = (positionRows ?? []).map((p) => ({ id: p.id, name: p.name }));
 
   // Cheap, roster-wide: name/avatar/tier for every member, plus one
   // aggregate row per athlete for their most recent workout (a Postgres
@@ -64,7 +78,9 @@ export default async function ClientsPage(
   const [{ data: memberships }, { data: lastWorkoutRows }] = await Promise.all([
     supabase
       .from("group_memberships")
-      .select("role, profiles ( id, full_name, avatar_url ), profile_id, client_tier")
+      .select(
+        "role, profiles ( id, full_name, avatar_url ), profile_id, client_tier, position_id, group_positions!group_memberships_position_id_fkey ( name )"
+      )
       .eq("group_id", params.groupId),
     supabase.rpc("get_last_workout_per_athlete", { p_group_id: params.groupId }),
   ]);
@@ -97,6 +113,8 @@ export default async function ClientsPage(
     lastWorkoutAt: lastLogByAthlete.get(m.profile_id) ?? null,
     clientTier: m.client_tier ?? null,
     nutritionPhase: phaseByAthleteId.get(m.profile_id) ?? null,
+    positionId: m.position_id ?? null,
+    positionName: m.group_positions?.name ?? null,
   }));
 
   roster.sort((a, b) => {
@@ -236,7 +254,7 @@ export default async function ClientsPage(
         </div>
       )}
 
-      <ClientCardGrid groupId={params.groupId} members={athletes} />
+      <ClientCardGrid groupId={params.groupId} members={athletes} positions={positions} />
     </CoachDesktopShell>
   );
 }

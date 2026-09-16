@@ -21,6 +21,11 @@ export interface RosterMember {
   // a coach has tagged this athlete with. Optional/undefined on any
   // roster-rendering path that doesn't fetch it.
   nutritionPhase?: NutritionPhase | null;
+  // team_sports_expansion_scoping.md — this athlete's assigned position
+  // (from group_positions), for team-mode groups only. Optional/
+  // undefined on any roster-rendering path that doesn't fetch it.
+  positionId?: string | null;
+  positionName?: string | null;
 }
 
 export interface GroupSummary {

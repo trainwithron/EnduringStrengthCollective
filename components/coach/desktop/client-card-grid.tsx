@@ -60,9 +60,16 @@ const AVATAR_CLASS: Record<CardSize, string> = {
 export function ClientCardGrid({
   groupId,
   members,
+  positions = [],
 }: {
   groupId: string;
   members: RosterMember[];
+  // team_sports_expansion_scoping.md — a football/team roster is
+  // 40-100+ athletes, where scanning card-by-card for one player or
+  // scrolling to bulk-manage a whole position group stops working.
+  // Empty for any non-team-mode group (the page never fetches it) —
+  // the filter/search stay exactly as useful as before for those.
+  positions?: { id: string; name: string }[];
 }) {
   const [rows, setRows] = useState(members);
   const [error, setError] = useState<string | null>(null);
@@ -74,8 +81,13 @@ export function ClientCardGrid({
   const [sortMode, setSortMode] = useState<SortMode>("attention");
   const [tierFilter, setTierFilter] = useState<ClientTier | "all">("all");
   const [goalFilter, setGoalFilter] = useState<NutritionPhase | "all">("all");
+  const [positionFilter, setPositionFilter] = useState<string>("all");
+  const [search, setSearch] = useState("");
   const [size, setSize] = useState<CardSize>("medium");
   const [page, setPage] = useState(0);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkTier, setBulkTier] = useState<ClientTier>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const router = useRouter();
 
   // Credits/wellness/integrity are each a heavier per-athlete lookup
@@ -119,9 +131,12 @@ export function ClientCardGrid({
 
   const isOnlyCoach = rows.filter((m) => m.role === "coach").length === 1;
 
+  const trimmedSearch = search.trim().toLowerCase();
   const filteredRows = rows
     .filter((m) => tierFilter === "all" || m.clientTier === tierFilter)
-    .filter((m) => goalFilter === "all" || m.nutritionPhase === goalFilter);
+    .filter((m) => goalFilter === "all" || m.nutritionPhase === goalFilter)
+    .filter((m) => positionFilter === "all" || m.positionId === positionFilter)
+    .filter((m) => !trimmedSearch || m.fullName.toLowerCase().includes(trimmedSearch));
 
   const sortedRows = useMemo(
     () =>
@@ -146,7 +161,7 @@ export function ClientCardGrid({
   // now-mismatched page number.
   useEffect(() => {
     setPage(0);
-  }, [sortMode, tierFilter, goalFilter]);
+  }, [sortMode, tierFilter, goalFilter, positionFilter, trimmedSearch]);
 
   useEffect(() => {
     let cancelled = false;
@@ -338,9 +353,97 @@ export function ClientCardGrid({
       });
   }
 
+  function toggleSelected(profileId: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(profileId)) next.delete(profileId);
+      else next.add(profileId);
+      return next;
+    });
+  }
+
+  const pageSelectedCount = pageRows.filter((m) => selectedIds.has(m.profileId)).length;
+  const allPageSelected = pageRows.length > 0 && pageSelectedCount === pageRows.length;
+
+  function toggleSelectAllOnPage() {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allPageSelected) {
+        for (const m of pageRows) next.delete(m.profileId);
+      } else {
+        for (const m of pageRows) next.add(m.profileId);
+      }
+      return next;
+    });
+  }
+
+  // team_sports_expansion_scoping.md — the actual reason bulk-select
+  // earns its keep at 40-100+ athletes: setting a whole position group's
+  // tier, or clearing out a batch of former roster members, one card at
+  // a time doesn't scale. Reuses the exact same write each per-card
+  // action already makes, just looped across the selection.
+  async function handleBulkSetTier() {
+    if (selectedIds.size === 0 || bulkBusy) return;
+    setBulkBusy(true);
+    const ids = [...selectedIds];
+    setRows((prev) => prev.map((m) => (selectedIds.has(m.profileId) ? { ...m, clientTier: bulkTier } : m)));
+    const supabase = createBrowserClient();
+    const { error: updateError } = await supabase
+      .from("group_memberships")
+      .update({ client_tier: bulkTier })
+      .eq("group_id", groupId)
+      .in("profile_id", ids);
+    setBulkBusy(false);
+    if (updateError) {
+      setError("Couldn't update tier for the selected athletes.");
+      return;
+    }
+    setSelectedIds(new Set());
+    router.refresh();
+  }
+
+  async function handleBulkRemove() {
+    if (selectedIds.size === 0 || bulkBusy) return;
+    const targets = rows.filter((m) => selectedIds.has(m.profileId));
+    if (targets.some((m) => m.role === "coach") && isOnlyCoach) {
+      setError("A group needs at least one coach — deselect the coach before removing.");
+      return;
+    }
+    if (!window.confirm(`Remove ${targets.length} selected ${targets.length === 1 ? "athlete" : "athletes"} from the group?`)) {
+      return;
+    }
+    setBulkBusy(true);
+    const ids = [...selectedIds];
+    setRows((prev) => prev.filter((m) => !selectedIds.has(m.profileId)));
+    const supabase = createBrowserClient();
+    const { error: deleteError } = await supabase
+      .from("group_memberships")
+      .delete()
+      .eq("group_id", groupId)
+      .in("profile_id", ids);
+    setBulkBusy(false);
+    if (deleteError) {
+      setError("Couldn't remove the selected athletes.");
+      setRows(members);
+      return;
+    }
+    setSelectedIds(new Set());
+    router.refresh();
+  }
+
   return (
     <div>
       {error && <p className="font-body text-sm text-rust mb-3">{error}</p>}
+
+      <div className="mb-3">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by name…"
+          className="h-9 w-64 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
+        />
+      </div>
 
       <div className="flex items-center justify-between gap-2 mb-4">
         <div className="flex items-center gap-2">
@@ -403,6 +506,79 @@ export function ClientCardGrid({
         </div>
       )}
 
+      {positions.length > 0 && (
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Position</span>
+          <button
+            type="button"
+            onClick={() => setPositionFilter("all")}
+            className={`font-body text-xs px-2 py-1 border ${
+              positionFilter === "all" ? "text-rust border-rust" : "text-steel border-steel/30"
+            }`}
+          >
+            All
+          </button>
+          {positions.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => setPositionFilter(p.id)}
+              className={`font-body text-xs px-2 py-1 border ${
+                positionFilter === p.id ? "text-rust border-rust" : "text-steel border-steel/30"
+              }`}
+            >
+              {p.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {pageRows.length > 0 && (
+        <div className="flex items-center justify-between gap-3 mb-3 pb-3 border-b border-steel/15">
+          <label className="flex items-center gap-2 font-body text-xs text-steel">
+            <input
+              type="checkbox"
+              checked={allPageSelected}
+              onChange={toggleSelectAllOnPage}
+              className="accent-rust"
+            />
+            Select all on this page
+          </label>
+
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="font-body text-xs text-steel">{selectedIds.size} selected</span>
+              <select
+                value={bulkTier ?? ""}
+                onChange={(e) => setBulkTier((e.target.value || null) as ClientTier)}
+                className="h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
+              >
+                <option value="">No tier</option>
+                <option value="one_on_one">1-on-1</option>
+                <option value="online">Online</option>
+                <option value="group">Group</option>
+              </select>
+              <button
+                type="button"
+                onClick={handleBulkSetTier}
+                disabled={bulkBusy}
+                className="h-8 px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
+              >
+                Set tier
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkRemove}
+                disabled={bulkBusy}
+                className="h-8 px-3 border border-steel/30 text-steel font-body text-xs disabled:opacity-40"
+              >
+                Remove selected
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {sortedRows.length === 0 ? (
         <p className="font-body text-sm text-steel py-6">
           No athletes yet. Send an invite to get the first one training.
@@ -415,8 +591,15 @@ export function ClientCardGrid({
             return (
               <div
                 key={member.profileId}
-                className="border border-steel/20 bg-surface/40 rounded-token-lg p-4 flex flex-col items-center text-center gap-2"
+                className="relative border border-steel/20 bg-surface/40 rounded-token-lg p-4 flex flex-col items-center text-center gap-2"
               >
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(member.profileId)}
+                  onChange={() => toggleSelected(member.profileId)}
+                  aria-label={`Select ${member.fullName}`}
+                  className="absolute top-2 left-2 accent-rust"
+                />
                 <Link href={`/groups/${groupId}/athletes/${member.profileId}`} className="flex flex-col items-center gap-2">
                   {member.avatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -433,6 +616,9 @@ export function ClientCardGrid({
                     </div>
                   )}
                   <span className="font-body font-medium text-[15px] text-chalk">{member.fullName}</span>
+                  {member.positionName && (
+                    <span className="font-body text-[11px] text-steel -mt-1.5">{member.positionName}</span>
+                  )}
                 </Link>
 
                 <span className="flex items-center gap-1.5">
