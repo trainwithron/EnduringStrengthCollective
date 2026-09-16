@@ -31,6 +31,10 @@
       "schedule": "0 12 * * *"
     },
     {
+      "path": "/api/google-health/sync",
+      "schedule": "0 12 * * *"
+    },
+    {
       "path": "/api/cron/coach-chat-cleanup",
       "schedule": "0 5 * * *"
     },

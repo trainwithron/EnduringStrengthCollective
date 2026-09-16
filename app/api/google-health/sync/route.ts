@@ -1,0 +1,104 @@
+import { NextResponse } from "next/server";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { fetchGoogleHealthDailyMetrics, refreshGoogleHealthTokens } from "@/lib/google-health";
+
+// Mirrors app/api/oura/sync/route.ts exactly — triggered daily by the
+// Vercel Cron entry in vercel.json, CRON_SECRET-gated, polls the
+// trailing week so a missed run or a late-finalizing summary still gets
+// picked up.
+const SYNC_WINDOW_DAYS = 7;
+
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function daysAgoIso(days: number) {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return d.toISOString().slice(0, 10);
+}
+
+export async function GET(request: Request) {
+  if (!process.env.CRON_SECRET) {
+    return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });
+  }
+  const authHeader = request.headers.get("authorization");
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
+  const supabase = createServiceRoleClient();
+  const { data: connections, error: connectionsError } = await supabase
+    .from("wearable_connections")
+    .select("id, wearable_oauth_tokens ( access_token, refresh_token, expires_at )")
+    .eq("provider", "google_health")
+    .eq("status", "active");
+
+  if (connectionsError) {
+    return NextResponse.json({ error: connectionsError.message }, { status: 500 });
+  }
+
+  const startDate = daysAgoIso(SYNC_WINDOW_DAYS);
+  const endDate = todayIso();
+  const results: { connectionId: string; ok: boolean; error?: string }[] = [];
+
+  for (const connection of connections ?? []) {
+    const tokenRow = Array.isArray(connection.wearable_oauth_tokens)
+      ? connection.wearable_oauth_tokens[0]
+      : connection.wearable_oauth_tokens;
+
+    if (!tokenRow) {
+      results.push({ connectionId: connection.id, ok: false, error: "No tokens on file." });
+      continue;
+    }
+
+    try {
+      let accessToken = tokenRow.access_token;
+
+      const expiresSoon = new Date(tokenRow.expires_at).getTime() - Date.now() < 5 * 60 * 1000;
+      if (expiresSoon) {
+        const refreshed = await refreshGoogleHealthTokens(tokenRow.refresh_token);
+        accessToken = refreshed.accessToken;
+        await supabase
+          .from("wearable_oauth_tokens")
+          .update({
+            access_token: refreshed.accessToken,
+            refresh_token: refreshed.refreshToken,
+            expires_at: refreshed.expiresAt,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("connection_id", connection.id);
+      }
+
+      const { steps, sleepScore, restingHeartRate, weight } = await fetchGoogleHealthDailyMetrics(
+        accessToken,
+        startDate,
+        endDate
+      );
+
+      const rows = [
+        ...steps.map((p) => ({ connection_id: connection.id, metric_date: p.date, metric_type: "steps" as const, value: p.value })),
+        ...sleepScore.map((p) => ({ connection_id: connection.id, metric_date: p.date, metric_type: "sleep_score" as const, value: p.value })),
+        ...restingHeartRate.map((p) => ({ connection_id: connection.id, metric_date: p.date, metric_type: "resting_heart_rate" as const, value: p.value })),
+        ...weight.map((p) => ({ connection_id: connection.id, metric_date: p.date, metric_type: "weight" as const, value: p.value })),
+      ];
+
+      if (rows.length > 0) {
+        const { error: upsertError } = await supabase
+          .from("wearable_daily_metrics")
+          .upsert(rows, { onConflict: "connection_id,metric_date,metric_type" });
+        if (upsertError) throw upsertError;
+      }
+
+      results.push({ connectionId: connection.id, ok: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      results.push({ connectionId: connection.id, ok: false, error: message });
+      if (message.includes("refresh")) {
+        await supabase.from("wearable_connections").update({ status: "error" }).eq("id", connection.id);
+      }
+    }
+  }
+
+  return NextResponse.json({ synced: results.length, results });
+}

@@ -1,14 +1,14 @@
 import { OuraConnection } from "@/components/athlete/oura-connection";
 import { WithingsConnection } from "@/components/athlete/withings-connection";
+import { GarminConnection } from "@/components/athlete/garmin-connection";
+import { GoogleHealthConnection } from "@/components/athlete/google-health-connection";
 
-// Oura and Withings are the first two real connections (real OAuth +
-// daily sync — see app/api/oura/ and app/api/withings/); the rest stay
-// as disabled "coming soon" rows until their own provider work lands —
-// see the wearables scoping memory for why each is still just a
-// placeholder (Garmin/Google Health need partner approval or
-// app-verification lead time; Apple Health has no server API at all
-// without a companion iOS app).
-const COMING_SOON_PROVIDERS = ["Garmin", "Apple Health", "Google Health"];
+// Oura, Withings, Garmin, and Google Health are the real connections
+// (real OAuth + sync — see app/api/oura/, app/api/withings/,
+// app/api/garmin/, app/api/google-health/). Apple Health stays a
+// disabled "coming soon" row — it has no server API at all without a
+// companion iOS app (see the wearables scoping memory).
+const COMING_SOON_PROVIDERS = ["Apple Health"];
 
 export function WearablePlaceholder({
   groupId,
@@ -18,6 +18,12 @@ export function WearablePlaceholder({
   withingsConnected,
   withingsStatus,
   withingsError,
+  garminConnected,
+  garminStatus,
+  garminError,
+  googleHealthConnected,
+  googleHealthStatus,
+  googleHealthError,
 }: {
   groupId: string;
   ouraConnected: boolean;
@@ -26,6 +32,12 @@ export function WearablePlaceholder({
   withingsConnected: boolean;
   withingsStatus: "active" | "revoked" | "error" | null;
   withingsError: string | null;
+  garminConnected: boolean;
+  garminStatus: "active" | "revoked" | "error" | null;
+  garminError: string | null;
+  googleHealthConnected: boolean;
+  googleHealthStatus: "active" | "revoked" | "error" | null;
+  googleHealthError: string | null;
 }) {
   return (
     <div>
@@ -45,6 +57,18 @@ export function WearablePlaceholder({
           connected={withingsConnected}
           status={withingsStatus}
           initialError={withingsError}
+        />
+        <GarminConnection
+          groupId={groupId}
+          connected={garminConnected}
+          status={garminStatus}
+          initialError={garminError}
+        />
+        <GoogleHealthConnection
+          groupId={groupId}
+          connected={googleHealthConnected}
+          status={googleHealthStatus}
+          initialError={googleHealthError}
         />
         {COMING_SOON_PROVIDERS.map((p) => (
           <div
