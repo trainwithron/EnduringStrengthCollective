@@ -17,11 +17,17 @@ export function isEstablishingBaseline(priorSessionCount: number): boolean {
   return priorSessionCount < BASELINE_WINDOW_SESSIONS;
 }
 
+// custom_shape_theming_idea.md — a PR can now come from weight, distance,
+// time, or pace (complete_workout_session's PR detection is no longer
+// weight-only), so this needs to hold whatever detail line actually
+// applies rather than assuming weight/reps/oneRepMax. `primary`/
+// `secondary` are pre-formatted by the caller (lib/shared-workout.ts) so
+// this stays a plain display shape — this module never branches on which
+// kind of PR it is, it only ever reads `.name`.
 export interface PrListItem {
   name: string;
-  weight: number;
-  reps: number;
-  oneRepMax: number;
+  primary: string;
+  secondary: string;
 }
 
 export interface BaselineSplit {

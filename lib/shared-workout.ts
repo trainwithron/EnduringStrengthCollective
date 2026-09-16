@@ -1,6 +1,7 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { estimateOneRepMax } from "@/lib/one-rep-max";
+import { parseNumericPaceSecondsPerUnit, formatPaceSecondsToClock } from "@/lib/progression-models";
 import { computeWeekStreak } from "@/lib/consistency-streak";
 import { splitPrsByBaseline } from "@/lib/pr-fatigue";
 import { computeHabitCompliance, computeCompliancePct, type HabitLogRow } from "@/lib/habits";
@@ -51,26 +52,59 @@ export async function getSharedWorkout(postId: string) {
   const broadcastLevel: "full" | "prs_only" | "checkin_only" = post.broadcast_level ?? "full";
   const newPrs: string[] = broadcastLevel === "checkin_only" ? [] : workoutLog.new_prs ?? [];
 
-  const bestByExercise = new Map<string, { weight: number; reps: number }>();
+  // custom_shape_theming_idea.md — a session's "best" per exercise is no
+  // longer weight-only (complete_workout_session's PR detection now also
+  // covers distance/time/pace), so this tracks all four independently per
+  // exercise rather than assuming weight is always present.
+  const bestByExercise = new Map<
+    string,
+    { weight: number; reps: number; distance: number | null; timeSeconds: number | null; paceSeconds: number | null }
+  >();
   if (workoutLog.session_id && broadcastLevel !== "checkin_only") {
     const { data: sets } = await supabase
       .from("set_logs")
-      .select("weight, reps, status, session_exercises!inner ( session_id, exercise_name )")
+      .select(
+        "weight, reps, distance, time_seconds, pace, status, session_exercises!inner ( session_id, exercise_name )"
+      )
       .eq("session_exercises.session_id", workoutLog.session_id)
       .eq("status", "completed");
 
     for (const row of (sets ?? []) as any[]) {
       const name = row.session_exercises.exercise_name;
       const weight = row.weight ?? 0;
-      const existing = bestByExercise.get(name);
-      if (!existing || weight > existing.weight) {
-        bestByExercise.set(name, { weight, reps: row.reps ?? 1 });
+      const existing = bestByExercise.get(name) ?? {
+        weight: 0,
+        reps: 1,
+        distance: null,
+        timeSeconds: null,
+        paceSeconds: null,
+      };
+      if (weight > existing.weight) {
+        existing.weight = weight;
+        existing.reps = row.reps ?? 1;
       }
+      if (row.distance != null && (existing.distance == null || row.distance > existing.distance)) {
+        existing.distance = row.distance;
+      }
+      if (row.time_seconds != null && (existing.timeSeconds == null || row.time_seconds < existing.timeSeconds)) {
+        existing.timeSeconds = row.time_seconds;
+      }
+      const paceSeconds = parseNumericPaceSecondsPerUnit(row.pace);
+      if (paceSeconds != null && (existing.paceSeconds == null || paceSeconds < existing.paceSeconds)) {
+        existing.paceSeconds = paceSeconds;
+      }
+      bestByExercise.set(name, existing);
     }
   }
 
+  // "Top lifts today" is inherently a weight-based ranking ("today's
+  // heaviest lifts") — a pure-cardio exercise (weight never logged) was
+  // previously still entering this list at a bogus "0 lbs × 1" once any
+  // exercise existed with no weight at all. Excluded here rather than
+  // just left to sort last, since 0 was never a real lift to begin with.
   const top5Candidates = Array.from(bestByExercise.entries())
     .map(([name, best]) => ({ name, ...best }))
+    .filter((l) => l.weight > 0)
     .sort((a, b) => b.weight - a.weight)
     .slice(0, 5);
 
@@ -81,16 +115,33 @@ export async function getSharedWorkout(postId: string) {
       ? top5Candidates.filter((l) => post.shared_exercise_names!.includes(l.name))
       : top5Candidates.slice(0, 3);
 
+  // Weight takes display priority when present (the common, established
+  // case, unchanged from before this PR-detection widening) — distance,
+  // then time, then pace fill in for a cardio exercise that was never
+  // going to have a weight at all. An exercise with none of the four
+  // (shouldn't happen if it's genuinely in new_prs, but matches the
+  // original "no data, skip it" behavior) is filtered out below.
   const prList = newPrs
     .map((name) => {
       const best = bestByExercise.get(name);
       if (!best) return null;
-      return {
-        name,
-        weight: best.weight,
-        reps: best.reps,
-        oneRepMax: estimateOneRepMax(best.weight, best.reps),
-      };
+      if (best.weight > 0) {
+        return {
+          name,
+          primary: `${best.weight} lbs × ${best.reps}`,
+          secondary: `est. 1RM ${estimateOneRepMax(best.weight, best.reps)} lbs`,
+        };
+      }
+      if (best.distance != null) {
+        return { name, primary: `${best.distance}`, secondary: "new distance PR" };
+      }
+      if (best.timeSeconds != null) {
+        return { name, primary: formatPaceSecondsToClock(best.timeSeconds), secondary: "new time PR" };
+      }
+      if (best.paceSeconds != null) {
+        return { name, primary: formatPaceSecondsToClock(best.paceSeconds), secondary: "new pace PR" };
+      }
+      return null;
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);
 

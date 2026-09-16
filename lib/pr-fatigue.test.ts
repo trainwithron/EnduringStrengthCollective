@@ -14,11 +14,10 @@ describe("isEstablishingBaseline", () => {
 });
 
 describe("splitPrsByBaseline", () => {
-  const makePr = (name: string): { name: string; weight: number; reps: number; oneRepMax: number } => ({
+  const makePr = (name: string): { name: string; primary: string; secondary: string } => ({
     name,
-    weight: 100,
-    reps: 5,
-    oneRepMax: 116,
+    primary: "100 lbs × 5",
+    secondary: "est. 1RM 116 lbs",
   });
 
   it("splits a brand-new exercise (no prior sessions at all) into establishingBaseline", () => {

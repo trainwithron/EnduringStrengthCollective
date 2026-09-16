@@ -6,7 +6,12 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 export function PrListToggle({
   items,
 }: {
-  items: { name: string; weight: number; reps: number; oneRepMax: number }[];
+  // primary/secondary are pre-formatted by the caller — this component
+  // renders the same two-tone line (plain steel text, then a rust-
+  // highlighted clause) regardless of whether the PR is weight, distance,
+  // time, or pace, so a cardio PR gets the exact same celebration
+  // treatment a lifting PR already gets, not a separate visual.
+  items: { name: string; primary: string; secondary: string }[];
 }) {
   const [open, setOpen] = useState(true);
 
@@ -29,8 +34,8 @@ export function PrListToggle({
             <div key={pr.name} className="text-left">
               <p className="font-display text-lg uppercase">{pr.name}</p>
               <p className="font-body text-sm text-steel">
-                {pr.weight} lbs &times; {pr.reps}
-                <span className="text-rust"> &middot; est. 1RM {pr.oneRepMax} lbs</span>
+                {pr.primary}
+                <span className="text-rust"> &middot; {pr.secondary}</span>
               </p>
             </div>
           ))}
