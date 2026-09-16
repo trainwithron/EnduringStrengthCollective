@@ -13,6 +13,8 @@ import { ClientProgrammingMenu } from "@/components/coach/client-programming-men
 import { MinorConsentControl } from "@/components/coach/minor-consent-control";
 import { GuardianShareButton } from "@/components/coach/guardian-share-button";
 import { NutritionPhaseControl } from "@/components/coach/nutrition-phase-control";
+import { InjuryStatusToggle } from "@/components/coach/injury-status-toggle";
+import { computeBmr, computeTdee } from "@/lib/bmr-tdee";
 import { VideoCheckinRecorder } from "@/components/coach/video-checkin-recorder";
 import { ParQAnswersPanel } from "@/components/coach/par-q-answers-panel";
 import { RosterSection } from "@/components/coach/desktop/roster-section";
@@ -81,6 +83,7 @@ export default async function AthleteProfilePage(
     { data: wellnessRows },
     { data: trainingMaxRows },
     { data: latestConfirmedEventGoal },
+    { data: injuryStatusRow },
   ] = await Promise.all([
     supabase
       .from("group_memberships")
@@ -177,7 +180,9 @@ export default async function AthleteProfilePage(
     // scopes this to "self or a coach who actually coaches them."
     supabase
       .from("athlete_profile_details")
-      .select("bio, birthday, phone, emergency_contact_name, emergency_contact_phone")
+      .select(
+        "bio, birthday, phone, emergency_contact_name, emergency_contact_phone, height_cm, biological_sex, body_fat_pct"
+      )
       .eq("athlete_id", params.athleteId)
       .maybeSingle(),
     // Published packages need no assignment — every client already
@@ -270,6 +275,15 @@ export default async function AthleteProfilePage(
       .order("confirmed_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    // coach_em_up_finley_funston_transcript.md — real client-safety gap:
+    // a manually-set "currently injured" flag that floors the nutrition
+    // check-in engine's calorie target at maintenance, overriding any
+    // active deficit phase.
+    supabase
+      .from("athlete_injury_status")
+      .select("is_injured, surplus_pct, marked_at")
+      .eq("athlete_id", params.athleteId)
+      .maybeSingle(),
   ]);
 
   if (membership?.role !== "coach") {
@@ -301,6 +315,36 @@ export default async function AthleteProfilePage(
   const activeProgram = personalProgram ?? sharedProgram;
   const isMinor = !!intake?.date_of_birth && isUnder13(intake.date_of_birth, new Date());
   const todayKeyForWave2 = new Date().toISOString().slice(0, 10);
+
+  // Real maintenance-calorie estimate for the injury-safety floor
+  // (lib/nutrition-checkin.ts) — same computeBmr/computeTdee this app
+  // already uses for Smart Macro Fill (daily-macros-form.tsx), never a
+  // guessed number. Only computed when every real input actually
+  // exists — no fallback/assumed values for height, sex, or DOB, since
+  // a wrong maintenance number defeats the point of a safety floor.
+  let maintenanceCalories: number | null = null;
+  const latestWeightLbs = weightLogs?.[0]?.weight ?? null;
+  if (
+    latestWeightLbs != null &&
+    profileDetails?.height_cm != null &&
+    profileDetails?.biological_sex &&
+    intake?.date_of_birth
+  ) {
+    const ageYears = Math.floor(
+      (Date.now() - new Date(intake.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000)
+    );
+    const bmr = computeBmr({
+      weightKg: latestWeightLbs * 0.453592,
+      heightCm: profileDetails.height_cm,
+      age: ageYears,
+      sex: profileDetails.biological_sex as "male" | "female",
+      bodyFatPct: profileDetails.body_fat_pct ?? null,
+    });
+    // No step data plumbed into this page — "moderate" matches this
+    // app's own existing fallback for the same gap (daily-macros-
+    // form.tsx), not a new assumption invented here.
+    maintenanceCalories = computeTdee(bmr, "moderate");
+  }
 
   // Wave 2 — each of these depends on a wave-1 result (or a pure JS
   // value derived from one), but not on each other, so they run as one
@@ -735,6 +779,13 @@ export default async function AthleteProfilePage(
               </div>
             </RosterSection>
           )}
+          <InjuryStatusToggle
+            athleteId={params.athleteId}
+            groupId={params.groupId}
+            coachId={user.id}
+            initialIsInjured={injuryStatusRow?.is_injured ?? false}
+            initialSurplusPct={injuryStatusRow?.surplus_pct ?? 0}
+          />
           <section>
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
               Stats

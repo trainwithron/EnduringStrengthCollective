@@ -223,3 +223,81 @@ describe("runCheckInEngine — maintenance", () => {
     expect(result.rationale).toContain("stabilized");
   });
 });
+
+// coach_em_up_finley_funston_transcript.md — real client-safety gap:
+// an injured client shouldn't keep cutting. Floors the phase-computed
+// number at maintenance (or a real coach-chosen surplus), never lowers.
+describe("runCheckInEngine — injury safety floor", () => {
+  it("floors a fat-loss stall-cut at maintenance when injured", () => {
+    // Stall cut would drop 2000 -> 1840 (recoveryRating 3, default 8%).
+    const result = runCheckInEngine(
+      baseInput({
+        currWeightLbs: 19.96,
+        recoveryRating: 3,
+        isInjured: true,
+        maintenanceCalories: 2100,
+      })
+    );
+    expect(result.newCalories).toBe(2100);
+    expect(result.injuryOverrideApplied).toBe(true);
+    expect(result.rationale).toContain("currently injured");
+    expect(result.rationale).toContain("2100");
+  });
+
+  it("applies a coach-chosen surplus above maintenance, not just maintenance itself", () => {
+    const result = runCheckInEngine(
+      baseInput({
+        currWeightLbs: 19.96,
+        recoveryRating: 3,
+        isInjured: true,
+        maintenanceCalories: 2100,
+        injurySurplusPct: 10,
+      })
+    );
+    expect(result.newCalories).toBe(Math.round(2100 * 1.1));
+    expect(result.injuryOverrideApplied).toBe(true);
+  });
+
+  it("never lowers a number the phase logic already put above the floor", () => {
+    // Hypertrophy stall-add takes 2000 -> 2100, already above maintenance.
+    const result = runCheckInEngine(
+      baseInput({
+        phase: "hypertrophy",
+        currWeightLbs: 20.01,
+        isInjured: true,
+        maintenanceCalories: 2000,
+      })
+    );
+    expect(result.newCalories).toBe(2100);
+    expect(result.injuryOverrideApplied).toBe(false);
+  });
+
+  it("does nothing when isInjured is true but no maintenanceCalories is provided — never invents a number", () => {
+    const result = runCheckInEngine(
+      baseInput({ currWeightLbs: 19.96, recoveryRating: 3, isInjured: true })
+    );
+    expect(result.newCalories).toBe(Math.round(2000 * (1 - 0.08)));
+    expect(result.injuryOverrideApplied).toBe(false);
+  });
+
+  it("does nothing when maintenanceCalories is provided but isInjured is false", () => {
+    const result = runCheckInEngine(
+      baseInput({ currWeightLbs: 19.96, recoveryRating: 3, maintenanceCalories: 2500 })
+    );
+    expect(result.newCalories).toBe(Math.round(2000 * (1 - 0.08)));
+    expect(result.injuryOverrideApplied).toBe(false);
+  });
+
+  it("clamps a surplus above 10% down to 10%, same discipline as the adjustment dial", () => {
+    const result = runCheckInEngine(
+      baseInput({
+        currWeightLbs: 19.96,
+        recoveryRating: 3,
+        isInjured: true,
+        maintenanceCalories: 2000,
+        injurySurplusPct: 25,
+      })
+    );
+    expect(result.newCalories).toBe(Math.round(2000 * 1.1));
+  });
+});
