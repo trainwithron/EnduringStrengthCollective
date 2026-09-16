@@ -27,6 +27,7 @@ export function ProgramBuilderDesktop({
   exerciseAliases,
   exerciseTierByName,
   movementPatterns,
+  laddersByPattern,
   initialStartDate,
   initialTrainingDays,
   initialVisibilityWindow,
@@ -49,6 +50,11 @@ export function ProgramBuilderDesktop({
   // same moment instead of two separate lookups.
   exerciseTierByName: Record<string, "A" | "B" | "C" | null>;
   movementPatterns: MovementPatternOption[];
+  // exercise_tier_template_system_assessment_task.md — every ladder rung
+  // for every pattern this coach owns, keyed by movement_pattern_id, so
+  // the exercise card can offer a one-tap swap the moment a pattern is
+  // tagged instead of only on the separate per-client override page.
+  laddersByPattern: Record<string, { exerciseName: string }[]>;
   initialStartDate: string | null;
   initialTrainingDays: number[] | null;
   initialVisibilityWindow: VisibilityWindow;
@@ -246,6 +252,7 @@ export function ProgramBuilderDesktop({
             exerciseAliases={exerciseAliases}
             exerciseTierByName={exerciseTierByName}
             movementPatterns={movementPatterns}
+            laddersByPattern={laddersByPattern}
             restSuggestions={restSuggestions}
             expanded={expandedWeeks.has(wn)}
             scheduledDateByDayId={scheduledDateByDayId}

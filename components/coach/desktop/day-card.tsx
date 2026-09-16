@@ -47,6 +47,7 @@ export function DayCard({
   exerciseAliases,
   exerciseTierByName,
   movementPatterns,
+  laddersByPattern,
   restSuggestions,
   condensed = false,
   collapsed,
@@ -62,6 +63,7 @@ export function DayCard({
   exerciseAliases: AliasEntry[];
   exerciseTierByName: Record<string, "A" | "B" | "C" | null>;
   movementPatterns: MovementPatternOption[];
+  laddersByPattern: Record<string, { exerciseName: string }[]>;
   restSuggestions?: RestTempoSuggestion[];
   // Week-level "Collapse days" toggle — shows each exercise as one
   // condensed line (name + sets×reps) instead of the full editable grid.
@@ -532,6 +534,7 @@ export function DayCard({
                       exerciseAliases={exerciseAliases}
                       exerciseTierByName={exerciseTierByName}
                       movementPatterns={movementPatterns}
+                      laddersByPattern={laddersByPattern}
                       restSuggestions={restSuggestions}
                       canMoveUp={index > 0}
                       canMoveDown={index < sortedItems.length - 1}

@@ -325,6 +325,29 @@ async function CoachProgramBuilder({
     if (!tierByName.has(row.exercise_name)) tierByName.set(row.exercise_name, row.tier);
   }
 
+  // exercise_tier_template_system_assessment_task.md — the click-to-scale
+  // ladder picker already existed on the per-client override page
+  // (app/groups/[groupId]/workouts/[workoutId]/clients/page.tsx) but
+  // never in the Program Builder itself, where a coach actually builds
+  // the shared exercise. Same query shape as that page, just scoped to
+  // every pattern this coach owns instead of only the ones already used
+  // on one workout's slots — the builder needs the whole vocabulary
+  // available up front, not just whatever's already assigned.
+  const laddersByPattern: Record<string, { exerciseName: string }[]> = {};
+  const patternIds = (patternRows ?? []).map((p) => p.id);
+  if (patternIds.length > 0) {
+    const { data: ladderRows } = await supabase
+      .from("movement_pattern_exercises")
+      .select("movement_pattern_id, exercise_name, difficulty_rank")
+      .in("movement_pattern_id", patternIds)
+      .order("difficulty_rank", { ascending: true });
+    for (const row of ladderRows ?? []) {
+      const list = laddersByPattern[row.movement_pattern_id] ?? [];
+      list.push({ exerciseName: row.exercise_name });
+      laddersByPattern[row.movement_pattern_id] = list;
+    }
+  }
+
   const days: BuilderDay[] = (workoutRows ?? []).map((w: any) => {
     const exerciseItems: BuilderExercise[] = (w.group_workout_exercises ?? []).map((ex: any) => {
       const media = mediaByName.get(ex.exercise_name);
@@ -415,6 +438,7 @@ async function CoachProgramBuilder({
         exerciseAliases={exerciseAliases}
         exerciseTierByName={Object.fromEntries(tierByName)}
         movementPatterns={movementPatterns}
+        laddersByPattern={laddersByPattern}
         initialStartDate={startDate}
         initialTrainingDays={trainingDays}
         initialVisibilityWindow={visibilityWindow}

@@ -90,6 +90,7 @@ export function ExerciseBuilderCard({
   exerciseAliases,
   exerciseTierByName,
   movementPatterns,
+  laddersByPattern,
   restSuggestions,
   canMoveUp,
   canMoveDown,
@@ -108,6 +109,11 @@ export function ExerciseBuilderCard({
   exerciseAliases: AliasEntry[];
   exerciseTierByName?: Record<string, "A" | "B" | "C" | null>;
   movementPatterns: MovementPatternOption[];
+  // exercise_tier_template_system_assessment_task.md — every ladder rung
+  // for every pattern this coach owns, keyed by movement_pattern_id. A
+  // pattern with no ladder rows yet (or none passed) simply shows no
+  // picker, same as today.
+  laddersByPattern?: Record<string, { exerciseName: string }[]>;
   // The program's own training-intent-derived rest/tempo reference
   // (training-intent.ts) — undefined/empty for a program with no
   // recognized intent, or one of the intents deliberately withheld
@@ -132,6 +138,14 @@ export function ExerciseBuilderCard({
   onDuplicated: (newExercise: BuilderExercise) => void;
 }) {
   const [nameDraft, setNameDraft] = useState(exercise.exerciseName);
+  // The ladder picker below changes exercise.exerciseName from OUTSIDE
+  // this input (a rung click, not typing) — without this, the same
+  // "value changes out from under us" staleness TargetCell already
+  // guards against (see its own comment above) would leave the name
+  // field showing the old exercise name after a swap.
+  useEffect(() => {
+    setNameDraft(exercise.exerciseName);
+  }, [exercise.exerciseName]);
   const [collapsed, setCollapsed] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [addFieldOpen, setAddFieldOpen] = useState(false);
@@ -701,6 +715,33 @@ export function ExerciseBuilderCard({
                 </option>
               ))}
             </select>
+          )}
+
+          {/* exercise_tier_template_system_assessment_task.md — the
+              click-to-scale ladder already existed on the per-client
+              override page; this is the same rung list, but picking one
+              here swaps the shared program exercise itself (handleNameCommit,
+              the same write path the name field above already uses) rather
+              than creating a per-athlete override. Ordered by
+              difficulty_rank server-side already. */}
+          {exercise.movementPatternId && (laddersByPattern?.[exercise.movementPatternId]?.length ?? 0) > 0 && (
+            <div className="flex flex-wrap gap-2 mb-2">
+              {laddersByPattern![exercise.movementPatternId]!.map((rung) => (
+                <button
+                  key={rung.exerciseName}
+                  type="button"
+                  onClick={() => handleNameCommit(rung.exerciseName)}
+                  disabled={rung.exerciseName === exercise.exerciseName}
+                  className={`h-8 px-3 border font-body text-xs transition-colors ${
+                    rung.exerciseName === exercise.exerciseName
+                      ? "bg-rust border-rust text-graphite"
+                      : "border-steel/30 text-steel active:border-rust active:text-rust"
+                  }`}
+                >
+                  {rung.exerciseName}
+                </button>
+              ))}
+            </div>
           )}
 
           <div className="flex items-center gap-2 mb-2">

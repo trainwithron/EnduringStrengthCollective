@@ -22,6 +22,7 @@ export function WeekGrid({
   exerciseAliases,
   exerciseTierByName,
   movementPatterns,
+  laddersByPattern,
   restSuggestions,
   expanded,
   scheduledDateByDayId,
@@ -39,6 +40,7 @@ export function WeekGrid({
   exerciseAliases: AliasEntry[];
   exerciseTierByName: Record<string, "A" | "B" | "C" | null>;
   movementPatterns: MovementPatternOption[];
+  laddersByPattern: Record<string, { exerciseName: string }[]>;
   restSuggestions?: RestTempoSuggestion[];
   expanded: boolean;
   scheduledDateByDayId?: Map<string, Date>;
@@ -285,6 +287,7 @@ export function WeekGrid({
                   exerciseAliases={exerciseAliases}
                   exerciseTierByName={exerciseTierByName}
                   movementPatterns={movementPatterns}
+                  laddersByPattern={laddersByPattern}
                   restSuggestions={restSuggestions}
                   condensed={daysCondensed}
                   collapsed={collapsedDayIds.has(day.id)}
