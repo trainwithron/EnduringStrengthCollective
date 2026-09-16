@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { mirrorGoogleCalendarEvent } from "@/lib/mirror-google-calendar-event";
 
 export function RescheduleSlotButton({
   bookingId,
@@ -35,6 +36,7 @@ export function RescheduleSlotButton({
       return;
     }
 
+    mirrorGoogleCalendarEvent(bookingId);
     // Clears the ?reschedule= param so the page falls back to its normal
     // booking view instead of staying in reschedule mode after a move.
     router.push(window.location.pathname);

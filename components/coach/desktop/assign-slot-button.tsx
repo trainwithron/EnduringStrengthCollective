@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { checkAndNotifyLowSessionBalance } from "@/lib/notify-low-session-balance";
 import { notifyBookingConfirmed } from "@/lib/notify-booking-confirmed";
+import { mirrorGoogleCalendarEvent } from "@/lib/mirror-google-calendar-event";
 
 export function AssignSlotButton({
   coachId,
@@ -31,7 +32,7 @@ export function AssignSlotButton({
     // Same atomic RPC book-slot-button.tsx uses. A coach assigning a
     // session doesn't need the client to already have a credit (they can
     // assign a courtesy session), but still gets the real overlap guard.
-    const { error: bookError } = await supabase.rpc("book_session", {
+    const { data: bookingId, error: bookError } = await supabase.rpc("book_session", {
       p_coach_id: coachId,
       p_athlete_id: athleteId,
       p_group_id: groupId,
@@ -52,6 +53,7 @@ export function AssignSlotButton({
 
     checkAndNotifyLowSessionBalance(athleteId, groupId);
     notifyBookingConfirmed(athleteId, groupId, startAt);
+    if (bookingId) mirrorGoogleCalendarEvent(bookingId);
     router.refresh();
   }
 

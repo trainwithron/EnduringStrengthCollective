@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { mirrorGoogleCalendarEvent } from "@/lib/mirror-google-calendar-event";
 
 export function CancelBookingButton({
   bookingId,
@@ -31,6 +32,7 @@ export function CancelBookingButton({
     // cancellation behind it at all).
     await supabase.rpc("cancel_booking_and_refund_credit", { p_booking_id: bookingId });
 
+    mirrorGoogleCalendarEvent(bookingId);
     router.refresh();
   }
 

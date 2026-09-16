@@ -8,6 +8,7 @@ import type { DraggedClient } from "./draggable-client-name";
 import type { CalendarEventEntry } from "./calendar-grid";
 import { checkAndNotifyLowSessionBalance } from "@/lib/notify-low-session-balance";
 import { notifyBookingConfirmed } from "@/lib/notify-booking-confirmed";
+import { mirrorGoogleCalendarEvent } from "@/lib/mirror-google-calendar-event";
 
 // A full day view shown when a client is dropped onto a calendar day —
 // replaces the old cramped time-slot dropdown with everything already
@@ -88,7 +89,7 @@ export function ExpandedDayScheduler({
     // Same atomic book_session RPC every booking path uses now — real
     // overlap guard beyond the exact-start_at unique index, in one
     // transaction with the credit spend.
-    const { error: bookError } = await supabase.rpc("book_session", {
+    const { data: bookingId, error: bookError } = await supabase.rpc("book_session", {
       p_coach_id: userData.user.id,
       p_athlete_id: client.athleteId,
       p_group_id: groupId,
@@ -109,6 +110,7 @@ export function ExpandedDayScheduler({
     // notification round trip.
     checkAndNotifyLowSessionBalance(client.athleteId, groupId);
     notifyBookingConfirmed(client.athleteId, groupId, start.toISOString());
+    if (bookingId) mirrorGoogleCalendarEvent(bookingId);
     onAssigned();
   }
 
