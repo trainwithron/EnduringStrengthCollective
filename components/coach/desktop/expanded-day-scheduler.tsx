@@ -7,6 +7,7 @@ import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import type { DraggedClient } from "./draggable-client-name";
 import type { CalendarEventEntry } from "./calendar-grid";
 import { checkAndNotifyLowSessionBalance } from "@/lib/notify-low-session-balance";
+import { notifyBookingConfirmed } from "@/lib/notify-booking-confirmed";
 
 // A full day view shown when a client is dropped onto a calendar day —
 // replaces the old cramped time-slot dropdown with everything already
@@ -107,6 +108,7 @@ export function ExpandedDayScheduler({
     // Fire-and-forget — never blocks the booking flow itself on a
     // notification round trip.
     checkAndNotifyLowSessionBalance(client.athleteId, groupId);
+    notifyBookingConfirmed(client.athleteId, groupId, start.toISOString());
     onAssigned();
   }
 

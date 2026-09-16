@@ -33,6 +33,10 @@
     {
       "path": "/api/cron/coach-chat-cleanup",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/session-reminder",
+      "schedule": "*/15 * * * *"
     }
   ]
 }

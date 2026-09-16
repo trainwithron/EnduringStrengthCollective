@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { notifyBookingConfirmed } from "@/lib/notify-booking-confirmed";
 
 export function BookSlotButton({
   coachId,
@@ -51,6 +52,7 @@ export function BookSlotButton({
       return;
     }
 
+    notifyBookingConfirmed(athleteId, groupId, startAt);
     router.refresh();
   }
 
