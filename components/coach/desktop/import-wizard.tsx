@@ -111,6 +111,8 @@ export function ImportWizard({
   athleteName,
   initialLibrary,
   initialAliases,
+  initialAiPrompt,
+  autoGenerate,
 }: {
   coachId: string;
   groupId: string;
@@ -123,6 +125,14 @@ export function ImportWizard({
   athleteName?: string | null;
   initialLibrary: LibraryExercise[];
   initialAliases: AliasEntry[];
+  // the_spot_dropdown_widget_redesign_sept16.md — the Spot's mobile NL
+  // builder composes a richer prompt (free text + progression rule +
+  // program length + methodology) before handing off to this exact same
+  // AI-generate pipeline, full screen. Both undefined for every existing
+  // caller (New Program / Import pages), which render identically to
+  // before.
+  initialAiPrompt?: string;
+  autoGenerate?: boolean;
 }) {
   const router = useRouter();
   const [status, setStatus] = useState<Status>("idle");
@@ -630,7 +640,8 @@ export function ImportWizard({
     );
   }
 
-  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiPrompt, setAiPrompt] = useState(initialAiPrompt ?? "");
+  const autoGenerateFiredRef = useRef(false);
 
   async function handleAiGenerate() {
     if (processingRef.current || !aiPrompt.trim()) return;
@@ -667,6 +678,19 @@ export function ImportWizard({
       processingRef.current = false;
     }
   }
+
+  // The Spot's mobile NL builder composes its prompt and wants generation
+  // to start the instant this component mounts, not require a second tap
+  // on a button the coach never sees (they already tapped "Generate" once
+  // on the compact sheet). The ref guards the real double-invoke React
+  // 18 Strict Mode runs every effect through in dev.
+  useEffect(() => {
+    if (autoGenerate && initialAiPrompt && !autoGenerateFiredRef.current) {
+      autoGenerateFiredRef.current = true;
+      handleAiGenerate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleAiPhotoUpload(file: File) {
     if (processingRef.current) return;

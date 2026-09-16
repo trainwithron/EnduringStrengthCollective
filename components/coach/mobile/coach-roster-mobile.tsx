@@ -215,6 +215,13 @@ function RosterRow({
             >
               Message
             </Link>
+            <Link
+              href={`/groups/${groupId}/clients?spotBuilder=${member.profileId}&spotBuilderName=${encodeURIComponent(member.fullName)}`}
+              onClick={close}
+              className="font-body text-sm text-rust"
+            >
+              Build with AI
+            </Link>
           </div>
         </div>
       )}
