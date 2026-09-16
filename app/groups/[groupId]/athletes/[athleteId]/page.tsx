@@ -11,6 +11,7 @@ import { PrivateFromOrgToggle } from "@/components/coach/private-from-org-toggle
 import { ChangeClientGroupControl } from "@/components/coach/change-client-group-control";
 import { ClientProgrammingMenu } from "@/components/coach/client-programming-menu";
 import { MinorConsentControl } from "@/components/coach/minor-consent-control";
+import { GuardianShareButton } from "@/components/coach/guardian-share-button";
 import { NutritionPhaseControl } from "@/components/coach/nutrition-phase-control";
 import { VideoCheckinRecorder } from "@/components/coach/video-checkin-recorder";
 import { ParQAnswersPanel } from "@/components/coach/par-q-answers-panel";
@@ -307,6 +308,7 @@ export default async function AthleteProfilePage(
   const [
     { data: activeProgramSchedule },
     { data: minorConsentRow },
+    { data: guardianLinkRow },
     { data: assignmentRows },
     { data: habitLogRows },
     signedPhotoResults,
@@ -323,6 +325,17 @@ export default async function AthleteProfilePage(
           .from("minor_consent")
           .select("verified, method, notes, verified_at")
           .eq("athlete_id", params.athleteId)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    isMinor
+      ? supabase
+          .from("guardian_links")
+          .select("access_token")
+          .eq("athlete_id", params.athleteId)
+          .eq("group_id", params.groupId)
+          .is("revoked_at", null)
+          .order("created_at", { ascending: false })
+          .limit(1)
           .maybeSingle()
       : Promise.resolve({ data: null }),
     supabase
@@ -914,7 +927,7 @@ export default async function AthleteProfilePage(
           )}
 
           {isMinor && (
-            <section>
+            <section className="space-y-3">
               <MinorConsentControl
                 athleteId={params.athleteId}
                 groupId={params.groupId}
@@ -922,6 +935,12 @@ export default async function AthleteProfilePage(
                 initialMethod={(minorConsentRow?.method as any) ?? null}
                 initialNotes={minorConsentRow?.notes ?? ""}
                 initialVerifiedAt={minorConsentRow?.verified_at ?? null}
+              />
+              <GuardianShareButton
+                athleteId={params.athleteId}
+                groupId={params.groupId}
+                consentVerified={minorConsentRow?.verified ?? false}
+                initialToken={guardianLinkRow?.access_token ?? null}
               />
             </section>
           )}

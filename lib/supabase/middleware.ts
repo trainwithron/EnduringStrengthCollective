@@ -42,6 +42,9 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/invite/") ||
     pathname.startsWith("/pr/") ||
     pathname.startsWith("/share/") ||
+    // guardian_links tokenized read-only view — a caregiver never has a
+    // real session, same gotcha already hit for /pr/ and /share/.
+    pathname.startsWith("/guardian/") ||
     pathname.startsWith("/book/") ||
     pathname.startsWith("/api/discovery-availability/") ||
     // Stripe calls this directly with no user session at all — its own
