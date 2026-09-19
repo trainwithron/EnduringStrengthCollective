@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getStripeClient, isStripeConfigured } from "@/lib/stripe";
-import { computeRevenueSplit, type CoachShare } from "@/lib/revenue-splits";
+import { computeRevenueSplit, computePlatformDeduction, type CoachShare } from "@/lib/revenue-splits";
 import { duplicateProgram } from "@/lib/program-duplication";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatch";
 import type Stripe from "stripe";
@@ -81,6 +81,68 @@ async function dispatchPackagePurchasedEvent(
   });
 }
 
+// platform_flat_fee_revenue_split_scoping_sept19.md — the real Stripe
+// processing fee for a specific charge, read from its own
+// balance_transaction (never estimated). Re-retrieves the source object
+// with a fresh expand rather than trusting whatever shape the webhook
+// payload itself carried — checkout sessions never expand payment_intent
+// by default, and invoice/payment-intent field shapes have drifted
+// across Stripe API versions (see the current_period_end/subscription
+// comments elsewhere in this file), so one retrieve-and-expand call is
+// more robust than branching on several possible payload shapes.
+// A payment with genuinely no payment intent (e.g. a $0 charge) has no
+// real card-processing fee to deduct, so this returns 0 rather than
+// throwing — but an actual Stripe API failure during the lookup still
+// throws, since silently defaulting to $0 there would recreate the
+// exact silent-absorption bug this feature exists to close.
+//
+// Bounded retry, confirmed necessary by a real live test against
+// Stripe's own test-mode API (not a hypothetical): a charge's
+// balance_transaction can still be null for a couple of seconds right
+// after the charge succeeds, even though checkout.session.completed/
+// invoice.paid have already fired by then. Three short attempts covers
+// this without risking the webhook handler hanging.
+async function getRealStripeFeeCents(
+  stripe: Stripe,
+  paymentIntentRef: string | Stripe.PaymentIntent | null | undefined
+): Promise<number> {
+  const paymentIntentId = typeof paymentIntentRef === "string" ? paymentIntentRef : paymentIntentRef?.id;
+  if (!paymentIntentId) return 0;
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId, {
+      expand: ["latest_charge.balance_transaction"],
+    });
+    const charge = paymentIntent.latest_charge;
+    if (charge && typeof charge !== "string") {
+      const balanceTransaction = charge.balance_transaction;
+      if (balanceTransaction && typeof balanceTransaction !== "string") {
+        return balanceTransaction.fee ?? 0;
+      }
+    }
+    if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 1500));
+  }
+  return 0;
+}
+
+// Same real-fee lookup as getRealStripeFeeCents, but for a recurring
+// invoice rather than a one-time checkout session. Invoices in this
+// Stripe API version carry no direct payment_intent field of their own
+// (removed in favor of the paginated invoice.payments list) — expand
+// that list, take its (only, for this app's single-payment-per-invoice
+// model) entry, and hand its payment_intent reference off to the same
+// balance_transaction lookup used above.
+async function getRealStripeFeeCentsForInvoice(stripe: Stripe, invoiceId: string): Promise<number> {
+  const invoice = await stripe.invoices.retrieve(invoiceId, {
+    expand: ["payments.data.payment.payment_intent"],
+  });
+  const paymentIntentRef = (invoice as any).payments?.data?.[0]?.payment?.payment_intent as
+    | string
+    | Stripe.PaymentIntent
+    | undefined;
+  return getRealStripeFeeCents(stripe, paymentIntentRef);
+}
+
 // Splits a payment's proceeds across the org's coaches per the existing
 // platform_fee_pct/revenue_share_pct model (lib/revenue-splits.ts —
 // unchanged math, just wired to real transfers here) and moves each
@@ -89,12 +151,21 @@ async function dispatchPackagePurchasedEvent(
 // silently skipped rather than blocking the whole payment — their share
 // simply isn't transferred until they connect, same as how a package
 // with is_active=false just doesn't appear rather than erroring.
+//
+// The platform's own flat deduction (real Stripe fee + $0.10, see
+// computePlatformDeduction) is taken off grossAmountCents FIRST, and
+// computeRevenueSplit runs on what's left — the org/coach split was
+// silently operating on the gross charge before this, absorbing
+// Stripe's real fee out of the org's own platform_fee_pct bucket with
+// zero tracking. Recorded once per event in platform_fee_ledger,
+// independent of how many (if any) coaches end up receiving a transfer.
 async function createRevenueSplitTransfers(
   supabase: SupabaseClient,
   stripe: Stripe,
   eventId: string,
   groupId: string,
-  amountCents: number
+  grossAmountCents: number,
+  stripeProcessingFeeCents: number
 ) {
   const { data: group } = await supabase.from("groups").select("organization_id").eq("id", groupId).maybeSingle();
   if (!group?.organization_id) return;
@@ -105,6 +176,22 @@ async function createRevenueSplitTransfers(
     .eq("id", group.organization_id)
     .maybeSingle();
   if (!org) return;
+
+  const deduction = computePlatformDeduction(grossAmountCents, stripeProcessingFeeCents);
+  const { error: ledgerError } = await supabase.from("platform_fee_ledger").insert({
+    stripe_event_id: eventId,
+    organization_id: group.organization_id,
+    gross_amount_cents: deduction.grossAmountCents,
+    stripe_processing_fee_cents: deduction.stripeProcessingFeeCents,
+    platform_flat_fee_cents: deduction.platformFlatFeeCents,
+    net_amount_cents: deduction.netAmountCents,
+  });
+  // Unique violation = this event's ledger row was already recorded on a
+  // prior attempt — fall through and keep going rather than returning
+  // early, since a prior attempt may have failed partway through the
+  // coach-transfer loop below (each transfer has its own idempotency
+  // guard via revenue_split_transfers' own unique constraint).
+  if (ledgerError && ledgerError.code !== "23505") throw ledgerError;
 
   const { data: memberRows } = await supabase
     .from("organization_memberships")
@@ -118,7 +205,7 @@ async function createRevenueSplitTransfers(
     role: m.role,
     revenueSharePct: m.revenue_share_pct,
   }));
-  const split = computeRevenueSplit(amountCents, org.platform_fee_pct, coaches);
+  const split = computeRevenueSplit(deduction.netAmountCents, org.platform_fee_pct, coaches);
   const connectByProfile = new Map(memberRows.map((m) => [m.profile_id, m]));
 
   for (const share of split.coachShares) {
@@ -231,7 +318,15 @@ export async function POST(request: Request) {
           });
           if (rpcError) throw rpcError;
 
-          await createRevenueSplitTransfers(supabase, stripe, event.id, groupId, session.amount_total ?? 0);
+          const stripeFeeCents = await getRealStripeFeeCents(stripe, session.payment_intent);
+          await createRevenueSplitTransfers(
+            supabase,
+            stripe,
+            event.id,
+            groupId,
+            session.amount_total ?? 0,
+            stripeFeeCents
+          );
           await assignLinkedProgramIfFirstEnrollment(supabase, {
             coachPackageId,
             athleteId,
@@ -338,7 +433,15 @@ export async function POST(request: Request) {
         });
         if (rpcError) throw rpcError;
 
-        await createRevenueSplitTransfers(supabase, stripe, event.id, groupId, invoice.amount_paid ?? 0);
+        const invoiceStripeFeeCents = await getRealStripeFeeCentsForInvoice(stripe, invoice.id!);
+        await createRevenueSplitTransfers(
+          supabase,
+          stripe,
+          event.id,
+          groupId,
+          invoice.amount_paid ?? 0,
+          invoiceStripeFeeCents
+        );
         await dispatchPackagePurchasedEvent(supabase, {
           groupId,
           coachPackageId,
