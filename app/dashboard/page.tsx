@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase/server";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { CoachHomeShell } from "@/components/coach/coach-home-shell";
+import { CoachProfileEditor } from "@/components/coach/coach-profile-editor";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import type { HomeClientCardData } from "@/components/coach/desktop/home-client-card";
 import type { HomeGroupCardData } from "@/components/coach/desktop/home-group-card";
@@ -107,6 +108,12 @@ export default async function CoachHomePage() {
     .eq("profile_id", user.id);
 
   const primaryOrgMembership = orgMemberships?.[0] ?? null;
+  const { data: viewerProfile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+  const { data: coachProfileRow } = await supabase
+    .from("coach_profiles")
+    .select("bio, photo_url")
+    .eq("coach_id", user.id)
+    .maybeSingle();
   const { data: org } = primaryOrgMembership
     ? await supabase
         .from("organizations")
@@ -411,6 +418,12 @@ export default async function CoachHomePage() {
     <>
       <DashboardAutoRefresh />
       <CollectiveIntelligenceChat />
+      <CoachProfileEditor
+        coachId={user.id}
+        coachName={viewerProfile?.full_name ?? "Coach"}
+        initialBio={coachProfileRow?.bio ?? null}
+        initialPhotoUrl={coachProfileRow?.photo_url ?? null}
+      />
       <div className="flex items-center justify-between mb-6">
         <h1 className="font-display font-bold text-2xl uppercase">Home</h1>
         <MarkAllSeenButton groupIds={allGroupIds} />

@@ -98,6 +98,7 @@ export default async function DayDetailPage(
   let dayMacros: { calories: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null } | null = null;
   let dayHabits: { id: string; title: string; completed: boolean }[] = [];
   let dayMeals: Record<string, any[]> | null = null;
+  let pinnedLinks: { id: string; title: string; url: string }[] = [];
 
   if (viewingAsAthlete) {
     const { data: assignment } = await supabase
@@ -188,6 +189,17 @@ export default async function DayDetailPage(
     );
     dayHabits = dueHabitDefs.map((h) => ({ id: h.id, title: h.title, completed: completedIds.has(h.id) }));
   }
+
+  // coach_identity_bio_social_link_pinning_scoping_sept19.md — a Pro
+  // Shop link the coach pinned to this exact athlete+date.
+  const { data: dayPinRows } = await supabase
+    .from("pro_shop_link_day_pins")
+    .select("id, pro_shop_links ( id, title, url )")
+    .eq("athlete_id", athleteId)
+    .eq("pin_date", params.date);
+  pinnedLinks = (dayPinRows ?? [])
+    .map((p: any) => (p.pro_shop_links ? { id: p.pro_shop_links.id as string, title: p.pro_shop_links.title as string, url: p.pro_shop_links.url as string } : null))
+    .filter((l): l is { id: string; title: string; url: string } => l != null);
 
   let slots: { start: Date; durationMinutes: number }[] = [];
   let bookingsForDay: any[] = [];
@@ -353,7 +365,7 @@ export default async function DayDetailPage(
               </Link>
             </div>
           )}
-          <TodayWidget todayDate={params.date} macros={dayMacros} habits={dayHabits} />
+          <TodayWidget todayDate={params.date} macros={dayMacros} habits={dayHabits} pinnedLinks={pinnedLinks} />
           <DayMealsView meals={dayMeals} />
         </section>
       )}

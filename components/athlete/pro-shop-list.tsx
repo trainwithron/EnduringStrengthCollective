@@ -8,6 +8,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   supplements: "Supplements",
   coaching: "Coaching",
   website: "Website",
+  social: "Social",
   other: "Link",
 };
 

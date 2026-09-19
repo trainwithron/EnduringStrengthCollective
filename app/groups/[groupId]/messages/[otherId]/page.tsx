@@ -5,6 +5,7 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { DirectMessageThread } from "@/components/messages/direct-message-thread";
+import { CoachProfilePopup } from "@/components/shared/coach-profile-popup";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 
@@ -121,7 +122,15 @@ export default async function MessageThreadPage(
         >
           &larr; All messages
         </Link>
-        <h1 className="font-display font-bold text-2xl uppercase leading-none mt-2">{otherName}</h1>
+        {viewerIsCoach ? (
+          <h1 className="font-display font-bold text-2xl uppercase leading-none mt-2">{otherName}</h1>
+        ) : (
+          <CoachProfilePopup coachId={params.otherId} coachName={otherName}>
+            <h1 className="font-display font-bold text-2xl uppercase leading-none mt-2 underline decoration-dotted underline-offset-4">
+              {otherName}
+            </h1>
+          </CoachProfilePopup>
+        )}
       </header>
       <div className="min-h-[50vh]">
         <DirectMessageThread

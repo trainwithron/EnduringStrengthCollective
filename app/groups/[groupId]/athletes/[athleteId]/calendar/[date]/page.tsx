@@ -8,6 +8,7 @@ import { DayHabitsPanel } from "@/components/coach/desktop/day-habits-panel";
 import type { DueHabit } from "@/components/coach/desktop/habit-day-checklist";
 import { MealSlotDropZones } from "@/components/coach/desktop/meal-slot-drop-zones";
 import { RecipeLibraryRail } from "@/components/coach/desktop/recipe-library-rail";
+import { ProShopDayPin } from "@/components/coach/desktop/pro-shop-day-pin";
 import { computeScheduledDates } from "@/lib/program-schedule";
 import { isHabitDueOn } from "@/lib/habits";
 import { gatherMacroSuggestion } from "@/lib/nutrition-block-adjustment-gather";
@@ -250,6 +251,23 @@ export default async function ClientCalendarDayPage(
     .eq("weekday", date.getDay())
     .order("start_time", { ascending: true });
 
+  // coach_identity_bio_social_link_pinning_scoping_sept19.md — this
+  // client's own Pro Shop links (to pick from) and whatever's already
+  // pinned to this exact day.
+  const [{ data: proShopLinkRows }, { data: dayPinRows }] = await Promise.all([
+    supabase.from("pro_shop_links").select("id, title").eq("coach_id", user.id).order("sort_order"),
+    supabase
+      .from("pro_shop_link_day_pins")
+      .select("id, link_id, pro_shop_links ( title )")
+      .eq("athlete_id", params.athleteId)
+      .eq("pin_date", params.date),
+  ]);
+  const dayPins = (dayPinRows ?? []).map((p: any) => ({
+    id: p.id as string,
+    linkId: p.link_id as string,
+    linkTitle: (p.pro_shop_links?.title as string) ?? "Link",
+  }));
+
   const dateLabel = date.toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
@@ -344,6 +362,15 @@ export default async function ClientCalendarDayPage(
           </div>
         </section>
       )}
+
+      <ProShopDayPin
+        athleteId={params.athleteId}
+        groupId={params.groupId}
+        coachId={user.id}
+        date={params.date}
+        availableLinks={proShopLinkRows ?? []}
+        initialPins={dayPins}
+      />
 
       <section className="border border-steel/20 p-4 mt-6">
         <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">

@@ -17,14 +17,26 @@ export interface TodayHabit {
   completed: boolean;
 }
 
+export interface PinnedProShopLink {
+  id: string;
+  title: string;
+  url: string;
+}
+
 export function TodayWidget({
   todayDate,
   macros,
   habits,
+  pinnedLinks,
 }: {
   todayDate: string;
   macros: TodayMacros | null;
   habits: TodayHabit[];
+  // coach_identity_bio_social_link_pinning_scoping_sept19.md — a Pro
+  // Shop link the coach pinned specifically to this athlete's today
+  // (e.g. an intra-workout supplement on a heavy-training day).
+  // Optional/undefined for any caller that hasn't fetched it.
+  pinnedLinks?: PinnedProShopLink[];
 }) {
   const [state, setState] = useState(habits);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +116,23 @@ export function TodayWidget({
               </span>
               <span className="font-body text-sm">{h.title}</span>
             </button>
+          ))}
+        </div>
+      )}
+
+      {pinnedLinks && pinnedLinks.length > 0 && (
+        <div className="space-y-1.5 pt-3 border-t border-steel/15">
+          <p className="font-body text-[10px] text-steel uppercase tracking-wide">From your coach, for today</p>
+          {pinnedLinks.map((l) => (
+            <a
+              key={l.id}
+              href={l.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block font-body text-sm text-rust underline underline-offset-2"
+            >
+              {l.title}
+            </a>
           ))}
         </div>
       )}

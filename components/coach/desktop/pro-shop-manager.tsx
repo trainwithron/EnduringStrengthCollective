@@ -22,6 +22,7 @@ const CATEGORIES = [
   { value: "supplements", label: "Supplements" },
   { value: "coaching", label: "Coaching / Apply" },
   { value: "website", label: "Website" },
+  { value: "social", label: "Social" },
   { value: "other", label: "Other" },
 ];
 
