@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { X, Sparkles, ChevronDown } from "lucide-react";
+import { X, Sparkles } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { LibraryExercise, AliasEntry } from "@/lib/exercise-matching";
 import { PROGRESSION_RULES, parseQuickBuildInput, type ProgressionRule } from "@/lib/spot-quick-build";
@@ -22,13 +22,19 @@ const ImportWizard = dynamic(() => import("@/components/coach/desktop/import-wiz
 // verbatim (Ron: "must not be lost in the rework") — the only change
 // from the 9/16 shipped version is that arriving at this panel via
 // swipe already counts as "open", so there's no separate closed/FAB
-// stage, and the compact stage's one text line now does double duty:
-// a direct "Generate" button for a fast one-line build, and — via
-// "Refine details" — the same text run through parseQuickBuildInput
-// (lib/spot-quick-build.ts) to prefill the structured fields before
-// generating, rather than requiring the coach to type the description
-// AND separately re-pick progression/weeks/style. One input, two paths,
-// per Ron's own "not two separate entry points" instruction.
+// stage.
+//
+// Compact-line mechanism, corrected per Ron's own direct follow-up
+// after the first pass ("if it keeps just giving me AI generations,
+// that will be annoying... we need to be able to pick which one we
+// want... just a quick button, AI or parse"): an explicit AI/Parse
+// toggle sits right on the compact line, not an implicit split between
+// two different buttons. AI mode fires straight to full generation;
+// Parse mode runs the exact same text through parseQuickBuildInput
+// (lib/spot-quick-build.ts) to prefill the structured fields for review
+// before generating — same one input either way, the coach just picks
+// which path it takes instead of the app guessing from which button
+// they happened to tap.
 const PROGRESSION_RULE_LIST = PROGRESSION_RULES;
 
 interface ClientOption {
@@ -46,6 +52,12 @@ export function SpotBuilderPanel({
   initialAthleteName?: string | null;
 }) {
   const [stage, setStage] = useState<"compact" | "expanded" | "fullscreen">(initialAthleteId ? "expanded" : "compact");
+  // Explicit, coach-controlled choice — not inferred from which button
+  // they tap (Ron's own correction: "just a quick button, AI or
+  // parse"). AI = fire full generation straight from the compact text;
+  // Parse = run the same text through the local heuristic parser to
+  // prefill the structured fields for review before generating.
+  const [mode, setMode] = useState<"ai" | "parse">("ai");
   const [athleteId, setAthleteId] = useState<string | null>(initialAthleteId ?? null);
   const [athleteName, setAthleteName] = useState<string | null>(initialAthleteName ?? null);
   const [clients, setClients] = useState<ClientOption[] | null>(null);
@@ -152,32 +164,40 @@ export function SpotBuilderPanel({
           </select>
         )}
 
+        <input
+          type="text"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder='e.g. "8-week strength block, 4 days/week, conjugate"'
+          className="w-full h-10 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
+        />
+
         <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder='e.g. "8-week strength block, 4 days/week, conjugate"'
-            className="flex-1 h-10 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
-          />
+          <div className="flex border border-steel/30 shrink-0">
+            <button
+              type="button"
+              onClick={() => setMode("ai")}
+              className={`h-10 px-3 font-body text-sm font-medium ${mode === "ai" ? "bg-rust text-graphite" : "text-steel"}`}
+            >
+              AI
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("parse")}
+              className={`h-10 px-3 font-body text-sm font-medium border-l border-steel/30 ${mode === "parse" ? "bg-rust text-graphite" : "text-steel"}`}
+            >
+              Parse
+            </button>
+          </div>
           <button
             type="button"
-            onClick={() => applyParsedGuessAndAdvance("fullscreen")}
+            onClick={() => applyParsedGuessAndAdvance(mode === "ai" ? "fullscreen" : "expanded")}
             disabled={!canGenerate}
-            className="h-10 px-3 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40 shrink-0"
+            className="flex-1 h-10 px-3 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40 disabled:bg-steel/30"
           >
-            Generate →
+            {mode === "ai" ? "Generate →" : "Parse →"}
           </button>
         </div>
-
-        <button
-          type="button"
-          onClick={() => applyParsedGuessAndAdvance("expanded")}
-          className="w-full flex items-center justify-center gap-1 font-body text-[11px] text-steel uppercase tracking-wide active:text-rust"
-        >
-          Refine details
-          <ChevronDown className="w-3.5 h-3.5" />
-        </button>
       </div>
     );
   }
