@@ -7,6 +7,7 @@ import { notifyPush } from "@/lib/push-notify";
 import { isHighPriorityClient } from "@/lib/notification-priority";
 import { checkAndNotifyLowSessionBalance } from "@/lib/notify-low-session-balance";
 import { notifyWebhookEvent } from "@/lib/notify-webhook-event";
+import { refreshEquipmentLoadRatios } from "@/lib/equipment-load-ratio-gather";
 
 // This project has no generated Supabase Database type, so a fresh RPC's
 // result falls back to an untyped shape — spelled out explicitly here
@@ -133,7 +134,7 @@ export function CompleteWorkoutButton({
       });
     }
 
-    const [{ data: athleteProfile }, { data: athleteMembership }] = await Promise.all([
+    const [{ data: athleteProfile }, { data: athleteMembership }, { data: workoutCoach }] = await Promise.all([
       supabase.from("profiles").select("feed_broadcast_level, full_name").eq("id", result.athlete_id).maybeSingle(),
       supabase
         .from("group_memberships")
@@ -141,8 +142,28 @@ export function CompleteWorkoutButton({
         .eq("group_id", result.group_id)
         .eq("profile_id", result.athlete_id)
         .maybeSingle(),
+      supabase
+        .from("group_memberships")
+        .select("profile_id")
+        .eq("group_id", result.group_id)
+        .eq("role", "coach")
+        .limit(1)
+        .maybeSingle(),
     ]);
     const broadcastLevel = athleteProfile?.feed_broadcast_level ?? "full";
+
+    // Equipment-variant load-ratio learning
+    // (equipment_variant_load_ratio_and_smart_swap_scoping_sept19.md) —
+    // "this swap's own logged sets become the seed data for the next
+    // occurrence." Fire-and-forget, same as the other post-completion
+    // side effects here: a real recompute over this athlete's full
+    // history, but never something the athlete waits on or that can
+    // fail the completion flow itself.
+    if (workoutCoach?.profile_id) {
+      refreshEquipmentLoadRatios(supabase, { athleteId: result.athlete_id, coachId: workoutCoach.profile_id }).catch(
+        () => {}
+      );
+    }
     const newPrs = result.new_prs ?? [];
     const newRecords = result.new_records ?? [];
 

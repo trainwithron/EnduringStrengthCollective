@@ -8,6 +8,8 @@ import { ExerciseSetGrid } from "./exercise-set-grid";
 import { ExerciseVideoThread } from "./exercise-video-thread";
 import { EquipmentVisual } from "./equipment-visual";
 import { ExerciseVolumeHistory } from "./exercise-volume-history";
+import { findLoadRatio } from "@/lib/equipment-load-ratio-gather";
+import { convertWeightAcrossVariants } from "@/lib/equipment-load-ratio";
 
 export function ExerciseCard({
   exercise,
@@ -70,6 +72,7 @@ export function ExerciseCard({
     }
     setSwapBusy(true);
     setSwapError(null);
+    const oldName = exercise.exerciseName;
     const supabase = createBrowserClient();
     const { error } = await supabase
       .from("session_exercises")
@@ -86,6 +89,32 @@ export function ExerciseCard({
     }
     onRenamed(name);
     setSwapping(false);
+
+    // Equipment-variant load-ratio suggestion
+    // (equipment_variant_load_ratio_and_smart_swap_scoping_sept19.md) —
+    // a swap mid-session is exactly the moment this app has zero logged
+    // history under the NEW name yet, so the normal correlating-week
+    // weight suggestion (lib/set-suggestions.ts) has nothing to work
+    // with. If this athlete has a learned conversion between the old and
+    // new exercise, convert their last known weight on the old one and
+    // offer it the same way any other weight suggestion is offered —
+    // a swipeable placeholder (suggestedWeight), never an assertion, and
+    // only into sets that don't already have a real logged value.
+    if (lastTime?.weight != null) {
+      const ratioRow = await findLoadRatio(supabase, {
+        athleteId,
+        exerciseNameOne: oldName,
+        exerciseNameTwo: name,
+      });
+      if (ratioRow) {
+        const suggested = convertWeightAcrossVariants(lastTime.weight, oldName, name, ratioRow);
+        if (suggested != null) {
+          for (const set of exercise.sets) {
+            if (set.weight == null) onSetChange(set.id, { suggestedWeight: suggested });
+          }
+        }
+      }
+    }
   }
 
   async function handleAddSet() {
