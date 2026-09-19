@@ -4,7 +4,7 @@ import {
   normalizeFoodName,
   scoreFoodMatch,
   pickBestFoodMatch,
-  pickSearchTerm,
+  significantWords,
   MIN_CONFIDENT_MATCH_SCORE,
 } from "./food-matching";
 
@@ -41,6 +41,17 @@ describe("normalizeFoodName", () => {
 
   it("is order-independent", () => {
     expect(normalizeFoodName("Breast, Chicken")).toBe(normalizeFoodName("Chicken Breast"));
+  });
+
+  // Real mismatch found live: the AI writes "Eggs" (plural); a real USDA
+  // description says "Egg, whole, raw, fresh" (singular) — same food,
+  // zero word overlap without destemming.
+  it("unifies a common singular/plural pair", () => {
+    expect(normalizeFoodName("Eggs")).toBe(normalizeFoodName("Egg"));
+  });
+
+  it("leaves a short word alone rather than over-stripping it", () => {
+    expect(normalizeFoodName("oz")).toBe("oz");
   });
 });
 
@@ -81,15 +92,42 @@ describe("pickBestFoodMatch", () => {
   it("returns null for an empty candidate list", () => {
     expect(pickBestFoodMatch("Chicken Breast", [])).toBeNull();
   });
-});
 
-describe("pickSearchTerm", () => {
-  it("picks the longest normalized word as the broad search term", () => {
-    expect(pickSearchTerm("Chicken Breast")).toBe("chicken");
-    expect(pickSearchTerm("Brown Rice")).toBe("brown");
+  // Real scaling bug found once the live table went from 2 rows to
+  // 8,262: a compound/blended product containing all the query's words
+  // ("Snacks, rice cakes, brown rice, sesame seed") must not beat a
+  // plain, precise match ("Rice, brown, long-grain, cooked") just
+  // because both technically contain "brown" and "rice".
+  it("prefers the more precise candidate when two options both fully contain the query", () => {
+    const result = pickBestFoodMatch("Brown Rice", [
+      { fdcId: 10, description: "Snacks, rice cakes, brown rice, sesame seed" },
+      { fdcId: 11, description: "Rice, brown, long-grain, cooked" },
+    ]);
+    expect(result?.fdcId).toBe(11);
   });
 
-  it("falls back to the trimmed raw name when nothing normalizes", () => {
-    expect(pickSearchTerm("   ")).toBe("");
+  // A generic ingredient name with no prep description conventionally
+  // means the raw/uncooked form (how a recipe states an ingredient
+  // before cooking) — a real scaling issue found once the live table
+  // had many candidates: a processed product mentioning the same words
+  // ("tenders, breaded, cooked, microwaved") shouldn't beat the plain
+  // raw ingredient just because it happens to score the same containment.
+  it("prefers a raw entry over an equally-containing processed one", () => {
+    const result = pickBestFoodMatch("Chicken Breast", [
+      { fdcId: 20, description: "Chicken breast tenders, breaded, cooked, microwaved" },
+      { fdcId: 21, description: "Chicken, broilers or fryers, breast, meat only, raw" },
+    ]);
+    expect(result?.fdcId).toBe(21);
+  });
+});
+
+describe("significantWords", () => {
+  it("returns every normalized word, not just the longest one", () => {
+    expect(significantWords("Chicken Breast")).toEqual(["breast", "chicken"]);
+    expect(significantWords("Brown Rice")).toEqual(["brown", "rice"]);
+  });
+
+  it("returns an empty array for a name with nothing left after normalizing", () => {
+    expect(significantWords("   ")).toEqual([]);
   });
 });

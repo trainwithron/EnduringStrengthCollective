@@ -10,7 +10,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   parseIngredientLine,
   pickBestFoodMatch,
-  pickSearchTerm,
+  significantWords,
   type FoodCandidate,
 } from "./food-matching";
 
@@ -47,6 +47,31 @@ export interface VerifiedMealOption {
 
 const MACRO_NUTRIENT_KEYS = ["protein_g", "carbs_g", "fat_g", "kcal"] as const;
 
+// Two-tier candidate fetch, real fix for a scaling issue found once the
+// live usda_foods table went from 2 rows to 8,262: requiring every
+// significant word (chained ilike = AND) gets a small, genuinely
+// relevant candidate pool directly, instead of hoping the right row
+// survives a single-broad-word .limit() lottery. Falls back to an OR
+// across the same words only if the strict pass finds nothing — a
+// prep-style word ("grilled") the AI used that never appears in any
+// USDA description shouldn't zero out the whole search when the food
+// itself (e.g. "chicken") still has real, matchable candidates.
+async function fetchFoodCandidates(supabase: SupabaseClient, name: string): Promise<FoodCandidate[]> {
+  const words = significantWords(name);
+  if (words.length === 0) return [];
+
+  let query = supabase.from("usda_foods").select("fdc_id, description");
+  for (const w of words) query = query.ilike("description", `%${w}%`);
+  const { data: strict } = await query.limit(50);
+  if (strict && strict.length > 0) {
+    return strict.map((r) => ({ fdcId: r.fdc_id as number, description: r.description as string }));
+  }
+
+  const orClause = words.map((w) => `description.ilike.%${w}%`).join(",");
+  const { data: loose } = await supabase.from("usda_foods").select("fdc_id, description").or(orClause).limit(50);
+  return (loose ?? []).map((r) => ({ fdcId: r.fdc_id as number, description: r.description as string }));
+}
+
 async function verifyIngredientLine(
   supabase: SupabaseClient,
   rawLine: string,
@@ -68,11 +93,7 @@ async function verifyIngredientLine(
     };
   }
 
-  const searchTerm = pickSearchTerm(parsed.name);
-  const { data: candidateRows } = searchTerm
-    ? await supabase.from("usda_foods").select("fdc_id, description").ilike("description", `%${searchTerm}%`).limit(25)
-    : { data: [] };
-  const candidates: FoodCandidate[] = (candidateRows ?? []).map((r) => ({ fdcId: r.fdc_id as number, description: r.description as string }));
+  const candidates = await fetchFoodCandidates(supabase, parsed.name);
   const match = pickBestFoodMatch(parsed.name, candidates);
 
   if (!match) {
