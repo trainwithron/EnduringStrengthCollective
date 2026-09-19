@@ -14,6 +14,7 @@ import { findAthleteVisibleCoachNoteForExercise } from "@/lib/exercise-note-hist
 import { parseNumericReps } from "@/lib/program-card-visuals";
 import { computePriorBest } from "@/lib/obstacle-unlock";
 import { computeVolumeHistory } from "@/lib/exercise-volume-history";
+import { ExitWorkoutButton } from "@/components/session/exit-workout-button";
 
 export default async function SessionPage(
   props: {
@@ -458,7 +459,7 @@ export default async function SessionPage(
   // something is genuinely pending today — never invented to fill space.
   const todayKey = new Date().toISOString().slice(0, 10);
   let pendingGateTask: PendingGateTask | null = null;
-  if (isOwnSession && session.status !== "completed") {
+  if (isOwnSession && session.status === "in_progress") {
     const [{ data: habitRows }, { data: wellnessRow }] = await Promise.all([
       supabase
         .from("client_habits")
@@ -500,12 +501,16 @@ export default async function SessionPage(
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-32">
       <header className="px-5 pt-8 pb-6 border-b border-steel/20">
-        <Link href={backHref} className="font-body text-xs text-steel uppercase tracking-wide">
-          &larr; Back
-        </Link>
+        {session.status === "in_progress" ? (
+          <ExitWorkoutButton sessionId={session.id} backHref={backHref} />
+        ) : (
+          <Link href={backHref} className="font-body text-xs text-steel uppercase tracking-wide">
+            &larr; Back
+          </Link>
+        )}
         <div className="flex items-center justify-between mt-3">
           <p className="font-body text-xs text-steel uppercase tracking-wide">
-            {session.status === "completed" ? "Completed" : "In progress"}
+            {session.status === "completed" ? "Completed" : session.status === "abandoned" ? "Exited" : "In progress"}
           </p>
           {session.logged_by_coach && <CoachLoggedBadge />}
         </div>
@@ -517,7 +522,7 @@ export default async function SessionPage(
             rest off. The client can already resume this exact session
             the moment they open it themselves (existingSession handles
             that); this just makes sure they know to. */}
-        {session.logged_by_coach && !isOwnSession && session.status !== "completed" && (
+        {session.logged_by_coach && !isOwnSession && session.status === "in_progress" && (
           <SendToClientButton
             athleteId={session.athlete_id}
             sessionId={session.id}
@@ -536,7 +541,7 @@ export default async function SessionPage(
 
       <SessionLogger
         sessionId={session.id}
-        isCompleted={session.status === "completed"}
+        isCompleted={session.status !== "in_progress"}
         initialExercises={exercises}
         lastTimeByExercise={lastTimeByExercise}
         ladderByExercise={ladderByExercise}
