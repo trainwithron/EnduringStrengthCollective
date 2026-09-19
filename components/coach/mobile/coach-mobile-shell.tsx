@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CoachMoreSheet } from "./coach-more-sheet";
 import { SpotTriggerButton } from "./spot-trigger-button";
-import { SpotNlBuilderSheet } from "./spot-nl-builder-sheet";
 
 // Owns the "More" sheet's open/closed state — the only reason this needs
 // to be a client component at all — so the actual Home content
@@ -13,11 +12,14 @@ import { SpotNlBuilderSheet } from "./spot-nl-builder-sheet";
 // real data, same split used throughout this app between data-fetching
 // pages and small interactive wrappers.
 //
-// the_spot_dropdown_widget_redesign_sept16.md — mounting both Spot entry
-// points here, not on any one page, is what makes them genuinely global
-// ("it doesn't matter if you're logging a workout or in your profile or
-// whatever you're doing") rather than screen-gated like the old View-as-
-// Client button was (coach-mobile-home.tsx's header, Home only).
+// the_spot_dropdown_widget_redesign_sept16.md — mounting the Spot here,
+// not on any one page, is what makes it genuinely global ("it doesn't
+// matter if you're logging a workout or in your profile or whatever
+// you're doing") rather than screen-gated like the old View-as-Client
+// button was (coach-mobile-home.tsx's header, Home only). "REVISED
+// 2026-09-19": one SpotTriggerButton now covers what used to be two
+// separate mounted pieces (the business-glance dropdown and the NL-
+// builder sheet) — SpotPanel's own swipeable structure holds both now.
 export function CoachMobileShell({
   groupId,
   groupName,
@@ -41,8 +43,7 @@ export function CoachMobileShell({
   return (
     <>
       {children}
-      <SpotTriggerButton groupId={groupId} />
-      <SpotNlBuilderSheet
+      <SpotTriggerButton
         key={spotBuilderAthleteId ?? "none"}
         groupId={groupId}
         initialAthleteId={spotBuilderAthleteId}

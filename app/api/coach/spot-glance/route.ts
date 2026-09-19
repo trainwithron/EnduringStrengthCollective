@@ -53,6 +53,7 @@ export async function GET(request: Request) {
     { data: intakeCompletedRows },
     { data: openRequests },
     { data: allSubsForMrr },
+    { data: upcomingBookings },
   ] = await Promise.all([
     athleteIds.length > 0
       ? supabase.from("session_credits").select("athlete_id, balance").eq("group_id", groupId).in("athlete_id", athleteIds)
@@ -80,6 +81,20 @@ export async function GET(request: Request) {
           .order("created_at", { ascending: false })
       : Promise.resolve({ data: [] as { id: string; subject: string; created_at: string }[] }),
     supabase.from("membership_subscriptions").select("price_cents, status").eq("status", "active"),
+    // the_spot_dropdown_widget_redesign_sept16.md "REVISED 2026-09-19" —
+    // a glanceable upcoming-sessions list for the business-glance panel.
+    // Coach-wide via bookings.coach_id directly (no group_id scoping
+    // needed, unlike the roster-scoped queries above) — a coach checking
+    // this glance wants to see everything coming up, not just this one
+    // group's bookings.
+    supabase
+      .from("bookings")
+      .select("id, start_at, profiles!bookings_athlete_id_fkey ( full_name )")
+      .eq("coach_id", user.id)
+      .eq("status", "confirmed")
+      .gte("start_at", new Date().toISOString())
+      .order("start_at", { ascending: true })
+      .limit(6),
   ]);
 
   const subscribedIds = new Set((subRows ?? []).map((s) => s.athlete_id));
@@ -94,10 +109,17 @@ export async function GET(request: Request) {
 
   const mrr = computeRealMRR((allSubsForMrr ?? []).map((s) => ({ status: s.status as "active", priceCents: s.price_cents })));
 
+  const upcomingSessions = (upcomingBookings ?? []).map((b: any) => ({
+    id: b.id,
+    athleteName: b.profiles?.full_name ?? "A client",
+    startAt: b.start_at,
+  }));
+
   return NextResponse.json({
     lowCreditsClients,
     incompleteWaiverClients,
     support: { openCount: (openRequests ?? []).length, openRequests: (openRequests ?? []).map((r) => ({ id: r.id, subject: r.subject, createdAt: r.created_at })) },
     mrr,
+    upcomingSessions,
   });
 }

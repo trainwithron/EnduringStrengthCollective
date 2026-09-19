@@ -2,66 +2,55 @@
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { X, Sparkles } from "lucide-react";
+import { X, Sparkles, ChevronDown } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { LibraryExercise, AliasEntry } from "@/lib/exercise-matching";
+import { PROGRESSION_RULES, parseQuickBuildInput, type ProgressionRule } from "@/lib/spot-quick-build";
 
-// ImportWizard statically pulls in the xlsx parsing library (large) —
-// CoachMobileShell mounts this sheet on every coach mobile page, so a
-// static import here would ship that weight to every page load instead
-// of only the rare moment a coach actually reaches the full-screen
-// builder. Same "lazy-load the heavy thing" discipline as the perf-fix
-// pass just before this one, applied at the bundle level instead of the
-// query-batching level.
-const ImportWizard = dynamic(
-  () => import("@/components/coach/desktop/import-wizard").then((m) => m.ImportWizard),
-  { loading: () => <p className="font-body text-sm text-steel">Loading…</p> }
-);
+// ImportWizard statically pulls in the xlsx parsing library (large) — the
+// Spot panel is mounted globally, so a static import here would ship
+// that weight to every coach mobile page load instead of only the rare
+// moment a coach actually reaches the full-screen builder.
+const ImportWizard = dynamic(() => import("@/components/coach/desktop/import-wizard").then((m) => m.ImportWizard), {
+  loading: () => <p className="font-body text-sm text-steel">Loading…</p>,
+});
 
-// the_spot_dropdown_widget_redesign_sept16.md — the bottom-anchored
-// entry point. Ron's own resolution: "for the workout builder... make
-// sure it's at the bottom and whenever you tap it it goes full
-// screen... one continuous gesture" (compact quick-generate row -> more
-// detail -> full screen day-by-day builder). Reuses the EXISTING,
-// already-shipped multi-week AI program generator (/api/ai/generate-
-// program) and the existing review/exercise-matching/DB-write pipeline
-// (ImportWizard) rather than building a second generation engine — the
-// "new architecture" this needed was a lightweight mobile entry point
-// into what already exists, not a new generator.
-//
-// Simplification, stated plainly: the three named stages (compact ->
-// expanded -> full screen) are tap-progressive here, not driven by a
-// real swipe/drag gesture with velocity tracking — same three-stage
-// structure Ron described, a lighter-weight implementation of the
-// gesture itself.
-
-const PROGRESSION_RULES = ["Let AI decide", "Linear", "Double Progression", "Undulating"] as const;
+// the_spot_dropdown_widget_redesign_sept16.md "REVISED 2026-09-19" —
+// swipe-right panel. Reuses the already-shipped multi-week AI generator
+// pipeline (ImportWizard, /api/ai/generate-program) and the already-
+// resolved progressive compact -> expanded -> full-screen mechanic
+// verbatim (Ron: "must not be lost in the rework") — the only change
+// from the 9/16 shipped version is that arriving at this panel via
+// swipe already counts as "open", so there's no separate closed/FAB
+// stage, and the compact stage's one text line now does double duty:
+// a direct "Generate" button for a fast one-line build, and — via
+// "Refine details" — the same text run through parseQuickBuildInput
+// (lib/spot-quick-build.ts) to prefill the structured fields before
+// generating, rather than requiring the coach to type the description
+// AND separately re-pick progression/weeks/style. One input, two paths,
+// per Ron's own "not two separate entry points" instruction.
+const PROGRESSION_RULE_LIST = PROGRESSION_RULES;
 
 interface ClientOption {
   id: string;
   fullName: string;
 }
 
-export function SpotNlBuilderSheet({
+export function SpotBuilderPanel({
   groupId,
   initialAthleteId,
   initialAthleteName,
 }: {
   groupId: string;
-  // Fast entry path #1: pre-scoped from a specific client's own row/
-  // profile. When omitted, the compact row's own inline picker is fast
-  // entry path #2, from the coach's own dashboard directly.
   initialAthleteId?: string | null;
   initialAthleteName?: string | null;
 }) {
-  const [stage, setStage] = useState<"closed" | "compact" | "expanded" | "fullscreen">(
-    initialAthleteId ? "expanded" : "closed"
-  );
+  const [stage, setStage] = useState<"compact" | "expanded" | "fullscreen">(initialAthleteId ? "expanded" : "compact");
   const [athleteId, setAthleteId] = useState<string | null>(initialAthleteId ?? null);
   const [athleteName, setAthleteName] = useState<string | null>(initialAthleteName ?? null);
   const [clients, setClients] = useState<ClientOption[] | null>(null);
   const [description, setDescription] = useState("");
-  const [progressionRule, setProgressionRule] = useState<(typeof PROGRESSION_RULES)[number]>("Let AI decide");
+  const [progressionRule, setProgressionRule] = useState<ProgressionRule>("Let AI decide");
   const [weeks, setWeeks] = useState("4");
   const [programType, setProgramType] = useState("");
   const [library, setLibrary] = useState<LibraryExercise[] | null>(null);
@@ -69,20 +58,18 @@ export function SpotNlBuilderSheet({
   const [coachId, setCoachId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (stage === "expanded" && clients === null && !initialAthleteId) {
-      const supabase = createBrowserClient();
-      supabase
-        .from("group_memberships")
-        .select("profile_id, profiles ( full_name )")
-        .eq("group_id", groupId)
-        .eq("role", "athlete")
-        .then(({ data }) => {
-          setClients(
-            (data ?? []).map((r: any) => ({ id: r.profile_id, fullName: r.profiles?.full_name ?? "Client" }))
-          );
-        });
-    }
-  }, [stage, clients, groupId, initialAthleteId]);
+    if (clients !== null || initialAthleteId) return;
+    const supabase = createBrowserClient();
+    supabase
+      .from("group_memberships")
+      .select("profile_id, profiles ( full_name )")
+      .eq("group_id", groupId)
+      .eq("role", "athlete")
+      .then(({ data }) => {
+        setClients((data ?? []).map((r: any) => ({ id: r.profile_id, fullName: r.profiles?.full_name ?? "Client" })));
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupId]);
 
   useEffect(() => {
     if (stage !== "fullscreen" || library !== null) return;
@@ -99,8 +86,31 @@ export function SpotNlBuilderSheet({
     });
   }, [stage, library]);
 
+  function composePrompt(): string {
+    const parts = [description.trim()];
+    parts.push(`${weeks || "4"} weeks.`);
+    if (progressionRule !== "Let AI decide") parts.push(`Use a ${progressionRule.toLowerCase()} progression scheme.`);
+    if (programType.trim()) parts.push(`Methodology/style: ${programType.trim()}.`);
+    if (athleteName) parts.push(`This program is for ${athleteName}.`);
+    return parts.filter(Boolean).join(" ");
+  }
+
+  // Applies the compact line's own parsed guess to the structured fields
+  // — run right before advancing to either "expanded" (so the fields
+  // are pre-filled for review) or straight to "fullscreen" (so a direct
+  // one-line generate still carries whatever the coach actually typed,
+  // e.g. "10 weeks, conjugate" isn't silently dropped just because they
+  // skipped the review step).
+  function applyParsedGuessAndAdvance(nextStage: "expanded" | "fullscreen") {
+    const guess = parseQuickBuildInput(description);
+    if (guess.weeks != null) setWeeks(String(guess.weeks));
+    if (guess.progressionRule != null) setProgressionRule(guess.progressionRule);
+    if (guess.style != null) setProgramType(guess.style);
+    setStage(nextStage);
+  }
+
   function close() {
-    setStage("closed");
+    setStage("compact");
     setDescription("");
     setProgressionRule("Let AI decide");
     setWeeks("4");
@@ -113,62 +123,74 @@ export function SpotNlBuilderSheet({
     }
   }
 
-  function composePrompt(): string {
-    const parts = [description.trim()];
-    parts.push(`${weeks || "4"} weeks.`);
-    if (progressionRule !== "Let AI decide") parts.push(`Use a ${progressionRule.toLowerCase()} progression scheme.`);
-    if (programType.trim()) parts.push(`Methodology/style: ${programType.trim()}.`);
-    if (athleteName) parts.push(`This program is for ${athleteName}.`);
-    return parts.filter(Boolean).join(" ");
-  }
-
-  if (stage === "closed") {
-    return (
-      <button
-        type="button"
-        onClick={() => setStage("compact")}
-        aria-label="AI Program Builder"
-        className="fixed bottom-20 right-4 z-30 h-12 w-12 rounded-token-circle bg-rust text-graphite flex items-center justify-center shadow-lg active:opacity-80 transition-opacity"
-      >
-        <Sparkles className="w-5 h-5" strokeWidth={2.25} />
-      </button>
-    );
-  }
+  const canGenerate = description.trim().length > 0 && (!!athleteId || !!initialAthleteId);
 
   if (stage === "compact") {
     return (
-      <div className="fixed bottom-16 inset-x-0 z-30 bg-graphite border-t border-steel/30 px-4 py-3 shadow-2xl">
+      <div className="space-y-3">
+        <p className="font-body text-sm font-medium text-chalk flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-rust shrink-0" strokeWidth={2.25} />
+          AI Program Builder
+        </p>
+
+        {!initialAthleteId && (
+          <select
+            value={athleteId ?? ""}
+            onChange={(e) => {
+              const c = (clients ?? []).find((c) => c.id === e.target.value);
+              setAthleteId(c?.id ?? null);
+              setAthleteName(c?.fullName ?? null);
+            }}
+            className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
+          >
+            <option value="">Pick a client…</option>
+            {(clients ?? []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.fullName}
+              </option>
+            ))}
+          </select>
+        )}
+
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder='e.g. "8-week strength block, 4 days/week, conjugate"'
+            className="flex-1 h-10 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
+          />
+          <button
+            type="button"
+            onClick={() => applyParsedGuessAndAdvance("fullscreen")}
+            disabled={!canGenerate}
+            className="h-10 px-3 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40 shrink-0"
+          >
+            Generate →
+          </button>
+        </div>
+
         <button
           type="button"
-          onClick={() => setStage("expanded")}
-          className="w-full flex items-center justify-between gap-2"
+          onClick={() => applyParsedGuessAndAdvance("expanded")}
+          className="w-full flex items-center justify-center gap-1 font-body text-[11px] text-steel uppercase tracking-wide active:text-rust"
         >
-          <span className="font-body text-sm text-chalk flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-rust shrink-0" strokeWidth={2.25} />
-            AI Program Builder — tap to build a program
-          </span>
-          <X
-            className="w-4 h-4 text-steel shrink-0"
-            onClick={(e) => {
-              e.stopPropagation();
-              close();
-            }}
-          />
+          Refine details
+          <ChevronDown className="w-3.5 h-3.5" />
         </button>
       </div>
     );
   }
 
   if (stage === "expanded") {
-    const canGenerate = description.trim().length > 0 && (!!athleteId || !!initialAthleteId);
     return (
-      <div className="fixed inset-x-0 bottom-0 z-30 bg-graphite border-t border-steel/30 px-4 pt-4 pb-6 shadow-2xl max-h-[75vh] overflow-y-auto">
+      <div>
         <div className="flex items-center justify-between mb-3">
           <p className="font-body text-sm font-medium text-chalk flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-rust shrink-0" strokeWidth={2.25} />
             AI Program Builder
           </p>
-          <button type="button" onClick={close} aria-label="Close">
+          <button type="button" onClick={close} aria-label="Back to compact">
             <X className="w-5 h-5 text-steel" />
           </button>
         </div>
@@ -212,10 +234,10 @@ export function SpotNlBuilderSheet({
             <label className="font-body text-[11px] text-steel uppercase tracking-wide">Progression</label>
             <select
               value={progressionRule}
-              onChange={(e) => setProgressionRule(e.target.value as (typeof PROGRESSION_RULES)[number])}
+              onChange={(e) => setProgressionRule(e.target.value as ProgressionRule)}
               className="w-full h-9 mt-1 bg-graphite border border-steel/30 text-chalk px-1 font-body text-xs"
             >
-              {PROGRESSION_RULES.map((r) => (
+              {PROGRESSION_RULE_LIST.map((r) => (
                 <option key={r} value={r}>
                   {r}
                 </option>
@@ -257,10 +279,9 @@ export function SpotNlBuilderSheet({
     );
   }
 
-  // stage === "fullscreen" — a true modal takeover (per the spec's own
-  // open question, resolved this way): keeps the sheet's already-entered
-  // fields/client-selection state alive across the transition, which a
-  // route navigation would have thrown away.
+  // stage === "fullscreen" — true modal takeover, escaping the panel's
+  // own scroll container via fixed positioning (unaffected by which
+  // swipe panel is currently in view underneath).
   return (
     <div className="fixed inset-0 z-50 bg-graphite overflow-y-auto">
       <div className="sticky top-0 z-10 bg-graphite border-b border-steel/20 px-4 py-3 flex items-center justify-between">

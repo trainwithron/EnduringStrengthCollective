@@ -2,22 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { QuickViewBubble } from "./quick-view-bubble";
-import { ViewAsClientPicker } from "@/components/athlete/view-as-client-picker";
 
-// the_spot_dropdown_widget_redesign_sept16.md — the Spot's top-anchored
-// widget bar: the default panel shown when the Spot opens generally (not
-// while impersonating anyone). Roster-wide glance across this group,
-// reusing QuickViewBubble verbatim per tile (the already-shipped
-// complications pattern), same as components/coach/mobile/the-spot-rail.tsx
-// does for its own single-client tiles. "View as Client" lives here now
-// as an action tile — the capability the old standalone button gave
-// still exists, it just moved inside the Spot rather than being a
-// second competing entry point.
+// the_spot_dropdown_widget_redesign_sept16.md "REVISED 2026-09-19" —
+// swipe-left panel of the Spot's 3-panel structure. Reuses the roster-
+// wide business glance shipped 9/16 (spot-glance API, QuickViewBubble
+// tiles) verbatim — the "View as Client" action tile that used to live
+// here moved to the new default/center panel (spot-clients-groups-panel.tsx),
+// since View-as is now the primary entry point, not folded into this
+// secondary glance. New addition: a glanceable upcoming-sessions list.
 interface SpotGlanceData {
   lowCreditsClients: { id: string; name: string; balance: number }[];
   incompleteWaiverClients: { id: string; name: string }[];
   support: { openCount: number; openRequests: { id: string; subject: string; createdAt: string }[] };
   mrr: number;
+  upcomingSessions: { id: string; athleteName: string; startAt: string }[];
 }
 
 function Tile({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
@@ -29,9 +27,16 @@ function Tile({ label, value, warn }: { label: string; value: string; warn?: boo
   );
 }
 
-export function SpotBusinessGlance({ groupId, onClose }: { groupId: string; onClose: () => void }) {
+function formatSessionTime(startAt: string): string {
+  const d = new Date(startAt);
+  const today = new Date();
+  const isToday = d.toDateString() === today.toDateString();
+  const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+  return isToday ? time : `${d.toLocaleDateString("en-US", { weekday: "short" })} ${time}`;
+}
+
+export function SpotBusinessPanel({ groupId }: { groupId: string }) {
   const [data, setData] = useState<SpotGlanceData | null>(null);
-  const [showViewAsClient, setShowViewAsClient] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,7 +51,7 @@ export function SpotBusinessGlance({ groupId, onClose }: { groupId: string; onCl
   }, [groupId]);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div className="flex overflow-x-auto snap-x snap-mandatory gap-2 pb-1">
         <QuickViewBubble
           title="Business — MRR"
@@ -71,7 +76,7 @@ export function SpotBusinessGlance({ groupId, onClose }: { groupId: string; onCl
             />
           }
         >
-          {(close) => (
+          {() => (
             <div className="space-y-2">
               {!data || data.lowCreditsClients.length === 0 ? (
                 <p className="font-body text-sm text-steel">Nobody&apos;s low right now.</p>
@@ -146,22 +151,23 @@ export function SpotBusinessGlance({ groupId, onClose }: { groupId: string; onCl
         </QuickViewBubble>
       </div>
 
-      <button
-        type="button"
-        onClick={() => setShowViewAsClient(true)}
-        className="w-full h-10 border border-steel/30 text-chalk font-body text-sm active:border-rust active:text-rust transition-colors"
-      >
-        View as Client →
-      </button>
-
-      {showViewAsClient && (
-        <ViewAsClientPicker
-          onClose={() => {
-            setShowViewAsClient(false);
-            onClose();
-          }}
-        />
-      )}
+      <div>
+        <p className="font-body text-[10px] text-steel uppercase tracking-wide mb-2">Upcoming sessions</p>
+        {!data ? (
+          <p className="font-body text-sm text-steel">…</p>
+        ) : data.upcomingSessions.length === 0 ? (
+          <p className="font-body text-sm text-steel">Nothing booked yet.</p>
+        ) : (
+          <ul className="space-y-1.5">
+            {data.upcomingSessions.map((s) => (
+              <li key={s.id} className="flex items-center justify-between gap-2 border-b border-steel/10 pb-1.5 last:border-b-0 last:pb-0">
+                <span className="font-body text-sm text-chalk truncate">{s.athleteName}</span>
+                <span className="font-body text-xs text-steel shrink-0">{formatSessionTime(s.startAt)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

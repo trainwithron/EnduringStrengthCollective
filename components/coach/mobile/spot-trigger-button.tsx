@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { Sparkles } from "lucide-react";
-import { SpotBusinessGlance } from "./spot-business-glance";
+import { SpotPanel } from "./spot-panel";
 
 // the_spot_dropdown_widget_redesign_sept16.md — replaces the "View as
 // Client" button as the coach's primary second access point. Ron's own
@@ -11,8 +11,24 @@ import { SpotBusinessGlance } from "./spot-business-glance";
 // everywhere in the coaching app — "it doesn't matter if you're logging
 // a workout or in your profile or whatever you're doing." Mounted once
 // in CoachMobileShell so every coach mobile page gets it for free.
-export function SpotTriggerButton({ groupId }: { groupId: string }) {
-  const [open, setOpen] = useState(false);
+//
+// "REVISED 2026-09-19": one button now opens the swipeable 3-panel
+// SpotPanel instead of a single business-glance panel — the old
+// bottom-anchored NL-builder trigger no longer exists as a separate
+// piece, folded in as SpotPanel's swipe-right panel instead.
+export function SpotTriggerButton({
+  groupId,
+  initialAthleteId,
+  initialAthleteName,
+}: {
+  groupId: string;
+  // Fast-entry path from a specific client's own row/profile (e.g. the
+  // Clients page's "Build with AI" action) — auto-opens straight to the
+  // builder panel instead of requiring a tap on this button first.
+  initialAthleteId?: string | null;
+  initialAthleteName?: string | null;
+}) {
+  const [open, setOpen] = useState(!!initialAthleteId);
   const panelId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -70,7 +86,12 @@ export function SpotTriggerButton({ groupId }: { groupId: string }) {
             <p className="font-body text-[10px] text-steel uppercase tracking-wide mb-2">
               The Spot — only you can see this
             </p>
-            <SpotBusinessGlance groupId={groupId} onClose={() => setOpen(false)} />
+            <SpotPanel
+              groupId={groupId}
+              onClose={() => setOpen(false)}
+              initialAthleteId={initialAthleteId}
+              initialAthleteName={initialAthleteName}
+            />
           </div>
         </>
       )}
