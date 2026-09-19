@@ -261,7 +261,7 @@ export default async function BusinessDashboardPage(
           </p>
         )}
       </div>
-      <div className="grid grid-cols-4 gap-3 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
         {hasBillingSetUp ? (
           <div className="border border-steel/20 rounded-token-lg p-3">
             <p className="font-display text-2xl leading-none">${realIncomeThisMonth.toLocaleString()}</p>
@@ -320,7 +320,7 @@ export default async function BusinessDashboardPage(
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <div className="border border-steel/20 rounded-token-lg p-4">
           <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
             <SwappableTerm termKey="client" form="singular" className="capitalize" /> growth (last 6 months)

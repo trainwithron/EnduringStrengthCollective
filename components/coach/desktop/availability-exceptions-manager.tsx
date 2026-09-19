@@ -185,7 +185,7 @@ export function AvailabilityExceptionsManager({
         />
 
         {mode === "one_off" ? (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <input
               type="datetime-local"
               value={oneOffStart}
@@ -201,7 +201,7 @@ export function AvailabilityExceptionsManager({
             />
           </div>
         ) : (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <select
               value={recurWeekday}
               onChange={(e) => setRecurWeekday(Number(e.target.value))}

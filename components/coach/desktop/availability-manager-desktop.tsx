@@ -68,7 +68,7 @@ export function AvailabilityManagerDesktop({
   }
 
   return (
-    <div className="grid grid-cols-[1fr_320px] gap-10 items-start">
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 lg:gap-10 items-start">
       <div>
         <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
           Recurring hours

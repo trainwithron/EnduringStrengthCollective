@@ -93,7 +93,7 @@ export function ReferralDirectoryManager({ initialPartners }: { initialPartners:
   }
 
   return (
-    <div className="grid grid-cols-[1fr_360px] gap-8 items-start">
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 lg:gap-8 items-start">
       <div className="divide-y divide-steel/15">
         {partners.length === 0 ? (
           <p className="font-body text-sm text-steel py-2">No referral partners added yet.</p>

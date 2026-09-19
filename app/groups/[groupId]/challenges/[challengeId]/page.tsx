@@ -173,7 +173,7 @@ export default async function ChallengeDetailPage(
           )}
         </div>
 
-        <div className="grid grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           <div className="border border-steel/20 p-4">
             <p className="font-display text-3xl leading-none">{participants.length}</p>
             <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Participants</p>
@@ -192,7 +192,7 @@ export default async function ChallengeDetailPage(
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
           <div className="border border-steel/20 p-4">
             <h3 className="font-body text-xs text-steel uppercase tracking-wide mb-2">Habit targets</h3>
             <ul className="space-y-1">
@@ -210,7 +210,7 @@ export default async function ChallengeDetailPage(
           <h3 className="font-body text-xs text-steel uppercase tracking-wide mb-2">
             Before &amp; after
           </h3>
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {participants.map((p) => (
               <div key={p.profileId} className="border border-steel/20 p-2">
                 <p className="font-body text-xs mb-1.5">{p.fullName}</p>

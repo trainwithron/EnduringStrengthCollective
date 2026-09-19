@@ -143,7 +143,7 @@ export default async function BrandingPage(
 
       {tab === "team" ? (
         <div>
-          <div className="border border-steel/20 p-4 mb-8 grid grid-cols-2 gap-6">
+          <div className="border border-steel/20 p-4 mb-8 grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div>
               <p className="font-body text-[11px] text-steel uppercase tracking-wide mb-1">
                 Organization
