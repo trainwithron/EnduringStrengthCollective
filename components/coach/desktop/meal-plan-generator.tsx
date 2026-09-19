@@ -8,12 +8,14 @@ import {
   computeCarbCyclingTargets,
   matchFlexTreat,
   generateFullMealPlan,
+  generateMealOptions,
   detectDietArchetype,
   QUICK_SWAP_NOTES,
   type Phase,
   type MacroTargets,
   type GeneratedMeal,
   type MealOption,
+  type MealPlanContext,
   type Recipe,
 } from "@/lib/meal-engine";
 import { fetchCustomRecipes } from "@/lib/custom-recipes";
@@ -110,8 +112,11 @@ export function MealPlanGenerator({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // "Suggest with AI" — one extra option per meal slot from the AI meal
-  // planner, additive alongside the deterministic engine's own options.
+  // "The Nutrition Spot" (nutrition_spot_revamp_scoping_sept19.md) — up
+  // to 3 real, verified AI-generated options per meal slot, additive
+  // alongside the deterministic engine's own options. Automatically
+  // falls back to the deterministic engine (clearly labeled) whenever
+  // AI is unavailable.
   const [aiSuggesting, setAiSuggesting] = useState<Record<string, boolean>>({});
   const [aiError, setAiError] = useState<Record<string, string | null>>({});
 
@@ -413,10 +418,54 @@ export function MealPlanGenerator({
     router.refresh();
   }
 
+  // The Nutrition Spot (nutrition_spot_revamp_scoping_sept19.md) — AI is
+  // now the primary suggestion source for a slot: one click returns up
+  // to 3 real, verified options (never the AI's own claimed macros —
+  // /api/ai/generate-meal-plan discards anything it can't confidently
+  // match against real food data before it ever reaches here). The
+  // deterministic engine's own options stay untouched and reachable —
+  // this only appends alongside them, same additive convention as
+  // before — but now serves as the automatic, clearly-labeled fallback
+  // whenever AI is unavailable or every option it returned failed
+  // verification, rather than a parallel manual choice.
   async function handleAiSuggest(meal: GeneratedMeal) {
     if (aiSuggesting[meal.spec.id]) return;
     setAiSuggesting((prev) => ({ ...prev, [meal.spec.id]: true }));
     setAiError((prev) => ({ ...prev, [meal.spec.id]: null }));
+
+    function appendOptions(newOptions: MealOption[]) {
+      setMealsByView((prev) => {
+        const updated = prev[dayView].map((m) =>
+          m.spec.id === meal.spec.id ? { ...m, options: [...m.options, ...newOptions] } : m
+        );
+        return { ...prev, [dayView]: updated };
+      });
+      setSelections((prev) => {
+        const startIndex = meal.options.length;
+        const newIndices = newOptions.map((_, i) => startIndex + i);
+        return { ...prev, [meal.spec.id]: [...(prev[meal.spec.id] ?? []), ...newIndices] };
+      });
+    }
+
+    function runFallback(reason: string) {
+      const context = {
+        archetype: (archetype || "omnivore") as MealPlanContext["archetype"],
+        bioScores: {
+          strength: parseInt(rateStrength, 10) || 4,
+          recovery: parseInt(rateRecovery, 10) || 4,
+          digestion: parseInt(rateDigestion, 10) || 5,
+          satiety: parseInt(rateSatiety, 10) || 4,
+        },
+        phase,
+        dietaryRestrictions,
+        favoriteFoods,
+      };
+      const fallback = generateMealOptions(meal.spec, activeMacros() ?? { calories: 0, protein: 0, carbs: 0, fats: 0 }, context, customRecipes);
+      appendOptions(
+        fallback.options.map((o) => ({ ...o, recipeId: `fallback-${Date.now()}-${o.recipeId}`, isFallback: true }))
+      );
+      setAiError((prev) => ({ ...prev, [meal.spec.id]: reason }));
+    }
 
     try {
       const res = await fetch("/api/ai/generate-meal-plan", {
@@ -433,29 +482,42 @@ export function MealPlanGenerator({
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Couldn't get an AI suggestion.");
 
-      const newOption: MealOption = {
-        recipeId: `ai-${Date.now()}`,
-        recipeName: data.recipeName,
-        ingredients: data.ingredients,
+      // Any non-2xx (not configured, rate-limited, a transient API
+      // error) is treated as "AI unavailable" for this purpose — the
+      // scoping's own list of trigger conditions — never a dead end.
+      if (!res.ok) {
+        runFallback("AI suggestions unavailable right now — here are some standard options instead.");
+        return;
+      }
+
+      const verifiedOptions: {
+        recipeName: string;
+        ingredients: { rawLine: string; grams: number | null }[];
+        totalProtein: number;
+        totalCarbs: number;
+        totalFat: number;
+        totalKcal: number;
+      }[] = data.options ?? [];
+
+      if (verifiedOptions.length === 0) {
+        setAiError((prev) => ({
+          ...prev,
+          [meal.spec.id]: "Couldn't verify any of this suggestion's ingredients against real food data — try again.",
+        }));
+        return;
+      }
+
+      const newOptions: MealOption[] = verifiedOptions.map((o, i) => ({
+        recipeId: `ai-${Date.now()}-${i}`,
+        recipeName: o.recipeName,
+        ingredients: o.ingredients.map((line) => line.rawLine),
         isAi: true,
-      };
-      setMealsByView((prev) => {
-        const updated = prev[dayView].map((m) =>
-          m.spec.id === meal.spec.id ? { ...m, options: [...m.options, newOption] } : m
-        );
-        return { ...prev, [dayView]: updated };
-      });
-      setSelections((prev) => ({
-        ...prev,
-        [meal.spec.id]: [...(prev[meal.spec.id] ?? []), meal.options.length],
+        verifiedMacros: { protein: o.totalProtein, carbs: o.totalCarbs, fat: o.totalFat, kcal: o.totalKcal },
       }));
-    } catch (err) {
-      setAiError((prev) => ({
-        ...prev,
-        [meal.spec.id]: err instanceof Error ? err.message : "Couldn't get an AI suggestion.",
-      }));
+      appendOptions(newOptions);
+    } catch {
+      runFallback("AI suggestions unavailable right now — here are some standard options instead.");
     } finally {
       setAiSuggesting((prev) => ({ ...prev, [meal.spec.id]: false }));
     }
@@ -750,11 +812,22 @@ export function MealPlanGenerator({
                           <span className="font-body text-sm font-medium flex-1">{opt.recipeName}</span>
                           {opt.isAi && (
                             <span className="font-body text-[9px] uppercase tracking-wide text-rust border border-rust/40 px-1.5 py-0.5">
-                              AI
+                              Nutrition Spot · verified
+                            </span>
+                          )}
+                          {opt.isFallback && (
+                            <span className="font-body text-[9px] uppercase tracking-wide text-steel border border-steel/40 px-1.5 py-0.5">
+                              Standard (AI unavailable)
                             </span>
                           )}
                           <RecipeVoteFavorite recipeId={opt.recipeId} />
                         </div>
+                        {opt.verifiedMacros && (
+                          <p className="font-body text-[10px] text-steel pl-6 mb-1">
+                            Verified: {opt.verifiedMacros.kcal} kcal — {opt.verifiedMacros.protein}p /{" "}
+                            {opt.verifiedMacros.carbs}c / {opt.verifiedMacros.fat}f
+                          </p>
+                        )}
                         <ul className="space-y-0.5 pl-6">
                           {opt.isAi
                             ? opt.ingredients.map((ing, i) => (
@@ -788,7 +861,7 @@ export function MealPlanGenerator({
                       disabled={aiSuggesting[meal.spec.id]}
                       className="h-7 px-3 font-body text-[11px] border border-rust/40 text-rust disabled:opacity-40"
                     >
-                      {aiSuggesting[meal.spec.id] ? "Asking AI…" : "Suggest with AI"}
+                      {aiSuggesting[meal.spec.id] ? "Asking the Nutrition Spot…" : "Ask the Nutrition Spot"}
                     </button>
                     {aiError[meal.spec.id] && (
                       <p className="font-body text-[10px] text-rust" role="alert">

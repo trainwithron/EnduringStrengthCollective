@@ -1162,6 +1162,18 @@ export interface MealOption {
   // Set on AI-generated suggestions only. Their ingredients are plain text,
   // not HTML — callers must render them without dangerouslySetInnerHTML.
   isAi?: boolean;
+  // The Nutrition Spot revamp (nutrition_spot_revamp_scoping_sept19.md)
+  // — only ever set on a real, verified AI option: real macros
+  // recomputed from matched USDA food data, never the AI's own claimed
+  // numbers. Shown alongside the ingredient list so a coach can see the
+  // actual (checked) accuracy, not a self-report.
+  verifiedMacros?: { protein: number; carbs: number; fat: number; kcal: number };
+  // True when this option came from the deterministic engine specifically
+  // BECAUSE AI generation was unavailable/failed — distinct from this
+  // engine's normal, always-present options, which are never labeled
+  // this way. Must be surfaced in the UI per the revamp's own
+  // requirement: never silently degrade without explanation.
+  isFallback?: boolean;
 }
 
 export interface GeneratedMeal {
