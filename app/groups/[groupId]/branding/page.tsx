@@ -6,6 +6,7 @@ import { BrandingForm } from "@/components/coach/desktop/branding-form";
 import { InviteCoachForm } from "@/components/coach/desktop/invite-coach-form";
 import { TransferOwnershipButton } from "@/components/coach/desktop/transfer-ownership-button";
 import { WorkoutCardBackgroundSettings } from "@/components/coach/desktop/workout-card-background-settings";
+import { DispatchSettings } from "@/components/coach/desktop/dispatch-settings";
 import type { ButtonShape, DisplayFont, BodyFont } from "@/lib/theme";
 
 type OrgTab = "team" | "branding" | "workout-card";
@@ -81,7 +82,7 @@ export default async function BrandingPage(
   const { data: org } = await supabase
     .from("organizations")
     .select(
-      "id, slug, name, owner_id, created_at, button_shape, accent_color, background_color, text_color, font_display, font_body, logo_url, app_icon_url, workout_card_background_mode, workout_card_background_url"
+      "id, slug, name, owner_id, created_at, button_shape, accent_color, background_color, text_color, font_display, font_body, logo_url, app_icon_url, workout_card_background_mode, workout_card_background_url, dispatch_ttl_minutes"
     )
     .eq("id", orgMembership.organization_id)
     .maybeSingle();
@@ -181,6 +182,14 @@ export default async function BrandingPage(
                 />
               )}
             </div>
+          )}
+
+          {isOwnerOrAdmin && (
+            <DispatchSettings
+              organizationId={orgMembership.organization_id}
+              orgSlug={org?.slug ?? ""}
+              initialTtlMinutes={org?.dispatch_ttl_minutes ?? 20}
+            />
           )}
 
           <p className="font-body text-xs text-steel">

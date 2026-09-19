@@ -50,6 +50,16 @@ export async function updateSession(request: NextRequest) {
     // equipment decal has no account and no session, same gotcha as
     // /book/ above.
     pathname.startsWith("/scan/") ||
+    // org_calendar_spotter_trainer_dispatch_scoping_sept19.md — a
+    // prospect requesting a trainer, and later answering a trainer's
+    // question, has no account either — same gotcha as /book/ and
+    // /scan/ above. /dispatch/[stepId] is deliberately NOT included
+    // here — that page is the trainer's own, and a trainer always has a
+    // real account.
+    pathname.startsWith("/join/") ||
+    pathname.startsWith("/dispatch-reply/") ||
+    pathname.startsWith("/api/org-dispatch/submit") ||
+    pathname.startsWith("/api/org-dispatch/reply") ||
     pathname.startsWith("/api/discovery-availability/") ||
     // Stripe calls this directly with no user session at all — its own
     // signature check is the real auth, same gotcha as /pr/ and /share/

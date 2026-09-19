@@ -9,7 +9,7 @@ import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 // making them hunt through entries like "Antarctica/Casey." Anything
 // missing here would need adding, not a free-text field (an invalid
 // IANA string would silently make every slot computation fail).
-const COMMON_TIMEZONES = [
+export const COMMON_TIMEZONES = [
   { value: "America/New_York", label: "Eastern (New York)" },
   { value: "America/Chicago", label: "Central (Chicago)" },
   { value: "America/Denver", label: "Mountain (Denver)" },
