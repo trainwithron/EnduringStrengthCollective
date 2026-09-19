@@ -31,6 +31,8 @@ import {
   MessageCircle,
   Zap,
   UserPlus,
+  SquareStack,
+  PanelLeft,
 } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
@@ -47,6 +49,8 @@ import { CalendarRailWidget } from "@/components/coach/desktop/rail-widgets/cale
 import { TeamRailWidget } from "@/components/coach/desktop/rail-widgets/team-rail-widget";
 import { BusinessRailWidget } from "@/components/coach/desktop/rail-widgets/business-rail-widget";
 import { ShellListPanel, type SectionSubLink } from "@/components/coach/desktop/shell-list-panel";
+import { FloatingCardStack } from "@/components/coach/desktop/floating-card-stack";
+import { readLayoutMode, writeLayoutMode, type LayoutMode } from "@/lib/coach-shell-panel-storage";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CoachMoreSheet } from "@/components/coach/mobile/coach-more-sheet";
 
@@ -133,6 +137,13 @@ export function CoachDesktopShell({
   children: React.ReactNode;
 }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  // cascading_card_stack_widget_layering_idea.md — a per-coach display
+  // preference between today's traditional ShellListPanel (one-at-a-time
+  // tab switcher) and the new floating cascaded card stack (2-4 of the
+  // same four mini-views shown at once). Read once on mount, same
+  // guarded-localStorage convention as the panel's own width/collapsed/
+  // view state — no server round trip for a pure display preference.
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>("traditional");
   const [feedUnread, setFeedUnread] = useState(0);
   const [clientsUnread, setClientsUnread] = useState(0);
   const [messagesUnread, setMessagesUnread] = useState(0);
@@ -156,6 +167,18 @@ export function CoachDesktopShell({
   // fetch cares about acting-as state.
   const [actingAsName, setActingAsName] = useState<string | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    setLayoutMode(readLayoutMode());
+  }, []);
+
+  function toggleLayoutMode() {
+    setLayoutMode((prev) => {
+      const next: LayoutMode = prev === "traditional" ? "card_stack" : "traditional";
+      writeLayoutMode(next);
+      return next;
+    });
+  }
 
   // Team (position groups/depth chart) is an opt-in feature for coaches
   // running an actual team sport — most individual-training coaches never
@@ -667,6 +690,22 @@ export function CoachDesktopShell({
               >
                 <MonitorPlay className="w-4 h-4" strokeWidth={2.25} />
               </a>
+              <button
+                type="button"
+                onClick={toggleLayoutMode}
+                title={
+                  layoutMode === "traditional"
+                    ? "Switch to floating card-stack layout"
+                    : "Switch to traditional layout"
+                }
+                className="w-11 h-11 flex items-center justify-center text-steel active:text-chalk"
+              >
+                {layoutMode === "traditional" ? (
+                  <SquareStack className="w-4 h-4" strokeWidth={2.25} />
+                ) : (
+                  <PanelLeft className="w-4 h-4" strokeWidth={2.25} />
+                )}
+              </button>
               <ViewModeToggle
                 targetMode="mobile"
                 label="Client-Facing Mode"
@@ -700,7 +739,7 @@ export function CoachDesktopShell({
             </>
           }
         />
-        {coachId && (
+        {coachId && layoutMode === "traditional" && (
           <ShellListPanel
             coachId={coachId}
             groupId={groupId}
@@ -708,6 +747,7 @@ export function CoachDesktopShell({
             sectionSubLinks={sectionSubLinks}
           />
         )}
+        {coachId && layoutMode === "card_stack" && <FloatingCardStack groupId={groupId} />}
 
         {/* Coach mobile tab bar (coach_mobile_app_redesign_plan.md) —
             replaces the old off-canvas drawer as the primary mobile nav;

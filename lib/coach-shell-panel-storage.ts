@@ -72,3 +72,58 @@ export function writeListPanelView(view: ListPanelView): void {
     // Non-fatal.
   }
 }
+
+// cascading_card_stack_widget_layering_idea.md — a second, switchable
+// layout for the same real estate ShellListPanel occupies today: one
+// floating, cascaded card stack showing 2-4 of the same four mini-views
+// simultaneously instead of one-at-a-time tab switching. Per-coach,
+// same guarded-localStorage convention as everything else in this file
+// — no server round trip needed for a pure display preference.
+export type LayoutMode = "traditional" | "card_stack";
+const LAYOUT_MODE_KEY = "coach-shell-layout-mode";
+
+export function readLayoutMode(): LayoutMode {
+  try {
+    return window.localStorage.getItem(LAYOUT_MODE_KEY) === "card_stack" ? "card_stack" : "traditional";
+  } catch {
+    return "traditional";
+  }
+}
+
+export function writeLayoutMode(mode: LayoutMode): void {
+  try {
+    window.localStorage.setItem(LAYOUT_MODE_KEY, mode);
+  } catch {
+    // Non-fatal.
+  }
+}
+
+// The card stack's own open/closed set AND front-to-back order in one
+// array (index 0 = front-most). Defaults to all four open — per Ron's
+// own mockup-refinement call ("whenever it populates, it would populate
+// as open"), not collapsed-requiring-a-tap like the original mockup.
+const CARD_STACK_ORDER_KEY = "coach-shell-card-stack-order";
+const DEFAULT_CARD_STACK_ORDER: ListPanelView[] = ["roster", "business", "calendar", "program"];
+
+export function readCardStackOrder(): ListPanelView[] {
+  try {
+    const raw = window.localStorage.getItem(CARD_STACK_ORDER_KEY);
+    if (!raw) return DEFAULT_CARD_STACK_ORDER;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return DEFAULT_CARD_STACK_ORDER;
+    const deduped = Array.from(new Set(parsed)).filter((v): v is ListPanelView =>
+      (VALID_VIEWS as string[]).includes(v)
+    );
+    return deduped;
+  } catch {
+    return DEFAULT_CARD_STACK_ORDER;
+  }
+}
+
+export function writeCardStackOrder(order: ListPanelView[]): void {
+  try {
+    window.localStorage.setItem(CARD_STACK_ORDER_KEY, JSON.stringify(order));
+  } catch {
+    // Non-fatal.
+  }
+}
