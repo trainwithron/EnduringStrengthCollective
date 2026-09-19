@@ -2,14 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { extractYoutubeId } from "@/lib/youtube";
 
 const ALLOWED_TYPES = ["video/mp4", "video/quicktime", "video/webm"];
 const MAX_BYTES = 100 * 1024 * 1024;
-
-function extractYoutubeId(url: string): string | null {
-  const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([a-zA-Z0-9_-]{11})/);
-  return m ? m[1] : null;
-}
 
 // Video is attached to the shared exercise_library row (keyed by name),
 // same upsert-by-name mechanism used to grow the library elsewhere — so

@@ -30,6 +30,7 @@ import {
   Tag,
   MessageCircle,
   Zap,
+  UserPlus,
 } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
@@ -81,6 +82,7 @@ type Active =
   | "packages"
   | "waiver"
   | "support"
+  | "leads"
   | "sms-settings"
   | "zapier"
   | "session-types"
@@ -444,6 +446,7 @@ export function CoachDesktopShell({
         { key: "waiver", label: "Waiver", href: `/groups/${groupId}/business/waiver`, icon: ClipboardList },
         { key: "availability", label: "Availability", href: `/groups/${groupId}/availability`, icon: CalendarClock },
         { key: "support", label: "Support", href: `/groups/${groupId}/business/support`, icon: HeartHandshake },
+        { key: "leads", label: "Leads", href: `/groups/${groupId}/business/leads`, icon: UserPlus },
         { key: "sms-settings", label: "SMS Notifications", href: `/groups/${groupId}/business/sms-settings`, icon: MessageCircle },
         { key: "zapier", label: "Zapier", href: `/groups/${groupId}/business/zapier`, icon: Zap },
         { key: "session-ledger", label: "Session Ledger", href: `/groups/${groupId}/business/session-ledger`, icon: Wallet },

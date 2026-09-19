@@ -9,6 +9,7 @@ import { classifyExerciseCategory } from "@/lib/exercise-category-classifier";
 import { classifyEquipmentType, type EquipmentType } from "@/lib/equipment-classifier";
 import { BiomechTagPicker, type BiomechTagOption, type BiomechTagSelection } from "./biomech-tag-picker";
 import { generateBiomechBreakdown } from "@/lib/biomech-breakdown";
+import { ExerciseQrCodeButton } from "./exercise-qr-code-button";
 import { Trash2, Trophy } from "lucide-react";
 
 export interface LibraryExerciseRow {
@@ -416,6 +417,7 @@ export function ExerciseLibraryList({
                       >
                         <Trophy className="w-4 h-4" />
                       </Link>
+                      <ExerciseQrCodeButton exerciseId={ex.id} exerciseName={ex.name} />
                       <button
                         type="button"
                         onClick={() => setExpandedId((prev) => (prev === ex.id ? null : ex.id))}

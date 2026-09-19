@@ -46,6 +46,10 @@ export async function updateSession(request: NextRequest) {
     // real session, same gotcha already hit for /pr/ and /share/.
     pathname.startsWith("/guardian/") ||
     pathname.startsWith("/book/") ||
+    // equipment_qr_decal_scoping_sept19.md — a walk-in scanning a gym's
+    // equipment decal has no account and no session, same gotcha as
+    // /book/ above.
+    pathname.startsWith("/scan/") ||
     pathname.startsWith("/api/discovery-availability/") ||
     // Stripe calls this directly with no user session at all — its own
     // signature check is the real auth, same gotcha as /pr/ and /share/
