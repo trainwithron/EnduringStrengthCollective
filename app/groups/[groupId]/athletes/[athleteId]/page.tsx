@@ -733,6 +733,13 @@ export default async function AthleteProfilePage(
           >
             This client&apos;s calendar
           </Link>
+          <Link
+            href={`/groups/${params.groupId}/athletes/${params.athleteId}/history`}
+            className="inline-flex items-center h-9 font-body text-xs text-rust border border-rust px-3"
+            title="Backfill training history from before this client joined — grounds the AI program builder"
+          >
+            Upload exercise history
+          </Link>
           <VideoCheckinRecorder athleteId={params.athleteId} groupId={params.groupId} coachId={user.id} />
           <Link
             href={`/groups/${params.groupId}/calendar?client=${params.athleteId}`}

@@ -67,7 +67,7 @@ export default async function SettingsPage(
         .single(),
       supabase
         .from("group_memberships")
-        .select("role")
+        .select("role, history_import_enabled")
         .eq("group_id", params.groupId)
         .eq("profile_id", athleteId)
         .maybeSingle(),
@@ -303,6 +303,14 @@ export default async function SettingsPage(
                 className="block font-body text-sm text-rust"
               >
                 Video Check-ins
+              </Link>
+            )}
+            {!isCoach && membership?.history_import_enabled && (
+              <Link
+                href={`/groups/${params.groupId}/my-history`}
+                className="block font-body text-sm text-rust"
+              >
+                My Exercise History →
               </Link>
             )}
           </div>
