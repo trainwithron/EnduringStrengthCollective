@@ -49,6 +49,15 @@ export async function getSharedWorkout(postId: string) {
         .maybeSingle()
     : { data: null };
 
+  // share_card_backgrounds_expansion_scoping_sept19.md — a per-athlete
+  // pick (profiles.preferred_share_background) overrides the org-wide
+  // default_rotation/custom setting above, when set to a real scenic key.
+  const { data: authorProfile } = await supabase
+    .from("profiles")
+    .select("preferred_share_background")
+    .eq("id", post.author_id)
+    .maybeSingle();
+
   const broadcastLevel: "full" | "prs_only" | "checkin_only" = post.broadcast_level ?? "full";
   const newPrs: string[] = broadcastLevel === "checkin_only" ? [] : workoutLog.new_prs ?? [];
 
@@ -386,6 +395,7 @@ export async function getSharedWorkout(postId: string) {
     groupName: group?.name ?? "Spotlight Coaching",
     workoutCardBackgroundMode: (org?.workout_card_background_mode as "default_rotation" | "custom" | null) ?? "default_rotation",
     workoutCardBackgroundUrl: org?.workout_card_background_url ?? null,
+    preferredShareBackground: authorProfile?.preferred_share_background ?? null,
     broadcastLevel,
     totalVolume: broadcastLevel === "full" ? workoutLog.total_volume ?? 0 : null,
     totalSetsCompleted: broadcastLevel === "full" ? workoutLog.total_sets_completed ?? 0 : null,

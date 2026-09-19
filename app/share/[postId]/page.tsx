@@ -7,10 +7,11 @@ import { getSharedWorkout } from "@/lib/shared-workout";
 import { PrListToggle } from "@/components/share/pr-list-toggle";
 import { ShareWorkoutButton } from "@/components/share/share-workout-button";
 import { CustomizeSharePanel } from "@/components/share/customize-share-panel";
+import { BackgroundPicker } from "@/components/share/background-picker";
 import { VolumeLiftRig } from "@/components/share/volume-lift-rig";
 import { ScenicBackground } from "@/components/share/scenic-background";
 import { HumorArchetypeCard } from "@/components/share/humor-archetype-card";
-import { pickScenicBackground } from "@/lib/scenic-backgrounds";
+import { pickScenicBackground, SCENIC_BACKGROUNDS } from "@/lib/scenic-backgrounds";
 import { pickHumorArchetype } from "@/lib/humor-archetypes";
 import { pickShareCardStyle } from "@/lib/share-card-style";
 
@@ -87,11 +88,26 @@ export default async function ShareWorkoutPage(
   // lifts, PRs, and streak below it, so a coach's real information is
   // never hidden just because a particular card happened to roll
   // "humor" this time.
+  // A personal stock pick (share_card_backgrounds_expansion_scoping_sept19.md)
+  // overrides the org-wide default_rotation/custom setting entirely; with
+  // no personal pick, behavior is exactly what it was before this feature.
+  const personalScenicPick = shared.preferredShareBackground
+    ? SCENIC_BACKGROUNDS.find((b) => b.key === shared.preferredShareBackground) ?? null
+    : null;
   const scenicAvailable =
+    !!personalScenicPick ||
     (shared.workoutCardBackgroundMode === "custom" && !!shared.workoutCardBackgroundUrl) ||
     shared.workoutCardBackgroundMode === "default_rotation";
   const cardStyle = pickShareCardStyle(params.postId, scenicAvailable);
-  const scenicBackground = cardStyle === "scenic" ? pickScenicBackground(params.postId) : null;
+  const useOrgCustomImage =
+    cardStyle === "scenic" &&
+    !personalScenicPick &&
+    shared.workoutCardBackgroundMode === "custom" &&
+    !!shared.workoutCardBackgroundUrl;
+  const scenicBackground =
+    cardStyle === "scenic" && !useOrgCustomImage
+      ? personalScenicPick ?? pickScenicBackground(params.postId)
+      : null;
   const humorArchetype = cardStyle === "humor" ? pickHumorArchetype(params.postId) : null;
   const headline = shared.celebratePrs.length > 0 ? "New PR 🎉" : "Workout Complete 💪";
 
@@ -101,10 +117,10 @@ export default async function ShareWorkoutPage(
         {cardStyle === "scenic" ? (
           <div className="relative h-[180px] px-7 pt-8 pb-5 flex flex-col justify-end text-center">
             <div className="absolute inset-0">
-              {shared.workoutCardBackgroundMode === "custom" && shared.workoutCardBackgroundUrl ? (
+              {useOrgCustomImage ? (
                 // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL
                 <img
-                  src={shared.workoutCardBackgroundUrl}
+                  src={shared.workoutCardBackgroundUrl!}
                   alt=""
                   className="absolute inset-0 w-full h-full object-cover"
                 />
@@ -259,6 +275,10 @@ export default async function ShareWorkoutPage(
             candidates={shared.top5Candidates}
             initialSelected={shared.selectedNames}
           />
+        )}
+
+        {user?.id === shared.authorId && (
+          <BackgroundPicker athleteId={shared.authorId} initialPreference={shared.preferredShareBackground} />
         )}
 
         <p className="font-body text-xs text-steel mt-6 pt-4 border-t border-steel/20">
