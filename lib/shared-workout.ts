@@ -383,7 +383,7 @@ export async function getSharedWorkout(postId: string) {
     groupId: post.group_id,
     athleteName: (post.profiles as any)?.full_name ?? "An athlete",
     athleteAvatarUrl: (post.profiles as any)?.avatar_url ?? null,
-    groupName: group?.name ?? "The Enduring Strength Collective",
+    groupName: group?.name ?? "Spotlight Coaching",
     workoutCardBackgroundMode: (org?.workout_card_background_mode as "default_rotation" | "custom" | null) ?? "default_rotation",
     workoutCardBackgroundUrl: org?.workout_card_background_url ?? null,
     broadcastLevel,

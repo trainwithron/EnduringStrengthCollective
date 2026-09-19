@@ -26,7 +26,7 @@ function shortNameFor(name: string): string {
 
 export default async function manifest(): Promise<MetadataRoute.Manifest> {
   const theme = await getViewerOrgTheme();
-  const name = theme.orgName ?? "The Enduring Strength Collective";
+  const name = theme.orgName ?? "Spotlight Coaching";
 
   // An org's uploaded app icon is used at both declared sizes rather than
   // generating real 192/512 renditions server-side — acceptable for now

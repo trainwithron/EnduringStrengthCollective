@@ -39,7 +39,7 @@ export async function getSharedMilestone(milestoneId: string) {
     .maybeSingle();
 
   const athleteName = profile?.full_name ?? "An athlete";
-  const groupName = group?.name ?? "The Enduring Strength Collective";
+  const groupName = group?.name ?? "Spotlight Coaching";
 
   if (event.milestone_type === "reverse_diet") {
     const detail = event.detail as {

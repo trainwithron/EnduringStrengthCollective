@@ -65,7 +65,7 @@ export async function getJourneyRecap(athleteId: string) {
   return {
     athleteId,
     athleteName: profile.full_name ?? "An athlete",
-    groupName: (membership as any)?.groups?.name ?? "The Enduring Strength Collective",
+    groupName: (membership as any)?.groups?.name ?? "Spotlight Coaching",
     journeyDuration: formatJourneyDuration(firstWorkoutDate, now),
     totalVolume: Math.round(totalVolume),
     totalWorkoutCount: logs.length,

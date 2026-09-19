@@ -7,8 +7,8 @@ import { getViewerOrgTheme } from "@/lib/org-theme-server";
 import { orgThemeToCssVars } from "@/lib/theme";
 
 export const metadata: Metadata = {
-  title: "The Enduring Strength Collective",
-  description: "The Enduring Strength Collective — group training platform",
+  title: "Spotlight Coaching",
+  description: "Spotlight Coaching — group training platform",
   manifest: "/manifest.webmanifest",
   // iOS Safari doesn't read the web manifest for "standalone" behavior —
   // it needs these apple-specific tags instead. Without appleWebApp.capable,
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "ESC",
+    title: "Spotlight",
   },
 };
 

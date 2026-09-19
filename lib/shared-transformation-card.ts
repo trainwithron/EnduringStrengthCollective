@@ -68,7 +68,7 @@ export async function getSharedTransformationCard(cardId: string) {
   return {
     id: card.id,
     athleteName: profile?.full_name ?? "An athlete",
-    groupName: group?.name ?? "The Enduring Strength Collective",
+    groupName: group?.name ?? "Spotlight Coaching",
     totalLossLbs,
     windowStartDate: card.window_start_date as string,
     windowEndDate: card.window_end_date as string,
