@@ -8,6 +8,7 @@ import { SwipeDirectionSetting } from "@/components/athlete/swipe-direction-sett
 import { GoalConfirmationControl } from "@/components/coach/goal-confirmation-control";
 import { PackageAssignmentControl } from "@/components/coach/package-assignment-control";
 import { PrivateFromOrgToggle } from "@/components/coach/private-from-org-toggle";
+import { ClientTagAssignmentControl } from "@/components/coach/client-tag-assignment-control";
 import { ChangeClientGroupControl } from "@/components/coach/change-client-group-control";
 import { AddSocialOnlyMembershipControl } from "@/components/coach/add-social-only-membership-control";
 import { ClientProgrammingMenu } from "@/components/coach/client-programming-menu";
@@ -100,7 +101,7 @@ export default async function AthleteProfilePage(
       .eq("group_id", params.groupId)
       .eq("profile_id", params.athleteId)
       .maybeSingle(),
-    supabase.from("groups").select("name").eq("id", params.groupId).single(),
+    supabase.from("groups").select("name, organization_id").eq("id", params.groupId).single(),
     // This client's own personal program wins over the group's shared
     // one — same precedence as lib/todays-workout.ts. Both queries run
     // unconditionally rather than fetching shared only when personal
@@ -361,6 +362,8 @@ export default async function AthleteProfilePage(
     { data: wearableMetrics },
     { data: withingsMetrics },
     { data: existingPlan },
+    { data: orgClientTagRows },
+    { data: clientTagAssignmentRows },
   ] = await Promise.all([
     activeProgram
       ? supabase.from("programs").select("training_days").eq("id", activeProgram.id).maybeSingle()
@@ -471,6 +474,14 @@ export default async function AthleteProfilePage(
           .eq("log_date", todayKeyForWave2)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    // organizational_only_group_kind_idea_sept16.md — every tag defined
+    // for this group's own organization, for the assignment control
+    // below. No org at all (a group not part of any organization) just
+    // means no tags to offer, not an error.
+    group?.organization_id
+      ? supabase.from("client_tags").select("id, name").eq("organization_id", group.organization_id).order("name")
+      : Promise.resolve({ data: null }),
+    supabase.from("client_tag_assignments").select("tag_id").eq("athlete_id", params.athleteId),
   ]);
 
   const sharedPhotos = signedPhotoResults;
@@ -1077,6 +1088,16 @@ export default async function AthleteProfilePage(
               athleteId={params.athleteId}
               groupId={params.groupId}
               initialValue={athleteMembership.private_from_org ?? false}
+            />
+          </section>
+
+          <section>
+            <ClientTagAssignmentControl
+              athleteId={params.athleteId}
+              orgTags={(orgClientTagRows ?? []).map((t) => ({ id: t.id, name: t.name }))}
+              initialAssignedTagIds={(clientTagAssignmentRows ?? [])
+                .map((a) => a.tag_id)
+                .filter((tagId) => (orgClientTagRows ?? []).some((t) => t.id === tagId))}
             />
           </section>
 

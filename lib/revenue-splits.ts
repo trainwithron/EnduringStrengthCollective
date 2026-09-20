@@ -84,3 +84,27 @@ export function computePlatformDeduction(
     netAmountCents,
   };
 }
+
+// organizational_only_group_kind_idea_sept16.md — the revenue-split
+// selectivity gate's untagged fallback: a client who was never sourced
+// by the org owner (i.e. doesn't carry the org's one designated
+// "pay-split-eligible" tag) skips the org-wide percentage split
+// entirely, and 100% of the already-platform-deducted net goes to
+// whichever coach(es) actually run that specific group — not a
+// percentage cut, the whole thing. Divided evenly across every coach on
+// a group in the rare multi-coach case, with any leftover cent from
+// integer division handed to the first coach(es) in order rather than
+// silently dropped.
+export function computeUntaggedFallbackShares(
+  netAmountCents: number,
+  groupCoaches: { profileId: string; fullName: string }[]
+): { profileId: string; fullName: string; amountCents: number }[] {
+  if (groupCoaches.length === 0) return [];
+  const baseCents = Math.floor(netAmountCents / groupCoaches.length);
+  let remainderCents = netAmountCents - baseCents * groupCoaches.length;
+  return groupCoaches.map((c) => {
+    const extra = remainderCents > 0 ? 1 : 0;
+    if (remainderCents > 0) remainderCents--;
+    return { profileId: c.profileId, fullName: c.fullName, amountCents: baseCents + extra };
+  });
+}

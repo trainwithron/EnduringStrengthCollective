@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { computeRevenueSplit, formatSplitCents, computePlatformDeduction, PLATFORM_FLAT_FEE_CENTS } from "./revenue-splits";
+import {
+  computeRevenueSplit,
+  formatSplitCents,
+  computePlatformDeduction,
+  computeUntaggedFallbackShares,
+  PLATFORM_FLAT_FEE_CENTS,
+} from "./revenue-splits";
 
 describe("computeRevenueSplit", () => {
   it("takes the platform fee off the top, then splits the remainder by coach share", () => {
@@ -82,5 +88,45 @@ describe("computePlatformDeduction", () => {
   it("handles a genuinely zero-amount transaction cleanly", () => {
     const result = computePlatformDeduction(0, 0);
     expect(result.netAmountCents).toBe(0);
+  });
+});
+
+describe("computeUntaggedFallbackShares", () => {
+  it("gives 100% to a single group coach", () => {
+    const result = computeUntaggedFallbackShares(9000, [{ profileId: "c1", fullName: "Coach A" }]);
+    expect(result).toEqual([{ profileId: "c1", fullName: "Coach A", amountCents: 9000 }]);
+  });
+
+  it("splits evenly across multiple coaches on the same group", () => {
+    const result = computeUntaggedFallbackShares(10000, [
+      { profileId: "c1", fullName: "Coach A" },
+      { profileId: "c2", fullName: "Coach B" },
+    ]);
+    expect(result).toEqual([
+      { profileId: "c1", fullName: "Coach A", amountCents: 5000 },
+      { profileId: "c2", fullName: "Coach B", amountCents: 5000 },
+    ]);
+  });
+
+  it("hands any leftover cent from integer division to the earlier coaches, never dropping it", () => {
+    const result = computeUntaggedFallbackShares(10001, [
+      { profileId: "c1", fullName: "Coach A" },
+      { profileId: "c2", fullName: "Coach B" },
+      { profileId: "c3", fullName: "Coach C" },
+    ]);
+    const total = result.reduce((sum, r) => sum + r.amountCents, 0);
+    expect(total).toBe(10001);
+    expect(result[0].amountCents).toBe(3334);
+    expect(result[1].amountCents).toBe(3334);
+    expect(result[2].amountCents).toBe(3333);
+  });
+
+  it("returns [] when the group has no coaches at all", () => {
+    expect(computeUntaggedFallbackShares(5000, [])).toEqual([]);
+  });
+
+  it("handles a zero net amount cleanly", () => {
+    const result = computeUntaggedFallbackShares(0, [{ profileId: "c1", fullName: "Coach A" }]);
+    expect(result).toEqual([{ profileId: "c1", fullName: "Coach A", amountCents: 0 }]);
   });
 });

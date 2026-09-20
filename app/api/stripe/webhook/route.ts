@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getStripeClient, isStripeConfigured } from "@/lib/stripe";
-import { computeRevenueSplit, computePlatformDeduction, type CoachShare } from "@/lib/revenue-splits";
+import {
+  computeRevenueSplit,
+  computePlatformDeduction,
+  computeUntaggedFallbackShares,
+  type CoachShare,
+} from "@/lib/revenue-splits";
 import { duplicateProgram } from "@/lib/program-duplication";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatch";
 import type Stripe from "stripe";
@@ -164,23 +169,25 @@ async function createRevenueSplitTransfers(
   stripe: Stripe,
   eventId: string,
   groupId: string,
+  athleteId: string,
   grossAmountCents: number,
   stripeProcessingFeeCents: number
 ) {
   const { data: group } = await supabase.from("groups").select("organization_id").eq("id", groupId).maybeSingle();
   if (!group?.organization_id) return;
+  const organizationId = group.organization_id;
 
   const { data: org } = await supabase
     .from("organizations")
     .select("platform_fee_pct")
-    .eq("id", group.organization_id)
+    .eq("id", organizationId)
     .maybeSingle();
   if (!org) return;
 
   const deduction = computePlatformDeduction(grossAmountCents, stripeProcessingFeeCents);
   const { error: ledgerError } = await supabase.from("platform_fee_ledger").insert({
     stripe_event_id: eventId,
-    organization_id: group.organization_id,
+    organization_id: organizationId,
     gross_amount_cents: deduction.grossAmountCents,
     stripe_processing_fee_cents: deduction.stripeProcessingFeeCents,
     platform_flat_fee_cents: deduction.platformFlatFeeCents,
@@ -196,8 +203,79 @@ async function createRevenueSplitTransfers(
   const { data: memberRows } = await supabase
     .from("organization_memberships")
     .select("profile_id, role, revenue_share_pct, stripe_connect_account_id, stripe_connect_status, profiles ( full_name )")
-    .eq("organization_id", group.organization_id);
+    .eq("organization_id", organizationId);
   if (!memberRows || memberRows.length === 0) return;
+
+  const connectByProfile = new Map(memberRows.map((m) => [m.profile_id, m]));
+
+  async function applyShares(shares: { profileId: string; amountCents: number }[]) {
+    for (const share of shares) {
+      if (share.amountCents <= 0) continue;
+      const member = connectByProfile.get(share.profileId);
+      if (!member || member.stripe_connect_status !== "enabled" || !member.stripe_connect_account_id) continue;
+
+      const { error: insertError } = await supabase.from("revenue_split_transfers").insert({
+        stripe_event_id: eventId,
+        coach_id: share.profileId,
+        organization_id: organizationId,
+        amount_cents: share.amountCents,
+      });
+      if (insertError) {
+        if (insertError.code === "23505") continue; // already transferred for this event
+        throw insertError;
+      }
+
+      const transfer = await stripe.transfers.create({
+        amount: share.amountCents,
+        currency: "usd",
+        destination: member.stripe_connect_account_id,
+        transfer_group: eventId,
+      });
+      await supabase
+        .from("revenue_split_transfers")
+        .update({ stripe_transfer_id: transfer.id })
+        .eq("stripe_event_id", eventId)
+        .eq("coach_id", share.profileId);
+    }
+  }
+
+  // organizational_only_group_kind_idea_sept16.md — revenue-split
+  // selectivity gate. No org-wide split at all until an org owner has
+  // deliberately flagged one real tag as the "pay-split-eligible"
+  // signal; until then this behaves exactly as it always has. Once a
+  // gating tag exists, a client who doesn't carry it was never sourced
+  // by the org owner — skip the org-wide percentage split entirely and
+  // give 100% of the net to whichever coach(es) actually run this
+  // specific group, instead of cutting every org member in.
+  const { data: gatingTag } = await supabase
+    .from("client_tags")
+    .select("id")
+    .eq("organization_id", organizationId)
+    .eq("gates_revenue_split", true)
+    .maybeSingle();
+
+  if (gatingTag) {
+    const { data: assignment } = await supabase
+      .from("client_tag_assignments")
+      .select("id")
+      .eq("tag_id", gatingTag.id)
+      .eq("athlete_id", athleteId)
+      .maybeSingle();
+
+    if (!assignment) {
+      const { data: groupCoachRows } = await supabase
+        .from("group_memberships")
+        .select("profile_id, profiles ( full_name )")
+        .eq("group_id", groupId)
+        .eq("role", "coach");
+      const groupCoaches = (groupCoachRows ?? []).map((c) => ({
+        profileId: c.profile_id,
+        fullName: (c.profiles as any)?.full_name ?? "Unknown",
+      }));
+      await applyShares(computeUntaggedFallbackShares(deduction.netAmountCents, groupCoaches));
+      return;
+    }
+  }
 
   const coaches: CoachShare[] = memberRows.map((m) => ({
     profileId: m.profile_id,
@@ -206,36 +284,7 @@ async function createRevenueSplitTransfers(
     revenueSharePct: m.revenue_share_pct,
   }));
   const split = computeRevenueSplit(deduction.netAmountCents, org.platform_fee_pct, coaches);
-  const connectByProfile = new Map(memberRows.map((m) => [m.profile_id, m]));
-
-  for (const share of split.coachShares) {
-    if (share.amountCents <= 0) continue;
-    const member = connectByProfile.get(share.profileId);
-    if (!member || member.stripe_connect_status !== "enabled" || !member.stripe_connect_account_id) continue;
-
-    const { error: insertError } = await supabase.from("revenue_split_transfers").insert({
-      stripe_event_id: eventId,
-      coach_id: share.profileId,
-      organization_id: group.organization_id,
-      amount_cents: share.amountCents,
-    });
-    if (insertError) {
-      if (insertError.code === "23505") continue; // already transferred for this event
-      throw insertError;
-    }
-
-    const transfer = await stripe.transfers.create({
-      amount: share.amountCents,
-      currency: "usd",
-      destination: member.stripe_connect_account_id,
-      transfer_group: eventId,
-    });
-    await supabase
-      .from("revenue_split_transfers")
-      .update({ stripe_transfer_id: transfer.id })
-      .eq("stripe_event_id", eventId)
-      .eq("coach_id", share.profileId);
-  }
+  await applyShares(split.coachShares);
 }
 
 // The only unauthenticated route in this app — Stripe calls this
@@ -324,6 +373,7 @@ export async function POST(request: Request) {
             stripe,
             event.id,
             groupId,
+            athleteId,
             session.amount_total ?? 0,
             stripeFeeCents
           );
@@ -439,6 +489,7 @@ export async function POST(request: Request) {
           stripe,
           event.id,
           groupId,
+          athleteId,
           invoice.amount_paid ?? 0,
           invoiceStripeFeeCents
         );

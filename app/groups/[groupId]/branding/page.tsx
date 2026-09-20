@@ -7,9 +7,10 @@ import { InviteCoachForm } from "@/components/coach/desktop/invite-coach-form";
 import { TransferOwnershipButton } from "@/components/coach/desktop/transfer-ownership-button";
 import { WorkoutCardBackgroundSettings } from "@/components/coach/desktop/workout-card-background-settings";
 import { DispatchSettings } from "@/components/coach/desktop/dispatch-settings";
+import { ClientTagManager } from "@/components/coach/desktop/client-tag-manager";
 import type { ButtonShape, DisplayFont, BodyFont } from "@/lib/theme";
 
-type OrgTab = "team" | "branding" | "workout-card";
+type OrgTab = "team" | "branding" | "workout-card" | "tags";
 
 export default async function BrandingPage(
   props: {
@@ -24,7 +25,9 @@ export default async function BrandingPage(
       ? "branding"
       : searchParams.tab === "workout-card"
         ? "workout-card"
-        : "team";
+        : searchParams.tab === "tags"
+          ? "tags"
+          : "team";
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -99,6 +102,17 @@ export default async function BrandingPage(
     fullName: (m.profiles as any)?.full_name ?? "Unknown",
   }));
 
+  const { data: tagRows } = await supabase
+    .from("client_tags")
+    .select("id, name, gates_revenue_split")
+    .eq("organization_id", orgMembership.organization_id)
+    .order("name", { ascending: true });
+  const clientTags = (tagRows ?? []).map((t) => ({
+    id: t.id,
+    name: t.name,
+    gatesRevenueSplit: t.gates_revenue_split,
+  }));
+
   const isOwner = orgMembership.role === "owner";
   const isOwnerOrAdmin = orgMembership.role === "owner" || orgMembership.role === "admin";
   const basePath = `/groups/${params.groupId}/branding`;
@@ -139,6 +153,14 @@ export default async function BrandingPage(
           }`}
         >
           Workout Card
+        </Link>
+        <Link
+          href={`${basePath}?tab=tags`}
+          className={`h-9 px-4 flex items-center font-body text-sm border ${
+            tab === "tags" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
+          }`}
+        >
+          Tags
         </Link>
       </div>
 
@@ -198,6 +220,14 @@ export default async function BrandingPage(
             </Link>
           </p>
         </div>
+      ) : tab === "tags" ? (
+        isOwnerOrAdmin ? (
+          <ClientTagManager organizationId={orgMembership.organization_id} coachId={user.id} initialTags={clientTags} />
+        ) : (
+          <p className="font-body text-sm text-steel">
+            Only owners and admins can manage client tags.
+          </p>
+        )
       ) : !isOwner ? (
         <p className="font-body text-sm text-steel">
           Only {org?.name ?? "the organization"}&apos;s owner can change branding.
