@@ -8,6 +8,7 @@ type Tab = "schedule" | "availability";
 export function CalendarPageTabs({
   coachId,
   initialWindows,
+  initialTab,
   children,
 }: {
   coachId: string;
@@ -18,9 +19,12 @@ export function CalendarPageTabs({
     endTime: string;
     slotDurationMinutes: number;
   }[];
+  // Lets a deep link (e.g. the Scheduling Spot's "Edit" action) land
+  // straight on Availability instead of always defaulting to Schedule.
+  initialTab?: Tab;
   children: React.ReactNode;
 }) {
-  const [tab, setTab] = useState<Tab>("schedule");
+  const [tab, setTab] = useState<Tab>(initialTab ?? "schedule");
 
   return (
     <div>

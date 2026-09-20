@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { ExerciseSetTarget } from "@/lib/types";
 import type { TrackedField } from "@/lib/exercise-fields";
+import { findMatchingBookingId } from "@/lib/booking-session-link";
 
 interface TemplateExercise {
   id: string;
@@ -61,6 +62,26 @@ export function StartWorkoutButton({
     setError(null);
     const supabase = createBrowserClient();
 
+    // Calendar Spotter Phase 2 — link this session to the real booking
+    // it fulfills, if one exists, so "booked 60 min, actually took 40"
+    // becomes a real, queryable question later. A freeform/unbooked
+    // session correctly finds nothing and stays null.
+    const now = new Date();
+    const windowStart = new Date(now.getTime() - 3 * 60 * 60000).toISOString();
+    const windowEnd = new Date(now.getTime() + 3 * 60 * 60000).toISOString();
+    const { data: candidateBookings } = await supabase
+      .from("bookings")
+      .select("id, start_at")
+      .eq("athlete_id", athleteId)
+      .eq("group_id", groupId)
+      .eq("status", "confirmed")
+      .gte("start_at", windowStart)
+      .lte("start_at", windowEnd);
+    const bookingId = findMatchingBookingId(
+      (candidateBookings ?? []).map((b) => ({ id: b.id, startAt: new Date(b.start_at) })),
+      now
+    );
+
     const { data: session, error: sessionError } = await supabase
       .from("athlete_sessions")
       .insert({
@@ -69,6 +90,7 @@ export function StartWorkoutButton({
         athlete_id: athleteId,
         logged_by_coach: loggedByCoach ?? false,
         session_type_id: sessionTypeId || null,
+        booking_id: bookingId,
       })
       .select("id")
       .single();

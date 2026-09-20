@@ -17,6 +17,8 @@ import { getEffectiveAthlete } from "@/lib/acting-as";
 import { computeQuietTier, QUIET_TIER_LABEL } from "@/lib/quiet-client-tier";
 import { gatherCalendarSpotterFindings } from "@/lib/calendar-spotter-gather";
 import { CalendarSpotterPanel } from "@/components/coach/desktop/calendar-spotter-panel";
+import { gatherSchedulingSpotterFlags } from "@/lib/calendar-spotter-phase2-gather";
+import { SchedulingSpotterPanel } from "@/components/coach/desktop/scheduling-spotter-panel";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
@@ -63,6 +65,7 @@ export default async function CoachCalendarPage(
       week?: string;
       reschedule?: string;
       scheduleFor?: string;
+      tab?: string;
     }>;
   }
 ) {
@@ -621,7 +624,7 @@ export default async function CoachCalendarPage(
 
   const { data: group } = await supabase
     .from("groups")
-    .select("name")
+    .select("name, organization_id")
     .eq("id", params.groupId)
     .single();
 
@@ -868,6 +871,10 @@ export default async function CoachCalendarPage(
     .filter((c) => c.tier !== "none");
 
   const calendarSpotterFindings = await gatherCalendarSpotterFindings(supabase, { groupId: params.groupId });
+  const schedulingSpotterFlags = await gatherSchedulingSpotterFlags(supabase, {
+    coachId: user.id,
+    organizationId: group?.organization_id ?? null,
+  });
 
   const timezone = coachProfile?.timezone ?? DEFAULT_COACH_TIMEZONE;
 
@@ -937,7 +944,13 @@ export default async function CoachCalendarPage(
         </div>
       )}
 
-      <CalendarPageTabs coachId={user.id} initialWindows={availabilityWindows}>
+      <SchedulingSpotterPanel flags={schedulingSpotterFlags} availabilityHref={`${basePath}?tab=availability`} />
+
+      <CalendarPageTabs
+        coachId={user.id}
+        initialWindows={availabilityWindows}
+        initialTab={searchParams.tab === "availability" ? "availability" : "schedule"}
+      >
       {/* mobile_must_fit_screen_standing_rule — this two-column layout
           (a fixed 260px "Needs attention"/"Clients" rail beside the
           grid) is desktop-shaped and never had a narrow-viewport
