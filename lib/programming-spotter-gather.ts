@@ -15,11 +15,17 @@ import {
   type FlatRepeatEntry,
   type BiomechTaggedEntry,
 } from "./programming-spotter";
+import { shouldPromptStopSuggesting } from "./spotter-feedback";
 
 export interface SpotterFlag {
   checkKind: "volume_concentration" | "redundancy" | "flat_repeat" | "missing_pattern" | "biomech_redundancy";
   patternKey: string;
   headline: string;
+  // spotter_feedback_learning_loop_research_sept19.md, Part 2/3: once this
+  // coach has denied/edited this exact (checkKind, patternKey) 3+ of the
+  // last 5 times it was shown, the panel offers a one-tap "stop showing
+  // this" instead of the normal confirm/deny/edit row.
+  promptStopSuggesting: boolean;
 }
 
 // A > B > C > untiered, for the biomech-redundancy check's alternative-
@@ -178,6 +184,7 @@ export async function gatherProgrammingSpotterFlags(
       checkKind: "volume_concentration",
       patternKey: f.movementPatternId,
       headline: `Week ${f.weekNumber}: ${f.totalSets} sets landed on the same movement pattern, mostly late in the session — a real priority block, or accessory drift worth a second look?`,
+      promptStopSuggesting: false,
     });
   }
 
@@ -187,6 +194,7 @@ export async function gatherProgrammingSpotterFlags(
       checkKind: "redundancy",
       patternKey: f.movementPatternId,
       headline: `Week ${f.weekNumber}: ${f.exerciseNames.join(", ")} are stacked back-to-back on the same movement pattern — intentional variety, or would one exercise for the same total sets do the job faster?`,
+      promptStopSuggesting: false,
     });
   }
 
@@ -196,6 +204,7 @@ export async function gatherProgrammingSpotterFlags(
       checkKind: "flat_repeat",
       patternKey: f.exerciseName,
       headline: `${f.exerciseName} has identical targets across ${f.weekCount} straight weeks (${f.weeks.join(", ")}) — worth checking this wasn't meant to progress.`,
+      promptStopSuggesting: false,
     });
   }
 
@@ -205,6 +214,7 @@ export async function gatherProgrammingSpotterFlags(
       checkKind: "missing_pattern",
       patternKey: f.category,
       headline: `"${programName}" reads as a full program, but ${CATEGORY_LABELS[f.category]} never shows up anywhere in it — worth a look?`,
+      promptStopSuggesting: false,
     });
   }
 
@@ -276,7 +286,35 @@ export async function gatherProgrammingSpotterFlags(
       const headline = alternative
         ? `Week ${f.weekNumber}: ${exerciseList} all train ${tagLabel} — intentional specialization, or would ${alternative} for more total load cover the same ground?`
         : `Week ${f.weekNumber}: ${exerciseList} all train ${tagLabel} — worth consolidating, or intentional?`;
-      flags.push({ checkKind: "biomech_redundancy", patternKey: f.tagKey, headline });
+      flags.push({ checkKind: "biomech_redundancy", patternKey: f.tagKey, headline, promptStopSuggesting: false });
+    }
+  }
+
+  // spotter_feedback_learning_loop_research_sept19.md, Part 2/3: one
+  // batched fetch of this coach's own recent feedback events for every
+  // dismissal_key still on screen, then a plain minimum-sample majority
+  // check per key — no Wilson bound, this isn't a comparative ranking.
+  if (flags.length > 0) {
+    const dismissalKeys = [...new Set(flags.map((f) => `${f.checkKind}::${f.patternKey}`))];
+    const { data: feedbackRows } = await supabase
+      .from("spotter_recommendation_feedback")
+      .select("dismissal_key, action, created_at")
+      .eq("coach_id", coachId)
+      .eq("spotter_kind", "programming")
+      .in("dismissal_key", dismissalKeys)
+      .order("created_at", { ascending: false })
+      .limit(500);
+
+    const eventsByKey = new Map<string, { action: "confirmed" | "denied" | "edited" }[]>();
+    for (const row of feedbackRows ?? []) {
+      const list = eventsByKey.get(row.dismissal_key) ?? [];
+      list.push({ action: row.action as "confirmed" | "denied" | "edited" });
+      eventsByKey.set(row.dismissal_key, list);
+    }
+
+    for (const flag of flags) {
+      const key = `${flag.checkKind}::${flag.patternKey}`;
+      flag.promptStopSuggesting = shouldPromptStopSuggesting(eventsByKey.get(key) ?? []);
     }
   }
 

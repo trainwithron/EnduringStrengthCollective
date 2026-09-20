@@ -196,10 +196,25 @@ export async function POST(request: Request) {
     .eq("coach_id", user.id)
     .order("created_at", { ascending: false })
     .limit(100);
-  const preferencesText =
-    prefRows && prefRows.length > 0
-      ? prefRows.map((p) => `- When ${p.condition_text}: ${p.preference_text}`).join("\n")
-      : "(none yet)";
+
+  // spotter_feedback_learning_loop_research_sept19.md, Part 4: a
+  // preference extracted from a Programming Spotter "Edit" decision
+  // flows into this exact same injection point, tagged by source so it
+  // reads distinctly from a conversation-derived rule.
+  const { data: spotterPrefRows } = await supabase
+    .from("spotter_coach_preferences")
+    .select("condition_text, preference_text")
+    .eq("coach_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(100);
+
+  const preferenceLines = [
+    ...(prefRows ?? []).map((p) => `- When ${p.condition_text}: ${p.preference_text}`),
+    ...(spotterPrefRows ?? []).map(
+      (p) => `- When ${p.condition_text}: ${p.preference_text} (from Programming Spotter feedback)`
+    ),
+  ];
+  const preferencesText = preferenceLines.length > 0 ? preferenceLines.join("\n") : "(none yet)";
 
   // Gap A (spotter_gap_audit_and_ai_quality_bar_research_sept15.md): the
   // real, persisted, RPE-aware training-max estimate (lib/rpe-training-
