@@ -34,6 +34,7 @@ import {
   UserPlus,
   SquareStack,
   PanelLeft,
+  SlidersHorizontal,
 } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
@@ -780,6 +781,13 @@ export function CoachDesktopShell({
                   >
                     <HeartHandshake className="w-4 h-4" strokeWidth={2.25} />
                     <NavBadge count={openSupportCount} collapsed />
+                  </Link>
+                  <Link
+                    href="/admin/marketplace-ranking"
+                    title="Marketplace Ranking Weights"
+                    className="w-11 h-11 flex items-center justify-center text-steel active:text-chalk"
+                  >
+                    <SlidersHorizontal className="w-4 h-4" strokeWidth={2.25} />
                   </Link>
                 </>
               )}
