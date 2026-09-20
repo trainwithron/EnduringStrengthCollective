@@ -7,12 +7,19 @@ import {
   computeRealIncomeThisMonth,
   computeRealMRR,
   computeActivePayingClients,
+  computeEngagement,
 } from "@/lib/business-metrics";
 
 interface MiniBusinessData {
   incomeThisMonth: number;
   mrr: number;
   payingClients: number;
+}
+
+interface ExpandedBusinessData {
+  rosterSize: number;
+  activeThisWeek: number;
+  activePct: number;
 }
 
 // The "pin a real Business mini-dashboard in place of the roster"
@@ -22,8 +29,16 @@ interface MiniBusinessData {
 // glance at without leaving whatever page they're actually on. "Go
 // deeper" links to the full page for the real charts/roster-level
 // detail this compact view deliberately doesn't try to replicate.
-export function BusinessMiniDashboard({ groupId }: { groupId: string }) {
+// `expanded` — the floating-card-stack widget's "drag/resize should be
+// functionally meaningful, not purely cosmetic" ask: past a real height
+// threshold, this view shows two more real tiles instead of just extra
+// whitespace. Roster/Calendar/Program already grow useful content with
+// more room (they're plain scrollable lists) — Business was the one
+// mini-view with genuinely fixed content regardless of card size, so
+// it's the one that needed an actual `expanded` branch.
+export function BusinessMiniDashboard({ groupId, expanded = false }: { groupId: string; expanded?: boolean }) {
   const [data, setData] = useState<MiniBusinessData | null>(null);
+  const [expandedData, setExpandedData] = useState<ExpandedBusinessData | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,6 +91,55 @@ export function BusinessMiniDashboard({ groupId }: { groupId: string }) {
     };
   }, [groupId]);
 
+  // Fetched lazily, only once the card is actually big enough to show
+  // it — no point paying for this query at the default compact size.
+  useEffect(() => {
+    if (!expanded) return;
+    let cancelled = false;
+    async function run() {
+      const supabase = createBrowserClient();
+
+      const { data: memberRows } = await supabase
+        .from("group_memberships")
+        .select("profile_id")
+        .eq("group_id", groupId)
+        .eq("role", "athlete");
+      const athleteIds = (memberRows ?? []).map((m: any) => m.profile_id);
+
+      const { data: logRows } =
+        athleteIds.length > 0
+          ? await supabase
+              .from("workout_logs")
+              .select("athlete_id, created_at")
+              .in("athlete_id", athleteIds)
+              .eq("group_id", groupId)
+              .order("created_at", { ascending: false })
+          : { data: [] };
+
+      const lastByAthlete = new Map<string, string>();
+      for (const row of logRows ?? []) {
+        if (!lastByAthlete.has(row.athlete_id)) lastByAthlete.set(row.athlete_id, row.created_at.slice(0, 10));
+      }
+      const engagement = computeEngagement(
+        athleteIds.map((id: string) => ({ lastActiveDateKey: lastByAthlete.get(id) ?? null })),
+        new Date().toISOString().slice(0, 10),
+        7
+      );
+
+      if (!cancelled) {
+        setExpandedData({
+          rosterSize: athleteIds.length,
+          activeThisWeek: engagement.activeCount,
+          activePct: engagement.pct,
+        });
+      }
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [groupId, expanded]);
+
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-2">
@@ -93,6 +157,22 @@ export function BusinessMiniDashboard({ groupId }: { groupId: string }) {
           <p className="font-display font-bold text-lg leading-none">{data ? data.payingClients : "—"}</p>
           <p className="font-body text-[10px] text-steel uppercase mt-1">Paying clients</p>
         </div>
+        {expanded && (
+          <>
+            <div className="border border-steel/20 p-2.5">
+              <p className="font-display font-bold text-lg leading-none">{expandedData ? expandedData.rosterSize : "—"}</p>
+              <p className="font-body text-[10px] text-steel uppercase mt-1">Roster size</p>
+            </div>
+            <div className="border border-steel/20 p-2.5">
+              <p className="font-display font-bold text-lg leading-none">
+                {expandedData ? `${expandedData.activeThisWeek}/${expandedData.rosterSize}` : "—"}
+              </p>
+              <p className="font-body text-[10px] text-steel uppercase mt-1">
+                Active this week{expandedData ? ` (${expandedData.activePct}%)` : ""}
+              </p>
+            </div>
+          </>
+        )}
       </div>
       <Link
         href={`/groups/${groupId}/business`}

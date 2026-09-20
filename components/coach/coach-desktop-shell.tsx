@@ -203,6 +203,15 @@ export function CoachDesktopShell({
     }
   }
 
+  // Real feedback from Ron: the only way out of card-stack mode was
+  // closing all 4 cards one at a time. A direct "collapse all" control
+  // on the widget itself (not just the small rail icon) sets the mode
+  // straight to traditional, no toggling logic needed.
+  function switchToTraditionalLayout() {
+    setLayoutMode("traditional");
+    writeLayoutMode("traditional");
+  }
+
   function showLayoutToggleTooltip() {
     const rect = layoutToggleRef.current?.getBoundingClientRect();
     if (rect) setLayoutToggleTooltipPos({ top: rect.top + rect.height / 2, left: rect.right + 10 });
@@ -807,7 +816,9 @@ export function CoachDesktopShell({
             sectionSubLinks={sectionSubLinks}
           />
         )}
-        {coachId && layoutMode === "card_stack" && <FloatingCardStack groupId={groupId} />}
+        {coachId && layoutMode === "card_stack" && (
+          <FloatingCardStack groupId={groupId} onExitToTraditional={switchToTraditionalLayout} />
+        )}
 
         {/* Coach mobile tab bar (coach_mobile_app_redesign_plan.md) —
             replaces the old off-canvas drawer as the primary mobile nav;

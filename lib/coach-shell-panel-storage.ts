@@ -128,6 +128,86 @@ export function writeCardStackOrder(order: ListPanelView[]): void {
   }
 }
 
+// Real feedback from Ron using the card-stack live: fixed cascade
+// offsets weren't enough — cards need to be freely dragged and resized,
+// "like we could do a custom window." Replaces the order-only model
+// above with one entry per open card carrying its own x/y/width/height;
+// array order is still front-to-back z-order (index 0 = front), same
+// convention as the old `order` array, just carrying more per entry.
+export interface CardStackEntry {
+  view: ListPanelView;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+const CARD_STACK_LAYOUT_KEY = "coach-shell-card-stack-layout";
+export const CARD_STACK_DEFAULT_WIDTH = 340;
+export const CARD_STACK_DEFAULT_HEIGHT = 560;
+export const CARD_STACK_MIN_WIDTH = 260;
+export const CARD_STACK_MIN_HEIGHT = 220;
+const CASCADE_BASE = 16;
+const CASCADE_STEP = 28;
+
+function defaultCardStackLayout(order: ListPanelView[]): CardStackEntry[] {
+  return order.map((view, i) => ({
+    view,
+    x: CASCADE_BASE + i * CASCADE_STEP,
+    y: CASCADE_BASE + i * CASCADE_STEP,
+    width: CARD_STACK_DEFAULT_WIDTH,
+    height: CARD_STACK_DEFAULT_HEIGHT,
+  }));
+}
+
+export function readCardStackLayout(): CardStackEntry[] {
+  try {
+    const raw = window.localStorage.getItem(CARD_STACK_LAYOUT_KEY);
+    // No saved layout yet — migrate from the older order-only format
+    // (or the default order for a brand-new coach) so an existing
+    // open/closed set and z-order survives this upgrade.
+    if (!raw) return defaultCardStackLayout(readCardStackOrder());
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return defaultCardStackLayout(readCardStackOrder());
+
+    const seen = new Set<string>();
+    const deduped: CardStackEntry[] = [];
+    for (const entry of parsed) {
+      if (
+        entry &&
+        typeof entry === "object" &&
+        (VALID_VIEWS as string[]).includes(entry.view) &&
+        !seen.has(entry.view)
+      ) {
+        seen.add(entry.view);
+        deduped.push({
+          view: entry.view,
+          x: Number.isFinite(entry.x) ? entry.x : CASCADE_BASE,
+          y: Number.isFinite(entry.y) ? entry.y : CASCADE_BASE,
+          width: Number.isFinite(entry.width)
+            ? Math.max(CARD_STACK_MIN_WIDTH, entry.width)
+            : CARD_STACK_DEFAULT_WIDTH,
+          height: Number.isFinite(entry.height)
+            ? Math.max(CARD_STACK_MIN_HEIGHT, entry.height)
+            : CARD_STACK_DEFAULT_HEIGHT,
+        });
+      }
+    }
+    return deduped;
+  } catch {
+    return defaultCardStackLayout(DEFAULT_CARD_STACK_ORDER);
+  }
+}
+
+export function writeCardStackLayout(layout: CardStackEntry[]): void {
+  try {
+    window.localStorage.setItem(CARD_STACK_LAYOUT_KEY, JSON.stringify(layout));
+  } catch {
+    // Non-fatal.
+  }
+}
+
 // overnight_comprehensive_polish_pass_sept19_20.md, finding #4 — the
 // layout-mode toggle is a real, working feature hidden behind a bare,
 // icon-only button with only a native browser tooltip. This tracks
