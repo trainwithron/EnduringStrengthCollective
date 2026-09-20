@@ -23,7 +23,6 @@ import {
   CollectiveIntelligencePanel,
   type CollectiveIntelligenceItem,
 } from "@/components/coach/desktop/collective-intelligence-panel";
-import { CollectiveIntelligenceChat } from "@/components/coach/desktop/collective-intelligence-chat";
 import { StuckDesktopModeBanner } from "@/components/coach/desktop/stuck-desktop-mode-banner";
 
 interface GroupRow {
@@ -460,7 +459,6 @@ export default async function CoachHomePage() {
     <>
       <DashboardAutoRefresh />
       {stuckInDesktopModeOnRealPhone && <StuckDesktopModeBanner />}
-      <CollectiveIntelligenceChat />
       <CoachProfileEditor
         coachId={user.id}
         coachName={viewerProfile?.full_name ?? "Coach"}

@@ -4,6 +4,7 @@ import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
 import { TerminologyProvider } from "@/components/coach/terminology-provider";
 import { ExitDesktopModeButton } from "@/components/coach/exit-desktop-mode-button";
+import { CollectiveIntelligenceChat } from "@/components/coach/desktop/collective-intelligence-chat";
 
 // A dedicated, minimal shell for the one cross-group page in the app —
 // not a retrofit of CoachDesktopShell, which has a lot of group-keyed
@@ -36,6 +37,9 @@ export function CoachHomeShell({ orgName, children }: { orgName: string; childre
         </div>
       </aside>
       <main className="flex-1 px-8 py-8 max-w-5xl">{children}</main>
+      {/* Same "available everywhere" mount as CoachDesktopShell, so the
+          brand-new-coach fallback branch of Home isn't missing it. */}
+      <CollectiveIntelligenceChat />
     </div>
     </TerminologyProvider>
   );

@@ -51,6 +51,7 @@ import { CalendarRailWidget } from "@/components/coach/desktop/rail-widgets/cale
 import { TeamRailWidget } from "@/components/coach/desktop/rail-widgets/team-rail-widget";
 import { BusinessRailWidget } from "@/components/coach/desktop/rail-widgets/business-rail-widget";
 import { ShellListPanel, type SectionSubLink } from "@/components/coach/desktop/shell-list-panel";
+import { CollectiveIntelligenceChat } from "@/components/coach/desktop/collective-intelligence-chat";
 import { FloatingCardStack } from "@/components/coach/desktop/floating-card-stack";
 import {
   readLayoutMode,
@@ -827,6 +828,12 @@ export function CoachDesktopShell({
 
         <main className="flex-1 min-w-0 px-4 pt-6 pb-24 md:px-10 md:pt-8 lg:pb-8 max-w-[1400px]">{children}</main>
       </div>
+      {/* Mounted once here so it's reachable from every one of this
+          shell's ~50 routes, not just /dashboard (collective_intelligence
+          audit gap — the component's own design intent was always
+          "available everywhere," it just was never actually wired in
+          anywhere but Home). Self-contained, no props needed. */}
+      <CollectiveIntelligenceChat />
     </div>
     </TerminologyProvider>
   );
