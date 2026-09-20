@@ -3,6 +3,10 @@
   "regions": ["pdx1"],
   "crons": [
     {
+      "path": "/api/cron/spotter-tier-sync",
+      "schedule": "30 10 * * *"
+    },
+    {
       "path": "/api/cron/coach-briefing",
       "schedule": "0 11 * * *"
     },
