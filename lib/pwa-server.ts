@@ -16,7 +16,7 @@ export async function isPwaStandalone(): Promise<boolean> {
 // and the dense desktop coaching shell shouldn't be their first
 // impression. Matches the same platforms AddToHomeScreenPrompt already
 // distinguishes client-side (iOS/Android), server-side.
-async function isMobileUserAgent(): Promise<boolean> {
+export async function isMobileUserAgent(): Promise<boolean> {
   const headerStore = await headers();
   const ua = headerStore.get("user-agent") ?? "";
   return /android|iphone|ipad|ipod|mobile/i.test(ua);

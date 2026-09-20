@@ -61,7 +61,7 @@ export function CollectiveIntelligenceChat() {
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? "Close Collective Intelligence chat" : "Open Collective Intelligence chat"}
-        className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-rust text-graphite flex items-center justify-center shadow-lg active:opacity-80"
+        className="hidden lg:flex fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-rust text-graphite items-center justify-center shadow-lg active:opacity-80"
       >
         {open ? <X className="w-6 h-6" /> : <MessageCircle className="w-6 h-6" />}
       </button>

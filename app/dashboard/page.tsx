@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase/server";
-import { prefersAthleteStyleView } from "@/lib/pwa-server";
+import { prefersAthleteStyleView, isMobileUserAgent } from "@/lib/pwa-server";
 import { CoachHomeShell } from "@/components/coach/coach-home-shell";
 import { CoachProfileEditor } from "@/components/coach/coach-profile-editor";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
@@ -23,6 +23,7 @@ import {
   type CollectiveIntelligenceItem,
 } from "@/components/coach/desktop/collective-intelligence-panel";
 import { CollectiveIntelligenceChat } from "@/components/coach/desktop/collective-intelligence-chat";
+import { StuckDesktopModeBanner } from "@/components/coach/desktop/stuck-desktop-mode-banner";
 
 interface GroupRow {
   id: string;
@@ -96,6 +97,24 @@ export default async function CoachHomePage() {
     }
     redirect(`/groups/${target}`);
   }
+
+  // Real bug from Ron's own phone, screenshot confirmed: a coach who
+  // taps "Desktop Mode" on the mobile Home page gets a sticky
+  // view_mode=desktop cookie override (by design — see the block
+  // above's own comment on why an explicit override always wins over
+  // device detection). On a REAL phone, that means every page on
+  // /dashboard renders its full, unresponsive desktop content — no
+  // Spot trigger (only CoachMobileShell mounts that), and the one real
+  // way back (ExitDesktopModeButton / the rail's own Client-Facing
+  // Mode toggle) sits inside chrome that's easy to miss at this exact
+  // width (a plain link at the bottom of an otherwise-empty sidebar
+  // column, or a rail icon that's itself hidden below lg:). This banner
+  // doesn't change any redirect logic (which would risk reintroducing
+  // the reload-loop bug documented above) — it's a plain, additional,
+  // unmissable render-time notice + one-tap fix shown only when the
+  // REAL device is mobile despite the override, so Ron (or anyone else
+  // in this spot) sees it immediately instead of hunting for tiny text.
+  const stuckInDesktopModeOnRealPhone = await isMobileUserAgent();
 
   // A coach can own/admin more than one organization (e.g. running
   // several client orgs at once) — fetching every row here, not just
@@ -417,6 +436,7 @@ export default async function CoachHomePage() {
   const content = (
     <>
       <DashboardAutoRefresh />
+      {stuckInDesktopModeOnRealPhone && <StuckDesktopModeBanner />}
       <CollectiveIntelligenceChat />
       <CoachProfileEditor
         coachId={user.id}
