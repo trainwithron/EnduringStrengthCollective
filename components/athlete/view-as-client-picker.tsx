@@ -37,6 +37,13 @@ export function ViewAsClientPicker({ onClose }: { onClose: () => void }) {
   const [pickingOwnGroup, setPickingOwnGroup] = useState(false);
   const [query, setQuery] = useState("");
   const [switching, setSwitching] = useState(false);
+  // overnight_comprehensive_polish_pass_sept19_20.md, finding #2 — same
+  // real-impersonation confirm step as spot-clients-groups-panel.tsx's
+  // roster tap, applied here too since this screen reaches the identical
+  // action (real account impersonation) through the identical endpoint.
+  // Not needed for "Log My Own Workout"/picking one's own group — that's
+  // the coach acting as themselves, no identity/attribution risk.
+  const [pendingClient, setPendingClient] = useState<ClientOption | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -140,8 +147,14 @@ export function ViewAsClientPicker({ onClose }: { onClose: () => void }) {
     router.refresh();
   }
 
-  async function selectClient(client: ClientOption) {
-    await actAs(client.id, client.groupId);
+  function selectClient(client: ClientOption) {
+    if (switching) return;
+    setPendingClient(client);
+  }
+
+  async function confirmSelectClient() {
+    if (!pendingClient) return;
+    await actAs(pendingClient.id, pendingClient.groupId);
   }
 
   async function logMyOwnWorkout() {
@@ -170,6 +183,46 @@ export function ViewAsClientPicker({ onClose }: { onClose: () => void }) {
   const filtered = (clients ?? []).filter((c) =>
     c.fullName.toLowerCase().includes(query.trim().toLowerCase())
   );
+
+  if (pendingClient) {
+    return (
+      <div className="fixed inset-0 z-40 bg-graphite text-chalk font-body flex flex-col">
+        <header className="px-5 pt-8 pb-4 border-b border-steel/20 flex items-center justify-between gap-3">
+          <h1 className="font-display font-bold text-2xl uppercase leading-none">View as {pendingClient.fullName}?</h1>
+          <button
+            type="button"
+            onClick={() => setPendingClient(null)}
+            aria-label="Cancel"
+            className="text-steel active:text-rust"
+          >
+            <X className="w-5 h-5" strokeWidth={2.5} />
+          </button>
+        </header>
+        <p className="font-body text-sm text-steel px-5 pt-4 max-w-[60ch]">
+          You&apos;ll see their real data, and anything you log from here on is attributed to them —
+          until you exit this view.
+        </p>
+        <div className="px-5 pt-6 flex items-center gap-3">
+          <button
+            type="button"
+            disabled={switching}
+            onClick={confirmSelectClient}
+            className="h-11 px-5 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-50"
+          >
+            View as {pendingClient.fullName}
+          </button>
+          <button
+            type="button"
+            disabled={switching}
+            onClick={() => setPendingClient(null)}
+            className="font-body text-sm text-steel disabled:opacity-50"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (pickingOwnGroup) {
     return (

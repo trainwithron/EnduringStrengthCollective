@@ -48,6 +48,12 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated }: { groupId: stri
   const [clients, setClients] = useState<ClientOption[] | null>(null);
   const [groups, setGroups] = useState<CoachedGroupOption[] | null>(null);
   const [pickingOwnGroup, setPickingOwnGroup] = useState(false);
+  // overnight_comprehensive_polish_pass_sept19_20.md, finding #2 — this
+  // tap starts real account impersonation (the coach sees and writes as
+  // this client from here on, until they exit), a categorically
+  // different action from desktop's "Client Profile" button, which only
+  // opens a read-only page. A one-tap confirm, matching Ron's own call.
+  const [pendingClient, setPendingClient] = useState<ClientOption | null>(null);
   const [myGroups, setMyGroups] = useState<{ groupId: string; name: string }[]>([]);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
@@ -139,8 +145,14 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated }: { groupId: stri
     };
   }, [groupId]);
 
-  async function actAsClient(client: ClientOption) {
+  function requestActAsClient(client: ClientOption) {
     if (busy) return;
+    setPendingClient(client);
+  }
+
+  async function confirmActAsClient() {
+    if (!pendingClient || busy) return;
+    const client = pendingClient;
     setBusy(true);
     await fetch("/api/coach/act-as", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ athleteId: client.id, groupId: client.groupId }) });
     onNavigated();
@@ -238,6 +250,36 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated }: { groupId: stri
   const filteredClients = (clients ?? []).filter((c) => c.fullName.toLowerCase().includes(query.trim().toLowerCase()));
   const groupSections = GROUP_KIND_ORDER.map((kind) => ({ kind, label: GROUP_KIND_LABELS[kind], list: (groups ?? []).filter((g) => g.kind === kind) }));
 
+  if (pendingClient) {
+    return (
+      <div>
+        <p className="font-body text-sm text-chalk mb-1">View as {pendingClient.fullName}?</p>
+        <p className="font-body text-xs text-steel mb-4">
+          You&apos;ll see their real data, and anything you log from here on is attributed to them — until you
+          exit this view.
+        </p>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={confirmActAsClient}
+            className="h-10 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-50"
+          >
+            View as {pendingClient.fullName}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setPendingClient(null)}
+            className="font-body text-sm text-steel disabled:opacity-50"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (pickingOwnGroup) {
     return (
       <div>
@@ -294,7 +336,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated }: { groupId: stri
                 key={c.id}
                 type="button"
                 disabled={busy}
-                onClick={() => actAsClient(c)}
+                onClick={() => requestActAsClient(c)}
                 className="w-full flex items-center gap-2.5 px-2 py-2 border border-steel/15 disabled:opacity-50 active:bg-surface/60 active:border-rust/50 transition-colors"
               >
                 {c.avatarUrl ? (
