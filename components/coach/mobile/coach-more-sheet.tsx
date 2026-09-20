@@ -19,6 +19,11 @@ import {
   MessagesSquare,
   MonitorPlay,
   Building2,
+  UserPlus,
+  MessageCircle,
+  Zap,
+  Wallet,
+  Tag,
   X,
 } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -130,6 +135,11 @@ export function CoachMoreSheet({
         <Item href={`/groups/${groupId}/business/waiver`} label="Waiver" icon={ClipboardList} />
         <Item href={`/groups/${groupId}/availability`} label="Availability" icon={CalendarClock} />
         <Item href={`/groups/${groupId}/business/support`} label="Support" icon={HeartHandshake} />
+        <Item href={`/groups/${groupId}/business/leads`} label="Leads" icon={UserPlus} />
+        <Item href={`/groups/${groupId}/business/sms-settings`} label="SMS Notifications" icon={MessageCircle} />
+        <Item href={`/groups/${groupId}/business/zapier`} label="Zapier" icon={Zap} />
+        <Item href={`/groups/${groupId}/business/session-ledger`} label="Session Ledger" icon={Wallet} />
+        <Item href={`/groups/${groupId}/business/session-types`} label="Session Types" icon={Tag} />
         <Item href={`/groups/${groupId}/branding`} label="Organization" icon={Palette} />
 
         <GroupHeader label="Engage" icon={Flag} />
