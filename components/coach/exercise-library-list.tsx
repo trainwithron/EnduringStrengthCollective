@@ -80,6 +80,18 @@ export function ExerciseLibraryList({
   const [tagsByExercise, setTagsByExercise] =
     useState<Record<string, BiomechTagSelection[]>>(initialBiomechTagsByExercise);
 
+  // AI-assisted suggest-and-confirm classifier
+  // (biomech_redundancy_tagging_backfill_scoping_sept19.md) — a real LLM
+  // call per exercise name, never auto-written. For an existing exercise
+  // the result sits here as chips the coach clicks to accept one at a
+  // time (or "Accept all"), each accept going through the exact same
+  // toggleExistingTag/setExistingTagRole write path a manual click would.
+  const [suggestingKey, setSuggestingKey] = useState<string | null>(null);
+  const [suggestionError, setSuggestionError] = useState<string | null>(null);
+  const [pendingSuggestions, setPendingSuggestions] = useState<
+    Record<string, { tagId: string; role: BiomechTagSelection["role"]; label: string }[]>
+  >({});
+
   function toggleNewTag(tagId: string) {
     setNewTags((prev) =>
       prev.some((t) => t.tagId === tagId)
@@ -130,6 +142,54 @@ export function ExerciseLibraryList({
       .update({ role })
       .eq("exercise_name", exerciseName)
       .eq("tag_id", tagId);
+  }
+
+  async function handleSuggestTags(exerciseName: string, target: "new" | string) {
+    if (!exerciseName.trim()) return;
+    setSuggestingKey(target);
+    setSuggestionError(null);
+    try {
+      const res = await fetch("/api/biomech-tags/suggest", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ exerciseName }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setSuggestionError(data.error ?? "Couldn't get suggestions — try again.");
+        return;
+      }
+      const suggestions: { tagId: string; role: BiomechTagSelection["role"]; label: string }[] =
+        data.suggestions ?? [];
+      if (target === "new") {
+        setNewTags(suggestions.map((s) => ({ tagId: s.tagId, role: s.role })));
+      } else {
+        const already = new Set((tagsByExercise[target] ?? []).map((t) => t.tagId));
+        setPendingSuggestions((prev) => ({
+          ...prev,
+          [target]: suggestions.filter((s) => !already.has(s.tagId)),
+        }));
+      }
+    } catch {
+      setSuggestionError("Couldn't reach the AI — try again.");
+    } finally {
+      setSuggestingKey(null);
+    }
+  }
+
+  async function acceptSuggestedTag(exerciseName: string, tagId: string, role: BiomechTagSelection["role"]) {
+    await toggleExistingTag(exerciseName, tagId);
+    if (role !== "prime_mover") await setExistingTagRole(exerciseName, tagId, role);
+    setPendingSuggestions((prev) => ({
+      ...prev,
+      [exerciseName]: (prev[exerciseName] ?? []).filter((s) => s.tagId !== tagId),
+    }));
+  }
+
+  async function acceptAllSuggestedTags(exerciseName: string) {
+    for (const s of pendingSuggestions[exerciseName] ?? []) {
+      await acceptSuggestedTag(exerciseName, s.tagId, s.role);
+    }
   }
 
   function handleNewNameChange(value: string) {
@@ -322,9 +382,19 @@ export function ExerciseLibraryList({
 
       {newName.trim() && (
         <div className="mb-6 max-w-3xl">
-          <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">
-            Biomechanical tags — required for a new exercise
-          </p>
+          <div className="flex items-center justify-between mb-1">
+            <p className="font-body text-xs text-steel uppercase tracking-wide">
+              Biomechanical tags — required for a new exercise
+            </p>
+            <button
+              type="button"
+              onClick={() => handleSuggestTags(newName, "new")}
+              disabled={suggestingKey === "new"}
+              className="font-body text-[11px] text-rust uppercase tracking-wide disabled:opacity-40"
+            >
+              {suggestingKey === "new" ? "Asking AI…" : "✨ Suggest tags (AI)"}
+            </button>
+          </div>
           <p className="font-body text-[11px] text-steel mb-2">
             {newTags.length === 0
               ? "Hidden from clients, used for corrective-exercise selection."
@@ -335,6 +405,7 @@ export function ExerciseLibraryList({
                   }))
                 ).summary}
           </p>
+          {suggestionError && <p className="font-body text-[11px] text-rust mb-2">{suggestionError}</p>}
           <BiomechTagPicker
             vocabulary={biomechVocabulary}
             selected={newTags}
@@ -460,12 +531,53 @@ export function ExerciseLibraryList({
                           }
                         />
                         <div>
-                          <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">
-                            Biomechanical tags
-                          </p>
+                          <div className="flex items-center justify-between mb-1">
+                            <p className="font-body text-xs text-steel uppercase tracking-wide">
+                              Biomechanical tags
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => handleSuggestTags(ex.name, ex.name)}
+                              disabled={suggestingKey === ex.name}
+                              className="font-body text-[11px] text-rust uppercase tracking-wide disabled:opacity-40"
+                            >
+                              {suggestingKey === ex.name ? "Asking AI…" : "✨ Suggest tags (AI)"}
+                            </button>
+                          </div>
                           <p className="font-body text-[11px] text-steel mb-2">
                             {breakdown?.summary ?? "No biomechanical tags added yet."}
                           </p>
+                          {suggestionError && (
+                            <p className="font-body text-[11px] text-rust mb-2">{suggestionError}</p>
+                          )}
+                          {(pendingSuggestions[ex.name]?.length ?? 0) > 0 && (
+                            <div className="border border-rust/30 bg-rust/5 px-3 py-2 mb-2">
+                              <div className="flex items-center justify-between mb-1.5">
+                                <p className="font-body text-[11px] text-steel">
+                                  AI suggests — click to accept, or ignore:
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => acceptAllSuggestedTags(ex.name)}
+                                  className="font-body text-[11px] text-rust uppercase tracking-wide font-bold"
+                                >
+                                  Accept all
+                                </button>
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {pendingSuggestions[ex.name]!.map((s) => (
+                                  <button
+                                    key={s.tagId}
+                                    type="button"
+                                    onClick={() => acceptSuggestedTag(ex.name, s.tagId, s.role)}
+                                    className="h-6 px-2 border border-steel/30 text-chalk font-body text-[11px] active:border-rust active:text-rust"
+                                  >
+                                    {s.label} · {s.role === "prime_mover" ? "Prime mover" : "Stabilizer"}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                           <BiomechTagPicker
                             vocabulary={biomechVocabulary}
                             selected={exTags}
