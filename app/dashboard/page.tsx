@@ -8,6 +8,7 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import type { HomeClientCardData } from "@/components/coach/desktop/home-client-card";
 import type { HomeGroupCardData } from "@/components/coach/desktop/home-group-card";
 import { NeedsReplyPanel, type NeedsReplyThread } from "@/components/coach/desktop/needs-reply-panel";
+import { OrgNotificationsPanel, type OrgNotification } from "@/components/coach/desktop/org-notifications-panel";
 import { MarkAllSeenButton } from "@/components/coach/desktop/mark-all-seen-button";
 import { findThreadsNeedingReply } from "@/lib/notification-priority";
 import { getCoachDashboardData } from "@/lib/dashboard-data";
@@ -298,6 +299,28 @@ export default async function CoachHomePage() {
     }
   }
 
+  // overnight_comprehensive_polish_pass_sept19_20.md, finding #1 — real
+  // org-level notifications (trainer-dispatch admin alerts, cascade
+  // offers, question replies) are inserted with group_id: null since
+  // they're inherently org-wide, not tied to one specific group. This is
+  // the one page in the app that's already cross-group by design, so
+  // it's the natural (and now only) in-app place these can surface.
+  const { data: orgNotificationRows } = await supabase
+    .from("notifications")
+    .select("id, type, body, link_path, created_at")
+    .eq("profile_id", user.id)
+    .is("group_id", null)
+    .is("read_at", null)
+    .order("created_at", { ascending: false })
+    .limit(20);
+  const orgNotifications: OrgNotification[] = (orgNotificationRows ?? []).map((n) => ({
+    id: n.id,
+    type: n.type,
+    body: n.body,
+    linkPath: n.link_path,
+    createdAt: n.created_at,
+  }));
+
   // "Needs a reply" — the one thing worth surfacing from a big/social
   // group's ordinary feed chatter (per the notification-priority design):
   // a question that's gone unanswered a while. Computed on read from
@@ -470,6 +493,8 @@ export default async function CoachHomePage() {
       </div>
 
       <CollectiveIntelligencePanel items={collectiveIntelligenceItems} hasRunToday={!!todaysBriefing} />
+
+      <OrgNotificationsPanel initialNotifications={orgNotifications} />
 
       <NeedsReplyPanel coachId={user.id} threads={needsReplyThreads} />
 
