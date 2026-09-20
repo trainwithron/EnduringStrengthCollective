@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -50,7 +51,13 @@ import { TeamRailWidget } from "@/components/coach/desktop/rail-widgets/team-rai
 import { BusinessRailWidget } from "@/components/coach/desktop/rail-widgets/business-rail-widget";
 import { ShellListPanel, type SectionSubLink } from "@/components/coach/desktop/shell-list-panel";
 import { FloatingCardStack } from "@/components/coach/desktop/floating-card-stack";
-import { readLayoutMode, writeLayoutMode, type LayoutMode } from "@/lib/coach-shell-panel-storage";
+import {
+  readLayoutMode,
+  writeLayoutMode,
+  readHasSeenLayoutModeToggle,
+  markLayoutModeToggleSeen,
+  type LayoutMode,
+} from "@/lib/coach-shell-panel-storage";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CoachMoreSheet } from "@/components/coach/mobile/coach-more-sheet";
 
@@ -144,6 +151,15 @@ export function CoachDesktopShell({
   // guarded-localStorage convention as the panel's own width/collapsed/
   // view state — no server round trip for a pure display preference.
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("traditional");
+  // overnight_comprehensive_polish_pass_sept19_20.md, finding #4 — a
+  // real, working toggle that was nearly invisible (bare icon, native
+  // tooltip only). A small "NEW" dot points at it until a coach has
+  // actually used it once; a styled hover tooltip (same portal-to-body
+  // pattern shell-rail.tsx already established for this exact rail's
+  // sticky-stacking-context issue) replaces the native title attribute.
+  const [hasSeenLayoutToggle, setHasSeenLayoutToggle] = useState(true);
+  const [layoutToggleTooltipPos, setLayoutToggleTooltipPos] = useState<{ top: number; left: number } | null>(null);
+  const layoutToggleRef = useRef<HTMLButtonElement>(null);
   const [feedUnread, setFeedUnread] = useState(0);
   const [clientsUnread, setClientsUnread] = useState(0);
   const [messagesUnread, setMessagesUnread] = useState(0);
@@ -170,6 +186,7 @@ export function CoachDesktopShell({
 
   useEffect(() => {
     setLayoutMode(readLayoutMode());
+    setHasSeenLayoutToggle(readHasSeenLayoutModeToggle());
   }, []);
 
   function toggleLayoutMode() {
@@ -178,6 +195,19 @@ export function CoachDesktopShell({
       writeLayoutMode(next);
       return next;
     });
+    if (!hasSeenLayoutToggle) {
+      markLayoutModeToggleSeen();
+      setHasSeenLayoutToggle(true);
+    }
+  }
+
+  function showLayoutToggleTooltip() {
+    const rect = layoutToggleRef.current?.getBoundingClientRect();
+    if (rect) setLayoutToggleTooltipPos({ top: rect.top + rect.height / 2, left: rect.right + 10 });
+  }
+
+  function hideLayoutToggleTooltip() {
+    setLayoutToggleTooltipPos(null);
   }
 
   // Team (position groups/depth chart) is an opt-in feature for coaches
@@ -691,20 +721,41 @@ export function CoachDesktopShell({
                 <MonitorPlay className="w-4 h-4" strokeWidth={2.25} />
               </a>
               <button
+                ref={layoutToggleRef}
                 type="button"
                 onClick={toggleLayoutMode}
-                title={
+                onMouseEnter={showLayoutToggleTooltip}
+                onMouseLeave={hideLayoutToggleTooltip}
+                aria-label={
                   layoutMode === "traditional"
                     ? "Switch to floating card-stack layout"
                     : "Switch to traditional layout"
                 }
-                className="w-11 h-11 flex items-center justify-center text-steel active:text-chalk"
+                className="relative w-11 h-11 flex items-center justify-center text-steel active:text-chalk"
               >
                 {layoutMode === "traditional" ? (
                   <SquareStack className="w-4 h-4" strokeWidth={2.25} />
                 ) : (
                   <PanelLeft className="w-4 h-4" strokeWidth={2.25} />
                 )}
+                {!hasSeenLayoutToggle && <span className="absolute top-1 right-1.5 w-2 h-2 rounded-full bg-rust" />}
+                {layoutToggleTooltipPos &&
+                  typeof document !== "undefined" &&
+                  createPortal(
+                    <span
+                      style={{
+                        top: layoutToggleTooltipPos.top,
+                        left: layoutToggleTooltipPos.left,
+                        transform: "translateY(-50%)",
+                      }}
+                      className="fixed pointer-events-none whitespace-nowrap bg-surface border border-steel/30 text-chalk font-body text-xs px-2 py-1 z-[100]"
+                    >
+                      {layoutMode === "traditional"
+                        ? "Try the floating card-stack layout"
+                        : "Switch back to the traditional layout"}
+                    </span>,
+                    document.body
+                  )}
               </button>
               <ViewModeToggle
                 targetMode="mobile"

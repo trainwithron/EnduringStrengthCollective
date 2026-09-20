@@ -127,3 +127,27 @@ export function writeCardStackOrder(order: ListPanelView[]): void {
     // Non-fatal.
   }
 }
+
+// overnight_comprehensive_polish_pass_sept19_20.md, finding #4 — the
+// layout-mode toggle is a real, working feature hidden behind a bare,
+// icon-only button with only a native browser tooltip. This tracks
+// whether a coach has ever actually toggled it at least once, so a
+// small "NEW" indicator can point at it until they have — same
+// per-viewer, no-server-round-trip convention as everything else here.
+const LAYOUT_MODE_TOGGLE_SEEN_KEY = "coach-shell-layout-mode-toggle-seen";
+
+export function readHasSeenLayoutModeToggle(): boolean {
+  try {
+    return window.localStorage.getItem(LAYOUT_MODE_TOGGLE_SEEN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+export function markLayoutModeToggleSeen(): void {
+  try {
+    window.localStorage.setItem(LAYOUT_MODE_TOGGLE_SEEN_KEY, "1");
+  } catch {
+    // Non-fatal.
+  }
+}
