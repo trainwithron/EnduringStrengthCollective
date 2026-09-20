@@ -28,12 +28,21 @@ export function RecapAndUpNext({
   carriedForwardNotes,
   groupId,
   coachId,
+  patternCheckFoundSomething,
 }: {
   recap: SessionRecap;
   nextWorkout: NextWorkout | null;
   carriedForwardNotes: Record<string, { body: string; date: string }>;
   groupId: string;
   coachId: string;
+  // Session Pattern Spotter's "checked, clear" indicator
+  // (habit_spotter_and_post_workout_coach_page_research_sept19.md) —
+  // null = no check has run yet for this session (a real possibility if
+  // the fire-and-forget check hasn't landed, or predates this feature),
+  // false = checked and genuinely clear, true = something was found
+  // (the coach already got a real page/notification for that, this is
+  // just the passive confirmation a check ran at all).
+  patternCheckFoundSomething?: boolean | null;
 }) {
   const [showNext, setShowNext] = useState(false);
   const [sessionNote, setSessionNote] = useState(recap.sessionNote);
@@ -154,6 +163,11 @@ export function RecapAndUpNext({
                 {recap.completedAt ? new Date(recap.completedAt).toLocaleString() : "—"} ·{" "}
                 {formatDuration(recap.durationSeconds)}
               </p>
+              {patternCheckFoundSomething === false && (
+                <p className="font-body text-[11px] text-steel mt-1">
+                  ✓ Checked for behavioral patterns — nothing notable this time.
+                </p>
+              )}
 
               <div className="grid grid-cols-3 gap-3 mt-4">
                 <div className="border border-steel/20 p-3 text-center">

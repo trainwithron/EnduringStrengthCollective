@@ -164,6 +164,19 @@ export function CompleteWorkoutButton({
         () => {}
       );
     }
+
+    // Session Pattern Spotter
+    // (habit_spotter_and_post_workout_coach_page_research_sept19.md) —
+    // same fire-and-forget, never-blocks-completion shape as the
+    // equipment-load-ratio refresh above. The route itself resolves the
+    // coach, runs the real detectors, and only notifies when it
+    // actually finds something.
+    fetch("/api/session-pattern-check", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sessionId, athleteId: result.athlete_id, groupId: result.group_id }),
+    }).catch(() => {});
+
     const newPrs = result.new_prs ?? [];
     const newRecords = result.new_records ?? [];
 

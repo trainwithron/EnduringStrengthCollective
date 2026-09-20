@@ -142,6 +142,12 @@ export default async function SessionRecapPage(props: { params: Promise<{ sessio
     }
   }
 
+  const { data: patternCheck } = await supabase
+    .from("session_pattern_checks")
+    .select("found_something")
+    .eq("session_id", params.sessionId)
+    .maybeSingle();
+
   return (
     <RecapAndUpNext
       recap={recap}
@@ -153,6 +159,7 @@ export default async function SessionRecapPage(props: { params: Promise<{ sessio
       carriedForwardNotes={Object.fromEntries(carriedForwardNoteByExerciseName)}
       groupId={session.group_id}
       coachId={user.id}
+      patternCheckFoundSomething={patternCheck ? patternCheck.found_something : null}
     />
   );
 }
