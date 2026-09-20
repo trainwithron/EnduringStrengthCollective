@@ -84,7 +84,7 @@ export function FloatingCardStack({ groupId }: { groupId: string }) {
               key={v}
               type="button"
               onClick={() => openCard(v)}
-              className="h-7 px-2 flex items-center gap-1 font-body text-[11px] text-steel border border-steel/30 bg-graphite active:text-chalk"
+              className="h-7 px-2 flex items-center gap-1 font-body text-[11px] text-steel border border-steel/30 bg-surface rounded-token-lg active:text-chalk"
             >
               <Plus className="w-3 h-3" />
               {CARD_META[v].icon} {CARD_META[v].label}
@@ -108,7 +108,7 @@ export function FloatingCardStack({ groupId }: { groupId: string }) {
                 <div
                   key={view}
                   onClick={() => !isFront && bringToFront(view)}
-                  className="absolute bg-graphite border border-steel/30 shadow-[0_12px_32px_-8px_rgba(0,0,0,0.6)]"
+                  className="absolute bg-surface border border-steel/30 rounded-token-lg shadow-[0_12px_32px_-8px_rgba(0,0,0,0.6)] overflow-hidden"
                   style={{
                     width: CARD_WIDTH,
                     left: offset,

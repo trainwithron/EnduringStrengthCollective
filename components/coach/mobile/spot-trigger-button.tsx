@@ -81,7 +81,7 @@ export function SpotTriggerButton({
             id={panelId}
             role="dialog"
             aria-label="The Spot"
-            className="fixed top-16 left-1/2 -translate-x-1/2 z-40 w-[92vw] max-w-md bg-graphite/95 backdrop-blur border border-steel/30 p-4 shadow-2xl"
+            className="fixed top-16 left-1/2 -translate-x-1/2 z-40 w-[92vw] max-w-md bg-graphite/95 backdrop-blur border border-steel/30 rounded-token-lg p-4 shadow-2xl"
           >
             <p className="font-body text-[10px] text-steel uppercase tracking-wide mb-2">
               The Spot — only you can see this

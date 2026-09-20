@@ -74,8 +74,8 @@ export function ProgrammingSpotterPanel({ programId, flags }: { programId: strin
   }
 
   return (
-    <div className="border border-steel/20 bg-surface px-4 py-3 mb-4">
-      <p className="font-body text-[11px] text-steel uppercase tracking-wide font-bold mb-2">
+    <div className="border border-rust/40 bg-rust/5 px-4 py-3 mb-4">
+      <p className="font-body text-[11px] text-rust uppercase tracking-wide font-bold mb-2">
         Programming Spotter
       </p>
       <div className="space-y-3">
@@ -163,7 +163,7 @@ export function ProgrammingSpotterPanel({ programId, flags }: { programId: strin
                   type="button"
                   onClick={() => sendFeedback(flag, "confirmed")}
                   disabled={busy}
-                  className="font-body text-[11px] text-steel uppercase tracking-wide active:text-chalk disabled:opacity-40"
+                  className="font-body text-[11px] text-moss uppercase tracking-wide disabled:opacity-40"
                 >
                   Confirm
                 </button>
@@ -179,7 +179,7 @@ export function ProgrammingSpotterPanel({ programId, flags }: { programId: strin
                   type="button"
                   onClick={() => sendFeedback(flag, "denied")}
                   disabled={busy}
-                  className="font-body text-[11px] text-steel uppercase tracking-wide active:text-rust disabled:opacity-40"
+                  className="font-body text-[11px] text-rust uppercase tracking-wide font-bold disabled:opacity-40"
                 >
                   Deny
                 </button>
