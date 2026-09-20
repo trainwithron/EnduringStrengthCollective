@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
-import { generateSlotsForDate, formatSlotTime } from "@/lib/booking-slots";
+import { generateSlotsForDate, formatSlotTime, minimumNoticeBlockedRange, isSlotBufferBlocked } from "@/lib/booking-slots";
 import { getBlockedRangesForDate } from "@/lib/availability-exceptions";
 import { zonedTimeToUtc, DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { AssignSlotButton } from "@/components/coach/desktop/assign-slot-button";
@@ -115,6 +115,8 @@ export default async function CoachDayDetailPage(
     let creditBalance = 0;
     let activeSubscription: { currentPeriodEnd: string | null } | null = null;
     let availablePackages: PackageOption[] = [];
+    let bufferBlockingBookings: { id: string; start: Date; end: Date }[] = [];
+    let resolvedBufferMinutes = 0;
 
     if (coachMembership) {
       // Wave 1: none of these five depend on each other — coachProfile's
@@ -125,6 +127,7 @@ export default async function CoachDayDetailPage(
         { data: creditsRow },
         { data: subscriptionRow },
         { data: packageRows },
+        { data: policyRow },
       ] = await Promise.all([
         supabase.from("profiles").select("timezone").eq("id", coachMembership.profile_id).maybeSingle(),
         supabase
@@ -150,6 +153,11 @@ export default async function CoachDayDetailPage(
           .eq("group_id", params.groupId)
           .eq("is_active", true)
           .order("sessions_per_week", { ascending: true }),
+        supabase
+          .from("coach_booking_policies")
+          .select("buffer_minutes, minimum_notice_hours")
+          .eq("coach_id", coachMembership.profile_id)
+          .maybeSingle(),
       ]);
 
       const timezone = coachProfile?.timezone ?? DEFAULT_COACH_TIMEZONE;
@@ -172,21 +180,37 @@ export default async function CoachDayDetailPage(
 
       const zonedDayStart = zonedTimeToUtc(params.date, "00:00", timezone);
       const zonedDayEnd = new Date(zonedDayStart.getTime() + 24 * 60 * 60 * 1000);
+      const bufferMinutes = policyRow?.buffer_minutes ?? 0;
+      const minimumNoticeHours = policyRow?.minimum_notice_hours ?? 0;
 
       // Wave 2: both need timezone from wave 1, but not each other.
-      const [blockedRanges, { data: bookingRows }] = await Promise.all([
+      const [blockedRangesFromExceptions, { data: bookingRows }] = await Promise.all([
         getBlockedRangesForDate(supabase, coachMembership.profile_id, date, timezone),
         supabase
           .from("bookings")
-          .select("id, start_at, athlete_id, session_type, profiles!bookings_athlete_id_fkey ( full_name )")
+          .select("id, start_at, end_at, athlete_id, session_type, profiles!bookings_athlete_id_fkey ( full_name )")
           .eq("coach_id", coachMembership.profile_id)
           .eq("status", "confirmed")
           .gte("start_at", zonedDayStart.toISOString())
           .lt("start_at", zonedDayEnd.toISOString()),
       ]);
 
+      // acuity_replacement_gap_audit_sept16.md — a too-soon slot is
+      // excluded from generation entirely (real athletes only; a coach
+      // "acting as" a client for real still books through this same
+      // branch, and correctly stays subject to their own notice rule,
+      // same as book_session's own v_is_self gate).
+      const noticeRange = minimumNoticeBlockedRange(new Date(), minimumNoticeHours);
+      const blockedRanges = noticeRange ? [...blockedRangesFromExceptions, noticeRange] : blockedRangesFromExceptions;
+
       slots = generateSlotsForDate(date, windows, blockedRanges, timezone);
       bookingsForDay = bookingRows ?? [];
+      bufferBlockingBookings = bookingsForDay.map((b) => ({
+        id: b.id as string,
+        start: new Date(b.start_at as string),
+        end: new Date(b.end_at as string),
+      }));
+      resolvedBufferMinutes = bufferMinutes;
     }
 
     const bookingByTime = new Map(
@@ -249,6 +273,19 @@ export default async function CoachDayDetailPage(
                 const isMine = booking?.athlete_id === athleteId;
                 const isBeingRescheduled = !!reschedulingBooking && booking?.id === reschedulingBooking.id;
                 const endAt = new Date(start.getTime() + durationMinutes * 60000);
+                // Real server-side enforcement lives in book_session/
+                // reschedule_booking — this mirrors it so an open (but
+                // buffer-blocked) slot doesn't invite a click that the
+                // RPC would just reject. Excludes the booking currently
+                // being rescheduled from its own buffer check.
+                const isBufferBlocked =
+                  !booking &&
+                  isSlotBufferBlocked(
+                    start,
+                    endAt,
+                    bufferBlockingBookings.filter((b) => b.id !== reschedulingBooking?.id),
+                    resolvedBufferMinutes
+                  );
 
                 return (
                   <div key={iso} className="py-3 flex items-center justify-between">
@@ -261,6 +298,8 @@ export default async function CoachDayDetailPage(
                     ) : reschedulingBooking ? (
                       booking ? (
                         <span className="font-body text-xs text-steel">Booked</span>
+                      ) : isBufferBlocked ? (
+                        <span className="font-body text-xs text-steel">Too close to another session</span>
                       ) : (
                         <RescheduleSlotButton
                           bookingId={reschedulingBooking.id}
@@ -280,6 +319,8 @@ export default async function CoachDayDetailPage(
                       ) : (
                         <span className="font-body text-xs text-steel">Booked</span>
                       )
+                    ) : isBufferBlocked ? (
+                      <span className="font-body text-xs text-steel">Too close to another session</span>
                     ) : creditBalance > 0 ? (
                       <BookSlotButton
                         coachId={coachMembership.profile_id}

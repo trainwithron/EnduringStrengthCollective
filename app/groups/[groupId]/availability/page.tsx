@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { AvailabilityManagerDesktop } from "@/components/coach/desktop/availability-manager-desktop";
-import { CancellationPolicyControl } from "@/components/coach/desktop/cancellation-policy-control";
+import { BookingPolicyControl } from "@/components/coach/desktop/booking-policy-control";
 import { AvailabilityExceptionsManager } from "@/components/coach/desktop/availability-exceptions-manager";
 import { DiscoveryCallsPanel, type DiscoveryCallRow } from "@/components/coach/desktop/discovery-calls-panel";
 import { TimezoneControl } from "@/components/coach/desktop/timezone-control";
@@ -68,7 +68,7 @@ export default async function AvailabilityPage(
 
   const { data: policyRow } = await supabase
     .from("coach_booking_policies")
-    .select("cancellation_window_hours")
+    .select("cancellation_window_hours, buffer_minutes, minimum_notice_hours")
     .eq("coach_id", user.id)
     .maybeSingle();
 
@@ -122,9 +122,11 @@ export default async function AvailabilityPage(
 
       <TimezoneControl initialTimezone={coachProfile?.timezone ?? null} />
 
-      <CancellationPolicyControl
+      <BookingPolicyControl
         coachId={user.id}
-        initialHours={policyRow?.cancellation_window_hours ?? 24}
+        initialCancellationHours={policyRow?.cancellation_window_hours ?? 24}
+        initialBufferMinutes={policyRow?.buffer_minutes ?? 0}
+        initialMinimumNoticeHours={policyRow?.minimum_notice_hours ?? 0}
       />
 
       <AvailabilityExceptionsManager coachId={user.id} initialExceptions={exceptions} />

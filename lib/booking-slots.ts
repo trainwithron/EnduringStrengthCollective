@@ -118,3 +118,33 @@ export function resolveBlockedRangesForDate(
 export function formatSlotTime(date: Date): string {
   return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
+
+// acuity_replacement_gap_audit_sept16.md — minimum-notice booking gap.
+// A single BlockedRange covering [now, now + minimumNoticeHours) is the
+// cleanest way to fold this into the existing generateSlotsForDate
+// pipeline (same mechanism already used for vacations/exceptions) rather
+// than adding a second, parallel filtering pass. Returns null when
+// there's no notice requirement, so a caller can skip appending it.
+export function minimumNoticeBlockedRange(now: Date, minimumNoticeHours: number): BlockedRange | null {
+  if (minimumNoticeHours <= 0) return null;
+  return { start: now, end: new Date(now.getTime() + minimumNoticeHours * 3600000) };
+}
+
+// The real server-side enforcement (book_session/reschedule_booking) is
+// the load-bearing check; this mirrors that same predicate for the UI so
+// a slot within buffer_minutes of an adjacent confirmed booking can be
+// flagged, without removing already-booked slots from the rendered list
+// (this app's day-detail pages show every slot with its own booked/open
+// status, not just the open ones).
+export function isSlotBufferBlocked(
+  slotStart: Date,
+  slotEnd: Date,
+  otherBookings: { start: Date; end: Date }[],
+  bufferMinutes: number
+): boolean {
+  if (bufferMinutes <= 0) return false;
+  const bufferMs = bufferMinutes * 60000;
+  return otherBookings.some((b) =>
+    overlaps(slotStart, slotEnd, new Date(b.start.getTime() - bufferMs), new Date(b.end.getTime() + bufferMs))
+  );
+}

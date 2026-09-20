@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
-import { generateSlotsForDate, formatSlotTime } from "@/lib/booking-slots";
+import { generateSlotsForDate, formatSlotTime, minimumNoticeBlockedRange, isSlotBufferBlocked } from "@/lib/booking-slots";
 import { getBlockedRangesForDate } from "@/lib/availability-exceptions";
 import { zonedTimeToUtc, DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { BookSlotButton } from "@/components/athlete/book-slot-button";
@@ -206,6 +206,8 @@ export default async function DayDetailPage(
   let creditBalance = 0;
   let activeSubscription: { currentPeriodEnd: string | null } | null = null;
   let availablePackages: PackageOption[] = [];
+  let bufferBlockingBookings: { id: string; start: Date; end: Date }[] = [];
+  let resolvedBufferMinutes = 0;
 
   if (coachMembership) {
     const { data: coachProfile } = await supabase
@@ -227,12 +229,27 @@ export default async function DayDetailPage(
       slotDurationMinutes: w.slot_duration_minutes,
     }));
 
-    const blockedRanges = await getBlockedRangesForDate(
+    const { data: policyRow } = await supabase
+      .from("coach_booking_policies")
+      .select("buffer_minutes, minimum_notice_hours")
+      .eq("coach_id", coachMembership.profile_id)
+      .maybeSingle();
+    resolvedBufferMinutes = policyRow?.buffer_minutes ?? 0;
+
+    const blockedRangesFromExceptions = await getBlockedRangesForDate(
       supabase,
       coachMembership.profile_id,
       date,
       timezone
     );
+    // Minimum notice only applies to an athlete booking for themselves —
+    // never to the coach's own scheduling view (matches book_session's
+    // v_is_self gate), so it's excluded from the shared slot list unless
+    // the current viewer is genuinely the athlete.
+    const noticeRange = viewingAsAthlete
+      ? minimumNoticeBlockedRange(new Date(), policyRow?.minimum_notice_hours ?? 0)
+      : null;
+    const blockedRanges = noticeRange ? [...blockedRangesFromExceptions, noticeRange] : blockedRangesFromExceptions;
     slots = generateSlotsForDate(date, windows, blockedRanges, timezone);
 
     // Bounded in the coach's own zone, not naive UTC midnight — a late-
@@ -243,13 +260,18 @@ export default async function DayDetailPage(
 
     const { data: bookingRows } = await supabase
       .from("bookings")
-      .select("id, start_at, athlete_id, profiles!bookings_athlete_id_fkey ( full_name )")
+      .select("id, start_at, end_at, athlete_id, profiles!bookings_athlete_id_fkey ( full_name )")
       .eq("coach_id", coachMembership.profile_id)
       .eq("status", "confirmed")
       .gte("start_at", zonedDayStart.toISOString())
       .lt("start_at", zonedDayEnd.toISOString());
 
     bookingsForDay = bookingRows ?? [];
+    bufferBlockingBookings = bookingsForDay.map((b) => ({
+      id: b.id as string,
+      start: new Date(b.start_at as string),
+      end: new Date(b.end_at as string),
+    }));
 
     if (viewingAsAthlete) {
       const { data: creditsRow } = await supabase
@@ -387,6 +409,18 @@ export default async function DayDetailPage(
               const isMine = booking?.athlete_id === athleteId;
               const isBeingRescheduled = !!reschedulingBooking && booking?.id === reschedulingBooking.id;
               const endAt = new Date(start.getTime() + durationMinutes * 60000);
+              // Real server-side enforcement lives in book_session/
+              // reschedule_booking — this mirrors it so an open (but
+              // buffer-blocked) slot doesn't invite a click the RPC
+              // would just reject.
+              const isBufferBlocked =
+                !booking &&
+                isSlotBufferBlocked(
+                  start,
+                  endAt,
+                  bufferBlockingBookings.filter((b) => b.id !== reschedulingBooking?.id),
+                  resolvedBufferMinutes
+                );
 
               return (
                 <div key={iso} className="py-3 flex items-center justify-between">
@@ -405,6 +439,8 @@ export default async function DayDetailPage(
                   ) : reschedulingBooking ? (
                     booking ? (
                       <span className="font-body text-xs text-steel">Booked</span>
+                    ) : isBufferBlocked ? (
+                      <span className="font-body text-xs text-steel">Too close to another session</span>
                     ) : (
                       <RescheduleSlotButton
                         bookingId={reschedulingBooking.id}
@@ -421,6 +457,8 @@ export default async function DayDetailPage(
                     ) : (
                       <span className="font-body text-xs text-steel">Booked</span>
                     )
+                  ) : isBufferBlocked ? (
+                    <span className="font-body text-xs text-steel">Too close to another session</span>
                   ) : creditBalance > 0 ? (
                     <BookSlotButton
                       coachId={coachMembership.profile_id}
