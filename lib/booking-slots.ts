@@ -148,3 +148,20 @@ export function isSlotBufferBlocked(
     overlaps(slotStart, slotEnd, new Date(b.start.getTime() - bufferMs), new Date(b.end.getTime() + bufferMs))
   );
 }
+
+// acuity_replacement_gap_audit_sept16.md — recurring bookings, the
+// availability-conflict check (Q4: flag for the coach to resolve rather
+// than silently auto-cancel or silently let it double-book). Reuses
+// generateSlotsForDate's own real slot-generation directly instead of
+// writing separate "does this instant fall in a window" date math — a
+// recurring occurrence "still fits" exactly when it's one of the slots
+// the coach's current real availability would generate for that date.
+export function bookingFitsAvailability(
+  bookingStart: Date,
+  windows: AvailabilityWindow[],
+  blockedRanges: BlockedRange[],
+  timezone: string = DEFAULT_COACH_TIMEZONE
+): boolean {
+  const slots = generateSlotsForDate(bookingStart, windows, blockedRanges, timezone);
+  return slots.some((s) => s.start.getTime() === bookingStart.getTime());
+}

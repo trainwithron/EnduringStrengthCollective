@@ -23,6 +23,9 @@ import type { PackageOption } from "@/components/athlete/package-picker";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { meetsMinimumAge } from "@/lib/coppa";
 import { MarkNoShowToggle } from "@/components/coach/mark-no-show-toggle";
+import { WaitlistJoinButton } from "@/components/athlete/waitlist-join-button";
+import { RecurringBookingButton } from "@/components/athlete/recurring-booking-button";
+import { RecurringConflictBadge } from "@/components/coach/desktop/recurring-conflict-badge";
 
 export default async function CoachDayDetailPage(
   props: {
@@ -119,6 +122,7 @@ export default async function CoachDayDetailPage(
     let availablePackages: PackageOption[] = [];
     let bufferBlockingBookings: { id: string; start: Date; end: Date }[] = [];
     let resolvedBufferMinutes = 0;
+    let waitlistStatusByTime = new Map<number, "waiting" | "offered">();
 
     if (coachMembership) {
       // Wave 1: none of these five depend on each other — coachProfile's
@@ -130,6 +134,7 @@ export default async function CoachDayDetailPage(
         { data: subscriptionRow },
         { data: packageRows },
         { data: policyRow },
+        { data: waitlistRows },
       ] = await Promise.all([
         supabase.from("profiles").select("timezone").eq("id", coachMembership.profile_id).maybeSingle(),
         supabase
@@ -160,7 +165,16 @@ export default async function CoachDayDetailPage(
           .select("buffer_minutes, minimum_notice_hours, credit_expiry_days")
           .eq("coach_id", coachMembership.profile_id)
           .maybeSingle(),
+        supabase
+          .from("booking_waitlist_entries")
+          .select("slot_start_at, status")
+          .eq("athlete_id", athleteId)
+          .eq("coach_id", coachMembership.profile_id)
+          .in("status", ["waiting", "offered"]),
       ]);
+      waitlistStatusByTime = new Map(
+        (waitlistRows ?? []).map((w) => [new Date(w.slot_start_at).getTime(), w.status as "waiting" | "offered"])
+      );
 
       const timezone = coachProfile?.timezone ?? DEFAULT_COACH_TIMEZONE;
       const windows = (windowRows ?? []).map((w) => ({
@@ -191,7 +205,9 @@ export default async function CoachDayDetailPage(
         getBlockedRangesForDate(supabase, coachMembership.profile_id, date, timezone),
         supabase
           .from("bookings")
-          .select("id, start_at, end_at, athlete_id, session_type, profiles!bookings_athlete_id_fkey ( full_name )")
+          .select(
+            "id, start_at, end_at, athlete_id, session_type, recurring_series_id, profiles!bookings_athlete_id_fkey ( full_name )"
+          )
           .eq("coach_id", coachMembership.profile_id)
           .eq("status", "confirmed")
           .gte("start_at", zonedDayStart.toISOString())
@@ -324,21 +340,38 @@ export default async function CoachDayDetailPage(
                           <CancelBookingButton
                             bookingId={booking.id}
                             rescheduleHref={`${backHref}/${params.date}?reschedule=${booking.id}`}
+                            recurringSeriesId={booking.recurring_series_id}
                           />
                         </div>
                       ) : (
-                        <span className="font-body text-xs text-steel">Booked</span>
+                        <WaitlistJoinButton
+                          coachId={coachMembership.profile_id}
+                          athleteId={athleteId}
+                          groupId={params.groupId}
+                          slotStartAt={iso}
+                          slotEndAt={endAt.toISOString()}
+                          existingStatus={waitlistStatusByTime.get(start.getTime()) ?? null}
+                        />
                       )
                     ) : isBufferBlocked ? (
                       <span className="font-body text-xs text-steel">Too close to another session</span>
                     ) : creditBalance > 0 ? (
-                      <BookSlotButton
-                        coachId={coachMembership.profile_id}
-                        athleteId={athleteId}
-                        groupId={params.groupId}
-                        startAt={iso}
-                        endAt={endAt.toISOString()}
-                      />
+                      <div className="flex flex-col items-end gap-1">
+                        <BookSlotButton
+                          coachId={coachMembership.profile_id}
+                          athleteId={athleteId}
+                          groupId={params.groupId}
+                          startAt={iso}
+                          endAt={endAt.toISOString()}
+                        />
+                        <RecurringBookingButton
+                          coachId={coachMembership.profile_id}
+                          athleteId={athleteId}
+                          groupId={params.groupId}
+                          startAt={iso}
+                          durationMinutes={durationMinutes}
+                        />
+                      </div>
                     ) : (
                       <span className="font-body text-xs text-steel">No sessions remaining</span>
                     )}
@@ -428,7 +461,9 @@ export default async function CoachDayDetailPage(
     getBlockedRangesForDate(supabase, user.id, date, timezone),
     supabase
       .from("bookings")
-      .select("id, start_at, end_at, athlete_id, session_type, no_show, profiles!bookings_athlete_id_fkey ( full_name )")
+      .select(
+        "id, start_at, end_at, athlete_id, session_type, no_show, needs_coach_resolution, profiles!bookings_athlete_id_fkey ( full_name )"
+      )
       .eq("coach_id", user.id)
       .eq("status", "confirmed")
       .gte("start_at", zonedDayStart.toISOString())
@@ -583,6 +618,7 @@ export default async function CoachDayDetailPage(
                     <span className="font-body text-xs text-steel">
                       Booked — {(booking.profiles as any)?.full_name ?? "Client"}
                     </span>
+                    {booking.needs_coach_resolution && <RecurringConflictBadge bookingId={booking.id} />}
                     {start.getTime() < Date.now() ? (
                       <MarkNoShowToggle bookingId={booking.id} initialNoShow={booking.no_show ?? false} />
                     ) : (

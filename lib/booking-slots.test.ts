@@ -4,6 +4,7 @@ import {
   resolveBlockedRangesForDate,
   minimumNoticeBlockedRange,
   isSlotBufferBlocked,
+  bookingFitsAvailability,
 } from "./booking-slots";
 
 // Every test passes "UTC" explicitly and asserts with getUTCHours()/
@@ -214,5 +215,36 @@ describe("isSlotBufferBlocked", () => {
   it("is unaffected by an unrelated, non-adjacent booking", () => {
     const distant = [{ start: new Date("2026-09-09T19:00:00Z"), end: new Date("2026-09-09T20:00:00Z") }];
     expect(isSlotBufferBlocked(slotStart, slotEnd, distant, 60)).toBe(false);
+  });
+});
+
+describe("bookingFitsAvailability", () => {
+  const tuesdayWindow = [{ weekday: 2, startTime: "17:00", endTime: "20:00", slotDurationMinutes: 60 }];
+
+  it("fits when the instant matches a real generated slot", () => {
+    expect(
+      bookingFitsAvailability(new Date("2026-09-08T18:00:00Z"), tuesdayWindow, [], "UTC")
+    ).toBe(true);
+  });
+
+  it("does not fit an instant that isn't slot-aligned", () => {
+    // 18:30 isn't a valid slot start for 60-minute slots starting at 17:00.
+    expect(
+      bookingFitsAvailability(new Date("2026-09-08T18:30:00Z"), tuesdayWindow, [], "UTC")
+    ).toBe(false);
+  });
+
+  it("does not fit once the coach's window no longer covers that weekday", () => {
+    const wednesdayOnly = [{ weekday: 3, startTime: "17:00", endTime: "20:00", slotDurationMinutes: 60 }];
+    expect(
+      bookingFitsAvailability(new Date("2026-09-08T18:00:00Z"), wednesdayOnly, [], "UTC")
+    ).toBe(false);
+  });
+
+  it("does not fit a slot now covered by a blocking exception", () => {
+    const blocked = [{ start: new Date("2026-09-08T18:00:00Z"), end: new Date("2026-09-08T19:00:00Z") }];
+    expect(
+      bookingFitsAvailability(new Date("2026-09-08T18:00:00Z"), tuesdayWindow, blocked, "UTC")
+    ).toBe(false);
   });
 });

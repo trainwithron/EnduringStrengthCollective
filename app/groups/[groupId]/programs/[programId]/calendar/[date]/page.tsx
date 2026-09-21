@@ -18,6 +18,9 @@ import { resolveDayMacroTarget } from "@/lib/todays-macros";
 import { CalendarPurchasePrompt } from "@/components/athlete/calendar-purchase-prompt";
 import type { PackageOption } from "@/components/athlete/package-picker";
 import { getEffectiveAthlete } from "@/lib/acting-as";
+import { WaitlistJoinButton } from "@/components/athlete/waitlist-join-button";
+import { RecurringBookingButton } from "@/components/athlete/recurring-booking-button";
+import { RecurringConflictBadge } from "@/components/coach/desktop/recurring-conflict-badge";
 
 export default async function DayDetailPage(
   props: {
@@ -210,6 +213,7 @@ export default async function DayDetailPage(
   let availablePackages: PackageOption[] = [];
   let bufferBlockingBookings: { id: string; start: Date; end: Date }[] = [];
   let resolvedBufferMinutes = 0;
+  let waitlistStatusByTime = new Map<number, "waiting" | "offered">();
 
   if (coachMembership) {
     const { data: coachProfile } = await supabase
@@ -262,7 +266,9 @@ export default async function DayDetailPage(
 
     const { data: bookingRows } = await supabase
       .from("bookings")
-      .select("id, start_at, end_at, athlete_id, profiles!bookings_athlete_id_fkey ( full_name )")
+      .select(
+        "id, start_at, end_at, athlete_id, needs_coach_resolution, recurring_series_id, profiles!bookings_athlete_id_fkey ( full_name )"
+      )
       .eq("coach_id", coachMembership.profile_id)
       .eq("status", "confirmed")
       .gte("start_at", zonedDayStart.toISOString())
@@ -284,6 +290,16 @@ export default async function DayDetailPage(
         .maybeSingle();
       creditBalance = creditsRow?.balance ?? 0;
       creditExpiresAt = creditExpiryDate(creditsRow?.last_granted_at ?? null, policyRow?.credit_expiry_days ?? 0);
+
+      const { data: waitlistRows } = await supabase
+        .from("booking_waitlist_entries")
+        .select("slot_start_at, status")
+        .eq("athlete_id", athleteId)
+        .eq("coach_id", coachMembership.profile_id)
+        .in("status", ["waiting", "offered"]);
+      waitlistStatusByTime = new Map(
+        (waitlistRows ?? []).map((w) => [new Date(w.slot_start_at).getTime(), w.status as "waiting" | "offered"])
+      );
 
       const { data: subscriptionRow } = await supabase
         .from("membership_subscriptions")
@@ -439,10 +455,11 @@ export default async function DayDetailPage(
                   </span>
 
                   {membership.role === "coach" && !isActingAsOther ? (
-                    <span className="font-body text-xs text-steel">
+                    <span className="font-body text-xs text-steel flex items-center gap-1.5">
                       {booking
                         ? `Booked — ${(booking.profiles as any)?.full_name ?? "Client"}`
                         : "Open"}
+                      {booking?.needs_coach_resolution && <RecurringConflictBadge bookingId={booking.id} />}
                     </span>
                   ) : isBeingRescheduled ? (
                     <span className="font-body text-xs text-steel">Currently here</span>
@@ -463,20 +480,37 @@ export default async function DayDetailPage(
                       <CancelBookingButton
                         bookingId={booking.id}
                         rescheduleHref={`${backHref}?reschedule=${booking.id}`}
+                        recurringSeriesId={booking.recurring_series_id}
                       />
                     ) : (
-                      <span className="font-body text-xs text-steel">Booked</span>
+                      <WaitlistJoinButton
+                        coachId={coachMembership.profile_id}
+                        athleteId={athleteId}
+                        groupId={params.groupId}
+                        slotStartAt={iso}
+                        slotEndAt={endAt.toISOString()}
+                        existingStatus={waitlistStatusByTime.get(start.getTime()) ?? null}
+                      />
                     )
                   ) : isBufferBlocked ? (
                     <span className="font-body text-xs text-steel">Too close to another session</span>
                   ) : creditBalance > 0 ? (
-                    <BookSlotButton
-                      coachId={coachMembership.profile_id}
-                      athleteId={athleteId}
-                      groupId={params.groupId}
-                      startAt={iso}
-                      endAt={endAt.toISOString()}
-                    />
+                    <div className="flex flex-col items-end gap-1">
+                      <BookSlotButton
+                        coachId={coachMembership.profile_id}
+                        athleteId={athleteId}
+                        groupId={params.groupId}
+                        startAt={iso}
+                        endAt={endAt.toISOString()}
+                      />
+                      <RecurringBookingButton
+                        coachId={coachMembership.profile_id}
+                        athleteId={athleteId}
+                        groupId={params.groupId}
+                        startAt={iso}
+                        durationMinutes={durationMinutes}
+                      />
+                    </div>
                   ) : (
                     <span className="font-body text-xs text-steel">No sessions remaining</span>
                   )}
