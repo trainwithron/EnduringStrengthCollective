@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { generateSlotsForDate, formatSlotTime, minimumNoticeBlockedRange, isSlotBufferBlocked } from "@/lib/booking-slots";
+import { creditExpiryDate } from "@/lib/credit-expiration";
 import { getBlockedRangesForDate } from "@/lib/availability-exceptions";
 import { zonedTimeToUtc, DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { AssignSlotButton } from "@/components/coach/desktop/assign-slot-button";
@@ -113,6 +114,7 @@ export default async function CoachDayDetailPage(
     let slots: { start: Date; durationMinutes: number }[] = [];
     let bookingsForDay: any[] = [];
     let creditBalance = 0;
+    let creditExpiresAt: Date | null = null;
     let activeSubscription: { currentPeriodEnd: string | null } | null = null;
     let availablePackages: PackageOption[] = [];
     let bufferBlockingBookings: { id: string; start: Date; end: Date }[] = [];
@@ -136,7 +138,7 @@ export default async function CoachDayDetailPage(
           .eq("coach_id", coachMembership.profile_id),
         supabase
           .from("session_credits")
-          .select("balance")
+          .select("balance, last_granted_at")
           .eq("athlete_id", athleteId)
           .eq("group_id", params.groupId)
           .maybeSingle(),
@@ -155,7 +157,7 @@ export default async function CoachDayDetailPage(
           .order("sessions_per_week", { ascending: true }),
         supabase
           .from("coach_booking_policies")
-          .select("buffer_minutes, minimum_notice_hours")
+          .select("buffer_minutes, minimum_notice_hours, credit_expiry_days")
           .eq("coach_id", coachMembership.profile_id)
           .maybeSingle(),
       ]);
@@ -168,6 +170,7 @@ export default async function CoachDayDetailPage(
         slotDurationMinutes: w.slot_duration_minutes,
       }));
       creditBalance = creditsRow?.balance ?? 0;
+      creditExpiresAt = creditExpiryDate(creditsRow?.last_granted_at ?? null, policyRow?.credit_expiry_days ?? 0);
       activeSubscription = subscriptionRow ? { currentPeriodEnd: subscriptionRow.current_period_end } : null;
       availablePackages = (packageRows ?? []).map((p) => ({
         id: p.id,
@@ -234,6 +237,13 @@ export default async function CoachDayDetailPage(
             <div className="mt-3">
               <p className="font-body text-xs text-steel">
                 Session credits available: {creditBalance}
+                {creditBalance > 0 && creditExpiresAt && (
+                  <span className="text-steel/70">
+                    {" "}
+                    — expires{" "}
+                    {creditExpiresAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </span>
+                )}
               </p>
               {creditBalance <= 0 && !reschedulingBooking && (
                 <div className="mt-2">

@@ -68,7 +68,7 @@ export default async function AvailabilityPage(
 
   const { data: policyRow } = await supabase
     .from("coach_booking_policies")
-    .select("cancellation_window_hours, buffer_minutes, minimum_notice_hours")
+    .select("cancellation_window_hours, buffer_minutes, minimum_notice_hours, credit_expiry_days")
     .eq("coach_id", user.id)
     .maybeSingle();
 
@@ -127,6 +127,7 @@ export default async function AvailabilityPage(
         initialCancellationHours={policyRow?.cancellation_window_hours ?? 24}
         initialBufferMinutes={policyRow?.buffer_minutes ?? 0}
         initialMinimumNoticeHours={policyRow?.minimum_notice_hours ?? 0}
+        initialCreditExpiryDays={policyRow?.credit_expiry_days ?? 0}
       />
 
       <AvailabilityExceptionsManager coachId={user.id} initialExceptions={exceptions} />
