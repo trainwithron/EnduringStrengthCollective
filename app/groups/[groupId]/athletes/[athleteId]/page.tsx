@@ -19,6 +19,7 @@ import { InjuryStatusToggle } from "@/components/coach/injury-status-toggle";
 import { computeBmr, computeTdee } from "@/lib/bmr-tdee";
 import { VideoCheckinRecorder } from "@/components/coach/video-checkin-recorder";
 import { ParQAnswersPanel } from "@/components/coach/par-q-answers-panel";
+import { WaiverStatusLine } from "@/components/coach/waiver-status-line";
 import { RosterSection } from "@/components/coach/desktop/roster-section";
 import { isUnder13 } from "@/lib/coppa";
 import { CoachLoggedBadge } from "@/components/coach-logged-badge";
@@ -763,7 +764,7 @@ export default async function AthleteProfilePage(
 
       <div className="grid grid-cols-[320px_1fr] gap-10 items-start">
         <div className="space-y-8">
-          {(hasAboutInfo || parQAnswers.length > 0) && (
+          {(hasAboutInfo || parQAnswers.length > 0 || !!intake) && (
             <RosterSection
               title="Personal Info"
               summary={
@@ -795,6 +796,13 @@ export default async function AthleteProfilePage(
                   </div>
                 )}
                 {parQAnswers.length > 0 && <ParQAnswersPanel answers={parQAnswers} />}
+                {intake && (
+                  <WaiverStatusLine
+                    waiverAccepted={!!intake.waiver_accepted}
+                    waiverSignedName={intake.waiver_signed_name}
+                    completedAt={intake.completed_at}
+                  />
+                )}
               </div>
             </RosterSection>
           )}
