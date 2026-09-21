@@ -19,7 +19,7 @@ import { NeedsAttentionStrip } from "./needs-attention-strip";
 import { RosterMiniList } from "./roster-mini-list";
 import { BusinessMiniDashboard } from "./business-mini-dashboard";
 import { CalendarMiniView } from "./calendar-mini-view";
-import { ProgramMiniView } from "./program-mini-view";
+import { EmbeddedProgramBuilder } from "./embedded-program-builder";
 
 export interface SectionSubLink {
   key: string;
@@ -189,7 +189,7 @@ export function ShellListPanel({
             className={`h-7 font-body text-[11px] uppercase tracking-wide border ${
               view === "program" ? "border-rust text-rust bg-rust/10" : "border-steel/30 text-steel"
             }`}
-            title="Pin a condensed Program Builder view"
+            title="Pin the full Program Builder, in place"
           >
             🏋 Program
           </button>
@@ -198,7 +198,7 @@ export function ShellListPanel({
         {view === "roster" && <RosterMiniList groupId={groupId} />}
         {view === "business" && <BusinessMiniDashboard groupId={groupId} />}
         {view === "calendar" && <CalendarMiniView groupId={groupId} />}
-        {view === "program" && <ProgramMiniView groupId={groupId} />}
+        {view === "program" && <EmbeddedProgramBuilder groupId={groupId} />}
       </div>
 
       {/* Drag-to-resize edge + full-collapse tab (item 3-4). */}

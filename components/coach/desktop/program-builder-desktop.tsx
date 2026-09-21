@@ -32,6 +32,7 @@ export function ProgramBuilderDesktop({
   initialTrainingDays,
   initialVisibilityWindow,
   initialTrainingIntent,
+  embedded = false,
 }: {
   programId: string;
   groupId: string;
@@ -59,6 +60,13 @@ export function ProgramBuilderDesktop({
   initialTrainingDays: number[] | null;
   initialVisibilityWindow: VisibilityWindow;
   initialTrainingIntent: TrainingIntent | null;
+  // Real feedback from Ron: the embedded copy inside ShellListPanel's
+  // resizable side panel should stay scoped to editing THIS one program
+  // — "Assign to Client"/"Duplicate" (which navigate to a brand-new
+  // program's own builder) don't make sense from inside a panel that's
+  // meant to keep you on your current page. Delete stays available; it's
+  // a real in-place action on this same program.
+  embedded?: boolean;
 }) {
   const [name, setName] = useState(programName);
   const [lastSavedName, setLastSavedName] = useState(programName);
@@ -187,7 +195,12 @@ export function ProgramBuilderDesktop({
             aria-label="Program name"
             className="flex-1 bg-transparent border-none focus:outline-none focus:ring-1 focus:ring-rust font-display font-bold text-3xl uppercase leading-none text-chalk"
           />
-          <ProgramCardMenu programId={programId} programName={name} groupId={groupId} />
+          <ProgramCardMenu
+            programId={programId}
+            programName={name}
+            groupId={groupId}
+            hideAssignAndDuplicate={embedded}
+          />
         </div>
         {programDescription && (
           <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">{programDescription}</p>

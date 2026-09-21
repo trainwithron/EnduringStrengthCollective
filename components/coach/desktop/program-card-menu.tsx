@@ -51,10 +51,18 @@ export function ProgramCardMenu({
   programId,
   programName,
   groupId,
+  hideAssignAndDuplicate = false,
 }: {
   programId: string;
   programName: string;
   groupId: string;
+  // Real feedback from Ron: every action in this menu that creates a
+  // NEW program and navigates into its builder (Assign to Client/
+  // Position/Myself, both Duplicate variants) makes no sense from the
+  // embedded copy inside ShellListPanel's side panel — the whole point
+  // there is staying on your current page. Delete is a real in-place
+  // action on this same program, so it stays either way.
+  hideAssignAndDuplicate?: boolean;
 }) {
   const router = useRouter();
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -443,56 +451,60 @@ export function ProgramCardMenu({
 
           {view === "menu" && (
             <div>
-              <button
-                type="button"
-                onClick={() => {
-                  setAssignStartDate(todayDateString());
-                  setView("assign");
-                  loadClients();
-                }}
-                className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50"
-              >
-                Assign to Client
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setAssignStartDate(todayDateString());
-                  setView("assign-position");
-                  loadPositions();
-                }}
-                className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50"
-              >
-                Assign to Position →
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setAssignStartDate(todayDateString());
-                  setView("assign-self");
-                }}
-                className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50"
-              >
-                Assign to Myself
-              </button>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={handleDuplicateSameGroup}
-                className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50 disabled:opacity-40"
-              >
-                {busy ? "Duplicating…" : "Duplicate"}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setView("duplicate-org");
-                  loadOrgs();
-                }}
-                className="w-full text-left px-3 py-2.5 font-body text-xs text-steel hover:bg-graphite/50"
-              >
-                Duplicate to another organization →
-              </button>
+              {!hideAssignAndDuplicate && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAssignStartDate(todayDateString());
+                      setView("assign");
+                      loadClients();
+                    }}
+                    className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50"
+                  >
+                    Assign to Client
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAssignStartDate(todayDateString());
+                      setView("assign-position");
+                      loadPositions();
+                    }}
+                    className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50"
+                  >
+                    Assign to Position →
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAssignStartDate(todayDateString());
+                      setView("assign-self");
+                    }}
+                    className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50"
+                  >
+                    Assign to Myself
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={handleDuplicateSameGroup}
+                    className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50 disabled:opacity-40"
+                  >
+                    {busy ? "Duplicating…" : "Duplicate"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setView("duplicate-org");
+                      loadOrgs();
+                    }}
+                    className="w-full text-left px-3 py-2.5 font-body text-xs text-steel hover:bg-graphite/50"
+                  >
+                    Duplicate to another organization →
+                  </button>
+                </>
+              )}
               <button
                 type="button"
                 disabled={busy}
