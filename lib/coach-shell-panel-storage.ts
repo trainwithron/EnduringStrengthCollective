@@ -11,7 +11,14 @@ const VIEW_KEY = "coach-shell-list-panel-view";
 
 export const DEFAULT_LIST_PANEL_WIDTH = 320;
 export const MIN_LIST_PANEL_WIDTH = 220;
-export const MAX_LIST_PANEL_WIDTH = 560;
+// Real feedback from Ron: the resize should go "effectively up to a
+// full window," not stay capped at a narrow band. A static ceiling
+// would either be too small on a big monitor or let the panel exceed a
+// small one, so this is a generous fixed cap and the actual drag is
+// additionally clamped against the live viewport width at drag time
+// (shell-list-panel.tsx), always leaving room for the icon rail plus a
+// sliver of main content.
+export const MAX_LIST_PANEL_WIDTH = 1600;
 
 export function readListPanelWidth(): number {
   try {

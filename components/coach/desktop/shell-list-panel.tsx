@@ -62,7 +62,11 @@ export function ShellListPanel({
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     const delta = e.clientX - dragStartX.current;
-    const next = Math.min(MAX_LIST_PANEL_WIDTH, Math.max(MIN_LIST_PANEL_WIDTH, dragStartWidth.current + delta));
+    // Real viewport ceiling, not just the static MAX — leaves room for
+    // the 64px icon rail plus a real sliver of main content (200px)
+    // rather than letting the panel swallow the whole window.
+    const viewportMax = Math.max(MIN_LIST_PANEL_WIDTH, window.innerWidth - 64 - 200);
+    const next = Math.min(MAX_LIST_PANEL_WIDTH, viewportMax, Math.max(MIN_LIST_PANEL_WIDTH, dragStartWidth.current + delta));
     setWidth(next);
   }, []);
 
