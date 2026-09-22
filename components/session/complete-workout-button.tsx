@@ -60,6 +60,15 @@ export function CompleteWorkoutButton({
   const [weightValue, setWeightValue] = useState("");
   const [weightSubmitting, setWeightSubmitting] = useState(false);
 
+  // Post-session RPE (half_finished_ideas_full_audit.md #18, greenlit by
+  // Ron as a single post-session one-tap prompt, not per-set averaged
+  // RPE) — the flagship training-load signal. Shown first, before the
+  // weight nudge, for the same own-session-only reason: it's the
+  // athlete's own subjective read on the session that just ended, so a
+  // coach logging a client's in-person session never sees it.
+  const [rpeNudge, setRpeNudge] = useState<{ athleteId: string; groupId: string; navHref: string } | null>(null);
+  const [rpeSubmitting, setRpeSubmitting] = useState(false);
+
   function finishNavigation(navHref: string) {
     router.push(navHref);
   }
@@ -236,24 +245,90 @@ export function CompleteWorkoutButton({
     // moment a client (or a coach logging in-person) gets after finishing.
     const navHref = postId ? `/share/${postId}` : `/groups/${result.group_id}`;
 
-    // Only for the athlete's own session (raised is set to isOwnSession by
-    // the caller) and only when today's weight hasn't already been logged.
+    // RPE comes first (own-session only, same reasoning as the weight
+    // nudge below — it's the athlete's own subjective read on the session
+    // that just ended). Once it's submitted/skipped,
+    // checkWeightThenNavigate below carries on to the existing
+    // weight-nudge-or-navigate logic.
     if (raised) {
-      const todayKey = new Date().toISOString().slice(0, 10);
-      const { data: todayLog } = await supabase
-        .from("body_weight_logs")
-        .select("id")
-        .eq("athlete_id", result.athlete_id)
-        .eq("logged_date", todayKey)
-        .maybeSingle();
-      if (!todayLog) {
-        setWeightNudge({ athleteId: result.athlete_id, groupId: result.group_id, navHref });
-        setSubmitting(false);
-        return;
-      }
+      setRpeNudge({ athleteId: result.athlete_id, groupId: result.group_id, navHref });
+      setSubmitting(false);
+      return;
     }
 
     finishNavigation(navHref);
+  }
+
+  async function checkWeightThenNavigate(athleteId: string, groupId: string, navHref: string) {
+    const supabase = createBrowserClient();
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const { data: todayLog } = await supabase
+      .from("body_weight_logs")
+      .select("id")
+      .eq("athlete_id", athleteId)
+      .eq("logged_date", todayKey)
+      .maybeSingle();
+    if (!todayLog) {
+      setWeightNudge({ athleteId, groupId, navHref });
+      return;
+    }
+    finishNavigation(navHref);
+  }
+
+  async function handleSubmitRpe(value: number) {
+    if (!rpeNudge) return;
+    setRpeSubmitting(true);
+    const supabase = createBrowserClient();
+    await supabase.from("athlete_sessions").update({ session_rpe: value }).eq("id", sessionId);
+    setRpeSubmitting(false);
+    const { athleteId, groupId, navHref } = rpeNudge;
+    setRpeNudge(null);
+    await checkWeightThenNavigate(athleteId, groupId, navHref);
+  }
+
+  async function handleSkipRpe() {
+    if (!rpeNudge) return;
+    const { athleteId, groupId, navHref } = rpeNudge;
+    setRpeNudge(null);
+    await checkWeightThenNavigate(athleteId, groupId, navHref);
+  }
+
+  if (rpeNudge) {
+    return (
+      <div
+        className={`fixed ${
+          raised ? "bottom-16" : "bottom-0"
+        } left-0 right-0 bg-graphite border-t border-steel/20 px-5 py-4`}
+      >
+        <p className="font-body text-sm text-chalk mb-2">How hard was that whole session? (1-10)</p>
+        <div className="grid grid-cols-5 gap-1.5">
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+            <button
+              key={n}
+              type="button"
+              aria-label={`Session RPE: ${n} of 10${n === 1 ? " (Easy)" : n === 10 ? " (All-out)" : ""}`}
+              onClick={() => handleSubmitRpe(n)}
+              disabled={rpeSubmitting}
+              className="h-9 border border-steel/30 text-chalk font-body text-sm active:bg-rust active:border-rust active:text-graphite disabled:opacity-40"
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center justify-between mt-1.5">
+          <span className="font-body text-[10px] text-steel">Easy</span>
+          <span className="font-body text-[10px] text-steel">All-out</span>
+        </div>
+        <button
+          type="button"
+          onClick={handleSkipRpe}
+          disabled={rpeSubmitting}
+          className="w-full h-9 mt-2 border border-steel/30 text-steel font-body text-xs disabled:opacity-40"
+        >
+          {rpeSubmitting ? "Saving…" : "Skip"}
+        </button>
+      </div>
+    );
   }
 
   if (weightNudge) {

@@ -5,6 +5,7 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { TrendChart } from "@/components/coach/desktop/trend-chart";
 import { computeEngagement } from "@/lib/business-metrics";
 import { computeDailyAverageReadiness, computeWeeklyActivity } from "@/lib/team-performance-metrics";
+import { computeAverageSessionRpe } from "@/lib/session-rpe";
 import { computeReadinessAverage, isLowReadiness } from "@/lib/wellness";
 import { isHabitDueOn } from "@/lib/habits";
 import { getCoachDashboardData } from "@/lib/dashboard-data";
@@ -155,6 +156,26 @@ export default async function TeamPerformancePage(
     ])
   );
 
+  // Post-session RPE (half_finished_ideas_full_audit.md #18) — the
+  // flagship training-load signal, scoped to the same 7-day window as
+  // "active this week" rather than the 30-day readiness window, since
+  // sRPE is meant to read as "how hard has training felt lately," not a
+  // long-run trend.
+  const { data: rpeRows } = await supabase
+    .from("athlete_sessions")
+    .select("athlete_id, session_rpe")
+    .eq("group_id", params.groupId)
+    .in("athlete_id", safeAthleteIds)
+    .not("session_rpe", "is", null)
+    .gte("completed_at", weekStartKey);
+  const avgSessionRpeThisWeek = computeAverageSessionRpe((rpeRows ?? []).map((r) => r.session_rpe as number));
+  const rpeByAthlete = new Map<string, number[]>();
+  for (const r of rpeRows ?? []) {
+    const arr = rpeByAthlete.get(r.athlete_id) ?? [];
+    arr.push(r.session_rpe as number);
+    rpeByAthlete.set(r.athlete_id, arr);
+  }
+
   const { data: habitRows } = await supabase
     .from("client_habits")
     .select("id, athlete_id, weekdays")
@@ -251,6 +272,15 @@ export default async function TeamPerformancePage(
           <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Habit compliance</p>
           <p className="font-body text-[11px] text-steel mt-0.5">Last 7 days</p>
         </div>
+        <div className="border border-steel/20 p-4">
+          <p className="font-display text-3xl leading-none">
+            {avgSessionRpeThisWeek != null ? avgSessionRpeThisWeek.toFixed(1) : "—"}
+          </p>
+          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Avg session RPE</p>
+          <p className="font-body text-[11px] text-steel mt-0.5">
+            {avgSessionRpeThisWeek != null ? "Last 7 days, out of 10" : "No ratings yet"}
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-6 mb-8">
@@ -301,6 +331,7 @@ export default async function TeamPerformancePage(
                 const habitStats = habitStatsByAthlete.get(r.athleteId);
                 const pct = habitStats && habitStats.due > 0 ? Math.round((habitStats.completed / habitStats.due) * 100) : null;
                 const readinessToday = readinessTodayByAthlete.get(r.athleteId);
+                const avgRpe = computeAverageSessionRpe(rpeByAthlete.get(r.athleteId) ?? []);
                 return (
                   <div key={r.athleteId} className="py-2.5 flex items-center justify-between gap-4">
                     <span className="font-body text-sm">{r.fullName}</span>
@@ -309,6 +340,7 @@ export default async function TeamPerformancePage(
                       <span>{prsThisMonthByAthlete.get(r.athleteId) ?? 0} PRs</span>
                       <span>{readinessToday != null ? readinessToday.toFixed(1) : "—"} readiness</span>
                       <span>{pct != null ? `${pct}%` : "—"} habits</span>
+                      <span>{avgRpe != null ? avgRpe.toFixed(1) : "—"} sRPE</span>
                     </div>
                   </div>
                 );
