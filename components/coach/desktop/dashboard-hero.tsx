@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { HeroFlag } from "@/lib/coach-hero-priority";
 import type { HeroEmptyState } from "@/lib/dashboard-data";
 import { QUIET_TIER_LABEL as TIER_LABEL } from "@/lib/quiet-client-tier";
+import { QuietClientNudgeButton } from "@/components/coach/quiet-client-nudge-button";
 
 // AI Assistant Slice 1 (lib/matched-load-trend.ts) — states the verified
 // fact (RPE has moved a specific direction at a matched-or-favorable
@@ -47,9 +48,14 @@ export function DashboardHero({
           )}
         </div>
         <p className="font-body text-lg text-chalk mb-3">{sentenceFor(flag)}</p>
-        <Link href={flag.href} className="font-body text-sm text-rust font-medium">
-          View {flag.athleteName.split(" ")[0]}&apos;s profile →
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link href={flag.href} className="font-body text-sm text-rust font-medium">
+            View {flag.athleteName.split(" ")[0]}&apos;s profile →
+          </Link>
+          {flag.kind === "quiet_client" && (
+            <QuietClientNudgeButton athleteFirstName={flag.athleteName.split(" ")[0]} />
+          )}
+        </div>
       </div>
     );
   }
