@@ -65,7 +65,7 @@ export default async function SessionPage(
       .from("session_exercises")
       .select(
         `
-      id, exercise_name, exercise_order, is_swapped, is_added, movement_pattern_id, tracked_fields, group_workout_exercise_id,
+      id, exercise_name, exercise_order, is_swapped, is_added, movement_pattern_id, tracked_fields, group_workout_exercise_id, athlete_note,
       group_workout_exercises ( notes ),
       set_logs ( id, set_order, weight, reps, rpe, rir, tempo, time_seconds, height, distance, rest_seconds, pace, status, weight_confirmed )
     `
@@ -314,6 +314,7 @@ export default async function SessionPage(
         youtubeUrl: media?.youtubeUrl ?? null,
         equipmentType: (media?.equipmentType as SessionExerciseEntry["equipmentType"]) ?? null,
         notes: se.group_workout_exercises?.notes ?? null,
+        athleteNote: se.athlete_note ?? null,
         priorBest: priorBestByExerciseName.get(se.exercise_name) ?? {
           maxWeight: null,
           maxReps: null,

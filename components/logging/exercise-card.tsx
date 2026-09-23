@@ -6,6 +6,7 @@ import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
 import { TRACKED_FIELD_DEFS, ACTUAL_COLUMN, ACTUAL_PROP, fieldDef, type TrackedField } from "@/lib/exercise-fields";
 import { ExerciseSetGrid } from "./exercise-set-grid";
 import { ExerciseVideoThread } from "./exercise-video-thread";
+import { ExerciseAthleteNote } from "./exercise-athlete-note";
 import { EquipmentVisual } from "./equipment-visual";
 import { ExerciseVolumeHistory } from "./exercise-volume-history";
 import { findLoadRatio } from "@/lib/equipment-load-ratio-gather";
@@ -290,6 +291,12 @@ export function ExerciseCard({
       {exercise.notes && (
         <p className="font-body text-xs text-steel mb-2">{exercise.notes}</p>
       )}
+
+      <ExerciseAthleteNote
+        sessionExerciseId={exercise.id}
+        initialNote={exercise.athleteNote ?? null}
+        readOnly={readOnly}
+      />
 
       {(exercise.videoUrl || exercise.youtubeUrl) && (
         <div className="mb-2">

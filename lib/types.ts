@@ -91,6 +91,12 @@ export interface SessionExerciseEntry {
   videoUrl: string | null;
   youtubeUrl: string | null;
   notes: string | null;
+  // coach_dashboard_redesign_scoping.md's injury-keyword-flag prerequisite
+  // — a plain, low-friction athlete-authored note on this exact exercise
+  // instance, distinct from `notes` above (the coach's own program-level
+  // cue). Optional/undefined on any render path that doesn't select it
+  // (e.g. the coach-builder preview), same convention as priorBest.
+  athleteNote?: string | null;
   sets: SetLogEntry[];
   // This athlete's real all-time best (weight/reps/single-set volume) on
   // this exact exercise name, from every other completed session — the
