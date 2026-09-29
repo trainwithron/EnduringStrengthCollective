@@ -501,13 +501,18 @@ export function DayCard({
             </div>
           )}
 
-          {/* coach_mobile_v2_feature_spec.md item 3 — a horizontal
-              swipeable carousel instead of a vertical stack. Container/IA
-              change only: ExerciseBuilderCard itself, and the existing
-              drag-and-drop reorder wiring below, are untouched — dragging
-              across a horizontal row works the same as it did down a
-              vertical one. */}
-          <div className="flex-1 p-3 flex overflow-x-auto snap-x snap-mandatory gap-3">
+          {/* Real usability correction from Ron: the horizontal swipe
+              carousel this replaced (coach_mobile_v2_feature_spec.md item 3)
+              nested one horizontal-scroll context inside another — a day
+              was already one of several horizontally-scrolled columns in
+              its week, and swiping to its second exercise meant a second,
+              separate horizontal scroll on top of that. "Each individual
+              workout should be a card and then the days it should be a full
+              column" — exercises stack vertically now, so a day is a real
+              column that just grows as tall as its content, no swipe needed
+              to see the rest of it. ExerciseBuilderCard itself and the
+              existing drag-and-drop reorder wiring are untouched. */}
+          <div className="flex-1 p-3 flex flex-col gap-3">
             {(() => {
               const sortedItems = day.items.slice().sort((a, b) => a.order - b.order);
               return sortedItems.map((item, index) => (
@@ -518,7 +523,7 @@ export function DayCard({
                   onDragEnd={() => setDraggedItemId(null)}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={() => handleDrop(item.id)}
-                  className={`snap-center shrink-0 w-full ${draggedItemId === item.id ? "opacity-50" : ""}`}
+                  className={`w-full ${draggedItemId === item.id ? "opacity-50" : ""}`}
                 >
                   {sortedItems.length > 1 && (
                     <p className="font-body text-[10px] text-steel uppercase tracking-wide text-center mb-1.5">
