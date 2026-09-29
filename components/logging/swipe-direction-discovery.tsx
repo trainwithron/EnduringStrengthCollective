@@ -35,6 +35,7 @@ export function SwipeDirectionDiscovery({
 }) {
   const [visible, setVisible] = useState(false);
   const [saving, setSaving] = useState<SwipeDirection | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const hScrollerRef = useRef<HTMLDivElement>(null);
   const vScrollerRef = useRef<HTMLDivElement>(null);
   const lastHIndex = useRef(0);
@@ -59,11 +60,30 @@ export function SwipeDirectionDiscovery({
     }
   }
 
+  // Real client bug (Johann Gorsek, live usage): the underlying save
+  // always succeeded, but the button was permanently stuck on "Saving…"
+  // — this widget's own visibility (`visible`) is local state that never
+  // got flipped back off on success, and it isn't derived from the
+  // parent's `exerciseSwipeDirection` prop (a one-time server value that
+  // never re-fetches mid-session), so nothing else was ever going to
+  // hide it either. Explicitly closing it here, and resetting `saving`
+  // on a real failure so a bad request doesn't leave the button stuck
+  // the same way.
   async function choose(direction: SwipeDirection) {
     setSaving(direction);
+    setError(null);
     const supabase = createBrowserClient();
-    await supabase.from("profiles").update({ exercise_swipe_direction: direction }).eq("id", athleteId);
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({ exercise_swipe_direction: direction })
+      .eq("id", athleteId);
+    if (updateError) {
+      setSaving(null);
+      setError("Couldn't save — check your connection and try again.");
+      return;
+    }
     onChosen(direction);
+    setVisible(false);
   }
 
   function handleHScroll() {
@@ -104,6 +124,11 @@ export function SwipeDirectionDiscovery({
       <p className="font-body text-xs text-steel mt-1">
         Swipe the samples below to feel each one, then pick whichever you liked better.
       </p>
+      {error && (
+        <p className="font-body text-xs text-rust mt-1" role="alert">
+          {error}
+        </p>
+      )}
 
       <div className="grid grid-cols-2 gap-3 mt-4">
         <div>

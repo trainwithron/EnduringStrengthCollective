@@ -27,6 +27,50 @@ import { Check, Lock, LockOpen } from "lucide-react";
 
 const SWIPE_THRESHOLD_PX = 28;
 
+// Real client feedback (Johann Gorsek, live usage): "not sure what RPE
+// is personally, maybe add definitions." A tap-friendly info button
+// (not a hover title — this is a touch-first logging screen) next to
+// the RPE row label. Renders as a `fixed`, viewport-centered overlay
+// rather than an absolutely-positioned popover anchored to the tiny
+// icon — the grid's own scroll container is `overflow-x-auto`, which
+// per the CSS spec also clips the Y axis, so a popover anchored inside
+// it would risk being cut off; `fixed` escapes that ancestor entirely.
+function FieldInfoButton({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="What's this?"
+        className="w-3.5 h-3.5 rounded-full border border-steel/40 text-steel text-[9px] leading-[12px] flex items-center justify-center shrink-0"
+      >
+        i
+      </button>
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-graphite/70 px-6"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-xs bg-graphite border border-steel/30 text-chalk font-body text-sm normal-case leading-snug p-4"
+          >
+            {text}
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="w-full h-9 mt-3 border border-steel/30 text-steel font-body text-xs"
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function vibrateConfirm() {
   try {
     navigator.vibrate?.(30);
@@ -490,6 +534,9 @@ export function ExerciseSetGrid({
           <div key={field} className="flex items-center gap-1.5">
             <span className="w-16 shrink-0 font-body text-xs text-steel truncate flex items-center gap-1">
               {fieldDef(field).label}
+              {field === "rpe" && (
+                <FieldInfoButton text="Rate of Perceived Exertion — how hard that set felt, 1 (easy) to 10 (max effort)." />
+              )}
               {field === "weight" && justUnlocked && (
                 <LockOpen
                   aria-hidden="true"

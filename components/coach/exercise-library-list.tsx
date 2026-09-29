@@ -216,6 +216,8 @@ export function ExerciseLibraryList({
     .filter((e) => e.name.toLowerCase().includes(search.trim().toLowerCase()))
     .sort((a, b) => a.name.localeCompare(b.name));
 
+  const withVideoCount = exercises.filter((e) => e.videoPath || e.youtubeUrl).length;
+
   const grouped = CATEGORY_ORDER.map((cat) => ({
     category: cat,
     items: visible.filter((e) => (e.category ?? "Uncategorized") === cat),
@@ -415,6 +417,15 @@ export function ExerciseLibraryList({
         </div>
       )}
 
+      {exercises.length > 0 && (
+        <p className="font-body text-xs text-steel mb-4">
+          {withVideoCount} of {exercises.length} exercises have a demo video —{" "}
+          {exercises.length - withVideoCount > 0
+            ? `${exercises.length - withVideoCount} still worth adding one to.`
+            : "every exercise is covered."}
+        </p>
+      )}
+
       {visible.length === 0 ? (
         <p className="font-body text-sm text-steel py-6">No exercises match.</p>
       ) : (
@@ -453,8 +464,17 @@ export function ExerciseLibraryList({
                           {ex.tier}
                         </span>
                       )}
-                      {(ex.videoPath || ex.youtubeUrl) && (
+                      {ex.videoPath || ex.youtubeUrl ? (
                         <span className="font-body text-[11px] text-positive">Media attached</span>
+                      ) : (
+                        // Real client feedback (Johann Gorsek, live usage):
+                        // "the demo videos are huge, I would include them
+                        // as much as you can" — an absent badge was too
+                        // weak a signal to notice while scanning a long
+                        // list; a real warning-colored one makes the gap
+                        // itself scannable, alongside the summary count
+                        // above the list.
+                        <span className="font-body text-[11px] text-amber-400">⚠ No video</span>
                       )}
                       <select
                         value={ex.category ?? ""}

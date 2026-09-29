@@ -167,7 +167,17 @@ export default async function ShareWorkoutPage(
 
         <div className="px-7 pb-7">
         <div className="mt-8 pt-[22px] pb-5 border-t border-b border-steel/20">
-          {shared.totalVolume != null ? (
+          {/* Real client feedback (Johann Gorsek, live usage): a session
+              with real logged reps but no weight/RPE entered (so no
+              set_logs row ever actually reached status='completed') showed
+              "0 LBS TOTAL VOLUME · 0 SETS" instead of the "Checked in"
+              fallback that's clearly meant for exactly this case. Root
+              cause: complete_workout_session's own total_volume is
+              coalesce(sum(...), 0) — always a real number, never null — so
+              the old `totalVolume != null` check could never actually
+              route here. totalSetsCompleted is the real signal for
+              "did anything actually finish," so branch on that instead. */}
+          {shared.totalSetsCompleted != null && shared.totalSetsCompleted > 0 ? (
             <>
               <p className="font-display text-5xl leading-none [font-variant-numeric:tabular-nums]">
                 {Math.round(shared.totalVolume).toLocaleString()}
@@ -265,8 +275,26 @@ export default async function ShareWorkoutPage(
           })}
         </p>
 
-        <div className="mt-6">
+        {/* Real client feedback (Johann Gorsek, live usage): "at the
+            end, I would make the choices more obvious as a user might be
+            unsure what to click next" — Share, Choose Your Background,
+            and Continue to Team Feed all read with the same low-key
+            weight before this. Share stays the one loud, filled primary
+            action; "Continue to Team Feed" — the actual next step in a
+            logged-in athlete's flow, not a customization option — is now
+            a real bordered secondary button of its own, visually
+            distinct from both Share above it and the quiet
+            customization toggles (background/lift picks) below it. */}
+        <div className="mt-6 space-y-2.5">
           <ShareWorkoutButton postId={params.postId} title={shareTitle} size="large" />
+          {user && (
+            <Link
+              href={`/groups/${shared.groupId}/feed`}
+              className="w-full h-11 flex items-center justify-center border border-steel/30 text-chalk font-body text-sm font-medium active:border-rust active:text-rust transition-colors"
+            >
+              Continue to Team Feed &rarr;
+            </Link>
+          )}
         </div>
 
         {user?.id === shared.authorId && shared.broadcastLevel === "full" && (
@@ -284,15 +312,6 @@ export default async function ShareWorkoutPage(
         <p className="font-body text-xs text-steel mt-6 pt-4 border-t border-steel/20">
           Trained with <span className="text-rust">{shared.groupName}</span>
         </p>
-
-        {user && (
-          <Link
-            href={`/groups/${shared.groupId}/feed`}
-            className="inline-block mt-6 font-body text-xs text-steel uppercase tracking-wide"
-          >
-            Continue to Team Feed &rarr;
-          </Link>
-        )}
         </div>
       </div>
     </main>

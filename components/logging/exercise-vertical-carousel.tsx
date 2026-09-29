@@ -148,9 +148,19 @@ export function ExerciseVerticalCarousel({
 
   return (
     <div>
+      {/* Real client feedback (Johann Gorsek, live usage): the old
+          stacked layout — a centered dot row directly above a full-width
+          "See all" button — put a large, edge-to-edge tap target right
+          where a thumb naturally starts a vertical scroll swipe, so a
+          scroll gesture kept misfiring as a tap into the overview list
+          instead. Fixed by shrinking "See all" to a small, off-to-one-
+          side control (dots left, compact button right) instead of a
+          full-width bar, and adding more clearance before the actual
+          scroller begins — both cuts down the accidental-hit surface and
+          gives the swipe gesture real room that isn't also a button. */}
       {exercises.length > 1 && (
-        <>
-          <div className="flex items-center justify-center gap-1.5 mb-2">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <div className="flex items-center gap-1.5">
             {exercises.map((ex, i) => (
               <span
                 key={ex.id}
@@ -164,12 +174,12 @@ export function ExerciseVerticalCarousel({
             type="button"
             onClick={() => setOverviewOpen(true)}
             aria-label="See all exercises"
-            className="w-full flex items-center justify-center gap-1.5 mb-3 font-body text-[11px] text-steel uppercase tracking-wide active:text-rust transition-colors"
+            className="flex items-center gap-1 font-body text-[11px] text-steel uppercase tracking-wide active:text-rust transition-colors shrink-0"
           >
             <List className="w-3.5 h-3.5" />
-            See all {exercises.length} exercises
+            See all {exercises.length}
           </button>
-        </>
+        </div>
       )}
 
       <div
