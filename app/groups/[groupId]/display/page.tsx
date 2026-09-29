@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { computeScheduledDates } from "@/lib/program-schedule";
-import { SET_ROW_SELECT, mapSetRow, type TrackedField } from "@/lib/exercise-fields";
+import { SET_ROW_SELECT, mapSetRow, DEFAULT_TRACKED_FIELDS, type TrackedField } from "@/lib/exercise-fields";
 import { getGroupLeaderboardRankings, getPositionLeaderboardRankings } from "@/lib/leaderboard-data";
 import { LiveGroupLeaderboard } from "@/components/leaderboard/live-group-leaderboard";
 import { DisplayWorkoutPanel, type DisplayExercise } from "@/components/coach/desktop/display-workout-panel";
@@ -90,7 +90,7 @@ export default async function DisplayModePage(
         id: e.id,
         exerciseName: e.exercise_name,
         exerciseOrder: e.exercise_order,
-        trackedFields: (e.tracked_fields ?? ["reps", "weight", "rpe"]) as TrackedField[],
+        trackedFields: (e.tracked_fields ?? DEFAULT_TRACKED_FIELDS) as TrackedField[],
         sets: (e.group_workout_exercise_sets ?? [])
           .slice()
           .sort((a: any, b: any) => a.set_order - b.set_order)

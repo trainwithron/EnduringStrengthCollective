@@ -31,7 +31,13 @@ export const TRACKED_FIELD_DEFS: { key: TrackedField; label: string; kind: "numb
   { key: "pace", label: "Pace", kind: "text" },
 ];
 
-export const DEFAULT_TRACKED_FIELDS: TrackedField[] = ["reps", "weight", "rpe"];
+// Real feedback from Ron: RPE shouldn't show by default — "we already
+// have all of the metrics that you can just add more... it just needs to
+// not show up by default." No new UI needed: the existing "+ Add"/remove
+// tracked-field control (exercise-builder-card.tsx, exercise-card.tsx)
+// already lets a coach or athlete turn RPE back on for any exercise —
+// this is purely the default a new exercise/session starts with.
+export const DEFAULT_TRACKED_FIELDS: TrackedField[] = ["reps", "weight"];
 
 export function fieldDef(key: TrackedField) {
   return TRACKED_FIELD_DEFS.find((f) => f.key === key)!;

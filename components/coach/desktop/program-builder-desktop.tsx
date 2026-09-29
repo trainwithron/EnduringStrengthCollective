@@ -11,6 +11,7 @@ import { computeScheduledDates, type VisibilityWindow } from "@/lib/program-sche
 import type { MovementPatternOption } from "../exercise-builder-card";
 import { ProgramCardMenu } from "./program-card-menu";
 import { SaveToast } from "./save-toast";
+import { SaveStatusBar } from "./save-status-bar";
 import { flashSaved, flashSaveError } from "@/lib/save-toast";
 import { ProgramChatPanel } from "./program-chat-panel";
 import { TrainingIntentSelector } from "../training-intent-selector";
@@ -201,6 +202,9 @@ export function ProgramBuilderDesktop({
             groupId={groupId}
             hideAssignAndDuplicate={embedded}
           />
+        </div>
+        <div className="mt-2">
+          <SaveStatusBar />
         </div>
         {programDescription && (
           <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">{programDescription}</p>
