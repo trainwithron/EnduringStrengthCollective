@@ -35,6 +35,7 @@ import {
   SquareStack,
   PanelLeft,
   SlidersHorizontal,
+  Lightbulb,
 } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
@@ -101,6 +102,7 @@ type Active =
   | "session-types"
   | "session-ledger"
   | "resources"
+  | "quick-tips"
   | "challenges"
   | "team"
   | "team-calendar"
@@ -534,6 +536,7 @@ export function CoachDesktopShell({
         { key: "challenges", label: "Challenges", href: `/groups/${groupId}/challenges`, icon: Flag },
         { key: "records", label: "Hall of Fame", href: `/groups/${groupId}/records`, icon: Trophy },
         { key: "resources", label: "Resources", href: `/groups/${groupId}/resources`, icon: HeartHandshake },
+        { key: "quick-tips", label: "Quick Tips", href: `/groups/${groupId}/quick-tips`, icon: Lightbulb },
       ],
     },
   ];

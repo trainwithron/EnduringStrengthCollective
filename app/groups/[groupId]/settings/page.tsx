@@ -292,6 +292,12 @@ export default async function SettingsPage(
               Resources
             </Link>
             <Link
+              href={`/groups/${params.groupId}/quick-tips`}
+              className="block font-body text-sm text-rust"
+            >
+              Quick Tips
+            </Link>
+            <Link
               href={`/groups/${params.groupId}/records`}
               className="block font-body text-sm text-rust"
             >
