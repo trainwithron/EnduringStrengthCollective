@@ -45,6 +45,10 @@ export function MacroCalculator({
   const [goal, setGoal] = useState<MacroGoal>("maintain");
   const [proteinPerLb, setProteinPerLb] = useState("1");
   const [split, setSplit] = useState<"high" | "balanced" | "low">("balanced");
+  // Real layout feedback from Ron: this explainer used to be its own
+  // always-open, visually heavy block — demoted to a collapsed-by-
+  // default sub-section nested under the current-calories result below.
+  const [showMaintenanceExplainer, setShowMaintenanceExplainer] = useState(false);
 
   const weightNum = parseFloat(weight) || 0;
   const valid = weightNum > 0;
@@ -179,45 +183,51 @@ export function MacroCalculator({
               Use these macros in the meal planner ↓
             </button>
           )}
+
+          <div className="pt-3">
+            <button
+              type="button"
+              onClick={() => setShowMaintenanceExplainer((v) => !v)}
+              className="font-body text-xs text-steel uppercase tracking-wide active:text-rust transition-colors"
+            >
+              {showMaintenanceExplainer ? "▾" : "▸"} Finding your real maintenance
+            </button>
+            {showMaintenanceExplainer && (
+              <div className="font-body text-sm text-steel space-y-3 leading-relaxed mt-3">
+                <p>
+                  Every calculator here — this one included — is built on population averages.
+                  Two people at the same weight, activity level, and goal can have real
+                  maintenance numbers that differ by three or four hundred calories, because
+                  things like NEAT, gut efficiency, and day-to-day movement never show up in a
+                  formula. Treat the number above as a smart starting point, not a verdict.
+                </p>
+                <p>
+                  The only maintenance number that&apos;s actually true is the one your body
+                  reports back. Here&apos;s how to find it:
+                </p>
+                <ol className="list-decimal pl-5 space-y-1.5">
+                  <li>Start at the estimate above — it&apos;s a fine place to begin.</li>
+                  <li>
+                    Eat that same target every day for a full week, tracking honestly (weigh
+                    your food, log everything, no untracked days).
+                  </li>
+                  <li>
+                    Weigh yourself each morning under the same conditions and average the week.
+                  </li>
+                  <li>Compare that average to the week before it.</li>
+                </ol>
+                <p>
+                  If your weight held steady — within about half a pound either way — you&apos;ve
+                  found your real maintenance, full stop, regardless of what any calculator
+                  said. If you gained, you were eating above it; if you lost, you were eating
+                  below it. Either way, you now have a real number to build from instead of a
+                  guess.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       )}
-
-      <div className="pt-4 border-t border-steel/15">
-        <h3 className="font-display uppercase text-sm tracking-wide text-chalk mb-2">
-          Finding your real maintenance
-        </h3>
-        <div className="font-body text-sm text-steel space-y-3 leading-relaxed">
-          <p>
-            Every calculator here — this one included — is built on population averages.
-            Two people at the same weight, activity level, and goal can have real
-            maintenance numbers that differ by three or four hundred calories, because
-            things like NEAT, gut efficiency, and day-to-day movement never show up in a
-            formula. Treat the number above as a smart starting point, not a verdict.
-          </p>
-          <p>
-            The only maintenance number that&apos;s actually true is the one your body
-            reports back. Here&apos;s how to find it:
-          </p>
-          <ol className="list-decimal pl-5 space-y-1.5">
-            <li>Start at the estimate above — it&apos;s a fine place to begin.</li>
-            <li>
-              Eat that same target every day for a full week, tracking honestly (weigh
-              your food, log everything, no untracked days).
-            </li>
-            <li>
-              Weigh yourself each morning under the same conditions and average the week.
-            </li>
-            <li>Compare that average to the week before it.</li>
-          </ol>
-          <p>
-            If your weight held steady — within about half a pound either way — you&apos;ve
-            found your real maintenance, full stop, regardless of what any calculator
-            said. If you gained, you were eating above it; if you lost, you were eating
-            below it. Either way, you now have a real number to build from instead of a
-            guess.
-          </p>
-        </div>
-      </div>
     </div>
   );
 }

@@ -921,38 +921,6 @@ export default async function AthleteProfilePage(
             </section>
           )}
 
-          {(wellnessRows ?? []).length > 0 && (
-            <RosterSection title="Wellness" summary="Sleep, soreness & energy trends">
-              <div className="space-y-4 pb-2">
-                <div>
-                  <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
-                    Sleep quality
-                  </p>
-                  <TrendChart
-                    points={sleepQualityTrend}
-                    emptyLabel="Only checked in once so far — needs a second check-in to chart a trend."
-                  />
-                </div>
-                <div>
-                  <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
-                    Soreness (higher = fresher)
-                  </p>
-                  <TrendChart
-                    points={sorenessTrend}
-                    emptyLabel="Only checked in once so far — needs a second check-in to chart a trend."
-                  />
-                </div>
-                <div>
-                  <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Energy</p>
-                  <TrendChart
-                    points={energyTrend}
-                    emptyLabel="Only checked in once so far — needs a second check-in to chart a trend."
-                  />
-                </div>
-              </div>
-            </RosterSection>
-          )}
-
           {(trainingMaxRows ?? []).length > 0 && (
             <section>
               <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
@@ -1138,33 +1106,6 @@ export default async function AthleteProfilePage(
             />
           </section>
 
-          <section>
-            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
-              Body weight
-            </h2>
-            <TrendChart
-              points={(weightLogs ?? [])
-                .slice()
-                .reverse()
-                .map((w) => ({ date: w.logged_date, value: w.weight }))}
-              unit=" lbs"
-            />
-            {weightLogs && weightLogs.length > 0 ? (
-              <div className="divide-y divide-steel/15 mt-2">
-                {weightLogs.map((w) => (
-                  <div key={w.id} className="py-2 flex items-center justify-between">
-                    <span className="font-body text-sm text-steel">
-                      {new Date(w.logged_date + "T00:00:00").toLocaleDateString()}
-                    </span>
-                    <span className="font-body text-sm">{w.weight} lbs</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="font-body text-sm text-steel py-2">No weight logged yet.</p>
-            )}
-          </section>
-
           {ouraConnection && (
             <section>
               <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
@@ -1278,21 +1219,91 @@ export default async function AthleteProfilePage(
         </div>
       </div>
 
-      {macrosEnabled && (
-        <section className="border-t border-steel/20 pt-6 mt-8 max-w-3xl">
-          <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
-            Nutrition
-          </h2>
-          <NutritionTools
-            athleteId={params.athleteId}
-            groupId={params.groupId}
-            date={todayKey}
-            latestBodyWeight={weightLogs?.[0]?.weight ?? null}
-            weightTrend={weightTrend}
-            existingPlan={existingPlan ?? null}
-          />
-        </section>
-      )}
+      {/* Real layout feedback from Ron: too much vertical scroll, wasted
+          screen space. Wellness and the Body Weight Log are kept
+          together (moved out of the long narrow left-column stack
+          above), and Nutrition — previously its own full-width block at
+          the very bottom of the page, after everything else — now sits
+          alongside them instead, turning that wasted scroll into real
+          horizontal use of the page. */}
+      <div className={`border-t border-steel/20 pt-6 mt-8 grid gap-10 ${macrosEnabled ? "lg:grid-cols-2" : ""}`}>
+        <div className="space-y-8">
+          {(wellnessRows ?? []).length > 0 && (
+            <RosterSection title="Wellness" summary="Sleep, soreness & energy trends" defaultExpanded>
+              <div className="space-y-4 pb-2">
+                <div>
+                  <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
+                    Sleep quality
+                  </p>
+                  <TrendChart
+                    points={sleepQualityTrend}
+                    emptyLabel="Only checked in once so far — needs a second check-in to chart a trend."
+                  />
+                </div>
+                <div>
+                  <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
+                    Soreness (higher = fresher)
+                  </p>
+                  <TrendChart
+                    points={sorenessTrend}
+                    emptyLabel="Only checked in once so far — needs a second check-in to chart a trend."
+                  />
+                </div>
+                <div>
+                  <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Energy</p>
+                  <TrendChart
+                    points={energyTrend}
+                    emptyLabel="Only checked in once so far — needs a second check-in to chart a trend."
+                  />
+                </div>
+              </div>
+            </RosterSection>
+          )}
+
+          <section>
+            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+              Body weight
+            </h2>
+            <TrendChart
+              points={(weightLogs ?? [])
+                .slice()
+                .reverse()
+                .map((w) => ({ date: w.logged_date, value: w.weight }))}
+              unit=" lbs"
+            />
+            {weightLogs && weightLogs.length > 0 ? (
+              <div className="divide-y divide-steel/15 mt-2">
+                {weightLogs.map((w) => (
+                  <div key={w.id} className="py-2 flex items-center justify-between">
+                    <span className="font-body text-sm text-steel">
+                      {new Date(w.logged_date + "T00:00:00").toLocaleDateString()}
+                    </span>
+                    <span className="font-body text-sm">{w.weight} lbs</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="font-body text-sm text-steel py-2">No weight logged yet.</p>
+            )}
+          </section>
+        </div>
+
+        {macrosEnabled && (
+          <section>
+            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
+              Nutrition
+            </h2>
+            <NutritionTools
+              athleteId={params.athleteId}
+              groupId={params.groupId}
+              date={todayKey}
+              latestBodyWeight={weightLogs?.[0]?.weight ?? null}
+              weightTrend={weightTrend}
+              existingPlan={existingPlan ?? null}
+            />
+          </section>
+        )}
+      </div>
     </CoachDesktopShell>
   );
 }
