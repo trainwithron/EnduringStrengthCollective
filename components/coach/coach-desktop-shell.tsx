@@ -461,7 +461,13 @@ export function CoachDesktopShell({
     { key: "team-performance", label: "Team Performance", href: `/groups/${groupId}/team-performance`, icon: Activity },
     { key: "clients", label: "Clients", href: `/groups/${groupId}/clients`, icon: Users, badge: clientsUnread, termKey: "client", termForm: "plural" },
     { key: "messages", label: "Messages", href: `/groups/${groupId}/messages`, icon: Mail, badge: messagesUnread },
-    { key: "feed", label: "Team Feed", href: `/groups/${groupId}/feed`, icon: MessagesSquare, badge: feedUnread },
+    // Real cleanup from Ron: a Team Feed only makes sense with an actual
+    // team on the other end of it — a 1-on-1 group is one specific
+    // client, so this entry (and its unread badge) is hidden entirely
+    // rather than showing an empty/meaningless feed for a "team" of one.
+    ...(groupKind !== "one_on_one"
+      ? [{ key: "feed" as const, label: "Team Feed", href: `/groups/${groupId}/feed`, icon: MessagesSquare, badge: feedUnread }]
+      : []),
     { key: "calendar", label: "Calendar", href: `/groups/${groupId}/calendar`, icon: CalendarDays },
 
     // Build — creation/authoring tools, kept as their own adjacent

@@ -30,6 +30,21 @@ export function ProgrammingSpotterPanel({ programId, flags }: { programId: strin
   const visible = flags.filter((f) => !handled.has(`${f.checkKind}::${f.patternKey}`));
   if (visible.length === 0) return null;
 
+  // Real ask from Ron: a bulk way to dismiss everything pending at once
+  // instead of working through each individually. Deliberately local-only
+  // (no /api/programming-spotter/feedback call, no deny-pattern tracking)
+  // — a bulk clear isn't an intentional judgment on any one suggestion the
+  // way a real per-item Confirm/Deny is, so it shouldn't feed the same
+  // escalating-suppress mechanism a real Deny does. These clear again
+  // next time this Spotter actually re-runs and re-finds them.
+  function handleClearAll() {
+    setHandled((prev) => {
+      const next = new Set(prev);
+      for (const f of visible) next.add(`${f.checkKind}::${f.patternKey}`);
+      return next;
+    });
+  }
+
   async function sendFeedback(flag: SpotterFlag, action: "confirmed" | "denied" | "edited", extra?: { condition: string; preference: string }) {
     const key = `${flag.checkKind}::${flag.patternKey}`;
     setBusyKey(key);
@@ -75,9 +90,20 @@ export function ProgrammingSpotterPanel({ programId, flags }: { programId: strin
 
   return (
     <div className="border border-rust/40 bg-rust/5 px-4 py-3 mb-4">
-      <p className="font-body text-[11px] text-rust uppercase tracking-wide font-bold mb-2">
-        Programming Spotter
-      </p>
+      <div className="flex items-center justify-between mb-2">
+        <p className="font-body text-[11px] text-rust uppercase tracking-wide font-bold">
+          Programming Spotter
+        </p>
+        {visible.length > 1 && (
+          <button
+            type="button"
+            onClick={handleClearAll}
+            className="font-body text-[11px] text-steel uppercase tracking-wide active:text-chalk"
+          >
+            Clear all
+          </button>
+        )}
+      </div>
       <div className="space-y-3">
         {visible.map((flag) => {
           const key = `${flag.checkKind}::${flag.patternKey}`;
