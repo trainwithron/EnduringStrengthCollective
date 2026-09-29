@@ -20,9 +20,19 @@ import { Lock } from "lucide-react";
 export default async function ProgramDetailPage(
   props: {
     params: Promise<{ groupId: string; programId: string }>;
+    // Real usability fix (Programs mini-view polish): every day link in
+    // the floating card-stack's condensed program view used to land on
+    // this exact same URL regardless of which week/day was actually
+    // clicked, so a coach glancing at "Week 3, Day 2" from the mini-view
+    // always landed back at the top and had to manually find and expand
+    // that week themselves. `?week=N` lets the mini-view jump straight
+    // to the right week already open.
+    searchParams: Promise<{ week?: string }>;
   }
 ) {
   const params = await props.params;
+  const searchParams = await props.searchParams;
+  const requestedWeek = searchParams.week ? Number(searchParams.week) : null;
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -70,7 +80,14 @@ export default async function ProgramDetailPage(
   // targets, tracked variables, video). Athletes get a simple week-grouped
   // "Log →" list — the builder treatment doesn't help logging.
   if (membership.role === "coach") {
-    return <CoachProgramBuilder groupId={params.groupId} programId={params.programId} coachId={user.id} />;
+    return (
+      <CoachProgramBuilder
+        groupId={params.groupId}
+        programId={params.programId}
+        coachId={user.id}
+        requestedWeek={requestedWeek}
+      />
+    );
   }
 
   const { data: workouts } = await supabase
@@ -223,10 +240,12 @@ async function CoachProgramBuilder({
   groupId,
   programId,
   coachId,
+  requestedWeek,
 }: {
   groupId: string;
   programId: string;
   coachId: string;
+  requestedWeek: number | null;
 }) {
   const supabase = await createServerClient();
   const data = await getProgramBuilderData(supabase, { groupId, programId, coachId });
@@ -268,6 +287,7 @@ async function CoachProgramBuilder({
         initialTrainingDays={data.initialTrainingDays}
         initialVisibilityWindow={data.initialVisibilityWindow}
         initialTrainingIntent={data.initialTrainingIntent}
+        initialExpandedWeek={requestedWeek}
       />
     </CoachDesktopShell>
   );

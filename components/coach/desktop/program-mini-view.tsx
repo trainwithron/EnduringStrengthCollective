@@ -103,7 +103,7 @@ export function ProgramMiniView({ groupId }: { groupId: string }) {
             {days.map((d) => (
               <Link
                 key={d.id}
-                href={`/groups/${groupId}/programs/${programId}`}
+                href={`/groups/${groupId}/programs/${programId}?week=${week}`}
                 className="block px-1.5 py-1.5 font-body text-sm text-chalk truncate hover:bg-surface/40 transition-colors"
               >
                 Day {d.dayIndex + 1}: {d.title}

@@ -33,6 +33,7 @@ export function ProgramBuilderDesktop({
   initialTrainingDays,
   initialVisibilityWindow,
   initialTrainingIntent,
+  initialExpandedWeek = null,
   embedded = false,
 }: {
   programId: string;
@@ -61,6 +62,12 @@ export function ProgramBuilderDesktop({
   initialTrainingDays: number[] | null;
   initialVisibilityWindow: VisibilityWindow;
   initialTrainingIntent: TrainingIntent | null;
+  // Programs mini-view polish — a week number to auto-expand on load
+  // (from the mini-view's own `?week=N` link), so jumping here from a
+  // specific day in the condensed card-stack view actually lands you on
+  // that week already open instead of back at the top of the builder.
+  // Null for the normal, un-deep-linked case.
+  initialExpandedWeek?: number | null;
   // Real feedback from Ron: the embedded copy inside ShellListPanel's
   // resizable side panel should stay scoped to editing THIS one program
   // — "Assign to Client"/"Duplicate" (which navigate to a brand-new
@@ -97,6 +104,9 @@ export function ProgramBuilderDesktop({
 
   const [expandedWeeks, setExpandedWeeks] = useState<Set<number>>(() => {
     const weekNumbers = initialDays.map((d) => d.weekNumber);
+    if (initialExpandedWeek != null && weekNumbers.includes(initialExpandedWeek)) {
+      return new Set([initialExpandedWeek]);
+    }
     return new Set(weekNumbers.length > 0 ? [Math.min(...weekNumbers)] : []);
   });
 
