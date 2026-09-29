@@ -12,7 +12,8 @@ import type { MovementPatternOption } from "../exercise-builder-card";
 import { ProgramCardMenu } from "./program-card-menu";
 import { SaveToast } from "./save-toast";
 import { SaveStatusBar } from "./save-status-bar";
-import { flashSaved, flashSaveError } from "@/lib/save-toast";
+import { SaveToastChannelContext } from "./save-toast-channel";
+import { createSaveToastChannel } from "@/lib/save-toast";
 import { ProgramChatPanel } from "./program-chat-panel";
 import { TrainingIntentSelector } from "../training-intent-selector";
 import { REST_TEMPO_SUGGESTIONS, type TrainingIntent } from "@/lib/training-intent";
@@ -76,6 +77,16 @@ export function ProgramBuilderDesktop({
   // a real in-place action on this same program.
   embedded?: boolean;
 }) {
+  // Own channel per mount — fixes a real bug (see lib/save-toast.ts's
+  // createSaveToastChannel doc comment): the full-page builder and an
+  // embedded ShellListPanel copy of a DIFFERENT program can be mounted
+  // at once, and a shared global save-toast bus meant editing one
+  // flashed a false "Saved ✓" on the other's status bar too. Every
+  // descendant (day-card, week-grid, exercise rows, etc.) reads this
+  // same instance via SaveToastChannelContext instead of importing the
+  // old global flashSaved/flashSaveError directly.
+  const saveToastChannel = useMemo(() => createSaveToastChannel(), []);
+  const { flashSaved, flashSaveError } = saveToastChannel;
   const [name, setName] = useState(programName);
   const [lastSavedName, setLastSavedName] = useState(programName);
   const [days, setDays] = useState<BuilderDay[]>(initialDays);
@@ -188,6 +199,7 @@ export function ProgramBuilderDesktop({
   }
 
   return (
+    <SaveToastChannelContext.Provider value={saveToastChannel}>
     <div>
       <SaveToast />
       <div className="pb-6 border-b border-steel/20 mb-6">
@@ -319,5 +331,6 @@ export function ProgramBuilderDesktop({
         </button>
       </div>
     </div>
+    </SaveToastChannelContext.Provider>
   );
 }

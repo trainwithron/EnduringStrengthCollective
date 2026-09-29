@@ -17,7 +17,7 @@ import {
   type TrackedField,
 } from "@/lib/exercise-fields";
 import { ChevronDown, ChevronUp, Copy, GripVertical, Trash2 } from "lucide-react";
-import { flashSaved, flashSaveError } from "@/lib/save-toast";
+import { useSaveToastChannel } from "./desktop/save-toast-channel";
 import { CARDIO_PRESETS, type CardioPreset } from "@/lib/cardio-presets";
 import type { RestTempoSuggestion } from "@/lib/training-intent";
 
@@ -137,6 +137,7 @@ export function ExerciseBuilderCard({
   onDeleted: () => void;
   onDuplicated: (newExercise: BuilderExercise) => void;
 }) {
+  const { flashSaved, flashSaveError } = useSaveToastChannel();
   const [nameDraft, setNameDraft] = useState(exercise.exerciseName);
   // The ladder picker below changes exercise.exerciseName from OUTSIDE
   // this input (a rung click, not typing) — without this, the same

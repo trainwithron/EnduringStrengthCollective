@@ -467,7 +467,13 @@ export function CoachDesktopShell({
     // team on the other end of it — a 1-on-1 group is one specific
     // client, so this entry (and its unread badge) is hidden entirely
     // rather than showing an empty/meaningless feed for a "team" of one.
-    ...(groupKind !== "one_on_one"
+    // Gated on a resolved (non-null) groupKind, not just "!== one_on_one"
+    // — groupKind starts null until the effect above resolves, and null
+    // !== "one_on_one" is true, so the old check let Team Feed flash on
+    // every load of a real 1-on-1 group before disappearing a moment
+    // later. Withholding it during that brief unresolved window is a
+    // much smaller, more honest gap than showing-then-yanking a nav item.
+    ...(groupKind !== null && groupKind !== "one_on_one"
       ? [{ key: "feed" as const, label: "Team Feed", href: `/groups/${groupId}/feed`, icon: MessagesSquare, badge: feedUnread }]
       : []),
     { key: "calendar", label: "Calendar", href: `/groups/${groupId}/calendar`, icon: CalendarDays },

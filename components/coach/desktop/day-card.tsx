@@ -20,7 +20,7 @@ import { TextNoteCard } from "../text-note-card";
 import { BulkEditDayPanel } from "./bulk-edit-day-panel";
 import { formatShortDate } from "@/lib/program-schedule";
 import { GripVertical, ChevronDown, ChevronUp } from "lucide-react";
-import { flashSaved, flashSaveError } from "@/lib/save-toast";
+import { useSaveToastChannel } from "./save-toast-channel";
 
 // Quick-add is typed fast, so a bare "Bench" for an existing "Bench
 // Press" is common — matchExercise's fuzzy threshold is deliberately
@@ -83,6 +83,7 @@ export function DayCard({
   onItemsChange: (items: BuilderItem[]) => void;
   onDeleted: () => void;
 }) {
+  const { flashSaved, flashSaveError } = useSaveToastChannel();
   const [titleDraft, setTitleDraft] = useState(day.title);
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);

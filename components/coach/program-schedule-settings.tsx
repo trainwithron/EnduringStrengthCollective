@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { VisibilityWindow } from "@/lib/program-schedule";
-import { flashSaved, flashSaveError } from "@/lib/save-toast";
+import { useSaveToastChannel } from "./desktop/save-toast-channel";
 
 const VISIBILITY_OPTIONS: { value: VisibilityWindow; label: string }[] = [
   { value: "day", label: "Day of" },
@@ -35,6 +35,7 @@ export function ProgramScheduleSettings({
   initialVisibilityWindow: VisibilityWindow;
   onChange: (startDate: string | null, trainingDays: number[] | null) => void;
 }) {
+  const { flashSaved, flashSaveError } = useSaveToastChannel();
   const [startDate, setStartDate] = useState(initialStartDate ?? "");
   const [trainingDays, setTrainingDays] = useState<number[]>(initialTrainingDays ?? []);
   const [visibilityWindow, setVisibilityWindow] = useState<VisibilityWindow>(

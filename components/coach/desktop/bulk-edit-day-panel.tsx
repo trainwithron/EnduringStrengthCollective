@@ -4,7 +4,7 @@ import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { BuilderExercise } from "@/lib/types";
 import { TARGET_COLUMN, fieldDef, type TrackedField } from "@/lib/exercise-fields";
-import { flashSaved, flashSaveError } from "@/lib/save-toast";
+import { useSaveToastChannel } from "./save-toast-channel";
 
 type Mode = "all" | "class";
 
@@ -17,6 +17,7 @@ export function BulkEditDayPanel({
   onApplied: (updates: { exerciseId: string; field: TrackedField; value: string | number | null }[]) => void;
   label?: string;
 }) {
+  const { flashSaved, flashSaveError } = useSaveToastChannel();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("all");
   const [field, setField] = useState<TrackedField>("reps");

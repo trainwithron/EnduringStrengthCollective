@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { TRAINING_INTENTS, type TrainingIntent } from "@/lib/training-intent";
-import { flashSaved, flashSaveError } from "@/lib/save-toast";
+import { useSaveToastChannel } from "./desktop/save-toast-channel";
 
 // Always visible and directly editable regardless of how it was set —
 // smart-defaulted from the program name at creation (training-intent.ts),
@@ -18,6 +18,7 @@ export function TrainingIntentSelector({
   initialIntent: TrainingIntent | null;
   onChange: (next: TrainingIntent | null) => void;
 }) {
+  const { flashSaved, flashSaveError } = useSaveToastChannel();
   const [intent, setIntent] = useState<TrainingIntent | null>(initialIntent);
   const [saving, setSaving] = useState(false);
 

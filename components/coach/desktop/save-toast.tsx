@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { subscribeSaveToast } from "@/lib/save-toast";
+import { useSaveToastChannel } from "./save-toast-channel";
 
 // Every edit in the Program Builder auto-persists with no button to
 // press — this is the only positive confirmation a coach gets that a
@@ -10,6 +10,7 @@ import { subscribeSaveToast } from "@/lib/save-toast";
 // coalescing rapid-fire edits (e.g. tabbing through several set fields)
 // into one visible pulse instead of a flicker per field.
 export function SaveToast() {
+  const { subscribeSaveToast } = useSaveToastChannel();
   const [state, setState] = useState<{ visible: boolean; error: string | null }>({
     visible: false,
     error: null,
@@ -27,7 +28,7 @@ export function SaveToast() {
         event.kind === "error" ? 5000 : 1400
       );
     });
-  }, []);
+  }, [subscribeSaveToast]);
 
   return (
     <div

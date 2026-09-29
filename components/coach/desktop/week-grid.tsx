@@ -11,7 +11,7 @@ import type { MovementPatternOption } from "../exercise-builder-card";
 import type { AliasEntry } from "@/lib/exercise-matching";
 import type { RestTempoSuggestion } from "@/lib/training-intent";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { flashSaved, flashSaveError } from "@/lib/save-toast";
+import { useSaveToastChannel } from "./save-toast-channel";
 
 export function WeekGrid({
   weekNumber,
@@ -50,6 +50,7 @@ export function WeekGrid({
   onWeeksGenerated: (newDays: BuilderDay[]) => void;
   onWeekDeleted: () => void;
 }) {
+  const { flashSaved, flashSaveError } = useSaveToastChannel();
   const [draggedDayId, setDraggedDayId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);

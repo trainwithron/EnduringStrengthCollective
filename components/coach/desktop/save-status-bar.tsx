@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { subscribeSaveToast } from "@/lib/save-toast";
+import { useSaveToastChannel } from "./save-toast-channel";
 
 // Real feedback from Ron: "I don't see a save button for my programs, I
 // want it to autosave and I want a save button." Investigated first —
@@ -19,12 +19,13 @@ import { subscribeSaveToast } from "@/lib/save-toast";
 // desktop.tsx` renders both) — not a replacement for the toast, an
 // addition, since the toast's brief pulse is still a fine extra signal.
 export function SaveStatusBar() {
+  const { subscribeSaveToast, flashSaved } = useSaveToastChannel();
   const [status, setStatus] = useState<"idle" | "saved" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const revertTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    return subscribeSaveToast((event) => {
+    const unsubscribe = subscribeSaveToast((event) => {
       if (revertTimer.current) clearTimeout(revertTimer.current);
       if (event.kind === "error") {
         // Stays up until the next real save event, not on a timer — a
@@ -37,16 +38,27 @@ export function SaveStatusBar() {
       setErrorMessage(null);
       revertTimer.current = setTimeout(() => setStatus("idle"), 2500);
     });
-  }, []);
+    return () => {
+      unsubscribe();
+      if (revertTimer.current) clearTimeout(revertTimer.current);
+    };
+  }, [subscribeSaveToast]);
 
   // Every field here already writes on its own blur/change — there's no
-  // batched "pending" state a Save button could flush. What a real click
-  // CAN honestly do: commit whatever the coach is still actively typing
-  // into right now, instead of waiting for them to click elsewhere first
-  // (the same blur that already triggers that field's own auto-persist).
+  // batched "pending" state a Save button could flush. The honest click
+  // behavior splits in two: if something is actively focused, blur it to
+  // commit whatever's still being typed (that field's own blur handler
+  // then flashes its own real save/error). If nothing is focused — the
+  // exact case Ron asked for, finishing an edit, clicking elsewhere, then
+  // clicking Save for reassurance — .blur() on a non-existent focus target
+  // is a silent no-op, so flash "Saved" directly instead: there's nothing
+  // pending, everything already persisted.
   function handleSaveClick() {
-    if (document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && active !== document.body) {
+      active.blur();
+    } else {
+      flashSaved();
     }
   }
 

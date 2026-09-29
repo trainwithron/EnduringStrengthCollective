@@ -33,8 +33,13 @@ export async function generateMetadata(
     shared.celebratePrs.length > 0
       ? `${shared.athleteName} just hit a new PR! 🎉`
       : `${shared.athleteName} just finished a workout! 💪`;
+  // Same fix as the on-page display below: total_volume is coalesce(...,
+  // 0), never null, so a null check here can never actually route a
+  // no-sets "checked in" post away from claiming "0 lbs total volume" in
+  // the actual link-preview text (iMessage/Slack/Discord unfurl) — the
+  // exact bug the on-page branch was fixed for, just left live here too.
   const description =
-    shared.totalVolume != null
+    shared.totalSetsCompleted != null && shared.totalSetsCompleted > 0
       ? `${Math.round(shared.totalVolume).toLocaleString()} lbs total volume — training with ${shared.groupName}.`
       : `Training with ${shared.groupName}.`;
 
@@ -72,7 +77,9 @@ export default async function ShareWorkoutPage(
   } = await supabase.auth.getUser();
 
   const volumeEquivalence =
-    shared.totalVolume != null ? getVolumeEquivalence(shared.totalVolume, params.postId) : null;
+    shared.totalSetsCompleted != null && shared.totalSetsCompleted > 0
+      ? getVolumeEquivalence(shared.totalVolume, params.postId)
+      : null;
   const gymJoke = pickGymJoke(new Date().toISOString().slice(0, 10));
 
   const shareTitle =

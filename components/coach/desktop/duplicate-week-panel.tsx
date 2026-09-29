@@ -16,7 +16,7 @@ import {
   type IntervalResultWeek,
   type UndulatingWaveStep,
 } from "@/lib/progression-models";
-import { flashSaved, flashSaveError } from "@/lib/save-toast";
+import { useSaveToastChannel } from "./save-toast-channel";
 
 type Model = "linear" | "double" | "undulating";
 type IntervalAxis = "rounds" | "rest" | "work";
@@ -68,6 +68,7 @@ export function DuplicateWeekPanel({
   existingWeekNumbers: number[];
   onGenerated: (newDays: BuilderDay[]) => void;
 }) {
+  const { flashSaved, flashSaveError } = useSaveToastChannel();
   const [open, setOpen] = useState(false);
   const [model, setModel] = useState<Model>("linear");
   const [weeks, setWeeks] = useState("3");
