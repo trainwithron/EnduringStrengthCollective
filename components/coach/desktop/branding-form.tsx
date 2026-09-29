@@ -83,6 +83,7 @@ export function BrandingForm({
   initialFontBody,
   initialLogoUrl,
   initialAppIconUrl,
+  initialZipCode,
 }: {
   organizationId: string;
   initialButtonShape: ButtonShape;
@@ -93,6 +94,7 @@ export function BrandingForm({
   initialFontBody: BodyFont;
   initialLogoUrl: string | null;
   initialAppIconUrl: string | null;
+  initialZipCode: string | null;
 }) {
   const [buttonShape, setButtonShape] = useState<ButtonShape>(initialButtonShape);
   const [accentColor, setAccentColor] = useState(initialAccentColor);
@@ -100,6 +102,9 @@ export function BrandingForm({
   const [textColor, setTextColor] = useState(initialTextColor);
   const [fontDisplay, setFontDisplay] = useState<DisplayFont>(initialFontDisplay);
   const [fontBody, setFontBody] = useState<BodyFont>(initialFontBody);
+  const [zipCode, setZipCode] = useState(initialZipCode ?? "");
+  const [zipError, setZipError] = useState<string | null>(null);
+  const [zipSaved, setZipSaved] = useState(false);
 
   // Cheap enough (a handful of float ops) to recompute on every render —
   // no debounce needed, matches the spec's "live as the picker drags"
@@ -158,6 +163,30 @@ export function BrandingForm({
     persist({ font_body: font });
   }
 
+  // Separate from persist() above — a different table shape (zip_code
+  // isn't part of that function's typed patch) and its own light
+  // validation, since a malformed ZIP should surface inline rather than
+  // silently fail the DB's own check constraint.
+  async function handleZipBlur() {
+    const trimmed = zipCode.trim();
+    setZipError(null);
+    setZipSaved(false);
+    if (trimmed && !/^[0-9]{5}$/.test(trimmed)) {
+      setZipError("Enter a 5-digit ZIP code, or leave this blank.");
+      return;
+    }
+    const supabase = createBrowserClient();
+    const { error } = await supabase
+      .from("organizations")
+      .update({ zip_code: trimmed || null })
+      .eq("id", organizationId);
+    if (error) {
+      setZipError("Couldn't save — try again.");
+      return;
+    }
+    setZipSaved(true);
+  }
+
   function handleApplyNow() {
     // The sidebar/nav colors and fonts are read once when the shell
     // mounts, so a full reload is the simple, reliable way to see the
@@ -186,6 +215,33 @@ export function BrandingForm({
             initialUrl={initialAppIconUrl}
             previewClassName="w-14 h-14"
           />
+        </div>
+      </Section>
+
+      <Section title="Location">
+        <div className="space-y-2">
+          <label className="flex flex-col gap-1 max-w-[10rem]">
+            <span className="font-body text-xs text-steel uppercase tracking-wide">ZIP code</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              maxLength={5}
+              value={zipCode}
+              onChange={(e) => {
+                setZipCode(e.target.value.replace(/[^0-9]/g, ""));
+                setZipSaved(false);
+              }}
+              onBlur={handleZipBlur}
+              placeholder="e.g. 89101"
+              className="h-10 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm"
+            />
+          </label>
+          <p className="font-body text-xs text-steel max-w-md">
+            Used to show real distance when a prospect searches the coach marketplace near them.
+            Optional — leave blank to skip location-based search for now.
+          </p>
+          {zipError && <p className="font-body text-xs text-rust">{zipError}</p>}
+          {zipSaved && !zipError && <p className="font-body text-xs text-moss">Saved.</p>}
         </div>
       </Section>
 

@@ -85,7 +85,7 @@ export default async function BrandingPage(
   const { data: org } = await supabase
     .from("organizations")
     .select(
-      "id, slug, name, owner_id, created_at, button_shape, accent_color, background_color, text_color, font_display, font_body, logo_url, app_icon_url, workout_card_background_mode, workout_card_background_url, dispatch_ttl_minutes"
+      "id, slug, name, owner_id, created_at, button_shape, accent_color, background_color, text_color, font_display, font_body, logo_url, app_icon_url, workout_card_background_mode, workout_card_background_url, dispatch_ttl_minutes, zip_code"
     )
     .eq("id", orgMembership.organization_id)
     .maybeSingle();
@@ -243,6 +243,7 @@ export default async function BrandingPage(
           initialFontBody={(org?.font_body as BodyFont) ?? "Inter"}
           initialLogoUrl={org?.logo_url ?? null}
           initialAppIconUrl={org?.app_icon_url ?? null}
+          initialZipCode={org?.zip_code ?? null}
         />
       ) : (
         <WorkoutCardBackgroundSettings

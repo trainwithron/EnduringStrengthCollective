@@ -57,6 +57,10 @@ export async function updateSession(request: NextRequest) {
     // here — that page is the trainer's own, and a trainer always has a
     // real account.
     pathname.startsWith("/join/") ||
+    // marketplace_gather_and_browse_ui_data_investigation_sept29.md — a
+    // prospect searching for a coach has no account yet either, same
+    // gotcha as /book/, /join/, and /scan/ above.
+    pathname.startsWith("/find-a-coach") ||
     pathname.startsWith("/dispatch-reply/") ||
     pathname.startsWith("/api/org-dispatch/submit") ||
     pathname.startsWith("/api/org-dispatch/reply") ||
