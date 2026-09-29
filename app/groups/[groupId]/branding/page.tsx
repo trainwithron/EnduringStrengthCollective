@@ -10,7 +10,7 @@ import { DispatchSettings } from "@/components/coach/desktop/dispatch-settings";
 import { ClientTagManager } from "@/components/coach/desktop/client-tag-manager";
 import type { ButtonShape, DisplayFont, BodyFont } from "@/lib/theme";
 
-type OrgTab = "team" | "branding" | "workout-card" | "tags";
+type OrgTab = "team" | "branding" | "workout-card" | "tags" | "dispatch";
 
 export default async function BrandingPage(
   props: {
@@ -27,7 +27,9 @@ export default async function BrandingPage(
         ? "workout-card"
         : searchParams.tab === "tags"
           ? "tags"
-          : "team";
+          : searchParams.tab === "dispatch"
+            ? "dispatch"
+            : "team";
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -162,6 +164,16 @@ export default async function BrandingPage(
         >
           Tags
         </Link>
+        {isOwnerOrAdmin && (
+          <Link
+            href={`${basePath}?tab=dispatch`}
+            className={`h-9 px-4 flex items-center font-body text-sm border ${
+              tab === "dispatch" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
+            }`}
+          >
+            Trainer Dispatch
+          </Link>
+        )}
       </div>
 
       {tab === "team" ? (
@@ -206,14 +218,6 @@ export default async function BrandingPage(
             </div>
           )}
 
-          {isOwnerOrAdmin && (
-            <DispatchSettings
-              organizationId={orgMembership.organization_id}
-              orgSlug={org?.slug ?? ""}
-              initialTtlMinutes={org?.dispatch_ttl_minutes ?? 20}
-            />
-          )}
-
           <p className="font-body text-xs text-steel">
             <Link href={`/groups/${params.groupId}/revenue-splits`} className="text-rust">
               View Revenue Splits →
@@ -226,6 +230,18 @@ export default async function BrandingPage(
         ) : (
           <p className="font-body text-sm text-steel">
             Only owners and admins can manage client tags.
+          </p>
+        )
+      ) : tab === "dispatch" ? (
+        isOwnerOrAdmin ? (
+          <DispatchSettings
+            organizationId={orgMembership.organization_id}
+            orgSlug={org?.slug ?? ""}
+            initialTtlMinutes={org?.dispatch_ttl_minutes ?? 20}
+          />
+        ) : (
+          <p className="font-body text-sm text-steel">
+            Only owners and admins can manage trainer dispatch.
           </p>
         )
       ) : !isOwner ? (
