@@ -154,6 +154,11 @@ export function FloatingCardStack({
   }, []);
 
   function startMove(e: React.PointerEvent, entry: CardStackEntry) {
+    // Without this, dragging the title bar also triggers the browser's
+    // own native text-selection drag on whatever page content sits
+    // underneath the card — stopPropagation alone only stops the event
+    // from bubbling, it doesn't suppress that default browser behavior.
+    e.preventDefault();
     // A drag always raises the card too, same as any real window manager.
     bringToFront(entry.view);
     dragRef.current = {
@@ -168,6 +173,10 @@ export function FloatingCardStack({
 
   function startResize(e: React.PointerEvent, entry: CardStackEntry) {
     e.stopPropagation();
+    // Same real bug as startMove above: stopPropagation alone doesn't
+    // stop the browser's own native text-selection drag from firing on
+    // whatever's underneath the card.
+    e.preventDefault();
     bringToFront(entry.view);
     dragRef.current = {
       kind: "resize",
@@ -262,7 +271,7 @@ export function FloatingCardStack({
                 <div
                   onPointerDown={(e) => startResize(e, entry)}
                   aria-hidden
-                  className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize"
+                  className="absolute bottom-0 right-0 w-4 h-4 cursor-nwse-resize select-none"
                   style={{
                     background:
                       "linear-gradient(135deg, transparent 0%, transparent 45%, rgba(255,255,255,0.25) 50%, transparent 55%, transparent 100%)",
