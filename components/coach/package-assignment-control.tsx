@@ -68,9 +68,9 @@ export function PackageAssignmentControl({
 
   return (
     <div>
-      <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
-        Private packages assigned to this client
-      </h2>
+      <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
+        Assigned to this client
+      </p>
       {privatePackages.length === 0 ? (
         <p className="font-body text-sm text-steel">
           No private packages yet — create one from the Packages page to assign custom pricing here.

@@ -66,7 +66,7 @@ export function NutritionPhaseControl({
   return (
     <div className="flex items-center gap-3">
       <span className="font-body text-xs text-steel uppercase tracking-wide">
-        Nutrition phase tracking
+        Phase tracking
       </span>
       <select
         value={phase ?? ""}

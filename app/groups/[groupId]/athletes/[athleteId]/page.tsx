@@ -15,6 +15,7 @@ import { ClientProgrammingMenu } from "@/components/coach/client-programming-men
 import { MinorConsentControl } from "@/components/coach/minor-consent-control";
 import { GuardianShareButton } from "@/components/coach/guardian-share-button";
 import { NutritionPhaseControl } from "@/components/coach/nutrition-phase-control";
+import { SettingsGroup } from "@/components/shared/settings-group";
 import { InjuryStatusToggle } from "@/components/coach/injury-status-toggle";
 import { computeBmr, computeTdee } from "@/lib/bmr-tdee";
 import { VideoCheckinRecorder } from "@/components/coach/video-checkin-recorder";
@@ -1005,76 +1006,80 @@ export default async function AthleteProfilePage(
             </section>
           )}
 
-          <section>
-            <SessionCreditsControl
-              athleteId={params.athleteId}
-              groupId={params.groupId}
-              initialBalance={creditsRow?.balance ?? 0}
-            />
-          </section>
+          <section className="space-y-4">
+            <SettingsGroup label="Billing">
+              <SessionCreditsControl
+                athleteId={params.athleteId}
+                groupId={params.groupId}
+                initialBalance={creditsRow?.balance ?? 0}
+              />
+            </SettingsGroup>
 
-          <section>
-            <SwipeDirectionSetting
-              athleteId={params.athleteId}
-              label="Exercise logging (set on their behalf)"
-              mode="coach"
-              initialDirection={
-                (profile?.exercise_swipe_direction as "vertical" | "horizontal" | null) ?? null
-              }
-            />
-          </section>
+            <SettingsGroup label="Workout Logging">
+              <SwipeDirectionSetting
+                athleteId={params.athleteId}
+                label="Swipe direction — set on their behalf"
+                mode="coach"
+                initialDirection={
+                  (profile?.exercise_swipe_direction as "vertical" | "horizontal" | null) ?? null
+                }
+              />
+            </SettingsGroup>
 
-          <section>
-            <NutritionPhaseControl
-              athleteId={params.athleteId}
-              groupId={params.groupId}
-              coachId={user.id}
-              initialPhase={(nutritionPhaseRow?.phase as NutritionPhase | undefined) ?? null}
-              initialStartedAt={nutritionPhaseRow?.started_at ?? null}
-            />
-            {nutritionTrendAlignment && (
-              <p
-                className={`font-body text-xs mt-2 ${
-                  nutritionTrendAlignment.aligned ? "text-positive" : "text-rust"
-                }`}
-              >
-                {nutritionTrendAlignment.aligned
-                  ? "✓ Trending as expected for this phase"
-                  : `⚠ Trend reads as "${nutritionTrendAlignment.trend.replace("_", " ")}" — doesn't match the tagged goal yet, worth a look`}
-              </p>
+            <SettingsGroup label="Nutrition">
+              <NutritionPhaseControl
+                athleteId={params.athleteId}
+                groupId={params.groupId}
+                coachId={user.id}
+                initialPhase={(nutritionPhaseRow?.phase as NutritionPhase | undefined) ?? null}
+                initialStartedAt={nutritionPhaseRow?.started_at ?? null}
+              />
+              {nutritionTrendAlignment && (
+                <p
+                  className={`font-body text-xs mt-2 ${
+                    nutritionTrendAlignment.aligned ? "text-positive" : "text-rust"
+                  }`}
+                >
+                  {nutritionTrendAlignment.aligned
+                    ? "✓ Trending as expected for this phase"
+                    : `⚠ Trend reads as "${nutritionTrendAlignment.trend.replace("_", " ")}" — doesn't match the tagged goal yet, worth a look`}
+                </p>
+              )}
+            </SettingsGroup>
+
+            <SettingsGroup label="Packages">
+              <PackageAssignmentControl
+                athleteId={params.athleteId}
+                privatePackages={(privatePackageRows ?? []).map((p) => ({
+                  id: p.id,
+                  name: p.name,
+                  sessionsPerWeek: p.sessions_per_week,
+                  rateCents: p.rate_cents,
+                  sessionsGranted: p.sessions_granted,
+                }))}
+                initialAssignedIds={assignedPackageIds}
+              />
+            </SettingsGroup>
+
+            <SettingsGroup label="Privacy">
+              <PrivateFromOrgToggle
+                athleteId={params.athleteId}
+                groupId={params.groupId}
+                initialValue={athleteMembership.private_from_org ?? false}
+              />
+            </SettingsGroup>
+
+            {(orgClientTagRows ?? []).length > 0 && (
+              <SettingsGroup label="Tags">
+                <ClientTagAssignmentControl
+                  athleteId={params.athleteId}
+                  orgTags={(orgClientTagRows ?? []).map((t) => ({ id: t.id, name: t.name }))}
+                  initialAssignedTagIds={(clientTagAssignmentRows ?? [])
+                    .map((a) => a.tag_id)
+                    .filter((tagId) => (orgClientTagRows ?? []).some((t) => t.id === tagId))}
+                />
+              </SettingsGroup>
             )}
-          </section>
-
-          <section>
-            <PackageAssignmentControl
-              athleteId={params.athleteId}
-              privatePackages={(privatePackageRows ?? []).map((p) => ({
-                id: p.id,
-                name: p.name,
-                sessionsPerWeek: p.sessions_per_week,
-                rateCents: p.rate_cents,
-                sessionsGranted: p.sessions_granted,
-              }))}
-              initialAssignedIds={assignedPackageIds}
-            />
-          </section>
-
-          <section>
-            <PrivateFromOrgToggle
-              athleteId={params.athleteId}
-              groupId={params.groupId}
-              initialValue={athleteMembership.private_from_org ?? false}
-            />
-          </section>
-
-          <section>
-            <ClientTagAssignmentControl
-              athleteId={params.athleteId}
-              orgTags={(orgClientTagRows ?? []).map((t) => ({ id: t.id, name: t.name }))}
-              initialAssignedTagIds={(clientTagAssignmentRows ?? [])
-                .map((a) => a.tag_id)
-                .filter((tagId) => (orgClientTagRows ?? []).some((t) => t.id === tagId))}
-            />
           </section>
 
           <section>

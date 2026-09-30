@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
@@ -13,6 +12,7 @@ import { PackagePicker, type PackageOption } from "@/components/athlete/package-
 import { ManageBillingLink } from "@/components/athlete/manage-billing-link";
 import { ProfileDetailsEditor } from "@/components/athlete/profile-details-editor";
 import { SwipeDirectionSetting } from "@/components/athlete/swipe-direction-setting";
+import { SettingsGroup } from "@/components/shared/settings-group";
 import { ExportDataButton } from "@/components/athlete/export-data-button";
 import { DeleteAccountButton } from "@/components/athlete/delete-account-button";
 import { GamificationToggle } from "@/components/coach/gamification-toggle";
@@ -338,31 +338,6 @@ export default async function SettingsPage(
 
       <BottomTabBar groupId={params.groupId} activeOverride="settings" />
     </main>
-  );
-}
-
-function SettingsGroup({
-  label,
-  highlight,
-  children,
-}: {
-  label: string;
-  highlight?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <div>
-      <p className="font-body text-[10px] font-bold uppercase tracking-wide text-rust mb-2">
-        {label}
-      </p>
-      <div
-        className={`border rounded-lg p-4 ${
-          highlight ? "border-rust/40 bg-surface/60" : "border-steel/20 bg-surface/30"
-        }`}
-      >
-        {children}
-      </div>
-    </div>
   );
 }
 
