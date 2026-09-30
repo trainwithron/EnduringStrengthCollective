@@ -70,17 +70,18 @@ export default async function FeedPage(
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Independent of each other — both only need groupId/user.id, batched
-  // per athlete_app_loading_time_investigation_sept14.md's census finding
-  // this file had zero Promise.all across 8 sequential awaits.
-  const [{ data: membership }, effective] = await Promise.all([
+  // Independent of each other — all three only need groupId/user.id,
+  // batched per athlete_app_loading_time_investigation_sept14.md's census
+  // finding this file had zero Promise.all across 8 sequential awaits.
+  const [{ data: membership }, effective, { data: group }] = await Promise.all([
     supabase
       .from("group_memberships")
-      .select("role, client_tier")
+      .select("role")
       .eq("group_id", params.groupId)
       .eq("profile_id", user?.id ?? "")
       .maybeSingle(),
     user ? getEffectiveAthlete(params.groupId, user.id) : Promise.resolve(null),
+    supabase.from("groups").select("name, group_kind").eq("id", params.groupId).maybeSingle(),
   ]);
 
   const isCoach = membership?.role === "coach";
@@ -92,21 +93,22 @@ export default async function FeedPage(
   const isActingAsOther = effective?.isActingAsOther ?? false;
   const athleteId = effective?.athleteId ?? user?.id ?? null;
 
-  // A 1-on-1 client has no team feed to see — server-side backstop for
-  // the same rule the bottom tab bar already hides the link for, in case
-  // someone lands here directly. Checked against whichever athlete this
-  // page is actually being viewed as.
+  // A 1-on-1 GROUP has no team feed to see — server-side backstop for the
+  // same rule the bottom tab bar/coach nav already use. This is the
+  // group's own group_kind, not the viewing athlete's client_tier —
+  // client_tier is an independent per-membership notification/billing
+  // signal that a genuine team group can (and does, in real data) assign
+  // to only one of its athletes. The old client_tier-based check here
+  // would wrongly bounce that one athlete out of an otherwise working
+  // Team Feed every teammate else could see — confirmed live. group_kind
+  // is a property of the group itself, so the same value applies whether
+  // this page is being viewed as the real athlete or an impersonated one.
+  const isOneOnOneGroup = (group?.group_kind ?? "team") === "one_on_one";
   if (isActingAsOther) {
-    const { data: actingAsMembership } = await supabase
-      .from("group_memberships")
-      .select("client_tier")
-      .eq("group_id", params.groupId)
-      .eq("profile_id", athleteId ?? "")
-      .maybeSingle();
-    if (actingAsMembership?.client_tier === "one_on_one") {
+    if (isOneOnOneGroup) {
       redirect(`/groups/${params.groupId}`);
     }
-  } else if (membership?.role === "athlete" && membership.client_tier === "one_on_one") {
+  } else if (membership?.role === "athlete" && isOneOnOneGroup) {
     redirect(`/groups/${params.groupId}`);
   }
 
@@ -120,12 +122,14 @@ export default async function FeedPage(
     ? (searchParams.channel as FeedChannel)
     : "general";
 
-  // Independent of each other — viewerProfile/posts/group only need
+  // Independent of each other — viewerProfile/posts only need
   // athleteId/groupId/channel (all already resolved); the leaderboard and
   // team_mode check only need groupId + the "general channel" gate, same
   // gate the leaderboard already used, just batched instead of run
-  // sequentially after everything else.
-  const [{ data: viewerProfile }, { data: posts }, { data: group }, teamModeResult, leaderboard] = await Promise.all([
+  // sequentially after everything else. `group` (name/group_kind) was
+  // already fetched above, before the redirect check — no need to fetch
+  // it a second time here.
+  const [{ data: viewerProfile }, { data: posts }, teamModeResult, leaderboard] = await Promise.all([
     athleteId
       ? supabase.from("profiles").select("full_name, feed_broadcast_level").eq("id", athleteId).maybeSingle()
       : Promise.resolve({ data: null as { full_name: string; feed_broadcast_level: string } | null }),
@@ -137,7 +141,6 @@ export default async function FeedPage(
       .order("pinned_at", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false })
       .limit(30),
-    supabase.from("groups").select("name").eq("id", params.groupId).single(),
     channel === "general"
       ? supabase.from("groups").select("team_mode").eq("id", params.groupId).maybeSingle()
       : Promise.resolve({ data: null as { team_mode: boolean } | null }),
