@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { UserPlus } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { checkOneOnOneGroupHasRoom } from "@/lib/group-kind-guard";
 
 function randomCode(length = 10) {
   // Excludes visually ambiguous characters (0/O, 1/l/I) since this gets
@@ -143,11 +144,24 @@ export function AddClientButton({
   // set) if the picker isn't in a submittable state.
   async function resolveGroupId(fallbackName: string): Promise<string | null> {
     setDestinationError(null);
-    if (destination === "current") return groupId;
+
+    if (destination === "current") {
+      const guardError = await checkOneOnOneGroupHasRoom(createBrowserClient(), groupId);
+      if (guardError) {
+        setDestinationError(guardError);
+        return null;
+      }
+      return groupId;
+    }
 
     if (destination === "existing") {
       if (!selectedExistingGroupId) {
         setDestinationError("Pick a group.");
+        return null;
+      }
+      const guardError = await checkOneOnOneGroupHasRoom(createBrowserClient(), selectedExistingGroupId);
+      if (guardError) {
+        setDestinationError(guardError);
         return null;
       }
       return selectedExistingGroupId;

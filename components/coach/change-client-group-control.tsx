@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { checkOneOnOneGroupHasRoom } from "@/lib/group-kind-guard";
 
 type Destination = "existing" | "new";
 
@@ -121,6 +122,12 @@ export function ChangeClientGroupControl({
     let targetGroupId: string;
 
     if (destination === "existing") {
+      const guardError = await checkOneOnOneGroupHasRoom(supabase, selectedGroupId);
+      if (guardError) {
+        setError(guardError);
+        setMoving(false);
+        return;
+      }
       targetGroupId = selectedGroupId;
     } else {
       const {
