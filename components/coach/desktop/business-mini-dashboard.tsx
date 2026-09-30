@@ -142,6 +142,14 @@ export function BusinessMiniDashboard({ groupId, expanded = false }: { groupId: 
 
   return (
     <div className="space-y-3">
+      {/* feature_redundancy_and_could_work_better_audit_sept29.md — the
+          Business hover-rail widget shows this same-named metric scoped
+          coach-wide (every group); this one is just the group currently
+          being viewed, which a coach with more than one group has no way
+          to tell apart otherwise. */}
+      <p className="font-body text-[10px] uppercase tracking-wide text-steel -mt-1">
+        This group only
+      </p>
       <div className="grid grid-cols-2 gap-2">
         <div className="border border-steel/20 p-2.5">
           <p className="font-display font-bold text-lg leading-none">

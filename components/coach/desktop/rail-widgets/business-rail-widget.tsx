@@ -162,7 +162,7 @@ export function BusinessRailWidget({ groupId }: { groupId: string }) {
   if (values === null || growthSeries === null) {
     return (
       <div>
-        <RailWidgetHeader title="Your top 3" />
+        <RailWidgetHeader title="Your top 3 · Whole business" />
         <RailWidgetLoading />
       </div>
     );
@@ -221,7 +221,12 @@ export function BusinessRailWidget({ groupId }: { groupId: string }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <RailWidgetHeader title="Your top 3" />
+        {/* feature_redundancy_and_could_work_better_audit_sept29.md — the
+            card-stack's Business mini-dashboard shows this same-named
+            metric scoped to just one group; this one is coach-wide
+            (every group), which a coach with more than one group has no
+            way to tell apart otherwise. */}
+        <RailWidgetHeader title="Your top 3 · Whole business" />
         <button
           type="button"
           onClick={() => setCustomizing(true)}
