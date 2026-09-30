@@ -614,6 +614,16 @@ export function CoachDesktopShell({
   return (
     <TerminologyProvider groupId={groupId}>
     <div className="min-h-screen bg-graphite text-chalk font-body">
+      {/* operational_resilience_oversight_check.md — WCAG 2.4.1 Bypass
+          Blocks (AA): this shell's sidebar is a real keyboard-tab-through
+          cost on every single page. Visually hidden until it receives
+          keyboard focus (Tab), then jumps straight to #main-content. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[200] focus:h-10 focus:px-4 focus:flex focus:items-center bg-rust text-graphite font-body text-sm font-medium"
+      >
+        Skip to content
+      </a>
       {/* Persistent top bar — always visible regardless of sidebar state,
           on every viewport. Houses the mobile nav toggle and the "View as
           Client" jump, since both need to stay reachable without scrolling
@@ -852,7 +862,7 @@ export function CoachDesktopShell({
           )}
         </div>
 
-        <main className="flex-1 min-w-0 px-4 pt-6 pb-24 md:px-10 md:pt-8 lg:pb-8 max-w-[1400px]">{children}</main>
+        <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 px-4 pt-6 pb-24 md:px-10 md:pt-8 lg:pb-8 max-w-[1400px] focus:outline-none">{children}</main>
       </div>
       {/* Mounted once here so it's reachable from every one of this
           shell's ~50 routes, not just /dashboard (collective_intelligence
