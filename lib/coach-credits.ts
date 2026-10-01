@@ -54,39 +54,48 @@ export async function getCoachCreditStanding(
 }
 
 // The real gate: call this from an authenticated AI-action route (the
-// coach spending their OWN credits — never pass a service-role client
-// here, that's only for the webhook's grant path via adjust_coach_credits
-// directly). Returns ok:false with a coach-facing message and spends
-// nothing when the balance is insufficient; actually decrements the
-// balance only when the action is allowed to proceed.
+// coach spending their OWN credits). coach_credits_race_condition_
+// sept30.md — this used to do a plain SELECT read then a SEPARATE
+// adjust_coach_credits RPC call, a real TOCTOU race (two concurrent
+// requests could both read the same pre-spend balance before either
+// committed). Now calls one atomic spend_coach_credits() RPC that does
+// the sufficiency check AND the decrement inside a single row-locked
+// transaction — a genuinely concurrent second call blocks on the lock
+// and sees the post-spend balance, not a stale read. Returns ok:false
+// with a coach-facing message and spends nothing when the balance is
+// insufficient.
 export async function checkAndSpendCoachCredits(
   supabase: SupabaseClient,
   coachId: string,
   action: AiActionKey
 ): Promise<CoachCreditCheck> {
   const cost = AI_ACTION_COSTS[action];
-  const standing = await getCoachCreditStanding(supabase, coachId);
+  const { data, error } = await supabase.rpc("spend_coach_credits", {
+    p_coach_id: coachId,
+    p_cost: cost,
+  });
 
-  if (standing.unlimited) {
-    return { ok: true, balance: standing.balance, unlimited: true };
+  if (error) {
+    return { ok: false, balance: 0, unlimited: false, error: "Couldn't process credits — try again." };
   }
 
-  if (standing.balance < cost) {
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) {
+    return { ok: false, balance: 0, unlimited: false, error: "Couldn't process credits — try again." };
+  }
+
+  if (row.unlimited) {
+    return { ok: true, balance: row.new_balance, unlimited: true };
+  }
+
+  if (!row.spent) {
     return {
       ok: false,
-      balance: standing.balance,
+      balance: row.new_balance,
       unlimited: false,
-      error: `This costs ${cost} credits — you have ${standing.balance}. Buy more credits or get Lift Off to keep going.`,
+      error: `This costs ${cost} credits — you have ${row.new_balance}. Buy more credits or get Lift Off to keep going.`,
     };
   }
 
-  const { data: newBalance, error } = await supabase.rpc("adjust_coach_credits", {
-    p_coach_id: coachId,
-    p_delta: -cost,
-  });
-  if (error) {
-    return { ok: false, balance: standing.balance, unlimited: false, error: "Couldn't process credits — try again." };
-  }
-
-  return { ok: true, balance: newBalance ?? standing.balance - cost, unlimited: false };
+  return { ok: true, balance: row.new_balance, unlimited: false };
 }
