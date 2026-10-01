@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type {
   DoubleProgressionConfig,
+  GzclpT1Config,
   LinearConfig,
   ProgressionModel,
   ProgressionUnit,
@@ -15,9 +16,15 @@ interface ExistingProgression {
   id: string;
   exercise_name: string;
   model: ProgressionModel;
-  config: LinearConfig | WaveConfig | DoubleProgressionConfig;
+  config: LinearConfig | WaveConfig | DoubleProgressionConfig | GzclpT1Config;
 }
 
+// Every ProgressionModel needs its own branch here — a model that falls
+// through to the final DoubleProgressionConfig cast renders whatever
+// fields that shape happens to share by name and "undefined" for the
+// rest (this is exactly how GZCLP/DUP rows used to render
+// "undefined-undefined reps": gzclp_t1/wave_from_training_max configs
+// have no repRangeLow/repRangeHigh at all).
 function summarize(existing: ExistingProgression | null): string {
   if (!existing) return "No progression set";
   const unit = existing.config.unit === "percent" ? "%" : "lbs";
@@ -28,11 +35,18 @@ function summarize(existing: ExistingProgression | null): string {
       c.repIncrement ? `, +${c.repIncrement} reps` : ""
     }`;
   }
-  if (existing.model === "wave") {
+  // wave_from_training_max reuses WaveConfig verbatim — same display,
+  // just auto-generated from the athlete's persisted training max
+  // instead of a manually-entered rep/weight scheme.
+  if (existing.model === "wave" || existing.model === "wave_from_training_max") {
     const c = existing.config as WaveConfig;
     return `Wave · reps ${c.repsPattern.join(",")} · weight ${c.weightDeltas
       .map((d) => (d >= 0 ? `+${d}` : d))
       .join(",")}${unit}`;
+  }
+  if (existing.model === "gzclp_t1") {
+    const c = existing.config as GzclpT1Config;
+    return `GZCLP T1 · start ${c.startingWeight}${unit}, +${c.weightIncrement}${unit}/step, ${c.deloadPercent}% deload`;
   }
   const c = existing.config as DoubleProgressionConfig;
   return `Double progression · ${c.repRangeLow}-${c.repRangeHigh} reps, +${c.weightIncrement}${unit}`;
