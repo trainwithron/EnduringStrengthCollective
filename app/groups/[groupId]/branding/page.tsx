@@ -149,10 +149,10 @@ export default async function BrandingPage(
         </p>
       </div>
 
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-6 overflow-x-auto">
         <Link
           href={`${basePath}?tab=team`}
-          className={`h-9 px-4 flex items-center font-body text-sm border ${
+          className={`h-9 px-4 flex items-center shrink-0 whitespace-nowrap font-body text-sm border ${
             tab === "team" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
           }`}
         >
@@ -160,7 +160,7 @@ export default async function BrandingPage(
         </Link>
         <Link
           href={`${basePath}?tab=branding`}
-          className={`h-9 px-4 flex items-center font-body text-sm border ${
+          className={`h-9 px-4 flex items-center shrink-0 whitespace-nowrap font-body text-sm border ${
             tab === "branding" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
           }`}
         >
@@ -168,7 +168,7 @@ export default async function BrandingPage(
         </Link>
         <Link
           href={`${basePath}?tab=workout-card`}
-          className={`h-9 px-4 flex items-center font-body text-sm border ${
+          className={`h-9 px-4 flex items-center shrink-0 whitespace-nowrap font-body text-sm border ${
             tab === "workout-card" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
           }`}
         >
@@ -176,7 +176,7 @@ export default async function BrandingPage(
         </Link>
         <Link
           href={`${basePath}?tab=tags`}
-          className={`h-9 px-4 flex items-center font-body text-sm border ${
+          className={`h-9 px-4 flex items-center shrink-0 whitespace-nowrap font-body text-sm border ${
             tab === "tags" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
           }`}
         >
@@ -185,7 +185,7 @@ export default async function BrandingPage(
         {isOwnerOrAdmin && (
           <Link
             href={`${basePath}?tab=dispatch`}
-            className={`h-9 px-4 flex items-center font-body text-sm border ${
+            className={`h-9 px-4 flex items-center shrink-0 whitespace-nowrap font-body text-sm border ${
               tab === "dispatch" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
             }`}
           >
@@ -194,7 +194,7 @@ export default async function BrandingPage(
         )}
         <Link
           href={`${basePath}?tab=terminology`}
-          className={`h-9 px-4 flex items-center font-body text-sm border ${
+          className={`h-9 px-4 flex items-center shrink-0 whitespace-nowrap font-body text-sm border ${
             tab === "terminology" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
           }`}
         >
@@ -202,7 +202,7 @@ export default async function BrandingPage(
         </Link>
         <Link
           href={`${basePath}?tab=credits`}
-          className={`h-9 px-4 flex items-center font-body text-sm border ${
+          className={`h-9 px-4 flex items-center shrink-0 whitespace-nowrap font-body text-sm border ${
             tab === "credits" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
           }`}
         >

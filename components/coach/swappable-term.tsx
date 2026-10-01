@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTerminology } from "./terminology-provider";
 import { resolveTerm, TERM_DEFAULTS, TERM_PRESETS, type TermForm, type TermKey } from "@/lib/terminology";
 
@@ -28,6 +28,17 @@ export function SwappableTerm({
   const [customOpen, setCustomOpen] = useState(false);
   const [customText, setCustomText] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  // Real mobile bug found live (mobile_must_fit_screen_standing_rule):
+  // a word sitting near the right edge of a narrow container (a
+  // settings-panel row, a nav item) opened this dropdown further right
+  // and ran it off the visible viewport, clipping/cutting off every
+  // preset past the first one. Measured at open-time rather than a
+  // static anchor, since this same component renders at both edges of
+  // the screen depending on where it's used (nav sidebar vs. a
+  // right-aligned settings row).
+  const [openLeftward, setOpenLeftward] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const DROPDOWN_WIDTH_PX = 130; // matches min-w-[110px] + its own padding
 
   const text = resolveTerm(overrides, termKey, form);
 
@@ -89,10 +100,15 @@ export function SwappableTerm({
   return (
     <span className={`relative inline-block ${className}`}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
+          if (!open && triggerRef.current) {
+            const rect = triggerRef.current.getBoundingClientRect();
+            setOpenLeftward(rect.left + DROPDOWN_WIDTH_PX > window.innerWidth);
+          }
           setOpen((v) => !v);
         }}
         className="underline decoration-dotted decoration-steel/50 underline-offset-4 hover:decoration-rust focus:outline-none"
@@ -110,7 +126,11 @@ export function SwappableTerm({
             }}
             aria-hidden="true"
           />
-          <div className="absolute z-30 top-full left-0 mt-1 bg-graphite border border-steel/30 py-1 min-w-[110px] shadow-lg">
+          <div
+            className={`absolute z-30 top-full mt-1 bg-graphite border border-steel/30 py-1 min-w-[110px] shadow-lg ${
+              openLeftward ? "right-0" : "left-0"
+            }`}
+          >
             <button
               type="button"
               onClick={pickDefault}
