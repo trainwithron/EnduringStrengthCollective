@@ -4,7 +4,6 @@ import { createServerClient } from "@/lib/supabase/server";
 import { NewProgramForm } from "@/components/coach/new-program-form";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ImportWizard } from "@/components/coach/desktop/import-wizard";
-import { AiExtractionGuide } from "@/components/coach/desktop/ai-extraction-guide";
 
 export default async function NewProgramPage(
   props: {
@@ -133,7 +132,6 @@ export default async function NewProgramPage(
             initialLibrary={libraryRows ?? []}
             initialAliases={(aliasRows ?? []).map((a) => ({ rawName: a.raw_name, exerciseName: a.exercise_name }))}
           />
-          <AiExtractionGuide />
         </>
       )}
     </CoachDesktopShell>
