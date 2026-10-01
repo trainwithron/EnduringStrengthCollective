@@ -9,6 +9,7 @@ import {
 } from "@/lib/revenue-splits";
 import { duplicateProgram } from "@/lib/program-duplication";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatch";
+import { LIFT_OFF_MONTHLY_CREDITS } from "@/lib/coach-credits";
 import type Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -319,6 +320,55 @@ export async function POST(request: Request) {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
+
+        // credit_topup_low_tier_monetization_idea.md — a coach buying
+        // their OWN credits/Lift Off, genuinely separate metadata shape
+        // from the athlete_id/group_id client-billing path below. Lift
+        // Off's actual credit grant happens in invoice.paid (every cycle,
+        // including the first) — this branch only ever records the
+        // subscription's existence/status, never grants credits itself,
+        // matching the exact same split already used for the client-
+        // billing membership_subscriptions flow below.
+        const purchaseKind = session.metadata?.purchase_kind;
+        if (purchaseKind === "coach_credit_pack" || purchaseKind === "coach_lift_off") {
+          const coachId = session.metadata?.coach_id;
+          if (!coachId) break;
+
+          if (purchaseKind === "coach_credit_pack") {
+            const credits = Number(session.metadata?.credits ?? 0);
+            if (credits <= 0) break;
+
+            const { error: insertError } = await supabase.from("coach_credit_purchases").insert({
+              stripe_event_id: event.id,
+              stripe_checkout_session_id: session.id,
+              coach_id: coachId,
+              credits_purchased: credits,
+              amount_cents: session.amount_total ?? 0,
+            });
+            if (insertError) {
+              if (insertError.code === "23505") break; // already processed this event
+              throw insertError;
+            }
+
+            const { error: rpcError } = await supabase.rpc("adjust_coach_credits", {
+              p_coach_id: coachId,
+              p_delta: credits,
+            });
+            if (rpcError) throw rpcError;
+          } else if (typeof session.subscription === "string") {
+            await supabase.from("lift_off_subscriptions").upsert(
+              {
+                coach_id: coachId,
+                stripe_subscription_id: session.subscription,
+                status: "active",
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: "coach_id" }
+            );
+          }
+          break;
+        }
+
         const athleteId = session.metadata?.athlete_id;
         const groupId = session.metadata?.group_id;
         const coachPackageId = session.metadata?.coach_package_id ?? null;
@@ -452,6 +502,32 @@ export async function POST(request: Request) {
         if (!subscriptionId) break;
 
         const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+
+        // Lift Off's own recurring grant — every cycle including the
+        // first, same idempotent-insert-then-RPC shape as the
+        // client-billing subscription grant below.
+        if (subscription.metadata?.purchase_kind === "coach_lift_off") {
+          const coachId = subscription.metadata?.coach_id;
+          if (!coachId) break;
+
+          const { error: grantError } = await supabase.from("lift_off_credit_grants").insert({
+            stripe_event_id: event.id,
+            coach_id: coachId,
+            credits_granted: LIFT_OFF_MONTHLY_CREDITS,
+          });
+          if (grantError) {
+            if (grantError.code === "23505") break; // already processed this event
+            throw grantError;
+          }
+
+          const { error: rpcError } = await supabase.rpc("adjust_coach_credits", {
+            p_coach_id: coachId,
+            p_delta: LIFT_OFF_MONTHLY_CREDITS,
+          });
+          if (rpcError) throw rpcError;
+          break;
+        }
+
         const athleteId = subscription.metadata?.athlete_id;
         const groupId = subscription.metadata?.group_id;
         const coachPackageId = subscription.metadata?.coach_package_id ?? null;
@@ -534,6 +610,32 @@ export async function POST(request: Request) {
       case "customer.subscription.paused":
       case "customer.subscription.resumed": {
         const subscription = event.data.object as Stripe.Subscription;
+
+        if (subscription.metadata?.purchase_kind === "coach_lift_off") {
+          const coachId = subscription.metadata?.coach_id;
+          if (!coachId) break;
+          const LIFT_OFF_STATUSES = ["active", "past_due", "canceled", "incomplete"] as const;
+          const liftOffStatus =
+            event.type === "customer.subscription.deleted"
+              ? "canceled"
+              : (LIFT_OFF_STATUSES as readonly string[]).includes(subscription.status)
+                ? (subscription.status as (typeof LIFT_OFF_STATUSES)[number])
+                : null;
+          if (!liftOffStatus) break;
+          const liftOffPeriodEndUnix = subscription.items.data[0]?.current_period_end;
+          await supabase.from("lift_off_subscriptions").upsert(
+            {
+              coach_id: coachId,
+              stripe_subscription_id: subscription.id,
+              status: liftOffStatus,
+              current_period_end: liftOffPeriodEndUnix ? new Date(liftOffPeriodEndUnix * 1000).toISOString() : null,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "coach_id" }
+          );
+          break;
+        }
+
         const athleteId = subscription.metadata?.athlete_id;
         const groupId = subscription.metadata?.group_id;
         if (!athleteId || !groupId) break;

@@ -8,9 +8,11 @@ import { TransferOwnershipButton } from "@/components/coach/desktop/transfer-own
 import { WorkoutCardBackgroundSettings } from "@/components/coach/desktop/workout-card-background-settings";
 import { DispatchSettings } from "@/components/coach/desktop/dispatch-settings";
 import { ClientTagManager } from "@/components/coach/desktop/client-tag-manager";
+import { TerminologySettingsPanel } from "@/components/coach/desktop/terminology-settings-panel";
+import { CoachCreditsPanel } from "@/components/coach/desktop/coach-credits-panel";
 import type { ButtonShape, DisplayFont, BodyFont } from "@/lib/theme";
 
-type OrgTab = "team" | "branding" | "workout-card" | "tags" | "dispatch";
+type OrgTab = "team" | "branding" | "workout-card" | "tags" | "dispatch" | "terminology" | "credits";
 
 export default async function BrandingPage(
   props: {
@@ -29,7 +31,11 @@ export default async function BrandingPage(
           ? "tags"
           : searchParams.tab === "dispatch"
             ? "dispatch"
-            : "team";
+            : searchParams.tab === "terminology"
+              ? "terminology"
+              : searchParams.tab === "credits"
+                ? "credits"
+                : "team";
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -115,6 +121,18 @@ export default async function BrandingPage(
     gatesRevenueSplit: t.gates_revenue_split,
   }));
 
+  // credit_topup_low_tier_monetization_idea.md — scoped to THIS coach
+  // (user.id), never the org: a coach's AI credits are their own
+  // personal purchase from the platform, not shared across an org's
+  // other coaches the way branding/tags are.
+  const [{ data: creditsRow }, { data: liftOffRow }] = await Promise.all([
+    supabase.from("coach_credits").select("balance, ai_access_mode").eq("coach_id", user.id).maybeSingle(),
+    supabase.from("lift_off_subscriptions").select("status").eq("coach_id", user.id).maybeSingle(),
+  ]);
+  const coachCreditBalance = creditsRow?.balance ?? 0;
+  const coachCreditsUnlimited = creditsRow?.ai_access_mode === "unlimited";
+  const liftOffActive = liftOffRow?.status === "active";
+
   const isOwner = orgMembership.role === "owner";
   const isOwnerOrAdmin = orgMembership.role === "owner" || orgMembership.role === "admin";
   const basePath = `/groups/${params.groupId}/branding`;
@@ -174,6 +192,22 @@ export default async function BrandingPage(
             Trainer Dispatch
           </Link>
         )}
+        <Link
+          href={`${basePath}?tab=terminology`}
+          className={`h-9 px-4 flex items-center font-body text-sm border ${
+            tab === "terminology" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
+          }`}
+        >
+          What You Call Things
+        </Link>
+        <Link
+          href={`${basePath}?tab=credits`}
+          className={`h-9 px-4 flex items-center font-body text-sm border ${
+            tab === "credits" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
+          }`}
+        >
+          Credits
+        </Link>
       </div>
 
       {tab === "team" ? (
@@ -244,6 +278,15 @@ export default async function BrandingPage(
             Only owners and admins can manage trainer dispatch.
           </p>
         )
+      ) : tab === "terminology" ? (
+        <TerminologySettingsPanel />
+      ) : tab === "credits" ? (
+        <CoachCreditsPanel
+          groupId={params.groupId}
+          balance={coachCreditBalance}
+          unlimited={coachCreditsUnlimited}
+          liftOffActive={liftOffActive}
+        />
       ) : !isOwner ? (
         <p className="font-body text-sm text-steel">
           Only {org?.name ?? "the organization"}&apos;s owner can change branding.
