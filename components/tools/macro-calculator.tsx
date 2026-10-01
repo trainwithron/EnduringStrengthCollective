@@ -71,7 +71,7 @@ export function MacroCalculator({
             type="number"
             value={weight}
             onChange={(e) => setWeight(e.target.value)}
-            className="h-10 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
+            className="w-full min-w-0 h-10 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
           />
         </label>
         <label className="flex flex-col gap-1">
@@ -83,7 +83,7 @@ export function MacroCalculator({
             step="0.1"
             value={proteinPerLb}
             onChange={(e) => setProteinPerLb(e.target.value)}
-            className="h-10 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
+            className="w-full min-w-0 h-10 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
           />
         </label>
       </div>
@@ -93,7 +93,7 @@ export function MacroCalculator({
         <select
           value={activity}
           onChange={(e) => setActivity(e.target.value as ActivityLevel)}
-          className="h-10 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
+          className="w-full min-w-0 h-10 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
         >
           {ACTIVITY_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>
@@ -108,7 +108,7 @@ export function MacroCalculator({
         <select
           value={goal}
           onChange={(e) => setGoal(e.target.value as MacroGoal)}
-          className="h-10 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
+          className="w-full min-w-0 h-10 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
         >
           {GOAL_OPTIONS.map((o) => (
             <option key={o.value} value={o.value}>

@@ -15,10 +15,13 @@ interface SavedPlanShape {
   meals: Record<string, unknown>;
 }
 
-// Combines the Macro Calculator with the Meal Planner on the client
-// profile page so a coach can compute a target and hand it straight to
-// the planner without retyping anything — the "Use these macros" button
-// below flows through this shared state.
+// One coherent "Meal Planner" flow, not two stacked tools (real layout
+// feedback from Ron, from a screenshot of this exact page): the
+// calculator is Step 1, collapsing to a one-line summary once it's been
+// run — same collapse pattern MacroCalculator's own "Finding your real
+// maintenance" sub-section already uses — and its output feeds straight
+// into Step 2 (the planner) below via the existing importedMacros wiring,
+// no retyping.
 export function NutritionTools({
   athleteId,
   groupId,
@@ -35,24 +38,47 @@ export function NutritionTools({
   existingPlan: SavedPlanShape | null;
 }) {
   const [importedMacros, setImportedMacros] = useState<ImportedMacros | null>(null);
+  const [calculatorExpanded, setCalculatorExpanded] = useState(true);
 
   function handleUseMacros(macros: CalculatedMacros) {
     setImportedMacros({ ...macros, key: Date.now() });
+    setCalculatorExpanded(false);
   }
 
   return (
-    <div className="space-y-8">
-      <div id="macro-calculator">
-        <h3 className="font-body text-xs text-steel uppercase tracking-wide mb-3">
-          Macro calculator
-        </h3>
-        <MacroCalculator onUseMacros={handleUseMacros} />
+    <div className="space-y-6">
+      <h3 className="font-body text-xs text-steel uppercase tracking-wide">Meal planner</h3>
+
+      <div id="macro-calculator" className="border border-steel/20">
+        <button
+          type="button"
+          onClick={() => setCalculatorExpanded((v) => !v)}
+          className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left"
+        >
+          <span className="font-body text-sm font-medium text-chalk shrink-0">
+            Step 1 — Macro Calculator
+          </span>
+          <span className="font-body text-xs text-steel flex items-center gap-2 min-w-0">
+            {importedMacros && (
+              <span className="truncate">
+                {importedMacros.calories} cal · {importedMacros.protein}p · {importedMacros.carbs}c ·{" "}
+                {importedMacros.fats}f
+              </span>
+            )}
+            <span className="shrink-0">{calculatorExpanded ? "▾" : "▸"}</span>
+          </span>
+        </button>
+        {calculatorExpanded && (
+          <div className="px-4 pb-4 border-t border-steel/15 pt-4">
+            <MacroCalculator onUseMacros={handleUseMacros} />
+          </div>
+        )}
       </div>
 
-      <div className="pt-6 border-t border-steel/20">
-        <h3 className="font-body text-xs text-steel uppercase tracking-wide mb-3">
-          Meal planner
-        </h3>
+      <div>
+        <p className="font-body text-xs text-steel uppercase tracking-wide mb-3">
+          Step 2 — Generate the plan
+        </p>
         <MealPlanGenerator
           athleteId={athleteId}
           groupId={groupId}
