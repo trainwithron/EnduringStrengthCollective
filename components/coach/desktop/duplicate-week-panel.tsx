@@ -9,6 +9,7 @@ import {
   generateDoubleProgression,
   generateUndulatingProgression,
   generateIntervalProgression,
+  generatePercentTrainingMaxProgression,
   parseNumericPaceSecondsPerUnit,
   formatPaceSecondsToClock,
   DEFAULT_UNDULATING_WAVE,
@@ -18,7 +19,7 @@ import {
 } from "@/lib/progression-models";
 import { useSaveToastChannel } from "./save-toast-channel";
 
-type Model = "linear" | "double" | "undulating";
+type Model = "linear" | "double" | "undulating" | "percent_tm";
 type IntervalAxis = "rounds" | "rest" | "work";
 
 // An interval exercise (Time + Rest tracked) progresses at the exercise
@@ -56,6 +57,7 @@ function isPlainInteger(text: string | null): boolean {
 export function DuplicateWeekPanel({
   programId,
   groupId,
+  athleteId,
   sourceWeekNumber,
   sourceDays,
   existingWeekNumbers,
@@ -63,6 +65,12 @@ export function DuplicateWeekPanel({
 }: {
   programId: string;
   groupId: string;
+  // disconnected_sibling_tools_ux_audit_sept30.md — the confirmed "%TM
+  // dup" gap. null for a shared group program (no single athlete to
+  // resolve a training max against) — the "% of training max" model is
+  // hidden entirely in that case, same reasoning already used to hide
+  // Assign-to-Client/Duplicate inside an embedded builder.
+  athleteId: string | null;
   sourceWeekNumber: number;
   sourceDays: BuilderDay[];
   existingWeekNumbers: number[];
@@ -74,6 +82,7 @@ export function DuplicateWeekPanel({
   const [weeks, setWeeks] = useState("3");
   const [linearWeightPct, setLinearWeightPct] = useState("2.5");
   const [doubleWeightBumpPct, setDoubleWeightBumpPct] = useState("5");
+  const [percentTmCycle, setPercentTmCycle] = useState("");
   const [wave, setWave] = useState<UndulatingWaveStep[]>(DEFAULT_UNDULATING_WAVE);
   const [intervalAxis, setIntervalAxis] = useState<IntervalAxis>("rounds");
   const [intervalAmountPerWeek, setIntervalAmountPerWeek] = useState("1");
@@ -97,6 +106,36 @@ export function DuplicateWeekPanel({
     const weekCount = Number(weeks);
     if (!weekCount || weekCount < 1) return;
     setGenerating(true);
+
+    const supabase = createBrowserClient();
+
+    // "% of training max" — resolved once, up front, never invented: an
+    // exercise with no persisted athlete_training_maxes row just falls
+    // through to leaving its source weight unchanged below (same "skip
+    // rather than guess" rule lib/progressions.ts's own
+    // wave_from_training_max resolution already follows).
+    let trainingMaxByExercise = new Map<string, number>();
+    if (model === "percent_tm" && athleteId) {
+      const exerciseNames = Array.from(
+        new Set(
+          sourceDays.flatMap((d) =>
+            d.items.filter((i): i is BuilderItem & { kind: "exercise" } => i.kind === "exercise").map((i) => i.exerciseName)
+          )
+        )
+      );
+      if (exerciseNames.length > 0) {
+        const { data: tmRows } = await supabase
+          .from("athlete_training_maxes")
+          .select("exercise_name, estimated_max")
+          .eq("athlete_id", athleteId)
+          .in("exercise_name", exerciseNames);
+        trainingMaxByExercise = new Map((tmRows ?? []).map((r) => [r.exercise_name, r.estimated_max]));
+      }
+    }
+    const percentTmValues = percentTmCycle
+      .split(",")
+      .map((s) => parseFloat(s.trim()))
+      .filter((n) => Number.isFinite(n));
 
     const startingWeek =
       existingWeekNumbers.length > 0 ? Math.max(...existingWeekNumbers) + 1 : sourceWeekNumber + 1;
@@ -235,6 +274,17 @@ export function DuplicateWeekPanel({
               weeks: weekCount,
               weightBumpPct: Number(doubleWeightBumpPct) || 0,
             });
+          } else if (model === "percent_tm") {
+            const trainingMax = !isDistancePace ? trainingMaxByExercise.get(item.exerciseName) : undefined;
+            if (trainingMax != null && percentTmValues.length > 0) {
+              const weights = generatePercentTrainingMaxProgression(trainingMax, percentTmValues, weekCount);
+              results = weights.map((w) => ({ weight: w, reps: source.reps }));
+            } else {
+              // No real training max for this exercise, or nothing typed
+              // in yet — never invent a number; leave this exercise's
+              // weight exactly as the source week had it.
+              results = Array.from({ length: weekCount }, () => ({ weight: source.weight, reps: source.reps }));
+            }
           } else {
             results = generateUndulatingProgression(source, { weeks: weekCount, wave });
           }
@@ -294,7 +344,6 @@ export function DuplicateWeekPanel({
       }
     }
 
-    const supabase = createBrowserClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -589,7 +638,11 @@ export function DuplicateWeekPanel({
       )}
 
       <div className="flex gap-1">
-        {(["linear", "double", "undulating"] as Model[]).map((m) => (
+        {(
+          athleteId
+            ? (["linear", "double", "undulating", "percent_tm"] as Model[])
+            : (["linear", "double", "undulating"] as Model[])
+        ).map((m) => (
           <button
             key={m}
             type="button"
@@ -598,7 +651,13 @@ export function DuplicateWeekPanel({
               model === m ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
             }`}
           >
-            {m === "linear" ? "Linear" : m === "double" ? "Double Progression" : "Undulating"}
+            {m === "linear"
+              ? "Linear"
+              : m === "double"
+                ? "Double Progression"
+                : m === "undulating"
+                  ? "Undulating"
+                  : "% of Training Max"}
           </button>
         ))}
       </div>
@@ -630,6 +689,27 @@ export function DuplicateWeekPanel({
             (needs a rep range set on each exercise)
           </span>
         </label>
+      )}
+
+      {model === "percent_tm" && (
+        <div className="space-y-2">
+          <label className="flex items-center gap-2">
+            <span className="font-body text-xs text-steel w-40">Weekly % of training max</span>
+            <input
+              type="text"
+              value={percentTmCycle}
+              onChange={(e) => setPercentTmCycle(e.target.value)}
+              placeholder="e.g. 70, 75, 80"
+              className="flex-1 h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
+            />
+          </label>
+          <p className="font-body text-[11px] text-steel">
+            One value per week — repeats from the start if there are more weeks than values. Reps
+            stay as the source week set them (combine with the class-rep cycle below to vary those
+            too). An exercise with no real training max logged for this client keeps its source
+            weight unchanged rather than guessing.
+          </p>
+        </div>
       )}
 
       {model === "undulating" && (

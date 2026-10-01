@@ -110,6 +110,29 @@ export function generateUndulatingProgression(
   return results;
 }
 
+// disconnected_sibling_tools_ux_audit_sept30.md — the confirmed "%TM dup"
+// gap: Program Builder's duplicate-with-progression panel had no
+// connection to an athlete's real training max at all. This is the pure
+// math half (weight only, reps carried through unchanged by the caller,
+// same "percent models don't touch reps" split as undulating above) —
+// the caller resolves the real `trainingMax` number from
+// athlete_training_maxes first (never invented here), then hands it in.
+// `percentPerWeek` cycles the same way a class rep cycle already does
+// elsewhere in this same panel (fewer values than weeks repeats from the
+// start) — a coach types "70, 75, 80" once, not one box per week.
+export function generatePercentTrainingMaxProgression(
+  trainingMax: number,
+  percentPerWeek: number[],
+  weeks: number
+): number[] {
+  const result: number[] = [];
+  for (let i = 0; i < weeks; i++) {
+    const pct = percentPerWeek[i % percentPerWeek.length];
+    result.push(roundToIncrement(trainingMax * (pct / 100)));
+  }
+  return result;
+}
+
 // Interval/energy-system progression — a genuinely different shape than
 // lifting's percentage-based weight compounding: a coach thinks in
 // "add a round" or "cut 5 seconds of rest," not "+2.5%." A fixed

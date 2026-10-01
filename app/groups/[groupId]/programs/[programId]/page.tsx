@@ -274,6 +274,7 @@ async function CoachProgramBuilder({
       <ProgramBuilderDesktop
         programId={programId}
         groupId={groupId}
+        athleteId={data.athleteId}
         programName={data.programName}
         programDescription={data.programDescription}
         aiSequencingNotes={data.aiSequencingNotes}

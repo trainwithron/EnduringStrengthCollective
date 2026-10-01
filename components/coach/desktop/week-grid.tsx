@@ -18,6 +18,7 @@ export function WeekGrid({
   days,
   programId,
   groupId,
+  athleteId,
   exerciseLibrary,
   exerciseAliases,
   exerciseTierByName,
@@ -36,6 +37,7 @@ export function WeekGrid({
   days: BuilderDay[];
   programId: string;
   groupId: string;
+  athleteId: string | null;
   exerciseLibrary: string[];
   exerciseAliases: AliasEntry[];
   exerciseTierByName: Record<string, "A" | "B" | "C" | null>;
@@ -252,6 +254,7 @@ export function WeekGrid({
         <DuplicateWeekPanel
           programId={programId}
           groupId={groupId}
+          athleteId={athleteId}
           sourceWeekNumber={weekNumber}
           sourceDays={days}
           existingWeekNumbers={existingWeekNumbers}

@@ -21,6 +21,7 @@ import { REST_TEMPO_SUGGESTIONS, type TrainingIntent } from "@/lib/training-inte
 export function ProgramBuilderDesktop({
   programId,
   groupId,
+  athleteId,
   programName,
   programDescription,
   aiSequencingNotes,
@@ -39,6 +40,12 @@ export function ProgramBuilderDesktop({
 }: {
   programId: string;
   groupId: string;
+  // disconnected_sibling_tools_ux_audit_sept30.md — null for a shared
+  // group program (no single athlete to resolve a training max
+  // against); set for a personal per-client copy. Threaded down to
+  // WeekGrid/DuplicateWeekPanel so "% of training max" can query a real
+  // athlete_training_maxes row instead of having no athlete context.
+  athleteId: string | null;
   programName: string;
   programDescription: string | null;
   // Only set for an AI-generated program — the "Ask the AI" why/correct
@@ -287,6 +294,7 @@ export function ProgramBuilderDesktop({
             days={days.filter((d) => d.weekNumber === wn)}
             programId={programId}
             groupId={groupId}
+            athleteId={athleteId}
             exerciseLibrary={exerciseLibrary}
             exerciseAliases={exerciseAliases}
             exerciseTierByName={exerciseTierByName}

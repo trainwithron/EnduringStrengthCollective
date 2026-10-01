@@ -8,7 +8,25 @@ import {
   parseNumericPaceSecondsPerUnit,
   formatPaceSecondsToClock,
   DEFAULT_UNDULATING_WAVE,
+  generatePercentTrainingMaxProgression,
 } from "./progression-models";
+
+describe("generatePercentTrainingMaxProgression", () => {
+  it("computes weight at each week's percent, rounded to the nearest plate increment", () => {
+    const result = generatePercentTrainingMaxProgression(300, [70, 75, 80], 3);
+    expect(result).toEqual([210, 225, 240]);
+  });
+
+  it("cycles the percent list when there are more weeks than percents", () => {
+    const result = generatePercentTrainingMaxProgression(200, [70, 80], 4);
+    expect(result).toEqual([140, 160, 140, 160]);
+  });
+
+  it("handles a single percent applied to every week", () => {
+    const result = generatePercentTrainingMaxProgression(100, [85], 2);
+    expect(result).toEqual([85, 85]);
+  });
+});
 
 describe("roundToIncrement", () => {
   it("rounds to the nearest 2.5 by default", () => {

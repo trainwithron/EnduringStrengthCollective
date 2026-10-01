@@ -103,6 +103,7 @@ export function EmbeddedProgramBuilder({ groupId }: { groupId: string }) {
       <ProgramBuilderDesktop
         programId={data.programId}
         groupId={data.groupId}
+        athleteId={data.athleteId}
         programName={data.programName}
         programDescription={data.programDescription}
         aiSequencingNotes={data.aiSequencingNotes}

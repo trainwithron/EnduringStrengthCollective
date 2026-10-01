@@ -19,6 +19,14 @@ import type { MovementPatternOption } from "@/components/coach/exercise-builder-
 export interface ProgramBuilderData {
   groupId: string;
   groupName: string;
+  // disconnected_sibling_tools_ux_audit_sept30.md's confirmed "%TM dup"
+  // gap — null for a shared group program (no single athlete to resolve
+  // a training max against); set for a personal per-client copy
+  // (programs.athlete_id, 0065_per_client_programs.sql). Threaded down
+  // to DuplicateWeekPanel so its "% of training max" option can query
+  // athlete_training_maxes for a real number instead of having no
+  // athlete context at all.
+  athleteId: string | null;
   programId: string;
   programName: string;
   programDescription: string | null;
@@ -44,7 +52,9 @@ export async function getProgramBuilderData(
 ): Promise<ProgramBuilderData | null> {
   const { data: program } = await supabase
     .from("programs")
-    .select("id, name, description, start_date, training_days, visibility_window, ai_sequencing_notes, training_intent")
+    .select(
+      "id, name, description, start_date, training_days, visibility_window, ai_sequencing_notes, training_intent, athlete_id"
+    )
     .eq("id", programId)
     .eq("group_id", groupId)
     .maybeSingle();
@@ -194,6 +204,7 @@ export async function getProgramBuilderData(
   return {
     groupId,
     groupName: group?.name ?? "Coaching",
+    athleteId: program.athlete_id,
     programId,
     programName: program.name,
     programDescription: program.description,
