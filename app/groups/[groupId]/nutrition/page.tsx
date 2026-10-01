@@ -390,26 +390,14 @@ export default async function NutritionPage(
               Weekly check-in
             </h2>
             {latestCheckin ? (
+              // The actual target numbers already render once, above, in
+              // "Today's targets" — a check-in applies straight to
+              // daily_macros, so repeating them here was a duplicate, not
+              // a second signal. This card's real, non-duplicate value is
+              // the *reasoning* behind the current target and when it was
+              // set.
               <div className="border border-steel/20 p-4 space-y-3">
                 <p className="font-body text-sm text-chalk">{latestCheckin.rationale}</p>
-                <div className="grid grid-cols-4 gap-2 text-center">
-                  <div>
-                    <p className="font-display text-lg leading-none">{latestCheckin.new_calories}</p>
-                    <p className="font-body text-[10px] text-steel uppercase mt-1">Kcal</p>
-                  </div>
-                  <div>
-                    <p className="font-display text-lg leading-none">{latestCheckin.protein_g}</p>
-                    <p className="font-body text-[10px] text-steel uppercase mt-1">Protein</p>
-                  </div>
-                  <div>
-                    <p className="font-display text-lg leading-none">{latestCheckin.carbs_g}</p>
-                    <p className="font-body text-[10px] text-steel uppercase mt-1">Carbs</p>
-                  </div>
-                  <div>
-                    <p className="font-display text-lg leading-none">{latestCheckin.fat_g}</p>
-                    <p className="font-body text-[10px] text-steel uppercase mt-1">Fat</p>
-                  </div>
-                </div>
                 <p className="font-body text-[11px] text-steel pt-2 border-t border-steel/15">
                   {new Date(latestCheckin.created_at).toLocaleDateString("en-US", {
                     month: "short",
