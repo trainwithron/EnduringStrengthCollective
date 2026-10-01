@@ -60,6 +60,12 @@ export default async function MacroCalculatorPage(
           </p>
         </div>
         <MacroCalculator />
+        <Link
+          href={`/groups/${params.groupId}/nutrition`}
+          className="inline-block mt-6 font-body text-sm text-rust"
+        >
+          Open the Meal Planner to build a plan from these macros &rarr;
+        </Link>
       </CoachDesktopShell>
     );
   }
@@ -106,6 +112,12 @@ export default async function MacroCalculatorPage(
 
       <section className="px-5 pt-6">
         <MacroCalculator initialWeight={latestWeightRow?.weight ?? null} />
+        <Link
+          href={`/groups/${params.groupId}/nutrition`}
+          className="inline-block mt-6 font-body text-sm text-rust"
+        >
+          Open Nutrition to build a meal plan from these macros &rarr;
+        </Link>
       </section>
 
       <BottomTabBar groupId={params.groupId} activeOverride="settings" />
