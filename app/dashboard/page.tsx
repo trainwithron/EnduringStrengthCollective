@@ -24,6 +24,7 @@ import {
   type CollectiveIntelligenceItem,
 } from "@/components/coach/desktop/collective-intelligence-panel";
 import { StuckDesktopModeBanner } from "@/components/coach/desktop/stuck-desktop-mode-banner";
+import { TerminologyFirstRunCard } from "@/components/coach/desktop/terminology-first-run-card";
 
 interface GroupRow {
   id: string;
@@ -469,6 +470,8 @@ export default async function CoachHomePage() {
         <h1 className="font-display font-bold text-2xl uppercase">Home</h1>
         <MarkAllSeenButton groupIds={allGroupIds} />
       </div>
+
+      {allGroups[0] && <TerminologyFirstRunCard groupId={allGroups[0].id} />}
 
       <div className="mb-6">
         <DashboardHero flag={dashboardData.heroFlag} emptyState={dashboardData.heroEmptyState} />

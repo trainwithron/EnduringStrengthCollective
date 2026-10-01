@@ -36,6 +36,7 @@ import {
   PanelLeft,
   SlidersHorizontal,
   Lightbulb,
+  Calculator,
 } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
@@ -497,6 +498,7 @@ export function CoachDesktopShell({
       items: [
         { key: "recipes", label: "Recipe Hub", href: `/groups/${groupId}/recipes`, icon: ChefHat },
         { key: "nutrition", label: "Meal Plans", href: `/groups/${groupId}/nutrition`, icon: Salad },
+        { key: "tools", label: "Macro Calculator", href: `/groups/${groupId}/tools/macro-calculator`, icon: Calculator },
       ],
     },
     ...(teamMode

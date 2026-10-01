@@ -8,12 +8,21 @@ interface ChatMessage {
   body: string;
 }
 
-// AI Assistant Phase 2 — the Collective Intelligence conversational chat
+// AI Assistant Phase 2 — the conversational chat companion to the
+// Collective Intelligence daily briefing panel
 // (collective_intelligence_phase_2_conversational_assistant.md). "A
 // floating chat, alongside the dashboard cards" — general questions stay
 // here, don't navigate anywhere. No streaming (resolved deliberately): the
 // numeral/name guards have to see the whole answer before the coach does,
 // so a brief "Checking…" state stands in for a live-typing effect.
+//
+// User-facing name is "Ask Spot," not "Collective Intelligence"
+// (feature_redundancy_and_could_work_better_audit_sept29.md) — this is a
+// different, pull-based mechanism (a coach asks a question) from the
+// push-based daily digest panel, which keeps the locked "Collective
+// Intelligence" name (ai_assistant_marketing_deep_dive.md). Reuses the
+// app's own already-established "Spot" assistant branding rather than
+// inventing a new term, so the two surfaces stop sharing one name.
 export function CollectiveIntelligenceChat() {
   const [open, setOpen] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
@@ -60,7 +69,7 @@ export function CollectiveIntelligenceChat() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-label={open ? "Close Collective Intelligence chat" : "Open Collective Intelligence chat"}
+        aria-label={open ? "Close Ask Spot chat" : "Open Ask Spot chat"}
         className="hidden lg:flex fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full bg-rust text-graphite items-center justify-center shadow-lg active:opacity-80"
       >
         {open ? <X className="w-6 h-6" /> : <MessageCircle className="w-6 h-6" />}
@@ -70,7 +79,7 @@ export function CollectiveIntelligenceChat() {
         <div className="fixed bottom-24 right-6 z-40 w-[360px] max-w-[calc(100vw-3rem)] h-[480px] bg-graphite border border-steel/30 shadow-2xl flex flex-col">
           <div className="px-4 py-3 border-b border-steel/20">
             <p className="font-body text-[10px] text-steel uppercase tracking-wide font-bold">
-              Collective Intelligence
+              Ask Spot
             </p>
             <p className="font-body text-[11px] text-steel mt-0.5">Ask about a specific client or exercise.</p>
           </div>

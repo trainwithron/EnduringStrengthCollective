@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { actAsSelfInGroup } from "@/lib/act-as-self";
 import { X, Search, Dumbbell } from "lucide-react";
 import { clientActivityStatus } from "@/lib/client-activity-status";
 import { computeQuietTier, QUIET_TIER_LABEL } from "@/lib/quiet-client-tier";
@@ -158,26 +159,21 @@ export function ViewAsClientPicker({ onClose }: { onClose: () => void }) {
   }
 
   async function logMyOwnWorkout() {
-    const supabase = createBrowserClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
     const groups = myGroups ?? [];
     if (groups.length === 1) {
-      await actAs(user.id, groups[0].groupId);
+      await selectOwnGroup(groups[0].groupId);
       return;
     }
     setPickingOwnGroup(true);
   }
 
   async function selectOwnGroup(groupId: string) {
-    const supabase = createBrowserClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
-    await actAs(user.id, groupId);
+    if (switching) return;
+    setSwitching(true);
+    await actAsSelfInGroup(groupId);
+    onClose();
+    router.push(`/groups/${groupId}`);
+    router.refresh();
   }
 
   const filtered = (clients ?? []).filter((c) =>

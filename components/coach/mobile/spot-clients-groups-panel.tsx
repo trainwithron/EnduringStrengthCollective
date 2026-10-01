@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Dumbbell, Plus } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { actAsSelfInGroup } from "@/lib/act-as-self";
 import { clientActivityStatus } from "@/lib/client-activity-status";
 import { computeQuietTier, QUIET_TIER_LABEL } from "@/lib/quiet-client-tier";
 import { initialsOf } from "@/lib/initials";
@@ -171,15 +172,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated }: { groupId: stri
   async function selectOwnGroup(targetGroupId: string) {
     if (busy) return;
     setBusy(true);
-    const supabase = createBrowserClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      setBusy(false);
-      return;
-    }
-    await fetch("/api/coach/act-as", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ athleteId: user.id, groupId: targetGroupId }) });
+    await actAsSelfInGroup(targetGroupId);
     onNavigated();
     router.push(`/groups/${targetGroupId}`);
     router.refresh();
