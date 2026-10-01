@@ -84,7 +84,7 @@ export function NutritionTools({
         </button>
         {calculatorExpanded && (
           <div className="px-4 pb-4 border-t border-steel/15 pt-4">
-            <MacroCalculator onUseMacros={handleUseMacros} />
+            <MacroCalculator onUseMacros={handleUseMacros} initialWeight={latestBodyWeight} />
           </div>
         )}
       </div>

@@ -37,10 +37,15 @@ export interface CalculatedMacros {
 
 export function MacroCalculator({
   onUseMacros,
+  initialWeight,
 }: {
   onUseMacros?: (macros: CalculatedMacros) => void;
+  // Real logged weight (body_weight_logs), when a specific client is in
+  // view — falls back to the old flat 180 guess only when no real data
+  // exists yet, rather than always starting from an arbitrary number.
+  initialWeight?: number | null;
 } = {}) {
-  const [weight, setWeight] = useState("180");
+  const [weight, setWeight] = useState(initialWeight != null ? String(initialWeight) : "180");
   const [activity, setActivity] = useState<ActivityLevel>("moderate");
   const [goal, setGoal] = useState<MacroGoal>("maintain");
   const [proteinPerLb, setProteinPerLb] = useState("1");

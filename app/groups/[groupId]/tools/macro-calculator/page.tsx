@@ -74,6 +74,15 @@ export default async function MacroCalculatorPage(
     actingAsFullName = profile?.full_name ?? "Client";
   }
 
+  const { data: latestWeightRow } = await supabase
+    .from("body_weight_logs")
+    .select("weight")
+    .eq("athlete_id", effective.athleteId)
+    .eq("group_id", params.groupId)
+    .order("logged_date", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
       {effective.isActingAsOther && (
@@ -96,7 +105,7 @@ export default async function MacroCalculatorPage(
       </header>
 
       <section className="px-5 pt-6">
-        <MacroCalculator />
+        <MacroCalculator initialWeight={latestWeightRow?.weight ?? null} />
       </section>
 
       <BottomTabBar groupId={params.groupId} activeOverride="settings" />
