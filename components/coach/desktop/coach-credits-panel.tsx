@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { LIFT_OFF_MONTHLY_CREDITS } from "@/lib/coach-credits";
 
 // credit_topup_low_tier_monetization_idea.md — the coach's own AI
 // credits (program generation, nutrition plans), genuinely separate
@@ -54,7 +55,9 @@ export function CoachCreditsPanel({
           <p className="font-display text-2xl uppercase">{balance} credits</p>
         )}
         {liftOffActive && (
-          <p className="font-body text-xs text-rust mt-1">Lift Off active — 9 credits every month</p>
+          <p className="font-body text-xs text-rust mt-1">
+            Lift Off active — {LIFT_OFF_MONTHLY_CREDITS} credits every month
+          </p>
         )}
       </div>
 
@@ -85,8 +88,9 @@ export function CoachCreditsPanel({
         )}
       </div>
       <p className="font-body text-[11px] text-steel mt-2">
-        Lift Off is a recurring $5/month bundle — 9 credits of AI access every cycle, only
-        available on auto-renew.
+        Lift Off is a recurring $5/month bundle — 1 program, 2 nutrition plans, and 1 overview
+        every cycle ({LIFT_OFF_MONTHLY_CREDITS} credits&apos; worth), only available on
+        auto-renew.
       </p>
     </div>
   );

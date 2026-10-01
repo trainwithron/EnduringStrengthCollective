@@ -7,7 +7,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 export const CREDIT_PACK_PRICE_CENTS = 500;
 export const CREDIT_PACK_CREDITS = 5;
 export const LIFT_OFF_PRICE_CENTS = 500;
-export const LIFT_OFF_MONTHLY_CREDITS = 9;
+// Kept literal to the original promise: 1 program (3) + 2 nutrition
+// plans (3 each = 6) + 1 CI overview (2) = 11. Ron's own direct call
+// 2026-09-30 — bumped from 9 once the nutrition-plan price itself
+// changed from 2 to 3, rather than letting the bundle quietly under-
+// deliver against its own stated components.
+export const LIFT_OFF_MONTHLY_CREDITS = 11;
 
 export const AI_ACTION_COSTS = {
   program_generation: 3,
