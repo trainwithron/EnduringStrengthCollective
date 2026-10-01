@@ -4,6 +4,7 @@ import { runCheckInEngine, DEFAULT_ADJUSTMENT_PCT, type NutritionPhase } from "@
 import { computeWeeklyWeightTrend } from "@/lib/weight-trend";
 import { computeReadinessAverage } from "@/lib/wellness";
 import { computeArchetypeMacros, detectDietArchetype } from "@/lib/macros";
+import { computeBmr, computeTdee } from "@/lib/bmr-tdee";
 
 // Weekly Check-In engine, made proactive (nutrition_checkin_engine_scoping
 // memory) — a coach shouldn't have to remember to open the panel and
@@ -65,7 +66,13 @@ export async function GET(request: Request) {
   const results: { athleteId: string; suggested: boolean }[] = [];
 
   for (const [athleteId, last] of latestByAthlete) {
-    const [{ data: weightLogs }, { data: wellnessRows }] = await Promise.all([
+    const [
+      { data: weightLogs },
+      { data: wellnessRows },
+      { data: injuryStatusRow },
+      { data: profileDetails },
+      { data: intake },
+    ] = await Promise.all([
       supabase
         .from("body_weight_logs")
         .select("logged_date, weight")
@@ -79,6 +86,22 @@ export async function GET(request: Request) {
         .eq("athlete_id", athleteId)
         .eq("group_id", last.group_id)
         .gte("log_date", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)),
+      // coach_em_up_finley_funston_transcript.md — same real
+      // client-safety gap as the two other runCheckInEngine call sites
+      // (WeeklyCheckinPanel, MealPlanGenerator): the automated digest was
+      // never checking this, so an injured client's phase-computed cut
+      // would apply here with no maintenance floor at all.
+      supabase
+        .from("athlete_injury_status")
+        .select("is_injured, surplus_pct")
+        .eq("athlete_id", athleteId)
+        .maybeSingle(),
+      supabase
+        .from("athlete_profile_details")
+        .select("height_cm, biological_sex, body_fat_pct")
+        .eq("athlete_id", athleteId)
+        .maybeSingle(),
+      supabase.from("client_intake").select("date_of_birth").eq("athlete_id", athleteId).maybeSingle(),
     ]);
 
     const trend = computeWeeklyWeightTrend(
@@ -101,6 +124,29 @@ export async function GET(request: Request) {
       recoveryRating = Math.min(5, Math.max(1, Math.round(avg)));
     }
 
+    // Same computeBmr/computeTdee estimate used at every other
+    // runCheckInEngine call site — only computed when every real input
+    // actually exists, never a guessed number backing a safety floor.
+    let maintenanceCalories: number | null = null;
+    if (
+      trend.currentAvg != null &&
+      profileDetails?.height_cm != null &&
+      profileDetails?.biological_sex &&
+      intake?.date_of_birth
+    ) {
+      const ageYears = Math.floor(
+        (Date.now() - new Date(intake.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000)
+      );
+      const bmr = computeBmr({
+        weightKg: trend.currentAvg * 0.453592,
+        heightCm: profileDetails.height_cm,
+        age: ageYears,
+        sex: profileDetails.biological_sex as "male" | "female",
+        bodyFatPct: profileDetails.body_fat_pct ?? null,
+      });
+      maintenanceCalories = computeTdee(bmr, "moderate");
+    }
+
     const engineResult = runCheckInEngine({
       phase: last.phase as NutritionPhase,
       prevWeightLbs: trend.previousAvg,
@@ -110,6 +156,9 @@ export async function GET(request: Request) {
       recoveryRating,
       consecutiveSurplusSpikes: last.consecutive_surplus_spikes,
       adjustmentPct: last.adjustment_pct ?? DEFAULT_ADJUSTMENT_PCT,
+      isInjured: injuryStatusRow?.is_injured ?? false,
+      maintenanceCalories,
+      injurySurplusPct: injuryStatusRow?.surplus_pct ?? 0,
     });
 
     // Only a real, actionable recommendation is worth a coach's

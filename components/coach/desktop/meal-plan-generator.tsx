@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import {
-  computeCheckIn,
   computeCarbCyclingTargets,
   matchFlexTreat,
   generateFullMealPlan,
@@ -18,6 +17,8 @@ import {
   type MealPlanContext,
   type Recipe,
 } from "@/lib/meal-engine";
+import { runCheckInEngine } from "@/lib/nutrition-checkin";
+import { computeArchetypeMacros, detectDietArchetype as detectMacroArchetype } from "@/lib/macros";
 import { fetchCustomRecipes } from "@/lib/custom-recipes";
 import {
   getDatesForWeekdays,
@@ -62,6 +63,13 @@ export function MealPlanGenerator({
   weightTrend,
   existingPlan,
   importedMacros,
+  defaultAdherenceDays,
+  defaultRecoveryRating,
+  defaultDietaryRestrictions,
+  isInjured,
+  maintenanceCalories,
+  injurySurplusPct,
+  initialConsecutiveSurplusSpikes,
 }: {
   athleteId: string;
   groupId: string;
@@ -70,6 +78,19 @@ export function MealPlanGenerator({
   weightTrend?: WeeklyWeightTrend | null;
   existingPlan: SavedPlanShape | null;
   importedMacros?: ImportedMacros | null;
+  // Real data, computed the same way WeeklyCheckinPanel's own identical
+  // props are (defaultRecoveryRating from wellness_checkins,
+  // defaultAdherenceDays from food_log_entries, isInjured/maintenanceCalories/
+  // injurySurplusPct from athlete_injury_status) — all optional so a
+  // caller that doesn't pass them yet sees the same manual-entry
+  // defaults this form already had.
+  defaultAdherenceDays?: number | null;
+  defaultRecoveryRating?: number | null;
+  defaultDietaryRestrictions?: string | null;
+  isInjured?: boolean;
+  maintenanceCalories?: number | null;
+  injurySurplusPct?: number;
+  initialConsecutiveSurplusSpikes?: number;
 }) {
   const router = useRouter();
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -84,17 +105,27 @@ export function MealPlanGenerator({
   );
   const [previousWeight, setPreviousWeight] = useState(weightTrend?.previousAvg?.toString() ?? "");
   const [currentCalories, setCurrentCalories] = useState("");
-  const [adherenceDays, setAdherenceDays] = useState("7");
+  const [adherenceDays, setAdherenceDays] = useState(
+    defaultAdherenceDays != null ? String(defaultAdherenceDays) : "7"
+  );
   const [rateStrength, setRateStrength] = useState("4");
-  const [rateRecovery, setRateRecovery] = useState("4");
+  const [rateRecovery, setRateRecovery] = useState(
+    defaultRecoveryRating != null ? String(defaultRecoveryRating) : "4"
+  );
   const [rateDigestion, setRateDigestion] = useState("5");
   const [rateSatiety, setRateSatiety] = useState("4");
   const [mealCount, setMealCount] = useState("4");
   const [includeSnack, setIncludeSnack] = useState(true);
-  const [dietaryRestrictions, setDietaryRestrictions] = useState("");
+  const [dietaryRestrictions, setDietaryRestrictions] = useState(defaultDietaryRestrictions ?? "");
   const [favoriteFoods, setFavoriteFoods] = useState("");
   const [carbCycling, setCarbCycling] = useState(false);
   const [trainingDays, setTrainingDays] = useState("4");
+  // Hypertrophy-phase running state, carried forward across repeated
+  // runs in this same session — same field runCheckInEngine already
+  // threads through nutrition_checkins via WeeklyCheckinPanel.
+  const [consecutiveSurplusSpikes, setConsecutiveSurplusSpikes] = useState(
+    initialConsecutiveSurplusSpikes ?? 0
+  );
 
   // Results
   const [rationale, setRationale] = useState("");
@@ -159,25 +190,50 @@ export function MealPlanGenerator({
       return;
     }
 
-    const result = computeCheckIn({
+    const engineResult = runCheckInEngine({
       phase,
-      currentWeight: currW,
-      previousWeight: parseFloat(previousWeight) || currW,
+      prevWeightLbs: parseFloat(previousWeight) || currW,
+      currWeightLbs: currW,
       currentCalories: currC,
       adherenceDays: parseInt(adherenceDays, 10) || 7,
-      rateStrength: parseInt(rateStrength, 10) || 4,
-      rateRecovery: parseInt(rateRecovery, 10) || 4,
-      rateDigestion: parseInt(rateDigestion, 10) || 5,
-      rateSatiety: parseInt(rateSatiety, 10) || 4,
-      dietaryRestrictions,
+      recoveryRating: parseInt(rateRecovery, 10) || 4,
+      consecutiveSurplusSpikes,
+      isInjured,
+      maintenanceCalories,
+      injurySurplusPct,
     });
+    setConsecutiveSurplusSpikes(engineResult.consecutiveSurplusSpikes);
 
-    setRationale(result.rationale);
-    setArchetype(result.archetype);
-    setDailyMacros(result.dailyBaseline);
+    // Two different archetype readings, deliberately kept separate: the
+    // 6-way one (meal-engine's own detectDietArchetype) drives recipe/
+    // food-suggestion matching below and is what gets saved/displayed as
+    // "archetype" — the 3-way one (lib/macros.ts, aliased on import) only
+    // ever feeds the macro-split math, matching WeeklyCheckinPanel's own
+    // identical split.
+    const recipeArchetype = detectDietArchetype(dietaryRestrictions);
+    const macroSplit = computeArchetypeMacros(
+      engineResult.newCalories,
+      currW,
+      detectMacroArchetype(dietaryRestrictions)
+    );
+    const dailyBaseline: MacroTargets = {
+      calories: macroSplit.resolvedCalories,
+      protein: macroSplit.proteinG,
+      carbs: macroSplit.carbsG,
+      fats: macroSplit.fatG,
+    };
+
+    setRationale(
+      engineResult.rationale +
+        (engineResult.injuryOverrideApplied
+          ? " [Injury floor applied — calories held up for recovery.]"
+          : "")
+    );
+    setArchetype(recipeArchetype);
+    setDailyMacros(dailyBaseline);
 
     const context = {
-      archetype: result.archetype,
+      archetype: recipeArchetype,
       bioScores: {
         strength: parseInt(rateStrength, 10) || 4,
         recovery: parseInt(rateRecovery, 10) || 4,
@@ -190,10 +246,10 @@ export function MealPlanGenerator({
     };
 
     const nMeals = parseInt(mealCount, 10) || 4;
-    const isCycling = carbCycling && result.archetype !== "carnivore";
+    const isCycling = carbCycling && recipeArchetype !== "carnivore";
 
     if (isCycling) {
-      const { trainingDay, restDay } = computeCarbCyclingTargets(result.dailyBaseline, parseInt(trainingDays, 10) || 4);
+      const { trainingDay, restDay } = computeCarbCyclingTargets(dailyBaseline, parseInt(trainingDays, 10) || 4);
       setTrainMacros(trainingDay);
       setRestMacros(restDay);
       setMealsByView({
@@ -205,11 +261,11 @@ export function MealPlanGenerator({
     } else {
       setTrainMacros(null);
       setRestMacros(null);
-      setMealsByView({ daily: generateFullMealPlan(result.dailyBaseline, nMeals, includeSnack, context, customRecipes), train: [], rest: [] });
+      setMealsByView({ daily: generateFullMealPlan(dailyBaseline, nMeals, includeSnack, context, customRecipes), train: [], rest: [] });
       setDayView("daily");
     }
 
-    const flex = matchFlexTreat(favoriteFoods, result.archetype);
+    const flex = matchFlexTreat(favoriteFoods, recipeArchetype);
     setFlexTreatText(
       flex
         ? `Requested ${flex.treat.name} (~${flex.treat.cals} kcal). Weekly buffer: trim ~${flex.dailyTrimCalories} kcal/day on the other 6 days. Same-day swap: drop ${flex.sameDayCarbDrop}g carbs and ${flex.sameDayFatDrop}g fat that day instead, keeping protein locked in.`

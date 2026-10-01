@@ -29,6 +29,13 @@ export function NutritionTools({
   latestBodyWeight,
   weightTrend,
   existingPlan,
+  defaultAdherenceDays,
+  defaultRecoveryRating,
+  defaultDietaryRestrictions,
+  isInjured,
+  maintenanceCalories,
+  injurySurplusPct,
+  initialConsecutiveSurplusSpikes,
 }: {
   athleteId: string;
   groupId: string;
@@ -36,6 +43,13 @@ export function NutritionTools({
   latestBodyWeight: number | null;
   weightTrend: WeeklyWeightTrend;
   existingPlan: SavedPlanShape | null;
+  defaultAdherenceDays?: number | null;
+  defaultRecoveryRating?: number | null;
+  defaultDietaryRestrictions?: string | null;
+  isInjured?: boolean;
+  maintenanceCalories?: number | null;
+  injurySurplusPct?: number;
+  initialConsecutiveSurplusSpikes?: number;
 }) {
   const [importedMacros, setImportedMacros] = useState<ImportedMacros | null>(null);
   const [calculatorExpanded, setCalculatorExpanded] = useState(true);
@@ -87,6 +101,13 @@ export function NutritionTools({
           weightTrend={weightTrend}
           existingPlan={existingPlan}
           importedMacros={importedMacros}
+          defaultAdherenceDays={defaultAdherenceDays}
+          defaultRecoveryRating={defaultRecoveryRating}
+          defaultDietaryRestrictions={defaultDietaryRestrictions}
+          isInjured={isInjured}
+          maintenanceCalories={maintenanceCalories}
+          injurySurplusPct={injurySurplusPct}
+          initialConsecutiveSurplusSpikes={initialConsecutiveSurplusSpikes}
         />
       </div>
     </div>

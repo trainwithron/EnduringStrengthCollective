@@ -743,6 +743,13 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
           latestBodyWeight={weightLogs?.[0]?.weight ?? null}
           weightTrend={weightTrend}
           existingPlan={existingPlan ?? null}
+          defaultAdherenceDays={defaultAdherenceDays}
+          defaultRecoveryRating={defaultRecoveryRating}
+          defaultDietaryRestrictions={lastCheckin?.dietaryRestrictions ?? null}
+          isInjured={isInjured}
+          maintenanceCalories={maintenanceCalories}
+          injurySurplusPct={injurySurplusPct}
+          initialConsecutiveSurplusSpikes={lastCheckin?.consecutiveSurplusSpikes ?? 0}
         />
       </div>
     </div>

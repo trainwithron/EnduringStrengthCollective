@@ -1305,6 +1305,9 @@ export default async function AthleteProfilePage(
               latestBodyWeight={weightLogs?.[0]?.weight ?? null}
               weightTrend={weightTrend}
               existingPlan={existingPlan ?? null}
+              isInjured={injuryStatusRow?.is_injured ?? false}
+              maintenanceCalories={maintenanceCalories}
+              injurySurplusPct={injuryStatusRow?.surplus_pct ?? 0}
             />
           </section>
         )}
