@@ -11,7 +11,15 @@ export const LIFT_OFF_MONTHLY_CREDITS = 9;
 
 export const AI_ACTION_COSTS = {
   program_generation: 3,
-  nutrition_plan: 2,
+  // Charged once for the whole plan (every meal slot in the current
+  // view), not per meal — Ron's own direct correction 2026-09-30,
+  // updating the original memory's "2 credits" figure.
+  nutrition_plan: 3,
+  // Defined for Lift Off's bundle accounting only — deliberately never
+  // gated. The Collective Intelligence overview has no manual "run it
+  // now" trigger and Ron confirmed (2026-09-30) it should stay that
+  // way permanently: it already runs automatically every night for
+  // everyone, so there's no real coach-initiated action to charge for.
   ci_overview: 2,
 } as const;
 export type AiActionKey = keyof typeof AI_ACTION_COSTS;

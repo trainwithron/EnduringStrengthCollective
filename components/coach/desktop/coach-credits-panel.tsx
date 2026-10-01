@@ -42,9 +42,8 @@ export function CoachCreditsPanel({
   return (
     <div className="max-w-[60ch]">
       <p className="font-body text-sm text-steel mb-4">
-        AI program generation (3 credits), nutrition plan generation (2 credits), and your daily
-        Collective Intelligence overview (2 credits) draw from this balance. Nav and UI help are
-        always free.
+        AI program generation (3 credits) and a full nutrition plan (3 credits, charged once for
+        the whole plan) draw from this balance. Nav and UI help are always free.
       </p>
 
       <div className="border border-steel/20 p-4 mb-4">
@@ -86,8 +85,8 @@ export function CoachCreditsPanel({
         )}
       </div>
       <p className="font-body text-[11px] text-steel mt-2">
-        Lift Off is a recurring $5/month bundle — 1 program, 2 nutrition plans, and 1 overview
-        every cycle (9 credits&apos; worth), only available on auto-renew.
+        Lift Off is a recurring $5/month bundle — 9 credits of AI access every cycle, only
+        available on auto-renew.
       </p>
     </div>
   );

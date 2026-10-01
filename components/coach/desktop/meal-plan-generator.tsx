@@ -119,6 +119,8 @@ export function MealPlanGenerator({
   // AI is unavailable.
   const [aiSuggesting, setAiSuggesting] = useState<Record<string, boolean>>({});
   const [aiError, setAiError] = useState<Record<string, string | null>>({});
+  const [aiSuggestingAll, setAiSuggestingAll] = useState(false);
+  const [aiSuggestAllError, setAiSuggestAllError] = useState<string | null>(null);
 
   // Per-meal-slot "assign this recipe to specific days this week" picker
   // — independent of the full-day Save button below.
@@ -523,6 +525,35 @@ export function MealPlanGenerator({
     }
   }
 
+  // credit_topup_low_tier_monetization_idea.md — nutrition plan
+  // generation is priced as ONE 3-credit charge for the whole plan, not
+  // per meal slot (the existing per-meal "AI Suggest" above stays free,
+  // a personal reroll convenience, not the creditable unit). This hits
+  // a single charge endpoint once, then reuses handleAiSuggest's exact
+  // per-meal fetch/verify/fallback logic for every slot in the current
+  // view — one charge, no duplicated AI-calling logic.
+  async function handleAiSuggestAll() {
+    const currentMeals = mealsByView[dayView];
+    if (aiSuggestingAll || currentMeals.length === 0) return;
+    setAiSuggestingAll(true);
+    setAiSuggestAllError(null);
+    try {
+      const res = await fetch("/api/ai/meal-plan-credit-charge", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setAiSuggestAllError(data.error || "Couldn't process credits.");
+        return;
+      }
+      for (const meal of currentMeals) {
+        await handleAiSuggest(meal);
+      }
+    } catch {
+      setAiSuggestAllError("Couldn't start AI generation — try again.");
+    } finally {
+      setAiSuggestingAll(false);
+    }
+  }
+
   const macros = activeMacros();
   const meals = mealsByView[dayView];
 
@@ -775,6 +806,22 @@ export function MealPlanGenerator({
               <p className="font-display text-lg">{macros.fats}g</p>
               <p className="font-body text-[10px] text-steel uppercase">Fat</p>
             </div>
+          </div>
+
+          <div>
+            <button
+              type="button"
+              disabled={aiSuggestingAll || meals.length === 0}
+              onClick={handleAiSuggestAll}
+              className="h-9 px-4 border border-rust/40 text-rust font-body text-sm disabled:opacity-50"
+            >
+              {aiSuggestingAll ? "Generating full plan…" : "AI Suggest All — 3 credits"}
+            </button>
+            {aiSuggestAllError && (
+              <p className="font-body text-xs text-rust mt-1" role="alert">
+                {aiSuggestAllError}
+              </p>
+            )}
           </div>
 
           <div className="space-y-3">
