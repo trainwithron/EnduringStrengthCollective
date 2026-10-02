@@ -49,16 +49,20 @@ describe("estimateMaintenanceCalories", () => {
 });
 
 describe("applyGoalAdjustment", () => {
-  it("cuts 20% off maintenance for a cut", () => {
-    expect(applyGoalAdjustment(2500, "cut")).toBe(2000);
+  it("cuts 20% off maintenance for fat_loss", () => {
+    expect(applyGoalAdjustment(2500, "fat_loss")).toBe(2000);
   });
 
-  it("leaves maintenance unchanged for maintain", () => {
-    expect(applyGoalAdjustment(2500, "maintain")).toBe(2500);
+  it("leaves maintenance unchanged for maintenance", () => {
+    expect(applyGoalAdjustment(2500, "maintenance")).toBe(2500);
   });
 
-  it("adds 10% for a lean bulk", () => {
-    expect(applyGoalAdjustment(2500, "lean_bulk")).toBe(2750);
+  it("adds 10% for hypertrophy", () => {
+    expect(applyGoalAdjustment(2500, "hypertrophy")).toBe(2750);
+  });
+
+  it("adds a smaller 5% for reverse_diet", () => {
+    expect(applyGoalAdjustment(2500, "reverse_diet")).toBe(2625);
   });
 });
 

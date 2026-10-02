@@ -14,7 +14,7 @@ import type { RosterMember, ClientTier } from "@/lib/types";
 import { MoreVertical, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   computeNutritionWeeklySeries,
-  type NutritionPhase,
+  type MilestonePhaseTag,
   type NutritionWeeklySeries,
 } from "@/lib/nutrition-trend-classifier";
 import { ClientCardNutritionSparkline } from "@/components/coach/desktop/client-card-nutrition-sparkline";
@@ -35,7 +35,7 @@ const TIER_LABELS: Record<NonNullable<ClientTier>, string> = {
   group: "Group",
 };
 
-const GOAL_LABELS: Record<NonNullable<NutritionPhase>, string> = {
+const GOAL_LABELS: Record<NonNullable<MilestonePhaseTag>, string> = {
   reverse_diet: "Reverse diet",
   cut: "Cut",
   bulk: "Bulk",
@@ -80,7 +80,7 @@ export function ClientCardGrid({
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [sortMode, setSortMode] = useState<SortMode>("attention");
   const [tierFilter, setTierFilter] = useState<ClientTier | "all">("all");
-  const [goalFilter, setGoalFilter] = useState<NutritionPhase | "all">("all");
+  const [goalFilter, setGoalFilter] = useState<MilestonePhaseTag | "all">("all");
   const [positionFilter, setPositionFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
   const [size, setSize] = useState<CardSize>("medium");

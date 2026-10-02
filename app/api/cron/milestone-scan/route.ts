@@ -5,7 +5,7 @@ import { sendPushToProfile } from "@/lib/send-push";
 import { computeReverseDietMilestone } from "@/lib/metabolic-trend";
 import { computeRecoveryVolumeMilestone } from "@/lib/recovery-volume-milestone";
 import { computeReadinessAverage } from "@/lib/wellness";
-import { classifyNutritionTrend, isTrendAligned, type NutritionPhase } from "@/lib/nutrition-trend-classifier";
+import { classifyNutritionTrend, isTrendAligned, type MilestonePhaseTag } from "@/lib/nutrition-trend-classifier";
 
 // Milestone Celebrations — weekly scan for both trend-based detectors
 // sharing this thread's one dual-trend engine (lib/metabolic-trend.ts's
@@ -273,7 +273,7 @@ export async function GET(request: Request) {
     // coach (see the athlete profile page), not something the cron
     // pushes a notification about. Only a genuine, confirmed alignment
     // is celebration-worthy.
-    if (!classification || !isTrendAligned(classification, row.phase as NutritionPhase)) continue;
+    if (!classification || !isTrendAligned(classification, row.phase as MilestonePhaseTag)) continue;
 
     const phaseLabel = row.phase === "cut" ? "cut" : "bulk";
     const fired = await recordMilestone(

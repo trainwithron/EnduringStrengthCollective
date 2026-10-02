@@ -1,6 +1,6 @@
 import type { TrackedField } from "./exercise-fields";
 import type { EquipmentType } from "./equipment-classifier";
-import type { NutritionPhase } from "./nutrition-trend-classifier";
+import type { MilestonePhaseTag } from "./nutrition-trend-classifier";
 
 export type MemberRole = "coach" | "athlete";
 
@@ -20,7 +20,7 @@ export interface RosterMember {
   // Milestone Celebrations, Category 2 — which nutrition phase (if any)
   // a coach has tagged this athlete with. Optional/undefined on any
   // roster-rendering path that doesn't fetch it.
-  nutritionPhase?: NutritionPhase | null;
+  nutritionPhase?: MilestonePhaseTag | null;
   // team_sports_expansion_scoping.md — this athlete's assigned position
   // (from group_positions), for team-mode groups only. Optional/
   // undefined on any roster-rendering path that doesn't fetch it.

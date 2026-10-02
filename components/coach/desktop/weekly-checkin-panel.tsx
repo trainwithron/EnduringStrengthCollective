@@ -51,6 +51,7 @@ export function WeeklyCheckinPanel({
   isInjured,
   maintenanceCalories,
   injurySurplusPct,
+  defaultPhase,
 }: {
   athleteId: string;
   groupId: string;
@@ -72,8 +73,14 @@ export function WeeklyCheckinPanel({
   isInjured?: boolean;
   maintenanceCalories?: number | null;
   injurySurplusPct?: number;
+  // progression_systems_and_phase_vocab_deep_dive_sept30.md — a prior
+  // check-in's own phase is still the stronger signal for an ongoing
+  // client (it's literally what this tool decided last time), so this
+  // only backs it up when there's no check-in history yet at all — a
+  // brand-new tagged client no longer always starts on "Fat loss."
+  defaultPhase?: NutritionPhase | null;
 }) {
-  const [phase, setPhase] = useState<NutritionPhase>(lastCheckin?.phase ?? "fat_loss");
+  const [phase, setPhase] = useState<NutritionPhase>(lastCheckin?.phase ?? defaultPhase ?? "fat_loss");
   const [adjustmentPct, setAdjustmentPct] = useState(lastCheckin?.adjustmentPct ?? DEFAULT_ADJUSTMENT_PCT);
   const [prevWeight, setPrevWeight] = useState(
     lastWeekAvgWeight != null ? String(lastWeekAvgWeight) : ""

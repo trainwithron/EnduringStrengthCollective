@@ -1,3 +1,5 @@
+import type { NutritionPhase } from "./nutrition-checkin";
+
 // Standard coaching rules of thumb — a starting point the coach can
 // always overwrite by hand afterward, not a locked formula.
 export const PROTEIN_G_PER_LB = 1;
@@ -52,12 +54,24 @@ export function estimateMaintenanceCalories(
   return Math.round(bodyWeightLbs * ACTIVITY_KCAL_PER_LB[activity]);
 }
 
-export type MacroGoal = "cut" | "maintain" | "lean_bulk";
+// progression_systems_and_phase_vocab_deep_dive_sept30.md — normalized
+// onto weekly-checkin-panel.tsx's own NutritionPhase vocabulary (the
+// confirmed canonical one: the only one of 4 competing vocabularies with
+// all 4 real concepts, already sharing "reverse_diet" with the client
+// profile's real persisted tag). "cut"/"maintain"/"lean_bulk" are gone —
+// this used to be its own separately-named 3-way goal with no
+// reverse-diet option at all, the real functional gap that motivated the
+// unification in the first place.
+export type MacroGoal = NutritionPhase;
 
 const GOAL_ADJUSTMENT_PCT: Record<MacroGoal, number> = {
-  cut: -0.2,
-  maintain: 0,
-  lean_bulk: 0.1,
+  fat_loss: -0.2,
+  maintenance: 0,
+  hypertrophy: 0.1,
+  // A real, deliberate, modest surplus — distinct from hypertrophy's
+  // larger permanent bulk — matching how an actual reverse diet starts
+  // (a small, controlled calorie increase above maintenance, not a bulk).
+  reverse_diet: 0.05,
 };
 
 export function applyGoalAdjustment(maintenanceCalories: number, goal: MacroGoal): number {

@@ -16,10 +16,14 @@ const ACTIVITY_OPTIONS: { value: ActivityLevel; label: string }[] = [
   { value: "very_active", label: "Very active (6+ workouts/week or physical job)" },
 ];
 
+// progression_systems_and_phase_vocab_deep_dive_sept30.md — same
+// labels/order as weekly-checkin-panel.tsx's canonical phase vocabulary,
+// including the real reverse-diet option this tool never had before.
 const GOAL_OPTIONS: { value: MacroGoal; label: string }[] = [
-  { value: "cut", label: "Fat loss (-20%)" },
-  { value: "maintain", label: "Maintenance" },
-  { value: "lean_bulk", label: "Lean bulk (+10%)" },
+  { value: "fat_loss", label: "Fat loss (-20%)" },
+  { value: "maintenance", label: "Maintenance" },
+  { value: "hypertrophy", label: "Muscle building (+10%)" },
+  { value: "reverse_diet", label: "Reverse diet (+5%)" },
 ];
 
 const SPLIT_OPTIONS: { value: "high" | "balanced" | "low"; label: string }[] = [
@@ -38,16 +42,21 @@ export interface CalculatedMacros {
 export function MacroCalculator({
   onUseMacros,
   initialWeight,
+  initialGoal,
 }: {
   onUseMacros?: (macros: CalculatedMacros) => void;
   // Real logged weight (body_weight_logs), when a specific client is in
   // view — falls back to the old flat 180 guess only when no real data
   // exists yet, rather than always starting from an arbitrary number.
   initialWeight?: number | null;
+  // This client's real tagged phase (mapped via milestoneTagToNutritionPhase),
+  // when one is in view — falls back to "maintenance" otherwise, same as
+  // before this existed.
+  initialGoal?: MacroGoal | null;
 } = {}) {
   const [weight, setWeight] = useState(initialWeight != null ? String(initialWeight) : "180");
   const [activity, setActivity] = useState<ActivityLevel>("moderate");
-  const [goal, setGoal] = useState<MacroGoal>("maintain");
+  const [goal, setGoal] = useState<MacroGoal>(initialGoal ?? "maintenance");
   const [proteinPerLb, setProteinPerLb] = useState("1");
   const [split, setSplit] = useState<"high" | "balanced" | "low">("balanced");
   // Real layout feedback from Ron: this explainer used to be its own

@@ -4,7 +4,24 @@ import {
   expectedTrendForPhase,
   isTrendAligned,
   computeNutritionWeeklySeries,
+  milestoneTagToNutritionPhase,
 } from "./nutrition-trend-classifier";
+
+describe("milestoneTagToNutritionPhase", () => {
+  it("maps cut to fat_loss", () => {
+    expect(milestoneTagToNutritionPhase("cut")).toBe("fat_loss");
+  });
+  it("maps bulk to hypertrophy", () => {
+    expect(milestoneTagToNutritionPhase("bulk")).toBe("hypertrophy");
+  });
+  it("maps reverse_diet to reverse_diet", () => {
+    expect(milestoneTagToNutritionPhase("reverse_diet")).toBe("reverse_diet");
+  });
+  it("maps untagged (null/undefined) to maintenance", () => {
+    expect(milestoneTagToNutritionPhase(null)).toBe("maintenance");
+    expect(milestoneTagToNutritionPhase(undefined)).toBe("maintenance");
+  });
+});
 
 describe("classifyNutritionTrend", () => {
   const asOf = new Date("2026-09-12T00:00:00");

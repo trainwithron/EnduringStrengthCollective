@@ -11,7 +11,7 @@ import type { RosterMember } from "@/lib/types";
 import {
   classifyNutritionTrend,
   isTrendAligned,
-  type NutritionPhase,
+  type MilestonePhaseTag,
 } from "@/lib/nutrition-trend-classifier";
 
 export default async function ClientsPage(
@@ -100,9 +100,9 @@ export default async function ClientsPage(
     .from("nutrition_phases")
     .select("athlete_id, phase")
     .eq("group_id", params.groupId);
-  const phaseByAthleteId = new Map<string, NutritionPhase>();
+  const phaseByAthleteId = new Map<string, MilestonePhaseTag>();
   for (const row of taggedPhaseRows ?? []) {
-    phaseByAthleteId.set(row.athlete_id, row.phase as NutritionPhase);
+    phaseByAthleteId.set(row.athlete_id, row.phase as MilestonePhaseTag);
   }
 
   const roster: RosterMember[] = (memberships ?? []).map((m: any) => ({

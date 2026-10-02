@@ -9,6 +9,7 @@ import { computeWeeklyWeightTrend } from "@/lib/weight-trend";
 import { computeBmr, computeTdee } from "@/lib/bmr-tdee";
 import { computeReadinessAverage } from "@/lib/wellness";
 import type { NutritionPhase } from "@/lib/nutrition-checkin";
+import { milestoneTagToNutritionPhase, type MilestonePhaseTag } from "@/lib/nutrition-trend-classifier";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
@@ -451,6 +452,7 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
     { data: injuryStatusRow },
     { data: bmrProfileDetails },
     { data: intakeDob },
+    { data: taggedPhaseRow },
   ] = await Promise.all([
     supabase
       .from("body_weight_logs")
@@ -516,6 +518,16 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
       .eq("athlete_id", athleteId)
       .maybeSingle(),
     supabase.from("client_intake").select("date_of_birth").eq("athlete_id", athleteId).maybeSingle(),
+    // progression_systems_and_phase_vocab_deep_dive_sept30.md — the real
+    // client-profile phase tag, so the Macro Calculator/Meal Plan
+    // Generator open seeded from what's actually tagged instead of a
+    // hardcoded guess.
+    supabase
+      .from("nutrition_phases")
+      .select("phase")
+      .eq("athlete_id", athleteId)
+      .eq("group_id", groupId)
+      .maybeSingle(),
   ]);
 
   const weightTrend = computeWeeklyWeightTrend(
@@ -722,6 +734,7 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
         isInjured={isInjured}
         maintenanceCalories={maintenanceCalories}
         injurySurplusPct={injurySurplusPct}
+        defaultPhase={milestoneTagToNutritionPhase(taggedPhaseRow?.phase as MilestonePhaseTag | undefined)}
       />
       <div className="pt-6 border-t border-steel/20">
         <NutritionTools
@@ -738,6 +751,7 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
           maintenanceCalories={maintenanceCalories}
           injurySurplusPct={injurySurplusPct}
           initialConsecutiveSurplusSpikes={lastCheckin?.consecutiveSurplusSpikes ?? 0}
+          defaultPhase={milestoneTagToNutritionPhase(taggedPhaseRow?.phase as MilestonePhaseTag | undefined)}
         />
       </div>
     </div>

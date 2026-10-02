@@ -5,9 +5,15 @@
 // can run inside the app. No AI involved yet, per the request: this is
 // the coach's existing deterministic rules engine, wired in as-is.
 
+import type { NutritionPhase } from "./nutrition-checkin";
+
 export type Archetype = "omnivore" | "vegetarian" | "vegan" | "carnivore" | "keto" | "paleo";
 export type MealSlot = "breakfast" | "lunch" | "dinner" | "snack" | "any";
-export type Phase = "fat_loss" | "maintenance" | "hypertrophy";
+// progression_systems_and_phase_vocab_deep_dive_sept30.md — was its own
+// 3-way Phase type (no reverse_diet) with only one real consumer
+// (meal-plan-generator.tsx); replaced with a direct alias onto the
+// canonical vocabulary instead of keeping a second name for it.
+export type Phase = NutritionPhase;
 
 export interface RecipeHelperOptions {
   enableLiquid: boolean;

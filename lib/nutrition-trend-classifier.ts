@@ -11,9 +11,16 @@
 // that against the tag. Reuses the same windowed-average primitive.
 
 import { computeWindowedAverage, type DateValueRow } from "./metabolic-trend";
+import type { NutritionPhase } from "./nutrition-checkin";
 
 export type NutritionTrend = "cutting" | "bulking" | "reverse_dieting" | "maintaining" | "ambiguous";
-export type NutritionPhase = "reverse_diet" | "cut" | "bulk";
+// Renamed from NutritionPhase (progression_systems_and_phase_vocab_deep_dive_sept30.md)
+// — a genuinely different type from lib/nutrition-checkin.ts's own
+// NutritionPhase (4 values: fat_loss/hypertrophy/maintenance/reverse_diet,
+// the canonical check-in vocabulary) that happened to share the same
+// name. This one is specifically the coach's 3-way milestone-tracking
+// tag (no "maintenance" concept — untagged/null already means that).
+export type MilestonePhaseTag = "reverse_diet" | "cut" | "bulk";
 
 export interface TrendClassification {
   trend: NutritionTrend;
@@ -77,13 +84,28 @@ export function classifyNutritionTrend(
   return { trend, calorieChangePct, weightChangePct };
 }
 
-export function expectedTrendForPhase(phase: NutritionPhase): NutritionTrend {
+// progression_systems_and_phase_vocab_deep_dive_sept30.md — none of the
+// macro/meal-plan tools ever read a client's real tagged phase to seed
+// their own default, so a client tagged "Bulk" could open the Meal Plan
+// Generator and have it default to "Fat Loss," the literal opposite of
+// what's tagged. Maps the client-profile tag's narrower 3-way vocabulary
+// onto the canonical 4-way one those tools now share; untagged (null)
+// maps to "maintenance" — the same neutral default those tools already
+// used before this existed, not a new assumption.
+export function milestoneTagToNutritionPhase(tag: MilestonePhaseTag | null | undefined): NutritionPhase {
+  if (tag === "cut") return "fat_loss";
+  if (tag === "bulk") return "hypertrophy";
+  if (tag === "reverse_diet") return "reverse_diet";
+  return "maintenance";
+}
+
+export function expectedTrendForPhase(phase: MilestonePhaseTag): NutritionTrend {
   if (phase === "reverse_diet") return "reverse_dieting";
   if (phase === "cut") return "cutting";
   return "bulking";
 }
 
-export function isTrendAligned(classification: TrendClassification, phase: NutritionPhase): boolean {
+export function isTrendAligned(classification: TrendClassification, phase: MilestonePhaseTag): boolean {
   return classification.trend === expectedTrendForPhase(phase);
 }
 

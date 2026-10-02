@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import type { NutritionPhase } from "@/lib/nutrition-trend-classifier";
+import type { MilestonePhaseTag } from "@/lib/nutrition-trend-classifier";
 
-const PHASE_LABELS: Record<NutritionPhase, string> = {
+const PHASE_LABELS: Record<MilestonePhaseTag, string> = {
   reverse_diet: "Reverse diet",
   cut: "Cut",
   bulk: "Bulk",
@@ -27,10 +27,10 @@ export function NutritionPhaseControl({
   athleteId: string;
   groupId: string;
   coachId: string;
-  initialPhase: NutritionPhase | null;
+  initialPhase: MilestonePhaseTag | null;
   initialStartedAt: string | null;
 }) {
-  const [phase, setPhase] = useState<NutritionPhase | null>(initialPhase);
+  const [phase, setPhase] = useState<MilestonePhaseTag | null>(initialPhase);
   const [startedAt, setStartedAt] = useState(initialStartedAt);
   const [saving, setSaving] = useState(false);
 
@@ -57,7 +57,7 @@ export function NutritionPhaseControl({
         },
         { onConflict: "athlete_id,group_id" }
       );
-      setPhase(value as NutritionPhase);
+      setPhase(value as MilestonePhaseTag);
       setStartedAt(today);
     }
     setSaving(false);
@@ -75,7 +75,7 @@ export function NutritionPhaseControl({
         className="h-8 bg-surface border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust disabled:opacity-40"
       >
         <option value="">Not tracking</option>
-        {(Object.keys(PHASE_LABELS) as NutritionPhase[]).map((p) => (
+        {(Object.keys(PHASE_LABELS) as MilestonePhaseTag[]).map((p) => (
           <option key={p} value={p}>
             {PHASE_LABELS[p]}
           </option>

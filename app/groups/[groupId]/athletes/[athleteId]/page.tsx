@@ -36,7 +36,8 @@ import { currentTaperMultiplier } from "@/lib/endurance-taper";
 import {
   classifyNutritionTrend,
   isTrendAligned,
-  type NutritionPhase,
+  milestoneTagToNutritionPhase,
+  type MilestonePhaseTag,
 } from "@/lib/nutrition-trend-classifier";
 
 export default async function AthleteProfilePage(
@@ -505,7 +506,7 @@ export default async function AthleteProfilePage(
     if (classification) {
       nutritionTrendAlignment = {
         trend: classification.trend,
-        aligned: isTrendAligned(classification, nutritionPhaseRow.phase as NutritionPhase),
+        aligned: isTrendAligned(classification, nutritionPhaseRow.phase as MilestonePhaseTag),
         calorieChangePct: classification.calorieChangePct,
         weightChangePct: classification.weightChangePct,
       };
@@ -1031,7 +1032,7 @@ export default async function AthleteProfilePage(
                 athleteId={params.athleteId}
                 groupId={params.groupId}
                 coachId={user.id}
-                initialPhase={(nutritionPhaseRow?.phase as NutritionPhase | undefined) ?? null}
+                initialPhase={(nutritionPhaseRow?.phase as MilestonePhaseTag | undefined) ?? null}
                 initialStartedAt={nutritionPhaseRow?.started_at ?? null}
               />
               {nutritionTrendAlignment && (
@@ -1308,6 +1309,7 @@ export default async function AthleteProfilePage(
               isInjured={injuryStatusRow?.is_injured ?? false}
               maintenanceCalories={maintenanceCalories}
               injurySurplusPct={injuryStatusRow?.surplus_pct ?? 0}
+              defaultPhase={milestoneTagToNutritionPhase(nutritionPhaseRow?.phase as MilestonePhaseTag | undefined)}
             />
           </section>
         )}

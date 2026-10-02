@@ -1,5 +1,5 @@
 import { buildSparklinePath } from "@/lib/program-card-visuals";
-import type { NutritionPhase, NutritionWeeklySeries } from "@/lib/nutrition-trend-classifier";
+import type { MilestonePhaseTag, NutritionWeeklySeries } from "@/lib/nutrition-trend-classifier";
 
 const SPARK_W = 100;
 const SPARK_H = 28;
@@ -10,7 +10,7 @@ const SPARK_H = 28;
 const RUST = "#D2703B";
 const STEEL = "#908B7E";
 
-const PHASE_LABELS: Record<NutritionPhase, string> = {
+const PHASE_LABELS: Record<MilestonePhaseTag, string> = {
   reverse_diet: "Reverse diet",
   cut: "Cut",
   bulk: "Bulk",
@@ -26,7 +26,7 @@ export function ClientCardNutritionSparkline({
   phase,
   series,
 }: {
-  phase: NutritionPhase;
+  phase: MilestonePhaseTag;
   series: NutritionWeeklySeries;
 }) {
   const finite = [...series.calorieIndexed, ...series.weightIndexed].filter(

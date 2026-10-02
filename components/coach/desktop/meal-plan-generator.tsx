@@ -70,6 +70,7 @@ export function MealPlanGenerator({
   maintenanceCalories,
   injurySurplusPct,
   initialConsecutiveSurplusSpikes,
+  initialPhase,
 }: {
   athleteId: string;
   groupId: string;
@@ -91,6 +92,10 @@ export function MealPlanGenerator({
   maintenanceCalories?: number | null;
   injurySurplusPct?: number;
   initialConsecutiveSurplusSpikes?: number;
+  // This client's real tagged phase (mapped via milestoneTagToNutritionPhase),
+  // when one is in view — falls back to "fat_loss" otherwise, same as
+  // before this existed.
+  initialPhase?: Phase | null;
 }) {
   const router = useRouter();
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -99,7 +104,7 @@ export function MealPlanGenerator({
   // for "current," last week's avg for "previous" — so the coach isn't
   // retyping numbers already sitting in body_weight_logs. Falls back to
   // the single latest log, then blank, when there isn't enough history.
-  const [phase, setPhase] = useState<Phase>("fat_loss");
+  const [phase, setPhase] = useState<Phase>(initialPhase ?? "fat_loss");
   const [currentWeight, setCurrentWeight] = useState(
     (weightTrend?.currentAvg ?? latestBodyWeight)?.toString() ?? ""
   );
@@ -633,9 +638,10 @@ export function MealPlanGenerator({
             onChange={(e) => setPhase(e.target.value as Phase)}
             className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm mt-1"
           >
-            <option value="fat_loss">Fat Loss / Deficit</option>
+            <option value="fat_loss">Fat loss</option>
+            <option value="hypertrophy">Muscle building</option>
             <option value="maintenance">Maintenance</option>
-            <option value="hypertrophy">Muscle Gain / Surplus</option>
+            <option value="reverse_diet">Reverse diet</option>
           </select>
         </label>
         <label className="block">

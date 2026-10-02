@@ -4,6 +4,7 @@ import { useState } from "react";
 import { MacroCalculator, type CalculatedMacros } from "@/components/tools/macro-calculator";
 import { MealPlanGenerator, type ImportedMacros } from "@/components/coach/desktop/meal-plan-generator";
 import type { WeeklyWeightTrend } from "@/lib/weight-trend";
+import type { NutritionPhase } from "@/lib/nutrition-checkin";
 
 interface SavedPlanShape {
   archetype: string;
@@ -36,6 +37,7 @@ export function NutritionTools({
   maintenanceCalories,
   injurySurplusPct,
   initialConsecutiveSurplusSpikes,
+  defaultPhase,
 }: {
   athleteId: string;
   groupId: string;
@@ -50,6 +52,10 @@ export function NutritionTools({
   maintenanceCalories?: number | null;
   injurySurplusPct?: number;
   initialConsecutiveSurplusSpikes?: number;
+  // This client's real tagged phase, mapped via milestoneTagToNutritionPhase
+  // — seeds both Step 1 and Step 2's own default, rather than each
+  // opening on a hardcoded guess regardless of what's actually tagged.
+  defaultPhase?: NutritionPhase | null;
 }) {
   const [importedMacros, setImportedMacros] = useState<ImportedMacros | null>(null);
   const [calculatorExpanded, setCalculatorExpanded] = useState(true);
@@ -84,7 +90,7 @@ export function NutritionTools({
         </button>
         {calculatorExpanded && (
           <div className="px-4 pb-4 border-t border-steel/15 pt-4">
-            <MacroCalculator onUseMacros={handleUseMacros} initialWeight={latestBodyWeight} />
+            <MacroCalculator onUseMacros={handleUseMacros} initialWeight={latestBodyWeight} initialGoal={defaultPhase} />
           </div>
         )}
       </div>
@@ -108,6 +114,7 @@ export function NutritionTools({
           maintenanceCalories={maintenanceCalories}
           injurySurplusPct={injurySurplusPct}
           initialConsecutiveSurplusSpikes={initialConsecutiveSurplusSpikes}
+          initialPhase={defaultPhase}
         />
       </div>
     </div>
