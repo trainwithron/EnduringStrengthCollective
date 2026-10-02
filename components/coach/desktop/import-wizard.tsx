@@ -102,6 +102,14 @@ interface PendingImport {
   // 2+ compute dynamically instead of needing weeks of precomputed
   // weights (dup_gzclp_build_spec_sept15.md §1.3).
   progressionRules?: GzclpProgressionRule[];
+  // ai_output_validation_audit_findings_sept30.md — true only for the two
+  // genuinely LLM-sourced paths (plain-English generate, AI photo read).
+  // A human-authored spreadsheet import or a deterministic DUP/GZCLP
+  // shell is never flagged, since there's no model output to second-
+  // guess. Gates the auto-finalize skip below: an AI-sourced import must
+  // always stop for a real look before it commits, even when every
+  // exercise happened to match exactly (see prepareImport's own comment).
+  isAiSourced: boolean;
 }
 
 export function ImportWizard({
@@ -242,18 +250,27 @@ export function ImportWizard({
   // Pure — matches every exercise against the coach's real library and
   // learned aliases, but writes nothing to the database yet. An exact or
   // alias match, or a name that matched nothing at all (added as its own
-  // new exercise either way), is unambiguous and never held up. A fuzzy
-  // match is a guess that can genuinely be wrong (two different exercises
-  // sharing a word) — those pause here for the coach to look at instead
-  // of silently landing in a real program, which is what the "nothing to
-  // confirm" copy claimed but the old flow didn't actually do.
+  // new exercise either way), is unambiguous and never held up for a
+  // human-authored import. A fuzzy match is a guess that can genuinely
+  // be wrong (two different exercises sharing a word) — those pause here
+  // for the coach to look at regardless of source.
+  //
+  // ai_output_validation_audit_findings_sept30.md — a real correctness
+  // bug lived here: an AI-sourced generation (plain-English or photo)
+  // that happened to match every exercise exactly skipped straight to
+  // finalizeImport with zero human review, silently going live as the
+  // athlete's active program (deactivating whatever they were already
+  // on) the moment the request resolved. `isAiSourced` closes that path —
+  // an AI-sourced import always stops for a real look, never just on
+  // whether a guess needs arbitrating.
   function prepareImport(
     parsed: ParsedImportRow[],
     programName: string,
     description: string,
     sequencingNotes: string | null = null,
     injuryConsiderations: string | null = null,
-    progressionRules?: GzclpProgressionRule[]
+    progressionRules?: GzclpProgressionRule[],
+    isAiSourced: boolean = false
   ) {
     setStatusLabel("Matching exercises…");
 
@@ -308,9 +325,10 @@ export function ImportWizard({
       sequencingNotes,
       injuryConsiderations,
       progressionRules,
+      isAiSourced,
     };
 
-    if (fuzzyMatches.length === 0) {
+    if (fuzzyMatches.length === 0 && !isAiSourced) {
       finalizeImport(pendingImport);
     } else {
       // Deliberately leaves processingRef true through the review step —
@@ -670,7 +688,9 @@ export function ImportWizard({
         data.programName,
         `AI-generated from: "${aiPrompt.trim()}"`,
         data.sequencingNotes ?? null,
-        data.injuryConsiderations ?? null
+        data.injuryConsiderations ?? null,
+        undefined,
+        true
       );
     } catch (err) {
       setStatus("error");
@@ -715,7 +735,15 @@ export function ImportWizard({
         return;
       }
 
-      prepareImport(data.rows, file.name.replace(/\.\w+$/, ""), `Imported from a photo (AI) — ${file.name}`);
+      prepareImport(
+        data.rows,
+        file.name.replace(/\.\w+$/, ""),
+        `Imported from a photo (AI) — ${file.name}`,
+        null,
+        null,
+        undefined,
+        true
+      );
     } catch (err) {
       setStatus("error");
       setError(err instanceof Error ? err.message : "Couldn't read that image — try again.");
@@ -724,17 +752,58 @@ export function ImportWizard({
   }
 
   if (status === "reviewing" && pending) {
+    // ai_output_validation_audit_findings_sept30.md — an AI-sourced
+    // import (isAiSourced) now always lands here, even with zero fuzzy
+    // matches to arbitrate, so this needs to show real content in that
+    // case rather than an empty "0 guessed exercises" heading. Computed
+    // lazily (only when there's actually something to show) since
+    // groupIntoWeeks isn't free on a long program.
+    const previewWeeks = pending.isAiSourced ? groupIntoWeeks(pending.parsed) : [];
     return (
       <div className="border border-yellow-500/40 bg-surface/60 p-6 max-w-2xl">
         <h3 className="font-display uppercase text-sm tracking-wide mb-2">
-          Double-check {pending.fuzzyMatches.length} guessed exercise
-          {pending.fuzzyMatches.length === 1 ? "" : "es"}
+          {pending.fuzzyMatches.length > 0
+            ? `Double-check ${pending.fuzzyMatches.length} guessed exercise${pending.fuzzyMatches.length === 1 ? "" : "s"}`
+            : "Review before creating"}
         </h3>
         <p className="font-body text-sm text-steel mb-4">
-          These weren&apos;t an exact match to anything in your library — we guessed the closest
-          one, but a guess can be wrong (two different exercises can share a word). Nothing has
-          been created yet.
+          {pending.fuzzyMatches.length > 0
+            ? "These weren't an exact match to anything in your library — we guessed the closest one, but a guess can be wrong (two different exercises can share a word). Nothing has been created yet."
+            : "AI-generated content always gets a real look before it's created — this will become the athlete's active program and replace whatever they're currently on. Nothing has been created yet."}
         </p>
+        {pending.isAiSourced && pending.injuryConsiderations && (
+          <div className="mb-4 border border-rust/40 bg-rust/5 p-3">
+            <p className="font-body text-xs text-rust font-medium mb-1">
+              How this handled {athleteName ?? "this client"}&apos;s flagged health/injury concern:
+            </p>
+            <p className="font-body text-xs text-chalk leading-snug">{pending.injuryConsiderations}</p>
+          </div>
+        )}
+        {previewWeeks.length > 0 && (
+          <div className="mb-5 max-h-80 overflow-y-auto border border-steel/20">
+            {previewWeeks.map((week) => (
+              <div key={week.weekLabel} className="border-b border-steel/15 last:border-b-0">
+                <p className="font-display text-[11px] uppercase tracking-wide text-steel px-3 pt-2.5">
+                  {week.weekLabel}
+                </p>
+                {week.days.map((day, i) => (
+                  <div key={i} className="px-3 py-2">
+                    <p className="font-body text-xs font-medium text-chalk mb-1">{day.dayLabel}</p>
+                    <ul className="font-body text-xs text-steel space-y-0.5">
+                      {day.exercises.map((ex, j) => (
+                        <li key={j}>
+                          {ex.exerciseName} — {ex.sets}×{ex.reps ?? "?"}
+                          {ex.weight != null ? ` @ ${ex.weight}` : ""}
+                          {ex.timeSeconds != null ? ` (${ex.timeSeconds}s)` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
         <div className="space-y-3 mb-5">
           {pending.fuzzyMatches.map((f) => (
             <div key={f.key} className="border border-steel/20 p-3">
@@ -921,8 +990,9 @@ export function ImportWizard({
       <div className="border border-steel/20 bg-surface/40 rounded-token-lg p-6">
         <p className="font-body text-sm text-steel mb-4">
           Or upload a photo or screenshot of a program — from another app, a spreadsheet, or a
-          handwritten sheet — and AI will read it into the same review pipeline as above. Convert a
-          PDF page to an image first (a screenshot works fine).
+          handwritten sheet — and AI will read it in. You&apos;ll always get a real review screen
+          before anything is created, even if nothing needs a second look. Convert a PDF page to
+          an image first (a screenshot works fine).
         </p>
         <input
           type="file"
@@ -939,8 +1009,9 @@ export function ImportWizard({
 
       <div className="border border-steel/20 bg-surface/40 rounded-token-lg p-6">
         <p className="font-body text-sm text-steel mb-3">
-          Or describe the program you want and AI will write a full draft — same review pipeline as
-          above, and it prefers exercises already in your library. Nothing is created until you confirm.
+          Or describe the program you want and AI will write a full draft, preferring exercises
+          already in your library. You&apos;ll always get a real review screen before anything is
+          created, even if nothing needs a second look.
         </p>
         <div className="mb-3 border border-steel/15 bg-graphite/60 p-3">
           <p className="font-body text-[11px] text-steel uppercase tracking-wide mb-1.5">
