@@ -37,6 +37,7 @@ import {
   SlidersHorizontal,
   Lightbulb,
   Calculator,
+  UserCheck,
 } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
@@ -110,7 +111,8 @@ type Active =
   | "game-detail"
   | "team-performance"
   | "messages"
-  | "records";
+  | "records"
+  | "kiosk";
 
 interface NavLeaf {
   key: Active;
@@ -757,6 +759,13 @@ export function CoachDesktopShell({
                 className="w-11 h-11 flex items-center justify-center text-steel active:text-chalk"
               >
                 <MonitorPlay className="w-4 h-4" strokeWidth={2.25} />
+              </a>
+              <a
+                href={`/groups/${groupId}/kiosk/settings`}
+                title="Kiosk Check-In"
+                className="w-11 h-11 flex items-center justify-center text-steel active:text-chalk"
+              >
+                <UserCheck className="w-4 h-4" strokeWidth={2.25} />
               </a>
               <button
                 ref={layoutToggleRef}
