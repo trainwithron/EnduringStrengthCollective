@@ -86,6 +86,19 @@ export default async function ProgressionsPage(
           Define how each exercise evolves across weeks. Targets are computed
           from each athlete&apos;s own logged performance in this program.
         </p>
+        {/* progression_systems_and_phase_vocab_deep_dive_sept30.md — a
+            week built with "Duplicate with progression" (Program Builder)
+            writes fixed real weeks and never checks back here, so an
+            exercise with both a rule set here AND coach-typed targets
+            from that tool can show two different numbers for the same
+            lift. This is the reciprocal note to the one on that tool. */}
+        <p className="font-body text-xs text-steel mt-3 max-w-[60ch]">
+          This is a live rule that keeps adjusting from what&apos;s actually logged — different
+          from &quot;Duplicate with progression&quot; in the Program Builder, which writes fixed
+          weeks once and stops. If a coach-typed target and this rule&apos;s goal ever disagree for
+          the same exercise, the coach-typed target always wins for weight; this rule&apos;s
+          suggestion is shown, never silently substituted.
+        </p>
       </header>
 
       <section className="px-5 pt-6">

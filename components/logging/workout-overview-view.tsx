@@ -116,8 +116,6 @@ export function WorkoutOverviewView({
               movementPatternId: ex.movementPatternId,
               trackedFields: ex.trackedFields,
               sets: ex.sets,
-              goalWeight: goalByExerciseId.get(ex.id)?.weight ?? null,
-              goalReps: goalByExerciseId.get(ex.id)?.reps ?? null,
             }))}
           />
         )}

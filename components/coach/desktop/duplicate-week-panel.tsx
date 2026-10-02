@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { BuilderDay, BuilderItem } from "@/lib/types";
 import { SET_ROW_SELECT, mapSetRow, type TrackedField } from "@/lib/exercise-fields";
@@ -652,15 +653,32 @@ export function DuplicateWeekPanel({
             }`}
           >
             {m === "linear"
-              ? "Linear"
+              ? "Flat % / Week"
               : m === "double"
-                ? "Double Progression"
+                ? "Rep-Range Reset"
                 : m === "undulating"
                   ? "Undulating"
                   : "% of Training Max"}
           </button>
         ))}
       </div>
+      {/* progression_systems_and_phase_vocab_deep_dive_sept30.md — these
+          labels were renamed off "Linear"/"Double Progression" because
+          Exercise Progressions (a separate, live-adjusting rule, not
+          this one-time batch precompute) uses those exact same two
+          names for genuinely different math. See the note below. */}
+      <p className="font-body text-[11px] text-steel">
+        This writes real weeks right now, from the numbers above — it won&apos;t keep adjusting
+        after that. For an ongoing target that updates itself from logged performance instead,
+        see{" "}
+        <Link
+          href={`/groups/${groupId}/programs/${programId}/progressions`}
+          className="text-rust underline underline-offset-2"
+        >
+          Exercise Progressions
+        </Link>
+        .
+      </p>
 
       {model === "linear" && (
         <div className="space-y-2">

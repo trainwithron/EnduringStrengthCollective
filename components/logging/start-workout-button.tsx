@@ -14,8 +14,6 @@ interface TemplateExercise {
   movementPatternId?: string | null;
   trackedFields: TrackedField[];
   sets: ExerciseSetTarget[];
-  goalWeight?: number | null;
-  goalReps?: number | null;
 }
 
 // target_reps is free text (ranges like "8-10", tags like "AMRAP") since a
@@ -137,23 +135,23 @@ export function StartWorkoutButton({
         ? ex.sets.map((target) => ({
             session_exercise_id: sessionExerciseId,
             set_order: target.setOrder,
-            // An explicit per-set target_weight is a real coach decision,
-            // so it still pre-fills for real. A progression-rule "goal"
-            // (ex.goalWeight) is a computed guess, not something the
-            // coach actually typed — it's now surfaced as the same kind
-            // of grayed-out, swipe/tap-to-accept suggestion as the
-            // correlating-history lookup (lib/set-suggestions.ts,
-            // resolved fresh on the session page), rather than silently
-            // committed as if the athlete had already reported it.
+            // An explicit per-set target_weight/target_reps is a real
+            // coach decision, so it still pre-fills for real. A
+            // progression-rule "goal" (Exercise Progressions' live
+            // computed suggestion) is never committed here as if the
+            // athlete had already reported it — it's already shown as
+            // the pre-start "Goal: ..." preview (pre-start-exercise-row.tsx)
+            // from this same goalByExerciseId data, same as weight; the
+            // athlete reports what they actually did, for both fields.
             weight: target.targetWeight ?? null,
-            reps: parseRepsTarget(target.targetReps) ?? ex.goalReps ?? null,
+            reps: parseRepsTarget(target.targetReps),
           }))
         : [
             {
               session_exercise_id: sessionExerciseId,
               set_order: 0,
               weight: null,
-              reps: ex.goalReps ?? null,
+              reps: null,
             },
           ];
     });
