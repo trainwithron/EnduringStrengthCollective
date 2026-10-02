@@ -29,6 +29,7 @@ import {
 } from "@/lib/meal-plan-assignment";
 import type { WeeklyWeightTrend } from "@/lib/weight-trend";
 import { RecipeVoteFavorite } from "./recipe-vote-favorite";
+import { AiOutputWrongButton } from "@/components/coach/ai-output-wrong-button";
 
 type DayView = "daily" | "train" | "rest";
 
@@ -157,6 +158,11 @@ export function MealPlanGenerator({
   const [aiError, setAiError] = useState<Record<string, string | null>>({});
   const [aiSuggestingAll, setAiSuggestingAll] = useState(false);
   const [aiSuggestAllError, setAiSuggestAllError] = useState<string | null>(null);
+  // ai_output_foolproofing_and_quality_assurance_idea.md — ties one
+  // "AI Suggest All" charge to its refund (auto, if nothing came back,
+  // or coach-flagged afterward). Cleared on a fresh run so a stale
+  // reference from an earlier charge is never reused.
+  const [lastChargeReferenceId, setLastChargeReferenceId] = useState<string | null>(null);
 
   // Per-meal-slot "assign this recipe to specific days this week" picker
   // — independent of the full-day Save button below.
@@ -491,8 +497,13 @@ export function MealPlanGenerator({
   // before — but now serves as the automatic, clearly-labeled fallback
   // whenever AI is unavailable or every option it returned failed
   // verification, rather than a parallel manual choice.
-  async function handleAiSuggest(meal: GeneratedMeal) {
-    if (aiSuggesting[meal.spec.id]) return;
+  // Returns whether this call actually delivered a real AI suggestion —
+  // used by handleAiSuggestAll to detect "every meal in the batch fell
+  // back" so it can auto-refund the flat charge (ai_output_
+  // foolproofing_and_quality_assurance_idea.md). The standalone per-meal
+  // button already ignores this return value, so it's a pure addition.
+  async function handleAiSuggest(meal: GeneratedMeal): Promise<boolean> {
+    if (aiSuggesting[meal.spec.id]) return false;
     setAiSuggesting((prev) => ({ ...prev, [meal.spec.id]: true }));
     setAiError((prev) => ({ ...prev, [meal.spec.id]: null }));
 
@@ -551,7 +562,7 @@ export function MealPlanGenerator({
       // scoping's own list of trigger conditions — never a dead end.
       if (!res.ok) {
         runFallback("AI suggestions unavailable right now — here are some standard options instead.");
-        return;
+        return false;
       }
 
       const verifiedOptions: {
@@ -568,7 +579,7 @@ export function MealPlanGenerator({
           ...prev,
           [meal.spec.id]: "Couldn't verify any of this suggestion's ingredients against real food data — try again.",
         }));
-        return;
+        return false;
       }
 
       const newOptions: MealOption[] = verifiedOptions.map((o, i) => ({
@@ -579,8 +590,10 @@ export function MealPlanGenerator({
         verifiedMacros: { protein: o.totalProtein, carbs: o.totalCarbs, fat: o.totalFat, kcal: o.totalKcal },
       }));
       appendOptions(newOptions);
+      return true;
     } catch {
       runFallback("AI suggestions unavailable right now — here are some standard options instead.");
+      return false;
     } finally {
       setAiSuggesting((prev) => ({ ...prev, [meal.spec.id]: false }));
     }
@@ -598,6 +611,13 @@ export function MealPlanGenerator({
     if (aiSuggestingAll || currentMeals.length === 0) return;
     setAiSuggestingAll(true);
     setAiSuggestAllError(null);
+    setLastChargeReferenceId(null);
+    // One id per charge, generated client-side before the charge even
+    // fires — ties this exact charge to its eventual refund (auto or
+    // coach-flagged), and the (coach_id, reference_id) uniqueness in
+    // refund_coach_credit means this batch can only ever be refunded
+    // once however it gets flagged.
+    const referenceId = crypto.randomUUID();
     try {
       const res = await fetch("/api/ai/meal-plan-credit-charge", { method: "POST" });
       const data = await res.json();
@@ -605,8 +625,30 @@ export function MealPlanGenerator({
         setAiSuggestAllError(data.error || "Couldn't process credits.");
         return;
       }
+      let anySucceeded = false;
       for (const meal of currentMeals) {
-        await handleAiSuggest(meal);
+        const ok = await handleAiSuggest(meal);
+        if (ok) anySucceeded = true;
+      }
+      if (anySucceeded) {
+        // Only offer the manual flag when the batch wasn't already
+        // auto-refunded below — no reason to show a redundant "This was
+        // wrong" button right next to a message saying it already
+        // refunded itself.
+        setLastChargeReferenceId(referenceId);
+      } else {
+        // ai_output_foolproofing_and_quality_assurance_idea.md — the
+        // charge already happened but every meal in the batch fell back
+        // to non-AI options, meaning nothing was actually delivered for
+        // it. Silent, automatic, no coach action needed.
+        const refundRes = await fetch("/api/ai/refund-credit", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action: "nutrition_plan", trigger: "auto_validator_failure", referenceId }),
+        }).catch(() => null);
+        if (refundRes?.ok) {
+          setAiSuggestAllError("Credit refunded — AI couldn't generate any suggestions right now.");
+        }
       }
     } catch {
       setAiSuggestAllError("Couldn't start AI generation — try again.");
@@ -883,6 +925,11 @@ export function MealPlanGenerator({
               <p className="font-body text-xs text-rust mt-1" role="alert">
                 {aiSuggestAllError}
               </p>
+            )}
+            {lastChargeReferenceId && !aiSuggestingAll && (
+              <div className="mt-1.5">
+                <AiOutputWrongButton action="nutrition_plan" referenceId={lastChargeReferenceId} />
+              </div>
             )}
           </div>
 

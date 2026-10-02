@@ -36,6 +36,7 @@ import { detectTrainingIntent } from "@/lib/training-intent";
 import { hasFlaggedMusculoskeletalConcern } from "@/lib/athlete-injury-flag";
 import { generateDupProgram, generateDupSelfUpdatingProgram, DUP_WEEKLY_SCHEME } from "@/lib/dup-generator";
 import { generateGzclpProgram, type GzclpLiftInput, type GzclpProgressionRule } from "@/lib/gzclp-generator";
+import { AiOutputWrongButton } from "@/components/coach/ai-output-wrong-button";
 
 type Status = "idle" | "working" | "reviewing" | "done" | "error";
 
@@ -77,6 +78,13 @@ interface ImportSummary {
   // concern, surfaced here so the coach's review is actually informed by
   // it before they commit, not buried in a field nobody looks at.
   injuryConsiderations: string | null;
+  // ai_output_foolproofing_and_quality_assurance_idea.md — only true for
+  // the two genuinely AI-sourced paths, same flag as PendingImport's own
+  // isAiSourced. Gates whether the "done" screen offers a refund — a
+  // human-authored import or a deterministic DUP/GZCLP shell was never
+  // credit-metered in the first place, nothing to refund.
+  isAiSourced: boolean;
+  programId: string;
 }
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -529,6 +537,8 @@ export function ImportWizard({
         .filter((f) => !f.useRaw)
         .map((f) => ({ rawName: f.rawName, matchedTo: f.matchedTo, score: f.score })),
       injuryConsiderations,
+      isAiSourced: importData.isAiSourced,
+      programId: programRow.id,
     });
     setDoneHref(`/groups/${groupId}/programs/${programRow.id}`);
     setPending(null);
@@ -910,7 +920,7 @@ export function ImportWizard({
             </div>
           </div>
         )}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 mb-4">
           <a
             href={doneHref}
             className="inline-flex items-center h-9 px-4 bg-rust text-graphite font-body text-sm font-medium"
@@ -929,6 +939,9 @@ export function ImportWizard({
             Import another file
           </button>
         </div>
+        {summary.isAiSourced && (
+          <AiOutputWrongButton action="program_generation" referenceId={summary.programId} />
+        )}
       </div>
     );
   }
