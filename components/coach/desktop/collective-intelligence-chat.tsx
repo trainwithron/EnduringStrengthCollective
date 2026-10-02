@@ -2,17 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
-import { MessageCircle, ChevronRight, ChevronLeft, Send } from "lucide-react";
+import { MessageCircle, ChevronRight, ChevronLeft } from "lucide-react";
 import {
   readAskSpotWidgetState,
   writeAskSpotWidgetState,
   DEFAULT_ASK_SPOT_WIDGET_STATE,
 } from "@/lib/ask-spot-widget-state";
-
-interface ChatMessage {
-  role: "coach" | "assistant";
-  body: string;
-}
+import { AskSpotChatPanel } from "@/components/coach/ask-spot-chat-panel";
 
 const MIN_BOTTOM = 88; // clears a mobile bottom tab bar (64px) + margin
 const TOP_SAFE_MARGIN = 160; // keeps the tab and its open panel clear of a top-anchored control (e.g. The Spot)
@@ -40,34 +36,33 @@ function clampBottom(value: number): number {
 // app's own already-established "Spot" assistant branding rather than
 // inventing a new term, so the two surfaces stop sharing one name.
 //
-// Mobile parity pass — this used to be `hidden lg:flex`, desktop-only,
-// with no way to reach it from a phone at all. Now mounted in both
-// CoachDesktopShell and CoachMobileShell.
+// Desktop-only entry point. Mobile's own entry point is the new "More"
+// edge drawer instead (coach-more-drawer.tsx, which folds Ask Spot in as
+// one of its tiles, rendering the exact same AskSpotChatPanel content
+// component below — not a second copy of the chat logic) —
+// mobile_more_tab_condensed_widget_hub_sept30.md. This component itself
+// stays desktop-only now; it previously also mounted standalone in
+// CoachMobileShell as its own edge-tab, which that memory's decision
+// explicitly absorbed into the broader drawer instead of shipping
+// separately.
 //
-// Visual form, revised per Ron's own direct steer away from a Messenger-
-// style floating circle: a Samsung Edge-Panel-style slim tab, always
-// docked flush against one screen edge — never drifting loose over
-// content. At rest it's just the tab; a tap or an outward swipe expands
-// it into the full chat, and a tap or an inward swipe on the panel's own
-// header collapses it straight back to the tab — one tap always gets a
-// coach back to it, no settings menu to hunt through. The tab can still
-// be dragged vertically along its edge to reposition it (not loose 2D
-// drag — it stays snapped to the edge), and that position persists per-
+// Visual form, per Ron's own direct steer away from a Messenger-style
+// floating circle: a Samsung Edge-Panel-style slim tab, always docked
+// flush against one screen edge — never drifting loose over content. At
+// rest it's just the tab; a tap or an outward swipe expands it into the
+// full chat, and a tap or an inward swipe on the panel's own header
+// collapses it straight back to the tab — one tap always gets a coach
+// back to it, no settings menu to hunt through. The tab can still be
+// dragged vertically along its edge to reposition it (not loose 2D drag
+// — it stays snapped to the edge), and that position persists per-
 // browser (lib/ask-spot-widget-state.ts) so it survives navigating to a
-// new page even though this component remounts fresh on every page (both
-// coach shells mount it per-page, not in a persistent root layout).
-// Deliberately a single fixed entry point, not a multi-slot dock — that
-// wasn't asked for.
+// new page even though this component remounts fresh on every page
+// (CoachDesktopShell mounts it per-page, not in a persistent root
+// layout).
 export function CollectiveIntelligenceChat() {
   const [open, setOpen] = useState(false);
   const [side, setSide] = useState<"left" | "right">(DEFAULT_ASK_SPOT_WIDGET_STATE.side);
   const [bottomOffset, setBottomOffset] = useState(DEFAULT_ASK_SPOT_WIDGET_STATE.bottomOffsetPx);
-  const [threadId, setThreadId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState("");
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
   const tabDrag = useRef<{ x: number; y: number; startBottom: number; moved: boolean } | null>(null);
   const headerDrag = useRef<{ x: number; moved: boolean } | null>(null);
 
@@ -75,14 +70,10 @@ export function CollectiveIntelligenceChat() {
   // markup mismatch (the default above is what both render identically
   // before this runs).
   useEffect(() => {
-    const saved = readAskSpotWidgetState();
+    const saved = readAskSpotWidgetState("ask-spot-widget-state");
     setSide(saved.side);
     setBottomOffset(clampBottom(saved.bottomOffsetPx));
   }, []);
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [messages, sending]);
 
   // --- Tab (collapsed) gestures: vertical drag repositions along the
   // edge; a plain tap, or a short outward swipe, expands the panel.
@@ -136,7 +127,7 @@ export function CollectiveIntelligenceChat() {
     // Whatever the vertical drag already settled on (live-updated during
     // move) is the real final position — persist it either way.
     const finalBottom = clampBottom(drag.startBottom - dy);
-    writeAskSpotWidgetState({ side, bottomOffsetPx: finalBottom });
+    writeAskSpotWidgetState("ask-spot-widget-state", { side, bottomOffsetPx: finalBottom });
   }
 
   // --- Open panel's header: a tap or an inward swipe collapses it back
@@ -175,34 +166,6 @@ export function CollectiveIntelligenceChat() {
     if (swipedInward) setOpen(false);
   }
 
-  async function handleSend() {
-    const question = input.trim();
-    if (!question || sending) return;
-    setInput("");
-    setError(null);
-    setMessages((prev) => [...prev, { role: "coach", body: question }]);
-    setSending(true);
-
-    try {
-      const response = await fetch("/api/collective-intelligence/chat", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ threadId, message: question }),
-      });
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error ?? "Something went wrong.");
-      }
-      const data = await response.json();
-      setThreadId(data.threadId);
-      setMessages((prev) => [...prev, { role: "assistant", body: data.answer }]);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Something went wrong — try again.");
-    } finally {
-      setSending(false);
-    }
-  }
-
   const edgeStyle: React.CSSProperties = { bottom: bottomOffset, [side]: 0 } as React.CSSProperties;
   const ChevronIcon = side === "right" ? ChevronLeft : ChevronRight;
 
@@ -233,7 +196,7 @@ export function CollectiveIntelligenceChat() {
         onPointerDown={handleHeaderPointerDown}
         onPointerMove={handleHeaderPointerMove}
         onPointerUp={handleHeaderPointerUp}
-        className="px-4 py-3 border-b border-steel/20 flex items-center justify-between gap-2 touch-none select-none cursor-grab"
+        className="px-4 py-3 border-b border-steel/20 flex items-center justify-between gap-2 touch-none select-none cursor-grab shrink-0"
       >
         <div>
           <p className="font-body text-[10px] text-steel uppercase tracking-wide font-bold">
@@ -247,47 +210,7 @@ export function CollectiveIntelligenceChat() {
         />
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-        {messages.length === 0 && (
-          <p className="font-body text-xs text-steel">
-            Try: &quot;How has Alice&apos;s squat been trending?&quot; or &quot;When did Ben last log a workout?&quot;
-          </p>
-        )}
-        {messages.map((m, i) => (
-          <div key={i} className={m.role === "coach" ? "text-right" : "text-left"}>
-            <p
-              className={`inline-block font-body text-sm px-3 py-2 max-w-[85%] ${
-                m.role === "coach" ? "bg-rust text-graphite" : "bg-surface text-chalk"
-              }`}
-            >
-              {m.body}
-            </p>
-          </div>
-        ))}
-        {sending && <p className="font-body text-xs text-steel">Checking…</p>}
-        {error && <p className="font-body text-xs text-rust">{error}</p>}
-      </div>
-
-      <div className="p-3 border-t border-steel/20 flex gap-2">
-        <input
-          type="text"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleSend();
-          }}
-          placeholder="Ask a question…"
-          className="flex-1 h-9 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
-        />
-        <button
-          type="button"
-          onClick={handleSend}
-          disabled={sending || !input.trim()}
-          className="h-9 w-9 flex items-center justify-center bg-rust text-graphite disabled:opacity-40"
-        >
-          <Send className="w-4 h-4" />
-        </button>
-      </div>
+      <AskSpotChatPanel />
     </div>
   );
 }
