@@ -1,11 +1,10 @@
-// Ask Spot's floating-bubble position/dock state — a personal, per-browser
-// UI preference (where a coach last dragged it, whether they swiped it
-// docked), not data worth syncing across devices. Same read/write-with-
-// fallback shape as lib/card-size.ts's localStorage wrapper.
+// Ask Spot's edge-tab position — a personal, per-browser UI preference
+// (which edge, and where along it a coach last dragged the tab), not
+// data worth syncing across devices. Same read/write-with-fallback shape
+// as lib/card-size.ts's localStorage wrapper.
 export interface AskSpotWidgetState {
   side: "left" | "right";
   bottomOffsetPx: number;
-  docked: boolean;
 }
 
 const STORAGE_KEY = "ask-spot-widget-state";
@@ -13,7 +12,6 @@ const STORAGE_KEY = "ask-spot-widget-state";
 export const DEFAULT_ASK_SPOT_WIDGET_STATE: AskSpotWidgetState = {
   side: "right",
   bottomOffsetPx: 88,
-  docked: false,
 };
 
 export function readAskSpotWidgetState(): AskSpotWidgetState {
@@ -22,12 +20,8 @@ export function readAskSpotWidgetState(): AskSpotWidgetState {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_ASK_SPOT_WIDGET_STATE;
     const parsed = JSON.parse(raw);
-    if (
-      (parsed.side === "left" || parsed.side === "right") &&
-      typeof parsed.bottomOffsetPx === "number" &&
-      typeof parsed.docked === "boolean"
-    ) {
-      return parsed;
+    if ((parsed.side === "left" || parsed.side === "right") && typeof parsed.bottomOffsetPx === "number") {
+      return { side: parsed.side, bottomOffsetPx: parsed.bottomOffsetPx };
     }
     return DEFAULT_ASK_SPOT_WIDGET_STATE;
   } catch {
