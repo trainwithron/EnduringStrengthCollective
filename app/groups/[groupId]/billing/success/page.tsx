@@ -10,6 +10,7 @@ export default async function BillingSuccessPage(
   const searchParams = await props.searchParams;
   const params = await props.params;
   const isSubscription = searchParams.kind === "subscription";
+  const isQuickPayment = searchParams.kind === "quick_payment";
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24 flex flex-col items-center justify-center px-6 text-center">
@@ -17,6 +18,8 @@ export default async function BillingSuccessPage(
       <p className="font-body text-sm text-steel mt-3 max-w-[40ch]">
         {isSubscription
           ? "Your membership is active. Welcome aboard."
+          : isQuickPayment
+          ? "Your payment has been received."
           : "Your session credits have been added to your account and are ready to use."}
       </p>
       <Link

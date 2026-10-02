@@ -51,20 +51,29 @@ export function BusinessMiniDashboard({ groupId, expanded = false }: { groupId: 
 
       const monthKey = new Date().toISOString().slice(0, 7);
 
-      const [{ data: purchaseRows }, { data: subRows }, { data: memberRows }] = await Promise.all([
-        supabase
-          .from("credit_purchases")
-          .select("amount_cents, created_at, athlete_id")
-          .eq("group_id", groupId),
-        supabase
-          .from("membership_subscriptions")
-          .select("price_cents, status, athlete_id")
-          .eq("group_id", groupId),
-        supabase.from("group_memberships").select("profile_id").eq("group_id", groupId).eq("role", "athlete"),
-      ]);
+      const [{ data: purchaseRows }, { data: quickPaymentRows }, { data: subRows }, { data: memberRows }] =
+        await Promise.all([
+          supabase
+            .from("credit_purchases")
+            .select("amount_cents, created_at, athlete_id")
+            .eq("group_id", groupId),
+          // Quick Payment (mobile_more_tab_condensed_widget_hub_sept30.md)
+          // — real money received, a separate table from credit_purchases
+          // (no session credits granted), but it still belongs in "income
+          // this month" alongside everything else.
+          supabase
+            .from("coach_quick_payments")
+            .select("amount_cents, created_at, athlete_id")
+            .eq("group_id", groupId),
+          supabase
+            .from("membership_subscriptions")
+            .select("price_cents, status, athlete_id")
+            .eq("group_id", groupId),
+          supabase.from("group_memberships").select("profile_id").eq("group_id", groupId).eq("role", "athlete"),
+        ]);
 
       const incomeThisMonth = computeRealIncomeThisMonth(
-        (purchaseRows ?? []).map((r: any) => ({
+        [...(purchaseRows ?? []), ...(quickPaymentRows ?? [])].map((r: any) => ({
           amountCents: r.amount_cents,
           createdAtDateKey: (r.created_at as string).slice(0, 10),
         })),
@@ -76,6 +85,9 @@ export function BusinessMiniDashboard({ groupId, expanded = false }: { groupId: 
       const athleteIds = new Set((memberRows ?? []).map((m: any) => m.profile_id));
       const payingClients = computeActivePayingClients([
         ...(purchaseRows ?? [])
+          .filter((r: any) => athleteIds.has(r.athlete_id))
+          .map((r: any) => ({ athleteId: r.athlete_id, hasActivePurchaseOrSub: true })),
+        ...(quickPaymentRows ?? [])
           .filter((r: any) => athleteIds.has(r.athlete_id))
           .map((r: any) => ({ athleteId: r.athlete_id, hasActivePurchaseOrSub: true })),
         ...(subRows ?? [])

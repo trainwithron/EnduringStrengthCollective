@@ -369,6 +369,33 @@ export async function POST(request: Request) {
           break;
         }
 
+        // Quick Payment (mobile_more_tab_condensed_widget_hub_sept30.md)
+        // — a coach-initiated one-off charge, no coach_package_id at
+        // all, so it has to be caught here before the generic
+        // athleteId/groupId/coachPackageId extraction below (which
+        // assumes a package purchase).
+        if (purchaseKind === "quick_payment") {
+          const coachId = session.metadata?.coach_id;
+          const quickAthleteId = session.metadata?.athlete_id;
+          const quickGroupId = session.metadata?.group_id;
+          if (!coachId || !quickAthleteId || !quickGroupId) break;
+
+          const { error: insertError } = await supabase.from("coach_quick_payments").insert({
+            stripe_event_id: event.id,
+            stripe_checkout_session_id: session.id,
+            coach_id: coachId,
+            athlete_id: quickAthleteId,
+            group_id: quickGroupId,
+            amount_cents: session.amount_total ?? 0,
+            description: session.metadata?.description || null,
+          });
+          if (insertError) {
+            if (insertError.code === "23505") break; // already processed this event
+            throw insertError;
+          }
+          break;
+        }
+
         const athleteId = session.metadata?.athlete_id;
         const groupId = session.metadata?.group_id;
         const coachPackageId = session.metadata?.coach_package_id ?? null;
