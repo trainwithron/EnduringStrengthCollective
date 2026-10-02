@@ -49,6 +49,15 @@ export function weeksUntilEvent(window: EventWindow, today: Date): number {
   return Math.floor(daysBetween(today, eventDate) / 7);
 }
 
+// Day-granularity version for the Strength Meet Week Taper, whose two
+// phases (t-1 ~7-10 days out, t-0 meet week) don't line up cleanly on
+// whole-week boundaries the way the endurance taper's does. Negative
+// once the event date has passed.
+export function daysUntilEvent(window: EventWindow, today: Date): number {
+  const eventDate = new Date(`${window.targetDate}T00:00:00`);
+  return daysBetween(today, eventDate);
+}
+
 export function isWithinTaperWindow(window: EventWindow, today: Date, taperWeeks: number): boolean {
   const weeksOut = weeksUntilEvent(window, today);
   return weeksOut >= 0 && weeksOut < taperWeeks;

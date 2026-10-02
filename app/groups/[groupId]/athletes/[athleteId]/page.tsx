@@ -31,8 +31,10 @@ import { isHabitDueOn, computeCompliancePct } from "@/lib/habits";
 import { computeQuietTier } from "@/lib/quiet-client-tier";
 import { isLowReadiness } from "@/lib/wellness";
 import { computeWeeklyWeightTrend } from "@/lib/weight-trend";
-import { deriveEventWindow, weeksUntilEvent, isWithinTaperWindow } from "@/lib/event-window";
+import { deriveEventWindow, weeksUntilEvent, isWithinTaperWindow, daysUntilEvent } from "@/lib/event-window";
 import { currentTaperMultiplier } from "@/lib/endurance-taper";
+import { computeStrengthTaperWeek, computeHeavySingleWeight } from "@/lib/strength-meet-taper";
+import { MainLiftPicker } from "@/components/coach/main-lift-picker";
 import {
   classifyNutritionTrend,
   isTrendAligned,
@@ -160,7 +162,7 @@ export default async function AthleteProfilePage(
     // page, not repeated on this profile.
     supabase
       .from("client_goals")
-      .select("id, goal_type, custom_label, target_date, priority_note, status")
+      .select("id, goal_type, custom_label, target_date, priority_note, status, main_lift_movement_pattern_id")
       .eq("athlete_id", params.athleteId)
       .eq("group_id", params.groupId)
       .order("created_at", { ascending: false })
@@ -271,7 +273,9 @@ export default async function AthleteProfilePage(
     // just to surface a real "you're in taper" notice.
     supabase
       .from("client_goals")
-      .select("status, target_date, event_type, event_expected_duration_minutes, event_priority, weight_class_flag")
+      .select(
+        "id, status, target_date, event_type, event_expected_duration_minutes, event_priority, weight_class_flag, goal_type, main_lift_movement_pattern_id"
+      )
       .eq("athlete_id", params.athleteId)
       .eq("group_id", params.groupId)
       .eq("status", "confirmed")
@@ -644,6 +648,43 @@ export default async function AthleteProfilePage(
   const inTaperWindow = eventWindow ? isWithinTaperWindow(eventWindow, todayDate, ENDURANCE_TAPER_WEEKS) : false;
   const taperMultiplier =
     eventWindow && weeksOut !== null ? currentTaperMultiplier(weeksOut, ENDURANCE_TAPER_WEEKS) : null;
+
+  // Strength Meet Week Taper — the structural analog of the above, for
+  // a powerbuilding/strongman goal with a linked main-lift movement
+  // pattern. Only ever computed for that specific goal_type; an
+  // endurance_event goal never reaches this branch, same as above never
+  // reaching an endurance number for a strength goal.
+  const isStrengthMeetGoal = latestConfirmedEventGoal?.goal_type === "powerbuilding_strongman";
+  const mainLiftPatternId = isStrengthMeetGoal
+    ? (latestConfirmedEventGoal?.main_lift_movement_pattern_id as string | null) ?? null
+    : null;
+
+  const [{ data: coachMovementPatterns }, { data: mainLiftExerciseRows }] = await Promise.all([
+    supabase.from("movement_patterns").select("id, name").eq("created_by", user.id).order("name"),
+    mainLiftPatternId
+      ? supabase
+          .from("movement_pattern_exercises")
+          .select("exercise_name")
+          .eq("movement_pattern_id", mainLiftPatternId)
+          .eq("tier", "A")
+          .order("exercise_name")
+          .limit(1)
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const strengthTaperWeek =
+    isStrengthMeetGoal && eventWindow
+      ? computeStrengthTaperWeek(daysUntilEvent(eventWindow, todayDate))
+      : null;
+  const mainLiftExerciseName = (mainLiftExerciseRows ?? [])[0]?.exercise_name as string | undefined;
+  const mainLiftTrainingMax = mainLiftExerciseName
+    ? (trainingMaxRows ?? []).find((r) => r.exercise_name === mainLiftExerciseName)?.estimated_max
+    : undefined;
+  const heavySingleWeight =
+    strengthTaperWeek?.heavySinglePct != null && mainLiftTrainingMax != null
+      ? computeHeavySingleWeight(mainLiftTrainingMax, strengthTaperWeek.heavySinglePct)
+      : null;
+
   const sleepQualityTrend = (wellnessRows ?? []).map((r) => ({ date: r.log_date, value: r.sleep_quality }));
   const sorenessTrend = (wellnessRows ?? []).map((r) => ({ date: r.log_date, value: r.soreness }));
   const energyTrend = (wellnessRows ?? []).map((r) => ({ date: r.log_date, value: r.energy }));
@@ -945,7 +986,7 @@ export default async function AthleteProfilePage(
             </section>
           )}
 
-          {eventWindow && inTaperWindow && (
+          {eventWindow && inTaperWindow && !isStrengthMeetGoal && (
             <section>
               <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
                 Event Taper
@@ -969,6 +1010,72 @@ export default async function AthleteProfilePage(
                     ⚠ Flagged as also cutting weight for a weight class — peaking and cutting at the same time has
                     no real evidence base to automate. Worth a direct conversation, not an automatic plan.
                   </p>
+                )}
+              </div>
+            </section>
+          )}
+
+          {isStrengthMeetGoal && eventWindow && (
+            <section>
+              <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+                Strength Meet Taper
+              </h2>
+              <div className="border border-rust/30 bg-surface px-4 py-3 space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-body text-sm text-chalk">
+                    {eventWindow.sportType ?? "Meet"} — target date {eventWindow.targetDate}
+                  </p>
+                  <MainLiftPicker
+                    goalId={latestConfirmedEventGoal!.id ?? ""}
+                    movementPatterns={coachMovementPatterns ?? []}
+                    currentPatternId={mainLiftPatternId}
+                  />
+                </div>
+                {!mainLiftPatternId && (
+                  <p className="font-body text-xs text-steel">
+                    Link a main lift above to see taper guidance here once this client is within 2 weeks of the
+                    meet.
+                  </p>
+                )}
+                {mainLiftPatternId && !strengthTaperWeek && (
+                  <p className="font-body text-xs text-steel">
+                    More than 2 weeks out — this client&apos;s program stays exactly as you&apos;ve authored it
+                    until taper guidance appears here.
+                  </p>
+                )}
+                {strengthTaperWeek && (
+                  <>
+                    <p className="font-body text-xs text-steel">
+                      {strengthTaperWeek.daysUntilMeet} day{strengthTaperWeek.daysUntilMeet === 1 ? "" : "s"} out
+                      ({strengthTaperWeek.label === "t-1" ? "taper week" : "meet week"}).
+                    </p>
+                    <p className="font-body text-xs text-steel">
+                      Recommended volume-load this week: {strengthTaperWeek.volumeLoadPctRange[0]}-
+                      {strengthTaperWeek.volumeLoadPctRange[1]}% of your most recently authored week — scale it
+                      down by hand, this doesn&apos;t touch the program itself.
+                    </p>
+                    {strengthTaperWeek.heavySinglePct != null && mainLiftExerciseName && (
+                      <p className="font-body text-xs text-steel">
+                        Keep one real heavy single at ~{strengthTaperWeek.heavySinglePct}% of current training max on{" "}
+                        {mainLiftExerciseName}
+                        {heavySingleWeight != null
+                          ? ` — about ${heavySingleWeight} lbs.`
+                          : " — no logged training max yet to compute a real number from."}
+                      </p>
+                    )}
+                    {strengthTaperWeek.heavySinglePct != null && mainLiftPatternId && !mainLiftExerciseName && (
+                      <p className="font-body text-xs text-steel">
+                        Keep one real heavy single around 90-95% of current training max — the linked pattern has no
+                        tier-A exercise set yet, so this can&apos;t compute a specific lift or weight.
+                      </p>
+                    )}
+                    {strengthTaperWeek.label === "t-0" && (
+                      <p className="font-body text-xs text-steel">
+                        Assistance work to zero. Competition-lift practice only, at opener weights — no new PRs
+                        attempted this week.
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             </section>
