@@ -538,7 +538,16 @@ export function MealPlanGenerator({
       appendOptions(
         fallback.options.map((o) => ({ ...o, recipeId: `fallback-${Date.now()}-${o.recipeId}`, isFallback: true }))
       );
-      setAiError((prev) => ({ ...prev, [meal.spec.id]: reason }));
+      // ai_output_validation_audit_findings_sept30.md — the deterministic
+      // fallback silently drops a stated dietary restriction when nothing
+      // compliant exists for this slot; surface that instead of letting
+      // it read as a clean, restriction-respecting option.
+      setAiError((prev) => ({
+        ...prev,
+        [meal.spec.id]: fallback.restrictionDropped
+          ? `${reason} ⚠ No option matched your stated dietary restriction for this slot — showing one that may not comply.`
+          : reason,
+      }));
     }
 
     try {

@@ -1037,6 +1037,12 @@ export interface MealOption {
 export interface GeneratedMeal {
   spec: MealSpec;
   options: MealOption[]; // up to 3, best match first
+  // ai_output_validation_audit_findings_sept30.md — true only when no
+  // recipe actually honored a stated dietary restriction for this slot,
+  // so the ban filter had to be dropped to return anything at all. The
+  // options above may violate a stated restriction when this is true;
+  // the caller must surface that, not silently show them as clean.
+  restrictionDropped: boolean;
 }
 
 export interface MealPlanContext {
@@ -1086,6 +1092,12 @@ export function generateMealOptions(
     return !hasBan;
   });
 
+  // Only ever true when a real restriction was actually stated — a
+  // coach/athlete with no restrictions never sees this, since `bans`
+  // would be empty and the first filter pass above already includes
+  // everything that matches slot+archetype.
+  const restrictionDropped = matched.length === 0 && bans.length > 0;
+
   if (matched.length === 0) {
     matched = recipePool.filter((r) => (r.slot === spec.slot || r.slot === "any") && r.archetype.includes(context.archetype));
   }
@@ -1113,7 +1125,7 @@ export function generateMealOptions(
     ingredients: recipe.build(spec.proteinTarget, spec.carbsTarget, spec.fatTarget, helperOptions),
   }));
 
-  return { spec, options };
+  return { spec, options, restrictionDropped };
 }
 
 export function generateFullMealPlan(

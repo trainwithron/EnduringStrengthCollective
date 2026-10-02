@@ -118,6 +118,16 @@ interface PendingImport {
   // always stop for a real look before it commits, even when every
   // exercise happened to match exactly (see prepareImport's own comment).
   isAiSourced: boolean;
+  // ai_output_validation_audit_findings_sept30.md — generate-program's
+  // own post-generation checks, surfaced here so the coach sees them on
+  // the review screen before confirming. Never gates/auto-rejects.
+  videoFlags: { exerciseName: string; flaggedReason: string }[];
+  adherenceCheck: {
+    equipmentLimits: string | null;
+    exclusions: string | null;
+    requestedSplit: string | null;
+    violations: string[];
+  } | null;
 }
 
 export function ImportWizard({
@@ -278,7 +288,9 @@ export function ImportWizard({
     sequencingNotes: string | null = null,
     injuryConsiderations: string | null = null,
     progressionRules?: GzclpProgressionRule[],
-    isAiSourced: boolean = false
+    isAiSourced: boolean = false,
+    videoFlags: { exerciseName: string; flaggedReason: string }[] = [],
+    adherenceCheck: PendingImport["adherenceCheck"] = null
   ) {
     setStatusLabel("Matching exercises…");
 
@@ -334,6 +346,8 @@ export function ImportWizard({
       injuryConsiderations,
       progressionRules,
       isAiSourced,
+      videoFlags,
+      adherenceCheck,
     };
 
     if (fuzzyMatches.length === 0 && !isAiSourced) {
@@ -700,7 +714,9 @@ export function ImportWizard({
         data.sequencingNotes ?? null,
         data.injuryConsiderations ?? null,
         undefined,
-        true
+        true,
+        data.videoFlags ?? [],
+        data.adherenceCheck ?? null
       );
     } catch (err) {
       setStatus("error");
@@ -787,6 +803,33 @@ export function ImportWizard({
               How this handled {athleteName ?? "this client"}&apos;s flagged health/injury concern:
             </p>
             <p className="font-body text-xs text-chalk leading-snug">{pending.injuryConsiderations}</p>
+          </div>
+        )}
+        {pending.isAiSourced && pending.adherenceCheck && pending.adherenceCheck.violations.length > 0 && (
+          <div className="mb-4 border border-yellow-500/40 bg-yellow-500/5 p-3">
+            <p className="font-body text-xs text-chalk font-medium mb-1.5">
+              The AI flagged possible issues with its own output — double-check these:
+            </p>
+            <ul className="font-body text-xs text-steel space-y-1 list-disc list-inside">
+              {pending.adherenceCheck.violations.map((v, i) => (
+                <li key={i}>{v}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {pending.isAiSourced && pending.videoFlags.length > 0 && (
+          <div className="mb-4 border border-yellow-500/40 bg-yellow-500/5 p-3">
+            <p className="font-body text-xs text-chalk font-medium mb-1.5">
+              {pending.videoFlags.length} exercise{pending.videoFlags.length === 1 ? "" : "s"} flagged for missing
+              video:
+            </p>
+            <ul className="font-body text-xs text-steel space-y-1">
+              {pending.videoFlags.map((f, i) => (
+                <li key={i}>
+                  <span className="text-chalk">{f.exerciseName}</span> — {f.flaggedReason}
+                </li>
+              ))}
+            </ul>
           </div>
         )}
         {previewWeeks.length > 0 && (

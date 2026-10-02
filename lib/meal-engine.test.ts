@@ -103,4 +103,30 @@ describe("generateMealOptions", () => {
       }
     }
   });
+
+  it("flags restrictionDropped false when a real restriction is honored normally", () => {
+    const specs = buildMealSpecs({ calories: 2200, protein: 180, carbs: 200, fats: 60 }, 4, false);
+    const restrictedContext = { ...context, dietaryRestrictions: "no eggs" };
+    const breakfast = generateMealOptions(specs[0], { calories: 2200, protein: 180, carbs: 200, fats: 60 }, restrictedContext);
+    expect(breakfast.restrictionDropped).toBe(false);
+  });
+
+  it("flags restrictionDropped false when no restriction was stated at all", () => {
+    const specs = buildMealSpecs({ calories: 2200, protein: 180, carbs: 200, fats: 60 }, 4, false);
+    const breakfast = generateMealOptions(specs[0], { calories: 2200, protein: 180, carbs: 200, fats: 60 }, context);
+    expect(breakfast.restrictionDropped).toBe(false);
+  });
+
+  it("flags restrictionDropped true when a stated restriction bans every matching recipe for the slot+archetype", () => {
+    const specs = buildMealSpecs({ calories: 2200, protein: 180, carbs: 200, fats: 60 }, 4, false);
+    // A restriction specific enough to plausibly ban everything the
+    // built-in recipe pool offers for this slot/archetype combination —
+    // real behavior (not every input produces this), so this directly
+    // exercises the "had to drop the ban filter" branch rather than
+    // asserting on a contrived always-true case.
+    const impossibleContext = { ...context, dietaryRestrictions: "chicken,beef,pork,fish,turkey,egg,dairy,yogurt,cheese,milk,oat,rice,bread,potato,bean" };
+    const breakfast = generateMealOptions(specs[0], { calories: 2200, protein: 180, carbs: 200, fats: 60 }, impossibleContext);
+    expect(breakfast.restrictionDropped).toBe(true);
+    expect(breakfast.options.length).toBeGreaterThan(0); // still returns something, just flagged
+  });
 });

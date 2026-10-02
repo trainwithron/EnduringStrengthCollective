@@ -4,6 +4,7 @@ import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError, AiTrunca
 import type { ParsedImportRow } from "@/lib/workout-import-parser";
 import { hasFlaggedMusculoskeletalConcern } from "@/lib/athlete-injury-flag";
 import { checkAndSpendCoachCredits, getCoachCreditStanding, AI_ACTION_COSTS } from "@/lib/coach-credits";
+import { matchExercise, matchTopN, type LibraryExercise } from "@/lib/exercise-matching";
 
 // Generates a full draft program from a coach's plain-English description
 // — "the bones" of an AI program builder, deliberately built as a
@@ -42,7 +43,19 @@ pain is never acceptable — that always means stop and the coach should follow 
 movement pattern (e.g. spinal flexion) is categorically unsafe — that specific claim is genuinely contested in the
 current literature, not settled fact.`;
 
-function buildSystemPrompt(hasInjuryContext: boolean): string {
+const ADHERENCE_JSON_FIELD = `,
+  "adherenceCheck": {
+    "equipmentLimits": string | null,  // any equipment constraint you detected in the description, or null if none
+    "exclusions": string | null,       // any movement/exercise exclusion you detected, or null if none stated
+    "requestedSplit": string | null,   // the training split you detected being asked for (e.g. "upper/lower"), or null if none specified
+    "violations": string[]             // HONEST, SELF-CRITICAL: list any way your OWN rows below might still
+                                          // violate an equipment limit, exclusion, or the requested split (e.g.
+                                          // "Row 'Barbell Bench Press' may violate the stated 'no barbell' limit").
+                                          // Empty array if you're confident there are none. This is reviewed by
+                                          // the coach before anything is created — do not hide a real doubt here.
+  }`;
+
+function buildSystemPrompt(hasInjuryContext: boolean, videoBackedNames: string[]): string {
   return `You are an experienced strength & conditioning coach writing a training program
 from a plain-English description. Respond with ONLY a JSON object shaped exactly like this — no markdown
 fences, no explanation:
@@ -55,7 +68,7 @@ fences, no explanation:
                                   // shown back to the coach later if they ask "why did you do that",
                                   // so it must reflect your ACTUAL reasoning, not a generic summary${
                                     hasInjuryContext ? INJURY_JSON_FIELD : ""
-                                  }
+                                  }${ADHERENCE_JSON_FIELD},
   "rows": [
     {
       "week": string,          // e.g. "Week 1"
@@ -88,7 +101,17 @@ Rules:
   described) rather than repeating the exact same week verbatim.
 - If this coach has standing preferences listed below (learned from past corrections), apply any whose
   stated condition matches this program — these come from a real coach explicitly correcting a past
-  program, so treat them as real methodology requirements, not suggestions.${
+  program, so treat them as real methodology requirements, not suggestions.
+- Exercises you choose AUTONOMOUSLY as part of your own program design — i.e. not something the coach's
+  description specifically named — must come ONLY from this video-backed subset of the library (these are
+  the exercises that actually have a demonstration video on file, so the athlete isn't handed something with
+  no visual reference): ${videoBackedNames.join(", ") || "(none on file yet — invent sensible names; they will be reviewed)"}.
+  If the coach's own description explicitly names a specific exercise by name — even one not in that list, or
+  not in the library at all — use it exactly as named anyway; that is a deliberate coach request, not
+  something you're picking on your own, and it is handled separately on review.
+- Pay real attention to any equipment limits, exclusions, or requested training split in the description, and
+  self-report your own adherence honestly in adherenceCheck above — including any row you're not fully
+  confident actually complies.${
     hasInjuryContext
       ? `
 - This program is for a specific client with a flagged injury/health concern, given to you below. Treat it as
@@ -193,13 +216,25 @@ export async function POST(request: Request) {
   }
   const hasInjuryContext = injuryContextText !== null;
 
+  // ai_output_validation_audit_findings_sept30.md's hard constraint: an
+  // exercise the AI picks autonomously must already have a video on file
+  // (video_path = a self-hosted upload, youtube_url = a linked video) —
+  // confirmed via a real coach account that only ~52% of a typical
+  // library has one, so this genuinely narrows the autonomous-pick pool,
+  // not a theoretical concern. A coach's own explicitly-named exercise
+  // is exempt (checked post-generation below, not here).
   const { data: libraryRows } = await supabase
     .from("exercise_library")
-    .select("name")
+    .select("name, video_path, youtube_url")
     .eq("created_by", user.id)
     .order("name")
     .limit(300);
-  const libraryNames = (libraryRows ?? []).map((r) => r.name);
+  const libraryExercises = (libraryRows ?? []).map((r) => ({
+    name: r.name as string,
+    hasVideo: !!(r.video_path || r.youtube_url),
+  }));
+  const libraryNames = libraryExercises.map((e) => e.name);
+  const videoBackedNames = libraryExercises.filter((e) => e.hasVideo).map((e) => e.name);
 
   // Learned from past corrections via the "Ask the AI why" chat
   // (ai_program_builder_conversational_learning_idea.md) — plain prompt
@@ -273,7 +308,7 @@ export async function POST(request: Request) {
 
   try {
     const text = await callClaude({
-      system: buildSystemPrompt(hasInjuryContext),
+      system: buildSystemPrompt(hasInjuryContext, videoBackedNames),
       userText:
         `Coach's exercise library (prefer these exact names where they fit):\n${libraryNames.join(", ") || "(empty — invent sensible exercise names)"}\n\n` +
         `This coach's standing preferences, learned from past corrections:\n${preferencesText}\n\n` +
@@ -345,6 +380,63 @@ export async function POST(request: Request) {
         ? parsed.injuryConsiderations.trim()
         : null;
 
+    // Real, self-reported-and-then-cross-checked prompt-adherence —
+    // ai_output_validation_audit_findings_sept30.md found zero post-
+    // generation check existed for equipment/exclusion/split adherence.
+    // Never auto-rejects (the suggestive-only/coach-is-QA principle) —
+    // surfaced on the review screen so the coach sees it and decides.
+    const rawAdherence = parsed.adherenceCheck && typeof parsed.adherenceCheck === "object" ? parsed.adherenceCheck : {};
+    const adherenceCheck = {
+      equipmentLimits: typeof rawAdherence.equipmentLimits === "string" ? rawAdherence.equipmentLimits.trim() || null : null,
+      exclusions: typeof rawAdherence.exclusions === "string" ? rawAdherence.exclusions.trim() || null : null,
+      requestedSplit: typeof rawAdherence.requestedSplit === "string" ? rawAdherence.requestedSplit.trim() || null : null,
+      violations: Array.isArray(rawAdherence.violations)
+        ? rawAdherence.violations.filter((v: unknown) => typeof v === "string" && v.trim()).map((v: string) => v.trim())
+        : [],
+    };
+
+    // The hard, enforced half of the same finding: an AI-autonomous pick
+    // must resolve to a real, video-backed library exercise. Never
+    // trusts the prompt alone — every row is checked here regardless of
+    // what the model claims it did. A coach's own explicitly-named
+    // exercise (detected by literal substring match against their own
+    // prompt text) is exempt, same exception Ron asked for directly.
+    const fullLibraryForMatching: LibraryExercise[] = libraryExercises.map((e) => ({ name: e.name }));
+    const videoLibraryForMatching: LibraryExercise[] = libraryExercises
+      .filter((e) => e.hasVideo)
+      .map((e) => ({ name: e.name }));
+    const promptLower = prompt.toLowerCase();
+    const videoFlags: { exerciseName: string; flaggedReason: string }[] = [];
+
+    const enforcedRows = rows.map((row) => {
+      const coachNamed = promptLower.includes(row.exerciseName.trim().toLowerCase());
+      if (coachNamed) return row; // a real, deliberate coach request — exempt either way
+
+      const match = matchExercise(row.exerciseName, fullLibraryForMatching, []);
+      const hasVideo = match.exerciseName
+        ? libraryExercises.find((e) => e.name === match.exerciseName)?.hasVideo ?? false
+        : false;
+      if (hasVideo) return row; // resolves to a real, video-backed entry
+
+      // Violation: either a real library entry with no video, or a pure
+      // hallucination with no match at all — try the nearest video-
+      // backed substitute before falling back to just flagging it.
+      const [bestVideoCandidate] = matchTopN(row.exerciseName, videoLibraryForMatching, [], 1);
+      if (bestVideoCandidate && bestVideoCandidate.score >= 0.4) {
+        videoFlags.push({
+          exerciseName: bestVideoCandidate.exerciseName,
+          flaggedReason: `Substituted for "${row.exerciseName}" — no video on file for that pick.`,
+        });
+        return { ...row, exerciseName: bestVideoCandidate.exerciseName };
+      }
+
+      videoFlags.push({
+        exerciseName: row.exerciseName,
+        flaggedReason: "No video on file, and no close video-backed match was found — review before using.",
+      });
+      return row;
+    });
+
     // Spend happens only now, on a genuine success — a failed/truncated/
     // empty-rows generation above never reaches here and never costs a
     // credit (coach_output_foolproofing's own "a bad output inside a
@@ -354,7 +446,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: spend.error }, { status: 402 });
     }
 
-    return NextResponse.json({ rows, programName, sequencingNotes, injuryConsiderations });
+    return NextResponse.json({
+      rows: enforcedRows,
+      programName,
+      sequencingNotes,
+      injuryConsiderations,
+      videoFlags,
+      adherenceCheck,
+    });
   } catch (err) {
     if (err instanceof AiNotConfiguredError) {
       return NextResponse.json({ error: err.message }, { status: 503 });
