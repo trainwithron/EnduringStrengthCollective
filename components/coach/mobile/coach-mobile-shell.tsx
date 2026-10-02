@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CoachMoreSheet } from "./coach-more-sheet";
 import { SpotTriggerButton } from "./spot-trigger-button";
+import { CollectiveIntelligenceChat } from "@/components/coach/desktop/collective-intelligence-chat";
 
 // Owns the "More" sheet's open/closed state — the only reason this needs
 // to be a client component at all — so the actual Home content
@@ -49,6 +50,7 @@ export function CoachMobileShell({
         initialAthleteId={spotBuilderAthleteId}
         initialAthleteName={spotBuilderAthleteName}
       />
+      <CollectiveIntelligenceChat />
       <BottomTabBar
         groupId={groupId}
         variant="coach"
