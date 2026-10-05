@@ -416,6 +416,11 @@ end
 $migrate$;
 
 -- ---- recurring series: up to 52 weeks, no credit at booking, wall-clock time kept across daylight saving ----------
+-- The series table itself capped the count at 12 (0210), so the function below would have failed on the 13th week.
+alter table public.recurring_booking_series drop constraint if exists recurring_booking_series_occurrences_total_check;
+alter table public.recurring_booking_series
+  add constraint recurring_booking_series_occurrences_total_check check (occurrences_total > 0 and occurrences_total <= 52);
+
 create or replace function public.create_recurring_booking_series(p_coach_id uuid, p_athlete_id uuid, p_group_id uuid, p_first_start_at timestamp with time zone, p_duration_minutes integer, p_occurrences_total integer)
 returns table(series_id uuid, booked_count integer, failed_count integer)
 language plpgsql
