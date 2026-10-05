@@ -55,7 +55,7 @@ const ADHERENCE_JSON_FIELD = `,
                                           // the coach before anything is created — do not hide a real doubt here.
   }`;
 
-function buildSystemPrompt(hasInjuryContext: boolean, videoBackedNames: string[]): string {
+function buildSystemPrompt(hasInjuryContext: boolean): string {
   return `You are an experienced strength & conditioning coach writing a training program
 from a plain-English description. Respond with ONLY a JSON object shaped exactly like this — no markdown
 fences, no explanation:
@@ -103,12 +103,11 @@ Rules:
   stated condition matches this program — these come from a real coach explicitly correcting a past
   program, so treat them as real methodology requirements, not suggestions.
 - Exercises you choose AUTONOMOUSLY as part of your own program design — i.e. not something the coach's
-  description specifically named — must come ONLY from this video-backed subset of the library (these are
-  the exercises that actually have a demonstration video on file, so the athlete isn't handed something with
-  no visual reference): ${videoBackedNames.join(", ") || "(none on file yet — invent sensible names; they will be reviewed)"}.
-  If the coach's own description explicitly names a specific exercise by name — even one not in that list, or
-  not in the library at all — use it exactly as named anyway; that is a deliberate coach request, not
-  something you're picking on your own, and it is handled separately on review.
+  description specifically named — must come ONLY from the coach's exercise library listed below, using the
+  exact names given. Never invent an exercise name on your own.
+  If the coach's own description explicitly names a specific exercise by name — even one not in the library —
+  use it exactly as named anyway; that is a deliberate coach request, not something you're picking on your
+  own, and it is handled separately on review.
 - Pay real attention to any equipment limits, exclusions, or requested training split in the description, and
   self-report your own adherence honestly in adherenceCheck above — including any row you're not fully
   confident actually complies.${
@@ -217,24 +216,19 @@ export async function POST(request: Request) {
   const hasInjuryContext = injuryContextText !== null;
 
   // ai_output_validation_audit_findings_sept30.md's hard constraint: an
-  // exercise the AI picks autonomously must already have a video on file
-  // (video_path = a self-hosted upload, youtube_url = a linked video) —
-  // confirmed via a real coach account that only ~52% of a typical
-  // library has one, so this genuinely narrows the autonomous-pick pool,
-  // not a theoretical concern. A coach's own explicitly-named exercise
-  // is exempt (checked post-generation below, not here).
+  // exercise the AI picks autonomously must be a real exercise in the
+  // coach's library — never a hallucinated name. (A video requirement
+  // was tried and dropped at Ron's direction: he's building out the
+  // library's videos himself, so missing video is not a violation.) A
+  // coach's own explicitly-named exercise is exempt (checked
+  // post-generation below, not here).
   const { data: libraryRows } = await supabase
     .from("exercise_library")
-    .select("name, video_path, youtube_url")
+    .select("name")
     .eq("created_by", user.id)
     .order("name")
     .limit(300);
-  const libraryExercises = (libraryRows ?? []).map((r) => ({
-    name: r.name as string,
-    hasVideo: !!(r.video_path || r.youtube_url),
-  }));
-  const libraryNames = libraryExercises.map((e) => e.name);
-  const videoBackedNames = libraryExercises.filter((e) => e.hasVideo).map((e) => e.name);
+  const libraryNames = (libraryRows ?? []).map((r) => r.name as string);
 
   // Learned from past corrections via the "Ask the AI why" chat
   // (ai_program_builder_conversational_learning_idea.md) — plain prompt
@@ -308,7 +302,7 @@ export async function POST(request: Request) {
 
   try {
     const text = await callClaude({
-      system: buildSystemPrompt(hasInjuryContext, videoBackedNames),
+      system: buildSystemPrompt(hasInjuryContext),
       userText:
         `Coach's exercise library (prefer these exact names where they fit):\n${libraryNames.join(", ") || "(empty — invent sensible exercise names)"}\n\n` +
         `This coach's standing preferences, learned from past corrections:\n${preferencesText}\n\n` +
@@ -396,46 +390,48 @@ export async function POST(request: Request) {
     };
 
     // The hard, enforced half of the same finding: an AI-autonomous pick
-    // must resolve to a real, video-backed library exercise. Never
+    // must resolve to a real exercise in the coach's library. Never
     // trusts the prompt alone — every row is checked here regardless of
     // what the model claims it did. A coach's own explicitly-named
     // exercise (detected by literal substring match against their own
-    // prompt text) is exempt, same exception Ron asked for directly.
-    const fullLibraryForMatching: LibraryExercise[] = libraryExercises.map((e) => ({ name: e.name }));
-    const videoLibraryForMatching: LibraryExercise[] = libraryExercises
-      .filter((e) => e.hasVideo)
-      .map((e) => ({ name: e.name }));
+    // prompt text) is exempt and is backfilled into the library by the
+    // existing import flow. Video presence is deliberately not checked.
+    const libraryForMatching: LibraryExercise[] = libraryNames.map((name) => ({ name }));
     const promptLower = prompt.toLowerCase();
-    const videoFlags: { exerciseName: string; flaggedReason: string }[] = [];
+    const libraryFlags: { exerciseName: string; flaggedReason: string }[] = [];
 
-    const enforcedRows = rows.map((row) => {
-      const coachNamed = promptLower.includes(row.exerciseName.trim().toLowerCase());
-      if (coachNamed) return row; // a real, deliberate coach request — exempt either way
+    // An empty library gives nothing to match against — the prompt
+    // already told the model to invent sensible names in that case.
+    const enforcedRows =
+      libraryForMatching.length === 0
+        ? rows
+        : rows.map((row) => {
+            const coachNamed = promptLower.includes(row.exerciseName.trim().toLowerCase());
+            if (coachNamed) return row;
 
-      const match = matchExercise(row.exerciseName, fullLibraryForMatching, []);
-      const hasVideo = match.exerciseName
-        ? libraryExercises.find((e) => e.name === match.exerciseName)?.hasVideo ?? false
-        : false;
-      if (hasVideo) return row; // resolves to a real, video-backed entry
+            // Any exact/alias/fuzzy match is a real library entry — fuzzy
+            // ones already get arbitrated by the existing review step.
+            const match = matchExercise(row.exerciseName, libraryForMatching, []);
+            if (match.exerciseName) return row;
 
-      // Violation: either a real library entry with no video, or a pure
-      // hallucination with no match at all — try the nearest video-
-      // backed substitute before falling back to just flagging it.
-      const [bestVideoCandidate] = matchTopN(row.exerciseName, videoLibraryForMatching, [], 1);
-      if (bestVideoCandidate && bestVideoCandidate.score >= 0.4) {
-        videoFlags.push({
-          exerciseName: bestVideoCandidate.exerciseName,
-          flaggedReason: `Substituted for "${row.exerciseName}" — no video on file for that pick.`,
-        });
-        return { ...row, exerciseName: bestVideoCandidate.exerciseName };
-      }
+            // A genuine hallucination: nearest real library match where
+            // one is close enough, otherwise flagged — never silently
+            // created as a new library row.
+            const [nearest] = matchTopN(row.exerciseName, libraryForMatching, [], 1);
+            if (nearest && nearest.score >= 0.4) {
+              libraryFlags.push({
+                exerciseName: nearest.exerciseName,
+                flaggedReason: `Substituted for "${row.exerciseName}" — that name isn't in your library.`,
+              });
+              return { ...row, exerciseName: nearest.exerciseName };
+            }
 
-      videoFlags.push({
-        exerciseName: row.exerciseName,
-        flaggedReason: "No video on file, and no close video-backed match was found — review before using.",
-      });
-      return row;
-    });
+            libraryFlags.push({
+              exerciseName: row.exerciseName,
+              flaggedReason: "Not in your library, and no close match was found — review before using.",
+            });
+            return row;
+          });
 
     // Spend happens only now, on a genuine success — a failed/truncated/
     // empty-rows generation above never reaches here and never costs a
@@ -451,7 +447,7 @@ export async function POST(request: Request) {
       programName,
       sequencingNotes,
       injuryConsiderations,
-      videoFlags,
+      libraryFlags,
       adherenceCheck,
     });
   } catch (err) {

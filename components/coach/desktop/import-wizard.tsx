@@ -121,7 +121,7 @@ interface PendingImport {
   // ai_output_validation_audit_findings_sept30.md — generate-program's
   // own post-generation checks, surfaced here so the coach sees them on
   // the review screen before confirming. Never gates/auto-rejects.
-  videoFlags: { exerciseName: string; flaggedReason: string }[];
+  libraryFlags: { exerciseName: string; flaggedReason: string }[];
   adherenceCheck: {
     equipmentLimits: string | null;
     exclusions: string | null;
@@ -289,7 +289,7 @@ export function ImportWizard({
     injuryConsiderations: string | null = null,
     progressionRules?: GzclpProgressionRule[],
     isAiSourced: boolean = false,
-    videoFlags: { exerciseName: string; flaggedReason: string }[] = [],
+    libraryFlags: { exerciseName: string; flaggedReason: string }[] = [],
     adherenceCheck: PendingImport["adherenceCheck"] = null
   ) {
     setStatusLabel("Matching exercises…");
@@ -346,7 +346,7 @@ export function ImportWizard({
       injuryConsiderations,
       progressionRules,
       isAiSourced,
-      videoFlags,
+      libraryFlags,
       adherenceCheck,
     };
 
@@ -715,7 +715,7 @@ export function ImportWizard({
         data.injuryConsiderations ?? null,
         undefined,
         true,
-        data.videoFlags ?? [],
+        data.libraryFlags ?? [],
         data.adherenceCheck ?? null
       );
     } catch (err) {
@@ -817,14 +817,14 @@ export function ImportWizard({
             </ul>
           </div>
         )}
-        {pending.isAiSourced && pending.videoFlags.length > 0 && (
+        {pending.isAiSourced && pending.libraryFlags.length > 0 && (
           <div className="mb-4 border border-yellow-500/40 bg-yellow-500/5 p-3">
             <p className="font-body text-xs text-chalk font-medium mb-1.5">
-              {pending.videoFlags.length} exercise{pending.videoFlags.length === 1 ? "" : "s"} flagged for missing
-              video:
+              {pending.libraryFlags.length} exercise{pending.libraryFlags.length === 1 ? "" : "s"} weren&apos;t in your
+              library:
             </p>
             <ul className="font-body text-xs text-steel space-y-1">
-              {pending.videoFlags.map((f, i) => (
+              {pending.libraryFlags.map((f, i) => (
                 <li key={i}>
                   <span className="text-chalk">{f.exerciseName}</span> — {f.flaggedReason}
                 </li>
