@@ -189,7 +189,7 @@ export function BreakoutMiniGame({
           </div>
         )}
       </div>
-      <p className="font-body text-[11px] text-steel">Drag to move the paddle — purely optional.</p>
+      <p className="font-body text-xs text-steel">Drag to move the paddle — purely optional.</p>
     </div>
   );
 }

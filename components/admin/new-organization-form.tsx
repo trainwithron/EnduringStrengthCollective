@@ -98,7 +98,7 @@ export function NewOrganizationForm({ existingOrgs, ownerId }: { existingOrgs: O
             </option>
           ))}
         </select>
-        <p className="font-body text-[11px] text-steel mt-1">
+        <p className="font-body text-xs text-steel mt-1">
           Copies colors, fonts, and button shape only — not the logo, since a new client uploads
           their own.
         </p>

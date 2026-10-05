@@ -127,7 +127,7 @@ export function ExpandedDayScheduler({
       <div className="bg-graphite border border-rust/40 w-full max-w-2xl max-h-[85vh] overflow-y-auto shadow-2xl">
         <div className="p-5 border-b border-steel/20 flex items-start justify-between gap-4">
           <div>
-            <p className="font-body text-[11px] text-steel uppercase tracking-wide">
+            <p className="font-body text-xs text-steel uppercase tracking-wide">
               Schedule session
             </p>
             <h2 className="font-display font-bold text-xl uppercase leading-tight mt-0.5">
@@ -183,7 +183,7 @@ export function ExpandedDayScheduler({
                 .map((w, i) => (
                   <span
                     key={i}
-                    className="font-body text-[11px] text-steel border border-steel/30 px-2 py-1"
+                    className="font-body text-xs text-steel border border-steel/30 px-2 py-1"
                   >
                     Available {w.startTime.slice(0, 5)}–{w.endTime.slice(0, 5)}
                   </span>

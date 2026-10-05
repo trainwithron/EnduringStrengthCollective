@@ -47,7 +47,7 @@ export function BackgroundPicker({
 
       {open && (
         <div className="mt-3">
-          <p className="font-body text-[11px] text-steel mb-2">
+          <p className="font-body text-xs text-steel mb-2">
             Pick a scene for every future card, or leave it on auto to keep it rotating.
           </p>
           <div className="grid grid-cols-3 gap-2">
@@ -59,7 +59,7 @@ export function BackgroundPicker({
                 selected === null ? "border-rust" : "border-steel/20"
               }`}
             >
-              <span className="font-body text-[10px] text-steel uppercase tracking-wide">Auto</span>
+              <span className="font-body text-xs text-steel uppercase tracking-wide">Auto</span>
               {selected === null && (
                 <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-rust flex items-center justify-center">
                   <Check className="w-2.5 h-2.5 text-graphite" strokeWidth={3} />

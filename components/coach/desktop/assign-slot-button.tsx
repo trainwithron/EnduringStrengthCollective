@@ -67,7 +67,7 @@ export function AssignSlotButton({
       >
         {submitting ? "Assigning…" : "Assign"}
       </button>
-      {error && <span className="font-body text-[11px] text-rust">{error}</span>}
+      {error && <span className="font-body text-xs text-rust">{error}</span>}
     </div>
   );
 }

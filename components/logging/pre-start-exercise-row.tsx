@@ -63,15 +63,15 @@ export function PreStartExerciseRow({
             <p className="font-body text-xs text-steel mt-0.5">{exercise.notes}</p>
           )}
           {exercise.isOverridden && (
-            <p className="font-body text-[11px] text-steel mt-0.5">customized for you</p>
+            <p className="font-body text-xs text-steel mt-0.5">customized for you</p>
           )}
           {lastTime && (
-            <p className="font-body text-[11px] text-steel mt-0.5">
+            <p className="font-body text-xs text-steel mt-0.5">
               Last: {lastTime.weight}&times;{lastTime.reps}
             </p>
           )}
           {goal && (goal.weight != null || goal.reps != null) && (
-            <p className="font-body text-[11px] text-rust mt-0.5">
+            <p className="font-body text-xs text-rust mt-0.5">
               Goal: {goal.weight != null ? `${goal.weight} lbs` : ""}
               {goal.weight != null && goal.reps != null ? " × " : ""}
               {goal.reps != null ? `${goal.reps} reps` : ""}

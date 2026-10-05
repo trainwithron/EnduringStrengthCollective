@@ -55,7 +55,7 @@ export function HomeMonthView({
         {WEEKDAY_LABELS.map((label) => (
           <div
             key={label}
-            className="bg-graphite text-center font-body text-[10px] text-steel uppercase tracking-wide py-1.5"
+            className="bg-graphite text-center font-body text-xs text-steel uppercase tracking-wide py-1.5"
           >
             {label}
           </div>
@@ -72,12 +72,12 @@ export function HomeMonthView({
 
           return (
             <Link key={i} href={`/groups/${groupId}?view=day&date=${key}`} className={cellClass}>
-              <span className={`font-body text-[10px] ${isToday ? "text-rust font-bold" : "text-steel"}`}>
+              <span className={`font-body text-xs ${isToday ? "text-rust font-bold" : "text-steel"}`}>
                 {date.getDate()}
               </span>
               {summary?.workout.title && (
                 <span
-                  className={`font-body text-[9px] leading-tight mt-0.5 truncate flex items-center gap-0.5 ${
+                  className={`font-body text-xs leading-tight mt-0.5 truncate flex items-center gap-0.5 ${
                     summary.workout.status === "locked" ? "text-steel" : "text-chalk"
                   }`}
                 >
@@ -86,7 +86,7 @@ export function HomeMonthView({
                 </span>
               )}
               {summary?.workout.status === "done" && (
-                <span className="font-body text-[9px] text-positive mt-0.5">Done</span>
+                <span className="font-body text-xs text-positive mt-0.5">Done</span>
               )}
               {summary && (summary.macroCalories != null || summary.habitsDue > 0) && (
                 <span className="font-body text-[8px] text-steel mt-0.5 truncate">

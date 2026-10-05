@@ -21,7 +21,7 @@ export function ScheduleClientPicker({
 
   return (
     <div className="px-5 pt-4 pb-2 border-b border-steel/20">
-      <label className="font-body text-[11px] text-steel uppercase tracking-wide">
+      <label className="font-body text-xs text-steel uppercase tracking-wide">
         Schedule a client
       </label>
       <select

@@ -178,8 +178,8 @@ export function WellnessCheckinWidget({
                 ))}
               </div>
               <div className="flex justify-between mt-1">
-                <span className="font-body text-[10px] text-steel">{field.lowLabel}</span>
-                <span className="font-body text-[10px] text-steel">{field.highLabel}</span>
+                <span className="font-body text-xs text-steel">{field.lowLabel}</span>
+                <span className="font-body text-xs text-steel">{field.highLabel}</span>
               </div>
             </div>
           ))}

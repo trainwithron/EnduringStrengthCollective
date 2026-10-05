@@ -55,7 +55,7 @@ export function CoachCreditsPanel({
       </p>
 
       <div className="border border-steel/20 p-4 mb-4">
-        <p className="font-body text-[11px] text-steel uppercase tracking-wide mb-1">Your balance</p>
+        <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">Your balance</p>
         {unlimited ? (
           <p className="font-display text-2xl uppercase text-rust">Unlimited</p>
         ) : (

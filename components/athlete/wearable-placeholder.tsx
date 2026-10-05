@@ -76,7 +76,7 @@ export function WearablePlaceholder({
             className="flex items-center justify-between h-10 px-3 border border-steel/15 opacity-50"
           >
             <span className="font-body text-sm">{p}</span>
-            <span className="font-body text-[11px] text-steel uppercase tracking-wide">
+            <span className="font-body text-xs text-steel uppercase tracking-wide">
               Coming soon
             </span>
           </div>

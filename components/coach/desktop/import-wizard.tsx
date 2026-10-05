@@ -844,7 +844,7 @@ export function ImportWizard({
           <div className="mb-5 max-h-80 overflow-y-auto border border-steel/20">
             {previewWeeks.map((week) => (
               <div key={week.weekLabel} className="border-b border-steel/15 last:border-b-0">
-                <p className="font-display text-[11px] uppercase tracking-wide text-steel px-3 pt-2.5">
+                <p className="font-display text-xs uppercase tracking-wide text-steel px-3 pt-2.5">
                   {week.weekLabel}
                 </p>
                 {week.days.map((day, i) => (
@@ -869,7 +869,7 @@ export function ImportWizard({
           {pending.fuzzyMatches.map((f) => (
             <div key={f.key} className="border border-steel/20 p-3">
               <p className="font-body text-sm">
-                &ldquo;{f.rawName}&rdquo; <span className="text-[11px] text-steel">({Math.round(f.score * 100)}% match)</span>
+                &ldquo;{f.rawName}&rdquo; <span className="text-xs text-steel">({Math.round(f.score * 100)}% match)</span>
               </p>
               <label className="flex items-center gap-2 mt-2 font-body text-xs text-chalk">
                 <input
@@ -973,7 +973,7 @@ export function ImportWizard({
               {summary.fuzzyMatches.map((f, i) => (
                 <p key={i} className="font-body text-xs text-steel">
                   &ldquo;{f.rawName}&rdquo; &rarr; <span className="text-chalk">{f.matchedTo}</span>{" "}
-                  <span className="text-[11px]">({Math.round(f.score * 100)}% match)</span>
+                  <span className="text-xs">({Math.round(f.score * 100)}% match)</span>
                 </p>
               ))}
             </div>
@@ -1046,7 +1046,7 @@ export function ImportWizard({
               {statusLabel}
             </p>
             {statusLabel === "Writing a program with AI…" && (
-              <p className="font-body text-[11px] text-steel/70 mt-1">
+              <p className="font-body text-xs text-steel mt-1">
                 Longer programs can take up to a minute — hang tight, this hasn&apos;t stalled.
               </p>
             )}
@@ -1086,7 +1086,7 @@ export function ImportWizard({
           created, even if nothing needs a second look.
         </p>
         <div className="mb-3 border border-steel/15 bg-graphite/60 p-3">
-          <p className="font-body text-[11px] text-steel uppercase tracking-wide mb-1.5">
+          <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5">
             For the best result, mention:
           </p>
           <ul className="font-body text-xs text-steel space-y-0.5 list-disc list-inside">
@@ -1103,7 +1103,7 @@ export function ImportWizard({
               )
             }
             disabled={status === "working"}
-            className="mt-2 font-body text-[11px] text-rust underline decoration-dotted disabled:opacity-40"
+            className="mt-2 font-body text-xs text-rust underline decoration-dotted disabled:opacity-40"
           >
             Use this example →
           </button>
@@ -1136,7 +1136,7 @@ export function ImportWizard({
             <span className="text-chalk">{athleteName ?? "this client"}</span> — deterministic, no
             AI involved, computed straight from their current training maxes below.
           </p>
-          <p className="font-body text-[11px] text-steel/70 mb-4">
+          <p className="font-body text-xs text-steel mb-4">
             Every training day covers every lift you select, rotating through{" "}
             {DUP_WEEKLY_SCHEME.map((s) => `${s.label} (${s.reps} @ ~${Math.round(s.percentOfTrainingMax * 100)}%)`).join(
               " → "
@@ -1153,7 +1153,7 @@ export function ImportWizard({
                   onChange={() => toggleDupLift(lift.exerciseName)}
                 />
                 {lift.exerciseName}{" "}
-                <span className="text-[11px] text-steel">({lift.trainingMax} lb training max)</span>
+                <span className="text-xs text-steel">({lift.trainingMax} lb training max)</span>
               </label>
             ))}
           </div>
@@ -1211,7 +1211,7 @@ export function ImportWizard({
             </p>
           ) : (
             <>
-              <p className="font-body text-[11px] text-steel/70 mb-4">
+              <p className="font-body text-xs text-steel mb-4">
                 T1 starting weight (week 1 only — every week after is computed live from real logged
                 performance, never precomputed) comes from{" "}
                 <label className="inline-flex items-center gap-1">
@@ -1222,7 +1222,7 @@ export function ImportWizard({
                     value={gzclpStartPercent}
                     onChange={(e) => setGzclpStartPercent(Math.max(50, Math.min(100, Number(e.target.value) || 85)))}
                     disabled={status === "working"}
-                    className="w-12 bg-graphite border border-steel/30 text-chalk px-1 py-0.5 font-body text-[11px] focus:outline-none focus:border-rust disabled:opacity-40"
+                    className="w-12 bg-graphite border border-steel/30 text-chalk px-1 py-0.5 font-body text-xs focus:outline-none focus:border-rust disabled:opacity-40"
                   />
                   %
                 </label>{" "}
@@ -1251,7 +1251,7 @@ export function ImportWizard({
                         </option>
                       ))}
                     </select>
-                    <label className="flex items-center gap-1.5 font-body text-[11px] text-steel">
+                    <label className="flex items-center gap-1.5 font-body text-xs text-steel">
                       T2 start
                       <input
                         type="number"
@@ -1272,7 +1272,7 @@ export function ImportWizard({
                   </div>
                 ))}
               </div>
-              <p className="font-body text-[11px] text-steel/70 mb-4">
+              <p className="font-body text-xs text-steel mb-4">
                 Lifts 1+2 pair together (each is the other&apos;s T2), same for lifts 3+4 — the
                 standard squat/bench + press/deadlift split, whatever you actually name them.
               </p>

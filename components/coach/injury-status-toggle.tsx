@@ -68,7 +68,7 @@ export function InjuryStatusToggle({
         <input type="checkbox" checked={isInjured} disabled={saving} onChange={handleToggle} />
         Currently injured
       </label>
-      <p className="font-body text-[11px] text-steel mt-1 max-w-[42ch]">
+      <p className="font-body text-xs text-steel mt-1 max-w-[42ch]">
         {isInjured
           ? "Nutrition check-ins floor this client's calories at maintenance (never a deficit) until you clear this. Undereating while injured measurably delays recovery."
           : "When set, nutrition check-ins won't cut this client's calories below maintenance, regardless of their active phase."}
@@ -85,7 +85,7 @@ export function InjuryStatusToggle({
             onChange={(e) => handleSurplusChange(Math.max(0, Math.min(10, Number(e.target.value) || 0)))}
             className="w-14 h-7 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs disabled:opacity-40"
           />
-          <span className="text-[11px]">% (0 = maintenance only, up to a real 5-10% surplus)</span>
+          <span className="text-xs">% (0 = maintenance only, up to a real 5-10% surplus)</span>
         </label>
       )}
     </div>

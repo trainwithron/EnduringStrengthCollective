@@ -66,7 +66,7 @@ export default async function GoalPage(props: { params: Promise<{ groupId: strin
       <section className="px-5 pt-6">
       {current && (
         <div className="border border-steel/20 p-4 mb-6">
-          <p className="font-body text-[10px] text-steel uppercase tracking-wide font-bold mb-1">
+          <p className="font-body text-xs text-steel uppercase tracking-wide font-bold mb-1">
             {current.status === "confirmed" ? "Current goal" : current.status === "proposed" ? "Waiting on your coach" : "Declined"}
           </p>
           <p className="font-body text-lg">{labelFor(current.goal_type, current.custom_label)}</p>

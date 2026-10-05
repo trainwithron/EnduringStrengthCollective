@@ -42,9 +42,9 @@ export function DashboardHero({
     return (
       <div className="border border-rust/40 bg-rust/5 p-5">
         <div className="flex items-center gap-2 mb-2">
-          <p className="font-body text-[10px] text-rust uppercase tracking-wide font-bold">Right now</p>
+          <p className="font-body text-xs text-rust uppercase tracking-wide font-bold">Right now</p>
           {flag.orgName && (
-            <p className="font-body text-[10px] text-steel uppercase tracking-wide">— {flag.orgName}</p>
+            <p className="font-body text-xs text-steel uppercase tracking-wide">— {flag.orgName}</p>
           )}
         </div>
         <p className="font-body text-lg text-chalk mb-3">{sentenceFor(flag)}</p>
@@ -63,7 +63,7 @@ export function DashboardHero({
   if (emptyState) {
     return (
       <div className="border border-steel/20 bg-surface p-5">
-        <p className="font-body text-[10px] text-steel uppercase tracking-wide font-bold mb-2">Right now</p>
+        <p className="font-body text-xs text-steel uppercase tracking-wide font-bold mb-2">Right now</p>
         <p className="font-body text-lg text-chalk">{emptyState.text}</p>
         {emptyState.href && (
           <Link href={emptyState.href} className="font-body text-sm text-rust font-medium mt-3 inline-block">

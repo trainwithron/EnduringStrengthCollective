@@ -74,12 +74,12 @@ export function WaitlistJoinButton({
   if (localStatus === "waiting" || localStatus === "offered") {
     return (
       <div className="flex items-center gap-2">
-        <span className="font-body text-[11px] text-steel">On waitlist</span>
+        <span className="font-body text-xs text-steel">On waitlist</span>
         <button
           type="button"
           onClick={handleLeave}
           disabled={submitting}
-          className="font-body text-[11px] text-rust disabled:opacity-40"
+          className="font-body text-xs text-rust disabled:opacity-40"
         >
           {submitting ? "…" : "Leave"}
         </button>
@@ -97,7 +97,7 @@ export function WaitlistJoinButton({
       >
         {submitting ? "Joining…" : "Join waitlist"}
       </button>
-      {error && <span className="font-body text-[11px] text-rust">{error}</span>}
+      {error && <span className="font-body text-xs text-rust">{error}</span>}
     </div>
   );
 }

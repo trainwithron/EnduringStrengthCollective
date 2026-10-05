@@ -86,7 +86,7 @@ export function NeedsAttentionStrip({ coachId, groupId }: { coachId: string; gro
 
   return (
     <div className="border border-steel/20 bg-surface/30 p-3 mb-3">
-      <p className="font-body text-[10px] text-steel uppercase tracking-wide mb-1">
+      <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">
         {CATEGORY_LABEL[idleContent.category]}
       </p>
       <p className="font-body text-xs text-chalk leading-snug">{idleContent.text}</p>

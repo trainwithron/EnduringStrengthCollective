@@ -75,7 +75,7 @@ export function ClientSlotRow({
         <p className="font-body font-medium text-[15px]">
           {resolvedExerciseName}
           {isOverridden && (
-            <span className="font-body text-[11px] text-rust ml-2 align-middle">customized</span>
+            <span className="font-body text-xs text-rust ml-2 align-middle">customized</span>
           )}
         </p>
         {isOverridden && (

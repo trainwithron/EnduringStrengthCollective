@@ -312,7 +312,7 @@ export default async function CoachDashboardPage(
           {recentActivity.map((entry) =>
             entry.kind === "post" ? (
               <div key={`post-${entry.post.id}`} className="relative">
-                <span className="absolute top-4 right-5 font-body text-[10px] text-steel">
+                <span className="absolute top-4 right-5 font-body text-xs text-steel">
                   {entry.groupName}
                 </span>
                 <WorkoutSummaryCard post={entry.post} viewerId={user.id} isCoach />
@@ -327,7 +327,7 @@ export default async function CoachDashboardPage(
               </div>
             ) : (
               <div key={entry.item.id} className="py-3 px-5 flex items-start gap-3">
-                <span className="font-body text-[10px] text-steel uppercase tracking-wide border border-steel/30 px-1.5 py-0.5 shrink-0 mt-0.5">
+                <span className="font-body text-xs text-steel uppercase tracking-wide border border-steel/30 px-1.5 py-0.5 shrink-0 mt-0.5">
                   {TYPE_LABEL[entry.item.type]}
                 </span>
                 <div className="min-w-0 flex-1">

@@ -244,7 +244,7 @@ export default async function TeamPerformancePage(
             {engagement.activeCount}/{engagement.totalCount}
           </p>
           <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Active this week</p>
-          <p className="font-body text-[11px] text-steel mt-0.5">{engagement.pct}% logged a workout</p>
+          <p className="font-body text-xs text-steel mt-0.5">{engagement.pct}% logged a workout</p>
         </div>
         <div className="border border-steel/20 p-4">
           <p className="font-display text-3xl leading-none">{workoutsThisWeek}</p>
@@ -260,9 +260,9 @@ export default async function TeamPerformancePage(
           </p>
           <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Avg readiness today</p>
           {lowReadinessToday > 0 ? (
-            <p className="font-body text-[11px] text-rust mt-0.5">{lowReadinessToday} flagged low</p>
+            <p className="font-body text-xs text-rust mt-0.5">{lowReadinessToday} flagged low</p>
           ) : (
-            <p className="font-body text-[11px] text-steel mt-0.5">
+            <p className="font-body text-xs text-steel mt-0.5">
               {avgReadinessToday != null ? "Out of 5" : "No check-ins yet"}
             </p>
           )}
@@ -270,14 +270,14 @@ export default async function TeamPerformancePage(
         <div className="border border-steel/20 p-4">
           <p className="font-display text-3xl leading-none">{habitCompliancePct}%</p>
           <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Habit compliance</p>
-          <p className="font-body text-[11px] text-steel mt-0.5">Last 7 days</p>
+          <p className="font-body text-xs text-steel mt-0.5">Last 7 days</p>
         </div>
         <div className="border border-steel/20 p-4">
           <p className="font-display text-3xl leading-none">
             {avgSessionRpeThisWeek != null ? avgSessionRpeThisWeek.toFixed(1) : "—"}
           </p>
           <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Avg session RPE</p>
-          <p className="font-body text-[11px] text-steel mt-0.5">
+          <p className="font-body text-xs text-steel mt-0.5">
             {avgSessionRpeThisWeek != null ? "Last 7 days, out of 10" : "No ratings yet"}
           </p>
         </div>
@@ -291,12 +291,12 @@ export default async function TeamPerformancePage(
           <div className="flex items-end gap-2 h-28">
             {weeklyActivity.map((b) => (
               <div key={b.weekLabel} className="flex-1 flex flex-col items-center gap-1.5">
-                <span className="font-body text-[11px] text-chalk">{b.count}</span>
+                <span className="font-body text-xs text-chalk">{b.count}</span>
                 <div
                   className="w-full bg-rust"
                   style={{ height: `${Math.max(4, (b.count / maxWeeklyCount) * 80)}px` }}
                 />
-                <span className="font-body text-[9px] text-steel">{b.weekLabel}</span>
+                <span className="font-body text-xs text-steel">{b.weekLabel}</span>
               </div>
             ))}
           </div>

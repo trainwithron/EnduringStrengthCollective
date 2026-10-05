@@ -89,14 +89,14 @@ function RecordsList({ records }: { records: RecordRow[] }) {
           </p>
           {r.history.length > 0 && (
             <details className="mt-2">
-              <summary className="font-body text-[11px] text-steel cursor-pointer">
+              <summary className="font-body text-xs text-steel cursor-pointer">
                 {r.history.length} previous holder{r.history.length === 1 ? "" : "s"}
               </summary>
               <div className="mt-2 space-y-1 pl-3 border-l border-steel/20">
                 {r.history
                   .sort((a, b) => b.achievedAt.localeCompare(a.achievedAt))
                   .map((h, i) => (
-                    <p key={i} className="font-body text-[11px] text-steel">
+                    <p key={i} className="font-body text-xs text-steel">
                       {h.athleteName} — {h.value} lb (
                       {new Date(h.achievedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                       )

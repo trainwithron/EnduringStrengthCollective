@@ -113,7 +113,7 @@ export function ClientSignInPanel({
             {s.done ? (
               <Check className="w-4 h-4 mt-0.5 text-positive shrink-0" strokeWidth={2.5} />
             ) : (
-              <Circle className="w-4 h-4 mt-0.5 text-steel/60 shrink-0" />
+              <Circle className="w-4 h-4 mt-0.5 text-steel shrink-0" />
             )}
             <span className={s.done ? "text-chalk" : "text-steel"}>{s.label}</span>
           </li>

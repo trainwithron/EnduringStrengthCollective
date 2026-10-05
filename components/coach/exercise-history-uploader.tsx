@@ -263,7 +263,7 @@ export function ExerciseHistoryUploader({
                 </p>
               ))}
               {csvRows.length > 20 && (
-                <p className="font-body text-xs text-steel/70 px-2 py-1">…and {csvRows.length - 20} more</p>
+                <p className="font-body text-xs text-steel px-2 py-1">…and {csvRows.length - 20} more</p>
               )}
             </div>
             <div className="flex items-center gap-3">
@@ -310,7 +310,7 @@ export function ExerciseHistoryUploader({
                     type="button"
                     onClick={() => handleDelete(group.sessionId)}
                     disabled={deletingId === group.sessionId}
-                    className="font-body text-[11px] text-rust disabled:opacity-40"
+                    className="font-body text-xs text-rust disabled:opacity-40"
                   >
                     {deletingId === group.sessionId ? "Deleting…" : "Delete"}
                   </button>

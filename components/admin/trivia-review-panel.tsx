@@ -81,7 +81,7 @@ export function TriviaReviewPanel({ initialQuestions }: { initialQuestions: Triv
             <div key={q.id} className="border border-steel/20 p-3 flex items-start justify-between gap-3">
               <div>
                 <p className="font-body text-sm text-chalk">{q.statement}</p>
-                <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">
+                <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">
                   Marked: {q.correctAnswer ? "True" : "False"}
                 </p>
               </div>

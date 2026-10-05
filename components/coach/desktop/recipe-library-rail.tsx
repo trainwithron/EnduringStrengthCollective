@@ -48,10 +48,10 @@ export function RecipeLibraryRail({ coachId }: { coachId: string }) {
 
   return (
     <div className="border border-steel/20 p-3">
-      <p className="font-body text-[11px] text-steel uppercase tracking-wide font-bold mb-2">
+      <p className="font-body text-xs text-steel uppercase tracking-wide font-bold mb-2">
         Recipe library
       </p>
-      <p className="font-body text-[10px] text-steel mb-2">
+      <p className="font-body text-xs text-steel mb-2">
         Drag a recipe onto a meal slot in an expanded day.
       </p>
       <input
@@ -67,7 +67,7 @@ export function RecipeLibraryRail({ coachId }: { coachId: string }) {
             key={f.value}
             type="button"
             onClick={() => setFilter(f.value)}
-            className={`font-body text-[10px] uppercase tracking-wide px-2 py-0.5 border ${
+            className={`font-body text-xs uppercase tracking-wide px-2 py-0.5 border ${
               filter === f.value ? "border-rust text-rust" : "border-steel/30 text-steel"
             }`}
           >
@@ -86,7 +86,7 @@ export function RecipeLibraryRail({ coachId }: { coachId: string }) {
               className="border border-steel/20 px-2 py-1.5 hover:border-steel/50"
             >
               <p className="font-body text-xs text-chalk leading-tight">{r.name}</p>
-              <p className="font-body text-[10px] text-steel">
+              <p className="font-body text-xs text-steel">
                 {r.slot === "any" ? "any meal" : r.slot}
                 {customIds.has(r.id) ? " · yours" : ""}
               </p>

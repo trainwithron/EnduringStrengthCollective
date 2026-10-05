@@ -112,7 +112,7 @@ export function MealCheckoffList({
                 {primaryOption && (
                   <p className="font-body text-xs text-steel truncate">{primaryOption.recipeName}</p>
                 )}
-                <p className="font-body text-[11px] text-steel mt-0.5">
+                <p className="font-body text-xs text-steel mt-0.5">
                   {meal.spec.proteinTarget}p / {meal.spec.carbsTarget}c / {meal.spec.fatTarget}f
                 </p>
               </div>
@@ -304,7 +304,7 @@ export function FreeTextFoodLog({
           <p className="font-body text-xs text-steel mt-1">
             ~{estimate.calories} kcal · {estimate.proteinG}p / {estimate.carbsG}c / {estimate.fatG}f
           </p>
-          <p className="font-body text-[11px] text-steel mt-1">Rough estimate — not lab-precise.</p>
+          <p className="font-body text-xs text-steel mt-1">Rough estimate — not lab-precise.</p>
           <div className="flex items-center gap-2 mt-2">
             <button
               type="button"

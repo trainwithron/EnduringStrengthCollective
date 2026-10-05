@@ -115,7 +115,7 @@ export function ChallengeCreator({
       />
       <div className="grid grid-cols-3 gap-2">
         <label className="block">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">Start date</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Start date</span>
           <input
             type="date"
             value={startDate}
@@ -124,7 +124,7 @@ export function ChallengeCreator({
           />
         </label>
         <label className="block">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">Weeks</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Weeks</span>
           <input
             type="number"
             min={1}
@@ -134,7 +134,7 @@ export function ChallengeCreator({
           />
         </label>
         <label className="block">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">Entry fee ($)</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Entry fee ($)</span>
           <input
             type="number"
             min={0}
@@ -146,7 +146,7 @@ export function ChallengeCreator({
       </div>
 
       <div>
-        <span className="font-body text-[11px] text-steel uppercase tracking-wide">
+        <span className="font-body text-xs text-steel uppercase tracking-wide">
           Daily habit targets
         </span>
         <div className="space-y-1.5 mt-1">
@@ -176,7 +176,7 @@ export function ChallengeCreator({
 
       {programs.length > 0 && (
         <label className="block">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">
+          <span className="font-body text-xs text-steel uppercase tracking-wide">
             Run alongside a program (optional)
           </span>
           <select

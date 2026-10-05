@@ -378,7 +378,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated }: { groupId: stri
       )}
 
       <div>
-        <p className="font-body text-[10px] text-steel uppercase tracking-wide mb-1.5">Clients</p>
+        <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5">Clients</p>
         <input
           type="text"
           value={query}
@@ -406,7 +406,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated }: { groupId: stri
                     </div>
                   )}
                   <span className="font-body text-sm text-chalk truncate flex-1 text-left min-w-0">{c.fullName}</span>
-                  <span className="font-body text-[11px] text-steel shrink-0 flex items-center gap-1">
+                  <span className="font-body text-xs text-steel shrink-0 flex items-center gap-1">
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${status.dotClass}`} />
                     {tier !== "none" ? QUIET_TIER_LABEL[tier] : status.text}
                   </span>
@@ -438,14 +438,14 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated }: { groupId: stri
       </div>
 
       <div>
-        <p className="font-body text-[10px] text-steel uppercase tracking-wide mb-1.5">Groups</p>
+        <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5">Groups</p>
         <div className="max-h-40 overflow-y-auto space-y-2">
           {groups === null && <p className="font-body text-sm text-steel px-1 py-2">Loading…</p>}
           {groupSections.map(
             (section) =>
               section.list.length > 0 && (
                 <div key={section.kind}>
-                  {section.kind !== "team" && <p className="font-body text-[10px] text-steel/70 uppercase tracking-wide px-1">{section.label}</p>}
+                  {section.kind !== "team" && <p className="font-body text-xs text-steel uppercase tracking-wide px-1">{section.label}</p>}
                   {section.list.map((g) => (
                     <button
                       key={g.id}
@@ -465,14 +465,14 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated }: { groupId: stri
       </div>
 
       <div className="border-t border-steel/20 pt-3">
-        <p className="font-body text-[10px] text-steel uppercase tracking-wide mb-1.5">+ Create Group</p>
+        <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5">+ Create Group</p>
         <div className="flex items-center gap-1 mb-1.5">
           {GROUP_KIND_ORDER.map((k) => (
             <button
               key={k}
               type="button"
               onClick={() => setNewGroupKind(k)}
-              className={`h-6 px-2 font-body text-[11px] border ${newGroupKind === k ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"}`}
+              className={`h-6 px-2 font-body text-xs border ${newGroupKind === k ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"}`}
             >
               {GROUP_KIND_LABELS[k]}
             </button>

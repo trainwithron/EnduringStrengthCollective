@@ -61,7 +61,7 @@ export function RecentFoodChips({
 
   return (
     <div className="mb-2">
-      <p className="font-body text-[10px] text-steel uppercase tracking-wide mb-1.5">Recent</p>
+      <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5">Recent</p>
       <div className="flex flex-wrap gap-1.5">
         {recents.map((r) => (
           <button

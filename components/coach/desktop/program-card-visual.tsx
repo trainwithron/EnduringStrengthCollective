@@ -127,7 +127,7 @@ export function ProgramCardVisual({
         </svg>
         {hovered && (
           <div
-            className="absolute pointer-events-none bg-graphite border border-steel/30 px-1.5 py-0.5 font-body text-[10px] text-chalk whitespace-nowrap z-10"
+            className="absolute pointer-events-none bg-graphite border border-steel/30 px-1.5 py-0.5 font-body text-xs text-chalk whitespace-nowrap z-10"
             style={{
               left: `${(hoverIdx! / Math.max(1, repsSeries.length - 1)) * 100}%`,
               top: 0,
@@ -149,7 +149,7 @@ export function ProgramCardVisual({
           <span style={{ width: `${categorySplit.lower}%`, backgroundColor: MOSS }} />
           <span style={{ width: `${categorySplit.conditioning}%`, backgroundColor: BLUE }} />
         </div>
-        <div className="flex gap-2 mt-1 font-body text-[9px] text-steel leading-none flex-wrap">
+        <div className="flex gap-2 mt-1 font-body text-xs text-steel leading-none flex-wrap">
           <span>Upper {categorySplit.upper}%</span>
           <span>Lower {categorySplit.lower}%</span>
           <span>Cond. {categorySplit.conditioning}%</span>

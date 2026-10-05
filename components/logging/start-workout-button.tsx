@@ -204,7 +204,7 @@ export function StartWorkoutButton({
     <div>
       {loggedByCoach && sessionTypes && sessionTypes.length > 0 && (
         <div className="mb-2 flex items-center gap-2 justify-center">
-          <label className="font-body text-[11px] text-steel uppercase tracking-wide">Session type</label>
+          <label className="font-body text-xs text-steel uppercase tracking-wide">Session type</label>
           <select
             value={sessionTypeId}
             onChange={(e) => setSessionTypeId(e.target.value)}

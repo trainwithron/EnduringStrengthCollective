@@ -104,7 +104,7 @@ export function TeamPracticeScheduleForm({
       )}
       <div className="flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">Title</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Title</span>
           <input
             type="text"
             value={title}
@@ -113,7 +113,7 @@ export function TeamPracticeScheduleForm({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">Day</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Day</span>
           <select
             value={weekday}
             onChange={(e) => setWeekday(e.target.value)}
@@ -127,7 +127,7 @@ export function TeamPracticeScheduleForm({
           </select>
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">Start</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Start</span>
           <input
             type="time"
             value={startTime}
@@ -136,7 +136,7 @@ export function TeamPracticeScheduleForm({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">End</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">End</span>
           <input
             type="time"
             value={endTime}

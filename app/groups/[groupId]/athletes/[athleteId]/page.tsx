@@ -964,7 +964,7 @@ export default async function AthleteProfilePage(
                         className="w-full aspect-square object-cover"
                       />
                     )}
-                    <p className="font-body text-[10px] text-steel mt-1">
+                    <p className="font-body text-xs text-steel mt-1">
                       {new Date(`${photo.takenDate}T00:00:00`).toLocaleDateString(undefined, {
                         month: "short",
                         day: "numeric",
@@ -1021,7 +1021,7 @@ export default async function AthleteProfilePage(
               <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
                 Estimated Training Maxes
               </h2>
-              <p className="font-body text-[11px] text-steel mb-2">
+              <p className="font-body text-xs text-steel mb-2">
                 Auto-estimated from logged sets (weight, reps, and RPE) — never a typed-in number, and only ever
                 moves up as a harder set gets logged.
               </p>
@@ -1296,7 +1296,7 @@ export default async function AthleteProfilePage(
               <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
                 Weight (Withings)
               </h2>
-              <p className="font-body text-[11px] text-steel mb-2">
+              <p className="font-body text-xs text-steel mb-2">
                 Auto-synced from a connected scale — separate from the manually-logged weight above.
               </p>
               <div className="pb-2">

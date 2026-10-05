@@ -315,7 +315,7 @@ export default async function NutritionPage(
       ) : (
         <div className="px-5 pt-6 space-y-6">
           <section className="border border-steel/20 p-4">
-            <p className="font-body text-[10px] text-steel uppercase tracking-wide mb-2">
+            <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
               Today&apos;s targets
             </p>
             {todayMacros && (todayMacros.calories != null || todayMacros.proteinG != null) ? (
@@ -331,11 +331,11 @@ export default async function NutritionPage(
                   <div className="grid grid-cols-2 gap-2 text-center">
                     <div>
                       <p className="font-display text-lg leading-none">{todayMacros.carbsG ?? "--"}</p>
-                      <p className="font-body text-[10px] text-steel uppercase mt-1">Carbs</p>
+                      <p className="font-body text-xs text-steel uppercase mt-1">Carbs</p>
                     </div>
                     <div>
                       <p className="font-display text-lg leading-none">{todayMacros.fatG ?? "--"}</p>
-                      <p className="font-body text-[10px] text-steel uppercase mt-1">Fat</p>
+                      <p className="font-body text-xs text-steel uppercase mt-1">Fat</p>
                     </div>
                   </div>
                 </div>
@@ -343,19 +343,19 @@ export default async function NutritionPage(
                 <div className="grid grid-cols-4 gap-2 text-center">
                   <div>
                     <p className="font-display text-xl leading-none">{todayMacros.calories ?? "--"}</p>
-                    <p className="font-body text-[10px] text-steel uppercase mt-1">Kcal</p>
+                    <p className="font-body text-xs text-steel uppercase mt-1">Kcal</p>
                   </div>
                   <div>
                     <p className="font-display text-xl leading-none">{todayMacros.proteinG ?? "--"}</p>
-                    <p className="font-body text-[10px] text-steel uppercase mt-1">Protein</p>
+                    <p className="font-body text-xs text-steel uppercase mt-1">Protein</p>
                   </div>
                   <div>
                     <p className="font-display text-xl leading-none">{todayMacros.carbsG ?? "--"}</p>
-                    <p className="font-body text-[10px] text-steel uppercase mt-1">Carbs</p>
+                    <p className="font-body text-xs text-steel uppercase mt-1">Carbs</p>
                   </div>
                   <div>
                     <p className="font-display text-xl leading-none">{todayMacros.fatG ?? "--"}</p>
-                    <p className="font-body text-[10px] text-steel uppercase mt-1">Fat</p>
+                    <p className="font-body text-xs text-steel uppercase mt-1">Fat</p>
                   </div>
                 </div>
               )
@@ -399,7 +399,7 @@ export default async function NutritionPage(
               // set.
               <div className="border border-steel/20 p-4 space-y-3">
                 <p className="font-body text-sm text-chalk">{latestCheckin.rationale}</p>
-                <p className="font-body text-[11px] text-steel pt-2 border-t border-steel/15">
+                <p className="font-body text-xs text-steel pt-2 border-t border-steel/15">
                   {new Date(latestCheckin.created_at).toLocaleDateString("en-US", {
                     month: "short",
                     day: "numeric",

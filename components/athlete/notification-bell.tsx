@@ -101,7 +101,7 @@ export function NotificationBell({
       >
         <Bell className="w-5 h-5" />
         {unreadCount > 0 && (
-          <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 flex items-center justify-center bg-rust text-graphite text-[10px] font-bold rounded-full leading-none">
+          <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 flex items-center justify-center bg-rust text-graphite text-xs font-bold rounded-full leading-none">
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
@@ -119,7 +119,7 @@ export function NotificationBell({
                 <button
                   type="button"
                   onClick={() => markRead(items.filter((n) => !n.readAt).map((n) => n.id))}
-                  className="font-body text-[11px] text-rust"
+                  className="font-body text-xs text-rust"
                 >
                   Mark all read
                 </button>
@@ -143,7 +143,7 @@ export function NotificationBell({
                       )}
                       <div className="min-w-0">
                         <p className="font-body text-sm text-chalk">{n.body}</p>
-                        <p className="font-body text-[11px] text-steel mt-0.5">
+                        <p className="font-body text-xs text-steel mt-0.5">
                           {timeAgo(n.createdAt)}
                         </p>
                       </div>

@@ -186,7 +186,7 @@ function BarcodeScanPanel({
         <p className="font-body text-xs text-steel mt-1">
           {result.calories} kcal · {result.proteinG}p / {result.carbsG}c / {result.fatG}f
         </p>
-        <p className="font-body text-[11px] text-steel mt-1">From the product&apos;s label data — double-check against the package if it looks off.</p>
+        <p className="font-body text-xs text-steel mt-1">From the product&apos;s label data — double-check against the package if it looks off.</p>
         <div className="flex items-center gap-2 mt-2">
           <button
             type="button"

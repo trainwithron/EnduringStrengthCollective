@@ -93,7 +93,7 @@ export function RecapExerciseRow({
       </button>
 
       {exercise.isPr && showTrainingMaxOnPr && exercise.trainingMaxBumped && (
-        <p className="font-body text-[11px] text-rust px-4 pb-2 -mt-1">
+        <p className="font-body text-xs text-rust px-4 pb-2 -mt-1">
           Also bumped their training-max estimate to {exercise.trainingMaxEstimate} lb
           {exercise.trainingMaxAssumedEffort ? " (assumed near-max effort — no RPE logged on this set)" : ""}.
         </p>
@@ -105,9 +105,9 @@ export function RecapExerciseRow({
             <table className="w-full text-left">
               <thead>
                 <tr>
-                  <th className="font-body text-[11px] text-steel uppercase pr-3 pb-1">Set</th>
+                  <th className="font-body text-xs text-steel uppercase pr-3 pb-1">Set</th>
                   {fields.map((f) => (
-                    <th key={f} className="font-body text-[11px] text-steel uppercase pr-3 pb-1">
+                    <th key={f} className="font-body text-xs text-steel uppercase pr-3 pb-1">
                       {fieldDef(f).label}
                     </th>
                   ))}
@@ -129,7 +129,7 @@ export function RecapExerciseRow({
           </div>
 
           <div>
-            <label className="font-body text-[11px] text-steel uppercase tracking-wide block mb-1">
+            <label className="font-body text-xs text-steel uppercase tracking-wide block mb-1">
               Note for this exercise
             </label>
             <input
@@ -148,7 +148,7 @@ export function RecapExerciseRow({
                 onChange={(e) => handleVisibilityChange(e.target.checked)}
                 className="accent-rust"
               />
-              <span className="font-body text-[11px] text-steel">
+              <span className="font-body text-xs text-steel">
                 Show to client next time they do this exercise
               </span>
             </label>

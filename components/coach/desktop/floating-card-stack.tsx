@@ -200,7 +200,7 @@ export function FloatingCardStack({
         <button
           type="button"
           onClick={onExitToTraditional}
-          className="h-7 px-2 flex items-center gap-1 font-body text-[11px] text-steel border border-steel/30 bg-surface rounded-token-lg active:text-chalk"
+          className="h-7 px-2 flex items-center gap-1 font-body text-xs text-steel border border-steel/30 bg-surface rounded-token-lg active:text-chalk"
         >
           <Minimize2 className="w-3 h-3" />
           Collapse all
@@ -210,7 +210,7 @@ export function FloatingCardStack({
             key={v}
             type="button"
             onClick={() => openCard(v)}
-            className="h-7 px-2 flex items-center gap-1 font-body text-[11px] text-steel border border-steel/30 bg-surface rounded-token-lg active:text-chalk"
+            className="h-7 px-2 flex items-center gap-1 font-body text-xs text-steel border border-steel/30 bg-surface rounded-token-lg active:text-chalk"
           >
             <Plus className="w-3 h-3" />
             {CARD_META[v].icon} {CARD_META[v].label}

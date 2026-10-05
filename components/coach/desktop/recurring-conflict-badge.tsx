@@ -36,7 +36,7 @@ export function RecurringConflictBadge({ bookingId }: { bookingId: string }) {
       </button>
       {open && (
         <div className="absolute right-0 top-5 z-20 w-56 bg-surface border border-rust/40 shadow-lg p-2 space-y-1.5">
-          <p className="font-body text-[11px] text-rust">This no longer fits your available hours.</p>
+          <p className="font-body text-xs text-rust">This no longer fits your available hours.</p>
           <button
             type="button"
             disabled={busy}

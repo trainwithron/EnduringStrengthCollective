@@ -164,7 +164,7 @@ export default async function SessionLedgerPage(
         <p className="font-body text-sm text-steel">No clients across your organization yet.</p>
       ) : (
         <div className="divide-y divide-steel/15 border-y border-steel/15">
-          <div className="grid grid-cols-[1fr_180px_140px_120px] gap-3 py-2 font-body text-[10px] text-steel uppercase tracking-wide">
+          <div className="grid grid-cols-[1fr_180px_140px_120px] gap-3 py-2 font-body text-xs text-steel uppercase tracking-wide">
             <span>Client</span>
             <span>Trainer</span>
             <span>Group</span>

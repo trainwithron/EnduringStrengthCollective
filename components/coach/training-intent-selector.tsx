@@ -43,7 +43,7 @@ export function TrainingIntentSelector({
 
   return (
     <label className="flex items-center gap-2">
-      <span className="font-body text-[11px] text-steel uppercase tracking-wide">
+      <span className="font-body text-xs text-steel uppercase tracking-wide">
         Training intent
       </span>
       <select

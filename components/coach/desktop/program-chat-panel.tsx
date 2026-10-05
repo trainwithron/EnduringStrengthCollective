@@ -132,7 +132,7 @@ export function ProgramChatPanel({
                 </p>
                 {m.proposedRule && (
                   <div className="mt-2 border border-rust/40 bg-rust/5 p-3 text-left max-w-[85%] ml-0">
-                    <p className="font-body text-[10px] text-rust uppercase tracking-wide font-bold mb-1">
+                    <p className="font-body text-xs text-rust uppercase tracking-wide font-bold mb-1">
                       Proposed standing preference
                     </p>
                     <p className="font-body text-xs text-chalk">

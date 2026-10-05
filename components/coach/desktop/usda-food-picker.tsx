@@ -48,11 +48,11 @@ export function UsdaFoodPicker({
   if (currentFdcId && !open) {
     return (
       <div className="flex items-center gap-2">
-        <span className="font-body text-[11px] text-moss truncate">{currentDescription ?? `#${currentFdcId}`}</span>
+        <span className="font-body text-xs text-moss truncate">{currentDescription ?? `#${currentFdcId}`}</span>
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="font-body text-[11px] text-steel underline shrink-0"
+          className="font-body text-xs text-steel underline shrink-0"
         >
           Change
         </button>
@@ -88,7 +88,7 @@ export function UsdaFoodPicker({
       </div>
       {(searching || results.length > 0) && (
         <div className="absolute z-10 left-0 right-0 mt-1 bg-graphite border border-steel/30 max-h-48 overflow-y-auto">
-          {searching && <p className="font-body text-[11px] text-steel p-2">Searching…</p>}
+          {searching && <p className="font-body text-xs text-steel p-2">Searching…</p>}
           {!searching &&
             results.map((r) => (
               <button
@@ -106,7 +106,7 @@ export function UsdaFoodPicker({
               </button>
             ))}
           {!searching && results.length === 0 && query.trim().length >= 2 && (
-            <p className="font-body text-[11px] text-steel p-2">
+            <p className="font-body text-xs text-steel p-2">
               No cached USDA foods match yet — the reference set is still growing.
             </p>
           )}

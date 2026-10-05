@@ -232,7 +232,7 @@ function ConversationLink({ groupId, conversation }: { groupId: string; conversa
         </p>
       </div>
       {conversation.unreadCount > 0 && (
-        <span className="h-5 min-w-[20px] px-1 rounded-full bg-rust text-graphite font-body text-[10px] font-bold flex items-center justify-center shrink-0">
+        <span className="h-5 min-w-[20px] px-1 rounded-full bg-rust text-graphite font-body text-xs font-bold flex items-center justify-center shrink-0">
           {conversation.unreadCount > 9 ? "9+" : conversation.unreadCount}
         </span>
       )}

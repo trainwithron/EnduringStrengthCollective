@@ -66,7 +66,7 @@ export function PlanBillingPanel({
   return (
     <div className="max-w-[64ch] space-y-5">
       <div className="border border-steel/20 p-4">
-        <p className="font-body text-[11px] text-steel uppercase tracking-wide mb-1">{orgName}</p>
+        <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">{orgName}</p>
         <p className="font-display text-2xl uppercase leading-tight">{statusLine}</p>
         {statusDetail && <p className="font-body text-sm text-steel mt-1">{statusDetail}</p>}
       </div>
@@ -82,7 +82,7 @@ export function PlanBillingPanel({
 
       {showQuote && (
         <div className="border border-steel/20 p-4">
-          <p className="font-body text-[11px] text-steel uppercase tracking-wide mb-3">
+          <p className="font-body text-xs text-steel uppercase tracking-wide mb-3">
             Your plan at your current size
           </p>
           <div className="space-y-2">
@@ -111,7 +111,7 @@ export function PlanBillingPanel({
       )}
 
       <div className="border border-steel/20 p-4">
-        <p className="font-body text-[11px] text-steel uppercase tracking-wide mb-2">Usage</p>
+        <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Usage</p>
         <div className="grid grid-cols-2 gap-4">
           <div>
             <p className="font-display text-2xl tabular-nums">{quote.clients}</p>
@@ -137,7 +137,7 @@ export function PlanBillingPanel({
               : `Room for ${plural(quote.clientsBeforeNextStep, "more client")} before the plan moves to ${formatPlanCents(quote.nextStepTotalCents ?? 0)}/mo.`}
           </p>
         ) : null}
-        <p className="font-body text-[11px] text-steel mt-3">
+        <p className="font-body text-xs text-steel mt-3">
           Clients in training count toward the plan. Social-only members and coaches are free.
         </p>
       </div>

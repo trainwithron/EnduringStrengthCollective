@@ -182,13 +182,13 @@ export function WorkoutCardBackgroundSettings({
 
       <div className="border border-steel/20 bg-graphite rounded-token-lg p-4">
         <div className="flex items-center justify-between mb-2">
-          <p className="font-body text-[10px] text-steel uppercase tracking-wide">
+          <p className="font-body text-xs text-steel uppercase tracking-wide">
             Copy this into ChatGPT, Gemini, or any image-generation tool
           </p>
           <button
             type="button"
             onClick={copyPrompt}
-            className="h-7 px-3 bg-rust text-graphite font-display font-bold text-[11px] uppercase rounded-token-sm shrink-0"
+            className="h-7 px-3 bg-rust text-graphite font-display font-bold text-xs uppercase rounded-token-sm shrink-0"
           >
             {copied ? "Copied!" : "Copy Prompt"}
           </button>
@@ -196,7 +196,7 @@ export function WorkoutCardBackgroundSettings({
         <pre className="font-body text-xs text-chalk whitespace-pre-wrap leading-relaxed">
           {AI_PROMPT}
         </pre>
-        <p className="font-body text-[11px] text-steel mt-3">
+        <p className="font-body text-xs text-steel mt-3">
           Paste the result back in as an upload once you&apos;ve generated one you like. Nothing
           is sent to any AI service on our end — this just hands you a prompt that works well
           with the card layout.

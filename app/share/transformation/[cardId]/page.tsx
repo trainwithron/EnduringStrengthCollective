@@ -60,7 +60,7 @@ export default async function ShareTransformationCardPage(
                   alt="Before"
                   className="w-full aspect-square object-cover"
                 />
-                <p className="font-body text-[10px] text-steel uppercase tracking-wide mt-1">Before</p>
+                <p className="font-body text-xs text-steel uppercase tracking-wide mt-1">Before</p>
               </div>
             )}
             {shared.afterPhotoUrl && (
@@ -71,7 +71,7 @@ export default async function ShareTransformationCardPage(
                   alt="After"
                   className="w-full aspect-square object-cover"
                 />
-                <p className="font-body text-[10px] text-steel uppercase tracking-wide mt-1">After</p>
+                <p className="font-body text-xs text-steel uppercase tracking-wide mt-1">After</p>
               </div>
             )}
           </div>

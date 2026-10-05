@@ -21,7 +21,7 @@ interface SpotGlanceData {
 function Tile({ label, value, warn }: { label: string; value: string; warn?: boolean }) {
   return (
     <div className={`border p-3 w-40 shrink-0 snap-start ${warn ? "border-rust/60 bg-rust/5" : "border-steel/20"}`}>
-      <p className="font-body text-[10px] text-steel uppercase tracking-wide">{label}</p>
+      <p className="font-body text-xs text-steel uppercase tracking-wide">{label}</p>
       <p className={`font-display text-lg leading-none mt-1 truncate ${warn ? "text-rust" : ""}`}>{value}</p>
     </div>
   );
@@ -152,7 +152,7 @@ export function SpotBusinessPanel({ groupId }: { groupId: string }) {
       </div>
 
       <div>
-        <p className="font-body text-[10px] text-steel uppercase tracking-wide mb-2">Upcoming sessions</p>
+        <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Upcoming sessions</p>
         {!data ? (
           <p className="font-body text-sm text-steel">…</p>
         ) : data.upcomingSessions.length === 0 ? (

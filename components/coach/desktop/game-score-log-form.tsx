@@ -55,7 +55,7 @@ export function GameScoreLogForm({
   return (
     <div className="flex items-end gap-3 mb-6">
       <div className="flex flex-col gap-1">
-        <label className="font-body text-[11px] text-steel uppercase tracking-wide">Athlete</label>
+        <label className="font-body text-xs text-steel uppercase tracking-wide">Athlete</label>
         <select
           value={athleteId}
           onChange={(e) => setAthleteId(e.target.value)}
@@ -69,7 +69,7 @@ export function GameScoreLogForm({
         </select>
       </div>
       <div className="flex flex-col gap-1">
-        <label className="font-body text-[11px] text-steel uppercase tracking-wide">Points</label>
+        <label className="font-body text-xs text-steel uppercase tracking-wide">Points</label>
         <input
           type="number"
           inputMode="numeric"

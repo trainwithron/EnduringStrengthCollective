@@ -138,7 +138,7 @@ export function RosterRow({
         )}
 
         {optimisticRole === "coach" && (
-          <span className="font-body text-[11px] tracking-wide text-rust shrink-0">
+          <span className="font-body text-xs tracking-wide text-rust shrink-0">
             Coach
           </span>
         )}

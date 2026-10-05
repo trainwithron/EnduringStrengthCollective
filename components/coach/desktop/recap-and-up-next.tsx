@@ -164,7 +164,7 @@ export function RecapAndUpNext({
                 {formatDuration(recap.durationSeconds)}
               </p>
               {patternCheckFoundSomething === false && (
-                <p className="font-body text-[11px] text-steel mt-1">
+                <p className="font-body text-xs text-steel mt-1">
                   ✓ Checked for behavioral patterns — nothing notable this time.
                 </p>
               )}
@@ -172,15 +172,15 @@ export function RecapAndUpNext({
               <div className="grid grid-cols-3 gap-3 mt-4">
                 <div className="border border-steel/20 p-3 text-center">
                   <p className="font-display text-xl leading-none">{Math.round(recap.totalVolume)}</p>
-                  <p className="font-body text-[10px] text-steel uppercase mt-1">Volume</p>
+                  <p className="font-body text-xs text-steel uppercase mt-1">Volume</p>
                 </div>
                 <div className="border border-steel/20 p-3 text-center">
                   <p className="font-display text-xl leading-none">{recap.totalSetsCompleted}</p>
-                  <p className="font-body text-[10px] text-steel uppercase mt-1">Sets</p>
+                  <p className="font-body text-xs text-steel uppercase mt-1">Sets</p>
                 </div>
                 <div className="border border-steel/20 p-3 text-center">
                   <p className="font-display text-xl leading-none">{recap.prCount}</p>
-                  <p className="font-body text-[10px] text-steel uppercase mt-1">PRs</p>
+                  <p className="font-body text-xs text-steel uppercase mt-1">PRs</p>
                 </div>
               </div>
 
@@ -189,7 +189,7 @@ export function RecapAndUpNext({
                   type="button"
                   onClick={toggleTrainingMaxPref}
                   disabled={savingTmPref}
-                  className="font-body text-[11px] text-steel underline underline-offset-2 mt-2 disabled:opacity-50"
+                  className="font-body text-xs text-steel underline underline-offset-2 mt-2 disabled:opacity-50"
                 >
                   {showTrainingMaxOnPr ? "Hide training-max note on PRs" : "Show training-max note on PRs"}
                 </button>
@@ -244,7 +244,7 @@ export function RecapAndUpNext({
           <div className="border border-steel/20 bg-surface/40 rounded-token-lg p-5 recap-bounce-in">
             <div className="flex items-center justify-between gap-3">
               <h2 className="font-display font-bold text-xl uppercase leading-none">{nextWorkout.title}</h2>
-              <span className="font-body text-[10px] text-rust uppercase tracking-wide border border-rust/40 rounded-token-pill px-2 py-1">
+              <span className="font-body text-xs text-rust uppercase tracking-wide border border-rust/40 rounded-token-pill px-2 py-1">
                 Editable draft
               </span>
             </div>

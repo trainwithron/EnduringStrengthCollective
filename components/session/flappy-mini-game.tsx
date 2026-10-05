@@ -170,7 +170,7 @@ export function FlappyMiniGame({
           </div>
         )}
       </div>
-      <p className="font-body text-[11px] text-steel">Tap to fly — purely optional.</p>
+      <p className="font-body text-xs text-steel">Tap to fly — purely optional.</p>
     </div>
   );
 }

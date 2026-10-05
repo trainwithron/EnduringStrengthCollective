@@ -113,7 +113,7 @@ export function BulkEditDayPanel({
             <button
               type="button"
               onClick={() => setMode("all")}
-              className={`h-6 px-2 font-body text-[11px] border ${
+              className={`h-6 px-2 font-body text-xs border ${
                 mode === "all" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
               }`}
             >
@@ -122,7 +122,7 @@ export function BulkEditDayPanel({
             <button
               type="button"
               onClick={() => setMode("class")}
-              className={`h-6 px-2 font-body text-[11px] border ${
+              className={`h-6 px-2 font-body text-xs border ${
                 mode === "class" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
               }`}
             >

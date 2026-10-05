@@ -684,7 +684,7 @@ export function MealPlanGenerator({
 
       <div className="grid grid-cols-2 gap-2">
         <label className="block">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">Phase</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Phase</span>
           <select
             value={phase}
             onChange={(e) => setPhase(e.target.value as Phase)}
@@ -697,7 +697,7 @@ export function MealPlanGenerator({
           </select>
         </label>
         <label className="block">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">Meal frequency</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Meal frequency</span>
           <select
             value={mealCount}
             onChange={(e) => setMealCount(e.target.value)}
@@ -752,7 +752,7 @@ export function MealPlanGenerator({
 
       <div className="grid grid-cols-2 gap-2">
         <label className="block">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">Current avg weight (lbs)</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Current avg weight (lbs)</span>
           <input
             type="number"
             value={currentWeight}
@@ -761,7 +761,7 @@ export function MealPlanGenerator({
           />
         </label>
         <label className="block">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">Previous avg weight (lbs)</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Previous avg weight (lbs)</span>
           <input
             type="number"
             value={previousWeight}
@@ -773,7 +773,7 @@ export function MealPlanGenerator({
 
       <div className="grid grid-cols-2 gap-2">
         <label className="block">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">
+          <span className="font-body text-xs text-steel uppercase tracking-wide">
             Current daily calories{" "}
             <a href="#macro-calculator" className="normal-case text-rust font-normal tracking-normal">
               (don&apos;t know? check here)
@@ -787,7 +787,7 @@ export function MealPlanGenerator({
           />
         </label>
         <label className="block">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">Adherence (days/7)</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Adherence (days/7)</span>
           <input
             type="number"
             min={0}
@@ -801,25 +801,25 @@ export function MealPlanGenerator({
 
       <div className="grid grid-cols-4 gap-2">
         <label className="block">
-          <span className="font-body text-[10px] text-steel uppercase tracking-wide">Strength 1-5</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Strength 1-5</span>
           <input type="number" min={1} max={5} value={rateStrength} onChange={(e) => setRateStrength(e.target.value)} className="w-full h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs mt-1" />
         </label>
         <label className="block">
-          <span className="font-body text-[10px] text-steel uppercase tracking-wide">Recovery 1-5</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Recovery 1-5</span>
           <input type="number" min={1} max={5} value={rateRecovery} onChange={(e) => setRateRecovery(e.target.value)} className="w-full h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs mt-1" />
         </label>
         <label className="block">
-          <span className="font-body text-[10px] text-steel uppercase tracking-wide">Digestion 1-5</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Digestion 1-5</span>
           <input type="number" min={1} max={5} value={rateDigestion} onChange={(e) => setRateDigestion(e.target.value)} className="w-full h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs mt-1" />
         </label>
         <label className="block">
-          <span className="font-body text-[10px] text-steel uppercase tracking-wide">Satiety 1-5</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Satiety 1-5</span>
           <input type="number" min={1} max={5} value={rateSatiety} onChange={(e) => setRateSatiety(e.target.value)} className="w-full h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs mt-1" />
         </label>
       </div>
 
       <label className="block">
-        <span className="font-body text-[11px] text-steel uppercase tracking-wide">Dietary restrictions / diet type / disliked foods</span>
+        <span className="font-body text-xs text-steel uppercase tracking-wide">Dietary restrictions / diet type / disliked foods</span>
         <input
           type="text"
           value={dietaryRestrictions}
@@ -830,7 +830,7 @@ export function MealPlanGenerator({
       </label>
 
       <label className="block">
-        <span className="font-body text-[11px] text-steel uppercase tracking-wide">Favorite foods / specific requests</span>
+        <span className="font-body text-xs text-steel uppercase tracking-wide">Favorite foods / specific requests</span>
         <input
           type="text"
           value={favoriteFoods}
@@ -906,19 +906,19 @@ export function MealPlanGenerator({
           <div className="grid grid-cols-4 gap-2 text-center">
             <div className="border border-steel/20 p-2">
               <p className="font-display text-lg">{macros.calories}</p>
-              <p className="font-body text-[10px] text-steel uppercase">Calories</p>
+              <p className="font-body text-xs text-steel uppercase">Calories</p>
             </div>
             <div className="border border-steel/20 p-2">
               <p className="font-display text-lg">{macros.protein}g</p>
-              <p className="font-body text-[10px] text-steel uppercase">Protein</p>
+              <p className="font-body text-xs text-steel uppercase">Protein</p>
             </div>
             <div className="border border-steel/20 p-2">
               <p className="font-display text-lg">{macros.carbs}g</p>
-              <p className="font-body text-[10px] text-steel uppercase">Carbs</p>
+              <p className="font-body text-xs text-steel uppercase">Carbs</p>
             </div>
             <div className="border border-steel/20 p-2">
               <p className="font-display text-lg">{macros.fats}g</p>
-              <p className="font-body text-[10px] text-steel uppercase">Fat</p>
+              <p className="font-body text-xs text-steel uppercase">Fat</p>
             </div>
           </div>
 
@@ -980,19 +980,19 @@ export function MealPlanGenerator({
                           <input type="checkbox" checked={checked} readOnly className="w-4 h-4" />
                           <span className="font-body text-sm font-medium flex-1">{opt.recipeName}</span>
                           {opt.isAi && (
-                            <span className="font-body text-[9px] uppercase tracking-wide text-rust border border-rust/40 px-1.5 py-0.5">
+                            <span className="font-body text-xs uppercase tracking-wide text-rust border border-rust/40 px-1.5 py-0.5">
                               Nutrition Spot · verified
                             </span>
                           )}
                           {opt.isFallback && (
-                            <span className="font-body text-[9px] uppercase tracking-wide text-steel border border-steel/40 px-1.5 py-0.5">
+                            <span className="font-body text-xs uppercase tracking-wide text-steel border border-steel/40 px-1.5 py-0.5">
                               Standard (AI unavailable)
                             </span>
                           )}
                           <RecipeVoteFavorite recipeId={opt.recipeId} />
                         </div>
                         {opt.verifiedMacros && (
-                          <p className="font-body text-[10px] text-steel pl-6 mb-1">
+                          <p className="font-body text-xs text-steel pl-6 mb-1">
                             Verified: {opt.verifiedMacros.kcal} kcal — {opt.verifiedMacros.protein}p /{" "}
                             {opt.verifiedMacros.carbs}c / {opt.verifiedMacros.fat}f
                           </p>
@@ -1028,19 +1028,19 @@ export function MealPlanGenerator({
                       type="button"
                       onClick={() => handleAiSuggest(meal)}
                       disabled={aiSuggesting[meal.spec.id]}
-                      className="h-7 px-3 font-body text-[11px] border border-rust/40 text-rust disabled:opacity-40"
+                      className="h-7 px-3 font-body text-xs border border-rust/40 text-rust disabled:opacity-40"
                     >
                       {aiSuggesting[meal.spec.id] ? "Asking the Nutrition Spot…" : "Ask the Nutrition Spot"}
                     </button>
                     {aiError[meal.spec.id] && (
-                      <p className="font-body text-[10px] text-rust" role="alert">
+                      <p className="font-body text-xs text-rust" role="alert">
                         {aiError[meal.spec.id]}
                       </p>
                     )}
                   </div>
 
                   <div className="mt-2.5 pt-2.5 border-t border-steel/10">
-                    <p className="font-body text-[10px] text-steel uppercase tracking-wide mb-1.5">
+                    <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5">
                       Assign this meal to specific days this week
                     </p>
                     <div className="flex items-center gap-1 flex-wrap">
@@ -1051,7 +1051,7 @@ export function MealPlanGenerator({
                             key={weekday}
                             type="button"
                             onClick={() => toggleDayPicker(meal.spec.id, weekday)}
-                            className={`w-7 h-7 font-body text-[10px] border ${
+                            className={`w-7 h-7 font-body text-xs border ${
                               active ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
                             }`}
                           >
@@ -1063,13 +1063,13 @@ export function MealPlanGenerator({
                         type="button"
                         onClick={() => handleAssignDays(meal)}
                         disabled={assigning === meal.spec.id || (dayPicker[meal.spec.id] ?? []).length === 0}
-                        className="h-7 px-3 font-body text-[10px] bg-positive text-graphite disabled:opacity-40"
+                        className="h-7 px-3 font-body text-xs bg-positive text-graphite disabled:opacity-40"
                       >
                         {assigning === meal.spec.id ? "Assigning…" : "Assign"}
                       </button>
                     </div>
                     {assignedMsg[meal.spec.id] && (
-                      <p className="font-body text-[10px] text-positive mt-1">{assignedMsg[meal.spec.id]}</p>
+                      <p className="font-body text-xs text-positive mt-1">{assignedMsg[meal.spec.id]}</p>
                     )}
                   </div>
                 </div>

@@ -6,7 +6,7 @@ import { Star } from "lucide-react";
 export function CoachLoggedBadge({ className = "" }: { className?: string }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 font-body text-[11px] text-[#D4A94C] ${className}`}
+      className={`inline-flex items-center gap-1 font-body text-xs text-[#D4A94C] ${className}`}
     >
       <Star className="w-3 h-3 fill-current" aria-hidden="true" />
       Coach logged

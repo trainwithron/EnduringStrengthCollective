@@ -69,7 +69,7 @@ export function SwipeDirectionSetting({
           </button>
         ))}
       </div>
-      <p className="font-body text-[11px] text-steel mt-1.5">
+      <p className="font-body text-xs text-steel mt-1.5">
         How exercises advance while logging a workout.
       </p>
     </div>

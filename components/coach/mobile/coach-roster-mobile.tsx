@@ -116,7 +116,7 @@ export function CoachRosterMobile({
     <div className="relative">
       {needsAttention.length > 0 && (
         <div className="mb-4">
-          <p className="font-body text-[11px] text-rust uppercase tracking-wide font-bold px-1 mb-1.5">
+          <p className="font-body text-xs text-rust uppercase tracking-wide font-bold px-1 mb-1.5">
             Needs attention
           </p>
           <div className="divide-y divide-steel/15 border border-steel/20 rounded-token-lg overflow-hidden">
@@ -130,7 +130,7 @@ export function CoachRosterMobile({
       <div className="divide-y divide-steel/15 border border-steel/20 rounded-token-lg overflow-hidden pr-6">
         {letters.map((letter) => (
           <div key={letter} id={`roster-letter-${letter}`}>
-            <p className="font-display text-[11px] text-steel uppercase tracking-wide bg-graphite/60 px-3 py-1 sticky top-0">
+            <p className="font-display text-xs text-steel uppercase tracking-wide bg-graphite/60 px-3 py-1 sticky top-0">
               {letter}
             </p>
             {groupedByLetter.get(letter)!.map(({ member, tier }) => (
@@ -148,7 +148,7 @@ export function CoachRosterMobile({
               type="button"
               onClick={() => scrollToLetter(letter)}
               aria-label={`Jump to ${letter}`}
-              className="font-body text-[9px] text-steel active:text-rust w-4 h-4 flex items-center justify-center"
+              className="font-body text-xs text-steel active:text-rust w-4 h-4 flex items-center justify-center"
             >
               {letter}
             </button>

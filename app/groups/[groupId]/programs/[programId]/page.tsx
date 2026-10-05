@@ -198,7 +198,7 @@ export default async function ProgramDetailPage(
                       <span className="font-body font-medium text-[15px]">
                         {w.title}
                         {isToday && (
-                          <span className="font-display text-[10px] uppercase tracking-wide text-rust ml-2 align-middle">
+                          <span className="font-display text-xs uppercase tracking-wide text-rust ml-2 align-middle">
                             Today
                           </span>
                         )}
@@ -208,7 +208,7 @@ export default async function ProgramDetailPage(
                       </span>
                     </div>
                     {scheduledDate && (
-                      <p className="font-body text-[11px] text-steel mt-0.5">
+                      <p className="font-body text-xs text-steel mt-0.5">
                         {formatShortDate(scheduledDate)}
                       </p>
                     )}

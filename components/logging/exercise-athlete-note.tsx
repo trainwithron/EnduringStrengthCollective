@@ -55,7 +55,7 @@ export function ExerciseAthleteNote({
           placeholder="Anything worth noting on this exercise today?"
           className="w-full bg-surface border border-steel/30 text-chalk px-2 py-1.5 font-body text-xs focus:outline-none focus:border-rust resize-none"
         />
-        {saving && <p className="font-body text-[11px] text-steel mt-1">Saving…</p>}
+        {saving && <p className="font-body text-xs text-steel mt-1">Saving…</p>}
       </div>
     );
   }

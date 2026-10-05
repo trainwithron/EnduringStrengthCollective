@@ -18,7 +18,7 @@ export function CoachHomeShell({ orgName, children }: { orgName: string; childre
     <div className="min-h-screen bg-graphite text-chalk flex">
       <aside className="w-60 shrink-0 border-r border-steel/20 flex flex-col">
         <div className="px-5 pt-6 pb-5 border-b border-steel/20">
-          <p className="font-body text-[11px] text-steel uppercase tracking-wide">Coaching</p>
+          <p className="font-body text-xs text-steel uppercase tracking-wide">Coaching</p>
           <h1 className="font-display font-bold text-lg uppercase leading-tight truncate mt-1">{orgName}</h1>
         </div>
         <nav className="flex-1 py-3">

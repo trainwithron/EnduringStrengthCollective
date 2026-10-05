@@ -73,7 +73,7 @@ function NavBadge({ count, collapsed }: { count: number; collapsed?: boolean }) 
     );
   }
   return (
-    <span className="ml-auto h-5 min-w-[20px] px-1 rounded-full bg-rust text-graphite font-body text-[10px] font-bold flex items-center justify-center">
+    <span className="ml-auto h-5 min-w-[20px] px-1 rounded-full bg-rust text-graphite font-body text-xs font-bold flex items-center justify-center">
       {count > 9 ? "9+" : count}
     </span>
   );
@@ -628,7 +628,7 @@ export function CoachDesktopShell({
               >
                 {orgName}
               </span>
-              <ChevronRight className="hidden sm:inline w-3.5 h-3.5 text-steel/50 shrink-0" />
+              <ChevronRight className="hidden sm:inline w-3.5 h-3.5 text-steel shrink-0" />
             </>
           )}
           <p className="font-display font-bold text-lg md:text-2xl uppercase tracking-wide truncate">
@@ -636,7 +636,7 @@ export function CoachDesktopShell({
           </p>
           {groupKind && (
             <span
-              className={`shrink-0 font-body text-[10px] uppercase tracking-wide px-1.5 py-0.5 border ${
+              className={`shrink-0 font-body text-xs uppercase tracking-wide px-1.5 py-0.5 border ${
                 groupKind === "one_on_one"
                   ? "border-rust text-rust"
                   : groupKind === "social"

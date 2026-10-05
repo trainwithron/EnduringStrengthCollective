@@ -99,7 +99,7 @@ export function ProgramMiniView({ groupId }: { groupId: string }) {
       <div className="space-y-2 max-h-64 overflow-y-auto">
         {Array.from(byWeek.entries()).map(([week, days]) => (
           <div key={week}>
-            <p className="font-body text-[10px] text-steel uppercase tracking-wide px-1.5 mb-0.5">
+            <p className="font-body text-xs text-steel uppercase tracking-wide px-1.5 mb-0.5">
               Week {week}
             </p>
             {days.map((d) => (

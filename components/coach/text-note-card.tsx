@@ -54,7 +54,7 @@ export function TextNoteCard({
   return (
     <div className="border border-steel/20 p-3 bg-surface/40">
       <div className="flex items-center justify-between mb-2">
-        <span className="font-body text-[10px] text-steel uppercase tracking-wide">
+        <span className="font-body text-xs text-steel uppercase tracking-wide">
           Text note
         </span>
         <div className="flex items-center gap-2">

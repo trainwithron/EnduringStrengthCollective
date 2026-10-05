@@ -75,7 +75,7 @@ export function SupportThread({
         <h3 className="font-body font-medium text-sm">{subject}</h3>
         <div className="flex items-center gap-2 shrink-0">
           <span
-            className={`font-body text-[10px] uppercase tracking-wide px-2 h-5 flex items-center ${
+            className={`font-body text-xs uppercase tracking-wide px-2 h-5 flex items-center ${
               currentStatus === "open" ? "bg-rust/20 text-rust" : "bg-steel/20 text-steel"
             }`}
           >
@@ -96,7 +96,7 @@ export function SupportThread({
       <div className="space-y-2 mb-3">
         {thread.map((m) => (
           <div key={m.id} className={m.authorId === viewerId ? "text-right" : ""}>
-            <p className="font-body text-[11px] text-steel">{m.authorName}</p>
+            <p className="font-body text-xs text-steel">{m.authorName}</p>
             <p className="font-body text-sm inline-block bg-surface border border-steel/20 px-3 py-2 mt-0.5 max-w-[85%]">
               {m.body}
             </p>

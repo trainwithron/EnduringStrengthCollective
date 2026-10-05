@@ -449,7 +449,7 @@ export function ProgramCardMenu({
           className="bg-surface border border-steel/30 z-50 shadow-lg"
         >
           {error && (
-            <p className="font-body text-[11px] text-rust px-3 pt-2.5" role="alert">
+            <p className="font-body text-xs text-rust px-3 pt-2.5" role="alert">
               {error}
             </p>
           )}
@@ -523,11 +523,11 @@ export function ProgramCardMenu({
 
           {view === "assign" && (
             <div>
-              <p className="font-body text-[11px] text-steel uppercase tracking-wide px-3 pt-2.5 pb-1.5">
+              <p className="font-body text-xs text-steel uppercase tracking-wide px-3 pt-2.5 pb-1.5">
                 Assign to which client?
               </p>
               <div className="px-3 pb-2">
-                <label className="font-body text-[11px] text-steel">
+                <label className="font-body text-xs text-steel">
                   Start date
                   <input
                     type="date"
@@ -561,10 +561,10 @@ export function ProgramCardMenu({
 
           {view === "assign-self" && (
             <div className="p-3">
-              <p className="font-body text-[11px] text-steel uppercase tracking-wide pb-1.5">
+              <p className="font-body text-xs text-steel uppercase tracking-wide pb-1.5">
                 Assign to yourself
               </p>
-              <label className="font-body text-[11px] text-steel">
+              <label className="font-body text-xs text-steel">
                 Start date
                 <input
                   type="date"
@@ -586,11 +586,11 @@ export function ProgramCardMenu({
 
           {view === "assign-position" && (
             <div>
-              <p className="font-body text-[11px] text-steel uppercase tracking-wide px-3 pt-2.5 pb-1.5">
+              <p className="font-body text-xs text-steel uppercase tracking-wide px-3 pt-2.5 pb-1.5">
                 Assign to which position?
               </p>
               <div className="px-3 pb-2">
-                <label className="font-body text-[11px] text-steel">
+                <label className="font-body text-xs text-steel">
                   Start date
                   <input
                     type="date"
@@ -677,7 +677,7 @@ export function ProgramCardMenu({
 
           {view === "duplicate-org" && (
             <div>
-              <p className="font-body text-[11px] text-steel uppercase tracking-wide px-3 pt-2.5 pb-1.5">
+              <p className="font-body text-xs text-steel uppercase tracking-wide px-3 pt-2.5 pb-1.5">
                 Which organization?
               </p>
               <div className="max-h-72 overflow-y-auto">
@@ -705,7 +705,7 @@ export function ProgramCardMenu({
 
           {view === "duplicate-group" && (
             <div>
-              <p className="font-body text-[11px] text-steel uppercase tracking-wide px-3 pt-2.5 pb-1.5">
+              <p className="font-body text-xs text-steel uppercase tracking-wide px-3 pt-2.5 pb-1.5">
                 Which group?
               </p>
               <div className="max-h-72 overflow-y-auto">
@@ -730,7 +730,7 @@ export function ProgramCardMenu({
               <button
                 type="button"
                 onClick={() => setView("duplicate-org")}
-                className="w-full text-left px-3 py-2 font-body text-[11px] text-steel border-t border-steel/15"
+                className="w-full text-left px-3 py-2 font-body text-xs text-steel border-t border-steel/15"
               >
                 ← Back to organizations
               </button>

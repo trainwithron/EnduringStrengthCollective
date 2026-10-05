@@ -18,7 +18,7 @@ export function ProgramDayDragList({ options }: { options: WorkoutOption[] }) {
       <h3 className="font-body text-xs text-steel uppercase tracking-wide mb-2">
         Drag a day onto the calendar
       </h3>
-      <p className="font-body text-[11px] text-steel mb-3">
+      <p className="font-body text-xs text-steel mb-3">
         Assigns that workout to this client on whatever date you drop it on.
       </p>
       <div className="max-h-64 overflow-y-auto space-y-1">

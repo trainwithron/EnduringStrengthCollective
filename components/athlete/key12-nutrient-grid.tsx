@@ -20,11 +20,11 @@ export function Key12NutrientGrid({
   return (
     <div className="border border-steel/20 p-4">
       <div className="flex items-center justify-between mb-3">
-        <p className="font-body text-[10px] text-steel uppercase tracking-wide">
+        <p className="font-body text-xs text-steel uppercase tracking-wide">
           Key nutrients — estimated from today&apos;s meals
         </p>
         {totalIngredientCount > 0 && (
-          <p className="font-body text-[10px] text-steel">
+          <p className="font-body text-xs text-steel">
             {coveredIngredientCount}/{totalIngredientCount} ingredients mapped
           </p>
         )}
@@ -35,7 +35,7 @@ export function Key12NutrientGrid({
       ) : (
         <>
           {isPartial && (
-            <p className="font-body text-[11px] text-steel mb-3 border-l-2 border-steel/30 pl-2">
+            <p className="font-body text-xs text-steel mb-3 border-l-2 border-steel/30 pl-2">
               Some ingredients in today&apos;s meals aren&apos;t mapped to real nutrition data yet —
               totals below are a partial estimate, not the full picture.
             </p>
@@ -48,7 +48,7 @@ export function Key12NutrientGrid({
                 <div key={n.key}>
                   <div className="flex items-baseline justify-between">
                     <p className="font-body text-xs text-chalk">{n.label}</p>
-                    <p className="font-body text-[11px] text-steel">
+                    <p className="font-body text-xs text-steel">
                       {Math.round(amount * 10) / 10}
                       {n.unit}
                     </p>
@@ -60,7 +60,7 @@ export function Key12NutrientGrid({
               );
             })}
           </div>
-          <p className="font-body text-[10px] text-steel mt-3">% of FDA general daily value (2,000 kcal reference diet)</p>
+          <p className="font-body text-xs text-steel mt-3">% of FDA general daily value (2,000 kcal reference diet)</p>
         </>
       )}
     </div>

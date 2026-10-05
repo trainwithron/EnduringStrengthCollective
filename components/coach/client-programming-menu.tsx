@@ -152,7 +152,7 @@ export function ClientProgrammingMenu({
           className="bg-surface border border-steel/30 z-50 shadow-lg"
         >
           {error && (
-            <p className="font-body text-[11px] text-rust px-3 pt-2.5" role="alert">
+            <p className="font-body text-xs text-rust px-3 pt-2.5" role="alert">
               {error}
             </p>
           )}
@@ -195,7 +195,7 @@ export function ClientProgrammingMenu({
 
           {view === "assign" && (
             <div>
-              <p className="font-body text-[11px] text-steel uppercase tracking-wide px-3 pt-2.5 pb-1.5">
+              <p className="font-body text-xs text-steel uppercase tracking-wide px-3 pt-2.5 pb-1.5">
                 Assign which program?
               </p>
               <div className="max-h-72 overflow-y-auto">
@@ -249,7 +249,7 @@ export function ClientProgrammingMenu({
 
           {view === "assigned" && (
             <div>
-              <p className="font-body text-[11px] text-steel uppercase tracking-wide px-3 pt-2.5 pb-1.5">
+              <p className="font-body text-xs text-steel uppercase tracking-wide px-3 pt-2.5 pb-1.5">
                 {athleteFullName}&apos;s programs
               </p>
               <div className="max-h-72 overflow-y-auto">
@@ -269,7 +269,7 @@ export function ClientProgrammingMenu({
                   >
                     <span className="truncate">{p.name}</span>
                     <span
-                      className={`shrink-0 font-body text-[10px] uppercase tracking-wide ${
+                      className={`shrink-0 font-body text-xs uppercase tracking-wide ${
                         p.isActive ? "text-moss" : "text-steel"
                       }`}
                     >

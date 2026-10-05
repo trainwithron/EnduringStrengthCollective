@@ -136,7 +136,7 @@ export function NeedsAttentionPanel({
             ) : (
               <div className="flex items-center flex-wrap gap-2">
                 {notifyStatus[keyOf(item)] && (
-                  <span className="font-body text-[11px] text-steel">{notifyStatus[keyOf(item)]}</span>
+                  <span className="font-body text-xs text-steel">{notifyStatus[keyOf(item)]}</span>
                 )}
                 <button
                   type="button"

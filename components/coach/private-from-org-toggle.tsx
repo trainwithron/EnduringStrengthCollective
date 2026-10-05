@@ -51,7 +51,7 @@ export function PrivateFromOrgToggle({
         />
         <span className="font-body text-sm">Keep this client&apos;s logs private from the org</span>
       </label>
-      <p className="font-body text-[11px] text-steel mt-1 max-w-[50ch]">
+      <p className="font-body text-xs text-steel mt-1 max-w-[50ch]">
         Off by default — an org owner/admin above you can normally see this
         client&apos;s full session history. Turning this on hides it from
         everyone except you and the client themselves.

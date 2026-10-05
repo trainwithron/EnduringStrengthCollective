@@ -157,7 +157,7 @@ export function BottomTabBar({
               strokeWidth={2.5}
             />
             <span
-              className={`font-body text-[10px] uppercase tracking-wide ${
+              className={`font-body text-xs uppercase tracking-wide ${
                 isActive ? "text-rust" : "text-steel"
               }`}
             >

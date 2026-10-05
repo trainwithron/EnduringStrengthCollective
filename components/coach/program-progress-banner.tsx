@@ -21,7 +21,7 @@ export function ProgramProgressBanner({
 
   return (
     <div className="border border-steel/20 bg-surface px-4 py-3 mb-4">
-      <p className="font-body text-[11px] text-steel uppercase tracking-wide font-bold">
+      <p className="font-body text-xs text-steel uppercase tracking-wide font-bold">
         Day {dayNumber} of {totalDays}
       </p>
       <p className="font-body text-sm text-chalk mt-1">

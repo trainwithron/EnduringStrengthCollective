@@ -158,7 +158,7 @@ export function QuickPaymentPanel({ groupId }: { groupId: string }) {
           ? `Charge $${(amountCents / 100).toFixed(2)}`
           : "Charge"}
       </button>
-      <p className="font-body text-[11px] text-steel">
+      <p className="font-body text-xs text-steel">
         You&apos;ll be taken to a secure Stripe checkout page to complete the charge.
       </p>
     </div>

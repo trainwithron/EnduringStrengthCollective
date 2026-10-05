@@ -108,7 +108,7 @@ export function PhotoLogFoodButton({
         <p className="font-body text-xs text-steel mt-1">
           ~{estimate.calories} kcal · {estimate.proteinG}p / {estimate.carbsG}c / {estimate.fatG}f
         </p>
-        <p className="font-body text-[11px] text-steel mt-1">
+        <p className="font-body text-xs text-steel mt-1">
           Rough visual estimate — photo-based logging is the least precise option here.
         </p>
         <div className="flex items-center gap-2 mt-2">

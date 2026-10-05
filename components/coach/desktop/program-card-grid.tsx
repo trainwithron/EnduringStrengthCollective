@@ -175,12 +175,12 @@ function ProgramCard({
           <ProgramCardVisual repsSeries={visual.repsSeries} weightSeries={visual.weightSeries} categorySplit={visual.categorySplit} />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-surface to-graphite">
-            <LayoutGrid className="w-6 h-6 text-steel/40" strokeWidth={1.5} />
+            <LayoutGrid className="w-6 h-6 text-steel" strokeWidth={1.5} />
           </div>
         )}
         <label className="absolute bottom-1.5 right-1.5 flex items-center gap-1 bg-graphite/85 border border-steel/30 px-2 py-1 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity">
           <ImagePlus className="w-3 h-3 text-chalk" strokeWidth={2} />
-          <span className="font-body text-[10px] text-chalk uppercase tracking-wide">
+          <span className="font-body text-xs text-chalk uppercase tracking-wide">
             {uploading ? "…" : signedUrl ? "Change" : "Add photo"}
           </span>
           <input
@@ -201,7 +201,7 @@ function ProgramCard({
               {program.workoutCount} {program.workoutCount === 1 ? "workout" : "workouts"}
             </p>
             {program.athleteName && (
-              <p className="font-body text-[11px] text-rust mt-0.5 truncate">
+              <p className="font-body text-xs text-rust mt-0.5 truncate">
                 {program.athleteName}&apos;s program
               </p>
             )}

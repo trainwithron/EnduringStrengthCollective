@@ -97,7 +97,7 @@ export function GameStatGrid({
           ))}
         </tbody>
       </table>
-      {savingKey && <p className="font-body text-[11px] text-steel mt-1">Saving…</p>}
+      {savingKey && <p className="font-body text-xs text-steel mt-1">Saving…</p>}
     </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSetSave } from "./set-save-context";
+import { validateSetFieldInput } from "@/lib/set-field-validation";
 import type { SetLogEntry } from "@/lib/types";
 import {
   ACTUAL_COLUMN,
@@ -43,7 +44,7 @@ function FieldInfoButton({ text }: { text: string }) {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="What's this?"
-        className="w-3.5 h-3.5 rounded-full border border-steel/40 text-steel text-[9px] leading-[12px] flex items-center justify-center shrink-0"
+        className="w-3.5 h-3.5 rounded-full border border-steel/40 text-steel text-xs leading-[12px] flex items-center justify-center shrink-0"
       >
         i
       </button>
@@ -154,6 +155,9 @@ function GridCell({
   const { save, failedIds } = useSetSave();
   const unsaved = failedIds.has(set.id);
   const [draft, setDraft] = useState(value === null || value === undefined ? "" : String(value));
+  // A value that can't be saved (RPE 89, 5.5 reps) stays on screen with the
+  // reason, instead of silently reverting or being saved as nonsense.
+  const [invalid, setInvalid] = useState<string | null>(null);
   const def = fieldDef(field);
   const isNumeric = def.kind === "number" || field === "reps"; // logged reps is always a real integer
 
@@ -219,9 +223,14 @@ function GridCell({
 
   function handleBlur() {
     // Focusing and leaving a cell is the athlete confirming this set.
+    const checked = validateSetFieldInput(field, draft);
+    if (!checked.ok) {
+      setInvalid(checked.message);
+      return;
+    }
+    setInvalid(null);
     onTouched();
-    const next = draft.trim() === "" ? null : isNumeric ? Number(draft) : draft.trim();
-    commit(next);
+    commit(checked.value);
   }
 
   const swipe = useSwipeGesture(() => {
@@ -243,24 +252,38 @@ function GridCell({
     <div className="relative w-16 h-10 shrink-0">
       <input
         type={isNumeric ? "number" : "text"}
-        inputMode={isNumeric ? "decimal" : undefined}
+        inputMode={isNumeric ? (field === "reps" ? "numeric" : "decimal") : undefined}
         aria-label={`${def.label} for set ${setNumber}${
           suggestion != null && draft.trim() === "" ? `, suggested ${suggestion}` : ""
         }${showLock ? " — locked, beat this to unlock it" : ""}`}
         placeholder={placeholder}
         value={draft}
         disabled={readOnly}
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={(e) => {
+          setDraft(e.target.value);
+          if (invalid) setInvalid(null);
+        }}
+        aria-invalid={invalid ? true : undefined}
         onBlur={handleBlur}
         {...swipe}
         className={`w-16 h-10 rounded-token-pill font-body text-sm text-center focus:outline-none focus:border-rust disabled:opacity-60 touch-pan-y ${
           unsaved ? "border-2 border-amber-400/70 " : ""
+        }${
+          invalid ? "border-2 border-rust " : ""
         }${
           showLock
             ? "bg-surface border-2 border-dashed border-rust/70 text-chalk/50"
             : "bg-surface border border-steel/30 text-chalk"
         }`}
       />
+      {invalid && (
+        <p
+          role="alert"
+          className="absolute top-full left-1/2 -translate-x-1/2 mt-1 z-20 w-40 bg-graphite border border-rust px-2 py-1 font-body text-xs text-chalk text-center"
+        >
+          {invalid}
+        </p>
+      )}
       {unsaved && (
         <span
           aria-hidden="true"
@@ -599,8 +622,8 @@ export function ExerciseSetGrid({
                   isComplete
                     ? "bg-moss border-moss text-graphite"
                     : isSkipped
-                    ? "border-steel/30 text-steel/50"
-                    : "border-steel/30 text-steel/30"
+                    ? "border-steel/30 text-steel"
+                    : "border-steel/30 text-steel"
                 }`}
               >
                 <Check className="w-4 h-4" strokeWidth={3} />

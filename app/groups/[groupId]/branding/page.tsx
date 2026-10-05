@@ -243,7 +243,7 @@ export default async function BrandingPage(
         <div>
           <div className="border border-steel/20 p-4 mb-8 grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div>
-              <p className="font-body text-[11px] text-steel uppercase tracking-wide mb-1">
+              <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">
                 Organization
               </p>
               <p className="font-body text-sm">{org?.name}</p>
@@ -253,7 +253,7 @@ export default async function BrandingPage(
               </p>
             </div>
             <div>
-              <p className="font-body text-[11px] text-steel uppercase tracking-wide mb-1">
+              <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">
                 Coaches
               </p>
               <div className="space-y-1">

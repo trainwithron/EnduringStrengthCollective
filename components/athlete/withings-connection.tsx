@@ -42,7 +42,7 @@ export function WithingsConnection({
         <span className="font-body text-sm">Withings</span>
         {connected ? (
           <div className="flex items-center gap-3">
-            <span className="font-body text-[11px] text-steel uppercase tracking-wide">
+            <span className="font-body text-xs text-steel uppercase tracking-wide">
               {status === "error" ? "Reconnect needed" : "Connected"}
             </span>
             <button

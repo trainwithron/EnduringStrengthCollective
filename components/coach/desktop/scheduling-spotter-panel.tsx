@@ -58,14 +58,14 @@ export function SchedulingSpotterPanel({
   return (
     <div className="border border-rust/40 bg-rust/5 px-4 py-3 mb-4">
       <div className="flex items-center justify-between mb-2">
-        <p className="font-body text-[11px] text-rust uppercase tracking-wide font-bold">
+        <p className="font-body text-xs text-rust uppercase tracking-wide font-bold">
           Scheduling Spot
         </p>
         {visible.length > 1 && (
           <button
             type="button"
             onClick={handleClearAll}
-            className="font-body text-[11px] text-steel uppercase tracking-wide active:text-chalk"
+            className="font-body text-xs text-steel uppercase tracking-wide active:text-chalk"
           >
             Clear all
           </button>
@@ -84,14 +84,14 @@ export function SchedulingSpotterPanel({
                   type="button"
                   onClick={() => sendFeedback(flag, "confirmed")}
                   disabled={busy}
-                  className="font-body text-[11px] text-moss uppercase tracking-wide disabled:opacity-40"
+                  className="font-body text-xs text-moss uppercase tracking-wide disabled:opacity-40"
                 >
                   Confirm
                 </button>
                 <a
                   href={availabilityHref}
                   onClick={() => sendFeedback(flag, "edited")}
-                  className="font-body text-[11px] text-steel uppercase tracking-wide active:text-chalk"
+                  className="font-body text-xs text-steel uppercase tracking-wide active:text-chalk"
                 >
                   Edit
                 </a>
@@ -99,7 +99,7 @@ export function SchedulingSpotterPanel({
                   type="button"
                   onClick={() => sendFeedback(flag, "denied")}
                   disabled={busy}
-                  className="font-body text-[11px] text-rust uppercase tracking-wide font-bold disabled:opacity-40"
+                  className="font-body text-xs text-rust uppercase tracking-wide font-bold disabled:opacity-40"
                 >
                   Deny
                 </button>

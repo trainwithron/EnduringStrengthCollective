@@ -44,12 +44,12 @@ export function GoogleCalendarConnection({
         <div>
           <span className="font-body text-sm">Google Calendar</span>
           {connected && personalEmail && (
-            <p className="font-body text-[11px] text-steel">{personalEmail}</p>
+            <p className="font-body text-xs text-steel">{personalEmail}</p>
           )}
         </div>
         {connected ? (
           <div className="flex items-center gap-3">
-            <span className="font-body text-[11px] text-steel uppercase tracking-wide">
+            <span className="font-body text-xs text-steel uppercase tracking-wide">
               {status === "error" ? "Reconnect needed" : "Connected"}
             </span>
             <button

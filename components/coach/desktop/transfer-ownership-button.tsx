@@ -87,7 +87,7 @@ export function TransferOwnershipButton({
               ))}
             </select>
           </div>
-          <p className="font-body text-[11px] text-steel">
+          <p className="font-body text-xs text-steel">
             You&apos;ll be moved from owner to admin — you keep access, but {selected?.fullName ?? "they"}{" "}
             becomes the organization&apos;s new owner.
           </p>

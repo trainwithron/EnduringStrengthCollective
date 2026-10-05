@@ -18,7 +18,7 @@ export function SettingsGroup({
   return (
     <div>
       {label && (
-        <p className="font-body text-[10px] font-bold uppercase tracking-wide text-rust mb-2">
+        <p className="font-body text-xs font-bold uppercase tracking-wide text-rust mb-2">
           {label}
         </p>
       )}

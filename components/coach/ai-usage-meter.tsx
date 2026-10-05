@@ -65,7 +65,7 @@ export function AiUsageMeter({
 
   if (compact) {
     return (
-      <p className="font-body text-[11px] text-steel">
+      <p className="font-body text-xs text-steel">
         Included in your plan: {summary} this month.{message ? ` ${message}` : ""}{" "}
         {(atLimit || nearLimit) && (
           <Link href={creditsHref} className="text-rust underline underline-offset-2">
@@ -78,7 +78,7 @@ export function AiUsageMeter({
 
   return (
     <div className="border border-steel/20 p-4 mb-4">
-      <p className="font-body text-[11px] text-steel uppercase tracking-wide mb-1">Included in your plan this month</p>
+      <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">Included in your plan this month</p>
       <p className="font-body text-sm text-chalk">{summary}</p>
       <p className="font-body text-xs text-steel mt-1">
         Resets {formatReset(usage.resetsOn)}. Your included amount grows with your client count ({usage.clients}{" "}

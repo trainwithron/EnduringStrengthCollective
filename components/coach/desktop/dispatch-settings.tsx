@@ -43,7 +43,7 @@ export function DispatchSettings({
 
   return (
     <div className="mb-8 border border-steel/20 p-4 max-w-xl">
-      <p className="font-body text-[11px] text-steel uppercase tracking-wide mb-2">
+      <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
         Trainer request page
       </p>
       <p className="font-body text-xs text-steel mb-2 max-w-[60ch]">
@@ -68,7 +68,7 @@ export function DispatchSettings({
       </div>
 
       <label className="flex items-center gap-2 mt-4">
-        <span className="font-body text-[11px] text-steel uppercase tracking-wide">
+        <span className="font-body text-xs text-steel uppercase tracking-wide">
           Trainer response window
         </span>
         <input

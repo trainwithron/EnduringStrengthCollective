@@ -628,11 +628,11 @@ export function DuplicateWeekPanel({
               onChange={(e) => setIntervalAmountPerWeek(e.target.value)}
               className="w-20 h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
             />
-            <span className="font-body text-[11px] text-steel">
+            <span className="font-body text-xs text-steel">
               {intervalAxis === "rest" ? "(negative = shorter rest)" : "(negative to decrease)"}
             </span>
           </label>
-          <p className="font-body text-[11px] text-steel">
+          <p className="font-body text-xs text-steel">
             Non-interval exercises in this week use the model below instead.
           </p>
         </div>
@@ -667,7 +667,7 @@ export function DuplicateWeekPanel({
           Exercise Progressions (a separate, live-adjusting rule, not
           this one-time batch precompute) uses those exact same two
           names for genuinely different math. See the note below. */}
-      <p className="font-body text-[11px] text-steel">
+      <p className="font-body text-xs text-steel">
         This writes real weeks right now, from the numbers above — it won&apos;t keep adjusting
         after that. For an ongoing target that updates itself from logged performance instead,
         see{" "}
@@ -703,7 +703,7 @@ export function DuplicateWeekPanel({
             onChange={(e) => setDoubleWeightBumpPct(e.target.value)}
             className="w-20 h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
           />
-          <span className="font-body text-[11px] text-steel">
+          <span className="font-body text-xs text-steel">
             (needs a rep range set on each exercise)
           </span>
         </label>
@@ -721,7 +721,7 @@ export function DuplicateWeekPanel({
               className="flex-1 h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
             />
           </label>
-          <p className="font-body text-[11px] text-steel">
+          <p className="font-body text-xs text-steel">
             One value per week — repeats from the start if there are more weeks than values. Reps
             stay as the source week set them (combine with the class-rep cycle below to vary those
             too). An exercise with no real training max logged for this client keeps its source
@@ -735,7 +735,7 @@ export function DuplicateWeekPanel({
           {["Heavy", "Moderate", "Light"].map((label, i) => (
             <div key={label} className="flex items-center gap-2">
               <span className="font-body text-xs text-steel w-20">{label}</span>
-              <span className="font-body text-[11px] text-steel">Reps</span>
+              <span className="font-body text-xs text-steel">Reps</span>
               <input
                 type="number"
                 value={wave[i].reps}

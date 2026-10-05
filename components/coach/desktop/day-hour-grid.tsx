@@ -89,7 +89,7 @@ export function DayHourGrid({
         {hourMarks.map((min) => (
           <div
             key={min}
-            className="absolute right-2 -translate-y-1/2 font-body text-[10px] text-steel"
+            className="absolute right-2 -translate-y-1/2 font-body text-xs text-steel"
             style={{ top: topFor(min) }}
           >
             {formatMinutes(min)}
@@ -127,7 +127,7 @@ export function DayHourGrid({
               className="absolute left-1 right-1 bg-rust/80 text-graphite px-2 py-0.5 overflow-hidden"
               style={{ top: topFor(start), height: Math.max(18, (end - start) * PX_PER_MIN) }}
             >
-              <p className="font-body text-[11px] font-medium leading-tight truncate">{b.label}</p>
+              <p className="font-body text-xs font-medium leading-tight truncate">{b.label}</p>
             </div>
           );
         })}
@@ -140,7 +140,7 @@ export function DayHourGrid({
               className="absolute left-1 right-1 bg-moss/80 text-graphite px-2 py-0.5 overflow-hidden"
               style={{ top: topFor(start), height: 18 }}
             >
-              <p className="font-body text-[11px] font-medium leading-tight truncate">{e.title}</p>
+              <p className="font-body text-xs font-medium leading-tight truncate">{e.title}</p>
             </div>
           );
         })}

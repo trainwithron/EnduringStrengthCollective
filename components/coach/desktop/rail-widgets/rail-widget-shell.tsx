@@ -8,7 +8,7 @@ import Link from "next/link";
 // this just keeps every widget's internal layout consistent.
 export function RailWidgetHeader({ title }: { title: string }) {
   return (
-    <p className="font-body text-[10px] uppercase tracking-wide text-steel mb-2">{title}</p>
+    <p className="font-body text-xs uppercase tracking-wide text-steel mb-2">{title}</p>
   );
 }
 
@@ -25,7 +25,7 @@ export function RailWidgetRow({
     <div className="flex items-center justify-between gap-2 py-1.5 border-b border-steel/10 last:border-b-0">
       <span className="font-body text-sm text-chalk truncate">{primary}</span>
       {secondary && (
-        <span className="font-body text-[11px] text-steel shrink-0 truncate max-w-[8rem]">{secondary}</span>
+        <span className="font-body text-xs text-steel shrink-0 truncate max-w-[8rem]">{secondary}</span>
       )}
     </div>
   );

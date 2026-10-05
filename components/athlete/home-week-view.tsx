@@ -57,7 +57,7 @@ export function HomeWeekView({
               }`}
             >
               <div className={`w-11 shrink-0 text-center ${isToday ? "text-rust" : "text-steel"}`}>
-                <p className="font-body text-[10px] uppercase tracking-wide">
+                <p className="font-body text-xs uppercase tracking-wide">
                   {WEEKDAY_SHORT[day.date.getDay()]}
                 </p>
                 <p className="font-display font-bold text-lg leading-none">{day.date.getDate()}</p>
@@ -68,7 +68,7 @@ export function HomeWeekView({
                   {day.workout.status === "done" && <Check className="w-3 h-3 shrink-0 text-positive" />}
                   {day.workout.title ?? (day.workout.status === "rest" ? "Rest day" : "—")}
                 </p>
-                <p className="font-body text-[11px] text-steel mt-0.5">
+                <p className="font-body text-xs text-steel mt-0.5">
                   {day.macroCalories != null ? `${day.macroCalories} kcal` : ""}
                   {day.macroCalories != null && day.habitsDue > 0 ? " · " : ""}
                   {day.habitsDue > 0 ? `${day.habitsCompleted}/${day.habitsDue} habits` : ""}

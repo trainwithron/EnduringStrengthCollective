@@ -92,7 +92,7 @@ export function ViewAsClientButton({ groupId }: { groupId: string }) {
 
       {open && (
         <div className="absolute right-0 top-full mt-1 w-64 max-w-[85vw] bg-surface border border-steel/30 z-30 shadow-lg">
-          <p className="font-body text-[11px] text-steel uppercase tracking-wide px-3 pt-2.5 pb-1.5">
+          <p className="font-body text-xs text-steel uppercase tracking-wide px-3 pt-2.5 pb-1.5">
             View a client&apos;s profile
           </p>
           <div className="max-h-72 overflow-y-auto">

@@ -210,7 +210,7 @@ export function WeightLogWidget({
           {logs.slice(0, 7).map((l) => (
             <div key={l.id} className="shrink-0 text-center">
               <p className="font-body text-sm">{l.weight}</p>
-              <p className="font-body text-[10px] text-steel">
+              <p className="font-body text-xs text-steel">
                 {new Date(l.loggedDate + "T00:00:00").toLocaleDateString(undefined, {
                   month: "numeric",
                   day: "numeric",

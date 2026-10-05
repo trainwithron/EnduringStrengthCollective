@@ -124,7 +124,7 @@ export function TriviaMiniGame({ onClose }: { onClose: () => void }) {
           True →
         </button>
       </div>
-      <p className="font-body text-[11px] text-steel">Swipe or tap — purely optional.</p>
+      <p className="font-body text-xs text-steel">Swipe or tap — purely optional.</p>
     </div>
   );
 }

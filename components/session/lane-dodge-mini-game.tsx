@@ -199,7 +199,7 @@ export function LaneDodgeMiniGame({
           Right →
         </button>
       </div>
-      <p className="font-body text-[11px] text-steel">Swipe or tap left/right — purely optional.</p>
+      <p className="font-body text-xs text-steel">Swipe or tap left/right — purely optional.</p>
     </div>
   );
 }

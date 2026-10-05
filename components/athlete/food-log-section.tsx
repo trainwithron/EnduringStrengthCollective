@@ -53,7 +53,7 @@ export function FoodLogSection({
     <div className="space-y-3">
       {allEntries.length > 0 && (
         <div className="border border-steel/20 p-3">
-          <p className="font-body text-[10px] text-steel uppercase tracking-wide mb-1.5">
+          <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5">
             Logged so far today
           </p>
           <p className="font-display text-lg leading-none">
@@ -92,7 +92,7 @@ export function FoodLogSection({
           {quickLogEntries.map((e) => (
             <div key={e.id} className="border border-steel/15 p-2.5">
               <p className="font-body text-xs text-chalk">{e.description}</p>
-              <p className="font-body text-[11px] text-steel mt-0.5">
+              <p className="font-body text-xs text-steel mt-0.5">
                 {e.calories} kcal · {e.proteinG}p / {e.carbsG}c / {e.fatG}f
               </p>
             </div>

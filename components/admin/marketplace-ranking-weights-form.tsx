@@ -106,7 +106,7 @@ export function MarketplaceRankingWeightsForm({
       <button
         onClick={handleSave}
         disabled={saving}
-        className="bg-rust text-chalk font-body text-sm font-medium px-4 py-2 rounded-token-md disabled:opacity-50"
+        className="bg-rust text-graphite font-body text-sm font-medium px-4 py-2 rounded-token-md disabled:opacity-50"
       >
         {saving ? "Saving…" : "Save weights"}
       </button>

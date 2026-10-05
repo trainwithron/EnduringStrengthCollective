@@ -156,7 +156,7 @@ export function WhackAMoleMiniGame({
           </div>
         )}
       </div>
-      <p className="font-body text-[11px] text-steel">Tap the lit holes — purely optional.</p>
+      <p className="font-body text-xs text-steel">Tap the lit holes — purely optional.</p>
     </div>
   );
 }

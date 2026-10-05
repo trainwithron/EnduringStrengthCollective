@@ -220,7 +220,7 @@ export default async function ChallengeDetailPage(
                     <img src={p.beforePhotoUrl} alt="Before" className="w-full aspect-square object-cover" />
                   ) : (
                     <div className="w-full aspect-square bg-surface flex items-center justify-center">
-                      <span className="font-body text-[9px] text-steel">No photo</span>
+                      <span className="font-body text-xs text-steel">No photo</span>
                     </div>
                   )}
                   {p.afterPhotoUrl ? (
@@ -228,7 +228,7 @@ export default async function ChallengeDetailPage(
                     <img src={p.afterPhotoUrl} alt="After" className="w-full aspect-square object-cover" />
                   ) : (
                     <div className="w-full aspect-square bg-surface flex items-center justify-center">
-                      <span className="font-body text-[9px] text-steel">No photo</span>
+                      <span className="font-body text-xs text-steel">No photo</span>
                     </div>
                   )}
                 </div>

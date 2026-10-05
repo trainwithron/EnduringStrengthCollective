@@ -58,7 +58,7 @@ export function ExerciseVolumeHistory({ history }: { history: VolumeHistoryPoint
               vectorEffect="non-scaling-stroke"
             />
           </svg>
-          <p className="font-body text-[11px] text-steel mt-1">
+          <p className="font-body text-xs text-steel mt-1">
             {Math.round(first.totalVolume).toLocaleString()} lbs &rarr;{" "}
             {Math.round(latest.totalVolume).toLocaleString()} lbs
           </p>

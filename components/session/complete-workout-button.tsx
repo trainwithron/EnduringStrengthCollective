@@ -364,8 +364,8 @@ export function CompleteWorkoutButton({
           ))}
         </div>
         <div className="flex items-center justify-between mt-1.5">
-          <span className="font-body text-[10px] text-steel">Easy</span>
-          <span className="font-body text-[10px] text-steel">All-out</span>
+          <span className="font-body text-xs text-steel">Easy</span>
+          <span className="font-body text-xs text-steel">All-out</span>
         </div>
         <button
           type="button"
@@ -451,7 +451,7 @@ export function CompleteWorkoutButton({
               Keep going
             </button>
           </div>
-          <p className="font-body text-[11px] text-steel mt-2">
+          <p className="font-body text-xs text-steel mt-2">
             Only the sets you&apos;ve filled in count toward this workout.
           </p>
         </div>

@@ -182,7 +182,7 @@ export function BroadcastComposer({
           className="w-full bg-surface border border-steel/30 text-chalk px-3 py-2 font-body text-sm focus:outline-none focus:border-rust"
           placeholder="Hey {first_name}, I'm out of town for six days. Sessions start back up next week."
         />
-        <p className={`font-body text-[11px] mt-1 ${tooLong ? "text-rust" : "text-steel"}`}>
+        <p className={`font-body text-xs mt-1 ${tooLong ? "text-rust" : "text-steel"}`}>
           {template.length}/{MAX_BROADCAST_LENGTH} — {FIRST_NAME_TOKEN} becomes each client&apos;s first name.
         </p>
       </div>
@@ -243,10 +243,10 @@ export function BroadcastComposer({
                 <input type="checkbox" checked={checked} onChange={() => toggleRecipient(a)} className="accent-rust" />
                 <span className="flex-1">{a.fullName}</span>
                 {groups.length > 1 && (
-                  <span className="text-[11px] text-steel">{groupNameById.get(a.groupId)?.name}</span>
+                  <span className="text-xs text-steel">{groupNameById.get(a.groupId)?.name}</span>
                 )}
                 {a.excludedByDefault && (
-                  <span className="text-[11px] text-rust">Under 13, no verified parental consent</span>
+                  <span className="text-xs text-rust">Under 13, no verified parental consent</span>
                 )}
               </label>
             );
@@ -281,12 +281,12 @@ export function BroadcastComposer({
             <div className="space-y-2 mb-4">
               {recipients.slice(0, 3).map((r) => (
                 <div key={r.athleteId} className="border border-steel/20 p-2">
-                  <p className="font-body text-[11px] text-steel">{r.fullName}</p>
+                  <p className="font-body text-xs text-steel">{r.fullName}</p>
                   <p className="font-body text-xs text-chalk whitespace-pre-wrap">{mergeFirstName(template, r.fullName)}</p>
                 </div>
               ))}
               {recipients.length > 3 && (
-                <p className="font-body text-[11px] text-steel">…and {recipients.length - 3} more, each with their own name.</p>
+                <p className="font-body text-xs text-steel">…and {recipients.length - 3} more, each with their own name.</p>
               )}
             </div>
             {error && (

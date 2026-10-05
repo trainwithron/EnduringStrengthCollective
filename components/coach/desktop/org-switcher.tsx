@@ -93,7 +93,7 @@ export function OrgSwitcher({
         <div role="menu" className="absolute left-0 top-full mt-1 z-50 min-w-[14rem] bg-graphite border border-steel/30 shadow-xl py-1">
           {orgs.length >= 2 && (
             <>
-              <p className="px-3 pt-1 pb-0.5 font-body text-[10px] text-steel uppercase tracking-wide">Your organizations</p>
+              <p className="px-3 pt-1 pb-0.5 font-body text-xs text-steel uppercase tracking-wide">Your organizations</p>
               {orgs.map((o) => (
                 <button
                   key={o.id}
@@ -111,7 +111,7 @@ export function OrgSwitcher({
           )}
           {administered.length > 0 && (
             <>
-              <p className="px-3 pt-2 pb-0.5 font-body text-[10px] text-steel uppercase tracking-wide">Admin only</p>
+              <p className="px-3 pt-2 pb-0.5 font-body text-xs text-steel uppercase tracking-wide">Admin only</p>
               {administered.map((o) => (
                 <button
                   key={o.id}

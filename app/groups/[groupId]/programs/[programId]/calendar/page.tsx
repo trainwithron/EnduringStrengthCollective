@@ -128,9 +128,19 @@ export default async function ProgramCalendarPage(
             {program.name}
           </h1>
         </header>
-        <p className="font-body text-sm text-steel px-5 py-6 max-w-[50ch]">
-          Set a start date and training days on this program to see it as a calendar.
-        </p>
+        <div className="px-5 py-6 max-w-[50ch]">
+          <p className="font-body text-sm text-steel">
+            {viewingAsAthlete
+              ? "This program has no dates yet, so there is no calendar. Your coach can add them. Your workouts are still on Home."
+              : "Set a start date and training days on this program to see it as a calendar."}
+          </p>
+          <Link
+            href={viewingAsAthlete ? `/groups/${params.groupId}` : backHref}
+            className="inline-flex items-center h-11 mt-3 font-body text-sm text-rust"
+          >
+            {viewingAsAthlete ? "Go to Home" : "Go to program settings"} &rarr;
+          </Link>
+        </div>
         {showMobileView && (
           <BottomTabBar groupId={params.groupId} activeOverride="calendar" />
         )}
@@ -364,7 +374,7 @@ export default async function ProgramCalendarPage(
             {WEEKDAY_LABELS.map((label) => (
               <div
                 key={label}
-                className="bg-graphite text-center font-body text-[10px] text-steel uppercase tracking-wide py-1.5"
+                className="bg-graphite text-center font-body text-xs text-steel uppercase tracking-wide py-1.5"
               >
                 {label}
               </div>
@@ -384,7 +394,7 @@ export default async function ProgramCalendarPage(
               const cellContent = (
                 <>
                   <span
-                    className={`font-body text-[10px] ${
+                    className={`font-body text-xs ${
                       isToday ? "text-rust font-bold" : "text-steel"
                     }`}
                   >
@@ -392,7 +402,7 @@ export default async function ProgramCalendarPage(
                   </span>
                   {w && (
                     <span
-                      className={`font-body text-[10px] leading-tight mt-0.5 ${
+                      className={`font-body text-xs leading-tight mt-0.5 ${
                         locked ? "text-steel flex items-center gap-0.5" : "text-chalk"
                       }`}
                     >
@@ -401,7 +411,7 @@ export default async function ProgramCalendarPage(
                     </span>
                   )}
                   {w && done && (
-                    <span className="font-body text-[9px] text-positive mt-0.5">Done</span>
+                    <span className="font-body text-xs text-positive mt-0.5">Done</span>
                   )}
                 </>
               );
@@ -473,7 +483,7 @@ export default async function ProgramCalendarPage(
               const rowInner = (
                 <>
                   <div className={`w-11 shrink-0 text-center ${isToday ? "text-rust" : "text-steel"}`}>
-                    <p className="font-body text-[10px] uppercase tracking-wide">{WEEKDAY_LABELS[i]}</p>
+                    <p className="font-body text-xs uppercase tracking-wide">{WEEKDAY_LABELS[i]}</p>
                     <p className="font-display font-bold text-lg leading-none">{date.getDate()}</p>
                   </div>
                   <div className="flex-1 min-w-0">

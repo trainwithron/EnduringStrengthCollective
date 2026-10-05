@@ -174,7 +174,7 @@ export function ProShopManager({ initialLinks }: { initialLinks: ProShopLink[] }
                   {l.discountDescription && (
                     <p className="font-body text-xs text-positive mt-0.5">{l.discountDescription}</p>
                   )}
-                  <p className="font-body text-[11px] text-steel mt-1">
+                  <p className="font-body text-xs text-steel mt-1">
                     {l.clickCount} click{l.clickCount === 1 ? "" : "s"}
                   </p>
                 </div>

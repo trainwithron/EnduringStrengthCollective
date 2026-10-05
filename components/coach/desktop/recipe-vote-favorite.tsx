@@ -92,7 +92,7 @@ export function RecipeVoteFavorite({ recipeId }: { recipeId: string }) {
       >
         <ChevronUp className="w-3.5 h-3.5" />
       </button>
-      <span className="font-body text-[11px] text-steel w-4 text-center tabular-nums">{netScore}</span>
+      <span className="font-body text-xs text-steel w-4 text-center tabular-nums">{netScore}</span>
       <button
         type="button"
         onClick={(e) => handleVote(e, -1)}

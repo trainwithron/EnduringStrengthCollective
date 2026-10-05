@@ -105,13 +105,13 @@ export function CoachProfileEditor({
             placeholder="A short bio your clients will see when they tap your name…"
             className="w-full bg-graphite border border-steel/30 text-chalk px-3 py-2 font-body text-sm focus:outline-none focus:border-rust resize-none"
           />
-          {saving && <p className="font-body text-[11px] text-steel">Saving…</p>}
+          {saving && <p className="font-body text-xs text-steel">Saving…</p>}
           {error && (
             <p className="font-body text-xs text-rust" role="alert">
               {error}
             </p>
           )}
-          <p className="font-body text-[11px] text-steel">
+          <p className="font-body text-xs text-steel">
             Add social links from Pro Shop (category: Social) — they show up in the same popup.
           </p>
         </div>

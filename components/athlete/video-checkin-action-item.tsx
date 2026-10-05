@@ -43,7 +43,7 @@ export function VideoCheckinActionItem({
           completed ? "bg-rust border-rust" : "border-steel/40"
         }`}
       >
-        {completed && <span className="text-graphite text-[10px] leading-none">✓</span>}
+        {completed && <span className="text-graphite text-xs leading-none">✓</span>}
       </span>
       <span className={`font-body text-sm ${completed ? "text-steel line-through" : "text-chalk"}`}>{body}</span>
     </button>

@@ -62,7 +62,7 @@ export function RosterSection({
           )}
           <div>
             {glow && (
-              <p className="font-body text-[10px] text-rust uppercase tracking-wide mb-0.5">
+              <p className="font-body text-xs text-rust uppercase tracking-wide mb-0.5">
                 One-time setup
               </p>
             )}
@@ -77,7 +77,7 @@ export function RosterSection({
           </div>
         </div>
         {!!needsAttentionCount && needsAttentionCount > 0 && (
-          <span className="font-body text-[10px] text-rust border border-rust/40 px-2 py-0.5 uppercase tracking-wide">
+          <span className="font-body text-xs text-rust border border-rust/40 px-2 py-0.5 uppercase tracking-wide">
             {needsAttentionCount} need{needsAttentionCount === 1 ? "s" : ""} attention
           </span>
         )}

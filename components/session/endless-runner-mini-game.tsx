@@ -169,7 +169,7 @@ export function EndlessRunnerMiniGame({
           </div>
         )}
       </div>
-      <p className="font-body text-[11px] text-steel">Tap to jump — purely optional.</p>
+      <p className="font-body text-xs text-steel">Tap to jump — purely optional.</p>
     </div>
   );
 }

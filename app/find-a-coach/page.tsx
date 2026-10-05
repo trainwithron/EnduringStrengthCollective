@@ -135,7 +135,7 @@ export default async function FindACoachPage(props: {
                 )}
               </div>
             ))}
-            <p className="font-body text-[11px] text-steel pt-2">
+            <p className="font-body text-xs text-steel pt-2">
               Ranked by a real blend of distance, program fit, and — where enough real client history
               exists — measured outcomes. Most coaches don&apos;t have outcome data tracked yet; that&apos;s
               expected, not an error.

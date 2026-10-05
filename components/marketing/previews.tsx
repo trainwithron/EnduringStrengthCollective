@@ -37,7 +37,7 @@ export function ProgramBuilderPreview() {
               {d.rows.map((r) => (
                 <div
                   key={r.name}
-                  className="flex items-center justify-between text-[11px] font-body"
+                  className="flex items-center justify-between text-xs font-body"
                 >
                   <span className="text-chalk/80 truncate pr-2">{r.name}</span>
                   <span className="text-rust font-medium shrink-0">{r.sets}</span>
@@ -69,7 +69,7 @@ export function BusinessDashboardPreview() {
             <p className="font-display text-xl font-bold text-chalk">
               {t.value}
             </p>
-            <p className="font-body text-[10px] text-steel uppercase tracking-wide mt-0.5">
+            <p className="font-body text-xs text-steel uppercase tracking-wide mt-0.5">
               {t.label}
             </p>
           </div>
@@ -91,7 +91,7 @@ export function AthleteMobilePreview() {
       <p className="font-display uppercase text-lg font-bold text-chalk">
         Day 2 — Lower
       </p>
-      <p className="font-body text-[11px] text-steel mt-0.5">Today&apos;s workout</p>
+      <p className="font-body text-xs text-steel mt-0.5">Today&apos;s workout</p>
       <div className="space-y-2 mt-4">
         {items.map((it) => (
           <div
@@ -109,7 +109,7 @@ export function AthleteMobilePreview() {
                 {it.name}
               </span>
             </div>
-            <span className="font-body text-[11px] text-steel shrink-0">
+            <span className="font-body text-xs text-steel shrink-0">
               {it.sets}
             </span>
           </div>

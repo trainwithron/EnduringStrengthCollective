@@ -116,7 +116,7 @@ export function InviteCoachForm({ groupId }: { groupId: string }) {
               <option value="coach">Coach</option>
               <option value="admin">Admin</option>
             </select>
-            <p className="font-body text-[11px] text-steel mt-1">
+            <p className="font-body text-xs text-steel mt-1">
               Admins and coaches have the same access today — this just records their level for
               when permission tiers are built out.
             </p>

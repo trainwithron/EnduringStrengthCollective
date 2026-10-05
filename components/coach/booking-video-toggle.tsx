@@ -37,7 +37,7 @@ export function BookingVideoToggle({
       type="button"
       onClick={toggle}
       disabled={busy}
-      className="font-body text-[11px] text-steel underline disabled:opacity-40"
+      className="font-body text-xs text-steel underline disabled:opacity-40"
     >
       {sessionType === "video" ? "Make in-person" : "Make video call"}
     </button>

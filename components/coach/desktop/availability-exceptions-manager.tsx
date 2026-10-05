@@ -126,7 +126,7 @@ export function AvailabilityExceptionsManager({
                 <p className="font-body text-sm text-chalk truncate">
                   {e.label || (e.kind === "one_off" ? "Time off" : "Recurring block")}
                 </p>
-                <p className="font-body text-[11px] text-steel">
+                <p className="font-body text-xs text-steel">
                   {e.kind === "one_off"
                     ? `${new Date(e.startAt!).toLocaleString(undefined, {
                         month: "short",

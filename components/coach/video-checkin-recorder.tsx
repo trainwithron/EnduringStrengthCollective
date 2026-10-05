@@ -223,7 +223,7 @@ export function VideoCheckinRecorder({
           </button>
 
           <label className="flex flex-col gap-1">
-            <span className="font-body text-[10px] text-steel uppercase tracking-wide">
+            <span className="font-body text-xs text-steel uppercase tracking-wide">
               Rough notes (AI turns these into a summary + action items)
             </span>
             <textarea

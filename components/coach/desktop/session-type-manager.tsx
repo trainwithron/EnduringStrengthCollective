@@ -91,7 +91,7 @@ export function SessionTypeManager({ initialTypes }: { initialTypes: SessionType
 
       <div className="flex items-end gap-3">
         <div className="flex flex-col gap-1">
-          <label className="font-body text-[11px] text-steel uppercase tracking-wide">Name</label>
+          <label className="font-body text-xs text-steel uppercase tracking-wide">Name</label>
           <input
             type="text"
             value={name}
@@ -101,7 +101,7 @@ export function SessionTypeManager({ initialTypes }: { initialTypes: SessionType
           />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="font-body text-[11px] text-steel uppercase tracking-wide">Credit cost</label>
+          <label className="font-body text-xs text-steel uppercase tracking-wide">Credit cost</label>
           <input
             type="number"
             inputMode="numeric"

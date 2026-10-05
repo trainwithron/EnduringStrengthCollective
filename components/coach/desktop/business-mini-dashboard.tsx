@@ -163,7 +163,7 @@ export function BusinessMiniDashboard({ groupId, expanded = false }: { groupId: 
           coach-wide (every group); this one is just the group currently
           being viewed, which a coach with more than one group has no way
           to tell apart otherwise. */}
-      <p className="font-body text-[10px] uppercase tracking-wide text-steel -mt-1">
+      <p className="font-body text-xs uppercase tracking-wide text-steel -mt-1">
         Whole organization
       </p>
       <div className="grid grid-cols-2 gap-2">
@@ -171,27 +171,27 @@ export function BusinessMiniDashboard({ groupId, expanded = false }: { groupId: 
           <p className="font-display font-bold text-lg leading-none">
             {data ? `$${data.incomeThisMonth.toFixed(0)}` : "—"}
           </p>
-          <p className="font-body text-[10px] text-steel uppercase mt-1">Income (mo)</p>
+          <p className="font-body text-xs text-steel uppercase mt-1">Income (mo)</p>
         </div>
         <div className="border border-steel/20 p-2.5">
           <p className="font-display font-bold text-lg leading-none">{data ? `$${data.mrr.toFixed(0)}` : "—"}</p>
-          <p className="font-body text-[10px] text-steel uppercase mt-1">MRR</p>
+          <p className="font-body text-xs text-steel uppercase mt-1">MRR</p>
         </div>
         <div className="border border-steel/20 p-2.5 col-span-2">
           <p className="font-display font-bold text-lg leading-none">{data ? data.payingClients : "—"}</p>
-          <p className="font-body text-[10px] text-steel uppercase mt-1">Paying clients</p>
+          <p className="font-body text-xs text-steel uppercase mt-1">Paying clients</p>
         </div>
         {expanded && (
           <>
             <div className="border border-steel/20 p-2.5">
               <p className="font-display font-bold text-lg leading-none">{expandedData ? expandedData.rosterSize : "—"}</p>
-              <p className="font-body text-[10px] text-steel uppercase mt-1">Roster size</p>
+              <p className="font-body text-xs text-steel uppercase mt-1">Roster size</p>
             </div>
             <div className="border border-steel/20 p-2.5">
               <p className="font-display font-bold text-lg leading-none">
                 {expandedData ? `${expandedData.activeThisWeek}/${expandedData.rosterSize}` : "—"}
               </p>
-              <p className="font-body text-[10px] text-steel uppercase mt-1">
+              <p className="font-body text-xs text-steel uppercase mt-1">
                 Active this week{expandedData ? ` (${expandedData.activePct}%)` : ""}
               </p>
             </div>

@@ -70,7 +70,7 @@ export function TrendChart({
           {unit}
         </text>
       </svg>
-      <div className="flex items-center justify-between font-body text-[11px] text-steel mt-1">
+      <div className="flex items-center justify-between font-body text-xs text-steel mt-1">
         <span>{new Date(first.date + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
         <span className={delta === 0 ? "" : delta > 0 ? "text-positive" : "text-rust"}>
           {delta > 0 ? "+" : ""}

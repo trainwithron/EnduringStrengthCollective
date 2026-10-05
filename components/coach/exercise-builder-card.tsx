@@ -775,7 +775,7 @@ export function ExerciseBuilderCard({
                     : null;
                 return (
                   <div key={field} className="flex items-center gap-1.5">
-                    <span className="w-14 shrink-0 font-body text-[10px] text-steel uppercase tracking-wide">
+                    <span className="w-14 shrink-0 font-body text-xs text-steel uppercase tracking-wide">
                       {def.label}
                     </span>
                     {exercise.sets.map((set, i) => (
@@ -795,7 +795,7 @@ export function ExerciseBuilderCard({
                       type="button"
                       onClick={() => handleRemoveField(field)}
                       aria-label={`Stop tracking ${def.label}`}
-                      className="w-6 h-9 flex items-center justify-center text-steel/60 active:text-rust shrink-0"
+                      className="w-6 h-9 flex items-center justify-center text-steel active:text-rust shrink-0"
                     >
                       ×
                     </button>
@@ -851,7 +851,7 @@ export function ExerciseBuilderCard({
                       className="text-left px-2.5 py-2 border-b border-steel/15 last:border-b-0 text-chalk font-body text-xs hover:bg-graphite/50 disabled:opacity-40"
                     >
                       <span className="block">{p.label}</span>
-                      <span className="block text-steel text-[10px] mt-0.5">
+                      <span className="block text-steel text-xs mt-0.5">
                         {p.workSeconds}s work / {p.restSeconds}s rest × {p.rounds}
                       </span>
                     </button>
@@ -892,7 +892,7 @@ export function ExerciseBuilderCard({
                         <span className="block">
                           {s.label} — {s.restSeconds}s
                         </span>
-                        <span className="block text-steel text-[10px] mt-0.5">{s.source}</span>
+                        <span className="block text-steel text-xs mt-0.5">{s.source}</span>
                       </button>
                     ))}
                   </div>
@@ -912,7 +912,7 @@ export function ExerciseBuilderCard({
           {showDetails && (
             <div className="mt-2 pt-2 border-t border-steel/15 space-y-2">
               <div className="flex items-center gap-2">
-                <span className="font-body text-[10px] text-steel uppercase tracking-wide shrink-0">
+                <span className="font-body text-xs text-steel uppercase tracking-wide shrink-0">
                   {exercise.trackedFields.includes("distance") && !exercise.trackedFields.includes("reps")
                     ? "Distance range (for Double Progression)"
                     : "Rep range (for Double Progression)"}

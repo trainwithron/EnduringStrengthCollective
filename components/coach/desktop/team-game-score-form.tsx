@@ -37,7 +37,7 @@ export function TeamGameScoreForm({
       <p className="font-display uppercase text-xs tracking-wide text-steel mb-2">Final score</p>
       <div className="flex items-center gap-3 mb-3">
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">Us</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Us</span>
           <input
             type="number"
             value={ourScore}
@@ -48,7 +48,7 @@ export function TeamGameScoreForm({
         </label>
         <span className="font-display text-lg text-steel mt-4">–</span>
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">Them</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Them</span>
           <input
             type="number"
             value={opponentScore}
@@ -59,7 +59,7 @@ export function TeamGameScoreForm({
         </label>
       </div>
       <label className="flex flex-col gap-1">
-        <span className="font-body text-[11px] text-steel uppercase tracking-wide">Notes</span>
+        <span className="font-body text-xs text-steel uppercase tracking-wide">Notes</span>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
@@ -68,7 +68,7 @@ export function TeamGameScoreForm({
           className="bg-surface border border-steel/30 text-chalk px-2 py-1.5 font-body text-sm"
         />
       </label>
-      {saved && <p className="font-body text-[11px] text-steel mt-1">Saved.</p>}
+      {saved && <p className="font-body text-xs text-steel mt-1">Saved.</p>}
     </div>
   );
 }

@@ -206,9 +206,9 @@ export function MealSlotDropZones({
             } ${savingSlot === slot ? "opacity-50" : ""}`}
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="font-body text-[11px] text-steel uppercase tracking-wide">{label}</span>
+              <span className="font-body text-xs text-steel uppercase tracking-wide">{label}</span>
               {assigned.length === 0 && (
-                <span className="font-body text-[10px] text-steel/70">drop a recipe</span>
+                <span className="font-body text-xs text-steel">drop a recipe</span>
               )}
             </div>
             {assigned.map((name) => (

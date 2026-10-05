@@ -169,7 +169,7 @@ export function CalendarGrid({
       {headerLabels.map((label, i) => (
         <div
           key={i}
-          className="bg-graphite text-center font-body text-[10px] text-steel uppercase tracking-wide py-1.5"
+          className="bg-graphite text-center font-body text-xs text-steel uppercase tracking-wide py-1.5"
         >
           {label}
         </div>
@@ -220,8 +220,8 @@ export function CalendarGrid({
           >
             <span className="inline-flex items-center gap-1">
               <span
-                className={`font-body text-[10px] ${
-                  isToday ? "text-rust font-bold" : isWeekend ? "text-steel/50" : "text-steel"
+                className={`font-body text-xs ${
+                  isToday ? "text-rust font-bold" : isWeekend ? "text-steel" : "text-steel"
                 }`}
               >
                 {date.getDate()}
@@ -237,14 +237,14 @@ export function CalendarGrid({
             {showAllBookings ? (
               <>
                 {workouts.map((w, idx) => (
-                  <span key={`w-${idx}`} className="font-body text-[9px] text-positive leading-tight truncate">
+                  <span key={`w-${idx}`} className="font-body text-xs text-positive leading-tight truncate">
                     {w.athleteName ? `${w.athleteName}: ` : ""}
                     {w.title}
                   </span>
                 ))}
 
                 {bookingsShown.map((b, idx) => (
-                  <span key={`b-${idx}`} className="font-body text-[9px] text-chalk leading-tight">
+                  <span key={`b-${idx}`} className="font-body text-xs text-chalk leading-tight">
                     {b.time} &middot; {b.name}
                   </span>
                 ))}
@@ -252,7 +252,7 @@ export function CalendarGrid({
                 {events.map((e) => (
                   <div
                     key={e.id}
-                    className={`flex items-center gap-1 font-body text-[9px] leading-tight ${
+                    className={`flex items-center gap-1 font-body text-xs leading-tight ${
                       e.type === "suggestion" ? "text-yellow-500" : "text-rust"
                     }`}
                   >
@@ -275,7 +275,7 @@ export function CalendarGrid({
                 ))}
 
                 {bookings.length === 0 && events.length === 0 && (
-                  <span className="font-body text-[10px] text-steel">No sessions</span>
+                  <span className="font-body text-xs text-steel">No sessions</span>
                 )}
               </>
             ) : (
@@ -310,11 +310,11 @@ export function CalendarGrid({
             <div className="divide-y divide-steel/15">
               {selectedItems.map((item) => (
                 <div key={item.key} className="flex items-center gap-3 py-2 group/row">
-                  <span className="font-mono text-[10px] text-steel w-12 shrink-0">{item.time ?? ""}</span>
+                  <span className="font-mono text-xs text-steel w-12 shrink-0">{item.time ?? ""}</span>
                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${item.dotClass}`} />
                   <span className="font-body text-sm text-chalk flex-1 truncate">{item.label}</span>
                   {item.badge && (
-                    <span className="font-mono text-[9px] px-1.5 py-0.5 rounded-token-pill bg-rust/15 text-rust shrink-0">
+                    <span className="font-mono text-xs px-1.5 py-0.5 rounded-token-pill bg-rust/15 text-rust shrink-0">
                       {item.badge}
                     </span>
                   )}

@@ -108,7 +108,7 @@ export function BulkMacroRangeForm({
       </h3>
       <div className="grid grid-cols-2 gap-2 mb-2">
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[10px] text-steel uppercase tracking-wide">From</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">From</span>
           <input
             type="date"
             value={startDate}
@@ -117,7 +117,7 @@ export function BulkMacroRangeForm({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[10px] text-steel uppercase tracking-wide">To</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">To</span>
           <input
             type="date"
             value={endDate}
@@ -129,7 +129,7 @@ export function BulkMacroRangeForm({
       </div>
 
       {startDate && endDate && (
-        <p className="font-body text-[11px] text-steel mb-3">
+        <p className="font-body text-xs text-steel mb-3">
           {dateKeys.length > 0
             ? `${dateKeys.length} day${dateKeys.length === 1 ? "" : "s"} selected${
                 dateKeys.length === MAX_RANGE_DAYS ? ` (capped at ${MAX_RANGE_DAYS})` : ""
@@ -140,7 +140,7 @@ export function BulkMacroRangeForm({
 
       <div className="space-y-2">
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[10px] text-steel uppercase tracking-wide">Calories</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Calories</span>
           <input
             type="number"
             min="0"
@@ -150,7 +150,7 @@ export function BulkMacroRangeForm({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[10px] text-steel uppercase tracking-wide">
+          <span className="font-body text-xs text-steel uppercase tracking-wide">
             Body weight (lbs) — sets protein at {PROTEIN_G_PER_LB}g/lb
           </span>
           <input
@@ -163,7 +163,7 @@ export function BulkMacroRangeForm({
         </label>
         <div className="grid grid-cols-3 gap-2">
           <label className="flex flex-col gap-1">
-            <span className="font-body text-[10px] text-steel uppercase tracking-wide">Protein (g)</span>
+            <span className="font-body text-xs text-steel uppercase tracking-wide">Protein (g)</span>
             <input
               type="number"
               min="0"
@@ -173,7 +173,7 @@ export function BulkMacroRangeForm({
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="font-body text-[10px] text-steel uppercase tracking-wide">Carbs (g)</span>
+            <span className="font-body text-xs text-steel uppercase tracking-wide">Carbs (g)</span>
             <input
               type="number"
               min="0"
@@ -183,7 +183,7 @@ export function BulkMacroRangeForm({
             />
           </label>
           <label className="flex flex-col gap-1">
-            <span className="font-body text-[10px] text-steel uppercase tracking-wide">Fat (g)</span>
+            <span className="font-body text-xs text-steel uppercase tracking-wide">Fat (g)</span>
             <input
               type="number"
               min="0"

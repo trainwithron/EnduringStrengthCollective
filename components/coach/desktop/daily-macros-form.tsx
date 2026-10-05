@@ -168,19 +168,19 @@ export function DailyMacrosForm({
       {suggestion && !suggestionDismissed && (
         <div className="border border-rust/40 bg-rust/5 p-2.5 space-y-1.5">
           <p className="font-body text-xs text-chalk font-medium">{suggestion.headline}</p>
-          <p className="font-body text-[11px] text-steel leading-snug">{suggestion.rationale}</p>
+          <p className="font-body text-xs text-steel leading-snug">{suggestion.rationale}</p>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={applySuggestion}
-              className="h-7 px-3 border border-rust text-rust font-body text-[11px] uppercase tracking-wide active:bg-rust active:text-graphite"
+              className="h-7 px-3 border border-rust text-rust font-body text-xs uppercase tracking-wide active:bg-rust active:text-graphite"
             >
               Apply
             </button>
             <button
               type="button"
               onClick={() => setSuggestionDismissed(true)}
-              className="h-7 px-3 border border-steel/30 text-steel font-body text-[11px] uppercase tracking-wide"
+              className="h-7 px-3 border border-steel/30 text-steel font-body text-xs uppercase tracking-wide"
             >
               Dismiss
             </button>
@@ -189,7 +189,7 @@ export function DailyMacrosForm({
       )}
 
       <div>
-        <label className="font-body text-[11px] text-steel uppercase tracking-wide">
+        <label className="font-body text-xs text-steel uppercase tracking-wide">
           Calories
         </label>
         <input
@@ -202,7 +202,7 @@ export function DailyMacrosForm({
       </div>
 
       <div>
-        <label className="font-body text-[11px] text-steel uppercase tracking-wide">
+        <label className="font-body text-xs text-steel uppercase tracking-wide">
           Body weight (lbs) — sets protein at {PROTEIN_G_PER_LB}g/lb
         </label>
         <input
@@ -228,7 +228,7 @@ export function DailyMacrosForm({
 
       <div className="grid grid-cols-3 gap-2">
         <div>
-          <label className="font-body text-[11px] text-steel uppercase tracking-wide">
+          <label className="font-body text-xs text-steel uppercase tracking-wide">
             Protein (g)
           </label>
           <input
@@ -240,7 +240,7 @@ export function DailyMacrosForm({
           />
         </div>
         <div>
-          <label className="font-body text-[11px] text-steel uppercase tracking-wide">
+          <label className="font-body text-xs text-steel uppercase tracking-wide">
             Carbs (g)
           </label>
           <input
@@ -252,7 +252,7 @@ export function DailyMacrosForm({
           />
         </div>
         <div>
-          <label className="font-body text-[11px] text-steel uppercase tracking-wide">
+          <label className="font-body text-xs text-steel uppercase tracking-wide">
             Fat (g)
           </label>
           <input

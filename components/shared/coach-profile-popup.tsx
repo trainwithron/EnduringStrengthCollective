@@ -85,7 +85,7 @@ export function CoachProfilePopup({
             className="w-full max-w-sm bg-graphite border border-steel/30 max-h-[80vh] overflow-y-auto"
           >
             <div className="flex items-center justify-between px-5 pt-5">
-              <p className="font-body text-[10px] text-steel uppercase tracking-wide">Coach</p>
+              <p className="font-body text-xs text-steel uppercase tracking-wide">Coach</p>
               <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="text-steel active:text-rust">
                 <X className="w-5 h-5" strokeWidth={2.5} />
               </button>
@@ -110,7 +110,7 @@ export function CoachProfilePopup({
                   {data.bio && <p className="font-body text-sm text-chalk whitespace-pre-wrap mb-4">{data.bio}</p>}
                   {data.socialLinks.length > 0 && (
                     <div>
-                      <p className="font-body text-[10px] text-steel uppercase tracking-wide mb-2">Follow / Connect</p>
+                      <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Follow / Connect</p>
                       <ProShopList links={data.socialLinks} />
                     </div>
                   )}

@@ -26,7 +26,7 @@ export function DayMealsView({
         {buckets.map((bucket) => (
           <div key={bucket}>
             {buckets.length > 1 && (
-              <p className="font-body text-[11px] text-steel uppercase tracking-wide mb-1.5">
+              <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5">
                 {BUCKET_LABELS[bucket] ?? bucket}
               </p>
             )}

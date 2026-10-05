@@ -77,7 +77,7 @@ export function ClientTagManager({
 
   return (
     <div className="mb-8 border border-steel/20 p-4 max-w-xl">
-      <p className="font-body text-[11px] text-steel uppercase tracking-wide mb-2">Client Tags</p>
+      <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Client Tags</p>
       <p className="font-body text-xs text-steel mb-3 max-w-[60ch]">
         Organize clients across every group in this organization — &ldquo;In-Home,&rdquo;
         &ldquo;Coast to Coast,&rdquo; whatever makes sense for your business. Assign tags from a
@@ -96,7 +96,7 @@ export function ClientTagManager({
                 onChange={(e) => handleSetGate(tag.id, e.target.checked)}
                 className="accent-rust"
               />
-              <span className="font-body text-[11px] text-steel uppercase tracking-wide">
+              <span className="font-body text-xs text-steel uppercase tracking-wide">
                 Gates revenue split
               </span>
             </label>
@@ -113,7 +113,7 @@ export function ClientTagManager({
       </div>
 
       {tags.some((t) => t.gatesRevenueSplit) && (
-        <p className="font-body text-[11px] text-steel mb-3 max-w-[60ch]">
+        <p className="font-body text-xs text-steel mb-3 max-w-[60ch]">
           Only clients tagged with the gating tag above are included in the org-wide revenue
           split — everyone else&apos;s payments go entirely to their own group&apos;s coach.
         </p>
@@ -137,7 +137,7 @@ export function ClientTagManager({
           Add
         </button>
       </div>
-      {error && <p className="font-body text-[11px] text-rust mt-2">{error}</p>}
+      {error && <p className="font-body text-xs text-rust mt-2">{error}</p>}
     </div>
   );
 }

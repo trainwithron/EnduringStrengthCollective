@@ -247,7 +247,7 @@ export function ExerciseCard({
             <h2 className="font-body font-medium text-[15px]">
               {exercise.exerciseName || "Untitled exercise"}
               {exercise.isSwapped && (
-                <span className="font-body text-[11px] text-steel ml-2 align-middle">
+                <span className="font-body text-xs text-steel ml-2 align-middle">
                   swapped
                 </span>
               )}

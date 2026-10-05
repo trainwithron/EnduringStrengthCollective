@@ -100,7 +100,7 @@ export function ClientCalendarGrid({
         {WEEKDAY_LABELS.map((label) => (
           <div
             key={label}
-            className="bg-graphite text-center font-body text-[10px] text-steel uppercase tracking-wide py-1.5"
+            className="bg-graphite text-center font-body text-xs text-steel uppercase tracking-wide py-1.5"
           >
             {label}
           </div>
@@ -148,29 +148,29 @@ export function ClientCalendarGrid({
                   >
                     <div className="flex items-center justify-between">
                       <span
-                        className={`font-body text-[10px] ${d.isToday ? "text-rust font-bold" : "text-steel"}`}
+                        className={`font-body text-xs ${d.isToday ? "text-rust font-bold" : "text-steel"}`}
                       >
                         {d.dayNumber}
                       </span>
                       <div className="flex items-center gap-1.5">
                         {d.mealPlan && (
                           <span
-                            className="font-body text-[9px] text-steel"
+                            className="font-body text-xs text-steel"
                             title={`${d.mealPlan.mealCount} meals${d.mealPlan.includeSnack ? " + snack" : ""}`}
                           >
                             🍽
                           </span>
                         )}
                         {d.bookingCount > 0 && (
-                          <span className="font-body text-[9px] text-steel">📅 {d.bookingCount}</span>
+                          <span className="font-body text-xs text-steel">📅 {d.bookingCount}</span>
                         )}
                       </div>
                     </div>
                     {d.overrideTitle ? (
-                      <span className="font-body text-[10px] leading-tight text-rust">{d.overrideTitle}</span>
+                      <span className="font-body text-xs leading-tight text-rust">{d.overrideTitle}</span>
                     ) : d.programWorkoutTitle ? (
                       <span
-                        className={`font-body text-[10px] leading-tight ${
+                        className={`font-body text-xs leading-tight ${
                           d.workoutDone ? "text-positive" : "text-chalk"
                         }`}
                       >
@@ -178,7 +178,7 @@ export function ClientCalendarGrid({
                       </span>
                     ) : null}
                     {d.macros?.calories != null && (
-                      <span className="font-body text-[9px] text-steel">
+                      <span className="font-body text-xs text-steel">
                         {d.macros.calories}cal
                         {d.macros.proteinG != null && ` ${d.macros.proteinG}p`}
                         {d.macros.carbsG != null && ` ${d.macros.carbsG}c`}
@@ -188,7 +188,7 @@ export function ClientCalendarGrid({
                     {d.cellDueHabits.slice(0, 2).map((h) => (
                       <span
                         key={h.id}
-                        className={`font-body text-[9px] leading-tight truncate ${
+                        className={`font-body text-xs leading-tight truncate ${
                           h.completed ? "text-positive" : "text-steel"
                         }`}
                       >
@@ -197,7 +197,7 @@ export function ClientCalendarGrid({
                       </span>
                     ))}
                     {d.cellDueHabits.length > 2 && (
-                      <span className="font-body text-[9px] text-steel">
+                      <span className="font-body text-xs text-steel">
                         +{d.cellDueHabits.length - 2} more
                       </span>
                     )}

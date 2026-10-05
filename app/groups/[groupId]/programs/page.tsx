@@ -93,7 +93,7 @@ export default async function ProgramsListPage(
             + New program
           </Link>
         </div>
-        <p className="font-body text-[11px] text-steel mt-1.5">
+        <p className="font-body text-xs text-steel mt-1.5">
           Upload a spreadsheet, upload a photo of a program, or just describe what you want in
           plain English — AI writes the draft either way.
         </p>

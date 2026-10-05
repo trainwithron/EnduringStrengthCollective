@@ -222,7 +222,7 @@ export function SnakeMiniGame({
         )}
       </div>
 
-      <p className="font-body text-[11px] text-steel">Swipe or use arrow keys — purely optional.</p>
+      <p className="font-body text-xs text-steel">Swipe or use arrow keys — purely optional.</p>
     </div>
   );
 }

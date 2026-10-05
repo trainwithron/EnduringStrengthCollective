@@ -49,7 +49,7 @@ export function HomeClientCard({ client }: { client: HomeClientCardData }) {
       <div className="min-w-0">
         <p className="font-body text-sm text-chalk truncate">{client.fullName}</p>
         {client.orgName && (
-          <p className="font-body text-[10px] text-steel/70 uppercase tracking-wide truncate">
+          <p className="font-body text-xs text-steel uppercase tracking-wide truncate">
             {client.orgName}
           </p>
         )}
@@ -58,7 +58,7 @@ export function HomeClientCard({ client }: { client: HomeClientCardData }) {
           {status.text}
         </p>
         {client.quietTier && (
-          <p className="font-body text-[10px] text-rust uppercase tracking-wide mt-0.5">
+          <p className="font-body text-xs text-rust uppercase tracking-wide mt-0.5">
             {client.quietTier === "strong" ? "Reach out — quiet a while" : "Missing scheduled sessions"}
           </p>
         )}

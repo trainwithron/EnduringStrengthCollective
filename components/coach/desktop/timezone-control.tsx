@@ -90,7 +90,7 @@ export function TimezoneControl({ initialTimezone }: { initialTimezone: string |
           ))}
         </select>
       </label>
-      <p className="font-body text-[11px] text-steel mt-1 max-w-[55ch]">
+      <p className="font-body text-xs text-steel mt-1 max-w-[55ch]">
         Your recurring hours below are in this timezone — clients booking
         from anywhere always see the correct real time.
       </p>

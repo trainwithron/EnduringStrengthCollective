@@ -80,7 +80,7 @@ export function WorkoutSummaryCard({
           <span className="font-display uppercase text-sm tracking-wide">
             Workout complete
           </span>
-          <span className="font-body text-[11px] text-steel ml-auto">
+          <span className="font-body text-xs text-steel ml-auto">
             {expanded ? "Tap to collapse ▲" : "Tap to expand ▼"}
           </span>
         </div>

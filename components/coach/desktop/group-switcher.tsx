@@ -306,7 +306,7 @@ export function GroupSwitcher({
                 (section) =>
                   section.list.length > 0 && (
                     <div key={section.key}>
-                      <p className="px-3 pt-2 pb-1 font-body text-[10px] text-steel uppercase tracking-wide">
+                      <p className="px-3 pt-2 pb-1 font-body text-xs text-steel uppercase tracking-wide">
                         {section.label}
                       </p>
                       {section.list.map((g) => (
@@ -332,7 +332,7 @@ export function GroupSwitcher({
             </div>
             <div className="border-t border-steel/20 p-2.5">
               {error && (
-                <p className="font-body text-[11px] text-rust mb-1.5" role="alert">
+                <p className="font-body text-xs text-rust mb-1.5" role="alert">
                   {error}
                 </p>
               )}
@@ -342,7 +342,7 @@ export function GroupSwitcher({
                     key={k}
                     type="button"
                     onClick={() => setNewKind(k)}
-                    className={`h-6 px-2 font-body text-[11px] border ${
+                    className={`h-6 px-2 font-body text-xs border ${
                       newKind === k ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
                     }`}
                   >
@@ -381,7 +381,7 @@ export function GroupSwitcher({
 
   return (
     <div className="px-5 pt-6 pb-5 border-b border-steel/20 relative group" ref={containerRef}>
-      <p className="font-body text-[11px] text-steel uppercase tracking-wide">Coaching</p>
+      <p className="font-body text-xs text-steel uppercase tracking-wide">Coaching</p>
       {editingName ? (
         <input
           type="text"
@@ -438,7 +438,7 @@ export function GroupSwitcher({
               (section) =>
                 section.list.length > 0 && (
                   <div key={section.key}>
-                    <p className="px-3 pt-2 pb-1 font-body text-[10px] text-steel uppercase tracking-wide">
+                    <p className="px-3 pt-2 pb-1 font-body text-xs text-steel uppercase tracking-wide">
                       {section.label}
                     </p>
                     {section.list.map((g) => (
@@ -484,7 +484,7 @@ export function GroupSwitcher({
                               onClick={(e) => e.stopPropagation()}
                               onChange={(e) => persistKind(g.id, e.target.value as GroupKind)}
                               aria-label={`Group kind for ${g.name}`}
-                              className="opacity-0 group-hover:opacity-100 shrink-0 h-6 bg-graphite border border-steel/30 text-steel font-body text-[10px] focus:outline-none"
+                              className="opacity-0 group-hover:opacity-100 shrink-0 h-6 bg-graphite border border-steel/30 text-steel font-body text-xs focus:outline-none"
                             >
                               {(Object.keys(GROUP_KIND_LABELS) as GroupKind[]).map((k) => (
                                 <option key={k} value={k}>
@@ -517,7 +517,7 @@ export function GroupSwitcher({
           </div>
           <div className="border-t border-steel/20 p-2.5">
             {error && (
-              <p className="font-body text-[11px] text-rust mb-1.5" role="alert">
+              <p className="font-body text-xs text-rust mb-1.5" role="alert">
                 {error}
               </p>
             )}
@@ -527,7 +527,7 @@ export function GroupSwitcher({
                   key={k}
                   type="button"
                   onClick={() => setNewKind(k)}
-                  className={`h-6 px-2 font-body text-[11px] border ${
+                  className={`h-6 px-2 font-body text-xs border ${
                     newKind === k ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
                   }`}
                 >

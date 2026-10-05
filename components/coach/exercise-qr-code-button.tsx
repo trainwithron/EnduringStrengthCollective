@@ -52,7 +52,7 @@ export function ExerciseQrCodeButton({ exerciseId, exerciseName }: { exerciseId:
                 <p className="font-body text-xs text-steel">Generating…</p>
               </div>
             )}
-            <p className="font-body text-[11px] text-steel mt-3 break-all">{scanUrl}</p>
+            <p className="font-body text-xs text-steel mt-3 break-all">{scanUrl}</p>
             <div className="flex items-center gap-2 mt-4">
               {dataUrl && (
                 <a

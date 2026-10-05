@@ -37,7 +37,7 @@ export function AddDayEventForm({ coachId, dateKey }: { coachId: string; dateKey
   return (
     <div className="flex items-end gap-2 mb-4 max-w-lg">
       <div className="flex-1">
-        <label className="font-body text-[11px] text-steel uppercase tracking-wide mb-1 block">
+        <label className="font-body text-xs text-steel uppercase tracking-wide mb-1 block">
           Add a to-do or event
         </label>
         <input

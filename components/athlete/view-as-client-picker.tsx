@@ -318,7 +318,7 @@ export function ViewAsClientPicker({ onClose }: { onClose: () => void }) {
                   </div>
                 )}
                 <p className="font-body text-sm text-chalk truncate w-full min-w-0 text-center">{c.fullName}</p>
-                <p className="w-full min-w-0 font-body text-[11px] text-steel flex items-center justify-center gap-1.5">
+                <p className="w-full min-w-0 font-body text-xs text-steel flex items-center justify-center gap-1.5">
                   <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${status.dotClass}`} />
                   <span className="truncate min-w-0">{tier !== "none" ? QUIET_TIER_LABEL[tier] : status.text}</span>
                 </p>

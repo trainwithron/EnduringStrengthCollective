@@ -150,9 +150,9 @@ export function NextWorkoutExerciseRow({
             <table className="w-full text-left">
               <thead>
                 <tr>
-                  <th className="font-body text-[11px] text-steel uppercase pr-3 pb-1">Set</th>
+                  <th className="font-body text-xs text-steel uppercase pr-3 pb-1">Set</th>
                   {fields.map((f) => (
-                    <th key={f} className="font-body text-[11px] text-steel uppercase pr-3 pb-1">
+                    <th key={f} className="font-body text-xs text-steel uppercase pr-3 pb-1">
                       {fieldDef(f).label}
                     </th>
                   ))}
@@ -184,7 +184,7 @@ export function NextWorkoutExerciseRow({
           </div>
 
           <div>
-            <label className="font-body text-[11px] text-steel uppercase tracking-wide block mb-1">
+            <label className="font-body text-xs text-steel uppercase tracking-wide block mb-1">
               Note for this exercise
             </label>
             <input
@@ -202,7 +202,7 @@ export function NextWorkoutExerciseRow({
               }`}
             />
             {isCarriedForward && (
-              <p className="font-body text-[11px] text-steel mt-1">
+              <p className="font-body text-xs text-steel mt-1">
                 Carried forward from {new Date(carriedForwardNote!.date).toLocaleDateString()}&apos;s note
               </p>
             )}

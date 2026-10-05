@@ -43,7 +43,7 @@ function Tile({ label, value, warn }: { label: string; value: string; warn?: boo
         warn ? "border-rust/60 bg-rust/5" : "border-steel/20"
       }`}
     >
-      <p className="font-body text-[10px] text-steel uppercase tracking-wide">{label}</p>
+      <p className="font-body text-xs text-steel uppercase tracking-wide">{label}</p>
       <p className={`font-display text-lg leading-none mt-1 truncate ${warn ? "text-rust" : ""}`}>{value}</p>
     </div>
   );
@@ -81,7 +81,7 @@ function HideWidgetLink({
       type="button"
       onClick={hide}
       disabled={saving}
-      className="font-body text-[11px] text-steel underline underline-offset-2 disabled:opacity-40"
+      className="font-body text-xs text-steel underline underline-offset-2 disabled:opacity-40"
     >
       {saving ? "Hiding…" : "Hide this from the Spot"}
     </button>
@@ -115,7 +115,7 @@ export function TheSpotRail({
 
   return (
     <div className="px-5 pt-3">
-      <p className="font-body text-[10px] text-steel uppercase tracking-wide mb-1.5">
+      <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5">
         The Spot — only you can see this
       </p>
       <div className="flex overflow-x-auto snap-x snap-mandatory gap-2 pb-1">

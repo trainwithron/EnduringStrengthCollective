@@ -50,7 +50,7 @@ export function HabitManager({
             <div key={h.id} className="py-2 flex items-center justify-between gap-2">
               <div>
                 <p className="font-body text-sm">{h.title}</p>
-                <p className="font-body text-[11px] text-steel">{habitFrequencyLabel(h.weekdays)}</p>
+                <p className="font-body text-xs text-steel">{habitFrequencyLabel(h.weekdays)}</p>
               </div>
               <button
                 type="button"

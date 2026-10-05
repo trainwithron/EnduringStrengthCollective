@@ -33,7 +33,7 @@ export default function Error({
           again, or head back and pick up from there.
         </p>
         {error.digest && (
-          <p className="font-body text-[11px] text-steel/60 mb-6">
+          <p className="font-body text-xs text-steel mb-6">
             Reference: {error.digest}
           </p>
         )}

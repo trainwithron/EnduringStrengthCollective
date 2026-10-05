@@ -392,12 +392,12 @@ export function ExerciseLibraryList({
               type="button"
               onClick={() => handleSuggestTags(newName, "new")}
               disabled={suggestingKey === "new"}
-              className="font-body text-[11px] text-rust uppercase tracking-wide disabled:opacity-40"
+              className="font-body text-xs text-rust uppercase tracking-wide disabled:opacity-40"
             >
               {suggestingKey === "new" ? "Asking AI…" : "✨ Suggest tags (AI)"}
             </button>
           </div>
-          <p className="font-body text-[11px] text-steel mb-2">
+          <p className="font-body text-xs text-steel mb-2">
             {newTags.length === 0
               ? "Hidden from clients, used for corrective-exercise selection."
               : generateBiomechBreakdown(
@@ -407,7 +407,7 @@ export function ExerciseLibraryList({
                   }))
                 ).summary}
           </p>
-          {suggestionError && <p className="font-body text-[11px] text-rust mb-2">{suggestionError}</p>}
+          {suggestionError && <p className="font-body text-xs text-rust mb-2">{suggestionError}</p>}
           <BiomechTagPicker
             vocabulary={biomechVocabulary}
             selected={newTags}
@@ -453,19 +453,19 @@ export function ExerciseLibraryList({
                       <div className="flex-1 min-w-0">
                         <span className="font-body font-medium text-[15px]">{ex.name}</span>
                         {ex.description && (
-                          <p className="font-body text-[11px] text-steel truncate">{ex.description}</p>
+                          <p className="font-body text-xs text-steel truncate">{ex.description}</p>
                         )}
                         {breakdown && (
-                          <p className="font-body text-[11px] text-steel truncate">{breakdown.summary}</p>
+                          <p className="font-body text-xs text-steel truncate">{breakdown.summary}</p>
                         )}
                       </div>
                       {ex.tier && (
-                        <span className="h-6 w-6 flex items-center justify-center border border-steel/30 font-body text-[11px] text-steel">
+                        <span className="h-6 w-6 flex items-center justify-center border border-steel/30 font-body text-xs text-steel">
                           {ex.tier}
                         </span>
                       )}
                       {ex.videoPath || ex.youtubeUrl ? (
-                        <span className="font-body text-[11px] text-positive">Media attached</span>
+                        <span className="font-body text-xs text-positive">Media attached</span>
                       ) : (
                         // Real client feedback (Johann Gorsek, live usage):
                         // "the demo videos are huge, I would include them
@@ -474,7 +474,7 @@ export function ExerciseLibraryList({
                         // list; a real warning-colored one makes the gap
                         // itself scannable, alongside the summary count
                         // above the list.
-                        <span className="font-body text-[11px] text-amber-400">⚠ No video</span>
+                        <span className="font-body text-xs text-amber-400">⚠ No video</span>
                       )}
                       <select
                         value={ex.category ?? ""}
@@ -559,27 +559,27 @@ export function ExerciseLibraryList({
                               type="button"
                               onClick={() => handleSuggestTags(ex.name, ex.name)}
                               disabled={suggestingKey === ex.name}
-                              className="font-body text-[11px] text-rust uppercase tracking-wide disabled:opacity-40"
+                              className="font-body text-xs text-rust uppercase tracking-wide disabled:opacity-40"
                             >
                               {suggestingKey === ex.name ? "Asking AI…" : "✨ Suggest tags (AI)"}
                             </button>
                           </div>
-                          <p className="font-body text-[11px] text-steel mb-2">
+                          <p className="font-body text-xs text-steel mb-2">
                             {breakdown?.summary ?? "No biomechanical tags added yet."}
                           </p>
                           {suggestionError && (
-                            <p className="font-body text-[11px] text-rust mb-2">{suggestionError}</p>
+                            <p className="font-body text-xs text-rust mb-2">{suggestionError}</p>
                           )}
                           {(pendingSuggestions[ex.name]?.length ?? 0) > 0 && (
                             <div className="border border-rust/30 bg-rust/5 px-3 py-2 mb-2">
                               <div className="flex items-center justify-between mb-1.5">
-                                <p className="font-body text-[11px] text-steel">
+                                <p className="font-body text-xs text-steel">
                                   AI suggests — click to accept, or ignore:
                                 </p>
                                 <button
                                   type="button"
                                   onClick={() => acceptAllSuggestedTags(ex.name)}
-                                  className="font-body text-[11px] text-rust uppercase tracking-wide font-bold"
+                                  className="font-body text-xs text-rust uppercase tracking-wide font-bold"
                                 >
                                   Accept all
                                 </button>
@@ -590,7 +590,7 @@ export function ExerciseLibraryList({
                                     key={s.tagId}
                                     type="button"
                                     onClick={() => acceptSuggestedTag(ex.name, s.tagId, s.role)}
-                                    className="h-6 px-2 border border-steel/30 text-chalk font-body text-[11px] active:border-rust active:text-rust"
+                                    className="h-6 px-2 border border-steel/30 text-chalk font-body text-xs active:border-rust active:text-rust"
                                   >
                                     {s.label} · {s.role === "prime_mover" ? "Prime mover" : "Stabilizer"}
                                   </button>

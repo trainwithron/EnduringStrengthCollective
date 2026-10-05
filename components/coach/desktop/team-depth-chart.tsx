@@ -258,7 +258,7 @@ function PlayerRow({
       <div className="flex items-center gap-2 shrink-0">
         {player.positionId && (
           <label className="flex items-center gap-1">
-            <span className="font-body text-[11px] text-steel">Rank</span>
+            <span className="font-body text-xs text-steel">Rank</span>
             <input
               type="number"
               min={1}

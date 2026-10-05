@@ -169,15 +169,15 @@ export function MacroCalculator({
           <div className="grid grid-cols-3 gap-2 text-center">
             <div className="border border-steel/20 p-2">
               <p className="font-display text-lg">{proteinG}g</p>
-              <p className="font-body text-[10px] text-steel uppercase">Protein</p>
+              <p className="font-body text-xs text-steel uppercase">Protein</p>
             </div>
             <div className="border border-steel/20 p-2">
               <p className="font-display text-lg">{remainder?.carbsG ?? "—"}g</p>
-              <p className="font-body text-[10px] text-steel uppercase">Carbs</p>
+              <p className="font-body text-xs text-steel uppercase">Carbs</p>
             </div>
             <div className="border border-steel/20 p-2">
               <p className="font-display text-lg">{remainder?.fatG ?? "—"}g</p>
-              <p className="font-body text-[10px] text-steel uppercase">Fat</p>
+              <p className="font-body text-xs text-steel uppercase">Fat</p>
             </div>
           </div>
 

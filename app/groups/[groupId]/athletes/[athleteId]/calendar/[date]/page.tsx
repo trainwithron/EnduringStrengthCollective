@@ -380,7 +380,7 @@ export default async function ClientCalendarDayPage(
         </h2>
         {availabilityWindows && availabilityWindows.length > 0 && (
           <div className="mb-3">
-            <p className="font-body text-[11px] text-steel uppercase tracking-wide mb-1">
+            <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">
               Recurring availability
             </p>
             <div className="flex flex-wrap gap-2">

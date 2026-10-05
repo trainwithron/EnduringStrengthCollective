@@ -18,7 +18,7 @@ export function ExerciseNoteCallout({ coachNote }: { coachNote: string | null })
   if (coachNote) {
     return (
       <div className="border-l-2 border-rust bg-surface/40 px-3 py-2.5">
-        <p className="font-body text-[10px] text-rust uppercase tracking-wide mb-1">
+        <p className="font-body text-xs text-rust uppercase tracking-wide mb-1">
           From your coach
         </p>
         <p className="font-body text-sm text-chalk">{coachNote}</p>
@@ -28,7 +28,7 @@ export function ExerciseNoteCallout({ coachNote }: { coachNote: string | null })
 
   return (
     <div className="border-l-2 border-steel/30 bg-surface/20 px-3 py-2.5">
-      <p className="font-body text-[10px] text-steel uppercase tracking-wide mb-1">
+      <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">
         {tip.type === "correction" ? "Actually…" : "Did you know"}
       </p>
       <p className="font-body text-sm text-steel">{tip.text}</p>

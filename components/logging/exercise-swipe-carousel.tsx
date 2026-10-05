@@ -203,13 +203,13 @@ export function ExerciseSwipeCarousel({
               className="snap-center shrink-0 w-full border border-steel/20 bg-surface/20 p-4"
             >
               <div className="flex items-center justify-between gap-2 mb-2">
-                <p className="font-body text-[11px] text-steel uppercase tracking-wide">
+                <p className="font-body text-xs text-steel uppercase tracking-wide">
                   Exercise {exercises.findIndex((e) => e.id === exercise.id) + 1} of {exercises.length}
                 </p>
                 <button
                   type="button"
                   onClick={() => setExpandedId(expanded ? null : exercise.id)}
-                  className="flex items-center gap-1 font-body text-[11px] text-steel uppercase tracking-wide active:text-rust"
+                  className="flex items-center gap-1 font-body text-xs text-steel uppercase tracking-wide active:text-rust"
                 >
                   {expanded ? "Less room" : "More room"}
                   {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}

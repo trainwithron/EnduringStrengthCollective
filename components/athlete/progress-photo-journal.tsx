@@ -166,14 +166,14 @@ export function ProgressPhotoJournal({ athleteId, groupId }: { athleteId: string
                 <img src={photo.signedUrl} alt="" className="w-full aspect-square object-cover" />
               )}
               <div className="p-2">
-                <p className="font-body text-[11px] text-steel">
+                <p className="font-body text-xs text-steel">
                   {new Date(`${photo.takenDate}T00:00:00`).toLocaleDateString(undefined, {
                     month: "short",
                     day: "numeric",
                     year: "numeric",
                   })}
                 </p>
-                <label className="flex items-center gap-1.5 mt-1.5 font-body text-[11px] text-chalk">
+                <label className="flex items-center gap-1.5 mt-1.5 font-body text-xs text-chalk">
                   <input
                     type="checkbox"
                     checked={photo.sharedWithCoach}
@@ -184,7 +184,7 @@ export function ProgressPhotoJournal({ athleteId, groupId }: { athleteId: string
                 <button
                   type="button"
                   onClick={() => handleDelete(photo)}
-                  className="font-body text-[11px] text-steel active:text-rust transition-colors mt-1"
+                  className="font-body text-xs text-steel active:text-rust transition-colors mt-1"
                 >
                   Delete
                 </button>

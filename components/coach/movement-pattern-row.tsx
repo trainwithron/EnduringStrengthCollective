@@ -145,7 +145,7 @@ export function MovementPatternRow({
       </button>
 
       <div className="flex items-center gap-1.5 mt-1.5">
-        <span className="font-body text-[10px] text-steel uppercase tracking-wide mr-0.5">
+        <span className="font-body text-xs text-steel uppercase tracking-wide mr-0.5">
           Plane
         </span>
         {PLANES.map((p) => (
@@ -154,7 +154,7 @@ export function MovementPatternRow({
             type="button"
             onClick={() => handlePlaneClick(p)}
             disabled={planeSaving}
-            className={`h-6 px-2 border font-body text-[11px] capitalize transition-colors disabled:opacity-40 ${
+            className={`h-6 px-2 border font-body text-xs capitalize transition-colors disabled:opacity-40 ${
               plane === p
                 ? "bg-rust border-rust text-graphite"
                 : "border-steel/30 text-steel active:border-rust active:text-rust"

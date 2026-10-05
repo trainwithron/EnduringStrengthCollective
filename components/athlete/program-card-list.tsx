@@ -71,7 +71,7 @@ function ProgramCard({
           <ProgramCardVisual repsSeries={visual.repsSeries} weightSeries={visual.weightSeries} categorySplit={visual.categorySplit} />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-surface to-graphite">
-            <LayoutGrid className="w-6 h-6 text-steel/40" strokeWidth={1.5} />
+            <LayoutGrid className="w-6 h-6 text-steel" strokeWidth={1.5} />
           </div>
         )}
       </div>

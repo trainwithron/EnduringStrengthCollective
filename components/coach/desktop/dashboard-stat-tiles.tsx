@@ -54,7 +54,7 @@ export function DashboardStatTiles({
             <p
               onMouseEnter={() => alternates.length > 0 && setPeekTile(tile.key)}
               onMouseLeave={() => setPeekTile((v) => (v === tile.key ? null : v))}
-              className="font-body text-[10px] text-steel uppercase tracking-wide mt-2 cursor-default"
+              className="font-body text-xs text-steel uppercase tracking-wide mt-2 cursor-default"
             >
               {tile.key === "clients" ? (
                 <SwappableTerm termKey="client" form="plural" className="capitalize" />

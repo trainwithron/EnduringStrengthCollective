@@ -129,7 +129,7 @@ export function BookingPolicyControl({
         </div>
       </div>
 
-      {!saved && <p className="font-body text-[11px] text-steel">saving…</p>}
+      {!saved && <p className="font-body text-xs text-steel">saving…</p>}
     </div>
   );
 }

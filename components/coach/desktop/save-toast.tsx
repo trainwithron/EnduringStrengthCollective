@@ -33,7 +33,7 @@ export function SaveToast() {
   return (
     <div
       className={`fixed bottom-5 right-5 z-40 font-body text-xs font-medium px-3 py-2 shadow-lg transition-opacity duration-200 ${
-        state.error ? "bg-rust text-chalk" : "bg-positive text-graphite"
+        state.error ? "bg-rust text-graphite" : "bg-positive text-graphite"
       } ${state.visible ? "opacity-100" : "opacity-0 pointer-events-none"}`}
     >
       {state.error ?? "Saved"}

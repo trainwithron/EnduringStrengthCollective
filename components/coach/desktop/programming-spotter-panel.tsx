@@ -91,14 +91,14 @@ export function ProgrammingSpotterPanel({ programId, flags }: { programId: strin
   return (
     <div className="border border-rust/40 bg-rust/5 px-4 py-3 mb-4">
       <div className="flex items-center justify-between mb-2">
-        <p className="font-body text-[11px] text-rust uppercase tracking-wide font-bold">
+        <p className="font-body text-xs text-rust uppercase tracking-wide font-bold">
           Programming Spotter
         </p>
         {visible.length > 1 && (
           <button
             type="button"
             onClick={handleClearAll}
-            className="font-body text-[11px] text-steel uppercase tracking-wide active:text-chalk"
+            className="font-body text-xs text-steel uppercase tracking-wide active:text-chalk"
           >
             Clear all
           </button>
@@ -121,7 +121,7 @@ export function ProgrammingSpotterPanel({ programId, flags }: { programId: strin
                     type="button"
                     onClick={() => handleStopSuggesting(flag)}
                     disabled={busy}
-                    className="font-body text-[11px] text-rust uppercase tracking-wide font-bold disabled:opacity-40"
+                    className="font-body text-xs text-rust uppercase tracking-wide font-bold disabled:opacity-40"
                   >
                     Yes, stop showing this
                   </button>
@@ -129,7 +129,7 @@ export function ProgrammingSpotterPanel({ programId, flags }: { programId: strin
                     type="button"
                     onClick={() => setIgnoredStopPrompt((prev) => new Set(prev).add(key))}
                     disabled={busy}
-                    className="font-body text-[11px] text-steel uppercase tracking-wide disabled:opacity-40"
+                    className="font-body text-xs text-steel uppercase tracking-wide disabled:opacity-40"
                   >
                     No, keep showing me these
                   </button>
@@ -162,7 +162,7 @@ export function ProgrammingSpotterPanel({ programId, flags }: { programId: strin
                       type="button"
                       onClick={() => sendFeedback(flag, "edited", { condition, preference })}
                       disabled={busy || !condition.trim() || !preference.trim()}
-                      className="font-body text-[11px] text-rust uppercase tracking-wide font-bold disabled:opacity-40"
+                      className="font-body text-xs text-rust uppercase tracking-wide font-bold disabled:opacity-40"
                     >
                       Save preference
                     </button>
@@ -170,7 +170,7 @@ export function ProgrammingSpotterPanel({ programId, flags }: { programId: strin
                       type="button"
                       onClick={() => setEditingKey(null)}
                       disabled={busy}
-                      className="font-body text-[11px] text-steel uppercase tracking-wide disabled:opacity-40"
+                      className="font-body text-xs text-steel uppercase tracking-wide disabled:opacity-40"
                     >
                       Cancel
                     </button>
@@ -189,7 +189,7 @@ export function ProgrammingSpotterPanel({ programId, flags }: { programId: strin
                   type="button"
                   onClick={() => sendFeedback(flag, "confirmed")}
                   disabled={busy}
-                  className="font-body text-[11px] text-moss uppercase tracking-wide disabled:opacity-40"
+                  className="font-body text-xs text-moss uppercase tracking-wide disabled:opacity-40"
                 >
                   Confirm
                 </button>
@@ -197,7 +197,7 @@ export function ProgrammingSpotterPanel({ programId, flags }: { programId: strin
                   type="button"
                   onClick={() => setEditingKey(key)}
                   disabled={busy}
-                  className="font-body text-[11px] text-steel uppercase tracking-wide active:text-chalk disabled:opacity-40"
+                  className="font-body text-xs text-steel uppercase tracking-wide active:text-chalk disabled:opacity-40"
                 >
                   Edit
                 </button>
@@ -205,7 +205,7 @@ export function ProgrammingSpotterPanel({ programId, flags }: { programId: strin
                   type="button"
                   onClick={() => sendFeedback(flag, "denied")}
                   disabled={busy}
-                  className="font-body text-[11px] text-rust uppercase tracking-wide font-bold disabled:opacity-40"
+                  className="font-body text-xs text-rust uppercase tracking-wide font-bold disabled:opacity-40"
                 >
                   Deny
                 </button>

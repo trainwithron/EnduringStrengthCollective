@@ -42,7 +42,7 @@ function GroupHeader({ label, icon: Icon }: { label: string; icon: typeof Layout
   return (
     <div className="flex items-center gap-2 px-5 pt-4 pb-1.5">
       <Icon className="w-3.5 h-3.5 text-steel" strokeWidth={2.25} />
-      <p className="font-body text-[10px] text-steel uppercase tracking-wide">{label}</p>
+      <p className="font-body text-xs text-steel uppercase tracking-wide">{label}</p>
     </div>
   );
 }

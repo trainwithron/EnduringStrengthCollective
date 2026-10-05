@@ -82,7 +82,7 @@ export function NutritionPhaseControl({
         ))}
       </select>
       {phase && startedAt && (
-        <span className="font-body text-[11px] text-steel">
+        <span className="font-body text-xs text-steel">
           since {new Date(`${startedAt}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
         </span>
       )}

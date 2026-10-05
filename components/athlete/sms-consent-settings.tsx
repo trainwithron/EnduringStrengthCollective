@@ -66,7 +66,7 @@ export function SmsConsentSettings({
       )}
 
       <label className="block mt-3">
-        <span className="font-body text-[11px] text-steel uppercase tracking-wide">Mobile number</span>
+        <span className="font-body text-xs text-steel uppercase tracking-wide">Mobile number</span>
         <input
           type="tel"
           inputMode="tel"
@@ -100,7 +100,7 @@ export function SmsConsentSettings({
         })}
       </div>
 
-      <p className="font-body text-[11px] text-steel mt-3">{SMS_DISCLOSURE_TEXT}</p>
+      <p className="font-body text-xs text-steel mt-3">{SMS_DISCLOSURE_TEXT}</p>
 
       {message && (
         <p className={`font-body text-xs mt-3 ${message.kind === "error" ? "text-rust" : "text-steel"}`} role="status">

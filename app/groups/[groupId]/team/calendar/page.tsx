@@ -129,7 +129,7 @@ export default async function TeamCalendarPage(
 
       <div className="grid grid-cols-7 gap-px bg-steel/15 border border-steel/15 mb-8">
         {WEEKDAYS.map((label) => (
-          <div key={label} className="bg-graphite text-center font-body text-[10px] text-steel uppercase tracking-wide py-1.5">
+          <div key={label} className="bg-graphite text-center font-body text-xs text-steel uppercase tracking-wide py-1.5">
             {label}
           </div>
         ))}
@@ -145,11 +145,11 @@ export default async function TeamCalendarPage(
               className={`bg-graphite p-1.5 flex flex-col gap-0.5 ${isToday ? "ring-1 ring-inset ring-rust" : ""}`}
               style={{ minHeight: 72 }}
             >
-              <span className={`font-body text-[10px] ${isToday ? "text-rust font-bold" : "text-steel"}`}>
+              <span className={`font-body text-xs ${isToday ? "text-rust font-bold" : "text-steel"}`}>
                 {date.getDate()}
               </span>
               {dayPractices.map((p) => (
-                <span key={p.id} className="font-body text-[9px] text-steel leading-tight truncate">
+                <span key={p.id} className="font-body text-xs text-steel leading-tight truncate">
                   {p.title} {p.startTime.slice(0, 5)}
                 </span>
               ))}
@@ -157,7 +157,7 @@ export default async function TeamCalendarPage(
                 <Link
                   key={g.id}
                   href={`${basePath}/games/${g.id}`}
-                  className="font-body text-[9px] text-rust leading-tight truncate"
+                  className="font-body text-xs text-rust leading-tight truncate"
                 >
                   vs {g.opponent} {g.our_score != null ? `(${g.our_score}-${g.opponent_score})` : ""}
                 </Link>

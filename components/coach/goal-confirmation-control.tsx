@@ -48,7 +48,7 @@ export function GoalConfirmationControl({ goal }: { goal: PendingGoal }) {
 
   return (
     <div className="border border-rust/40 bg-rust/5 p-4">
-      <p className="font-body text-[10px] text-rust uppercase tracking-wide font-bold mb-1">
+      <p className="font-body text-xs text-rust uppercase tracking-wide font-bold mb-1">
         Proposed goal — waiting on you
       </p>
       <p className="font-body text-base">{label}</p>

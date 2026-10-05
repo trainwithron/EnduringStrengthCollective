@@ -78,7 +78,7 @@ function WorkoutSection({
   wellnessCheckin?: WellnessCheckinValues | null;
 }) {
   const readinessChip = wellnessCheckin ? (
-    <span className="font-body text-[10px] text-steel border border-steel/30 px-2 py-0.5 ml-2">
+    <span className="font-body text-xs text-steel border border-steel/30 px-2 py-0.5 ml-2">
       Feeling {Math.round(computeReadinessAverage(wellnessCheckin))}/5 today
     </span>
   ) : null;
@@ -202,23 +202,23 @@ function ReadOnlyDaySummary({
     <div className="border border-steel/20 p-4">
       {hasMacros && (
         <>
-          <p className="font-body text-[10px] text-steel uppercase tracking-wide mb-1">Targets</p>
+          <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">Targets</p>
           <div className="grid grid-cols-4 gap-2 text-center mb-3">
             <div>
               <p className="font-display text-lg leading-none">{macros!.calories ?? "--"}</p>
-              <p className="font-body text-[10px] text-steel uppercase mt-1">Kcal</p>
+              <p className="font-body text-xs text-steel uppercase mt-1">Kcal</p>
             </div>
             <div>
               <p className="font-display text-lg leading-none">{macros!.proteinG ?? "--"}</p>
-              <p className="font-body text-[10px] text-steel uppercase mt-1">Protein</p>
+              <p className="font-body text-xs text-steel uppercase mt-1">Protein</p>
             </div>
             <div>
               <p className="font-display text-lg leading-none">{macros!.carbsG ?? "--"}</p>
-              <p className="font-body text-[10px] text-steel uppercase mt-1">Carbs</p>
+              <p className="font-body text-xs text-steel uppercase mt-1">Carbs</p>
             </div>
             <div>
               <p className="font-display text-lg leading-none">{macros!.fatG ?? "--"}</p>
-              <p className="font-body text-[10px] text-steel uppercase mt-1">Fat</p>
+              <p className="font-body text-xs text-steel uppercase mt-1">Fat</p>
             </div>
           </div>
         </>

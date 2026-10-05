@@ -49,7 +49,7 @@ export function PinPostButton({
         {optimisticPinned ? "Unpin" : "Pin"}
       </button>
       {error && (
-        <span className="font-body text-[11px] text-rust" role="alert">
+        <span className="font-body text-xs text-rust" role="alert">
           {error}
         </span>
       )}

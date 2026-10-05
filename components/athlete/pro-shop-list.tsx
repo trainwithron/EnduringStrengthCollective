@@ -40,7 +40,7 @@ export function ProShopList({ links }: { links: ProShopLink[] }) {
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-3">
               <p className="font-body font-medium text-[15px]">{l.title}</p>
-              <span className="font-body text-[10px] uppercase tracking-wide text-steel shrink-0">
+              <span className="font-body text-xs uppercase tracking-wide text-steel shrink-0">
                 {CATEGORY_LABELS[l.category] ?? l.category}
               </span>
             </div>

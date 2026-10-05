@@ -117,11 +117,11 @@ export function ExerciseVerticalCarousel({
     return (
       <div>
         <div className="flex items-center justify-between mb-3">
-          <p className="font-body text-[11px] text-steel uppercase tracking-wide">All exercises</p>
+          <p className="font-body text-xs text-steel uppercase tracking-wide">All exercises</p>
           <button
             type="button"
             onClick={() => setOverviewOpen(false)}
-            className="flex items-center gap-1 font-body text-[11px] text-steel uppercase tracking-wide active:text-rust transition-colors"
+            className="flex items-center gap-1 font-body text-xs text-steel uppercase tracking-wide active:text-rust transition-colors"
           >
             Close
             <X className="w-3.5 h-3.5" />
@@ -135,7 +135,7 @@ export function ExerciseVerticalCarousel({
               onClick={() => jumpToExerciseExpanded(i)}
               className="text-left border border-steel/20 bg-surface/20 p-3 active:border-rust transition-colors"
             >
-              <p className="font-body text-[11px] text-steel uppercase tracking-wide">
+              <p className="font-body text-xs text-steel uppercase tracking-wide">
                 Exercise {i + 1} of {exercises.length}
               </p>
               <p className="font-body text-sm text-chalk mt-0.5">{exercise.exerciseName}</p>
@@ -174,7 +174,7 @@ export function ExerciseVerticalCarousel({
             type="button"
             onClick={() => setOverviewOpen(true)}
             aria-label="See all exercises"
-            className="flex items-center gap-1 font-body text-[11px] text-steel uppercase tracking-wide active:text-rust transition-colors shrink-0"
+            className="flex items-center gap-1 font-body text-xs text-steel uppercase tracking-wide active:text-rust transition-colors shrink-0"
           >
             <List className="w-3.5 h-3.5" />
             See all {exercises.length}
@@ -196,13 +196,13 @@ export function ExerciseVerticalCarousel({
               className="snap-center shrink-0 border border-steel/20 bg-surface/20 p-4"
             >
               <div className="flex items-center justify-between gap-2 mb-2">
-                <p className="font-body text-[11px] text-steel uppercase tracking-wide">
+                <p className="font-body text-xs text-steel uppercase tracking-wide">
                   Exercise {exercises.findIndex((e) => e.id === exercise.id) + 1} of {exercises.length}
                 </p>
                 <button
                   type="button"
                   onClick={() => setExpandedId(expanded ? null : exercise.id)}
-                  className="flex items-center gap-1 font-body text-[11px] text-steel uppercase tracking-wide active:text-rust"
+                  className="flex items-center gap-1 font-body text-xs text-steel uppercase tracking-wide active:text-rust"
                 >
                   {expanded ? "Less room" : "More room"}
                   {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}

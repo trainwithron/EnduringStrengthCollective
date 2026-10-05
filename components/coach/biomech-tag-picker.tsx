@@ -87,7 +87,7 @@ export function BiomechTagPicker({
             <button
               type="button"
               onClick={() => onRoleChange(tag.id, "prime_mover")}
-              className={`h-6 px-1.5 font-body text-[10px] border ${
+              className={`h-6 px-1.5 font-body text-xs border ${
                 role === "prime_mover"
                   ? "bg-rust text-graphite border-rust"
                   : "border-steel/30 text-steel"
@@ -98,7 +98,7 @@ export function BiomechTagPicker({
             <button
               type="button"
               onClick={() => onRoleChange(tag.id, "stabilizer_demand")}
-              className={`h-6 px-1.5 font-body text-[10px] border ${
+              className={`h-6 px-1.5 font-body text-xs border ${
                 role === "stabilizer_demand"
                   ? "bg-rust text-graphite border-rust"
                   : "border-steel/30 text-steel"
@@ -117,7 +117,7 @@ export function BiomechTagPicker({
       <div className="grid grid-cols-2 gap-x-6">
         {jointGroups.map((group) => (
           <div key={group.joint} className="mb-3">
-            <p className="font-body text-[10px] text-steel uppercase tracking-wide mb-1">
+            <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">
               {JOINT_LABEL[group.joint] ?? group.joint}
             </p>
             {group.tags.map(renderTagRow)}
@@ -125,7 +125,7 @@ export function BiomechTagPicker({
         ))}
       </div>
       <div>
-        <p className="font-body text-[10px] text-steel uppercase tracking-wide mb-1">
+        <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">
           Stabilization / Chain Demand
         </p>
         <div className="grid grid-cols-2 gap-x-6">{stabilization.map(renderTagRow)}</div>

@@ -134,7 +134,7 @@ export function ShellListPanel({
 
         {sectionSubLinks.length > 0 && (
           <div className="mb-3 pb-3 border-b border-steel/20">
-            <p className="font-body text-[10px] text-steel uppercase tracking-wide mb-1.5 px-1">
+            <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5 px-1">
               {sectionLabel}
             </p>
             <div className="space-y-0.5">
@@ -157,7 +157,7 @@ export function ShellListPanel({
           <button
             type="button"
             onClick={() => selectView("roster")}
-            className={`h-7 font-body text-[11px] uppercase tracking-wide border ${
+            className={`h-7 font-body text-xs uppercase tracking-wide border ${
               view === "roster" ? "border-rust text-rust bg-rust/10" : "border-steel/30 text-steel"
             }`}
           >
@@ -166,7 +166,7 @@ export function ShellListPanel({
           <button
             type="button"
             onClick={() => selectView("business")}
-            className={`h-7 font-body text-[11px] uppercase tracking-wide border ${
+            className={`h-7 font-body text-xs uppercase tracking-wide border ${
               view === "business" ? "border-rust text-rust bg-rust/10" : "border-steel/30 text-steel"
             }`}
             title="Pin the Business mini-dashboard"
@@ -176,7 +176,7 @@ export function ShellListPanel({
           <button
             type="button"
             onClick={() => selectView("calendar")}
-            className={`h-7 font-body text-[11px] uppercase tracking-wide border ${
+            className={`h-7 font-body text-xs uppercase tracking-wide border ${
               view === "calendar" ? "border-rust text-rust bg-rust/10" : "border-steel/30 text-steel"
             }`}
             title="Pin the Calendar mini-view"
@@ -186,7 +186,7 @@ export function ShellListPanel({
           <button
             type="button"
             onClick={() => selectView("program")}
-            className={`h-7 font-body text-[11px] uppercase tracking-wide border ${
+            className={`h-7 font-body text-xs uppercase tracking-wide border ${
               view === "program" ? "border-rust text-rust bg-rust/10" : "border-steel/30 text-steel"
             }`}
             title="Pin the full Program Builder, in place"

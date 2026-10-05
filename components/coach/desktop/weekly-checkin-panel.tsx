@@ -204,7 +204,7 @@ export function WeeklyCheckinPanel({
 
       <div className="grid grid-cols-2 gap-3">
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[10px] text-steel uppercase tracking-wide">Phase</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Phase</span>
           <select
             value={phase}
             onChange={(e) => setPhase(e.target.value as NutritionPhase)}
@@ -219,9 +219,9 @@ export function WeeklyCheckinPanel({
         </label>
 
         <label className="flex flex-col gap-1 col-span-2">
-          <span className="font-body text-[10px] text-steel uppercase tracking-wide">
+          <span className="font-body text-xs text-steel uppercase tracking-wide">
             Adjustment size — {adjustmentPct}% {phase === "reverse_diet" ? "increase" : "cut"}{" "}
-            <span className="normal-case text-steel/70">(typical: {TYPICAL_MIN_PCT}-{TYPICAL_MAX_PCT}%)</span>
+            <span className="normal-case text-steel">(typical: {TYPICAL_MIN_PCT}-{TYPICAL_MAX_PCT}%)</span>
           </span>
           {/* The full range (1-15%) covers real edge cases, but most
               clients land in 3-10% — a bare slider gave that no visual
@@ -247,14 +247,14 @@ export function WeeklyCheckinPanel({
               className="relative w-full accent-rust"
             />
           </div>
-          <span className="font-body text-[10px] text-steel">
+          <span className="font-body text-xs text-steel">
             How big a planned calorie change to make when one&apos;s due — gentler for a client who
             needs a soft touch, bigger for one who can handle a real jump.
           </span>
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[10px] text-steel uppercase tracking-wide">
+          <span className="font-body text-xs text-steel uppercase tracking-wide">
             Adherence (days/7)
           </span>
           <input
@@ -266,14 +266,14 @@ export function WeeklyCheckinPanel({
             className="h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
           />
           {defaultAdherenceDays != null && (
-            <span className="font-body text-[10px] text-steel">
+            <span className="font-body text-xs text-steel">
               From real logged days this week — still editable.
             </span>
           )}
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[10px] text-steel uppercase tracking-wide">
+          <span className="font-body text-xs text-steel uppercase tracking-wide">
             Last week&apos;s avg weight (lbs)
           </span>
           <input
@@ -286,7 +286,7 @@ export function WeeklyCheckinPanel({
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[10px] text-steel uppercase tracking-wide">
+          <span className="font-body text-xs text-steel uppercase tracking-wide">
             This week&apos;s avg weight (lbs)
           </span>
           <input
@@ -299,7 +299,7 @@ export function WeeklyCheckinPanel({
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[10px] text-steel uppercase tracking-wide">
+          <span className="font-body text-xs text-steel uppercase tracking-wide">
             Current daily calories
           </span>
           <input
@@ -311,7 +311,7 @@ export function WeeklyCheckinPanel({
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[10px] text-steel uppercase tracking-wide">
+          <span className="font-body text-xs text-steel uppercase tracking-wide">
             Recovery (1-5)
           </span>
           <input
@@ -325,7 +325,7 @@ export function WeeklyCheckinPanel({
         </label>
 
         <label className="flex flex-col gap-1 col-span-2">
-          <span className="font-body text-[10px] text-steel uppercase tracking-wide">
+          <span className="font-body text-xs text-steel uppercase tracking-wide">
             Dietary restrictions / diet type
           </span>
           <input
@@ -353,19 +353,19 @@ export function WeeklyCheckinPanel({
           <div className="grid grid-cols-4 gap-2 text-center">
             <div>
               <p className="font-display text-lg leading-none">{result.newCalories}</p>
-              <p className="font-body text-[10px] text-steel uppercase mt-1">Kcal</p>
+              <p className="font-body text-xs text-steel uppercase mt-1">Kcal</p>
             </div>
             <div>
               <p className="font-display text-lg leading-none">{macros.proteinG}</p>
-              <p className="font-body text-[10px] text-steel uppercase mt-1">Protein</p>
+              <p className="font-body text-xs text-steel uppercase mt-1">Protein</p>
             </div>
             <div>
               <p className="font-display text-lg leading-none">{macros.carbsG}</p>
-              <p className="font-body text-[10px] text-steel uppercase mt-1">Carbs</p>
+              <p className="font-body text-xs text-steel uppercase mt-1">Carbs</p>
             </div>
             <div>
               <p className="font-display text-lg leading-none">{macros.fatG}</p>
-              <p className="font-body text-[10px] text-steel uppercase mt-1">Fat</p>
+              <p className="font-body text-xs text-steel uppercase mt-1">Fat</p>
             </div>
           </div>
 
@@ -389,7 +389,7 @@ export function WeeklyCheckinPanel({
             </button>
             {saved && <span className="font-body text-xs text-positive">Saved</span>}
           </div>
-          <p className="font-body text-[11px] text-steel">
+          <p className="font-body text-xs text-steel">
             To apply this across the coming week instead of one day at a time, use the
             date-range assignment on this client&apos;s calendar.
           </p>

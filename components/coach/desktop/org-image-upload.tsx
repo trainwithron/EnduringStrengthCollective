@@ -117,7 +117,7 @@ export function OrgImageUpload({
             // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL, not a local asset Next can optimize.
             <img src={url} alt={label} className="max-w-full max-h-full object-contain" />
           ) : (
-            <span className="font-body text-[10px] text-steel uppercase tracking-wide px-2 text-center">
+            <span className="font-body text-xs text-steel uppercase tracking-wide px-2 text-center">
               None set
             </span>
           )}

@@ -74,7 +74,7 @@ export function ReactionButton({
         <span className="font-body text-sm tabular-nums">{count}</span>
       </button>
       {error && (
-        <p className="font-body text-[11px] text-rust mt-1" role="alert">
+        <p className="font-body text-xs text-rust mt-1" role="alert">
           {error}
         </p>
       )}

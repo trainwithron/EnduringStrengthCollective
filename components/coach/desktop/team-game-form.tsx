@@ -61,7 +61,7 @@ export function TeamGameForm({ groupId, createdBy }: { groupId: string; createdB
     <div className="border border-steel/20 p-4 space-y-3 max-w-sm">
       <p className="font-display uppercase text-xs tracking-wide text-steel">Add game</p>
       <label className="flex flex-col gap-1">
-        <span className="font-body text-[11px] text-steel uppercase tracking-wide">Date</span>
+        <span className="font-body text-xs text-steel uppercase tracking-wide">Date</span>
         <input
           type="date"
           value={eventDate}
@@ -70,7 +70,7 @@ export function TeamGameForm({ groupId, createdBy }: { groupId: string; createdB
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className="font-body text-[11px] text-steel uppercase tracking-wide">Time (optional)</span>
+        <span className="font-body text-xs text-steel uppercase tracking-wide">Time (optional)</span>
         <input
           type="time"
           value={startTime}
@@ -79,7 +79,7 @@ export function TeamGameForm({ groupId, createdBy }: { groupId: string; createdB
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className="font-body text-[11px] text-steel uppercase tracking-wide">Opponent</span>
+        <span className="font-body text-xs text-steel uppercase tracking-wide">Opponent</span>
         <input
           type="text"
           value={opponent}

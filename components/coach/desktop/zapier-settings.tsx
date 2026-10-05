@@ -65,7 +65,7 @@ export function ZapierSettings({ initialSubscriptions }: { initialSubscriptions:
           type="button"
           onClick={handleGenerate}
           disabled={generating}
-          className="px-4 py-2 bg-rust text-chalk font-body text-sm disabled:opacity-50"
+          className="px-4 py-2 bg-rust text-graphite font-body text-sm disabled:opacity-50"
         >
           {generating ? "Generating…" : apiKey ? "Generate a new key" : "Generate key"}
         </button>

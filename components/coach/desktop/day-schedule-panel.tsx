@@ -73,7 +73,7 @@ export function DaySchedulePanel({ date }: { date: string }) {
     <div>
       {availability.length > 0 && (
         <div className="mb-3">
-          <p className="font-body text-[11px] text-steel uppercase tracking-wide mb-1">
+          <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">
             Recurring availability
           </p>
           <div className="flex flex-wrap gap-2">

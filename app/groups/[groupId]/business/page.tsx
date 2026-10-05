@@ -265,26 +265,26 @@ export default async function BusinessDashboardPage(
         {hasBillingSetUp ? (
           <div className="border border-steel/20 rounded-token-lg p-3">
             <p className="font-display text-2xl leading-none">${realIncomeThisMonth.toLocaleString()}</p>
-            <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">Income this month</p>
+            <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Income this month</p>
           </div>
         ) : (
           <div className="border border-steel/20 rounded-token-lg p-3 opacity-60">
             <p className="font-display text-2xl leading-none text-steel">—</p>
-            <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">Income this month</p>
-            <p className="font-body text-[10px] text-steel mt-0.5">No billing yet</p>
+            <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Income this month</p>
+            <p className="font-body text-xs text-steel mt-0.5">No billing yet</p>
           </div>
         )}
         <div className="border border-steel/20 rounded-token-lg p-3">
           <p className="font-display text-2xl leading-none">{uniqueAthleteIds.size}</p>
-          <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">Roster size</p>
+          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Roster size</p>
           {newThisMonth > 0 && (
-            <p className="font-body text-[10px] text-positive mt-0.5">+{newThisMonth} this month</p>
+            <p className="font-body text-xs text-positive mt-0.5">+{newThisMonth} this month</p>
           )}
         </div>
         {hasBillingSetUp ? (
           <div className="border border-steel/20 rounded-token-lg p-3">
             <p className="font-display text-2xl leading-none">{payingClientsCount}</p>
-            <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">
+            <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">
               Paying <SwappableTerm termKey="client" form="plural" />
             </p>
           </div>
@@ -294,29 +294,29 @@ export default async function BusinessDashboardPage(
             className="rounded-token-lg p-3 bg-surface border border-rust/30 shadow-[0_0_0_1px_rgb(var(--rust)/0.15),0_0_16px_rgb(var(--rust)/0.12)] block"
           >
             <p className="font-display text-2xl leading-none">{payingClientsCount}</p>
-            <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">
+            <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">
               Paying <SwappableTerm termKey="client" form="plural" />
             </p>
-            <p className="font-body text-[10px] text-rust mt-0.5">Add a package &rarr;</p>
+            <p className="font-body text-xs text-rust mt-0.5">Add a package &rarr;</p>
           </Link>
         )}
         <div className="border border-steel/20 rounded-token-lg p-3">
           <p className="font-display text-2xl leading-none">{totalOutstandingCredits}</p>
-          <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">
+          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">
             Outstanding credits
           </p>
         </div>
         <div className="border border-steel/20 rounded-token-lg p-3">
           <p className="font-display text-2xl leading-none">{bookingsThisMonthCount ?? 0}</p>
-          <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">Sessions this month</p>
+          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Sessions this month</p>
         </div>
         <div className="border border-steel/20 rounded-token-lg p-3">
           <p className="font-display text-2xl leading-none">{totalReferralClicks}</p>
-          <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">Referral clicks</p>
+          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Referral clicks</p>
         </div>
         <div className="border border-steel/20 rounded-token-lg p-3">
           <p className="font-display text-2xl leading-none">{totalProShopClicks}</p>
-          <p className="font-body text-[11px] text-steel mt-1 uppercase tracking-wide">Pro Shop clicks</p>
+          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Pro Shop clicks</p>
         </div>
       </div>
 
@@ -328,12 +328,12 @@ export default async function BusinessDashboardPage(
           <div className="flex items-end gap-3 h-28">
             {growth.map((g) => (
               <div key={g.monthLabel} className="flex-1 flex flex-col items-center gap-1.5">
-                <span className="font-body text-[11px] text-chalk">{g.count}</span>
+                <span className="font-body text-xs text-chalk">{g.count}</span>
                 <div
                   className="w-full bg-rust"
                   style={{ height: `${Math.max(4, (g.count / maxGrowthCount) * 80)}px` }}
                 />
-                <span className="font-body text-[9px] text-steel">{g.monthLabel}</span>
+                <span className="font-body text-xs text-steel">{g.monthLabel}</span>
               </div>
             ))}
           </div>
@@ -371,7 +371,7 @@ export default async function BusinessDashboardPage(
               <div key={c.membershipId} className="py-2.5 flex items-center justify-between gap-4">
                 <div className="min-w-0">
                   <p className="font-body text-sm truncate">{c.fullName}</p>
-                  <p className="font-body text-[11px] text-steel">
+                  <p className="font-body text-xs text-steel">
                     {c.clientTier ? TIER_LABELS[c.clientTier] ?? c.clientTier : "Tier not set"} &middot;
                     Joined {new Date(c.joinedAt).toLocaleDateString()}
                   </p>

@@ -105,7 +105,7 @@ export function CalendarMiniView({ groupId }: { groupId: string }) {
         <p className="font-body text-xs text-steel px-1">Nothing booked in the next 30 days.</p>
       ) : (
         <div className="space-y-0.5">
-          <p className="font-body text-[10px] text-steel uppercase tracking-wide px-1.5 mb-1">
+          <p className="font-body text-xs text-steel uppercase tracking-wide px-1.5 mb-1">
             {ZOOM_LABEL[zoomLevel]}
           </p>
           {visibleBookings.map((b) => {
@@ -118,7 +118,7 @@ export function CalendarMiniView({ groupId }: { groupId: string }) {
                 className="flex items-center justify-between gap-2 px-1.5 py-2 hover:bg-surface/40 transition-colors"
               >
                 <span className="font-body text-sm text-chalk truncate">{b.athleteName}</span>
-                <span className={`font-body text-[11px] shrink-0 ${isToday ? "text-rust" : "text-steel"}`}>
+                <span className={`font-body text-xs shrink-0 ${isToday ? "text-rust" : "text-steel"}`}>
                   {isToday
                     ? start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
                     : start.toLocaleDateString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" })}

@@ -210,7 +210,7 @@ export function PackageManager({
         )}
 
         {inactive.length > 0 && (
-          <p className="font-body text-[11px] text-steel mt-4">
+          <p className="font-body text-xs text-steel mt-4">
             {inactive.length} deactivated package{inactive.length === 1 ? "" : "s"} — hidden from clients, kept for
             purchase history.
           </p>
@@ -220,7 +220,7 @@ export function PackageManager({
       <div className="border border-steel/20 p-4 space-y-3">
         <p className="font-display uppercase text-xs tracking-wide text-steel">Add a package</p>
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">Name</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Name</span>
           <input
             type="text"
             value={name}
@@ -230,7 +230,7 @@ export function PackageManager({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">Sessions / week (tier label)</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Sessions / week (tier label)</span>
           <input
             type="number"
             min={1}
@@ -240,7 +240,7 @@ export function PackageManager({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">Billing type</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Billing type</span>
           <select
             value={billingType}
             onChange={(e) => setBillingType(e.target.value as "subscription" | "one_time")}
@@ -251,7 +251,7 @@ export function PackageManager({
           </select>
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">
+          <span className="font-body text-xs text-steel uppercase tracking-wide">
             Sessions granted {billingType === "subscription" ? "per month" : "total"}
           </span>
           <input
@@ -263,7 +263,7 @@ export function PackageManager({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">Rate per session ($)</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Rate per session ($)</span>
           <input
             type="number"
             min={0.01}
@@ -274,13 +274,13 @@ export function PackageManager({
           />
         </label>
         {previewTotal && (
-          <p className="font-body text-[11px] text-steel">
+          <p className="font-body text-xs text-steel">
             Client pays ${previewTotal}
             {billingType === "subscription" ? "/month" : " total"}
           </p>
         )}
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">
+          <span className="font-body text-xs text-steel uppercase tracking-wide">
             Link a program (optional)
           </span>
           <select
@@ -295,7 +295,7 @@ export function PackageManager({
               </option>
             ))}
           </select>
-          <span className="font-body text-[10px] text-steel">
+          <span className="font-body text-xs text-steel">
             A client who buys or is assigned this package gets their own personal copy of this program automatically.
           </span>
         </label>
@@ -306,7 +306,7 @@ export function PackageManager({
             onChange={(e) => setIsPublic(e.target.checked)}
             className="accent-rust"
           />
-          <span className="font-body text-[11px] text-steel">
+          <span className="font-body text-xs text-steel">
             Publish to all clients — leave unchecked to assign privately per client
           </span>
         </label>

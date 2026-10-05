@@ -70,23 +70,23 @@ export function TodayWidget({
 
       {hasMacros && (
         <>
-        <p className="font-body text-[10px] text-steel uppercase tracking-wide mb-1">Your targets today</p>
+        <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">Your targets today</p>
         <div className="grid grid-cols-4 gap-2 text-center mb-4">
           <div>
             <p className="font-display text-lg leading-none">{macros!.calories ?? "--"}</p>
-            <p className="font-body text-[10px] text-steel uppercase mt-1">Kcal</p>
+            <p className="font-body text-xs text-steel uppercase mt-1">Kcal</p>
           </div>
           <div>
             <p className="font-display text-lg leading-none">{macros!.proteinG ?? "--"}</p>
-            <p className="font-body text-[10px] text-steel uppercase mt-1">Protein</p>
+            <p className="font-body text-xs text-steel uppercase mt-1">Protein</p>
           </div>
           <div>
             <p className="font-display text-lg leading-none">{macros!.carbsG ?? "--"}</p>
-            <p className="font-body text-[10px] text-steel uppercase mt-1">Carbs</p>
+            <p className="font-body text-xs text-steel uppercase mt-1">Carbs</p>
           </div>
           <div>
             <p className="font-display text-lg leading-none">{macros!.fatG ?? "--"}</p>
-            <p className="font-body text-[10px] text-steel uppercase mt-1">Fat</p>
+            <p className="font-body text-xs text-steel uppercase mt-1">Fat</p>
           </div>
         </div>
         </>
@@ -122,7 +122,7 @@ export function TodayWidget({
 
       {pinnedLinks && pinnedLinks.length > 0 && (
         <div className="space-y-1.5 pt-3 border-t border-steel/15">
-          <p className="font-body text-[10px] text-steel uppercase tracking-wide">From your coach, for today</p>
+          <p className="font-body text-xs text-steel uppercase tracking-wide">From your coach, for today</p>
           {pinnedLinks.map((l) => (
             <a
               key={l.id}

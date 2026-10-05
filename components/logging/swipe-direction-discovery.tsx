@@ -132,7 +132,7 @@ export function SwipeDirectionDiscovery({
 
       <div className="grid grid-cols-2 gap-3 mt-4">
         <div>
-          <p className="font-body text-[11px] text-steel uppercase tracking-wide mb-1.5 text-center">
+          <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5 text-center">
             Side to side
           </p>
           <div
@@ -161,7 +161,7 @@ export function SwipeDirectionDiscovery({
         </div>
 
         <div>
-          <p className="font-body text-[11px] text-steel uppercase tracking-wide mb-1.5 text-center">
+          <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5 text-center">
             Up and down
           </p>
           <div

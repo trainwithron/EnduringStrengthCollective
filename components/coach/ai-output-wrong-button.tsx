@@ -72,13 +72,13 @@ export function AiOutputWrongButton({ action, referenceId }: { action: AiRefundA
       <p className="font-body text-xs text-positive mb-2">✓ Credit refunded.</p>
       {!reasonSent && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="font-body text-[11px] text-steel mr-1">What went wrong? (optional)</span>
+          <span className="font-body text-xs text-steel mr-1">What went wrong? (optional)</span>
           {AI_REFUND_REASONS.map((r) => (
             <button
               key={r.value}
               type="button"
               onClick={() => sendReason(r.label)}
-              className="h-6 px-2 border border-steel/30 font-body text-[11px] text-chalk"
+              className="h-6 px-2 border border-steel/30 font-body text-xs text-chalk"
             >
               {r.label}
             </button>
@@ -91,11 +91,11 @@ export function AiOutputWrongButton({ action, referenceId }: { action: AiRefundA
               if (e.key === "Enter") sendReason(customReason);
             }}
             placeholder="Something else…"
-            className="h-6 w-32 bg-transparent border border-steel/30 px-2 font-body text-[11px] text-chalk focus:outline-none"
+            className="h-6 w-32 bg-transparent border border-steel/30 px-2 font-body text-xs text-chalk focus:outline-none"
           />
         </div>
       )}
-      {reasonSent && <p className="font-body text-[11px] text-steel">Thanks — noted.</p>}
+      {reasonSent && <p className="font-body text-xs text-steel">Thanks — noted.</p>}
     </div>
   );
 }

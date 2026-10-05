@@ -221,7 +221,7 @@ export function SpotBuilderPanel({
           </p>
         ) : (
           <div className="mb-3">
-            <label className="font-body text-[11px] text-steel uppercase tracking-wide">Client</label>
+            <label className="font-body text-xs text-steel uppercase tracking-wide">Client</label>
             <select
               value={athleteId ?? ""}
               onChange={(e) => {
@@ -251,7 +251,7 @@ export function SpotBuilderPanel({
 
         <div className="grid grid-cols-3 gap-2 mt-3">
           <div>
-            <label className="font-body text-[11px] text-steel uppercase tracking-wide">Progression</label>
+            <label className="font-body text-xs text-steel uppercase tracking-wide">Progression</label>
             <select
               value={progressionRule}
               onChange={(e) => setProgressionRule(e.target.value as ProgressionRule)}
@@ -265,7 +265,7 @@ export function SpotBuilderPanel({
             </select>
           </div>
           <div>
-            <label className="font-body text-[11px] text-steel uppercase tracking-wide">Weeks</label>
+            <label className="font-body text-xs text-steel uppercase tracking-wide">Weeks</label>
             <input
               type="number"
               min={1}
@@ -276,7 +276,7 @@ export function SpotBuilderPanel({
             />
           </div>
           <div>
-            <label className="font-body text-[11px] text-steel uppercase tracking-wide">Style</label>
+            <label className="font-body text-xs text-steel uppercase tracking-wide">Style</label>
             <input
               type="text"
               value={programType}

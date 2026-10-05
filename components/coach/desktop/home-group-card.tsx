@@ -26,7 +26,7 @@ export function HomeGroupCard({ group }: { group: HomeGroupCardData }) {
       )}
       <p className="font-body text-sm text-chalk truncate">{group.name}</p>
       {group.orgName && (
-        <p className="font-body text-[10px] text-steel/70 uppercase tracking-wide truncate">
+        <p className="font-body text-xs text-steel uppercase tracking-wide truncate">
           {group.orgName}
         </p>
       )}

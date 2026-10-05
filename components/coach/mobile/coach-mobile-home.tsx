@@ -134,7 +134,7 @@ export async function CoachMobileHome({
               href={`/groups/${groupId}/athletes/${topDue.athleteId}/log/${topDue.workoutId}`}
               className="block border border-rust bg-rust/10 p-5 active:bg-rust/15 transition-colors"
             >
-              <p className="font-body text-[10px] text-rust uppercase tracking-wide font-bold">
+              <p className="font-body text-xs text-rust uppercase tracking-wide font-bold">
                 Due today
               </p>
               <p className="font-display font-bold text-2xl leading-tight mt-1 truncate">

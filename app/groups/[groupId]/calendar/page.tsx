@@ -254,7 +254,7 @@ export default async function CoachCalendarPage(
               {WEEKDAY_LABELS.map((label) => (
                 <div
                   key={label}
-                  className="bg-graphite text-center font-body text-[10px] text-steel uppercase tracking-wide py-1.5"
+                  className="bg-graphite text-center font-body text-xs text-steel uppercase tracking-wide py-1.5"
                 >
                   {label}
                 </div>
@@ -270,7 +270,7 @@ export default async function CoachCalendarPage(
                       isToday ? "ring-1 ring-inset ring-rust" : ""
                     }`}
                   >
-                    <span className={`font-body text-[10px] ${isToday ? "text-rust font-bold" : "text-steel"}`}>
+                    <span className={`font-body text-xs ${isToday ? "text-rust font-bold" : "text-steel"}`}>
                       {date.getDate()}
                     </span>
                   </Link>
@@ -541,7 +541,7 @@ export default async function CoachCalendarPage(
               {WEEKDAY_LABELS.map((label) => (
                 <div
                   key={label}
-                  className="bg-graphite text-center font-body text-[10px] text-steel uppercase tracking-wide py-1.5"
+                  className="bg-graphite text-center font-body text-xs text-steel uppercase tracking-wide py-1.5"
                 >
                   {label}
                 </div>
@@ -554,7 +554,7 @@ export default async function CoachCalendarPage(
                   isToday ? "ring-1 ring-inset ring-rust" : ""
                 }`;
                 const dayNumber = (
-                  <span className={`font-body text-[10px] ${isToday ? "text-rust font-bold" : "text-steel"}`}>
+                  <span className={`font-body text-xs ${isToday ? "text-rust font-bold" : "text-steel"}`}>
                     {date.getDate()}
                   </span>
                 );
@@ -594,7 +594,7 @@ export default async function CoachCalendarPage(
                 const rowClass = `flex items-center gap-3 py-3 ${isToday ? "bg-surface/40" : ""}`;
                 const rowInner = (
                   <div className={`w-11 shrink-0 text-center ${isToday ? "text-rust" : "text-steel"}`}>
-                    <p className="font-body text-[10px] uppercase tracking-wide">{WEEKDAY_LABELS[i]}</p>
+                    <p className="font-body text-xs uppercase tracking-wide">{WEEKDAY_LABELS[i]}</p>
                     <p className="font-display font-bold text-lg leading-none">{date.getDate()}</p>
                   </div>
                 );
@@ -1107,7 +1107,7 @@ export default async function CoachCalendarPage(
           <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
             Clients
           </h2>
-          <p className="font-body text-[11px] text-steel mb-2">
+          <p className="font-body text-xs text-steel mb-2">
             Drag a name onto a day to book them, or click a name then click a
             date. Use +/- to quickly adjust session credits.
           </p>

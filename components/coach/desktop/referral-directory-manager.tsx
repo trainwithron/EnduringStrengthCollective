@@ -108,7 +108,7 @@ export function ReferralDirectoryManager({ initialPartners }: { initialPartners:
                 {p.discountDescription && (
                   <p className="font-body text-xs text-positive mt-0.5">{p.discountDescription}</p>
                 )}
-                <p className="font-body text-[11px] text-steel mt-1">
+                <p className="font-body text-xs text-steel mt-1">
                   {p.clickCount} click{p.clickCount === 1 ? "" : "s"}
                 </p>
               </div>

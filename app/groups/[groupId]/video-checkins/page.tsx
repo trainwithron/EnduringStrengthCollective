@@ -84,7 +84,7 @@ export default async function VideoCheckinsPage(props: { params: Promise<{ group
         ) : (
           checkins.map((c) => (
             <div key={c.id} className="border border-steel/20 p-4 space-y-3">
-              <p className="font-body text-[11px] text-steel uppercase tracking-wide">
+              <p className="font-body text-xs text-steel uppercase tracking-wide">
                 {new Date(c.createdAt).toLocaleDateString("en-US", {
                   month: "short",
                   day: "numeric",

@@ -259,7 +259,7 @@ export default async function ClientsPage(
                   <img src={c.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
                 ) : (
                   <div className="w-8 h-8 rounded-full bg-surface border border-steel/30 flex items-center justify-center">
-                    <span className="font-display text-[10px] text-chalk">
+                    <span className="font-display text-xs text-chalk">
                       {c.fullName
                         .split(" ")
                         .map((p) => p[0])

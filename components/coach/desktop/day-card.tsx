@@ -452,7 +452,7 @@ export function DayCard({
             className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust disabled:opacity-50"
           />
           {quickEntryError && (
-            <p className="font-body text-[11px] text-rust mt-1">{quickEntryError}</p>
+            <p className="font-body text-xs text-rust mt-1">{quickEntryError}</p>
           )}
         </div>
       )}
@@ -527,7 +527,7 @@ export function DayCard({
                   className={`w-full ${draggedItemId === item.id ? "opacity-50" : ""}`}
                 >
                   {sortedItems.length > 1 && (
-                    <p className="font-body text-[10px] text-steel uppercase tracking-wide text-center mb-1.5">
+                    <p className="font-body text-xs text-steel uppercase tracking-wide text-center mb-1.5">
                       {index + 1} of {sortedItems.length}
                     </p>
                   )}

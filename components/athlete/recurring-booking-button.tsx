@@ -57,7 +57,7 @@ export function RecurringBookingButton({
 
   if (result) {
     return (
-      <p className="font-body text-[11px] text-steel">
+      <p className="font-body text-xs text-steel">
         Booked {result.booked} of {occurrences} weekly sessions
         {result.failed > 0 ? ` (${result.failed} couldn't be booked — check your credits)` : ""}.
       </p>
@@ -66,7 +66,7 @@ export function RecurringBookingButton({
 
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className="font-body text-[11px] text-rust">
+      <button type="button" onClick={() => setOpen(true)} className="font-body text-xs text-rust">
         Book weekly →
       </button>
     );
@@ -74,7 +74,7 @@ export function RecurringBookingButton({
 
   return (
     <div className="flex flex-col items-end gap-1.5 border border-steel/20 bg-surface/40 p-2">
-      <label className="font-body text-[11px] text-steel flex items-center gap-1.5">
+      <label className="font-body text-xs text-steel flex items-center gap-1.5">
         Repeat for
         <input
           type="number"
@@ -90,7 +90,7 @@ export function RecurringBookingButton({
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="font-body text-[11px] text-steel"
+          className="font-body text-xs text-steel"
         >
           Cancel
         </button>
@@ -98,12 +98,12 @@ export function RecurringBookingButton({
           type="button"
           onClick={handleCreate}
           disabled={submitting}
-          className="h-7 px-2 bg-rust text-graphite font-body text-[11px] font-medium disabled:opacity-40"
+          className="h-7 px-2 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
         >
           {submitting ? "Booking…" : "Confirm"}
         </button>
       </div>
-      {error && <span className="font-body text-[11px] text-rust">{error}</span>}
+      {error && <span className="font-body text-xs text-rust">{error}</span>}
     </div>
   );
 }

@@ -52,7 +52,7 @@ const GRID_CLASS: Record<CardSize, string> = {
 };
 
 const AVATAR_CLASS: Record<CardSize, string> = {
-  small: "w-10 h-10 text-[11px]",
+  small: "w-10 h-10 text-xs",
   medium: "w-14 h-14 text-sm",
   large: "w-[72px] h-[72px] text-base",
 };
@@ -617,7 +617,7 @@ export function ClientCardGrid({
                   )}
                   <span className="font-body font-medium text-[15px] text-chalk">{member.fullName}</span>
                   {member.positionName && (
-                    <span className="font-body text-[11px] text-steel -mt-1.5">{member.positionName}</span>
+                    <span className="font-body text-xs text-steel -mt-1.5">{member.positionName}</span>
                   )}
                 </Link>
 
@@ -633,7 +633,7 @@ export function ClientCardGrid({
                 )}
 
                 {lowReadinessAthleteIds?.has(member.profileId) && (
-                  <span className="font-body text-[11px] text-amber-400 bg-amber-400/10 border border-amber-400/30 rounded-token-pill px-1.5 py-0.5">
+                  <span className="font-body text-xs text-amber-400 bg-amber-400/10 border border-amber-400/30 rounded-token-pill px-1.5 py-0.5">
                     ⚠ Low readiness
                   </span>
                 )}
@@ -650,14 +650,14 @@ export function ClientCardGrid({
                   return integrity.level === "pattern" ? (
                     <span
                       title={`${integrity.flaggedCount} of ${integrity.totalSessions} recent sessions logged implausibly fast`}
-                      className="font-body text-[11px] text-rust bg-rust/10 border border-rust/40 rounded-token-pill px-1.5 py-0.5"
+                      className="font-body text-xs text-rust bg-rust/10 border border-rust/40 rounded-token-pill px-1.5 py-0.5"
                     >
                       ⏱ Fast sessions ({integrity.flaggedCount})
                     </span>
                   ) : (
                     <span
                       title="One recent session was logged faster than the prescribed sets/rest would realistically take"
-                      className="font-body text-[11px] text-steel bg-steel/10 border border-steel/30 rounded-token-pill px-1.5 py-0.5"
+                      className="font-body text-xs text-steel bg-steel/10 border border-steel/30 rounded-token-pill px-1.5 py-0.5"
                     >
                       ⏱ Fast session
                     </span>

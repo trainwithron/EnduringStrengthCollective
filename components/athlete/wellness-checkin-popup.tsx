@@ -134,7 +134,7 @@ export function WellnessCheckinPopup({
         <button
           type="button"
           onClick={handleSnooze}
-          className="w-full text-center font-body text-[11px] text-steel/60 mt-2"
+          className="w-full text-center font-body text-xs text-steel mt-2"
         >
           Don&apos;t ask for a week
         </button>

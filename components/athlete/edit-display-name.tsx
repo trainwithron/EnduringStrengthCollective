@@ -56,7 +56,7 @@ export function EditDisplayName({ initialName, profileId }: { initialName: strin
         autoFocus
         className="w-full h-9 bg-surface border border-steel/30 text-chalk px-2.5 font-body text-sm focus:outline-none focus:border-rust"
       />
-      <p className="font-body text-[11px] text-steel mt-1">
+      <p className="font-body text-xs text-steel mt-1">
         This is what other members see on the feed and roster — it doesn&apos;t have to be your legal name.
       </p>
       {error && (

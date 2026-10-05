@@ -104,7 +104,7 @@ export function ProgramScheduleSettings({
   return (
     <div className="px-5 pt-4 pb-2 flex flex-wrap items-center gap-4">
       <label className="flex items-center gap-2">
-        <span className="font-body text-[11px] text-steel uppercase tracking-wide">
+        <span className="font-body text-xs text-steel uppercase tracking-wide">
           Start date
         </span>
         <input
@@ -121,7 +121,7 @@ export function ProgramScheduleSettings({
       </label>
 
       <div className="flex items-center gap-1">
-        <span className="font-body text-[11px] text-steel uppercase tracking-wide mr-1">
+        <span className="font-body text-xs text-steel uppercase tracking-wide mr-1">
           Training days
         </span>
         {WEEKDAYS.map((day) => (
@@ -132,7 +132,7 @@ export function ProgramScheduleSettings({
             disabled={saving}
             aria-label={day.label}
             aria-pressed={trainingDays.includes(day.value)}
-            className={`h-6 w-6 flex items-center justify-center border font-body text-[10px] transition-colors disabled:opacity-40 ${
+            className={`h-6 w-6 flex items-center justify-center border font-body text-xs transition-colors disabled:opacity-40 ${
               trainingDays.includes(day.value)
                 ? "bg-rust border-rust text-graphite"
                 : "border-steel/30 text-steel active:border-rust active:text-rust"
@@ -144,7 +144,7 @@ export function ProgramScheduleSettings({
       </div>
 
       <label className="flex items-center gap-2">
-        <span className="font-body text-[11px] text-steel uppercase tracking-wide">
+        <span className="font-body text-xs text-steel uppercase tracking-wide">
           Unlock ahead
         </span>
         <select
@@ -162,7 +162,7 @@ export function ProgramScheduleSettings({
       </label>
 
       <label className="flex items-center gap-2">
-        <span className="font-body text-[11px] text-steel uppercase tracking-wide">
+        <span className="font-body text-xs text-steel uppercase tracking-wide">
           Shift schedule
         </span>
         <input
@@ -173,7 +173,7 @@ export function ProgramScheduleSettings({
           disabled={saving || !startDate}
           className="h-8 w-16 px-2 bg-surface border border-steel/30 text-chalk font-body text-xs disabled:opacity-40"
         />
-        <span className="font-body text-[11px] text-steel">days</span>
+        <span className="font-body text-xs text-steel">days</span>
         <button
           type="button"
           onClick={handleShift}

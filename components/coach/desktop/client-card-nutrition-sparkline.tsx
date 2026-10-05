@@ -40,7 +40,7 @@ export function ClientCardNutritionSparkline({
 
   return (
     <div className="w-full">
-      <p className="font-body text-[10px] text-steel uppercase tracking-wide mb-0.5">
+      <p className="font-body text-xs text-steel uppercase tracking-wide mb-0.5">
         {PHASE_LABELS[phase]}
       </p>
       <svg
@@ -67,7 +67,7 @@ export function ClientCardNutritionSparkline({
           vectorEffect="non-scaling-stroke"
         />
       </svg>
-      <div className="flex gap-2 font-body text-[9px] text-steel leading-none mt-0.5">
+      <div className="flex gap-2 font-body text-xs text-steel leading-none mt-0.5">
         <span className="flex items-center gap-1">
           <span className="w-2 h-0 border-t border-dashed border-steel inline-block" /> Calories
         </span>

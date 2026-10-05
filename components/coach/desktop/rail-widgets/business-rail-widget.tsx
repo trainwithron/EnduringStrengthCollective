@@ -230,7 +230,7 @@ export function BusinessRailWidget({ groupId }: { groupId: string }) {
         <button
           type="button"
           onClick={() => setCustomizing(true)}
-          className="font-body text-[10px] text-steel underline underline-offset-2 -mt-2"
+          className="font-body text-xs text-steel underline underline-offset-2 -mt-2"
         >
           Customize
         </button>
@@ -247,7 +247,7 @@ export function BusinessRailWidget({ groupId }: { groupId: string }) {
             )
         )}
       </svg>
-      <p className="font-body text-[10px] text-steel uppercase tracking-wide -mt-1.5 mb-2">New clients, 6mo</p>
+      <p className="font-body text-xs text-steel uppercase tracking-wide -mt-1.5 mb-2">New clients, 6mo</p>
 
       <div>
         {picked.map((key) => (

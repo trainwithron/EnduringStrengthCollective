@@ -62,7 +62,7 @@ export function SendToClientButton({
       >
         📲 Send to client to finish
       </button>
-      {status && <p className="font-body text-[11px] text-steel mt-1">{status}</p>}
+      {status && <p className="font-body text-xs text-steel mt-1">{status}</p>}
     </div>
   );
 }

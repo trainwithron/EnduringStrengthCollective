@@ -74,7 +74,7 @@ export default async function SessionPatternNotePage(props: { params: Promise<{ 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body px-6 py-10">
       <div className="max-w-xl mx-auto">
-        <p className="font-body text-[11px] text-rust uppercase tracking-wide font-bold mb-2">
+        <p className="font-body text-xs text-rust uppercase tracking-wide font-bold mb-2">
           Session Pattern Spot
         </p>
         <h1 className="font-display font-bold text-2xl uppercase leading-tight mb-4">
@@ -87,7 +87,7 @@ export default async function SessionPatternNotePage(props: { params: Promise<{ 
 
         {signals.length > 0 && (
           <div className="mb-8">
-            <p className="font-body text-[11px] text-steel uppercase tracking-wide mb-2">What was found</p>
+            <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">What was found</p>
             <ul className="space-y-1.5">
               {signals.map((s, i) => (
                 <li key={i} className="flex items-start gap-2">

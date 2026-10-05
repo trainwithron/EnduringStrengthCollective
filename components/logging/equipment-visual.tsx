@@ -120,7 +120,7 @@ function BarbellVisual({
   popping: boolean;
   finale: boolean;
 }) {
-  if (weight == null) return <BarbellIcon perSide={[]} className="text-steel/40" />;
+  if (weight == null) return <BarbellIcon perSide={[]} className="text-steel" />;
   const breakdown = computePlateBreakdown(weight);
   const isMilestone = isPlateMathMilestone(weight);
   return (
@@ -132,15 +132,15 @@ function BarbellVisual({
       <BarbellIcon perSide={breakdown.perSide} className={isMilestone ? "text-rust" : "text-chalk"} />
       <span className="font-display text-sm">
         {weight}
-        <span className="font-body text-[10px] text-steel ml-0.5">lbs</span>
+        <span className="font-body text-xs text-steel ml-0.5">lbs</span>
       </span>
       {breakdown.exact && breakdown.perSide.length > 0 && (
-        <span className="font-body text-[10px] text-steel">
+        <span className="font-body text-xs text-steel">
           ({breakdown.perSide.join("/")} per side)
         </span>
       )}
       {weight < STANDARD_BAR_WEIGHT_LBS && (
-        <span className="font-body text-[10px] text-steel">under bar weight</span>
+        <span className="font-body text-xs text-steel">under bar weight</span>
       )}
     </div>
   );
@@ -192,7 +192,7 @@ function KettlebellVisual({
       {weight != null && (
         <span className="font-display text-sm">
           {weight}
-          <span className="font-body text-[10px] text-steel ml-0.5">lbs</span>
+          <span className="font-body text-xs text-steel ml-0.5">lbs</span>
         </span>
       )}
     </div>
@@ -223,7 +223,7 @@ function DumbbellVisual({
           own printed-weight convention. */}
       <span className="font-display text-sm">
         {weight ?? "—"}
-        <span className="font-body text-[10px] text-steel ml-0.5">lbs</span>
+        <span className="font-body text-xs text-steel ml-0.5">lbs</span>
       </span>
     </div>
   );

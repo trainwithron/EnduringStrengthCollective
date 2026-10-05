@@ -121,8 +121,15 @@ function SetPasswordForm() {
         <div>
           <h1 className="font-display uppercase text-2xl font-bold">Link invalid or expired</h1>
           <p className="font-body text-steel text-sm mt-2 max-w-sm">
-            Sign-in links work once and expire. Ask your coach to send you a new one.
+            This link has expired or was already used. If you have already chosen a password, sign in. If
+            not, ask your coach to send you a new link.
           </p>
+          <a
+            href="/login"
+            className="inline-flex items-center justify-center h-11 px-6 mt-5 bg-rust text-graphite font-body text-sm font-medium"
+          >
+            Sign in
+          </a>
         </div>
       </main>
     );

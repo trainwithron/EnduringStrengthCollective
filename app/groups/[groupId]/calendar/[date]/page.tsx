@@ -254,7 +254,7 @@ export default async function CoachDayDetailPage(
               <p className="font-body text-xs text-steel">
                 Session credits available: {creditBalance}
                 {creditBalance > 0 && creditExpiresAt && (
-                  <span className="text-steel/70">
+                  <span className="text-steel">
                     {" "}
                     — expires{" "}
                     {creditExpiresAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}

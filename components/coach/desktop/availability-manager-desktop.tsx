@@ -125,7 +125,7 @@ export function AvailabilityManagerDesktop({
           Add recurring window
         </p>
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">Day</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Day</span>
           <select
             value={weekday}
             onChange={(e) => setWeekday(e.target.value)}
@@ -139,7 +139,7 @@ export function AvailabilityManagerDesktop({
           </select>
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">Start</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Start</span>
           <input
             type="time"
             value={startTime}
@@ -148,7 +148,7 @@ export function AvailabilityManagerDesktop({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">End</span>
+          <span className="font-body text-xs text-steel uppercase tracking-wide">End</span>
           <input
             type="time"
             value={endTime}
@@ -157,7 +157,7 @@ export function AvailabilityManagerDesktop({
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="font-body text-[11px] text-steel uppercase tracking-wide">
+          <span className="font-body text-xs text-steel uppercase tracking-wide">
             Minutes/session
           </span>
           <input

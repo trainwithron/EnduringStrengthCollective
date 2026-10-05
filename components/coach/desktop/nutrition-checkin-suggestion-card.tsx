@@ -118,10 +118,10 @@ export function NutritionCheckinSuggestionCard({
   return (
     <div className="border border-rust/40 bg-surface/60 p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <p className="font-body text-[10px] text-rust uppercase tracking-wide font-bold">
+        <p className="font-body text-xs text-rust uppercase tracking-wide font-bold">
           Weekly check-in suggestion — {PHASE_LABELS[suggestion.phase] ?? suggestion.phase}
         </p>
-        <p className="font-body text-[10px] text-steel">
+        <p className="font-body text-xs text-steel">
           {new Date(suggestion.generatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
         </p>
       </div>
@@ -129,19 +129,19 @@ export function NutritionCheckinSuggestionCard({
       <div className="grid grid-cols-4 gap-2 text-center">
         <div>
           <p className="font-display text-lg leading-none">{suggestion.newCalories}</p>
-          <p className="font-body text-[10px] text-steel uppercase mt-1">Kcal</p>
+          <p className="font-body text-xs text-steel uppercase mt-1">Kcal</p>
         </div>
         <div>
           <p className="font-display text-lg leading-none">{suggestion.proteinG}</p>
-          <p className="font-body text-[10px] text-steel uppercase mt-1">Protein</p>
+          <p className="font-body text-xs text-steel uppercase mt-1">Protein</p>
         </div>
         <div>
           <p className="font-display text-lg leading-none">{suggestion.carbsG}</p>
-          <p className="font-body text-[10px] text-steel uppercase mt-1">Carbs</p>
+          <p className="font-body text-xs text-steel uppercase mt-1">Carbs</p>
         </div>
         <div>
           <p className="font-display text-lg leading-none">{suggestion.fatG}</p>
-          <p className="font-body text-[10px] text-steel uppercase mt-1">Fat</p>
+          <p className="font-body text-xs text-steel uppercase mt-1">Fat</p>
         </div>
       </div>
       {error && (

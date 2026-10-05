@@ -185,7 +185,7 @@ export function ChallengeParticipantPanel({
         </h3>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <p className="font-body text-[11px] text-steel mb-1">Day 1</p>
+            <p className="font-body text-xs text-steel mb-1">Day 1</p>
             {beforePhotoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={beforePhotoUrl} alt="Before" className="w-full aspect-square object-cover" />
@@ -204,7 +204,7 @@ export function ChallengeParticipantPanel({
             )}
           </div>
           <div>
-            <p className="font-body text-[11px] text-steel mb-1">
+            <p className="font-body text-xs text-steel mb-1">
               {hasEnded ? "Final" : "Latest"}
             </p>
             {afterPhotoUrl ? (

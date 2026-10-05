@@ -435,7 +435,7 @@ export function BrandingForm({
                   Card
                 </div>
                 <span
-                  className="px-2 py-1 text-[10px] uppercase border"
+                  className="px-2 py-1 text-xs uppercase border"
                   style={{ borderColor: accentColor, color: accentColor, borderRadius: scale.pill }}
                 >
                   Badge

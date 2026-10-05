@@ -198,10 +198,10 @@ export function CollectiveIntelligenceChat() {
         className="px-4 py-3 border-b border-steel/20 flex items-center justify-between gap-2 touch-none select-none cursor-grab shrink-0"
       >
         <div>
-          <p className="font-body text-[10px] text-steel uppercase tracking-wide font-bold">
+          <p className="font-body text-xs text-steel uppercase tracking-wide font-bold">
             Ask Spot
           </p>
-          <p className="font-body text-[11px] text-steel mt-0.5">Ask about a specific client or exercise.</p>
+          <p className="font-body text-xs text-steel mt-0.5">Ask about a specific client or exercise.</p>
         </div>
         <ChevronIcon
           className="w-4 h-4 text-steel shrink-0"

@@ -462,7 +462,7 @@ function RecipeCard({
                 Add ingredient
               </button>
             </div>
-            <p className="font-body text-[11px] text-steel mb-2">
+            <p className="font-body text-xs text-steel mb-2">
               Use at most one &quot;source&quot; ingredient per macro — its amount is solved directly from
               the target (e.g. protein target ÷ protein per 100g). Add as many &quot;fixed&quot; ingredients
               as you want (herbs, a fixed drizzle, produce) — they never scale.
@@ -551,7 +551,7 @@ function IngredientEditor({
 
       {ingredient.role === "fixed" ? (
         <label className="block mt-2">
-          <span className="font-body text-[11px] text-steel">
+          <span className="font-body text-xs text-steel">
             Display text (e.g. &quot;1-2 cups steamed&quot; — leave blank to show just the label)
           </span>
           <input
@@ -565,7 +565,7 @@ function IngredientEditor({
       ) : (
         <div className="grid grid-cols-3 gap-2 mt-2">
           <label className="block">
-            <span className="font-body text-[11px] text-steel">Protein /100g</span>
+            <span className="font-body text-xs text-steel">Protein /100g</span>
             <input
               type="number"
               value={proteinDraft}
@@ -578,7 +578,7 @@ function IngredientEditor({
             />
           </label>
           <label className="block">
-            <span className="font-body text-[11px] text-steel">Carbs /100g</span>
+            <span className="font-body text-xs text-steel">Carbs /100g</span>
             <input
               type="number"
               value={carbsDraft}
@@ -591,7 +591,7 @@ function IngredientEditor({
             />
           </label>
           <label className="block">
-            <span className="font-body text-[11px] text-steel">Fat /100g</span>
+            <span className="font-body text-xs text-steel">Fat /100g</span>
             <input
               type="number"
               value={fatDraft}
@@ -608,7 +608,7 @@ function IngredientEditor({
 
       {ingredient.role !== "fixed" && (
         <label className="block mt-2">
-          <span className="font-body text-[11px] text-steel">
+          <span className="font-body text-xs text-steel">
             Real nutrition data — maps this to a real USDA food so the athlete&apos;s Key nutrients
             grid can include it
           </span>

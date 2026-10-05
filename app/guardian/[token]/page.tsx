@@ -79,7 +79,7 @@ export default async function GuardianPage(
           )}
         </div>
 
-        <p className="font-body text-[11px] text-steel mt-6">
+        <p className="font-body text-xs text-steel mt-6">
           This is a read-only view shared by {view.athleteName}&apos;s coach — no login needed, and
           nothing here can be edited from this page.
         </p>

@@ -120,7 +120,7 @@ export function ExerciseNameInput({
                 >
                   <span className="truncate">{name}</span>
                   {tier && (
-                    <span className="shrink-0 w-4 h-4 flex items-center justify-center border border-steel/40 text-steel text-[10px] font-bold">
+                    <span className="shrink-0 w-4 h-4 flex items-center justify-center border border-steel/40 text-steel text-xs font-bold">
                       {tier}
                     </span>
                   )}

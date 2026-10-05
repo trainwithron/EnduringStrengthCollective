@@ -171,7 +171,7 @@ export function CoachSpotHub({
                   <ArrowLeft className="w-4 h-4" />
                 </button>
               ) : null}
-              <p className="font-body text-[10px] text-steel uppercase tracking-wide font-bold truncate flex-1">{title}</p>
+              <p className="font-body text-xs text-steel uppercase tracking-wide font-bold truncate flex-1">{title}</p>
               <button
                 type="button"
                 onClick={close}

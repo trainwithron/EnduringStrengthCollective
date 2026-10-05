@@ -14,7 +14,7 @@ import { NeedsAttentionPanel, type NeedsAttentionItem } from "../desktop/needs-a
 function Tile({ label, value }: { label: string; value: string }) {
   return (
     <div className="border border-steel/20 p-3 w-40 shrink-0 snap-start">
-      <p className="font-body text-[10px] text-steel uppercase tracking-wide">{label}</p>
+      <p className="font-body text-xs text-steel uppercase tracking-wide">{label}</p>
       <p className="font-display text-lg leading-none mt-1 truncate">{value}</p>
     </div>
   );
@@ -24,7 +24,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p className="font-display text-lg leading-none">{value}</p>
-      <p className="font-body text-[10px] text-steel uppercase mt-1">{label}</p>
+      <p className="font-body text-xs text-steel uppercase mt-1">{label}</p>
     </div>
   );
 }

@@ -91,7 +91,7 @@ export function DashboardTileGrid({
             <div key={key} className="relative">
               {customizing && (
                 <div className="flex items-center justify-between mb-1 px-1">
-                  <p className="font-body text-[10px] text-steel uppercase tracking-wide">{tile.label}</p>
+                  <p className="font-body text-xs text-steel uppercase tracking-wide">{tile.label}</p>
                   <div className="flex items-center gap-1">
                     <button
                       type="button"
@@ -130,7 +130,7 @@ export function DashboardTileGrid({
 
       {customizing && hidden.length > 0 && (
         <div className="mt-4 border border-steel/20 border-dashed p-3">
-          <p className="font-body text-[10px] text-steel uppercase tracking-wide mb-2">Hidden — tap to add back</p>
+          <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Hidden — tap to add back</p>
           <div className="flex flex-wrap gap-2">
             {hidden.map((key) => {
               const tile = tileByKey.get(key as DashboardTileKey);

@@ -122,7 +122,7 @@ export function ProfileDetailsEditor({
           />
         </div>
       </div>
-      <p className="font-body text-[11px] text-steel">
+      <p className="font-body text-xs text-steel">
         Only visible to you and your coach — never shown to other clients.
       </p>
       {saving && <p className="font-body text-xs text-steel">Saving…</p>}
