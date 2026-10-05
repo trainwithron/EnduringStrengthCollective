@@ -7,7 +7,10 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | Migration | Applies in planned order | Rehearsed in SQL | Checks passing | What is tested |
 |---|---|---|---|---|
 | 0239 | already live | yes | 14 | 0244 macro target history and row security |
+| 0243 | already live | yes | 17 | 0243 email-changed notification, 0246 session ledger and assign, 0247 rate limiter |
 | 0245 | already live | yes | 42 | 0245 refunds tied to charges; 0250 AI allowance scaling |
+| 0246 | already live | yes | 17 | 0243 email-changed notification, 0246 session ledger and assign, 0247 rate limiter |
+| 0247 | already live | yes | 17 | 0243 email-changed notification, 0246 session ledger and assign, 0247 rate limiter |
 | 0248 | yes | yes | 30 | 0248 session credit settlement; 0236 workout session integrity (and 0248's patch of complete_workout_session) |
 | 0249 | yes | yes | 13 | 0240 guide dismissal, 0241 program label/order, 0249 completion message |
 | 0250 | yes | yes | 42 | 0245 refunds tied to charges; 0250 AI allowance scaling |
@@ -30,6 +33,7 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0263 | yes | yes | 57 | 0259 ongoing series, 0260 re-up fields, 0261 public booking tables, 0262 cron runs, 0263 group sessions |
 | 0264 | yes | yes | 6 | 0264 clients cannot edit their own session balance |
 | 0265 | yes | yes | 11 | 0265 bookings: direct writes are coach-only, booking functions still work |
+| 0266 | yes | yes | 26 | 0266 client-writable columns that should be coach-only |
 | 0238 | yes | yes | 24 | invite links: join_group_with_invite, revoked links, closing the loose self-join |
 | 0252 | yes | yes | 29 | 0251/0252 kiosk PINs: hashed, lockout and escalation |
 | 0253 | yes | yes | 23 | 0253 anon share policies closed; 0254 client tag write rules |

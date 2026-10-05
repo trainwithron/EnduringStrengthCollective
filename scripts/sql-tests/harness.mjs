@@ -17,7 +17,7 @@ export const LIVE_EXTRA = ["0239", "0243", "0245", "0246", "0247"];
 // the invite-join smoke test, because they close access the old code still uses.
 export const PLAN_ORDER = [
   "0248", "0249", "0250", "0251", "0254", "0240", "0241", "0237", "0242", "0236", "0244",
-  "0255", "0256", "0257", "0258", "0259", "0260", "0261", "0262", "0263", "0264", "0265",
+  "0255", "0256", "0257", "0258", "0259", "0260", "0261", "0262", "0263", "0264", "0265", "0266",
   "0238", "0252", "0253",
 ];
 
@@ -37,7 +37,7 @@ export async function createDb() {
     create extension pgcrypto with schema extensions;
     create table auth.users (id uuid primary key default gen_random_uuid(), email text, raw_user_meta_data jsonb, created_at timestamptz default now());
     create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
-    create function auth.role() returns text language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claim.role', true), ''), 'authenticated') $$;
+    create function auth.role() returns text language sql stable as $$ select nullif(current_setting('request.jwt.claim.role', true), '') $$;
     create function auth.jwt() returns jsonb language sql stable as $$ select '{}'::jsonb $$;
     create table storage.buckets (id text primary key, name text, public boolean default false, file_size_limit bigint, allowed_mime_types text[]);
     create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text, owner uuid, metadata jsonb);
