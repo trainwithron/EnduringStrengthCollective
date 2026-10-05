@@ -4,6 +4,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { toFriendlyAuthEmailError } from "@/lib/auth-email-error";
 import { placeholderEmailFor } from "@/lib/client-claim";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatch";
+import { checkOneOnOneGroupHasRoom } from "@/lib/group-kind-guard";
 
 // Creates a client BEFORE they've ever signed in: a real auth account and
 // profile, silently — no email is sent, so nothing reaches them until the
@@ -41,6 +42,11 @@ export async function POST(request: Request) {
 
   const serviceRole = createServiceRoleClient();
 
+  // A one-on-one group that already has its client can't take another. Check BEFORE creating
+  // anything, so a refusal never leaves an account behind.
+  const roomError = await checkOneOnOneGroupHasRoom(serviceRole as never, groupId);
+  if (roomError) return NextResponse.json({ error: roomError }, { status: 409 });
+
   const { data: created, error: createError } = await serviceRole.auth.admin.createUser({
     email: trimmedEmail || placeholderEmailFor(crypto.randomUUID()),
     email_confirm: true,
@@ -77,6 +83,9 @@ export async function POST(request: Request) {
     .from("group_memberships")
     .insert({ group_id: groupId, profile_id: newUserId, role: "athlete" });
   if (membershipError) {
+    // Don't leave a half-made client behind (an account with a placeholder email and no group).
+    // Deleting the auth user removes its profile with it.
+    await serviceRole.auth.admin.deleteUser(newUserId).catch(() => {});
     return NextResponse.json(
       { error: `Couldn't add them to the group: ${membershipError.message}` },
       { status: 502 }

@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { isPlaceholderEmail } from "@/lib/client-claim";
+import { isPlaceholderEmail, validateClaimEmail, validateNewPassword } from "@/lib/client-claim";
 
 export default function SetPasswordPage() {
   return (
@@ -21,6 +21,7 @@ function SetPasswordForm() {
   // address; they enter their real email here.
   const [needsEmail, setNeedsEmail] = useState(false);
   const [email, setEmail] = useState("");
+  const [emailConfirm, setEmailConfirm] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -39,27 +40,30 @@ function SetPasswordForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
+    const passwordError = validateNewPassword(password);
+    if (passwordError) {
+      setError(passwordError);
       return;
+    }
+    if (needsEmail) {
+      const emailError = validateClaimEmail(email, emailConfirm);
+      if (emailError) {
+        setError(emailError);
+        return;
+      }
     }
     setSubmitting(true);
     setError(null);
 
     const supabase = createBrowserClient();
-    const { error: updateError } = await supabase.auth.updateUser({ password });
-    if (updateError) {
-      setError(updateError.message);
-      setSubmitting(false);
-      return;
-    }
 
-    // Records that they've signed in and, for a coach-created account, saves
-    // the real email they entered (server-side, for their own account only).
+    // One server step saves the password (and, for a coach-created account, the real
+    // email) together, so a taken or mistyped email can never leave them with a new
+    // password and no way in. It also records that they've signed in.
     const claimRes = await fetch("/api/clients/complete-claim", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, emailConfirm, password }),
     });
     if (!claimRes.ok) {
       const data = await claimRes.json().catch(() => ({}));
@@ -159,7 +163,22 @@ function SetPasswordForm() {
               onChange={(e) => setEmail(e.target.value)}
               className="w-full h-11 mt-1 bg-surface border border-steel/30 text-chalk px-3 font-body focus:outline-none focus:border-rust"
             />
-            <p className="font-body text-xs text-steel mt-1">You&apos;ll use this to sign in and reset your password.</p>
+            <label htmlFor="email-confirm" className="font-body text-xs text-steel uppercase tracking-wide mt-3 block">
+              Type it again
+            </label>
+            <input
+              id="email-confirm"
+              type="email"
+              autoComplete="off"
+              required
+              value={emailConfirm}
+              onChange={(e) => setEmailConfirm(e.target.value)}
+              onPaste={(e) => e.preventDefault()}
+              className="w-full h-11 mt-1 bg-surface border border-steel/30 text-chalk px-3 font-body focus:outline-none focus:border-rust"
+            />
+            <p className="font-body text-xs text-steel mt-1">
+              You&apos;ll use this to sign in and reset your password, so make sure it&apos;s right.
+            </p>
           </div>
         )}
 
@@ -176,6 +195,11 @@ function SetPasswordForm() {
           onChange={(e) => setPassword(e.target.value)}
           className="w-full h-11 mt-1 bg-surface border border-steel/30 text-chalk px-3 font-body focus:outline-none focus:border-rust"
         />
+
+        <p className="font-body text-xs text-steel mt-4 max-w-[44ch]">
+          On an iPhone: finish this step first, then add the app to your Home Screen, then sign in once inside the
+          app. The Home Screen app doesn&apos;t share your sign-in from Safari.
+        </p>
 
         {error && (
           <p className="font-body text-sm text-rust mt-3" role="alert">

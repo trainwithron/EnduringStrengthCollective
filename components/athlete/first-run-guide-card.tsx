@@ -154,7 +154,7 @@ export function FirstRunGuideCard({
                         the bottom of Safari.
                       </p>
                       <p>Scroll down and tap &ldquo;Add to Home Screen&rdquo;.</p>
-                      <p>Open the new icon on your home screen, then finish step 2 there.</p>
+                      <p>Open the new icon on your home screen and sign in once inside it. The Home Screen app doesn&apos;t share your sign-in from Safari. Then finish step 2 there.</p>
                     </>
                   )}
                   {platform === "ios-other" && (

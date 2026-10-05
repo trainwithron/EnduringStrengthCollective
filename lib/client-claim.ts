@@ -17,7 +17,29 @@ export function isPlaceholderEmail(email: string | null | undefined): boolean {
   return !!email && email.toLowerCase().endsWith(`@${PLACEHOLDER_EMAIL_DOMAIN}`);
 }
 
-export const CLAIM_LINK_LIFETIME_DAYS = 14;
+// A claim link is a full account credential sent by text message, so it is short-lived.
+// A new one is a single tap for the coach.
+export const CLAIM_LINK_LIFETIME_HOURS = 48;
+
+export const MIN_PASSWORD_LENGTH = 6;
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// The email a client types when claiming a coach-created account. It becomes their
+// sign-in and password-reset address with no verification email, so a typo strands
+// them: ask twice, and compare before anything is changed.
+export function validateClaimEmail(email: string, confirm: string): string | null {
+  const a = email.trim();
+  const b = confirm.trim();
+  if (!EMAIL_PATTERN.test(a)) return "Enter your email address.";
+  if (a.toLowerCase() !== b.toLowerCase()) return "The two emails don't match. Check for a typo.";
+  return null;
+}
+
+export function validateNewPassword(password: string): string | null {
+  if (password.length < MIN_PASSWORD_LENGTH) return `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
+  return null;
+}
 
 // 32 random bytes, URL-safe. Only its sha256 is ever stored.
 export function generateClaimToken(): string {
