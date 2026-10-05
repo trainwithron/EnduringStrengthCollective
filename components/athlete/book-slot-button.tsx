@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { notifyBookingConfirmed } from "@/lib/notify-booking-confirmed";
 import { mirrorGoogleCalendarEvent } from "@/lib/mirror-google-calendar-event";
+import { CANT_BOOK_NO_SESSIONS } from "@/lib/session-credit-copy";
 
 export function BookSlotButton({
   coachId,
@@ -45,7 +46,7 @@ export function BookSlotButton({
     if (bookError) {
       setError(
         bookError.message.includes("no session credits")
-          ? "No sessions remaining — contact your coach."
+          ? CANT_BOOK_NO_SESSIONS
           : bookError.message.includes("just taken")
             ? "That slot was just taken. Try another."
             : "Couldn't book that slot."

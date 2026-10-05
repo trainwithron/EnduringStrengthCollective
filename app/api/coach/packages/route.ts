@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getStripeClient, isStripeConfigured } from "@/lib/stripe";
+import { programBelongsToCoach } from "@/lib/package-program-access";
 
 // Package create/edit/delete has a real Stripe side effect (a Product +
 // Price per package), so this can't be a plain client-side
@@ -60,6 +61,10 @@ export async function POST(request: Request) {
   if ("error" in authCheck) return authCheck.error;
 
   const serviceRole = createServiceRoleClient();
+
+  if (defaultProgramId && !(await programBelongsToCoach(serviceRole, authCheck.userId, defaultProgramId))) {
+    return NextResponse.json({ error: "That program is not one of yours." }, { status: 400 });
+  }
 
   // Insert first (without Stripe ids) to get a stable id before creating
   // the Stripe objects — avoids an orphaned Stripe Product/Price if the
@@ -129,6 +134,9 @@ export async function PATCH(request: Request) {
   if ("error" in authCheck) return authCheck.error;
 
   const serviceRole = createServiceRoleClient();
+  if (defaultProgramId && !(await programBelongsToCoach(serviceRole, authCheck.userId, defaultProgramId))) {
+    return NextResponse.json({ error: "That program is not one of yours." }, { status: 400 });
+  }
   const { data: existing } = await serviceRole
     .from("coach_packages")
     .select("*")

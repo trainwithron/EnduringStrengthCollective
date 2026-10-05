@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { NO_PACKAGES_LINE } from "@/lib/session-credit-copy";
 
 export interface PackageOption {
   id: string;
@@ -43,7 +44,7 @@ export function PackagePicker({ packages }: { packages: PackageOption[] }) {
   }
 
   if (packages.length === 0) {
-    return <p className="font-body text-sm text-steel">Your coach hasn&apos;t set up any packages yet.</p>;
+    return <p className="font-body text-sm text-steel">{NO_PACKAGES_LINE}</p>;
   }
 
   return (

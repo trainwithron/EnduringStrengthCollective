@@ -19,6 +19,7 @@ import { gatherCalendarSpotterFindings } from "@/lib/calendar-spotter-gather";
 import { CalendarSpotterPanel } from "@/components/coach/desktop/calendar-spotter-panel";
 import { gatherSchedulingSpotterFlags } from "@/lib/calendar-spotter-phase2-gather";
 import { SchedulingSpotterPanel } from "@/components/coach/desktop/scheduling-spotter-panel";
+import { sessionBalanceLine } from "@/lib/session-credit-copy";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
@@ -465,7 +466,7 @@ export default async function CoachCalendarPage(
           </p>
           {coachMembership && (
             <p className="font-body text-xs text-steel mt-3">
-              Session credits available: <span className="text-chalk font-medium">{creditBalance}</span>
+              {sessionBalanceLine(creditBalance)}
             </p>
           )}
         </header>

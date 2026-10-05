@@ -26,6 +26,7 @@ import { MarkNoShowToggle } from "@/components/coach/mark-no-show-toggle";
 import { WaitlistJoinButton } from "@/components/athlete/waitlist-join-button";
 import { RecurringBookingButton } from "@/components/athlete/recurring-booking-button";
 import { RecurringConflictBadge } from "@/components/coach/desktop/recurring-conflict-badge";
+import { sessionBalanceLine, NO_SESSIONS_SLOT_LABEL } from "@/lib/session-credit-copy";
 
 export default async function CoachDayDetailPage(
   props: {
@@ -252,7 +253,7 @@ export default async function CoachDayDetailPage(
           {coachMembership && (
             <div className="mt-3">
               <p className="font-body text-xs text-steel">
-                Session credits available: {creditBalance}
+                {sessionBalanceLine(creditBalance)}
                 {creditBalance > 0 && creditExpiresAt && (
                   <span className="text-steel">
                     {" "}
@@ -373,7 +374,7 @@ export default async function CoachDayDetailPage(
                         />
                       </div>
                     ) : (
-                      <span className="font-body text-xs text-steel">No sessions remaining</span>
+                      <span className="font-body text-xs text-steel">{NO_SESSIONS_SLOT_LABEL}</span>
                     )}
                   </div>
                 );

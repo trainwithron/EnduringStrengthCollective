@@ -9,6 +9,7 @@ import { CancelBookingButton } from "@/components/athlete/cancel-booking-button"
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { Lock } from "lucide-react";
+import { sessionBalanceLine } from "@/lib/session-credit-copy";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
@@ -298,7 +299,7 @@ export default async function ProgramCalendarPage(
         </h1>
         {viewingAsAthlete && coachMembership && (
           <p className="font-body text-xs text-steel mt-3">
-            Session credits available: <span className="text-chalk font-medium">{creditBalance}</span>
+            {sessionBalanceLine(creditBalance)}
           </p>
         )}
       </header>

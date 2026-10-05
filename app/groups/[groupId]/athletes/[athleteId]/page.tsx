@@ -7,6 +7,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { AthleteNotesEditor } from "@/components/coach/athlete-notes-editor";
 import { SessionCreditsControl } from "@/components/coach/session-credits-control";
+import { AssignSessionsControl } from "@/components/coach/assign-sessions-control";
 import { SwipeDirectionSetting } from "@/components/athlete/swipe-direction-setting";
 import { GoalConfirmationControl } from "@/components/coach/goal-confirmation-control";
 import { PackageAssignmentControl } from "@/components/coach/package-assignment-control";
@@ -789,6 +790,15 @@ export default async function AthleteProfilePage(
   const sorenessTrend = (wellnessRows ?? []).map((r) => ({ date: r.log_date, value: r.soreness }));
   const energyTrend = (wellnessRows ?? []).map((r) => ({ date: r.log_date, value: r.energy }));
 
+  // Recent hand-assigned sessions. Until the adjustments table exists the select errors and this is just empty.
+  const { data: sessionGrantRows } = await supabase
+    .from("session_credit_adjustments")
+    .select("id, delta, note, created_at")
+    .eq("athlete_id", params.athleteId)
+    .eq("group_id", params.groupId)
+    .order("created_at", { ascending: false })
+    .limit(5);
+
   const initials = (profile?.full_name ?? "?")
     .split(" ")
     .map((p: string) => p[0])
@@ -1250,6 +1260,21 @@ export default async function AthleteProfilePage(
                 athleteId={params.athleteId}
                 groupId={params.groupId}
                 initialBalance={creditsRow?.balance ?? 0}
+              />
+            </SettingsGroup>
+
+            <SettingsGroup label="Assign sessions">
+              <AssignSessionsControl
+                athleteId={params.athleteId}
+                groupId={params.groupId}
+                clientName={profile?.full_name ?? "this client"}
+                initialBalance={creditsRow?.balance ?? 0}
+                recent={(sessionGrantRows ?? []).map((r) => ({
+                  id: r.id as string,
+                  delta: r.delta as number,
+                  note: (r.note as string | null) ?? null,
+                  createdAt: r.created_at as string,
+                }))}
               />
             </SettingsGroup>
 

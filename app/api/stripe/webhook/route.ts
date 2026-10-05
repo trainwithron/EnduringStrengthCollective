@@ -8,6 +8,7 @@ import {
   type CoachShare,
 } from "@/lib/revenue-splits";
 import { duplicateProgram } from "@/lib/program-duplication";
+import { programBelongsToCoach } from "@/lib/package-program-access";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatch";
 import { LIFT_OFF_MONTHLY_CREDITS } from "@/lib/coach-credits";
 import type Stripe from "stripe";
@@ -37,6 +38,8 @@ async function assignLinkedProgramIfFirstEnrollment(
     .eq("id", coachPackageId)
     .maybeSingle();
   if (!pkg?.default_program_id) return;
+  // Checked again at copy time: the link may predate the ownership check, and this copy runs with the service role.
+  if (!(await programBelongsToCoach(supabase, pkg.coach_id, pkg.default_program_id))) return;
 
   await duplicateProgram(supabase, {
     sourceProgramId: pkg.default_program_id,
