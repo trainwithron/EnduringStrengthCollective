@@ -133,7 +133,7 @@ export function ProgressPhotoJournal({ athleteId, groupId }: { athleteId: string
             a specific photo.
           </p>
         </div>
-        <label className="h-10 px-4 bg-rust text-graphite font-body text-sm font-medium flex items-center cursor-pointer disabled:opacity-40">
+        <label className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium flex items-center cursor-pointer disabled:opacity-40">
           {uploading ? "Uploading…" : "+ Add photo"}
           <input
             type="file"

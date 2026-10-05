@@ -35,7 +35,7 @@ export function ExitWorkoutButton({ sessionId, backHref }: { sessionId: string; 
             type="button"
             onClick={handleExit}
             disabled={exiting}
-            className="h-8 px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
+            className="h-11 px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
           >
             {exiting ? "Exiting…" : "Exit workout"}
           </button>
@@ -43,7 +43,7 @@ export function ExitWorkoutButton({ sessionId, backHref }: { sessionId: string; 
             type="button"
             onClick={() => setConfirming(false)}
             disabled={exiting}
-            className="h-8 px-3 border border-steel/30 text-steel font-body text-xs"
+            className="h-11 px-3 border border-steel/30 text-steel font-body text-xs"
           >
             Keep going
           </button>

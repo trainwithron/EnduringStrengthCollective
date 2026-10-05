@@ -74,7 +74,7 @@ export function SmsConsentSettings({
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
           placeholder="(555) 123-4567"
-          className="mt-1 w-full h-10 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
+          className="mt-1 w-full h-11 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
         />
       </label>
 
@@ -112,7 +112,7 @@ export function SmsConsentSettings({
         type="button"
         onClick={save}
         disabled={saving || locked}
-        className="mt-3 h-10 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-50"
+        className="mt-3 h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-50"
       >
         {saving ? "Saving…" : "Save text preferences"}
       </button>

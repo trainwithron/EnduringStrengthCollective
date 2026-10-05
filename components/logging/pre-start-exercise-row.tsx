@@ -108,7 +108,7 @@ export function PreStartExerciseRow({
               type="button"
               onClick={() => handleSwap(name)}
               disabled={busy}
-              className="h-8 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
+              className="h-11 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
             >
               {busy ? "Swapping…" : name}
             </button>

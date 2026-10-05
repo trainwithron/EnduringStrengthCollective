@@ -165,7 +165,7 @@ export function QuickAddNlButton({
             type="button"
             onClick={handleConfirm}
             disabled={saving}
-            className="h-9 px-4 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
+            className="h-11 px-4 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
           >
             {saving ? "Adding…" : "Confirm & add"}
           </button>
@@ -198,7 +198,7 @@ export function QuickAddNlButton({
           type="button"
           onClick={handleParse}
           disabled={parsing || !text.trim()}
-          className="h-9 px-4 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
+          className="h-11 px-4 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
         >
           {parsing ? "Parsing…" : "Parse"}
         </button>

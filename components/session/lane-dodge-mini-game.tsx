@@ -176,7 +176,7 @@ export function LaneDodgeMiniGame({
             <button
               type="button"
               onClick={handleRestart}
-              className="h-8 px-3 bg-rust text-graphite font-body text-xs font-medium"
+              className="h-11 px-3 bg-rust text-graphite font-body text-xs font-medium"
             >
               Play again
             </button>
@@ -187,14 +187,14 @@ export function LaneDodgeMiniGame({
         <button
           type="button"
           onClick={() => (laneChangeRef.current = -1)}
-          className="h-8 px-4 border border-steel/30 text-steel font-body text-xs"
+          className="h-11 px-4 border border-steel/30 text-steel font-body text-xs"
         >
           ← Left
         </button>
         <button
           type="button"
           onClick={() => (laneChangeRef.current = 1)}
-          className="h-8 px-4 border border-steel/30 text-steel font-body text-xs"
+          className="h-11 px-4 border border-steel/30 text-steel font-body text-xs"
         >
           Right →
         </button>

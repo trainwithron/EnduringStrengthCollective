@@ -308,13 +308,13 @@ export function InlineCommentSection({
           }}
           placeholder={replyTarget ? `Reply to ${replyTarget.profiles.full_name}` : "Add a comment"}
           disabled={sending}
-          className="flex-1 h-10 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust disabled:opacity-60"
+          className="flex-1 h-11 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust disabled:opacity-60"
         />
         <button
           type="button"
           onClick={handleSend}
           disabled={sending || !body.trim()}
-          className="h-10 px-3.5 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
+          className="h-11 px-3.5 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
         >
           {sending ? "…" : "Send"}
         </button>

@@ -94,7 +94,7 @@ export function TrainingPartnerRequestsPanel({
                         type="button"
                         onClick={() => accept(r)}
                         disabled={!responseDraft.trim()}
-                        className="h-9 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
+                        className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
                       >
                         Confirm accept
                       </button>
@@ -104,7 +104,7 @@ export function TrainingPartnerRequestsPanel({
                           setAcceptingId(null);
                           setResponseDraft("");
                         }}
-                        className="h-9 px-4 border border-steel/30 text-steel font-body text-sm"
+                        className="h-11 px-4 border border-steel/30 text-steel font-body text-sm"
                       >
                         Cancel
                       </button>
@@ -115,14 +115,14 @@ export function TrainingPartnerRequestsPanel({
                     <button
                       type="button"
                       onClick={() => setAcceptingId(r.id)}
-                      className="h-9 px-4 bg-rust text-graphite font-body text-sm font-medium"
+                      className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium"
                     >
                       Accept
                     </button>
                     <button
                       type="button"
                       onClick={() => decline(r)}
-                      className="h-9 px-4 border border-steel/30 text-steel font-body text-sm"
+                      className="h-11 px-4 border border-steel/30 text-steel font-body text-sm"
                     >
                       Decline
                     </button>

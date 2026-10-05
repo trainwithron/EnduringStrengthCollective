@@ -192,7 +192,7 @@ function BarcodeScanPanel({
             type="button"
             onClick={handleConfirm}
             disabled={saving}
-            className="h-8 px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
+            className="h-11 px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
           >
             {saving ? "Saving…" : "Confirm & log"}
           </button>
@@ -225,13 +225,13 @@ function BarcodeScanPanel({
           value={manualCode}
           onChange={(e) => setManualCode(e.target.value.replace(/\D/g, ""))}
           placeholder="Type barcode number"
-          className="flex-1 h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust"
+          className="flex-1 h-11 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust"
         />
         <button
           type="button"
           onClick={() => manualCode && lookup(manualCode)}
           disabled={!manualCode || looking}
-          className="h-9 px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
+          className="h-11 px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
         >
           Look up
         </button>

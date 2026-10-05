@@ -68,7 +68,7 @@ export function PushNotificationToggle() {
         type="button"
         onClick={handleToggle}
         disabled={loading || busy}
-        className={`h-9 px-4 font-body text-sm font-medium disabled:opacity-40 ${
+        className={`h-11 px-4 font-body text-sm font-medium disabled:opacity-40 ${
           subscribed ? "border border-steel/30 text-steel" : "bg-rust text-graphite"
         }`}
       >

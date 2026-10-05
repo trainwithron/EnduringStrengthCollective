@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
+import { UnavailableState } from "@/components/ui/unavailable-state";
 import { ProgramBuilderDesktop } from "@/components/coach/desktop/program-builder-desktop";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import {
@@ -90,7 +91,7 @@ export default async function ProgramDetailPage(
     );
   }
 
-  const { data: workouts } = await supabase
+  const { data: workouts, error: workoutsError } = await supabase
     .from("workouts")
     .select("id, title, week_number, day_index, scheduled_date, group_workout_exercises(count)")
     .eq("program_id", params.programId)
@@ -177,7 +178,8 @@ export default async function ProgramDetailPage(
           />
         )}
 
-        {weekNumbers.length === 0 && (
+        {workoutsError && <UnavailableState what="this program's workouts" compact />}
+        {!workoutsError && weekNumbers.length === 0 && (
           <p className="font-body text-sm text-steel py-3">No workouts assigned yet.</p>
         )}
 

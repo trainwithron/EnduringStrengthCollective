@@ -63,7 +63,7 @@ export function ReportUserButton({ reportedId }: { reportedId: string }) {
         value={reason}
         onChange={(e) => setReason(e.target.value)}
         placeholder="What's wrong?"
-        className="h-8 w-40 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"
+        className="h-11 w-40 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"
       />
       {error && (
         <p className="font-body text-xs text-rust" role="alert">

@@ -93,7 +93,7 @@ export function WaitlistJoinButton({
         type="button"
         onClick={handleJoin}
         disabled={submitting}
-        className="h-8 px-3 border border-steel/30 text-steel font-body text-xs font-medium disabled:opacity-40"
+        className="h-11 px-3 border border-steel/30 text-steel font-body text-xs font-medium disabled:opacity-40"
       >
         {submitting ? "Joining…" : "Join waitlist"}
       </button>

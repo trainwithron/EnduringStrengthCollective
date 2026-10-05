@@ -25,7 +25,7 @@ export function ChannelTabs({
         <Link
           key={c.key}
           href={`${basePath}?channel=${c.key}`}
-          className={`h-10 px-4 flex items-center font-body text-sm whitespace-nowrap border-b-2 transition-colors shrink-0 ${
+          className={`h-11 px-4 flex items-center font-body text-sm whitespace-nowrap border-b-2 transition-colors shrink-0 ${
             active === c.key
               ? "border-rust text-chalk"
               : "border-transparent text-steel active:text-chalk"

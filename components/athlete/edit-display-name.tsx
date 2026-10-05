@@ -54,7 +54,7 @@ export function EditDisplayName({ initialName, profileId }: { initialName: strin
         value={name}
         onChange={(e) => setName(e.target.value)}
         autoFocus
-        className="w-full h-9 bg-surface border border-steel/30 text-chalk px-2.5 font-body text-sm focus:outline-none focus:border-rust"
+        className="w-full h-11 bg-surface border border-steel/30 text-chalk px-2.5 font-body text-sm focus:outline-none focus:border-rust"
       />
       <p className="font-body text-xs text-steel mt-1">
         This is what other members see on the feed and roster — it doesn&apos;t have to be your legal name.
@@ -69,7 +69,7 @@ export function EditDisplayName({ initialName, profileId }: { initialName: strin
           type="button"
           onClick={handleSave}
           disabled={saving}
-          className="h-8 px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
+          className="h-11 px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
         >
           {saving ? "Saving…" : "Save"}
         </button>

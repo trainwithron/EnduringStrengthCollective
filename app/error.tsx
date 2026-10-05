@@ -41,7 +41,7 @@ export default function Error({
           <button
             type="button"
             onClick={reset}
-            className="h-10 px-5 bg-rust text-graphite font-body text-sm font-medium"
+            className="h-11 px-5 bg-rust text-graphite font-body text-sm font-medium"
           >
             Try again
           </button>

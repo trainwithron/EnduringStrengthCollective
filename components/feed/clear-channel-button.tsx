@@ -116,7 +116,7 @@ export function ClearChannelButton({ groupId, channel }: { groupId: string; chan
               type="button"
               onClick={handleClear}
               disabled={clearing}
-              className="h-9 px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
+              className="h-11 px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
             >
               {clearing ? "Clearing…" : "Clear channel"}
             </button>

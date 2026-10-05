@@ -208,7 +208,7 @@ export function StartWorkoutButton({
           <select
             value={sessionTypeId}
             onChange={(e) => setSessionTypeId(e.target.value)}
-            className="h-8 bg-surface border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"
+            className="h-11 bg-surface border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"
           >
             <option value="">Training session</option>
             {sessionTypes.map((t) => (

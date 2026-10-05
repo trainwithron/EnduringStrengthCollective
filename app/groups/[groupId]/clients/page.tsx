@@ -3,6 +3,7 @@ import { claimStatus } from "@/lib/client-claim";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ClientCardGrid } from "@/components/coach/desktop/client-card-grid";
+import { UnavailableState } from "@/components/ui/unavailable-state";
 import { AddClientButton } from "@/components/coach/desktop/add-client-button";
 import { SwappableTerm } from "@/components/coach/swappable-term";
 import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
@@ -76,7 +77,7 @@ export default async function ClientsPage(
   // join) and are deliberately NOT computed here for the whole roster —
   // ClientCardGrid fetches those client-side, scoped to just the
   // currently-visible page of athletes, once pagination is applied.
-  const [{ data: memberships }, { data: lastWorkoutRows }] = await Promise.all([
+  const [{ data: memberships, error: rosterError }, { data: lastWorkoutRows }] = await Promise.all([
     supabase
       .from("group_memberships")
       .select(
@@ -277,7 +278,11 @@ export default async function ClientsPage(
         </div>
       )}
 
-      <ClientCardGrid groupId={params.groupId} members={athletes} positions={positions} />
+      {rosterError ? (
+        <UnavailableState what="your clients" />
+      ) : (
+        <ClientCardGrid groupId={params.groupId} members={athletes} positions={positions} />
+      )}
     </CoachDesktopShell>
   );
 }

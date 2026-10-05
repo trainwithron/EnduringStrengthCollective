@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { UnavailableState } from "@/components/ui/unavailable-state";
 import { createServerClient } from "@/lib/supabase/server";
 import { GroupHubHeader } from "@/components/group/group-hub-header";
 import { RosterList } from "@/components/group/roster-list";
@@ -96,7 +97,7 @@ export default async function GroupHubPage(
     { data: group, error: groupError },
     { data: memberships },
     { data: recentLogs },
-    { data: programs },
+    { data: programs, error: programsError },
   ] = await Promise.all([
     supabase.from("groups").select("id, name, description, organization_id, group_kind").eq("id", params.groupId).single(),
     // Roster with role + most recent completed workout timestamp.
@@ -628,7 +629,9 @@ export default async function GroupHubPage(
         <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
           Programs
         </h2>
-        {programs && programs.length > 0 ? (
+        {programsError ? (
+          <UnavailableState what="your programs" compact />
+        ) : programs && programs.length > 0 ? (
           <ProgramCardList
             groupId={params.groupId}
             programs={programs.map((p: any) => ({

@@ -58,7 +58,7 @@ export function DeleteAccountButton() {
           type="text"
           value={confirmText}
           onChange={(e) => setConfirmText(e.target.value)}
-          className="w-full h-10 mt-1 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
+          className="w-full h-11 mt-1 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
         />
       </label>
       {error && (
@@ -71,7 +71,7 @@ export function DeleteAccountButton() {
           type="button"
           onClick={handleDelete}
           disabled={confirmText !== "DELETE" || deleting}
-          className="h-10 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
+          className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
         >
           {deleting ? "Deleting…" : "Permanently delete"}
         </button>

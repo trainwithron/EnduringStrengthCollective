@@ -77,7 +77,7 @@ export function ProfileDetailsEditor({
             value={details.birthday}
             onChange={(e) => setDetails((d) => ({ ...d, birthday: e.target.value }))}
             onBlur={handleBlur("birthday")}
-            className="w-full mt-1 h-10 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-sm focus:outline-none focus:border-rust"
+            className="w-full mt-1 h-11 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-sm focus:outline-none focus:border-rust"
           />
         </div>
         <div>
@@ -90,7 +90,7 @@ export function ProfileDetailsEditor({
             value={details.phone}
             onChange={(e) => setDetails((d) => ({ ...d, phone: e.target.value }))}
             onBlur={handleBlur("phone")}
-            className="w-full mt-1 h-10 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-sm focus:outline-none focus:border-rust"
+            className="w-full mt-1 h-11 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-sm focus:outline-none focus:border-rust"
           />
         </div>
       </div>
@@ -105,7 +105,7 @@ export function ProfileDetailsEditor({
             value={details.emergencyContactName}
             onChange={(e) => setDetails((d) => ({ ...d, emergencyContactName: e.target.value }))}
             onBlur={handleBlur("emergencyContactName")}
-            className="w-full mt-1 h-10 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-sm focus:outline-none focus:border-rust"
+            className="w-full mt-1 h-11 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-sm focus:outline-none focus:border-rust"
           />
         </div>
         <div>
@@ -118,7 +118,7 @@ export function ProfileDetailsEditor({
             value={details.emergencyContactPhone}
             onChange={(e) => setDetails((d) => ({ ...d, emergencyContactPhone: e.target.value }))}
             onBlur={handleBlur("emergencyContactPhone")}
-            className="w-full mt-1 h-10 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-sm focus:outline-none focus:border-rust"
+            className="w-full mt-1 h-11 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-sm focus:outline-none focus:border-rust"
           />
         </div>
       </div>

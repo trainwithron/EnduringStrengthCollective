@@ -438,7 +438,7 @@ export function CompleteWorkoutButton({
                 handleComplete();
               }}
               disabled={submitting}
-              className="h-10 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
+              className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
             >
               {submitting ? "Finishing…" : "Finish workout"}
             </button>
@@ -446,7 +446,7 @@ export function CompleteWorkoutButton({
               type="button"
               onClick={() => setConfirming(false)}
               disabled={submitting}
-              className="h-10 px-4 border border-steel/30 text-steel font-body text-sm"
+              className="h-11 px-4 border border-steel/30 text-steel font-body text-sm"
             >
               Keep going
             </button>

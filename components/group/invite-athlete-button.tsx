@@ -71,12 +71,12 @@ export function InviteAthleteButton({
             readOnly
             value={link}
             onFocus={(e) => e.target.select()}
-            className="flex-1 h-10 min-w-0 bg-surface border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none"
+            className="flex-1 h-11 min-w-0 bg-surface border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none"
           />
           <button
             type="button"
             onClick={handleCopy}
-            className="h-10 px-3 border border-rust text-rust font-body text-xs shrink-0"
+            className="h-11 px-3 border border-rust text-rust font-body text-xs shrink-0"
           >
             {copied ? "Copied" : "Copy"}
           </button>

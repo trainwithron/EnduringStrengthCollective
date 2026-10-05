@@ -184,7 +184,7 @@ export function PostComposerDesktop({
           type="button"
           onClick={handlePost}
           disabled={submitting}
-          className="h-9 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
+          className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
         >
           {submitting ? "Posting…" : "Post"}
         </button>

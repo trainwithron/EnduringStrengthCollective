@@ -63,7 +63,7 @@ export function PackagePicker({ packages }: { packages: PackageOption[] }) {
               type="button"
               onClick={() => handleBuy(pkg.id)}
               disabled={loadingId === pkg.id}
-              className="h-9 px-3.5 shrink-0 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
+              className="h-11 px-3.5 shrink-0 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
             >
               {loadingId === pkg.id
                 ? "Redirecting…"

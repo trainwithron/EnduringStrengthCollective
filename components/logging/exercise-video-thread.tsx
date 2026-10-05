@@ -242,13 +242,13 @@ function VideoWithComments({
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
             placeholder="Add feedback"
             disabled={sending}
-            className="flex-1 h-8 bg-surface border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust disabled:opacity-60"
+            className="flex-1 h-11 bg-surface border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust disabled:opacity-60"
           />
           <button
             type="button"
             onClick={handleSend}
             disabled={sending || !body.trim()}
-            className="h-8 px-2.5 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
+            className="h-11 px-2.5 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
           >
             {sending ? "…" : "Send"}
           </button>

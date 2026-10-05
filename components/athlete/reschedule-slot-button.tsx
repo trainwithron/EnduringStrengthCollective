@@ -49,7 +49,7 @@ export function RescheduleSlotButton({
         type="button"
         onClick={handleMove}
         disabled={submitting}
-        className="h-8 px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
+        className="h-11 px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
       >
         {submitting ? "Moving…" : "Move here"}
       </button>

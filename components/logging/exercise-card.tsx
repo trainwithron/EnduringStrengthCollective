@@ -225,7 +225,7 @@ export function ExerciseCard({
                 value={nameDraft}
                 onChange={(e) => setNameDraft(e.target.value)}
                 disabled={swapBusy}
-                className="flex-1 h-9 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust disabled:opacity-60"
+                className="flex-1 h-11 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust disabled:opacity-60"
               />
               <button
                 type="button"

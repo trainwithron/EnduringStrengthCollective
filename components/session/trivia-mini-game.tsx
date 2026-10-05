@@ -112,14 +112,14 @@ export function TriviaMiniGame({ onClose }: { onClose: () => void }) {
         <button
           type="button"
           onClick={() => handleAnswer(false)}
-          className="h-10 px-5 border border-rust/50 text-rust font-body text-sm font-medium"
+          className="h-11 px-5 border border-rust/50 text-rust font-body text-sm font-medium"
         >
           ← False
         </button>
         <button
           type="button"
           onClick={() => handleAnswer(true)}
-          className="h-10 px-5 bg-rust text-graphite font-body text-sm font-medium"
+          className="h-11 px-5 bg-rust text-graphite font-body text-sm font-medium"
         >
           True →
         </button>

@@ -113,7 +113,7 @@ export function TransformationCardCreator({
             <select
               value={beforePhotoId}
               onChange={(e) => setBeforePhotoId(e.target.value)}
-              className="h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
+              className="h-11 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
             >
               <option value="">No &quot;before&quot; photo</option>
               {photos.map((p) => (
@@ -125,7 +125,7 @@ export function TransformationCardCreator({
             <select
               value={afterPhotoId}
               onChange={(e) => setAfterPhotoId(e.target.value)}
-              className="h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
+              className="h-11 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
             >
               <option value="">No &quot;after&quot; photo</option>
               {photos.map((p) => (

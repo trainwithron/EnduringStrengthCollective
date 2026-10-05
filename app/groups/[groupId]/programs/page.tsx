@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
+import { UnavailableState } from "@/components/ui/unavailable-state";
 import { ProgramCardGrid, type ProgramCardData } from "@/components/coach/desktop/program-card-grid";
 import { computeProgramCardVisuals } from "@/lib/program-card-data";
 import { SwappableTerm } from "@/components/coach/swappable-term";
@@ -44,7 +45,7 @@ export default async function ProgramsListPage(
     .eq("id", params.groupId)
     .single();
 
-  const { data: programs } = await supabase
+  const { data: programs, error: programsError } = await supabase
     .from("programs")
     .select(
       "id, name, is_active, cover_image_path, athlete_id, profiles!programs_athlete_id_fkey ( full_name ), workouts(count)"
@@ -99,7 +100,11 @@ export default async function ProgramsListPage(
         </p>
       </div>
 
-      <ProgramCardGrid groupId={params.groupId} programs={cards} visualsByProgramId={visualsByProgramId} />
+      {programsError ? (
+        <UnavailableState what="your programs" />
+      ) : (
+        <ProgramCardGrid groupId={params.groupId} programs={cards} visualsByProgramId={visualsByProgramId} />
+      )}
     </CoachDesktopShell>
   );
 }

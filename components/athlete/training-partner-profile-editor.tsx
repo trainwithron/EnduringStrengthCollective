@@ -80,7 +80,7 @@ export function TrainingPartnerProfileEditor({
               onChange={(e) => setState((s) => ({ ...s, locationText: e.target.value }))}
               onBlur={handleBlur("locationText")}
               placeholder="Las Vegas, NV"
-              className="w-full h-10 mt-1 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-sm focus:outline-none focus:border-rust"
+              className="w-full h-11 mt-1 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-sm focus:outline-none focus:border-rust"
             />
           </label>
           <label className="block">

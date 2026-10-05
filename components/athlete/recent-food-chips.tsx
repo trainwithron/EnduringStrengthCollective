@@ -69,7 +69,7 @@ export function RecentFoodChips({
             type="button"
             onClick={() => handleTap(r)}
             disabled={loggingKey === r.description}
-            className="h-8 px-2.5 border border-steel/30 text-chalk font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
+            className="h-11 px-2.5 border border-steel/30 text-chalk font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
           >
             {loggingKey === r.description ? "Logging…" : r.description}
           </button>

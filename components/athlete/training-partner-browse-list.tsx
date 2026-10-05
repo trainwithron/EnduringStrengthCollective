@@ -104,7 +104,7 @@ export function TrainingPartnerBrowseList({
                   type="button"
                   onClick={() => sendRequest(p.athleteId)}
                   disabled={!message.trim() || sending}
-                  className="h-9 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
+                  className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
                 >
                   {sending ? "Sending…" : "Send"}
                 </button>
@@ -115,7 +115,7 @@ export function TrainingPartnerBrowseList({
                     setMessage("");
                     setError(null);
                   }}
-                  className="h-9 px-4 border border-steel/30 text-steel font-body text-sm"
+                  className="h-11 px-4 border border-steel/30 text-steel font-body text-sm"
                 >
                   Cancel
                 </button>
@@ -126,7 +126,7 @@ export function TrainingPartnerBrowseList({
               <button
                 type="button"
                 onClick={() => setOpenRequestFor(p.athleteId)}
-                className="h-9 px-4 bg-rust text-graphite font-body text-sm font-medium"
+                className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium"
               >
                 Send request
               </button>

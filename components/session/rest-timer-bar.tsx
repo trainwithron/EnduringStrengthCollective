@@ -215,14 +215,14 @@ export function RestTimerBar({
             <button
               type="button"
               onClick={addFifteen}
-              className="h-8 px-2.5 border border-steel/30 text-steel font-body text-xs"
+              className="h-11 px-2.5 border border-steel/30 text-steel font-body text-xs"
             >
               +15s
             </button>
             <button
               type="button"
               onClick={skip}
-              className="h-8 px-2.5 border border-steel/30 text-steel font-body text-xs"
+              className="h-11 px-2.5 border border-steel/30 text-steel font-body text-xs"
             >
               Skip
             </button>
@@ -236,7 +236,7 @@ export function RestTimerBar({
                   <button
                     type="button"
                     onClick={() => setGateOpen((v) => !v)}
-                    className="h-8 px-2.5 border border-steel/30 text-steel font-body text-xs"
+                    className="h-11 px-2.5 border border-steel/30 text-steel font-body text-xs"
                   >
                     🔒 Unlock
                   </button>
@@ -244,7 +244,7 @@ export function RestTimerBar({
                   <button
                     type="button"
                     onClick={() => (selectedGame ? setSelectedGame(null) : setPickerOpen((v) => !v))}
-                    className={`h-8 px-2.5 border font-body text-xs ${
+                    className={`h-11 px-2.5 border font-body text-xs ${
                       selectedGame ? "bg-rust border-rust text-graphite" : "border-steel/30 text-steel"
                     }`}
                   >
@@ -323,7 +323,7 @@ export function RestTimerBar({
               key={seconds}
               type="button"
               onClick={() => startPreset(seconds)}
-              className={`h-8 px-3 font-body text-xs border ${
+              className={`h-11 px-3 font-body text-xs border ${
                 seconds === pendingPrompt!.defaultSeconds
                   ? "bg-rust border-rust text-graphite"
                   : "border-steel/30 text-steel"
@@ -336,7 +336,7 @@ export function RestTimerBar({
             <button
               type="button"
               onClick={() => startPreset(pendingPrompt!.defaultSeconds)}
-              className="h-8 px-3 font-body text-xs border bg-rust border-rust text-graphite"
+              className="h-11 px-3 font-body text-xs border bg-rust border-rust text-graphite"
             >
               {pendingPrompt!.defaultSeconds}s
             </button>

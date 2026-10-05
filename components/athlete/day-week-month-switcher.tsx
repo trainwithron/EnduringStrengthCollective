@@ -92,7 +92,7 @@ export function DayWeekMonthSwitcher({ groupId }: { groupId: string }) {
           key={tab.key}
           type="button"
           onClick={() => handleSelect(tab.key)}
-          className={`h-8 px-3 flex items-center font-body text-xs border ${
+          className={`h-11 px-3 flex items-center font-body text-xs border ${
             active === tab.key
               ? "bg-rust text-graphite border-rust"
               : "border-steel/30 text-steel active:border-rust active:text-rust"

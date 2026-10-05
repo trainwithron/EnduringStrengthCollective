@@ -68,7 +68,7 @@ export function GoalProposalForm({ athleteId, groupId }: { athleteId: string; gr
         <select
           value={goalType}
           onChange={(e) => setGoalType(e.target.value as GoalType)}
-          className="w-full h-9 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm mt-1"
+          className="w-full h-11 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm mt-1"
         >
           {GOAL_TYPE_ORDER.map((t) => (
             <option key={t} value={t}>
@@ -83,7 +83,7 @@ export function GoalProposalForm({ athleteId, groupId }: { athleteId: string; gr
           value={customLabel}
           onChange={(e) => setCustomLabel(e.target.value)}
           placeholder="Describe your goal"
-          className="w-full h-9 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm"
+          className="w-full h-11 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm"
         />
       )}
 
@@ -93,12 +93,12 @@ export function GoalProposalForm({ athleteId, groupId }: { athleteId: string; gr
             value={eventType}
             onChange={(e) => setEventType(e.target.value)}
             placeholder="Sport / event"
-            className="h-9 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm"
+            className="h-11 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm"
           />
           <select
             value={eventPriority}
             onChange={(e) => setEventPriority(e.target.value as "" | "A" | "B" | "C")}
-            className="h-9 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm"
+            className="h-11 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm"
           >
             <option value="">Priority</option>
             <option value="A">A — top priority</option>
@@ -128,7 +128,7 @@ export function GoalProposalForm({ athleteId, groupId }: { athleteId: string; gr
           type="date"
           value={targetDate}
           onChange={(e) => setTargetDate(e.target.value)}
-          className="w-full h-9 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm mt-1"
+          className="w-full h-11 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm mt-1"
         />
       </div>
 

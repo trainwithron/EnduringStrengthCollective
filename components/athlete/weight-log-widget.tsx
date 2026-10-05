@@ -188,12 +188,12 @@ export function WeightLogWidget({
           value={weight}
           onChange={(e) => setWeight(e.target.value)}
           placeholder={todayLog ? `Today: ${todayLog.weight} lbs` : "Weight (lbs)"}
-          className="flex-1 h-10 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
+          className="flex-1 h-11 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
         />
         <button
           type="submit"
           disabled={submitting || !weight}
-          className="h-10 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
+          className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
         >
           {todayLog ? "Update" : "Log"}
         </button>

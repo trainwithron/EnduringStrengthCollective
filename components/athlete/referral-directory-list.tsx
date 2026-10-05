@@ -30,7 +30,7 @@ export function ReferralDirectoryList({ partners }: { partners: ReferralPartner[
               <button
                 type="button"
                 onClick={() => handleBook(p)}
-                className="shrink-0 h-9 px-4 bg-rust text-graphite font-body text-xs font-medium"
+                className="shrink-0 h-11 px-4 bg-rust text-graphite font-body text-xs font-medium"
               >
                 Book
               </button>

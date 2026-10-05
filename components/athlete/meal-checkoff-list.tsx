@@ -146,7 +146,7 @@ export function MealCheckoffList({
                   type="button"
                   onClick={() => logMeal(meal, "ate_it")}
                   disabled={saving}
-                  className="h-8 px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
+                  className="h-11 px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
                 >
                   Ate it
                 </button>
@@ -154,7 +154,7 @@ export function MealCheckoffList({
                   type="button"
                   onClick={() => setModifyingSlot(meal.spec.id)}
                   disabled={saving}
-                  className="h-8 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
+                  className="h-11 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
                 >
                   Modified
                 </button>
@@ -162,7 +162,7 @@ export function MealCheckoffList({
                   type="button"
                   onClick={() => logMeal(meal, "skipped")}
                   disabled={saving}
-                  className="h-8 px-3 font-body text-xs text-steel disabled:opacity-40"
+                  className="h-11 px-3 font-body text-xs text-steel disabled:opacity-40"
                 >
                   Skip
                 </button>
@@ -283,7 +283,7 @@ export function FreeTextFoodLog({
               type="button"
               onClick={handleEstimate}
               disabled={estimating || !text.trim()}
-              className="h-8 px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
+              className="h-11 px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
             >
               {estimating ? "Estimating…" : "Estimate"}
             </button>
@@ -310,7 +310,7 @@ export function FreeTextFoodLog({
               type="button"
               onClick={handleConfirm}
               disabled={saving}
-              className="h-8 px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
+              className="h-11 px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
             >
               {saving ? "Saving…" : "Confirm & log"}
             </button>

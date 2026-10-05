@@ -138,7 +138,7 @@ export function ChallengeParticipantPanel({
             type="button"
             onClick={handleJoin}
             disabled={joining}
-            className="h-10 px-5 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
+            className="h-11 px-5 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
           >
             {joining ? "Joining…" : "Join challenge"}
           </button>

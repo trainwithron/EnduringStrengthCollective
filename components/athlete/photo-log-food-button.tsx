@@ -116,7 +116,7 @@ export function PhotoLogFoodButton({
             type="button"
             onClick={handleConfirm}
             disabled={saving}
-            className="h-8 px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
+            className="h-11 px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
           >
             {saving ? "Saving…" : "Confirm & log"}
           </button>
