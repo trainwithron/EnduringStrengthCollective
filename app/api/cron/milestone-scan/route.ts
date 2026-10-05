@@ -5,6 +5,8 @@ import { sendPushToProfile } from "@/lib/send-push";
 import { computeReverseDietMilestone } from "@/lib/metabolic-trend";
 import { computeRecoveryVolumeMilestone } from "@/lib/recovery-volume-milestone";
 import { computeReadinessAverage } from "@/lib/wellness";
+import { calorieSeriesWithStanding } from "@/lib/macro-resolution";
+import { fetchStandingTarget } from "@/lib/standing-macros";
 import { classifyNutritionTrend, isTrendAligned, type MilestonePhaseTag } from "@/lib/nutrition-trend-classifier";
 
 // Milestone Celebrations — weekly scan for both trend-based detectors
@@ -133,9 +135,16 @@ export async function GET(request: Request) {
       .eq("group_id", row.group_id)
       .gte("logged_date", windowStart.toISOString().slice(0, 10));
 
-    const calorieSeries = (macroRows ?? [])
-      .filter((r) => r.calories != null)
-      .map((r) => ({ date: r.log_date as string, value: r.calories as number }));
+    // Explicit day rows, plus the client's standing target on days with no row
+    // (from when it was saved onward).
+    const calorieSeries = calorieSeriesWithStanding(
+      (macroRows ?? [])
+        .filter((r) => r.calories != null)
+        .map((r) => ({ date: r.log_date as string, value: r.calories as number })),
+      await fetchStandingTarget(supabase, row.athlete_id),
+      windowStart.toISOString().slice(0, 10),
+      now.toISOString().slice(0, 10)
+    );
     const weightSeries = (weightRows ?? []).map((r) => ({
       date: r.logged_date as string,
       value: r.weight as number,
@@ -259,9 +268,16 @@ export async function GET(request: Request) {
       .eq("group_id", row.group_id)
       .gte("logged_date", windowStart.toISOString().slice(0, 10));
 
-    const calorieSeries = (macroRows ?? [])
-      .filter((r) => r.calories != null)
-      .map((r) => ({ date: r.log_date as string, value: r.calories as number }));
+    // Explicit day rows, plus the client's standing target on days with no row
+    // (from when it was saved onward).
+    const calorieSeries = calorieSeriesWithStanding(
+      (macroRows ?? [])
+        .filter((r) => r.calories != null)
+        .map((r) => ({ date: r.log_date as string, value: r.calories as number })),
+      await fetchStandingTarget(supabase, row.athlete_id),
+      windowStart.toISOString().slice(0, 10),
+      now.toISOString().slice(0, 10)
+    );
     const weightSeries = (weightRows ?? []).map((r) => ({
       date: r.logged_date as string,
       value: r.weight as number,

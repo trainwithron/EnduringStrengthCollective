@@ -13,7 +13,8 @@ import {
 } from "@/lib/meal-engine";
 import { fetchCustomRecipes } from "@/lib/custom-recipes";
 import { mergeMealIntoPlan, type MealEntryPayload, type MealPlanRow } from "@/lib/meal-plan-assignment";
-import { resolveDayMacroTarget } from "@/lib/todays-macros";
+import { resolveDayMacros } from "@/lib/macro-resolution";
+import { fetchStandingTarget } from "@/lib/standing-macros";
 import { RECIPE_DRAG_MIME, type DraggedRecipe } from "./draggable-recipe";
 
 const SLOTS: { slot: Exclude<MealSlot, "any">; label: string }[] = [
@@ -79,7 +80,7 @@ export function MealSlotDropZones({
       return;
     }
 
-    const [{ data: existingRow }, { data: dailyMacrosRow }] = await Promise.all([
+    const [{ data: existingRow }, { data: dailyMacrosRow }, standingTarget] = await Promise.all([
       supabase
         .from("meal_plans")
         .select("archetype, meal_count, include_snack, carb_cycling, rationale, macros, meals")
@@ -92,6 +93,7 @@ export function MealSlotDropZones({
         .eq("athlete_id", athleteId)
         .eq("log_date", date)
         .maybeSingle(),
+      fetchStandingTarget(supabase as never, athleteId),
     ]);
     const existing = (existingRow as unknown as MealPlanRow | null) ?? null;
 
@@ -99,11 +101,12 @@ export function MealSlotDropZones({
     // real macro target already is (the same resolution lib/todays-macros
     // uses to decide which source wins) — never phantom/zero macros when
     // a real target exists.
-    const resolved = resolveDayMacroTarget(
+    const resolved = resolveDayMacros(
       dailyMacrosRow ?? null,
       (existing?.macros as Record<string, any> | null) ?? null,
-      (existing?.meals as Record<string, unknown[]> | null) ?? null
-    );
+      (existing?.meals as Record<string, unknown[]> | null) ?? null,
+      standingTarget
+    ).target;
     const dayMacros = {
       calories: resolved?.calories ?? 0,
       protein: resolved?.proteinG ?? 0,

@@ -104,8 +104,11 @@ export function BulkMacroRangeForm({
   return (
     <div className="border border-steel/20 p-4">
       <h3 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
-        Assign macros across a date range
+        Set targets for a date range
       </h3>
+      <p className="font-body text-xs text-steel mb-3">
+        These become day-specific targets that win over the standing target for those dates.
+      </p>
       <div className="grid grid-cols-2 gap-2 mb-2">
         <label className="flex flex-col gap-1">
           <span className="font-body text-xs text-steel uppercase tracking-wide">From</span>

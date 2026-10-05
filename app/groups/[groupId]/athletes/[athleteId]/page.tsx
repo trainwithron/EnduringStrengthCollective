@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { calorieSeriesWithStanding } from "@/lib/macro-resolution";
+import { fetchStandingTarget } from "@/lib/standing-macros";
+import { StandingMacroTargetCard } from "@/components/coach/desktop/standing-macro-target-card";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
@@ -43,6 +46,18 @@ import {
   milestoneTagToNutritionPhase,
   type MilestonePhaseTag,
 } from "@/lib/nutrition-trend-classifier";
+
+// Every date key from `startKey` through `endKey`, inclusive.
+function last7DatesForTargets(startKey: string, endKey: string): string[] {
+  const out: string[] = [];
+  const cursor = new Date(`${startKey}T00:00:00Z`);
+  const end = new Date(`${endKey}T00:00:00Z`);
+  while (cursor <= end) {
+    out.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return out;
+}
 
 export default async function AthleteProfilePage(
   props: {
@@ -530,9 +545,14 @@ export default async function AthleteProfilePage(
     weightChangePct: number;
   } | null = null;
   if (nutritionPhaseRow?.phase) {
-    const calorieSeries = (nutritionTrendInputs.macroRows ?? [])
-      .filter((r) => r.calories != null)
-      .map((r) => ({ date: r.log_date as string, value: r.calories as number }));
+    const calorieSeries = calorieSeriesWithStanding(
+      (nutritionTrendInputs.macroRows ?? [])
+        .filter((r) => r.calories != null)
+        .map((r) => ({ date: r.log_date as string, value: r.calories as number })),
+      macrosEnabled ? await fetchStandingTarget(supabase, params.athleteId) : null,
+      "0000-01-01",
+      new Date().toISOString().slice(0, 10)
+    );
     const weightSeries = (nutritionTrendInputs.weightRowsForTrend ?? []).map((r) => ({
       date: r.logged_date as string,
       value: r.weight as number,
@@ -641,11 +661,28 @@ export default async function AthleteProfilePage(
   // day (upserted, never duplicated) — clearing a day via the new "Clear
   // this day" control removes it here too, so a coach testing numbers
   // doesn't leave a fake point behind.
-  const calorieTrend = (calorieRows ?? []).map((r) => ({ date: r.log_date, value: r.calories as number }));
+  const standingTarget = macrosEnabled ? await fetchStandingTarget(supabase, params.athleteId) : null;
+  const standingFromKey = standingTarget?.updated_at ? standingTarget.updated_at.slice(0, 10) : null;
+  const calorieTrend = calorieSeriesWithStanding(
+    (calorieRows ?? []).map((r) => ({ date: r.log_date as string, value: r.calories as number })),
+    standingTarget,
+    "0000-01-01",
+    todayKey
+  );
+  // Explicit day rows from today onward: the "overrides ahead" the coach sees next to the standing target.
+  const upcomingOverrides = (calorieRows ?? [])
+    .filter((r) => (r.log_date as string) >= todayKey)
+    .slice(0, 14)
+    .map((r) => ({ date: r.log_date as string, calories: r.calories as number }));
+  const latestExplicitRow = (calorieRows ?? []).length > 0 ? (calorieRows ?? [])[(calorieRows ?? []).length - 1] : null;
   // Same rows as above, just the last-7-days slice — one query serves
   // both instead of a second round trip against the same table/filter.
-  const daysWithMacroTarget = (calorieRows ?? []).filter(
-    (r) => r.log_date >= weekStartKey && r.log_date <= todayKey
+  // A day counts as having a target if it has its own row, or the standing
+  // target was already in place on it.
+  const daysWithMacroTarget = last7DatesForTargets(weekStartKey, todayKey).filter(
+    (d) =>
+      (calorieRows ?? []).some((r) => r.log_date === d) ||
+      (standingTarget?.calories != null && (!standingFromKey || d >= standingFromKey))
   ).length;
 
   const thirtyDaysAgoKey = (() => {
@@ -1458,6 +1495,27 @@ export default async function AthleteProfilePage(
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
               Nutrition
             </h2>
+            <StandingMacroTargetCard
+              athleteId={params.athleteId}
+              groupId={params.groupId}
+              initial={
+                standingTarget
+                  ? {
+                      calories: standingTarget.calories,
+                      proteinG: standingTarget.protein_g,
+                      carbsG: standingTarget.carbs_g,
+                      fatG: standingTarget.fat_g,
+                    }
+                  : null
+              }
+              latestExplicit={
+                latestExplicitRow
+                  ? { date: latestExplicitRow.log_date as string, calories: latestExplicitRow.calories as number }
+                  : null
+              }
+              upcomingOverrides={upcomingOverrides}
+              calendarHref={`/groups/${params.groupId}/athletes/${params.athleteId}/calendar`}
+            />
             <NutritionTools
               athleteId={params.athleteId}
               groupId={params.groupId}

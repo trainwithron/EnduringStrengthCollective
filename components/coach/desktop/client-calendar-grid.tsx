@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { AssignWorkoutForm, type WorkoutOption } from "./assign-workout-form";
 import { DailyMacrosForm } from "./daily-macros-form";
+import { SOURCE_LABEL, type MacroSource } from "@/lib/macro-resolution";
 import { DayHabitsPanel } from "./day-habits-panel";
 import { DaySchedulePanel } from "./day-schedule-panel";
 import { WORKOUT_DAY_DRAG_MIME, type DraggedWorkoutDay } from "./draggable-workout-day";
@@ -23,7 +24,17 @@ export interface DayCellData {
   assignmentNote: string;
   programWorkoutTitle: string | null;
   workoutDone: boolean;
+  // This day's OWN target row (what the form below edits). Empty when the day follows the standing target.
   macros: { calories: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null } | null;
+  // The target the athlete actually sees for this day, and where it comes from.
+  active: {
+    calories: number | null;
+    proteinG: number | null;
+    carbsG: number | null;
+    fatG: number | null;
+    source: MacroSource;
+    mealPlanDiffers: boolean;
+  } | null;
   mealPlan: { mealCount: number; includeSnack: boolean } | null;
   assignedMealsBySlot: Partial<Record<Exclude<MealSlot, "any">, string[]>>;
   bookingCount: number;
@@ -177,12 +188,16 @@ export function ClientCalendarGrid({
                         {d.programWorkoutTitle}
                       </span>
                     ) : null}
-                    {d.macros?.calories != null && (
+                    {d.active?.calories != null && (
                       <span className="font-body text-xs text-steel">
-                        {d.macros.calories}cal
-                        {d.macros.proteinG != null && ` ${d.macros.proteinG}p`}
-                        {d.macros.carbsG != null && ` ${d.macros.carbsG}c`}
-                        {d.macros.fatG != null && ` ${d.macros.fatG}f`}
+                        {d.active.calories}cal
+                        {d.active.proteinG != null && ` ${d.active.proteinG}p`}
+                        {d.active.carbsG != null && ` ${d.active.carbsG}c`}
+                        {d.active.fatG != null && ` ${d.active.fatG}f`}
+                        <span className={d.active.source === "override" ? "text-rust" : ""}>
+                          {" · "}
+                          {d.active.source === "override" ? "set for day" : d.active.source === "meal_plan" ? "plan" : "standing"}
+                        </span>
                       </span>
                     )}
                     {d.cellDueHabits.slice(0, 2).map((h) => (
@@ -258,6 +273,14 @@ export function ClientCalendarGrid({
                     <h4 className="font-display uppercase text-xs tracking-wide text-steel mb-3">
                       Daily macros
                     </h4>
+                    {macrosEnabled && expandedData.active && (
+                      <p className="font-body text-xs text-steel mb-2">
+                        Athlete sees: {SOURCE_LABEL[expandedData.active.source]}
+                        {expandedData.active.mealPlanDiffers
+                          ? ". A meal plan with different totals is also saved for this day."
+                          : "."}
+                      </p>
+                    )}
                     {macrosEnabled ? (
                       <DailyMacrosForm
                         key={expandedData.dateKey}

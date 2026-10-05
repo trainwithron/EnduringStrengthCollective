@@ -14,7 +14,8 @@ import { TodayWidget } from "@/components/athlete/today-widget";
 import { DayMealsView } from "@/components/athlete/day-meals-view";
 import { computeScheduledDates } from "@/lib/program-schedule";
 import { isHabitDueOn } from "@/lib/habits";
-import { resolveDayMacroTarget } from "@/lib/todays-macros";
+import { resolveDayMacros, standingForDate } from "@/lib/macro-resolution";
+import { fetchStandingTarget } from "@/lib/standing-macros";
 import { CalendarPurchasePrompt } from "@/components/athlete/calendar-purchase-prompt";
 import type { PackageOption } from "@/components/athlete/package-picker";
 import { getEffectiveAthlete } from "@/lib/acting-as";
@@ -172,7 +173,12 @@ export default async function DayDetailPage(
       // meals shown below — that target wins over daily_macros when both
       // exist, so the number here never contradicts what's actually
       // assigned. See lib/todays-macros.ts.
-      dayMacros = resolveDayMacroTarget(macrosRow ?? null, mealPlanRow?.macros ?? null, dayMeals);
+      dayMacros = resolveDayMacros(
+        macrosRow ?? null,
+        mealPlanRow?.macros ?? null,
+        dayMeals,
+        standingForDate(await fetchStandingTarget(supabase, athleteId), params.date)
+      ).target;
     }
 
     const { data: habitDefs } = await supabase

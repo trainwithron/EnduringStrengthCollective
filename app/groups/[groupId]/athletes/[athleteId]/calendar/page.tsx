@@ -1,3 +1,5 @@
+import { resolveDayMacros, standingForDate } from "@/lib/macro-resolution";
+import { fetchStandingTarget } from "@/lib/standing-macros";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
@@ -236,12 +238,13 @@ export default async function ClientCalendarPage(
   const { data: mealPlanRows } = macrosEnabled
     ? await supabase
         .from("meal_plans")
-        .select("log_date, meal_count, include_snack, meals")
+        .select("log_date, meal_count, include_snack, meals, macros")
         .eq("athlete_id", params.athleteId)
         .gte("log_date", rangeStart)
         .lte("log_date", rangeEnd)
     : { data: [] };
   const mealPlanByDateKey = new Map((mealPlanRows ?? []).map((m) => [m.log_date, m]));
+  const standingTarget = macrosEnabled ? await fetchStandingTarget(supabase, params.athleteId) : null;
 
   // The coach's own bookings this month, across every client — an overlay
   // so scheduling for this athlete doesn't happen blind to the coach's own
@@ -275,6 +278,16 @@ export default async function ClientCalendarPage(
     const programWorkout = workoutByDateKey.get(key);
     const macroRow = macrosByDateKey.get(key);
     const mealPlanRow = mealPlanByDateKey.get(key);
+    // The standing target is not retroactive: it applies from the day it was saved.
+    const standingForDay = standingForDate(standingTarget, key);
+    const resolvedMacros = macrosEnabled
+      ? resolveDayMacros(
+          macroRow ?? null,
+          ((mealPlanRow as { macros?: unknown } | undefined)?.macros ?? null) as never,
+          (mealPlanRow?.meals ?? null) as never,
+          standingForDay
+        )
+      : null;
     const cellDueHabits = variableHabits
       .filter((h) => isHabitDueOn(h.weekdays, d))
       .map((h) => ({ id: h.id, title: h.title, completed: completedHabitDates.has(`${h.id}:${key}`) }));
@@ -299,6 +312,10 @@ export default async function ClientCalendarPage(
             fatG: macroRow.fat_g,
           }
         : null,
+      active:
+        resolvedMacros?.target && resolvedMacros.source
+          ? { ...resolvedMacros.target, source: resolvedMacros.source, mealPlanDiffers: resolvedMacros.mealPlanDiffers }
+          : null,
       mealPlan: mealPlanRow
         ? { mealCount: mealPlanRow.meal_count, includeSnack: mealPlanRow.include_snack }
         : null,

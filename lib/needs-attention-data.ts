@@ -1,3 +1,4 @@
+import { fetchStandingTargets } from "@/lib/standing-macros";
 import { computeScheduledDates } from "@/lib/program-schedule";
 import {
   computeProgramEndingSuggestions,
@@ -131,9 +132,16 @@ export async function getNeedsAttentionItems(
     macroDaysCountByAthlete.set(row.athlete_id, (macroDaysCountByAthlete.get(row.athlete_id) ?? 0) + 1);
   }
 
+  // A standing target covers every day of next week; only a client with neither
+  // a standing target nor explicit rows is "missing macros".
+  const standingByAthlete = await fetchStandingTargets(supabase, macroEligibleIds);
+
   const macroInfos: AthleteMacroInfo[] = macroEligibleAthletes.map((a) => ({
     ...a,
-    daysWithMacrosNextWeek: macroDaysCountByAthlete.get(a.athleteId) ?? 0,
+    daysWithMacrosNextWeek:
+      standingByAthlete.get(a.athleteId)?.calories != null
+        ? 7
+        : macroDaysCountByAthlete.get(a.athleteId) ?? 0,
   }));
 
   const rawMacroSuggestions = computeMacrosMissingSuggestions(macroInfos);

@@ -52,6 +52,7 @@ export function WeeklyCheckinPanel({
   maintenanceCalories,
   injurySurplusPct,
   defaultPhase,
+  hasStandingTarget = false,
 }: {
   athleteId: string;
   groupId: string;
@@ -79,6 +80,9 @@ export function WeeklyCheckinPanel({
   // only backs it up when there's no check-in history yet at all — a
   // brand-new tagged client no longer always starts on "Fat loss."
   defaultPhase?: NutritionPhase | null;
+  // When the client has a standing target, a check-in updates THAT by default, so the new
+  // numbers keep applying after one date. Without it the old one-date apply is the default.
+  hasStandingTarget?: boolean;
 }) {
   const [phase, setPhase] = useState<NutritionPhase>(lastCheckin?.phase ?? defaultPhase ?? "fat_loss");
   const [adjustmentPct, setAdjustmentPct] = useState(lastCheckin?.adjustmentPct ?? DEFAULT_ADJUSTMENT_PCT);
@@ -99,6 +103,7 @@ export function WeeklyCheckinPanel({
     lastCheckin?.dietaryRestrictions ?? ""
   );
   const [applyDate, setApplyDate] = useState(todayIso());
+  const [applyMode, setApplyMode] = useState<"standing" | "date">(hasStandingTarget ? "standing" : "date");
 
   const [result, setResult] = useState<CheckInResult | null>(null);
   const [macros, setMacros] = useState<{ proteinG: number; carbsG: number; fatG: number } | null>(
@@ -170,19 +175,34 @@ export function WeeklyCheckinPanel({
       return;
     }
 
-    const { error: macroError } = await supabase.from("daily_macros").upsert(
-      {
-        athlete_id: athleteId,
-        group_id: groupId,
-        log_date: applyDate,
-        calories: result.newCalories,
-        protein_g: macros.proteinG,
-        carbs_g: macros.carbsG,
-        fat_g: macros.fatG,
-        created_by: user?.id,
-      },
-      { onConflict: "athlete_id,log_date" }
-    );
+    const { error: macroError } =
+      applyMode === "standing"
+        ? await supabase.from("client_macro_targets").upsert(
+            {
+              athlete_id: athleteId,
+              group_id: groupId,
+              calories: result.newCalories,
+              protein_g: macros.proteinG,
+              carbs_g: macros.carbsG,
+              fat_g: macros.fatG,
+              updated_by: user?.id ?? null,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "athlete_id" }
+          )
+        : await supabase.from("daily_macros").upsert(
+            {
+              athlete_id: athleteId,
+              group_id: groupId,
+              log_date: applyDate,
+              calories: result.newCalories,
+              protein_g: macros.proteinG,
+              carbs_g: macros.carbsG,
+              fat_g: macros.fatG,
+              created_by: user?.id,
+            },
+            { onConflict: "athlete_id,log_date" }
+          );
 
     if (macroError) {
       setError("Check-in saved, but couldn't apply the new targets to that date.");
@@ -372,13 +392,24 @@ export function WeeklyCheckinPanel({
           <div className="flex items-center gap-2 pt-2 border-t border-steel/15">
             <label className="flex items-center gap-2 font-body text-xs text-steel">
               Apply to
+              <select
+                value={applyMode}
+                onChange={(e) => setApplyMode(e.target.value as "standing" | "date")}
+                className="h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
+              >
+                <option value="standing">Standing target (every day)</option>
+                <option value="date">One date only</option>
+              </select>
+            </label>
+            {applyMode === "date" && (
               <input
                 type="date"
                 value={applyDate}
                 onChange={(e) => setApplyDate(e.target.value)}
+                aria-label="Date to apply to"
                 className="h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
               />
-            </label>
+            )}
             <button
               type="button"
               onClick={handleSave}
@@ -390,8 +421,9 @@ export function WeeklyCheckinPanel({
             {saved && <span className="font-body text-xs text-positive">Saved</span>}
           </div>
           <p className="font-body text-xs text-steel">
-            To apply this across the coming week instead of one day at a time, use the
-            date-range assignment on this client&apos;s calendar.
+            {applyMode === "standing"
+              ? "Days that already have their own target keep it."
+              : "To apply this across a range of dates, use the date-range assignment on this client's calendar."}
           </p>
         </div>
       )}

@@ -2,6 +2,7 @@
 // Supabase queries, no unit tests of its own, same convention as
 // lib/programming-spotter-gather.ts — only the pure
 // lib/nutrition-block-adjustment.ts functions it calls are tested).
+import { fetchStandingTarget } from "@/lib/standing-macros";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { deriveEventWindow } from "./event-window";
 import { computeScheduledDates } from "./program-schedule";
@@ -33,13 +34,22 @@ export async function gatherMacroSuggestion(
   // coach actually set, not a computed average.
   const { data: recentMacro } = await supabase
     .from("daily_macros")
-    .select("calories")
+    .select("log_date, calories")
     .eq("athlete_id", athleteId)
     .lte("log_date", date)
     .order("log_date", { ascending: false })
     .limit(1)
     .maybeSingle();
-  const baseCalories = recentMacro?.calories ?? null;
+  // A standing target saved after the last explicit row (or with no row at all)
+  // is the latest number the coach actually set.
+  const standing = await fetchStandingTarget(supabase, athleteId);
+  const standingDay = standing?.updated_at ? standing.updated_at.slice(0, 10) : null;
+  const useStanding =
+    standing?.calories != null &&
+    standingDay != null &&
+    standingDay <= date &&
+    (!recentMacro || standingDay > (recentMacro.log_date as string));
+  const baseCalories = useStanding ? standing!.calories : recentMacro?.calories ?? null;
 
   // Rule 1 first, and it always wins when it fires: a taper week's real
   // drop in planned volume would itself trip Rule 2's "lighter week"

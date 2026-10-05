@@ -1,5 +1,7 @@
 "use client";
 
+import { calorieSeriesWithStanding } from "@/lib/macro-resolution";
+import { fetchStandingTargets } from "@/lib/standing-macros";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -228,7 +230,7 @@ export function ClientCardGrid({
       const sixWeeksAgo = new Date();
       sixWeeksAgo.setDate(sixWeeksAgo.getDate() - 42);
       const supabase = createBrowserClient();
-      const [macroResult, weightResult] = await Promise.all([
+      const [macroResult, weightResult, standingByAthlete] = await Promise.all([
         supabase
           .from("daily_macros")
           .select("athlete_id, log_date, calories")
@@ -241,6 +243,7 @@ export function ClientCardGrid({
           .eq("group_id", groupId)
           .in("athlete_id", taggedIds)
           .gte("logged_date", sixWeeksAgo.toISOString().slice(0, 10)),
+        fetchStandingTargets(supabase as never, taggedIds),
       ]);
       if (cancelled) return;
 
@@ -264,7 +267,12 @@ export function ClientCardGrid({
         series.set(
           athleteId,
           computeNutritionWeeklySeries(
-            calorieRowsByAthlete.get(athleteId) ?? [],
+            calorieSeriesWithStanding(
+              calorieRowsByAthlete.get(athleteId) ?? [],
+              standingByAthlete.get(athleteId) ?? null,
+              sixWeeksAgo.toISOString().slice(0, 10),
+              now.toISOString().slice(0, 10)
+            ),
             weightRowsByAthlete.get(athleteId) ?? [],
             now
           )

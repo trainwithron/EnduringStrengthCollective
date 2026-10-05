@@ -25,7 +25,9 @@ import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { getViewerOrgTheme } from "@/lib/org-theme-server";
 import { dateKeyInZone, getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
+import { resolveDayMacros, calorieTargetForDate, standingForDate } from "@/lib/macro-resolution";
 import { resolveDayMacroTarget } from "@/lib/todays-macros";
+import { fetchStandingTarget } from "@/lib/standing-macros";
 import {
   getActiveProgramForAthlete,
   getScheduledWorkouts,
@@ -326,7 +328,7 @@ export default async function GroupHubPage(
           : { status: "unscheduled", workoutId: null, title: null }
         : resolveDayWorkout(scheduledWorkouts, loggedIds, targetDate, today, visibilityWindow);
 
-      const [macroResult, mealPlanResult, { data: dueLogRows }] = await Promise.all([
+      const [macroResult, mealPlanResult, standingTarget, { data: dueLogRows }] = await Promise.all([
         macrosEnabled
           ? supabase
               .from("daily_macros")
@@ -343,6 +345,7 @@ export default async function GroupHubPage(
               .eq("log_date", targetDateKey)
               .maybeSingle()
           : Promise.resolve({ data: null }),
+        macrosEnabled ? fetchStandingTarget(supabase, athleteId) : Promise.resolve(null),
         supabase
           .from("habit_logs")
           .select("habit_id, completed_at")
@@ -350,11 +353,12 @@ export default async function GroupHubPage(
           .eq("log_date", targetDateKey),
       ]);
 
-      dayMacros = resolveDayMacroTarget(
+      dayMacros = resolveDayMacros(
         macroResult.data ?? null,
         (mealPlanResult.data?.macros as any) ?? null,
-        (mealPlanResult.data?.meals as any) ?? null
-      );
+        (mealPlanResult.data?.meals as any) ?? null,
+        standingForDate(standingTarget, targetDateKey)
+      ).target;
 
       const dueHabitDefs = (habitRows ?? []).filter((h) => isHabitDueOn(h.weekdays, targetDate));
       const completedIds = new Set(
@@ -694,7 +698,7 @@ async function computeRangeSummaries(
   const startKey = dateKeys[0];
   const endKey = dateKeys[dateKeys.length - 1];
 
-  const [macroResult, habitLogResult] = await Promise.all([
+  const [macroResult, planResult, standingTarget, habitLogResult] = await Promise.all([
     macrosEnabled
       ? supabase
           .from("daily_macros")
@@ -703,6 +707,15 @@ async function computeRangeSummaries(
           .gte("log_date", startKey)
           .lte("log_date", endKey)
       : Promise.resolve({ data: [] }),
+    macrosEnabled
+      ? supabase
+          .from("meal_plans")
+          .select("log_date, meals, macros")
+          .eq("athlete_id", athleteId)
+          .gte("log_date", startKey)
+          .lte("log_date", endKey)
+      : Promise.resolve({ data: [] }),
+    macrosEnabled ? fetchStandingTarget(supabase, athleteId) : Promise.resolve(null),
     habitDefs.length > 0
       ? supabase
           .from("habit_logs")
@@ -716,6 +729,10 @@ async function computeRangeSummaries(
   const caloriesByDate = new Map<string, number | null>();
   for (const row of macroResult.data ?? []) {
     caloriesByDate.set((row as any).log_date, (row as any).calories);
+  }
+  const planCaloriesByDate = new Map<string, number | null>();
+  for (const row of (planResult.data ?? []) as any[]) {
+    planCaloriesByDate.set(row.log_date, resolveDayMacroTarget(null, row.macros ?? null, row.meals ?? null)?.calories ?? null);
   }
   const completedByHabitAndDate = new Set(
     (habitLogResult.data ?? [])
@@ -732,7 +749,7 @@ async function computeRangeSummaries(
       dateKey,
       date,
       workout,
-      macroCalories: caloriesByDate.get(dateKey) ?? null,
+      macroCalories: calorieTargetForDate(dateKey, caloriesByDate, standingForDate(standingTarget, dateKey), planCaloriesByDate),
       habitsDue: dueHabits.length,
       habitsCompleted,
     };

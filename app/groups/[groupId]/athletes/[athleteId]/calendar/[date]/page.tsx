@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { AssignWorkoutForm, type WorkoutOption } from "@/components/coach/desktop/assign-workout-form";
+import { resolveDayMacros, SOURCE_LABEL, standingForDate } from "@/lib/macro-resolution";
+import { fetchStandingTarget } from "@/lib/standing-macros";
 import { DailyMacrosForm } from "@/components/coach/desktop/daily-macros-form";
 import { DayHabitsPanel } from "@/components/coach/desktop/day-habits-panel";
 import type { DueHabit } from "@/components/coach/desktop/habit-day-checklist";
@@ -138,6 +140,8 @@ export default async function ClientCalendarDayPage(
     .eq("log_date", params.date)
     .maybeSingle();
 
+  const standingTarget = macrosEnabled ? await fetchStandingTarget(supabase, params.athleteId) : null;
+
   // Training-block-aware suggestion (taper freeze / volume-relative
   // nudge) + this day's already-assigned meals, for the four drop zones.
   const [suggestion, { data: mealPlanRow }] = await Promise.all([
@@ -146,13 +150,20 @@ export default async function ClientCalendarDayPage(
       : Promise.resolve(null),
     supabase
       .from("meal_plans")
-      .select("meals")
+      .select("meals, macros")
       .eq("athlete_id", params.athleteId)
       .eq("log_date", params.date)
       .maybeSingle(),
   ]);
   const assignedBySlot = assignedMealsBySlotFromMeals(
     (mealPlanRow?.meals ?? null) as Record<string, MealEntryPayload[]> | null
+  );
+
+  const activeMacros = resolveDayMacros(
+    macros ?? null,
+    ((mealPlanRow as { macros?: unknown } | null)?.macros ?? null) as never,
+    (mealPlanRow?.meals ?? null) as never,
+    standingForDate(standingTarget, params.date)
   );
 
   const { data: latestWeightRow } = await supabase
@@ -311,6 +322,14 @@ export default async function ClientCalendarDayPage(
           <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
             Daily macros
           </h2>
+          {macrosEnabled && activeMacros.source && (
+            <p className="font-body text-xs text-steel mb-3">
+              Athlete sees: <span className={activeMacros.source === "override" ? "text-rust" : "text-chalk"}>{SOURCE_LABEL[activeMacros.source]}</span>
+              {activeMacros.target?.calories != null ? ` (${activeMacros.target.calories} kcal)` : ""}
+              {activeMacros.mealPlanDiffers ? ". A meal plan with different totals is also saved for this day." : "."}
+              {activeMacros.source !== "override" ? " Saving numbers below sets a target for this day only." : " Clear this day to go back to the standing target."}
+            </p>
+          )}
           {macrosEnabled ? (
             <DailyMacrosForm
               athleteId={params.athleteId}
