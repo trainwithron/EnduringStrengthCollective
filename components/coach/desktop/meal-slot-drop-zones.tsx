@@ -13,8 +13,8 @@ import {
 } from "@/lib/meal-engine";
 import { fetchCustomRecipes } from "@/lib/custom-recipes";
 import { mergeMealIntoPlan, type MealEntryPayload, type MealPlanRow } from "@/lib/meal-plan-assignment";
-import { resolveDayMacros } from "@/lib/macro-resolution";
-import { fetchStandingTarget } from "@/lib/standing-macros";
+import { resolveDayMacros, standingForDate } from "@/lib/macro-resolution";
+import { fetchStandingHistory } from "@/lib/standing-macros";
 import { RECIPE_DRAG_MIME, type DraggedRecipe } from "./draggable-recipe";
 
 const SLOTS: { slot: Exclude<MealSlot, "any">; label: string }[] = [
@@ -93,7 +93,7 @@ export function MealSlotDropZones({
         .eq("athlete_id", athleteId)
         .eq("log_date", date)
         .maybeSingle(),
-      fetchStandingTarget(supabase as never, athleteId),
+      fetchStandingHistory(supabase as never, athleteId),
     ]);
     const existing = (existingRow as unknown as MealPlanRow | null) ?? null;
 
@@ -105,7 +105,7 @@ export function MealSlotDropZones({
       dailyMacrosRow ?? null,
       (existing?.macros as Record<string, any> | null) ?? null,
       (existing?.meals as Record<string, unknown[]> | null) ?? null,
-      standingTarget
+      standingForDate(standingTarget, date)
     ).target;
     const dayMacros = {
       calories: resolved?.calories ?? 0,

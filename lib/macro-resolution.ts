@@ -80,9 +80,13 @@ export const SOURCE_LABEL: Record<MacroSource, string> = {
   standing: "Standing target",
 };
 
-export interface StandingWithDate extends MacroRowLike {
-  updated_at?: string | null;
+// A client's standing target is a HISTORY: each row says "from this date on, the target is X". Editing
+// protein on Wednesday adds a Wednesday row; Monday and Tuesday keep what they showed. A row with no
+// numbers means the standing target was removed from that date.
+export interface StandingRow extends MacroRowLike {
+  effective_from: string; // YYYY-MM-DD, the coach's own calendar day
 }
+export type StandingHistory = StandingRow[]; // ascending by effective_from
 
 function addDaysKey(key: string, days: number): string {
   const d = new Date(`${key}T00:00:00Z`);
@@ -90,41 +94,47 @@ function addDaysKey(key: string, days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-// A calorie-by-day series for trend analysis (is intake moving the way the
-// client's phase says it should?). Explicit day rows are used as written. Days
-// from the moment the standing target was last saved onward are filled with
-// it, because from then on that IS the prescribed intake. Days before that are
-// left empty rather than retroactively given a number nobody had set yet.
+// The standing target in force on `dateKey`: the latest row on or before it. Null before the first row,
+// or when that row is a removal.
+export function standingForDate(history: StandingHistory | null | undefined, dateKey: string): StandingRow | null {
+  if (!history || history.length === 0) return null;
+  let found: StandingRow | null = null;
+  for (const row of history) {
+    if (row.effective_from <= dateKey) found = row;
+    else break;
+  }
+  return found && hasAnyValue(found) ? found : null;
+}
+
+// The newest row, whatever date it takes effect (what the coach's card shows for editing).
+export function latestStanding(history: StandingHistory | null | undefined): StandingRow | null {
+  if (!history || history.length === 0) return null;
+  const row = history[history.length - 1];
+  return hasAnyValue(row) ? row : null;
+}
+
+// A calorie-by-day series for trend analysis (is intake moving the way the client's phase says it
+// should?). Explicit day rows are used as written; other days take whatever the standing history said
+// that day. Days before the first standing row stay empty.
 export function calorieSeriesWithStanding(
   overrideRows: { date: string; value: number }[],
-  standing: StandingWithDate | null | undefined,
+  history: StandingHistory | null | undefined,
   startKey: string,
   endKey: string
 ): { date: string; value: number }[] {
   const byDate = new Map(overrideRows.map((r) => [r.date, r.value]));
-  if (standing?.calories != null) {
-    const effectiveFrom = standing.updated_at ? addDaysKey(standing.updated_at.slice(0, 10), -1) : startKey;
-    let cursor = effectiveFrom > startKey ? effectiveFrom : startKey;
+  if (history && history.length > 0) {
+    const first = history[0].effective_from;
+    let cursor = first > startKey ? first : startKey;
     while (cursor <= endKey) {
-      if (!byDate.has(cursor)) byDate.set(cursor, standing.calories);
+      if (!byDate.has(cursor)) {
+        const row = standingForDate(history, cursor);
+        if (row?.calories != null) byDate.set(cursor, row.calories);
+      }
       cursor = addDaysKey(cursor, 1);
     }
   }
   return Array.from(byDate.entries())
     .map(([date, value]) => ({ date, value }))
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-}
-
-// The standing target applies from the day it was saved onward. Older dates
-// get nothing from it, so changing the standing number today never rewrites
-// what a past day showed.
-export function standingForDate<T extends StandingWithDate>(
-  standing: T | null | undefined,
-  dateKey: string
-): T | null {
-  if (!standing) return null;
-  // updated_at is UTC: a coach saving at 9pm US time is already "tomorrow" in UTC, so
-  // allow one day of slack rather than hiding the target for the rest of their evening.
-  const from = standing.updated_at ? addDaysKey(standing.updated_at.slice(0, 10), -1) : null;
-  return from && dateKey < from ? null : standing;
 }

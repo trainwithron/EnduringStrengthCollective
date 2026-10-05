@@ -2,7 +2,8 @@
 // Supabase queries, no unit tests of its own, same convention as
 // lib/programming-spotter-gather.ts — only the pure
 // lib/nutrition-block-adjustment.ts functions it calls are tested).
-import { fetchStandingTarget } from "@/lib/standing-macros";
+import { fetchStandingHistory } from "@/lib/standing-macros";
+import { standingForDate } from "./macro-resolution";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { deriveEventWindow } from "./event-window";
 import { computeScheduledDates } from "./program-schedule";
@@ -42,13 +43,10 @@ export async function gatherMacroSuggestion(
     .maybeSingle();
   // A standing target saved after the last explicit row (or with no row at all)
   // is the latest number the coach actually set.
-  const standing = await fetchStandingTarget(supabase, athleteId);
-  const standingDay = standing?.updated_at ? standing.updated_at.slice(0, 10) : null;
+  const standing = standingForDate(await fetchStandingHistory(supabase, athleteId, groupId), date);
   const useStanding =
     standing?.calories != null &&
-    standingDay != null &&
-    standingDay <= date &&
-    (!recentMacro || standingDay > (recentMacro.log_date as string));
+    (!recentMacro || standing.effective_from > (recentMacro.log_date as string));
   const baseCalories = useStanding ? standing!.calories : recentMacro?.calories ?? null;
 
   // Rule 1 first, and it always wins when it fires: a taper week's real

@@ -6,7 +6,7 @@ import { computeReverseDietMilestone } from "@/lib/metabolic-trend";
 import { computeRecoveryVolumeMilestone } from "@/lib/recovery-volume-milestone";
 import { computeReadinessAverage } from "@/lib/wellness";
 import { calorieSeriesWithStanding } from "@/lib/macro-resolution";
-import { fetchStandingTarget } from "@/lib/standing-macros";
+import { fetchStandingHistory } from "@/lib/standing-macros";
 import { classifyNutritionTrend, isTrendAligned, type MilestonePhaseTag } from "@/lib/nutrition-trend-classifier";
 
 // Milestone Celebrations — weekly scan for both trend-based detectors
@@ -141,7 +141,7 @@ export async function GET(request: Request) {
       (macroRows ?? [])
         .filter((r) => r.calories != null)
         .map((r) => ({ date: r.log_date as string, value: r.calories as number })),
-      await fetchStandingTarget(supabase, row.athlete_id),
+      await fetchStandingHistory(supabase, row.athlete_id),
       windowStart.toISOString().slice(0, 10),
       now.toISOString().slice(0, 10)
     );
@@ -274,7 +274,7 @@ export async function GET(request: Request) {
       (macroRows ?? [])
         .filter((r) => r.calories != null)
         .map((r) => ({ date: r.log_date as string, value: r.calories as number })),
-      await fetchStandingTarget(supabase, row.athlete_id),
+      await fetchStandingHistory(supabase, row.athlete_id),
       windowStart.toISOString().slice(0, 10),
       now.toISOString().slice(0, 10)
     );

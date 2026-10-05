@@ -4,6 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saveStandingTarget } from "@/lib/standing-macros";
+import { localDateKey } from "@/lib/timezone";
 
 interface Target {
   calories: number | null;
@@ -91,27 +93,21 @@ export function StandingMacroTargetCard({
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    const { error: upsertError } = await supabase.from("client_macro_targets").upsert(
-      {
-        athlete_id: athleteId,
-        group_id: groupId,
-        calories: parsed.calories,
-        protein_g: parsed.proteinG,
-        carbs_g: parsed.carbsG,
-        fat_g: parsed.fatG,
-        updated_by: user?.id ?? null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "athlete_id" }
-    );
+    const result = await saveStandingTarget(supabase, {
+      athleteId,
+      groupId,
+      userId: user?.id ?? null,
+      target: parsed,
+      today: localDateKey(),
+    });
     setBusy(false);
-    if (upsertError) {
+    if (!result.ok) {
       setError("Couldn't save the standing target. Check your connection and try again.");
       return;
     }
     setSaved(parsed);
     setDraft(toDraft(parsed));
-    setMessage("Saved. It applies from today on every day without its own target.");
+    setMessage("Saved. It applies from today on. Earlier days keep the target they had.");
     router.refresh();
   }
 
@@ -121,9 +117,18 @@ export function StandingMacroTargetCard({
     setMessage(null);
     setBusy(true);
     const supabase = createBrowserClient();
-    const { error: deleteError } = await supabase.from("client_macro_targets").delete().eq("athlete_id", athleteId);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const result = await saveStandingTarget(supabase, {
+      athleteId,
+      groupId,
+      userId: user?.id ?? null,
+      target: null,
+      today: localDateKey(),
+    });
     setBusy(false);
-    if (deleteError) {
+    if (!result.ok) {
       setError("Couldn't remove it. Try again.");
       return;
     }

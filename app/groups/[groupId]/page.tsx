@@ -29,7 +29,7 @@ import { getViewerOrgTheme } from "@/lib/org-theme-server";
 import { dateKeyInZone, getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
 import { resolveDayMacros, calorieTargetForDate, standingForDate } from "@/lib/macro-resolution";
 import { resolveDayMacroTarget } from "@/lib/todays-macros";
-import { fetchStandingTarget } from "@/lib/standing-macros";
+import { fetchStandingHistory } from "@/lib/standing-macros";
 import { dateKeyOf, parseDateKey, type DayWorkoutInfo } from "@/lib/athlete-day-schedule";
 import {
   contextWorkoutIds,
@@ -344,7 +344,7 @@ export default async function GroupHubPage(
               .eq("log_date", targetDateKey)
               .maybeSingle()
           : Promise.resolve({ data: null }),
-        macrosEnabled ? fetchStandingTarget(supabase, athleteId) : Promise.resolve(null),
+        macrosEnabled ? fetchStandingHistory(supabase, athleteId) : Promise.resolve(null),
         supabase
           .from("habit_logs")
           .select("habit_id, completed_at")
@@ -744,7 +744,7 @@ async function computeRangeSummaries(
           .gte("log_date", startKey)
           .lte("log_date", endKey)
       : Promise.resolve({ data: [] }),
-    macrosEnabled ? fetchStandingTarget(supabase, athleteId) : Promise.resolve(null),
+    macrosEnabled ? fetchStandingHistory(supabase, athleteId) : Promise.resolve(null),
     habitDefs.length > 0
       ? supabase
           .from("habit_logs")

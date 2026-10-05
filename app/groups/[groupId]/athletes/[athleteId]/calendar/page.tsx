@@ -1,5 +1,5 @@
 import { resolveDayMacros, standingForDate } from "@/lib/macro-resolution";
-import { fetchStandingTarget } from "@/lib/standing-macros";
+import { fetchStandingHistory } from "@/lib/standing-macros";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
@@ -244,7 +244,7 @@ export default async function ClientCalendarPage(
         .lte("log_date", rangeEnd)
     : { data: [] };
   const mealPlanByDateKey = new Map((mealPlanRows ?? []).map((m) => [m.log_date, m]));
-  const standingTarget = macrosEnabled ? await fetchStandingTarget(supabase, params.athleteId) : null;
+  const standingTarget = macrosEnabled ? await fetchStandingHistory(supabase, params.athleteId) : null;
 
   // The coach's own bookings this month, across every client — an overlay
   // so scheduling for this athlete doesn't happen blind to the coach's own

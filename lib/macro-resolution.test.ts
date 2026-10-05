@@ -73,44 +73,79 @@ describe("calorieTargetForDate", () => {
   });
 });
 
-import { calorieSeriesWithStanding } from "./macro-resolution";
+import { calorieSeriesWithStanding, latestStanding, standingForDate, type StandingHistory } from "./macro-resolution";
+
+const row = (effective_from: string, calories: number | null, protein_g: number | null = null) => ({
+  effective_from,
+  calories,
+  protein_g,
+  carbs_g: null,
+  fat_g: null,
+});
+
+describe("standing target history", () => {
+  const history: StandingHistory = [row("2026-10-01", 2200, 180), row("2026-10-07", 2300, 190)];
+
+  it("each day shows the target that was in force that day", () => {
+    expect(standingForDate(history, "2026-09-30")).toBeNull();
+    expect(standingForDate(history, "2026-10-01")?.calories).toBe(2200);
+    expect(standingForDate(history, "2026-10-06")?.calories).toBe(2200);
+    expect(standingForDate(history, "2026-10-07")?.calories).toBe(2300);
+    expect(standingForDate(history, "2026-10-20")?.protein_g).toBe(190);
+  });
+
+  it("editing a value on Wednesday does not blank Monday and Tuesday", () => {
+    const h: StandingHistory = [row("2026-10-05", 2200, 180), row("2026-10-07", 2200, 200)];
+    expect(standingForDate(h, "2026-10-05")?.protein_g).toBe(180);
+    expect(standingForDate(h, "2026-10-06")?.protein_g).toBe(180);
+    expect(standingForDate(h, "2026-10-07")?.protein_g).toBe(200);
+  });
+
+  it("a row with no numbers removes the standing target from that date", () => {
+    const h: StandingHistory = [row("2026-10-01", 2200), row("2026-10-08", null)];
+    expect(standingForDate(h, "2026-10-05")?.calories).toBe(2200);
+    expect(standingForDate(h, "2026-10-09")).toBeNull();
+    expect(latestStanding(h)).toBeNull();
+  });
+
+  it("empty or missing history is no target", () => {
+    expect(standingForDate([], "2026-10-05")).toBeNull();
+    expect(standingForDate(null, "2026-10-05")).toBeNull();
+    expect(latestStanding(undefined)).toBeNull();
+  });
+
+  it("latestStanding is the newest row, even one that has not taken effect yet", () => {
+    expect(latestStanding(history)?.effective_from).toBe("2026-10-07");
+  });
+});
 
 describe("calorieSeriesWithStanding", () => {
-  const st = { calories: 2200, protein_g: null, carbs_g: null, fat_g: null, updated_at: "2026-10-03T12:00:00Z" };
-
-  it("fills days from when the standing target was saved (one day of UTC slack), never earlier", () => {
-    const s = calorieSeriesWithStanding([], st, "2026-10-01", "2026-10-05");
-    expect(s.map((r) => r.date)).toEqual(["2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05"]);
-    expect(s.every((r) => r.value === 2200)).toBe(true);
+  it("fills each day from the target that applied that day", () => {
+    const h: StandingHistory = [row("2026-10-02", 2200), row("2026-10-04", 2300)];
+    const s = calorieSeriesWithStanding([], h, "2026-10-01", "2026-10-05");
+    expect(s).toEqual([
+      { date: "2026-10-02", value: 2200 },
+      { date: "2026-10-03", value: 2200 },
+      { date: "2026-10-04", value: 2300 },
+      { date: "2026-10-05", value: 2300 },
+    ]);
   });
 
   it("keeps explicit day rows as written", () => {
-    const s = calorieSeriesWithStanding([{ date: "2026-10-04", value: 1800 }], st, "2026-10-01", "2026-10-05");
+    const h: StandingHistory = [row("2026-10-02", 2200)];
+    const s = calorieSeriesWithStanding([{ date: "2026-10-04", value: 1800 }], h, "2026-10-01", "2026-10-05");
     expect(s.find((r) => r.date === "2026-10-04")?.value).toBe(1800);
     expect(s.find((r) => r.date === "2026-10-05")?.value).toBe(2200);
   });
 
-  it("returns only the explicit rows when there is no standing target", () => {
-    const s = calorieSeriesWithStanding([{ date: "2026-10-02", value: 2000 }], null, "2026-10-01", "2026-10-05");
+  it("returns only the explicit rows with no history", () => {
+    const s = calorieSeriesWithStanding([{ date: "2026-10-02", value: 2000 }], [], "2026-10-01", "2026-10-05");
     expect(s).toEqual([{ date: "2026-10-02", value: 2000 }]);
   });
-});
 
-import { standingForDate } from "./macro-resolution";
-
-describe("standingForDate", () => {
-  const st = { calories: 2200, protein_g: null, carbs_g: null, fat_g: null, updated_at: "2026-10-03T12:00:00Z" };
-  it("applies on and after the day it was saved, not before", () => {
-    expect(standingForDate(st, "2026-10-01")).toBeNull();
-    expect(standingForDate(st, "2026-10-02")).toBe(st); // one day of UTC slack
-    expect(standingForDate(st, "2026-10-03")).toBe(st);
-    expect(standingForDate(st, "2026-10-09")).toBe(st);
-  });
-  it("applies to every date when it has no saved-at", () => {
-    const noDate = { ...st, updated_at: null };
-    expect(standingForDate(noDate, "2020-01-01")).toBe(noDate);
-  });
-  it("is null when there is no standing target", () => {
-    expect(standingForDate(null, "2026-10-03")).toBeNull();
+  it("stops filling after a removal row", () => {
+    const h: StandingHistory = [row("2026-10-02", 2200), row("2026-10-04", null)];
+    const s = calorieSeriesWithStanding([], h, "2026-10-01", "2026-10-06");
+    expect(s.map((r) => r.date)).toEqual(["2026-10-02", "2026-10-03"]);
   });
 });

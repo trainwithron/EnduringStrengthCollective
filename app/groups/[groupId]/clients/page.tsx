@@ -3,7 +3,7 @@ import { claimStatus } from "@/lib/client-claim";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { calorieSeriesWithStanding } from "@/lib/macro-resolution";
-import { fetchStandingTarget } from "@/lib/standing-macros";
+import { fetchStandingHistory } from "@/lib/standing-macros";
 import { ClientCardGrid } from "@/components/coach/desktop/client-card-grid";
 import { UnavailableState } from "@/components/ui/unavailable-state";
 import { GroupInvitesPanel, type GroupInviteRow } from "@/components/coach/desktop/group-invites-panel";
@@ -249,7 +249,7 @@ export default async function ClientsPage(
         (macroRows ?? [])
           .filter((r) => r.calories != null)
           .map((r) => ({ date: r.log_date as string, value: r.calories as number })),
-        await fetchStandingTarget(supabase, athleteId),
+        await fetchStandingHistory(supabase, athleteId),
         sixWeeksAgo.toISOString().slice(0, 10),
         new Date().toISOString().slice(0, 10)
       );

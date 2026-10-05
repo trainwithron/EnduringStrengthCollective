@@ -14,8 +14,8 @@ import { getEffectiveAthlete } from "@/lib/acting-as";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { TrendChart } from "@/components/coach/desktop/trend-chart";
-import { resolveDayMacros } from "@/lib/macro-resolution";
-import { fetchStandingTarget } from "@/lib/standing-macros";
+import { resolveDayMacros, latestStanding, standingForDate } from "@/lib/macro-resolution";
+import { fetchStandingHistory } from "@/lib/standing-macros";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { FoodLogSection } from "@/components/athlete/food-log-section";
 import { computeAdherenceDays } from "@/lib/food-log-adherence";
@@ -258,13 +258,14 @@ export default async function NutritionPage(
     8
   );
 
-  const standingTarget = macrosEnabled ? await fetchStandingTarget(supabase, athleteId) : null;
+  const standingHistory = macrosEnabled ? await fetchStandingHistory(supabase, athleteId, params.groupId) : [];
+  const todayKeyForMacros = new Date().toISOString().slice(0, 10);
   const todayMacros = macrosEnabled
     ? resolveDayMacros(
         todayMacroRow ?? null,
         (todayMealPlan?.macros as any) ?? null,
         (todayMealPlan?.meals as any) ?? null,
-        standingTarget
+        standingForDate(standingHistory, todayKeyForMacros)
       ).target
     : null;
 
@@ -441,7 +442,8 @@ export default async function NutritionPage(
 
 async function NutritionSection({ groupId, athleteId }: { groupId: string; athleteId: string }) {
   const supabase = await createServerClient();
-  const standingTargetForCheckin = await fetchStandingTarget(supabase, athleteId);
+  const standingHistoryForCheckin = await fetchStandingHistory(supabase, athleteId, groupId);
+  const standingTargetForCheckin = latestStanding(standingHistoryForCheckin);
   const todayKey = new Date().toISOString().slice(0, 10);
   const sevenDaysAgoKey = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
@@ -736,7 +738,7 @@ async function NutritionSection({ groupId, athleteId }: { groupId: string; athle
         defaultCurrentCalories={
           standingTargetForCheckin?.calories != null &&
           (!recentMacroRow ||
-            (standingTargetForCheckin.updated_at ?? "").slice(0, 10) > ((recentMacroRow.log_date as string) ?? ""))
+            standingTargetForCheckin.effective_from > ((recentMacroRow.log_date as string) ?? ""))
             ? standingTargetForCheckin.calories
             : recentMacroRow?.calories ?? standingTargetForCheckin?.calories ?? null
         }

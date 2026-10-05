@@ -1,5 +1,5 @@
-import { resolveDayMacros } from "@/lib/macro-resolution";
-import { fetchStandingTarget } from "@/lib/standing-macros";
+import { resolveDayMacros, standingForDate } from "@/lib/macro-resolution";
+import { fetchStandingHistory } from "@/lib/standing-macros";
 import Link from "next/link";
 import { createServerClient } from "@/lib/supabase/server";
 import { getTodaysDueRoster } from "@/lib/todays-due-roster";
@@ -82,7 +82,7 @@ export async function CoachMobileHome({
         .eq("athlete_id", athleteId)
         .eq("log_date", todayKey)
         .maybeSingle(),
-      fetchStandingTarget(supabase, athleteId),
+      fetchStandingHistory(supabase, athleteId),
     ]);
 
     soloStatus = result.status === "ready" ? null : result.status;
@@ -92,7 +92,7 @@ export async function CoachMobileHome({
     }
     if (soloMacros === null) {
       // Today's own target if one was set for the day, otherwise the standing target.
-      soloMacros = resolveDayMacros(macroRow ?? null, null, null, standingTarget).target;
+      soloMacros = resolveDayMacros(macroRow ?? null, null, null, standingForDate(standingTarget, todayKey)).target;
     }
 
     if (soloNextWorkoutId) {

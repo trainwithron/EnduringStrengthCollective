@@ -15,7 +15,7 @@ import { DayMealsView } from "@/components/athlete/day-meals-view";
 import { computeScheduledDates } from "@/lib/program-schedule";
 import { isHabitDueOn } from "@/lib/habits";
 import { resolveDayMacros, standingForDate } from "@/lib/macro-resolution";
-import { fetchStandingTarget } from "@/lib/standing-macros";
+import { fetchStandingHistory } from "@/lib/standing-macros";
 import { CalendarPurchasePrompt } from "@/components/athlete/calendar-purchase-prompt";
 import type { PackageOption } from "@/components/athlete/package-picker";
 import { getEffectiveAthlete } from "@/lib/acting-as";
@@ -177,7 +177,7 @@ export default async function DayDetailPage(
         macrosRow ?? null,
         mealPlanRow?.macros ?? null,
         dayMeals,
-        standingForDate(await fetchStandingTarget(supabase, athleteId), params.date)
+        standingForDate(await fetchStandingHistory(supabase, athleteId), params.date)
       ).target;
     }
 

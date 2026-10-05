@@ -4,7 +4,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { AssignWorkoutForm, type WorkoutOption } from "@/components/coach/desktop/assign-workout-form";
 import { resolveDayMacros, SOURCE_LABEL, standingForDate } from "@/lib/macro-resolution";
-import { fetchStandingTarget } from "@/lib/standing-macros";
+import { fetchStandingHistory } from "@/lib/standing-macros";
 import { DailyMacrosForm } from "@/components/coach/desktop/daily-macros-form";
 import { DayHabitsPanel } from "@/components/coach/desktop/day-habits-panel";
 import type { DueHabit } from "@/components/coach/desktop/habit-day-checklist";
@@ -140,7 +140,7 @@ export default async function ClientCalendarDayPage(
     .eq("log_date", params.date)
     .maybeSingle();
 
-  const standingTarget = macrosEnabled ? await fetchStandingTarget(supabase, params.athleteId) : null;
+  const standingTarget = macrosEnabled ? await fetchStandingHistory(supabase, params.athleteId) : null;
 
   // Training-block-aware suggestion (taper freeze / volume-relative
   // nudge) + this day's already-assigned meals, for the four drop zones.

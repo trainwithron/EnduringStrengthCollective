@@ -1,7 +1,7 @@
 "use client";
 
 import { calorieSeriesWithStanding } from "@/lib/macro-resolution";
-import { fetchStandingTargets } from "@/lib/standing-macros";
+import { fetchStandingHistories } from "@/lib/standing-macros";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -243,7 +243,7 @@ export function ClientCardGrid({
           .eq("group_id", groupId)
           .in("athlete_id", taggedIds)
           .gte("logged_date", sixWeeksAgo.toISOString().slice(0, 10)),
-        fetchStandingTargets(supabase as never, taggedIds),
+        fetchStandingHistories(supabase as never, taggedIds),
       ]);
       if (cancelled) return;
 

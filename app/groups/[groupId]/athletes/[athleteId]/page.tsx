@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { calorieSeriesWithStanding } from "@/lib/macro-resolution";
-import { fetchStandingTarget } from "@/lib/standing-macros";
+import { calorieSeriesWithStanding, latestStanding, standingForDate } from "@/lib/macro-resolution";
+import { fetchStandingHistory } from "@/lib/standing-macros";
 import { StandingMacroTargetCard } from "@/components/coach/desktop/standing-macro-target-card";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
@@ -581,7 +581,7 @@ export default async function AthleteProfilePage(
       (nutritionTrendInputs.macroRows ?? [])
         .filter((r) => r.calories != null)
         .map((r) => ({ date: r.log_date as string, value: r.calories as number })),
-      macrosEnabled ? await fetchStandingTarget(supabase, params.athleteId) : null,
+      macrosEnabled ? await fetchStandingHistory(supabase, params.athleteId, params.groupId) : [],
       "0000-01-01",
       new Date().toISOString().slice(0, 10)
     );
@@ -693,11 +693,11 @@ export default async function AthleteProfilePage(
   // day (upserted, never duplicated) — clearing a day via the new "Clear
   // this day" control removes it here too, so a coach testing numbers
   // doesn't leave a fake point behind.
-  const standingTarget = macrosEnabled ? await fetchStandingTarget(supabase, params.athleteId) : null;
-  const standingFromKey = standingTarget?.updated_at ? standingTarget.updated_at.slice(0, 10) : null;
+  const standingHistory = macrosEnabled ? await fetchStandingHistory(supabase, params.athleteId, params.groupId) : [];
+  const standingTarget = latestStanding(standingHistory);
   const calorieTrend = calorieSeriesWithStanding(
     (calorieRows ?? []).map((r) => ({ date: r.log_date as string, value: r.calories as number })),
-    standingTarget,
+    standingHistory,
     "0000-01-01",
     todayKey
   );
@@ -714,7 +714,7 @@ export default async function AthleteProfilePage(
   const daysWithMacroTarget = last7DatesForTargets(weekStartKey, todayKey).filter(
     (d) =>
       (calorieRows ?? []).some((r) => r.log_date === d) ||
-      (standingTarget?.calories != null && (!standingFromKey || d >= standingFromKey))
+      standingForDate(standingHistory, d)?.calories != null
   ).length;
 
   const thirtyDaysAgoKey = (() => {

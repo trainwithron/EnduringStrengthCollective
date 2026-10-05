@@ -12,6 +12,8 @@ import {
   type CheckInResult,
 } from "@/lib/nutrition-checkin";
 import { computeArchetypeMacros, detectDietArchetype } from "@/lib/macros";
+import { saveStandingTarget } from "@/lib/standing-macros";
+import { localDateKey } from "@/lib/timezone";
 
 // Purely a display band for the slider below — the real min/max/step/
 // default (1-15%, default 5%) are untouched; this just marks where most
@@ -25,6 +27,11 @@ const PHASE_LABELS: Record<NutritionPhase, string> = {
   maintenance: "Maintenance",
   reverse_diet: "Reverse diet",
 };
+
+// The check-in code below reads "{ error }" off whichever save ran; adapt the standing-target result to that shape.
+function standingSaveAsSupabaseResult(r: { ok: boolean }) {
+  return { error: r.ok ? null : { message: "standing target save failed" } };
+}
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -177,18 +184,19 @@ export function WeeklyCheckinPanel({
 
     const { error: macroError } =
       applyMode === "standing"
-        ? await supabase.from("client_macro_targets").upsert(
-            {
-              athlete_id: athleteId,
-              group_id: groupId,
-              calories: result.newCalories,
-              protein_g: macros.proteinG,
-              carbs_g: macros.carbsG,
-              fat_g: macros.fatG,
-              updated_by: user?.id ?? null,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "athlete_id" }
+        ? await standingSaveAsSupabaseResult(
+            await saveStandingTarget(supabase, {
+              athleteId,
+              groupId,
+              userId: user?.id ?? null,
+              target: {
+                calories: result.newCalories,
+                proteinG: macros.proteinG,
+                carbsG: macros.carbsG,
+                fatG: macros.fatG,
+              },
+              today: localDateKey(),
+            })
           )
         : await supabase.from("daily_macros").upsert(
             {
