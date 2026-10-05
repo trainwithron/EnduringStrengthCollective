@@ -180,12 +180,12 @@ export default async function SettingsPage(
         </SettingsGroup>
 
         {isCoach && (
-          <SettingsGroup label="Coaching" highlight>
+          <SettingsGroup label="Coaching">
             <Link
               href={`/groups/${params.groupId}/dashboard`}
               className="font-body text-sm font-bold text-rust"
             >
-              Coach Dashboard →
+              Your coaching workspace →
             </Link>
             <p className="font-body text-xs text-steel mt-1">
               Programs, clients, business tools — the full site.
@@ -269,12 +269,6 @@ export default async function SettingsPage(
           <FeedbackButton />
         </SettingsGroup>
 
-        <SettingsGroup label="Messages">
-          <Link href={`/groups/${params.groupId}/messages`} className="font-body text-sm font-bold text-rust">
-            {isCoach ? "Message your athletes →" : "Message your coach →"}
-          </Link>
-        </SettingsGroup>
-
         {!isCoach && (
           <SettingsGroup label="Billing">
             <PackagePicker packages={packages} />
@@ -284,70 +278,10 @@ export default async function SettingsPage(
           </SettingsGroup>
         )}
 
-        <SettingsGroup label="Tools & Community">
-          <div className="space-y-3">
-            <Link href={`/groups/${params.groupId}/goal`} className="block font-body text-sm text-rust">
-              My Goal
-            </Link>
-            <Link
-              href={`/groups/${params.groupId}/tools/one-rep-max`}
-              className="block font-body text-sm text-rust"
-            >
-              1RM Calculator
-            </Link>
-            <Link
-              href={`/groups/${params.groupId}/tools/macro-calculator`}
-              className="block font-body text-sm text-rust"
-            >
-              Macro Calculator
-            </Link>
-            <Link href="/partners" className="block font-body text-sm text-rust">
-              Find a training partner →
-            </Link>
-            <Link href={`/share/journey/${athleteId}`} className="block font-body text-sm text-rust">
-              Share my progress →
-            </Link>
-            <Link
-              href={`/groups/${params.groupId}/progress-photos`}
-              className="block font-body text-sm text-rust"
-            >
-              My progress photos →
-            </Link>
-            <Link
-              href={`/groups/${params.groupId}/resources`}
-              className="block font-body text-sm text-rust"
-            >
-              Resources
-            </Link>
-            <Link
-              href={`/groups/${params.groupId}/quick-tips`}
-              className="block font-body text-sm text-rust"
-            >
-              Quick Tips
-            </Link>
-            <Link
-              href={`/groups/${params.groupId}/records`}
-              className="block font-body text-sm text-rust"
-            >
-              Hall of Fame
-            </Link>
-            {!isCoach && (
-              <Link
-                href={`/groups/${params.groupId}/video-checkins`}
-                className="block font-body text-sm text-rust"
-              >
-                Video Check-ins
-              </Link>
-            )}
-            {!isCoach && membership?.history_import_enabled && (
-              <Link
-                href={`/groups/${params.groupId}/my-history`}
-                className="block font-body text-sm text-rust"
-              >
-                My Exercise History →
-              </Link>
-            )}
-          </div>
+        <SettingsGroup label="More">
+          <Link href={`/groups/${params.groupId}/more`} className="block font-body text-sm text-chalk">
+            Goals, tools, photos, messages and community →
+          </Link>
         </SettingsGroup>
 
         {!isCoach && !effective.isActingAsOther && (

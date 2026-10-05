@@ -137,6 +137,8 @@ const COACH_DESKTOP: [string, string][] = [
   ["all notifications", "/notifications"],
   ["what did i miss", "/notifications"],
   ["turn on notifications", "/groups/g1/settings"],
+  ["more", "/groups/g1/more"],
+  ["where are the tools", "/groups/g1/more"],
   ["sign out", "/groups/g1/settings"],
   ["report a problem", "/groups/g1/settings"],
   ["send feedback", "/groups/g1/settings"],
