@@ -17,6 +17,7 @@ import { AddSocialOnlyMembershipControl } from "@/components/coach/add-social-on
 import { ClientProgrammingMenu } from "@/components/coach/client-programming-menu";
 import { MinorConsentControl } from "@/components/coach/minor-consent-control";
 import { ClientSignInPanel } from "@/components/coach/client-signin-panel";
+import { CorrectClientEmail } from "@/components/coach/correct-client-email";
 import { claimStatus } from "@/lib/client-claim";
 import { claimLinkDetail } from "@/lib/invite-state";
 import { GuardianShareButton } from "@/components/coach/guardian-share-button";
@@ -383,8 +384,16 @@ export default async function AthleteProfilePage(
   });
   const signInStatus = claimStatus({
     claimedAt: profile?.claimed_at ?? null,
-    latestInvite: latestInviteRow ? { expiresAt: latestInviteRow.expires_at, usedAt: latestInviteRow.used_at } : null,
+    latestInvite: latestInviteRow
+      ? { expiresAt: latestInviteRow.expires_at, usedAt: latestInviteRow.used_at, revokedAt: latestInviteRow.revoked_at ?? null }
+      : null,
   });
+  // The coach's own first name signs the text message they send the client.
+  const { data: viewerProfile } =
+    signInStatus === "active"
+      ? { data: null }
+      : await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+  const coachFirstName = (viewerProfile?.full_name ?? "").split(" ")[0] || null;
   // Same gate used everywhere else this tier's feature set is hidden —
   // group-tier clients don't get macro/meal-plan programming at all.
   const macrosEnabled = athleteMembership.client_tier !== "group";
@@ -905,6 +914,14 @@ export default async function AthleteProfilePage(
               clientName={profile?.full_name ?? "Client"}
               status={signInStatus}
               linkDetail={signInDetail}
+              coachFirstName={coachFirstName}
+            />
+          )}
+          {signInStatus === "active" && (
+            <CorrectClientEmail
+              groupId={params.groupId}
+              athleteId={params.athleteId}
+              clientName={profile?.full_name ?? "Client"}
             />
           )}
           {(hasAboutInfo || parQAnswers.length > 0 || !!intake) && (

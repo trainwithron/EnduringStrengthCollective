@@ -60,6 +60,13 @@ export async function POST(request: Request) {
     .eq("id", user.id)
     .is("claimed_at", null);
 
+  // They're in: retire any link the coach still has open for them.
+  await serviceRole
+    .from("client_invites")
+    .update({ used_at: new Date().toISOString() })
+    .eq("athlete_id", user.id)
+    .is("used_at", null);
+
   return NextResponse.json({ ok: true });
 }
 

@@ -55,14 +55,32 @@ ${message ? `<p class="err">${message}</p>` : ""}
 
 async function findUsableInvite(token: string) {
   const serviceRole = createServiceRoleClient();
-  const { data: invite } = await serviceRole
+  const { data: found } = await serviceRole
     .from("client_invites")
     .select("id, athlete_id")
     .eq("token_hash", hashClaimToken(token))
     .is("used_at", null)
     .gt("expires_at", new Date().toISOString())
     .maybeSingle();
-  return { serviceRole, invite };
+  if (!found) return { serviceRole, invite: null };
+
+  // A client who already signed in another way (a password reset, say) keeps no used link on file, so an
+  // old link would still look valid. Once the account is claimed it is THEIR account: refuse, and retire
+  // anything still open.
+  const { data: profile } = await serviceRole
+    .from("profiles")
+    .select("claimed_at")
+    .eq("id", found.athlete_id)
+    .maybeSingle();
+  if (!profile || profile.claimed_at) {
+    await serviceRole
+      .from("client_invites")
+      .update({ used_at: new Date().toISOString() })
+      .eq("athlete_id", found.athlete_id)
+      .is("used_at", null);
+    return { serviceRole, invite: null };
+  }
+  return { serviceRole, invite: found };
 }
 
 function tokenLooksValid(token: string | undefined): token is string {

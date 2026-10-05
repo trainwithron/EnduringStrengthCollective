@@ -51,24 +51,34 @@ export function hashClaimToken(token: string): string {
 }
 
 // What the coach sees per client (the short checklist state).
-export type ClaimStatus = "not_signed_in" | "invite_created" | "active";
+// finishing_setup: the link was used (they tapped Continue) but they have not finished the
+// set-password step yet, so the account is still unclaimed.
+export type ClaimStatus = "not_signed_in" | "invite_created" | "finishing_setup" | "active";
+
+const FINISHING_SETUP_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export function claimStatus(input: {
   claimedAt: string | null;
   // The most recent invite the coach created for this client, if any.
-  latestInvite: { expiresAt: string; usedAt: string | null } | null;
+  latestInvite: { expiresAt: string; usedAt: string | null; revokedAt?: string | null } | null;
   now?: Date;
 }): ClaimStatus {
   if (input.claimedAt) return "active";
   const now = input.now ?? new Date();
   const inv = input.latestInvite;
   if (inv && !inv.usedAt && new Date(inv.expiresAt) > now) return "invite_created";
+  // Used but not claimed: they are partway through. A cancelled link is also marked used, so a link
+  // known to be cancelled is excluded, and only a recent use counts (a stale one just means they stopped).
+  if (inv && inv.usedAt && !inv.revokedAt && now.getTime() - new Date(inv.usedAt).getTime() <= FINISHING_SETUP_WINDOW_MS) {
+    return "finishing_setup";
+  }
   return "not_signed_in";
 }
 
 export const CLAIM_STATUS_LABEL: Record<ClaimStatus, string> = {
   not_signed_in: "Not signed in yet",
   invite_created: "Invite link created",
+  finishing_setup: "Link used, finishing setup",
   active: "Active",
 };
 

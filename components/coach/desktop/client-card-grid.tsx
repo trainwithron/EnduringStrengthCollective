@@ -640,7 +640,11 @@ export function ClientCardGrid({
                     className="font-body text-xs text-amber-400 bg-amber-400/10 border border-amber-400/30 rounded-token-pill px-2 py-0.5 underline-offset-2 hover:underline"
                     title="Open their profile to see, cancel or remake the sign-in link"
                   >
-                    {member.signInStatus === "invite_created" ? "Invite link created" : "Not signed in yet"}
+                    {member.signInStatus === "invite_created"
+                      ? "Invite link created"
+                      : member.signInStatus === "finishing_setup"
+                      ? "Link used, finishing setup"
+                      : "Not signed in yet"}
                   </Link>
                 )}
 

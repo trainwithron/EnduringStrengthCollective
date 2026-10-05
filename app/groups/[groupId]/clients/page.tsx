@@ -145,16 +145,21 @@ export default async function ClientsPage(
   const unclaimedIds = (memberships ?? [])
     .filter((m: any) => m.role === "athlete" && !m.profiles?.claimed_at)
     .map((m: any) => m.profile_id as string);
-  const latestInviteByAthlete = new Map<string, { expiresAt: string; usedAt: string | null }>();
+  const latestInviteByAthlete = new Map<string, { expiresAt: string; usedAt: string | null; revokedAt: string | null }>();
   if (unclaimedIds.length > 0) {
-    const { data: inviteRows } = await supabase
-      .from("client_invites")
-      .select("athlete_id, expires_at, used_at, created_at")
-      .in("athlete_id", unclaimedIds)
-      .order("created_at", { ascending: false });
-    for (const r of inviteRows ?? []) {
+    // revoked_at comes from a later database update; without it the query is retried without that column.
+    const loadInvites = (columns: string) =>
+      supabase.from("client_invites").select(columns).in("athlete_id", unclaimedIds).order("created_at", { ascending: false });
+    let inviteResult = await loadInvites("athlete_id, expires_at, used_at, created_at, revoked_at");
+    if (inviteResult.error) inviteResult = await loadInvites("athlete_id, expires_at, used_at, created_at");
+    for (const r of (inviteResult.data ?? []) as unknown as {
+      athlete_id: string;
+      expires_at: string;
+      used_at: string | null;
+      revoked_at?: string | null;
+    }[]) {
       if (!latestInviteByAthlete.has(r.athlete_id)) {
-        latestInviteByAthlete.set(r.athlete_id, { expiresAt: r.expires_at, usedAt: r.used_at });
+        latestInviteByAthlete.set(r.athlete_id, { expiresAt: r.expires_at, usedAt: r.used_at, revokedAt: r.revoked_at ?? null });
       }
     }
   }
