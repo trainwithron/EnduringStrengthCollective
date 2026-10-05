@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         error:
-          "Google Health isn't configured yet — ask your admin to set GOOGLE_HEALTH_CLIENT_ID/GOOGLE_HEALTH_CLIENT_SECRET/GOOGLE_HEALTH_REDIRECT_URI.",
+          "Google Health isn't available yet.",
       },
       { status: 503 }
     );

@@ -34,7 +34,7 @@ async function requireCoachOfGroup(groupId: string) {
 export async function POST(request: Request) {
   if (!isStripeConfigured()) {
     return NextResponse.json(
-      { error: "Payments aren't configured yet — ask your admin to add a STRIPE_SECRET_KEY." },
+      { error: "Payments aren't set up yet." },
       { status: 503 }
     );
   }

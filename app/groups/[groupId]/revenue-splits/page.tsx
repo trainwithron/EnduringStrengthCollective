@@ -59,12 +59,6 @@ export default async function RevenueSplitsPage(
     );
   }
 
-  const { data: org } = await supabase
-    .from("organizations")
-    .select("platform_fee_pct")
-    .eq("id", orgMembership.organization_id)
-    .maybeSingle();
-
   const { data: memberRows } = await supabase
     .from("organization_memberships")
     .select("profile_id, role, revenue_share_pct, stripe_connect_status, profiles ( full_name )")
@@ -136,7 +130,6 @@ export default async function RevenueSplitsPage(
         groupId={params.groupId}
         currentUserId={user.id}
         totalRevenueCents={totalRevenueCents}
-        initialPlatformFeePct={org?.platform_fee_pct ?? 10}
         coaches={coaches}
         isOwner={isOwner}
       />

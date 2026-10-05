@@ -17,7 +17,6 @@ export function RevenueSplitEditor({
   groupId,
   currentUserId,
   totalRevenueCents,
-  initialPlatformFeePct,
   coaches,
   isOwner,
 }: {
@@ -25,12 +24,10 @@ export function RevenueSplitEditor({
   groupId: string;
   currentUserId: string;
   totalRevenueCents: number;
-  initialPlatformFeePct: number;
   coaches: (CoachShare & { stripeConnectStatus: string })[];
   isOwner: boolean;
 }) {
   const router = useRouter();
-  const [platformFeePct, setPlatformFeePct] = useState(initialPlatformFeePct.toString());
   const [shares, setShares] = useState<Record<string, string>>(
     Object.fromEntries(coaches.map((c) => [c.profileId, c.revenueSharePct.toString()]))
   );
@@ -55,22 +52,13 @@ export function RevenueSplitEditor({
     }
   }
 
+  // No percentage platform fee: only the real Stripe fee and a flat per-payment fee come off, and that happens when a
+  // payment is processed. This preview splits the whole monthly figure.
   const result = computeRevenueSplit(
     totalRevenueCents,
-    parseFloat(platformFeePct) || 0,
+    0,
     coaches.map((c) => ({ ...c, revenueSharePct: parseFloat(shares[c.profileId]) || 0 }))
   );
-
-  async function persistPlatformFee(value: string) {
-    setPlatformFeePct(value);
-    if (!isOwner) return;
-    const supabase = createBrowserClient();
-    await supabase
-      .from("organizations")
-      .update({ platform_fee_pct: parseFloat(value) || 0 })
-      .eq("id", organizationId);
-    router.refresh();
-  }
 
   async function persistShare(profileId: string, value: string) {
     setShares((prev) => ({ ...prev, [profileId]: value }));
@@ -88,35 +76,13 @@ export function RevenueSplitEditor({
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <div className="grid grid-cols-3 gap-4">
-        <div className="border border-steel/20 p-4">
-          <p className="font-display text-2xl leading-none">{formatSplitCents(result.totalRevenueCents)}</p>
-          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Total est. revenue</p>
-        </div>
-        <div className="border border-steel/20 p-4">
-          <p className="font-display text-2xl leading-none">{formatSplitCents(result.platformFeeCents)}</p>
-          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">ESN platform fee</p>
-        </div>
-        <div className="border border-steel/20 p-4">
-          <p className="font-display text-2xl leading-none">{formatSplitCents(result.remainderCents)}</p>
-          <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Remainder to split</p>
-        </div>
+      <div className="border border-steel/20 p-4 max-w-xs">
+        <p className="font-display text-2xl leading-none">{formatSplitCents(result.remainderCents)}</p>
+        <p className="font-body text-xs text-steel mt-1 uppercase tracking-wide">Monthly rates entered, to split</p>
+        <p className="font-body text-xs text-steel mt-2">
+          Added up from each client&apos;s monthly rate. Real payments split what is left after the card fee.
+        </p>
       </div>
-
-      <label className="block max-w-xs">
-        <span className="font-body text-xs text-steel uppercase tracking-wide">
-          Platform fee (%)
-        </span>
-        <input
-          type="number"
-          min={0}
-          max={100}
-          value={platformFeePct}
-          onChange={(e) => persistPlatformFee(e.target.value)}
-          disabled={!isOwner}
-          className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm mt-1 disabled:opacity-50"
-        />
-      </label>
 
       <div>
         <h3 className="font-body text-xs text-steel uppercase tracking-wide mb-2">

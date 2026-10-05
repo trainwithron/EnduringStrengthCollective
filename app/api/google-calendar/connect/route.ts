@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         error:
-          "Google Calendar isn't configured yet — ask your admin to set GOOGLE_CALENDAR_CLIENT_ID/GOOGLE_CALENDAR_CLIENT_SECRET/GOOGLE_CALENDAR_REDIRECT_URI.",
+          "Google Calendar isn't available yet.",
       },
       { status: 503 }
     );

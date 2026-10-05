@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         error:
-          "Oura isn't configured yet — ask your admin to set OURA_CLIENT_ID/OURA_CLIENT_SECRET/OURA_REDIRECT_URI.",
+          "Oura isn't available yet.",
       },
       { status: 503 }
     );

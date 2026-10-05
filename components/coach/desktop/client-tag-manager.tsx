@@ -80,7 +80,7 @@ export function ClientTagManager({
       <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Client Tags</p>
       <p className="font-body text-xs text-steel mb-3 max-w-[60ch]">
         Organize clients across every group in this organization — &ldquo;In-Home,&rdquo;
-        &ldquo;Coast to Coast,&rdquo; whatever makes sense for your business. Assign tags from a
+        &ldquo;Online,&rdquo; whatever makes sense for your business. Assign tags from a
         client&apos;s own profile.
       </p>
 

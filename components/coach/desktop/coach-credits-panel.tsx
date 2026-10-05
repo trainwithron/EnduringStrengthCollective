@@ -15,11 +15,14 @@ export function CoachCreditsPanel({
   balance,
   unlimited,
   liftOffActive,
+  purchaseAvailable = true,
 }: {
   groupId: string;
   balance: number;
   unlimited: boolean;
   liftOffActive: boolean;
+  // False when payments are not set up yet: there is nothing to buy, so no buy button is shown.
+  purchaseAvailable?: boolean;
 }) {
   const [loadingKind, setLoadingKind] = useState<"credit_pack" | "lift_off" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +77,12 @@ export function CoachCreditsPanel({
         </p>
       )}
 
-      <div className="flex flex-wrap gap-3">
+      {!purchaseAvailable && (
+        <p className="font-body text-xs text-steel">
+          Extra credits aren&apos;t available to buy yet. Your plan includes AI generations each month.
+        </p>
+      )}
+      <div className={purchaseAvailable ? "flex flex-wrap gap-3" : "hidden"}>
         <button
           type="button"
           disabled={!!loadingKind}

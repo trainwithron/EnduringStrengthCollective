@@ -8,6 +8,7 @@ import { SignOutButton } from "@/components/group/sign-out-button";
 import { EditDisplayName } from "@/components/athlete/edit-display-name";
 import { PushNotificationToggle } from "@/components/athlete/push-notification-toggle";
 import { SmsConsentSettings } from "@/components/athlete/sms-consent-settings";
+import { isTwilioConfigured } from "@/lib/twilio";
 import { WearablePlaceholder } from "@/components/athlete/wearable-placeholder";
 import { PackagePicker, type PackageOption } from "@/components/athlete/package-picker";
 import { ManageBillingLink } from "@/components/athlete/manage-billing-link";
@@ -222,7 +223,7 @@ export default async function SettingsPage(
         <SettingsGroup label="Text messages & devices">
           {/* Consent is the person's own to give, so it is never shown (or
               writable) while a coach is acting as them. */}
-          {!isCoach && !effective.isActingAsOther && (
+          {!isCoach && !effective.isActingAsOther && isTwilioConfigured() && (
             <div className="py-4 border-b border-steel/20">
               <SmsConsentSettings
                 initialPhone={smsConsent?.phone_e164 ?? profileDetails?.phone ?? ""}

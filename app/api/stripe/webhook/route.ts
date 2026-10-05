@@ -208,11 +208,7 @@ async function createRevenueSplitTransfers(
   if (!group?.organization_id) return;
   const organizationId = group.organization_id;
 
-  const { data: org } = await supabase
-    .from("organizations")
-    .select("platform_fee_pct")
-    .eq("id", organizationId)
-    .maybeSingle();
+  const { data: org } = await supabase.from("organizations").select("id").eq("id", organizationId).maybeSingle();
   if (!org) return;
 
   const deduction = computePlatformDeduction(grossAmountCents, stripeProcessingFeeCents);
@@ -314,7 +310,9 @@ async function createRevenueSplitTransfers(
     role: m.role,
     revenueSharePct: m.revenue_share_pct,
   }));
-  const split = computeRevenueSplit(deduction.netAmountCents, org.platform_fee_pct, coaches);
+  // The platform's take is only the real Stripe fee plus the flat fee, both already removed in `deduction`. There is no
+  // percentage fee, so the org-level platform_fee_pct is not applied (0).
+  const split = computeRevenueSplit(deduction.netAmountCents, 0, coaches);
   await applyShares(split.coachShares);
 }
 

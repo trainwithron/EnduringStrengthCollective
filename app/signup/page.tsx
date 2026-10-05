@@ -86,7 +86,7 @@ export default function SignupPage() {
               required
               value={orgName}
               onChange={(e) => setOrgName(e.target.value)}
-              placeholder="e.g. Coast to Coast Fitness"
+              placeholder="e.g. Iron Yard Athletics"
               className="w-full h-11 mt-1 bg-surface border border-steel/30 text-chalk px-3 font-body focus:outline-none focus:border-rust"
             />
           </div>

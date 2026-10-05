@@ -58,7 +58,7 @@ export async function POST(request: Request) {
 
   if (!isAiConfigured()) {
     return NextResponse.json(
-      { error: "Quick add isn't configured yet — ask your admin to add an ANTHROPIC_API_KEY." },
+      { error: "Quick add isn't available yet." },
       { status: 503 }
     );
   }

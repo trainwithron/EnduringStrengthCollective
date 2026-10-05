@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         error:
-          "Withings isn't configured yet — ask your admin to set WITHINGS_CLIENT_ID/WITHINGS_CLIENT_SECRET/WITHINGS_REDIRECT_URI.",
+          "Withings isn't available yet.",
       },
       { status: 503 }
     );

@@ -22,7 +22,7 @@ export async function POST(request: Request) {
 
   if (!isStripeConfigured()) {
     return NextResponse.json(
-      { error: "Payments aren't configured yet — ask your admin to add a STRIPE_SECRET_KEY." },
+      { error: "Payments aren't set up yet." },
       { status: 503 }
     );
   }
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     kind === "credit_pack" ? process.env.STRIPE_PRICE_COACH_CREDIT_PACK : process.env.STRIPE_PRICE_COACH_LIFT_OFF;
   if (!priceId) {
     return NextResponse.json(
-      { error: "This purchase isn't configured yet — ask your admin to add the Stripe price id." },
+      { error: "This purchase isn't available yet." },
       { status: 503 }
     );
   }

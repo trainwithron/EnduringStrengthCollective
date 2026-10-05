@@ -147,7 +147,7 @@ export async function POST(request: Request) {
 
   if (!isAiConfigured()) {
     return NextResponse.json(
-      { error: "The AI program builder isn't configured yet — ask your admin to add an ANTHROPIC_API_KEY." },
+      { error: "The AI program builder isn't available yet." },
       { status: 503 }
     );
   }

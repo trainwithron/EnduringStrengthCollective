@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { SmsSettingsForm } from "@/components/coach/desktop/sms-settings-form";
+import { isTwilioConfigured } from "@/lib/twilio";
 
 export default async function SmsSettingsPage(
   props: { params: Promise<{ groupId: string }> }
@@ -53,6 +54,7 @@ export default async function SmsSettingsPage(
         initialSmsEnabled={config?.sms_enabled ?? false}
         initialQuietHoursStart={config?.quiet_hours_start ?? null}
         initialQuietHoursEnd={config?.quiet_hours_end ?? null}
+        smsAvailable={isTwilioConfigured()}
       />
     </CoachDesktopShell>
   );

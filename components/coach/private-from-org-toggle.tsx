@@ -53,8 +53,10 @@ export function PrivateFromOrgToggle({
       </label>
       <p className="font-body text-xs text-steel mt-1 max-w-[50ch]">
         Off by default — an org owner/admin above you can normally see this
-        client&apos;s full session history. Turning this on hides it from
-        everyone except you and the client themselves.
+        client&apos;s full session history. Turning this on hides it from org
+        owners and admins who don&apos;t coach this client. An owner who opens
+        this client&apos;s group themselves becomes a coach there and can still
+        see it.
       </p>
       {error && <p className="font-body text-xs text-rust mt-1">{error}</p>}
     </div>

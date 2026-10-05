@@ -73,7 +73,7 @@ export async function POST(request: Request) {
 
   if (!isAiConfigured()) {
     return NextResponse.json(
-      { error: "AI meal suggestions aren't configured yet — ask your admin to add an ANTHROPIC_API_KEY." },
+      { error: "AI meal suggestions aren't available yet." },
       { status: 503 }
     );
   }

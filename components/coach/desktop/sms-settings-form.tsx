@@ -18,12 +18,15 @@ export function SmsSettingsForm({
   initialSmsEnabled,
   initialQuietHoursStart,
   initialQuietHoursEnd,
+  smsAvailable = true,
 }: {
   coachId: string;
   initialPhone: string | null;
   initialSmsEnabled: boolean;
   initialQuietHoursStart: string | null;
   initialQuietHoursEnd: string | null;
+  // Whether the platform can send texts at all right now.
+  smsAvailable?: boolean;
 }) {
   const [phone, setPhone] = useState(initialPhone ?? "");
   const [smsEnabled, setSmsEnabled] = useState(initialSmsEnabled);
@@ -61,9 +64,9 @@ export function SmsSettingsForm({
     <div className="max-w-2xl space-y-6">
       <div className="border border-rust/40 bg-rust/5 p-3">
         <p className="font-body text-xs text-chalk">
-          Real text messages cost a small amount per send (Twilio&apos;s own usage-based pricing) and
-          require your own Twilio account credentials to be configured — this page controls when
-          and to whom this app sends them, not whether Twilio itself is set up.
+          {smsAvailable
+            ? "Text messages are on for this platform. This page controls whether your clients get them and when."
+            : "Text messages aren't switched on for this platform yet, so nothing is sent today. Your choices here are saved and take effect when they are. Clients are only offered texting once it works."}
         </p>
       </div>
 

@@ -14,6 +14,7 @@ import { PlanBillingPanel } from "@/components/coach/desktop/plan-billing-panel"
 import { getOrgBillingSummary } from "@/lib/org-billing-server";
 import { isBillingEnforced } from "@/lib/org-entitlements";
 import type { ButtonShape, DisplayFont, BodyFont } from "@/lib/theme";
+import { isStripeConfigured } from "@/lib/stripe";
 
 type OrgTab = "team" | "branding" | "workout-card" | "tags" | "dispatch" | "terminology" | "credits" | "plan";
 
@@ -317,6 +318,7 @@ export default async function BrandingPage(
         )
       ) : tab === "credits" ? (
         <CoachCreditsPanel
+          purchaseAvailable={isStripeConfigured() && !!process.env.STRIPE_PRICE_COACH_CREDIT_PACK}
           groupId={params.groupId}
           balance={coachCreditBalance}
           unlimited={coachCreditsUnlimited}

@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         error:
-          "Garmin isn't configured yet — ask your admin to set GARMIN_CLIENT_ID/GARMIN_CLIENT_SECRET/GARMIN_REDIRECT_URI.",
+          "Garmin isn't available yet.",
       },
       { status: 503 }
     );

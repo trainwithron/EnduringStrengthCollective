@@ -64,7 +64,7 @@ export function NewOrganizationForm({ existingOrgs, ownerId }: { existingOrgs: O
           required
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Coast to Coast Fitness"
+          placeholder="e.g. Iron Yard Athletics"
           className="w-full h-10 mt-1 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-sm focus:outline-none focus:border-rust"
         />
       </div>
