@@ -19,6 +19,8 @@ import {
   ViewModeRedirector,
 } from "@/components/athlete/day-week-month-switcher";
 import { ProgramCardList } from "@/components/athlete/program-card-list";
+import { HomeThread } from "@/components/athlete/home-thread";
+import { buildHomeThread } from "@/lib/home-thread";
 import { computeProgramCardVisuals } from "@/lib/program-card-data";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
@@ -282,6 +284,7 @@ export default async function GroupHubPage(
   let nextWorkoutText: string | null = null;
   // No workout logged yet: the wellness check-in becomes a plain card under the workout, not a full-screen block.
   let isFirstDay = false;
+  let homeThreadLines: string[] = [];
   let weekDays: HomeDaySummary[] = [];
   let monthSummaryByDateKey = new Map<string, HomeDaySummary>();
   let weekRangeStart = targetDate;
@@ -341,6 +344,48 @@ export default async function GroupHubPage(
           .eq("athlete_id", athleteId)
           .eq("group_id", params.groupId);
         isFirstDay = (priorWorkoutCount ?? 0) === 0;
+
+        // The thread above Today: confirmed goal, place in the main program, weekly streak. Any failure just leaves it out.
+        try {
+          const twoYearsAgo = new Date(Date.now() - 730 * 86400000).toISOString();
+          const [{ data: goalRow }, { data: threadLogs }] = await Promise.all([
+            supabase
+              .from("client_goals")
+              .select("goal_type, custom_label, target_date, status")
+              .eq("athlete_id", athleteId)
+              .eq("group_id", params.groupId)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle(),
+            supabase
+              .from("workout_logs")
+              .select("created_at")
+              .eq("athlete_id", athleteId)
+              .gte("created_at", twoYearsAgo)
+              .order("created_at", { ascending: false })
+              .limit(800),
+          ]);
+          const main = programContexts[0];
+          homeThreadLines = buildHomeThread({
+            goal: goalRow
+              ? { goalType: goalRow.goal_type, customLabel: goalRow.custom_label, targetDate: goalRow.target_date, status: goalRow.status }
+              : null,
+            program: main
+              ? {
+                  name: main.heading,
+                  unscheduled: main.unscheduled,
+                  startDate: main.program.startDate,
+                  scheduledDates: main.scheduled.map((e) => e.date),
+                  totalWorkouts: main.all.length,
+                  doneWorkouts: main.all.filter((w) => loggedIds.has(w.id)).length,
+                }
+              : null,
+            logDates: (threadLogs ?? []).map((l) => nowInZone(timezone, new Date(l.created_at))),
+            today,
+          });
+        } catch {
+          homeThreadLines = [];
+        }
       }
       const todayAllDone = daySessions.length > 0 && daySessions.every((x) => x.status === "done");
       if (isToday && todayAllDone) {
@@ -638,6 +683,7 @@ export default async function GroupHubPage(
 
           {view === "day" && (
             <div className="space-y-4">
+              {isToday && <HomeThread lines={homeThreadLines} />}
               {reupState && <ReupCard state={reupState} />}
               {upcomingClasses > 0 && (
                 <Link href={`/groups/${params.groupId}/classes`} className="block border border-steel/30 bg-surface/40 px-4 py-3 font-body text-sm text-chalk">

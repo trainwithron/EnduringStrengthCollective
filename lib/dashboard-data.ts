@@ -1,5 +1,6 @@
 // Server-only data orchestration behind the coach Home dashboard redesign
 import { needsPayment } from "@/lib/reup";
+import { localDayBounds } from "@/lib/timezone";
 // (coach_dashboard_redesign_scoping.md). Pairs with the tested pure libs
 // (team-pulse.ts, quiet-client-tier.ts, coach-hero-priority.ts) the same
 // way lib/leaderboard-data.ts pairs with lib/leaderboard.ts — this file
@@ -109,14 +110,17 @@ export async function getCoachDashboardData(
     // Which alternate value each hover-peek tile currently defaults to
     // (coach_dashboard_layout.tile_metric_overrides), e.g. {"mrr": "projected"}.
     tileMetricOverrides?: Record<string, string>;
+    // The coach's own time zone, so "today" is their day and not the server's (UTC). Without it the old UTC day is used.
+    timezone?: string;
   }
 ): Promise<CoachDashboardData> {
-  const { coachId, teamGroups, allGroups, tileMetricOverrides = {} } = params;
+  const { coachId, teamGroups, allGroups, tileMetricOverrides = {}, timezone } = params;
   const allGroupIds = allGroups.map((g) => g.id);
   const groupNameById = new Map(allGroups.map((g) => [g.id, g.name]));
   const orgNameByGroupId = new Map(allGroups.map((g) => [g.id, g.orgName ?? null]));
   const now = new Date();
-  const todayKey = todayKeyOf(now);
+  const dayBounds = timezone ? localDayBounds(timezone, now) : null;
+  const todayKey = dayBounds?.dateKey ?? todayKeyOf(now);
   const sevenDaysAgoKey = daysAgoKey(7);
   const monthKey = todayKey.slice(0, 7);
 
@@ -177,8 +181,8 @@ export async function getCoachDashboardData(
       .eq("coach_id", coachId)
       .in("group_id", allGroupIds)
       .eq("status", "confirmed")
-      .gte("start_at", `${todayKey}T00:00:00`)
-      .lt("start_at", `${todayKey}T23:59:59`)
+      .gte("start_at", dayBounds?.startIso ?? `${todayKey}T00:00:00Z`)
+      .lt("start_at", dayBounds?.endIso ?? `${todayKey}T23:59:59Z`)
       .order("start_at", { ascending: true }),
     supabase
       .from("credit_purchases")

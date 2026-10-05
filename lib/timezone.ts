@@ -82,6 +82,20 @@ export function dateKeyInZone(timeZone: string, now: Date = new Date()): string 
   return nowInZone(timeZone, now).toISOString().slice(0, 10);
 }
 
+// The real start and end instants of the calendar day it is right now in `timeZone`, plus that day's key. The end is the next local
+// midnight, so a day with a daylight-saving change is 23 or 25 hours long rather than a fixed 24. Use these for "today" queries instead of
+// the UTC date, which for a US coach is already tomorrow in the evening.
+export function localDayBounds(timeZone: string, now: Date = new Date()): { dateKey: string; startIso: string; endIso: string } {
+  const dateKey = dateKeyInZone(timeZone, now);
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const next = new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+  return {
+    dateKey,
+    startIso: zonedTimeToUtc(dateKey, "00:00", timeZone).toISOString(),
+    endIso: zonedTimeToUtc(next, "00:00", timeZone).toISOString(),
+  };
+}
+
 // One group's coach's stored zone (profiles.timezone), for "is it today
 // yet" checks against that group's own program schedule — the same
 // convention already used for booking/availability, extended to content

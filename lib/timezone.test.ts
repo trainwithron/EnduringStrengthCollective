@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { zonedTimeToUtc, nowInZone, dateKeyInZone } from "./timezone";
+import { zonedTimeToUtc, nowInZone, dateKeyInZone, localDayBounds } from "./timezone";
 
 describe("zonedTimeToUtc", () => {
   it("converts a US Eastern wall-clock time (winter, EST = UTC-5)", () => {
@@ -88,5 +88,26 @@ describe("localDateKey", () => {
     // Constructed from local fields, so it is "Oct 5, 9:30pm" wherever tests run.
     expect(localDateKey(new Date(2026, 9, 5, 21, 30))).toBe("2026-10-05");
     expect(localDateKey(new Date(2026, 0, 1, 0, 5))).toBe("2026-01-01");
+  });
+});
+
+describe("localDayBounds", () => {
+  it("is the coach's own day, not the UTC day", () => {
+    // 9:30pm Eastern on Oct 5 is already Oct 6 in UTC.
+    const b = localDayBounds("America/New_York", new Date("2026-10-06T01:30:00Z"));
+    expect(b.dateKey).toBe("2026-10-05");
+    expect(b.startIso).toBe("2026-10-05T04:00:00.000Z");
+    expect(b.endIso).toBe("2026-10-06T04:00:00.000Z");
+  });
+  it("is 25 hours long on the day the clocks go back and 23 when they go forward", () => {
+    const fall = localDayBounds("America/New_York", new Date("2026-11-01T15:00:00Z"));
+    expect((Date.parse(fall.endIso) - Date.parse(fall.startIso)) / 3600000).toBe(25);
+    const spring = localDayBounds("America/New_York", new Date("2027-03-14T15:00:00Z"));
+    expect((Date.parse(spring.endIso) - Date.parse(spring.startIso)) / 3600000).toBe(23);
+  });
+  it("works east of UTC too", () => {
+    const b = localDayBounds("Australia/Sydney", new Date("2026-10-05T20:00:00Z")); // Oct 6, 7am in Sydney (daylight time)
+    expect(b.dateKey).toBe("2026-10-06");
+    expect(b.startIso).toBe("2026-10-05T13:00:00.000Z");
   });
 });

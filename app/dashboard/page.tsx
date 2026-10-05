@@ -16,7 +16,11 @@ import { getCoachDashboardData } from "@/lib/dashboard-data";
 import { DashboardHero } from "@/components/coach/desktop/dashboard-hero";
 import { PulseTabs } from "@/components/coach/desktop/pulse-tabs";
 import { DashboardStatTiles } from "@/components/coach/desktop/dashboard-stat-tiles";
-import { DashboardTodayPanel } from "@/components/coach/desktop/dashboard-today-panel";
+import { YourDayPanel } from "@/components/coach/desktop/your-day-panel";
+import { attentionFromSources, buildSchedule, type ClassSource } from "@/lib/your-day";
+import { DEFAULT_COACH_TIMEZONE, localDayBounds } from "@/lib/timezone";
+import { isValidTimeZone } from "@/lib/format-in-timezone";
+import { isLowReadiness } from "@/lib/wellness";
 import { NeedsPaymentPanel } from "@/components/coach/desktop/needs-payment-panel";
 import { DashboardWeekNarrative } from "@/components/coach/desktop/dashboard-week-narrative";
 import { DashboardAutoRefresh } from "@/components/coach/desktop/dashboard-auto-refresh";
@@ -121,7 +125,9 @@ export default async function CoachHomePage() {
     .eq("profile_id", user.id);
 
   const primaryOrgMembership = orgMemberships?.[0] ?? null;
-  const { data: viewerProfile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+  const { data: viewerProfile } = await supabase.from("profiles").select("full_name, timezone").eq("id", user.id).maybeSingle();
+  // The coach's own time zone: "today" on this page is their day, not the server's.
+  const coachTimezone = isValidTimeZone(viewerProfile?.timezone) ? (viewerProfile!.timezone as string) : DEFAULT_COACH_TIMEZONE;
   const { data: coachProfileRow } = await supabase
     .from("coach_profiles")
     .select("bio, photo_url")
@@ -215,6 +221,7 @@ export default async function CoachHomePage() {
     teamGroups: teamGroups.map((g) => ({ id: g.id, name: g.name, orgName: orgNameByGroupId(g.organization_id) })),
     allGroups: allGroups.map((g) => ({ id: g.id, name: g.name, orgName: orgNameByGroupId(g.organization_id) })),
     tileMetricOverrides,
+    timezone: coachTimezone,
   });
 
   // "Has something new happened here" dot — same coach_view_state data
@@ -448,6 +455,72 @@ export default async function CoachHomePage() {
 
   const orgName = org?.display_name || org?.name || "Your Coaching Business";
 
+  // Your day: today's classes (the 1-on-1 sessions are already in dashboardData), and low-readiness check-ins from today. Any failure
+  // (or the group-sessions migration not applied yet) just leaves that part out.
+  const day = localDayBounds(coachTimezone);
+  const allGroupIdList = allGroups.map((g) => g.id);
+  let todaysClasses: ClassSource[] = [];
+  try {
+    const { data: classRows } = await supabase
+      .from("group_sessions")
+      .select("id, title, start_at, end_at, capacity")
+      .eq("coach_id", user.id)
+      .eq("status", "scheduled")
+      .gte("start_at", day.startIso)
+      .lt("start_at", day.endIso)
+      .order("start_at", { ascending: true });
+    const ids = (classRows ?? []).map((c: any) => c.id as string);
+    const counts = new Map<string, { joined: number; waitlisted: number }>();
+    if (ids.length > 0) {
+      const { data: countRows } = await supabase.rpc("group_session_counts", { p_session_ids: ids });
+      for (const c of (countRows ?? []) as any[]) counts.set(c.session_id, { joined: c.joined, waitlisted: c.waitlisted });
+    }
+    // The classes page lives under a group the coach coaches; any one of them opens it.
+    const classesGroupId = (allGroups.find((g) => g.group_kind !== "one_on_one") ?? allGroups[0])?.id;
+    if (classesGroupId) {
+      todaysClasses = (classRows ?? []).map((c: any) => ({
+        id: c.id,
+        title: c.title,
+        startAt: c.start_at,
+        endAt: c.end_at,
+        capacity: c.capacity,
+        joined: counts.get(c.id)?.joined ?? 0,
+        waitlisted: counts.get(c.id)?.waitlisted ?? 0,
+        groupId: classesGroupId,
+      }));
+    }
+  } catch {
+    todaysClasses = [];
+  }
+
+  let lowReadiness: { athleteId: string; groupId: string; name: string }[] = [];
+  try {
+    if (allGroupIdList.length > 0) {
+      const { data: wellnessRows } = await supabase
+        .from("wellness_checkins")
+        .select("athlete_id, group_id, sleep_quality, soreness, energy")
+        .in("group_id", allGroupIdList)
+        .eq("log_date", day.dateKey);
+      const low = (wellnessRows ?? []).filter((w: any) => isLowReadiness({ sleepQuality: w.sleep_quality, soreness: w.soreness, energy: w.energy }));
+      if (low.length > 0) {
+        const { data: nameRows } = await supabase.from("profiles").select("id, full_name").in("id", low.map((w: any) => w.athlete_id));
+        const nameById = new Map((nameRows ?? []).map((p: any) => [p.id, p.full_name as string]));
+        lowReadiness = low.map((w: any) => ({ athleteId: w.athlete_id, groupId: w.group_id, name: nameById.get(w.athlete_id) ?? "A client" }));
+      }
+    }
+  } catch {
+    lowReadiness = [];
+  }
+
+  const yourDaySchedule = buildSchedule(user.id, dashboardData.todayBookings, todaysClasses);
+  const yourDayAttention = attentionFromSources({
+    replies: needsReplyThreads,
+    payments: dashboardData.needsPayment,
+    readiness: lowReadiness,
+    insights: collectiveIntelligenceItems.filter((i) => i.itemType !== "celebration").map((i) => ({ id: i.id, headline: i.headline, athleteId: i.athleteId, groupId: i.groupId })),
+    notices: orgNotifications.map((n) => ({ id: n.id, body: n.body, linkPath: n.linkPath, createdAt: n.createdAt })),
+  });
+
   // "N — Dual Signal" (coach_dashboard_redesign_scoping.md): a "Right
   // now" hero beside per-team-group Team Pulse gauges, above a bento
   // grid (stats, Today, This Week, the expandable roster wall). The
@@ -476,6 +549,8 @@ export default async function CoachHomePage() {
       {clientCards.length === 0 && teamCards.length === 0 && socialCards.length === 0 && allGroups[0] && (
         <GettingStartedCard groupId={(allGroups.find((g) => g.group_kind !== "one_on_one") ?? allGroups[0]).id} />
       )}
+
+      <YourDayPanel schedule={yourDaySchedule} attention={yourDayAttention} timezone={coachTimezone} />
 
       <div className="mb-6">
         <DashboardHero flag={dashboardData.heroFlag} emptyState={dashboardData.heroEmptyState} />
@@ -520,11 +595,6 @@ export default async function CoachHomePage() {
             key: "week",
             label: "This Week",
             node: <DashboardWeekNarrative text={dashboardData.weekNarrative} />,
-          },
-          {
-            key: "today",
-            label: "Today",
-            node: <DashboardTodayPanel bookings={dashboardData.todayBookings} />,
           },
         ]}
       />
