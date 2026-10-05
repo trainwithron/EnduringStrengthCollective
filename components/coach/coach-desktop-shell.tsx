@@ -43,7 +43,7 @@ import {
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
 import { FeedbackButton } from "@/components/feedback/feedback-button";
-import { ViewAsClientButton } from "@/components/coach/desktop/view-as-client-button";
+import { ClientFinder } from "@/components/coach/desktop/client-finder";
 import { HeaderNotificationBell } from "@/components/notifications/header-bell";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { TerminologyProvider } from "@/components/coach/terminology-provider";
@@ -665,7 +665,7 @@ export function CoachDesktopShell({
         <div className="ml-auto flex items-center gap-1.5 shrink-0">
           <HeaderNotificationBell />
           <DownloadAppButton variant="topbar" />
-          <ViewAsClientButton groupId={groupId} />
+          <ClientFinder currentGroupId={groupId} />
         </div>
       </header>
 

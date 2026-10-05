@@ -4,6 +4,7 @@ import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
 import { TerminologyProvider } from "@/components/coach/terminology-provider";
 import { ExitDesktopModeButton } from "@/components/coach/exit-desktop-mode-button";
+import { ClientFinder } from "@/components/coach/desktop/client-finder";
 import { HeaderNotificationBell } from "@/components/notifications/header-bell";
 import { CollectiveIntelligenceChat } from "@/components/coach/desktop/collective-intelligence-chat";
 
@@ -21,6 +22,9 @@ export function CoachHomeShell({ orgName, children }: { orgName: string; childre
         <div className="px-5 pt-6 pb-5 border-b border-steel/20">
           <p className="font-body text-xs text-steel uppercase tracking-wide">Coaching</p>
           <h1 className="font-display font-bold text-lg uppercase leading-tight truncate mt-1">{orgName}</h1>
+        </div>
+        <div className="px-3 pt-3">
+          <ClientFinder currentGroupId={null} align="left" />
         </div>
         <nav className="flex-1 py-3">
           <Link
