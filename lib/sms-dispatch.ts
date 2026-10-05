@@ -15,6 +15,9 @@ export type SmsDispatchReason =
   | "no_phone"
   | "invalid_phone"
   | "not_opted_in"
+  | "no_consent"
+  | "opted_out"
+  | "minor_no_guardian_consent"
   | "quiet_hours"
   | "already_sent"
   | "send_failed";
@@ -24,10 +27,37 @@ export interface SmsDispatchResult {
   reason?: SmsDispatchReason;
 }
 
+// What the client consented to (athlete_sms_consent, migration 0229):
+//   appointments  = booking confirmations + session reminders
+//   announcements = check-ins/nudges (and announcements, later)
+// "coach_only" messages go to the coach's own phone, not a client, so
+// they need no client consent.
+export type SmsConsentScope = "appointments" | "announcements" | "coach_only";
+
+const CONSENT_SCOPE: Record<SmsMessageType, SmsConsentScope> = {
+  booking_confirmation: "appointments",
+  session_reminder: "appointments",
+  attendance_nudge: "announcements",
+  low_credit_alert: "coach_only",
+};
+
+export function consentScopeFor(messageType: SmsMessageType): SmsConsentScope {
+  return CONSENT_SCOPE[messageType];
+}
+
 // The single call point every SMS trigger in this app goes through —
-// crons, event-fired API routes, all of it. Centralizing the opt-in +
-// quiet-hours + idempotency checks here means no call site can forget
-// one; a new trigger only ever has to build the message and call this.
+// crons, event-fired API routes, all of it. Centralizing the consent +
+// opt-in + quiet-hours + idempotency checks here means no call site can
+// forget one; a new trigger only ever has to build the message and call
+// this.
+//
+// Client-facing messages FAIL CLOSED: the caller passes the athlete, not a
+// phone number, and the number texted is the one that athlete consented to
+// (never an athlete-typed profile field). No athleteId, no consent row, the
+// wrong scope, a STOP reply, or an under-13 athlete without verified
+// guardian consent all mean no text. The Supabase client must be the
+// service-role one (the consent check is a service-role-only function; any
+// error from it also fails closed).
 //
 // Insert-then-send, not send-then-log: sms_log's own unique
 // (message_type, reference_id) constraint is the real idempotency
@@ -39,16 +69,45 @@ export async function dispatchSms(
   supabase: SupabaseClient,
   params: {
     coachId: string;
-    recipientPhone: string | null | undefined;
     messageType: SmsMessageType;
     referenceId: string;
     body: string;
+    // Client-facing types: who is being texted.
+    athleteId?: string | null;
+    // coach_only types: the coach's own phone.
+    recipientPhone?: string | null;
   }
 ): Promise<SmsDispatchResult> {
   if (!isTwilioConfigured()) return { sent: false, reason: "twilio_not_configured" };
-  if (!params.recipientPhone) return { sent: false, reason: "no_phone" };
 
-  const normalizedPhone = normalizePhoneToE164(params.recipientPhone);
+  const scope = consentScopeFor(params.messageType);
+  let phoneToText: string | null | undefined;
+
+  if (scope === "coach_only") {
+    phoneToText = params.recipientPhone;
+  } else {
+    if (!params.athleteId) return { sent: false, reason: "no_consent" };
+    const { data, error } = await supabase.rpc("sms_consent_for_dispatch", {
+      p_athlete_id: params.athleteId,
+      p_scope: scope,
+    });
+    const row = (Array.isArray(data) ? data[0] : data) as
+      | { phone_e164: string | null; allowed: boolean; reason: string | null }
+      | null
+      | undefined;
+    if (error || !row || !row.allowed) {
+      const reason = row?.reason;
+      return {
+        sent: false,
+        reason: reason === "opted_out" || reason === "minor_no_guardian_consent" ? reason : "no_consent",
+      };
+    }
+    phoneToText = row.phone_e164;
+  }
+
+  if (!phoneToText) return { sent: false, reason: "no_phone" };
+
+  const normalizedPhone = normalizePhoneToE164(phoneToText);
   if (!normalizedPhone) return { sent: false, reason: "invalid_phone" };
 
   const { data: config } = await supabase

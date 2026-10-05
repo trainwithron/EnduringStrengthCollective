@@ -7,6 +7,7 @@ import { getEffectiveAthlete } from "@/lib/acting-as";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { EditDisplayName } from "@/components/athlete/edit-display-name";
 import { PushNotificationToggle } from "@/components/athlete/push-notification-toggle";
+import { SmsConsentSettings } from "@/components/athlete/sms-consent-settings";
 import { WearablePlaceholder } from "@/components/athlete/wearable-placeholder";
 import { PackagePicker, type PackageOption } from "@/components/athlete/package-picker";
 import { ManageBillingLink } from "@/components/athlete/manage-billing-link";
@@ -59,6 +60,7 @@ export default async function SettingsPage(
     { data: googleCalendarConnection },
     { data: profileDetails },
     { data: group },
+    { data: smsConsent },
   ] = await Promise.all([
       supabase
         .from("profiles")
@@ -109,6 +111,11 @@ export default async function SettingsPage(
         .from("groups")
         .select("gamification_enabled")
         .eq("id", params.groupId)
+        .maybeSingle(),
+      supabase
+        .from("athlete_sms_consent")
+        .select("phone_e164, appointments, announcements, opted_out_at")
+        .eq("athlete_id", athleteId)
         .maybeSingle(),
     ]);
   const isCoach = membership?.role === "coach";
@@ -210,6 +217,18 @@ export default async function SettingsPage(
           <div className="pb-4 border-b border-steel/20">
             <PushNotificationToggle />
           </div>
+          {/* Consent is the person's own to give, so it is never shown (or
+              writable) while a coach is acting as them. */}
+          {!isCoach && !effective.isActingAsOther && (
+            <div className="py-4 border-b border-steel/20">
+              <SmsConsentSettings
+                initialPhone={smsConsent?.phone_e164 ?? profileDetails?.phone ?? ""}
+                initialAppointments={smsConsent?.appointments ?? false}
+                initialAnnouncements={smsConsent?.announcements ?? false}
+                optedOut={!!smsConsent?.opted_out_at}
+              />
+            </div>
+          )}
           <div className="pt-4">
             <WearablePlaceholder
               groupId={params.groupId}

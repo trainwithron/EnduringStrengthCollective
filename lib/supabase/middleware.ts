@@ -71,6 +71,9 @@ export async function updateSession(request: NextRequest) {
     // of reaching the route handler, silently breaking credit/subscription
     // grants in every environment, including production.
     pathname.startsWith("/api/stripe/webhook") ||
+    // Twilio posts inbound texts (STOP/START/HELP) here with no session;
+    // its X-Twilio-Signature check inside the route is the real auth.
+    pathname.startsWith("/api/twilio/inbound") ||
     // An invite email's link establishes a real session client-side, from
     // the URL fragment — the initial server-rendered request has no
     // session cookie yet, same gotcha already hit once for /pr/ and

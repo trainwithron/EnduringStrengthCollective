@@ -67,16 +67,10 @@ export async function GET(request: Request) {
         .maybeSingle();
       if (recentNudge) continue;
 
-      const { data: athleteDetails } = await supabase
-        .from("athlete_profile_details")
-        .select("phone")
-        .eq("athlete_id", gap.athleteId)
-        .maybeSingle();
-
       const todayKey = new Date().toISOString().slice(0, 10);
       const result = await dispatchSms(supabase, {
         coachId: coach.coachId,
-        recipientPhone: athleteDetails?.phone,
+        athleteId: gap.athleteId,
         messageType: "attendance_nudge",
         referenceId: `${gap.athleteId}:${groupId}:${todayKey}`,
         body: `Hi ${gap.athleteName.split(" ")[0]}, it's been a couple weeks since your last session with ${coach.coachName} — hope you're doing well! Book your next one whenever you're ready.`,

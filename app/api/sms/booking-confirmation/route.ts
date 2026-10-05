@@ -32,6 +32,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing athleteId, groupId, or startAt." }, { status: 400 });
   }
 
+  // Only the athlete themself or a coach of that group can trigger this —
+  // it texts a real person, so any signed-in user must not be able to aim
+  // it at someone else's athleteId.
+  if (user.id !== athleteId) {
+    const { data: callerMembership } = await supabase
+      .from("group_memberships")
+      .select("role")
+      .eq("group_id", groupId)
+      .eq("profile_id", user.id)
+      .maybeSingle();
+    if (callerMembership?.role !== "coach") {
+      return NextResponse.json({ error: "Not allowed." }, { status: 403 });
+    }
+  }
+
   const serviceRole = createServiceRoleClient();
 
   const { data: coachRow } = await serviceRole
@@ -42,12 +57,6 @@ export async function POST(request: Request) {
     .limit(1)
     .maybeSingle();
   if (!coachRow) return NextResponse.json({ sent: false, reason: "no_coach" });
-
-  const { data: athleteDetails } = await serviceRole
-    .from("athlete_profile_details")
-    .select("phone")
-    .eq("athlete_id", athleteId)
-    .maybeSingle();
 
   const coachName = (coachRow as any).profiles?.full_name ?? "your coach";
   const when = new Date(startAt).toLocaleString(undefined, {
@@ -60,7 +69,7 @@ export async function POST(request: Request) {
 
   const result = await dispatchSms(serviceRole, {
     coachId: coachRow.profile_id,
-    recipientPhone: athleteDetails?.phone,
+    athleteId,
     messageType: "booking_confirmation",
     referenceId: `${athleteId}:${groupId}:${startAt}`,
     body: `You're booked with ${coachName} for ${when}.`,

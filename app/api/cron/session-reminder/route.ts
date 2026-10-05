@@ -66,14 +66,9 @@ export async function GET(request: Request) {
     // Reuses this exact same query/window/dedup pass rather than a
     // second cron: reminder_sent_at is one dedup guard for "the
     // reminder moment happened," regardless of which channel(s) fired.
-    const { data: athleteDetails } = await supabase
-      .from("athlete_profile_details")
-      .select("phone")
-      .eq("athlete_id", booking.athlete_id)
-      .maybeSingle();
     const smsResult = await dispatchSms(supabase, {
       coachId: booking.coach_id,
-      recipientPhone: athleteDetails?.phone,
+      athleteId: booking.athlete_id,
       messageType: "session_reminder",
       referenceId: booking.id,
       body: `Reminder: your session with ${coachName} starts at ${when}.`,

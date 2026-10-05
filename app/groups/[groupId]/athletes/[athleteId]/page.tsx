@@ -91,6 +91,7 @@ export default async function AthleteProfilePage(
     { data: trainingMaxRows },
     { data: latestConfirmedEventGoal },
     { data: injuryStatusRow },
+    { data: smsConsentRow },
   ] = await Promise.all([
     supabase
       .from("group_memberships")
@@ -291,6 +292,14 @@ export default async function AthleteProfilePage(
     supabase
       .from("athlete_injury_status")
       .select("is_injured, surplus_pct, marked_at")
+      .eq("athlete_id", params.athleteId)
+      .maybeSingle(),
+    // The client's own text-message consent (they set it in their
+    // Settings; RLS lets their coach read it). Shown so the coach knows
+    // what a text would actually reach before relying on it.
+    supabase
+      .from("athlete_sms_consent")
+      .select("appointments, announcements, opted_out_at")
       .eq("athlete_id", params.athleteId)
       .maybeSingle(),
   ]);
@@ -838,6 +847,19 @@ export default async function AthleteProfilePage(
                     </div>
                   </div>
                 )}
+                <p className="font-body text-xs text-steel">
+                  Text messages:{" "}
+                  {!smsConsentRow || (!smsConsentRow.appointments && !smsConsentRow.announcements)
+                    ? "not opted in"
+                    : smsConsentRow.opted_out_at
+                      ? "opted out (replied STOP)"
+                      : [
+                          smsConsentRow.appointments ? "appointments" : null,
+                          smsConsentRow.announcements ? "check-ins and announcements" : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" + ")}
+                </p>
                 {parQAnswers.length > 0 && <ParQAnswersPanel answers={parQAnswers} />}
                 {intake && (
                   <WaiverStatusLine
