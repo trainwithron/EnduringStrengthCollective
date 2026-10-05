@@ -6,7 +6,9 @@ import { AiUsageMeter } from "@/components/coach/ai-usage-meter";
 
 // credit_topup_low_tier_monetization_idea.md — the coach's own AI
 // credits (program generation, nutrition plans), genuinely separate
-// from everything else billed in this app. Mirrors package-picker.tsx's
+// from everything else billed in this app. The Lift Off subscription is
+// retired (the plan now includes AI each month): its purchase UI is hidden
+// here, the code and any existing subscriber display are kept. Mirrors package-picker.tsx's
 // exact checkout-call shape, pointed at the new coach-only route.
 export function CoachCreditsPanel({
   groupId,
@@ -81,22 +83,7 @@ export function CoachCreditsPanel({
         >
           {loadingKind === "credit_pack" ? "Starting checkout…" : "Buy 5 credits — $5"}
         </button>
-        {!liftOffActive && (
-          <button
-            type="button"
-            disabled={!!loadingKind}
-            onClick={() => buy("lift_off")}
-            className="h-10 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-50"
-          >
-            {loadingKind === "lift_off" ? "Starting checkout…" : "Get Lift Off — $5/mo"}
-          </button>
-        )}
       </div>
-      <p className="font-body text-[11px] text-steel mt-2">
-        Lift Off is a recurring $5/month bundle — 1 program, 2 nutrition plans, and 1 overview
-        every cycle ({LIFT_OFF_MONTHLY_CREDITS} credits&apos; worth), only available on
-        auto-renew.
-      </p>
     </div>
   );
 }

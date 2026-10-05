@@ -10,9 +10,12 @@ import { DispatchSettings } from "@/components/coach/desktop/dispatch-settings";
 import { ClientTagManager } from "@/components/coach/desktop/client-tag-manager";
 import { TerminologySettingsPanel } from "@/components/coach/desktop/terminology-settings-panel";
 import { CoachCreditsPanel } from "@/components/coach/desktop/coach-credits-panel";
+import { PlanBillingPanel } from "@/components/coach/desktop/plan-billing-panel";
+import { getOrgBillingSummary } from "@/lib/org-billing-server";
+import { isBillingEnforced } from "@/lib/org-entitlements";
 import type { ButtonShape, DisplayFont, BodyFont } from "@/lib/theme";
 
-type OrgTab = "team" | "branding" | "workout-card" | "tags" | "dispatch" | "terminology" | "credits";
+type OrgTab = "team" | "branding" | "workout-card" | "tags" | "dispatch" | "terminology" | "credits" | "plan";
 
 export default async function BrandingPage(
   props: {
@@ -35,7 +38,9 @@ export default async function BrandingPage(
               ? "terminology"
               : searchParams.tab === "credits"
                 ? "credits"
-                : "team";
+                : searchParams.tab === "plan"
+                  ? "plan"
+                  : "team";
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -137,6 +142,20 @@ export default async function BrandingPage(
   const isOwnerOrAdmin = orgMembership.role === "owner" || orgMembership.role === "admin";
   const basePath = `/groups/${params.groupId}/branding`;
 
+  // Plan & Billing is invisible until COACH_BILLING_ENFORCED is on, except
+  // to the platform admin, who can preview it (and an org's real state)
+  // before anything is switched on for coaches.
+  const { data: viewerProfile } = await supabase
+    .from("profiles")
+    .select("is_platform_admin")
+    .eq("id", user.id)
+    .maybeSingle();
+  const showPlanTab = isBillingEnforced() || viewerProfile?.is_platform_admin === true;
+  const planSummary =
+    showPlanTab && tab === "plan" && org
+      ? await getOrgBillingSummary(supabase, orgMembership.organization_id, org.created_at)
+      : null;
+
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="branding">
       <div className="pb-6 border-b border-steel/20 mb-6">
@@ -208,6 +227,16 @@ export default async function BrandingPage(
         >
           Credits
         </Link>
+        {showPlanTab && (
+          <Link
+            href={`${basePath}?tab=plan`}
+            className={`h-9 px-4 flex items-center shrink-0 whitespace-nowrap font-body text-sm border ${
+              tab === "plan" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
+            }`}
+          >
+            Plan &amp; Billing
+          </Link>
+        )}
       </div>
 
       {tab === "team" ? (
@@ -280,6 +309,12 @@ export default async function BrandingPage(
         )
       ) : tab === "terminology" ? (
         <TerminologySettingsPanel />
+      ) : tab === "plan" ? (
+        planSummary ? (
+          <PlanBillingPanel summary={planSummary} isOwner={isOwner} orgName={org?.name ?? "Organization"} />
+        ) : (
+          <p className="font-body text-sm text-steel">Plan &amp; Billing isn&apos;t available yet.</p>
+        )
       ) : tab === "credits" ? (
         <CoachCreditsPanel
           groupId={params.groupId}

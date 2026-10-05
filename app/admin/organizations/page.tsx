@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { NewOrganizationForm } from "@/components/admin/new-organization-form";
+import { OrgBillingExemptToggle } from "@/components/admin/org-billing-exempt-toggle";
 
 export default async function AdminOrganizationsPage() {
   const supabase = await createServerClient();
@@ -33,6 +34,8 @@ export default async function AdminOrganizationsPage() {
     .from("groups")
     .select("id, organization_id, created_at")
     .order("created_at", { ascending: true });
+  const { data: billingRows } = await supabase.from("organization_billing").select("organization_id, billing_exempt");
+  const exemptByOrg = new Map((billingRows ?? []).map((b) => [b.organization_id, b.billing_exempt]));
   const groupCountByOrg = new Map<string, number>();
   const firstGroupByOrg = new Map<string, string>();
   for (const g of groupCounts ?? []) {
@@ -63,28 +66,27 @@ export default async function AdminOrganizationsPage() {
         <div className="divide-y divide-steel/15">
           {(orgs ?? []).map((org) => {
             const firstGroupId = firstGroupByOrg.get(org.id);
-            const row = (
-              <div className="py-3 flex items-center justify-between gap-4">
-                <div>
-                  <p className="font-body text-sm font-medium">{org.name}</p>
-                  <p className="font-body text-xs text-steel">
-                    /{org.slug} · Owner: {(org.profiles as any)?.full_name ?? "Unknown"} ·{" "}
-                    {groupCountByOrg.get(org.id) ?? 0} group{groupCountByOrg.get(org.id) === 1 ? "" : "s"} ·
-                    Created {new Date(org.created_at).toLocaleDateString()}
-                  </p>
-                </div>
+            const info = (
+              <div>
+                <p className="font-body text-sm font-medium">{org.name}</p>
+                <p className="font-body text-xs text-steel">
+                  /{org.slug} · Owner: {(org.profiles as any)?.full_name ?? "Unknown"} ·{" "}
+                  {groupCountByOrg.get(org.id) ?? 0} group{groupCountByOrg.get(org.id) === 1 ? "" : "s"} ·
+                  Created {new Date(org.created_at).toLocaleDateString()}
+                </p>
               </div>
             );
-            return firstGroupId ? (
-              <Link
-                key={org.id}
-                href={`/groups/${firstGroupId}/branding`}
-                className="block hover:bg-steel/5"
-              >
-                {row}
-              </Link>
-            ) : (
-              <div key={org.id}>{row}</div>
+            return (
+              <div key={org.id} className="py-3 flex items-center justify-between gap-4">
+                {firstGroupId ? (
+                  <Link href={`/groups/${firstGroupId}/branding`} className="block flex-1 hover:bg-steel/5">
+                    {info}
+                  </Link>
+                ) : (
+                  <div className="flex-1">{info}</div>
+                )}
+                <OrgBillingExemptToggle organizationId={org.id} initialExempt={exemptByOrg.get(org.id) ?? false} />
+              </div>
             );
           })}
           {(orgs ?? []).length === 0 && (
