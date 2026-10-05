@@ -30,6 +30,7 @@ export async function POST(request: Request) {
 
   try {
     const raw = await callClaude({
+      meta: { feature: "trivia_generate", userId: user.id },
       system:
         "You write true/false trivia questions about workout science, resistance training, and general " +
         "exercise physiology, for a fitness coaching app. Every statement must be a real, well-established, " +

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, isAiConfigured, AiNotConfiguredError, extractJson } from "@/lib/anthropic-client";
+import { AiRateLimitedError } from "@/lib/ai-usage";
 
 // Turns a coach's rough, typed bullet notes (jotted during/after
 // recording a video check-in) into a polished summary + a real action
@@ -41,6 +42,7 @@ export async function POST(request: Request) {
 
   try {
     const raw = await callClaude({
+      meta: { feature: "video_checkin_summary", userId: user.id },
       system:
         "You are a fitness coach's assistant. The coach will give you rough, informal notes " +
         "jotted during or after a video check-in with a client. Turn them into (1) a short, " +
@@ -60,6 +62,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ summary, actionItems });
   } catch (err) {
+    if (err instanceof AiRateLimitedError) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
     if (err instanceof AiNotConfiguredError) {
       return NextResponse.json({ error: err.message }, { status: 503 });
     }

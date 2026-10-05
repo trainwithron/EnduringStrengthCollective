@@ -81,6 +81,7 @@ export async function synthesizeCornerstone(
   let rawItems: RawModelItem[] = [];
   try {
     const responseText = await callClaude({
+      meta: { feature: "spotter_cornerstone", coachId },
       system: buildSystemPrompt(cornerstone.replace("_", "/")),
       userText: buildUserPrompt(tier1Reports),
       maxTokens: 1024,

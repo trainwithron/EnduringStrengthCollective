@@ -105,6 +105,7 @@ export async function GET(request: Request) {
     let rawItems: RawModelItem[] = [];
     try {
       const responseText = await callClaude({
+        meta: { feature: "coach_briefing", coachId },
         system: SYSTEM_PROMPT,
         userText: buildUserPrompt(candidates),
         maxTokens: 1024,

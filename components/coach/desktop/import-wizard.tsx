@@ -37,6 +37,7 @@ import { hasFlaggedMusculoskeletalConcern } from "@/lib/athlete-injury-flag";
 import { generateDupProgram, generateDupSelfUpdatingProgram, DUP_WEEKLY_SCHEME } from "@/lib/dup-generator";
 import { generateGzclpProgram, type GzclpLiftInput, type GzclpProgressionRule } from "@/lib/gzclp-generator";
 import { AiOutputWrongButton } from "@/components/coach/ai-output-wrong-button";
+import { AiUsageMeter } from "@/components/coach/ai-usage-meter";
 
 type Status = "idle" | "working" | "reviewing" | "done" | "error";
 
@@ -1108,6 +1109,9 @@ export function ImportWizard({
         >
           Generate program
         </button>
+        <div className="mt-2">
+          <AiUsageMeter groupId={groupId} focus="program" compact />
+        </div>
       </div>
 
       {athleteId && dupTrainingMaxes.length > 0 && (

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError } from "@/lib/anthropic-client";
+import { AiRateLimitedError } from "@/lib/ai-usage";
 import type { ParsedImportRow } from "@/lib/workout-import-parser";
 
 const SYSTEM_PROMPT = `You read a photo, screenshot, or PDF page of a workout program — it might be
@@ -70,6 +71,7 @@ export async function POST(request: Request) {
 
   try {
     const text = await callClaude({
+      meta: { feature: "program_import_photo", userId: user.id },
       system: SYSTEM_PROMPT,
       userText: "Extract the workout program from this image as the JSON array described.",
       image: { mediaType, base64Data: imageBase64 },
@@ -102,6 +104,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ rows });
   } catch (err) {
+    if (err instanceof AiRateLimitedError) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
     if (err instanceof AiNotConfiguredError) {
       return NextResponse.json({ error: err.message }, { status: 503 });
     }

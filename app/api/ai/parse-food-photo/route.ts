@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError } from "@/lib/anthropic-client";
+import { AiRateLimitedError } from "@/lib/ai-usage";
 
 // V2 #3 from calorie_tracking_ux_research_and_plan.md — AI photo
 // logging, sequenced deliberately last (real, sourced accuracy limits:
@@ -53,6 +54,7 @@ export async function POST(request: Request) {
 
   try {
     const raw = await callClaude({
+      meta: { feature: "food_photo_parse", userId: user.id },
       system: SYSTEM_PROMPT,
       userText: "Estimate the nutrition of the food in this photo as the JSON object described.",
       image: { mediaType, base64Data: imageBase64 },
@@ -81,6 +83,9 @@ export async function POST(request: Request) {
       fatG: Math.max(0, Math.round(parsed.fatG)),
     });
   } catch (err) {
+    if (err instanceof AiRateLimitedError) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
     if (err instanceof AiNotConfiguredError) {
       return NextResponse.json({ error: err.message }, { status: 503 });
     }

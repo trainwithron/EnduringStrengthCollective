@@ -5,6 +5,9 @@
 // worth adding for that. Never import this from a "use client" component —
 // it reads the secret key from process.env.
 
+import type { AiCallMeta } from "@/lib/ai-usage";
+import { reserveAiCall } from "@/lib/ai-usage-server";
+
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
 const DEFAULT_MODEL = "claude-sonnet-5";
@@ -23,6 +26,10 @@ export interface ClaudeCallOptions {
   userText: string;
   image?: ClaudeImageInput;
   maxTokens?: number;
+  // Who/what this call is for — drives usage logging (model + tokens per
+  // call, for per-coach cost) and the burst limit (lib/ai-usage.ts).
+  // Required so a new call site can't silently skip the cost log.
+  meta: AiCallMeta;
 }
 
 export class AiNotConfiguredError extends Error {
@@ -55,6 +62,7 @@ export async function callClaude({
   userText,
   image,
   maxTokens = 4096,
+  meta,
 }: ClaudeCallOptions): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new AiNotConfiguredError();
@@ -68,27 +76,46 @@ export async function callClaude({
   }
   content.push({ type: "text", text: userText });
 
-  const response = await fetch(ANTHROPIC_API_URL, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": ANTHROPIC_VERSION,
-    },
-    body: JSON.stringify({
-      model: DEFAULT_MODEL,
-      max_tokens: maxTokens,
-      system,
-      messages: [{ role: "user", content }],
-    }),
-  });
+  // Throws AiRateLimitedError when this actor is over the burst limit or
+  // the monthly ceiling; otherwise reserves the usage-log row up front.
+  const usage = await reserveAiCall(meta);
+
+  let response: Response;
+  try {
+    response = await fetch(ANTHROPIC_API_URL, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": ANTHROPIC_VERSION,
+      },
+      body: JSON.stringify({
+        model: DEFAULT_MODEL,
+        max_tokens: maxTokens,
+        system,
+        messages: [{ role: "user", content }],
+      }),
+    });
+  } catch (err) {
+    await usage.complete({ status: "error" });
+    throw err;
+  }
 
   if (!response.ok) {
+    await usage.complete({ status: "error" });
     const detail = await response.text();
     throw new Error(`Claude API error (${response.status}): ${detail.slice(0, 300)}`);
   }
 
   const data = await response.json();
+  // Tokens are billed whether or not the output is usable, so they're
+  // recorded for truncated calls too.
+  await usage.complete({
+    model: data.model,
+    inputTokens: data.usage?.input_tokens,
+    outputTokens: data.usage?.output_tokens,
+    status: data.stop_reason === "max_tokens" ? "truncated" : "ok",
+  });
   if (data.stop_reason === "max_tokens") {
     throw new AiTruncatedError();
   }

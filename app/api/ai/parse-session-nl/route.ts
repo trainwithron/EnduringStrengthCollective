@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError } from "@/lib/anthropic-client";
+import { AiRateLimitedError } from "@/lib/ai-usage";
 
 // Lightweight NL program builder (coach_mobile_app_redesign_plan.md,
 // locked 2026-09-14) — mirrors parse-food-log's shape almost exactly.
@@ -69,6 +70,7 @@ export async function POST(request: Request) {
 
   try {
     const raw = await callClaude({
+      meta: { feature: "session_nl", userId: user.id },
       system: SYSTEM_PROMPT,
       userText: text.trim(),
       maxTokens: 1024,
@@ -97,6 +99,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ exercises });
   } catch (err) {
+    if (err instanceof AiRateLimitedError) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
     if (err instanceof AiNotConfiguredError) {
       return NextResponse.json({ error: err.message }, { status: 503 });
     }

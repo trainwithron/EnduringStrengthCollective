@@ -30,6 +30,7 @@ import {
 import type { WeeklyWeightTrend } from "@/lib/weight-trend";
 import { RecipeVoteFavorite } from "./recipe-vote-favorite";
 import { AiOutputWrongButton } from "@/components/coach/ai-output-wrong-button";
+import { AiUsageMeter } from "@/components/coach/ai-usage-meter";
 
 type DayView = "daily" | "train" | "rest";
 
@@ -930,6 +931,9 @@ export function MealPlanGenerator({
             >
               {aiSuggestingAll ? "Generating full plan…" : "AI Suggest All — 3 credits"}
             </button>
+            <div className="mt-1.5">
+              <AiUsageMeter groupId={groupId} focus="mealplan" compact refreshKey={lastChargeReferenceId} />
+            </div>
             {aiSuggestAllError && (
               <p className="font-body text-xs text-rust mt-1" role="alert">
                 {aiSuggestAllError}

@@ -85,7 +85,12 @@ export async function synthesizeOverarching(
   const reportsById = new Map(tier2Reports.map((r) => [r.id!, r]));
   let rawItems: RawModelItem[] = [];
   try {
-    const responseText = await callClaude({ system: SYSTEM_PROMPT, userText: buildUserPrompt(tier2Reports), maxTokens: 1024 });
+    const responseText = await callClaude({
+      system: SYSTEM_PROMPT,
+      userText: buildUserPrompt(tier2Reports),
+      maxTokens: 1024,
+      meta: { feature: "spotter_overarching", coachId },
+    });
     const parsed = JSON.parse(extractJson(responseText));
     if (Array.isArray(parsed)) rawItems = parsed.slice(0, MAX_ITEMS);
   } catch {

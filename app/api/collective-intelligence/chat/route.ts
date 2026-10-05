@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured } from "@/lib/anthropic-client";
+import { AiRateLimitedError } from "@/lib/ai-usage";
 import { validateNoHallucinatedNumbers, validateNoNumbers } from "@/lib/coach-briefing-numeral-guard";
 import { validateNoUnresolvedAthleteNames } from "@/lib/coach-chat-name-guard";
 import {
@@ -126,13 +127,17 @@ export async function POST(request: Request) {
   let requestedLookups: RouterLookupRequest[] = [];
   try {
     const routerResponse = await callClaude({
+      meta: { feature: "ci_chat_router", userId: user.id },
       system: ROUTER_SYSTEM_PROMPT,
       userText: `${buildHistoryText(history)}Coach's new question: ${message}`,
       maxTokens: 512,
     });
     const parsed = JSON.parse(extractJson(routerResponse));
     if (Array.isArray(parsed.lookups)) requestedLookups = parsed.lookups.slice(0, MAX_LOOKUPS_PER_TURN);
-  } catch {
+  } catch (err) {
+    if (err instanceof AiRateLimitedError) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
     requestedLookups = [];
   }
 
@@ -198,6 +203,7 @@ export async function POST(request: Request) {
   let answerParts: { type: "fact" | "question"; text: string }[] = [];
   try {
     const synthesisResponse = await callClaude({
+      meta: { feature: "ci_chat_synthesis", userId: user.id },
       system: SYNTHESIS_SYSTEM_PROMPT,
       userText: `${buildHistoryText(history)}Retrieved facts:\n${factsText}\n\nAthletes you may reference: ${
         referenceableNames.length > 0 ? referenceableNames.join(", ") : "(none)"
@@ -206,7 +212,10 @@ export async function POST(request: Request) {
     });
     const parsed = JSON.parse(extractJson(synthesisResponse));
     if (Array.isArray(parsed.answer_parts)) answerParts = parsed.answer_parts;
-  } catch {
+  } catch (err) {
+    if (err instanceof AiRateLimitedError) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
     answerParts = [];
   }
 

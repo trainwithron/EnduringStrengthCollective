@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, isAiConfigured, extractJson, AiNotConfiguredError, AiTruncatedError } from "@/lib/anthropic-client";
+import { AiRateLimitedError } from "@/lib/ai-usage";
 import { parseBiomechTagSuggestions } from "@/lib/biomech-tag-suggestions";
 
 // AI-assisted suggest-and-confirm biomech-tag classifier
@@ -48,6 +49,7 @@ export async function POST(request: Request) {
 
   try {
     const text = await callClaude({
+      meta: { feature: "biomech_tag_suggest", userId: user.id },
       system:
         "You are a biomechanics-literate strength coach classifying which joint actions and stabilization demands a named resistance-training exercise involves. Only use tag keys that appear in the vocabulary given — never invent a key. Respond with ONLY a JSON array, no prose, no markdown fence, each item shaped exactly {\"key\": \"<tag key>\", \"role\": \"prime_mover\" or \"stabilizer_demand\"}. prime_mover = a joint action this exercise directly, intentionally trains through a real range of motion. stabilizer_demand = a joint or region that must resist unwanted movement while performing it, without moving through it. Be realistic and selective — most exercises have roughly 2-5 prime movers and 1-3 stabilizer demands, not most of the vocabulary.",
       userText: `Vocabulary:\n${vocabText}\n\nExercise: ${exerciseName.trim()}`,
@@ -73,6 +75,9 @@ export async function POST(request: Request) {
       })),
     });
   } catch (e) {
+    if (e instanceof AiRateLimitedError) {
+      return NextResponse.json({ error: e.message }, { status: 429 });
+    }
     if (e instanceof AiNotConfiguredError) {
       return NextResponse.json({ error: "AI isn't configured on this server yet." }, { status: 503 });
     }

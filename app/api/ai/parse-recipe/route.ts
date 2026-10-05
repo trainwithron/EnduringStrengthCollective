@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError } from "@/lib/anthropic-client";
+import { AiRateLimitedError } from "@/lib/ai-usage";
 
 // Replaces the manual "+ New recipe → fill in every ingredient by hand"
 // flow (live_walkthrough_round2_findings.md — Ron's own read, backed by
@@ -65,6 +66,7 @@ export async function POST(request: Request) {
 
   try {
     const raw = await callClaude({
+      meta: { feature: "recipe_parse", userId: user.id },
       system: SYSTEM_PROMPT,
       userText: description.trim(),
       maxTokens: 1024,
@@ -118,6 +120,9 @@ export async function POST(request: Request) {
       ingredients,
     });
   } catch (err) {
+    if (err instanceof AiRateLimitedError) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
     if (err instanceof AiNotConfiguredError) {
       return NextResponse.json({ error: err.message }, { status: 503 });
     }

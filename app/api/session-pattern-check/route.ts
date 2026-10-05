@@ -71,7 +71,7 @@ export async function POST(request: Request) {
     try {
       const allowedValues = findings.flatMap((f) => f.numericValues);
       const userText = `Real findings for this client's recent session pattern:\n${findings.map((f) => `- ${f.description}`).join("\n")}\n\nWrite the note now.`;
-      const responseText = await callClaude({ system: SYSTEM_PROMPT, userText, maxTokens: 300 });
+      const responseText = await callClaude({ system: SYSTEM_PROMPT, userText, maxTokens: 300, meta: { feature: "session_pattern_check", coachId } });
       const candidateText = extractJson(responseText).trim();
       if (candidateText && validateNoHallucinatedNumbers(candidateText, allowedValues).valid) {
         synthesisText = candidateText;

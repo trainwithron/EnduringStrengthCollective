@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError } from "@/lib/anthropic-client";
+import { AiRateLimitedError } from "@/lib/ai-usage";
 
 // Natural-language quick-log (calorie_tracking_ux_research_and_plan.md,
 // V1) — mirrors app/api/ai/parse-workout/route.ts's shape closely.
@@ -49,6 +50,7 @@ export async function POST(request: Request) {
 
   try {
     const raw = await callClaude({
+      meta: { feature: "food_log_parse", userId: user.id },
       system: SYSTEM_PROMPT,
       userText: text.trim(),
       maxTokens: 512,
@@ -76,6 +78,9 @@ export async function POST(request: Request) {
       fatG: Math.max(0, Math.round(parsed.fatG)),
     });
   } catch (err) {
+    if (err instanceof AiRateLimitedError) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
     if (err instanceof AiNotConfiguredError) {
       return NextResponse.json({ error: err.message }, { status: 503 });
     }

@@ -1,4 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  AI_ALLOWANCE_PER_STEP,
+  allowanceLimit,
+  allowanceUsed,
+  clientSteps,
+  nextAllowanceReset,
+  type AllowanceAction,
+} from "@/lib/ai-usage";
 
 // credit_topup_low_tier_monetization_idea.md — locked pricing. $5 buys
 // 5 credits ($1/credit). "Lift Off" is a separate $5/mo recurring-only
@@ -53,26 +61,104 @@ export async function getCoachCreditStanding(
   };
 }
 
+// What a coach has used of this month's included generations (the plan
+// includes AI per 100-client step — see lib/ai-usage.ts), for the usage
+// meter and the fail-fast pre-check. "Clients" matches coach_client_steps()
+// in migration 0227: distinct training-membership athletes across every
+// group this person coaches.
+export interface AiUsageSummary {
+  unlimited: boolean;
+  balance: number;
+  clients: number;
+  steps: number;
+  program: { used: number; limit: number };
+  mealplan: { used: number; limit: number };
+  resetsOn: string; // YYYY-MM-DD, first of next month UTC
+}
+
+export async function getAiUsage(supabase: SupabaseClient, coachId: string): Promise<AiUsageSummary> {
+  const [{ data: row }, { data: coachedRows }] = await Promise.all([
+    supabase
+      .from("coach_credits")
+      .select("balance, ai_access_mode, allowance_period, program_used, mealplan_used")
+      .eq("coach_id", coachId)
+      .maybeSingle(),
+    supabase.from("group_memberships").select("group_id").eq("profile_id", coachId).eq("role", "coach"),
+  ]);
+  const groupIds = (coachedRows ?? []).map((r) => r.group_id as string);
+  let clients = 0;
+  if (groupIds.length > 0) {
+    const { data: athleteRows } = await supabase
+      .from("group_memberships")
+      .select("profile_id")
+      .in("group_id", groupIds)
+      .eq("role", "athlete")
+      .eq("membership_type", "training");
+    clients = new Set((athleteRows ?? []).map((r) => r.profile_id as string)).size;
+  }
+  return {
+    unlimited: row?.ai_access_mode === "unlimited",
+    balance: row?.balance ?? 0,
+    clients,
+    steps: clientSteps(clients),
+    program: {
+      used: allowanceUsed("program_generation", row ?? null),
+      limit: allowanceLimit("program_generation", clients),
+    },
+    mealplan: {
+      used: allowanceUsed("nutrition_plan", row ?? null),
+      limit: allowanceLimit("nutrition_plan", clients),
+    },
+    resetsOn: nextAllowanceReset(),
+  };
+}
+
+// Fail-fast, read-only: can this coach run the action right now (included
+// generations left, or credits to cover it, or unlimited)?
+export async function canRunAiAction(
+  supabase: SupabaseClient,
+  coachId: string,
+  action: AiActionKey
+): Promise<{ ok: boolean; error?: string }> {
+  const usage = await getAiUsage(supabase, coachId);
+  if (usage.unlimited) return { ok: true };
+  const cost = AI_ACTION_COSTS[action];
+  if (action === "program_generation" && usage.program.used < usage.program.limit) return { ok: true };
+  if (action === "nutrition_plan" && usage.mealplan.used < usage.mealplan.limit) return { ok: true };
+  if (usage.balance >= cost) return { ok: true };
+  return { ok: false, error: outOfAllowanceMessage(action, usage.balance) };
+}
+
+function outOfAllowanceMessage(action: AiActionKey, balance: number): string {
+  const cost = AI_ACTION_COSTS[action];
+  const what = action === "program_generation" ? "program generations" : "meal plans";
+  if (action === "ci_overview") {
+    return `This costs ${cost} credits — you have ${balance}. Buy more credits or get Lift Off to keep going.`;
+  }
+  return `You've used this month's included ${what}. Extra ones are ${cost} credits each — you have ${balance}. Buy more credits or get Lift Off to keep going.`;
+}
+
 // The real gate: call this from an authenticated AI-action route (the
-// coach spending their OWN credits). coach_credits_race_condition_
-// sept30.md — this used to do a plain SELECT read then a SEPARATE
-// adjust_coach_credits RPC call, a real TOCTOU race (two concurrent
-// requests could both read the same pre-spend balance before either
-// committed). Now calls one atomic spend_coach_credits() RPC that does
-// the sufficiency check AND the decrement inside a single row-locked
-// transaction — a genuinely concurrent second call blocks on the lock
-// and sees the post-spend balance, not a stale read. Returns ok:false
-// with a coach-facing message and spends nothing when the balance is
-// insufficient.
+// coach spending their OWN allowance/credits). coach_credits_race_
+// condition_sept30.md — this used to do a plain SELECT read then a
+// SEPARATE adjust_coach_credits RPC call, a real TOCTOU race. Now one
+// atomic spend_ai_action() RPC (migration 0226/0227) uses this month's
+// included generations first, then credits, all inside a single
+// row-locked transaction — a genuinely concurrent second call blocks on
+// the lock and sees the post-spend state. Returns ok:false with a
+// coach-facing message and spends nothing when neither covers it.
 export async function checkAndSpendCoachCredits(
   supabase: SupabaseClient,
   coachId: string,
   action: AiActionKey
 ): Promise<CoachCreditCheck> {
   const cost = AI_ACTION_COSTS[action];
-  const { data, error } = await supabase.rpc("spend_coach_credits", {
+  const allowancePerStep = action in AI_ALLOWANCE_PER_STEP ? AI_ALLOWANCE_PER_STEP[action as AllowanceAction] : 0;
+  const { data, error } = await supabase.rpc("spend_ai_action", {
     p_coach_id: coachId,
-    p_cost: cost,
+    p_action: action,
+    p_credit_cost: cost,
+    p_allowance: allowancePerStep,
   });
 
   if (error) {
@@ -89,12 +175,7 @@ export async function checkAndSpendCoachCredits(
   }
 
   if (!row.spent) {
-    return {
-      ok: false,
-      balance: row.new_balance,
-      unlimited: false,
-      error: `This costs ${cost} credits — you have ${row.new_balance}. Buy more credits or get Lift Off to keep going.`,
-    };
+    return { ok: false, balance: row.new_balance, unlimited: false, error: outOfAllowanceMessage(action, row.new_balance) };
   }
 
   return { ok: true, balance: row.new_balance, unlimited: false };

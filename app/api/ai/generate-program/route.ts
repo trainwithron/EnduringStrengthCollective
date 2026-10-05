@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError, AiTruncatedError } from "@/lib/anthropic-client";
+import { AiRateLimitedError } from "@/lib/ai-usage";
 import type { ParsedImportRow } from "@/lib/workout-import-parser";
 import { hasFlaggedMusculoskeletalConcern } from "@/lib/athlete-injury-flag";
-import { checkAndSpendCoachCredits, getCoachCreditStanding, AI_ACTION_COSTS } from "@/lib/coach-credits";
+import { checkAndSpendCoachCredits, canRunAiAction } from "@/lib/coach-credits";
 import { matchExercise, matchTopN, type LibraryExercise } from "@/lib/exercise-matching";
 
 // Generates a full draft program from a coach's plain-English description
@@ -166,19 +167,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Only coaches can generate programs." }, { status: 403 });
   }
 
-  // credit_topup_low_tier_monetization_idea.md — program generation
-  // costs 3 credits for a metered (non-grandfathered, non-Lift-Off)
-  // coach. This is a read-only pre-check so a coach fails fast before
-  // any expensive work; the real spend happens only on a genuine
-  // success below, never here.
-  const creditStanding = await getCoachCreditStanding(supabase, user.id);
-  if (!creditStanding.unlimited && creditStanding.balance < AI_ACTION_COSTS.program_generation) {
-    return NextResponse.json(
-      {
-        error: `This costs ${AI_ACTION_COSTS.program_generation} credits — you have ${creditStanding.balance}. Buy more credits or get Lift Off to keep going.`,
-      },
-      { status: 402 }
-    );
+  // Read-only pre-check so a coach fails fast before any expensive work:
+  // this month's included generations, then credits (migration 0226/0227).
+  // The real spend happens only on a genuine success below, never here.
+  const canRun = await canRunAiAction(supabase, user.id, "program_generation");
+  if (!canRun.ok) {
+    return NextResponse.json({ error: canRun.error }, { status: 402 });
   }
 
   // Injury-awareness (injury_pain_science_research_and_ai_gap_sept15.md)
@@ -302,6 +296,7 @@ export async function POST(request: Request) {
 
   try {
     const text = await callClaude({
+      meta: { feature: "program_generation", userId: user.id },
       system: buildSystemPrompt(hasInjuryContext),
       userText:
         `Coach's exercise library (prefer these exact names where they fit):\n${libraryNames.join(", ") || "(empty — invent sensible exercise names)"}\n\n` +
@@ -451,6 +446,9 @@ export async function POST(request: Request) {
       adherenceCheck,
     });
   } catch (err) {
+    if (err instanceof AiRateLimitedError) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
     if (err instanceof AiNotConfiguredError) {
       return NextResponse.json({ error: err.message }, { status: 503 });
     }

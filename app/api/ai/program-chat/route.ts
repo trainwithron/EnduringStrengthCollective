@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured } from "@/lib/anthropic-client";
+import { AiRateLimitedError } from "@/lib/ai-usage";
 
 // AI Program Builder conversational learning
 // (ai_program_builder_conversational_learning_idea.md) — lets a coach ask
@@ -143,6 +144,7 @@ export async function POST(request: Request) {
 
   try {
     const response = await callClaude({
+      meta: { feature: "program_chat", userId: user.id },
       system: SYSTEM_PROMPT,
       userText:
         `Program: "${program.name}"\n\n` +
@@ -166,7 +168,10 @@ export async function POST(request: Request) {
         preference: parsed.proposedRule.preference.trim(),
       };
     }
-  } catch {
+  } catch (err) {
+    if (err instanceof AiRateLimitedError) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
     // reply/proposedRule keep their fallback values above.
   }
 

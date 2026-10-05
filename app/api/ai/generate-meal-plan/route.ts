@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError } from "@/lib/anthropic-client";
+import { AiRateLimitedError } from "@/lib/ai-usage";
 import { verifyMealOptions, type RawMealOption } from "@/lib/meal-option-verification";
 
 // "The Nutrition Spot" (nutrition_spot_revamp_scoping_sept19.md,
@@ -92,7 +93,7 @@ Dietary restrictions / dislikes: ${dietaryRestrictions || "none given"}
 Favorite foods / requests: ${favoriteFoods || "none given"}`;
 
   try {
-    const text = await callClaude({ system: SYSTEM_PROMPT, userText, maxTokens: 2048 });
+    const text = await callClaude({ meta: { feature: "meal_plan_slot", userId: user.id }, system: SYSTEM_PROMPT, userText, maxTokens: 2048 });
     const parsed = JSON.parse(extractJson(text));
 
     const isValidOption = (o: unknown): o is RawMealOption => {
@@ -118,6 +119,9 @@ Favorite foods / requests: ${favoriteFoods || "none given"}`;
 
     return NextResponse.json({ options: verifiedOptions });
   } catch (err) {
+    if (err instanceof AiRateLimitedError) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
     if (err instanceof AiNotConfiguredError) {
       return NextResponse.json({ error: err.message }, { status: 503 });
     }

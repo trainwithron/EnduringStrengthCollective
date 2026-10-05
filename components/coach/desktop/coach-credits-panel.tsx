@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { LIFT_OFF_MONTHLY_CREDITS } from "@/lib/coach-credits";
+import { AiUsageMeter } from "@/components/coach/ai-usage-meter";
 
 // credit_topup_low_tier_monetization_idea.md — the coach's own AI
 // credits (program generation, nutrition plans), genuinely separate
@@ -42,9 +43,13 @@ export function CoachCreditsPanel({
 
   return (
     <div className="max-w-[60ch]">
+      <AiUsageMeter groupId={groupId} />
+
       <p className="font-body text-sm text-steel mb-4">
-        AI program generation (3 credits) and a full nutrition plan (3 credits, charged once for
-        the whole plan) draw from this balance. Nav and UI help are always free.
+        AI program generation and full nutrition plans are included in your plan each month. Past
+        the included amount, each program generation (3 credits) and each nutrition plan (3
+        credits, charged once for the whole plan) draws from this balance. Nav and UI help are
+        always free.
       </p>
 
       <div className="border border-steel/20 p-4 mb-4">
