@@ -4,6 +4,7 @@ import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
 import { TerminologyProvider } from "@/components/coach/terminology-provider";
 import { ExitDesktopModeButton } from "@/components/coach/exit-desktop-mode-button";
+import { HeaderNotificationBell } from "@/components/notifications/header-bell";
 import { CollectiveIntelligenceChat } from "@/components/coach/desktop/collective-intelligence-chat";
 
 // A dedicated, minimal shell for the one cross-group page in the app —
@@ -31,6 +32,10 @@ export function CoachHomeShell({ orgName, children }: { orgName: string; childre
           </Link>
         </nav>
         <div className="border-t border-steel/20 p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <Link href="/notifications" className="font-body text-sm text-steel">Notifications</Link>
+            <HeaderNotificationBell placement="above" />
+          </div>
           <ExitDesktopModeButton />
           <DownloadAppButton />
           <SignOutButton />

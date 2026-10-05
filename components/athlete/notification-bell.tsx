@@ -5,37 +5,53 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { Bell } from "lucide-react";
+import { timeAgo } from "@/lib/notification-days";
 
 export interface NotificationEntry {
   id: string;
-  type: "comment" | "program_assigned" | "macros_assigned";
+  type: string;
   body: string;
   linkPath: string;
   createdAt: string;
   readAt: string | null;
 }
 
-function timeAgo(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(ms / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
-
+// One bell for everyone (coach, client, trainer), on every screen that has a header. With `initial` it starts from what the page already
+// fetched; without it, it loads the viewer's latest notifications itself, so any header can mount it with just the viewer's id.
 export function NotificationBell({
   initial,
   viewerId,
+  placement = "below",
 }: {
-  initial: NotificationEntry[];
+  initial?: NotificationEntry[];
   viewerId: string;
+  // "above" opens the list upward from a bell at the bottom of a sidebar.
+  placement?: "below" | "above";
 }) {
-  const [items, setItems] = useState(initial);
+  const [items, setItems] = useState<NotificationEntry[]>(initial ?? []);
   const [open, setOpen] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    if (initial) return;
+    let cancelled = false;
+    const supabase = createBrowserClient();
+    supabase
+      .from("notifications")
+      .select("id, type, body, link_path, read_at, created_at")
+      .eq("profile_id", viewerId)
+      .order("created_at", { ascending: false })
+      .limit(20)
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        setItems(
+          data.map((n: any) => ({ id: n.id, type: n.type, body: n.body, linkPath: n.link_path ?? "/", createdAt: n.created_at, readAt: n.read_at }))
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [initial, viewerId]);
 
   useEffect(() => {
     // This was a one-shot server fetch with no live update at all — a
@@ -110,7 +126,7 @@ export function NotificationBell({
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-11 z-50 w-80 max-h-[70vh] overflow-y-auto bg-surface border border-steel/30 shadow-lg">
+          <div className={`absolute z-50 w-80 max-w-[85vw] max-h-[70vh] overflow-y-auto bg-surface border border-steel/30 shadow-lg ${placement === "above" ? "bottom-11 left-0" : "right-0 top-11"}`}>
             <div className="flex items-center justify-between px-3 py-2.5 border-b border-steel/15">
               <p className="font-display uppercase text-xs tracking-wide text-steel">
                 Notifications
@@ -152,6 +168,13 @@ export function NotificationBell({
                 ))}
               </div>
             )}
+            <Link
+              href="/notifications"
+              onClick={() => setOpen(false)}
+              className="block px-3 py-2.5 border-t border-steel/15 font-body text-xs text-steel text-center"
+            >
+              See all notifications
+            </Link>
           </div>
         </>
       )}
