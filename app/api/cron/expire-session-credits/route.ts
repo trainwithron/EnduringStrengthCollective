@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendPushToProfile } from "@/lib/send-push";
 import { isCreditBalanceExpired } from "@/lib/credit-expiration";
+import { withCronRun } from "@/lib/cron-monitor";
 
 // acuity_replacement_gap_audit_sept16.md — credit-expiration window.
 // Triggered daily by the Vercel Cron entry in vercel.json, same
@@ -9,7 +10,7 @@ import { isCreditBalanceExpired } from "@/lib/credit-expiration";
 // Only ever touches a balance where the coach has set a real
 // credit_expiry_days (0 is the default for every existing coach and is
 // never treated as "already expired" — see isCreditBalanceExpired).
-export async function GET(request: Request) {
+async function handler(request: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });
   }
@@ -98,3 +99,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ ok: true, expiredCount });
 }
+
+export const GET = withCronRun("expire-session-credits", handler);

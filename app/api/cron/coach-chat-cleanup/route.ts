@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { withCronRun } from "@/lib/cron-monitor";
 
 // AI Assistant Phase 2 — enforces the resolved 90-day retention window for
 // Collective Intelligence chat transcripts
@@ -9,7 +10,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 // CRON_SECRET/service-role shape as every other cron in this app.
 const RETENTION_DAYS = 90;
 
-export async function GET(request: Request) {
+async function handler(request: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });
   }
@@ -36,3 +37,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ deletedThreads: expiredIds.length });
 }
+
+export const GET = withCronRun("coach-chat-cleanup", handler);

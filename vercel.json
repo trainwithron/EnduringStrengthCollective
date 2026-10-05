@@ -1,6 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": ["pdx1"],
+  "regions": [
+    "pdx1"
+  ],
   "crons": [
     {
       "path": "/api/cron/spotter-tier-sync",
@@ -73,6 +75,14 @@
     {
       "path": "/api/cron/flag-recurring-booking-conflicts",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/series-top-up",
+      "schedule": "30 7 * * *"
+    },
+    {
+      "path": "/api/cron/cron-watchdog",
+      "schedule": "0 9 * * *"
     }
   ]
 }

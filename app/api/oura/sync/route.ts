@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { fetchOuraDailyMetrics, refreshOuraTokens } from "@/lib/oura";
+import { withCronRun } from "@/lib/cron-monitor";
 
 const SYNC_WINDOW_DAYS = 7;
 
@@ -19,7 +20,7 @@ function daysAgoIso(days: number) {
 // signature check plays for the Stripe webhook. Polls the last week of
 // data (not just yesterday) so a missed run or a late-finalizing Oura
 // summary still gets picked up on the next sync.
-export async function GET(request: Request) {
+async function handler(request: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });
   }
@@ -128,3 +129,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ synced: results.length, results });
 }
+
+export const GET = withCronRun("oura-sync", handler);

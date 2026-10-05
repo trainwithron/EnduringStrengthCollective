@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { listPersonalCalendarEvents, refreshGoogleCalendarTokens } from "@/lib/google-calendar";
+import { withCronRun } from "@/lib/cron-monitor";
 
 // Daily sync of each connected coach's personal Google Calendar events
 // into google_calendar_personal_events, for rendering inside the in-app
@@ -13,7 +14,7 @@ import { listPersonalCalendarEvents, refreshGoogleCalendarTokens } from "@/lib/g
 // itself in real time, this cache only feeds a secondary in-app view.
 const SYNC_WINDOW_DAYS_AHEAD = 30;
 
-export async function GET(request: Request) {
+async function handler(request: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });
   }
@@ -92,3 +93,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ synced: results.length, results });
 }
+
+export const GET = withCronRun("google-calendar-sync", handler);

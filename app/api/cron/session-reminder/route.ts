@@ -3,6 +3,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendPushToProfile } from "@/lib/send-push";
 import { dispatchSms } from "@/lib/sms-dispatch";
 import { formatInTimezone, timezoneForProfiles } from "@/lib/format-in-timezone";
+import { withCronRun } from "@/lib/cron-monitor";
 
 // acuity_replacement_gap_audit_sept16.md — the single clearest,
 // highest-value gap against Acuity: zero reminder/confirmation infra
@@ -19,7 +20,7 @@ import { formatInTimezone, timezoneForProfiles } from "@/lib/format-in-timezone"
 // a session moved to a new time correctly gets a fresh reminder.
 const LEAD_TIME_MINUTES = 60;
 
-export async function GET(request: Request) {
+async function handler(request: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });
   }
@@ -88,3 +89,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ checked: upcoming?.length ?? 0, sent, smsSent });
 }
+
+export const GET = withCronRun("session-reminder", handler);

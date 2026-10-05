@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { attemptWebhookDelivery } from "@/lib/webhook-dispatch";
 import { isDeliveryDueForRetry, MAX_WEBHOOK_ATTEMPTS } from "@/lib/webhook-retry";
+import { withCronRun } from "@/lib/cron-monitor";
 
 // "Basic retry/failure handling" per this task's own scope — this app
 // has no real job queue, so a periodic cron re-checking failed
 // deliveries (exponential backoff, capped at MAX_WEBHOOK_ATTEMPTS) is
 // the retry mechanism, same shape as every other cron in this project.
-export async function GET(request: Request) {
+async function handler(request: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });
   }
@@ -47,3 +48,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ retried, delivered });
 }
+
+export const GET = withCronRun("webhook-retry", handler);

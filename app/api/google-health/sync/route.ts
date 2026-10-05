@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { fetchGoogleHealthDailyMetrics, refreshGoogleHealthTokens } from "@/lib/google-health";
+import { withCronRun } from "@/lib/cron-monitor";
 
 // Mirrors app/api/oura/sync/route.ts exactly — triggered daily by the
 // Vercel Cron entry in vercel.json, CRON_SECRET-gated, polls the
@@ -18,7 +19,7 @@ function daysAgoIso(days: number) {
   return d.toISOString().slice(0, 10);
 }
 
-export async function GET(request: Request) {
+async function handler(request: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });
   }
@@ -102,3 +103,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ synced: results.length, results });
 }
+
+export const GET = withCronRun("google-health-sync", handler);

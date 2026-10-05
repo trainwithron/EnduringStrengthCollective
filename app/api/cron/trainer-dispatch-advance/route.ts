@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { isStepOverdue } from "@/lib/trainer-dispatch";
 import { advanceDispatch } from "@/lib/trainer-dispatch-advance";
+import { withCronRun } from "@/lib/cron-monitor";
 
 // org_calendar_spotter_trainer_dispatch_scoping_sept19.md — the
 // TTL-then-advance mechanic for the cascade, matching the established
@@ -10,7 +11,7 @@ import { advanceDispatch } from "@/lib/trainer-dispatch-advance";
 // minutes (vercel.json) rather than those two routes' 15-minute
 // interval, since dispatch_ttl_minutes is org-configurable and could be
 // set well under 15.
-export async function GET(request: Request) {
+async function handler(request: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });
   }
@@ -40,3 +41,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ checked: (pendingSteps ?? []).length, advanced });
 }
+
+export const GET = withCronRun("trainer-dispatch-advance", handler);

@@ -4,6 +4,7 @@ import { callClaude, extractJson, isAiConfigured } from "@/lib/anthropic-client"
 import { gatherCandidateSignals, type CandidateSignal } from "@/lib/coach-briefing-gather";
 import { validateNoHallucinatedNumbers, validateNoNumbers } from "@/lib/coach-briefing-numeral-guard";
 import { enforceReservedQuietSlot } from "@/lib/coach-briefing-reserved-slot";
+import { withCronRun } from "@/lib/cron-monitor";
 
 // AI Assistant Slice 2 ("Collective Intelligence" — The Briefing). Same
 // CRON_SECRET/service-role shape as every other cron in this app. One
@@ -40,7 +41,7 @@ function buildUserPrompt(candidates: CandidateSignal[]): string {
   return `Here are today's eligible signals for this coach's roster:\n\n${lines.join("\n")}\n\nReturn the JSON array now.`;
 }
 
-export async function GET(request: Request) {
+async function handler(request: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });
   }
@@ -165,3 +166,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ coaches: results.length, results });
 }
+
+export const GET = withCronRun("coach-briefing", handler);

@@ -7,11 +7,12 @@ import { mirrorBookingToGoogleCalendar } from "@/lib/google-calendar-mirror-serv
 import { sendPushToProfile } from "@/lib/send-push";
 import { formatInTimezone } from "@/lib/format-in-timezone";
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
+import { withCronRun } from "@/lib/cron-monitor";
 
 // Runs daily. Keeps every running "no end date" schedule booked 12 weeks ahead, and sends to Google Calendar any recurring
 // session that has come inside the next 12 weeks since the last run. A date that cannot be booked because the time is now
 // taken is told to the coach once and then left alone, so it never repeats every day.
-export async function GET(request: Request) {
+async function handler(request: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });
   }
@@ -90,3 +91,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ ok: true, schedules: (running ?? []).length, booked, reported, mirrored });
 }
+
+export const GET = withCronRun("series-top-up", handler);

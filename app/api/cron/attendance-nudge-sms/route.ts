@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { gatherCalendarSpotterFindings } from "@/lib/calendar-spotter-gather";
 import { dispatchSms } from "@/lib/sms-dispatch";
+import { withCronRun } from "@/lib/cron-monitor";
 
 // The Calendar Spotter's own "gap" finding (14+ days since a booked
 // session was actually attended — lib/calendar-spotter.ts) turned into
@@ -23,7 +24,7 @@ import { dispatchSms } from "@/lib/sms-dispatch";
 // window the gap detector itself uses (14 days) before sending another.
 const RENUDGE_COOLDOWN_DAYS = 14;
 
-export async function GET(request: Request) {
+async function handler(request: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });
   }
@@ -81,3 +82,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ checked, sent });
 }
+
+export const GET = withCronRun("attendance-nudge-sms", handler);

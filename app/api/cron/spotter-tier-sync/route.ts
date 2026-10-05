@@ -4,6 +4,7 @@ import { syncTier1ExpertReports } from "@/lib/spotter-tier1-sync";
 import { synthesizeCornerstone } from "@/lib/spotter-cornerstone-synthesis";
 import { synthesizeOverarching } from "@/lib/spotter-overarching-synthesis";
 import type { Cornerstone, SpotterExpertReport } from "@/lib/spotter-expert-report";
+import { withCronRun } from "@/lib/cron-monitor";
 
 // 3-layer Spotter framework
 // (two_layer_spotter_framework_architecture_research_sept19.md) — once
@@ -16,7 +17,7 @@ import type { Cornerstone, SpotterExpertReport } from "@/lib/spotter-expert-repo
 // generation path in this pass.
 const CORNERSTONES: Cornerstone[] = ["business", "programming", "nutrition", "calendar", "habit_recovery"];
 
-export async function GET(request: Request) {
+async function handler(request: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });
   }
@@ -126,3 +127,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ ok: true, results });
 }
+
+export const GET = withCronRun("spotter-tier-sync", handler);

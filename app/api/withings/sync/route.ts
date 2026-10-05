@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { fetchWithingsWeight, refreshWithingsTokens } from "@/lib/withings";
+import { withCronRun } from "@/lib/cron-monitor";
 
 const SYNC_WINDOW_DAYS = 7;
 
@@ -18,7 +19,7 @@ function daysAgoIso(days: number) {
 // session involved — auth is the CRON_SECRET header. Mirrors
 // app/api/oura/sync/route.ts exactly, just for the one Withings metric
 // (weight) instead of Oura's two.
-export async function GET(request: Request) {
+async function handler(request: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });
   }
@@ -97,3 +98,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ synced: results.length, results });
 }
+
+export const GET = withCronRun("withings-sync", handler);

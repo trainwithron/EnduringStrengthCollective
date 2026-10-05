@@ -5,6 +5,7 @@ import { computeWeeklyWeightTrend } from "@/lib/weight-trend";
 import { computeReadinessAverage } from "@/lib/wellness";
 import { computeArchetypeMacros, detectDietArchetype } from "@/lib/macros";
 import { computeBmr, computeTdee } from "@/lib/bmr-tdee";
+import { withCronRun } from "@/lib/cron-monitor";
 
 // Weekly Check-In engine, made proactive (nutrition_checkin_engine_scoping
 // memory) — a coach shouldn't have to remember to open the panel and
@@ -23,7 +24,7 @@ import { computeBmr, computeTdee } from "@/lib/bmr-tdee";
 // check-in with a real adherence number instead of applying this one.
 const AUTOMATED_ADHERENCE_DAYS = 7;
 
-export async function GET(request: Request) {
+async function handler(request: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });
   }
@@ -196,3 +197,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ athletes: results.length, results });
 }
+
+export const GET = withCronRun("nutrition-checkin-suggestions", handler);

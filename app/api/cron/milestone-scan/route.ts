@@ -8,6 +8,7 @@ import { computeReadinessAverage } from "@/lib/wellness";
 import { calorieSeriesWithStanding } from "@/lib/macro-resolution";
 import { fetchStandingHistory } from "@/lib/standing-macros";
 import { classifyNutritionTrend, isTrendAligned, type MilestonePhaseTag } from "@/lib/nutrition-trend-classifier";
+import { withCronRun } from "@/lib/cron-monitor";
 
 // Milestone Celebrations — weekly scan for both trend-based detectors
 // sharing this thread's one dual-trend engine (lib/metabolic-trend.ts's
@@ -83,7 +84,7 @@ async function alreadyFiredRecently(
   return !!(data && data.length > 0);
 }
 
-export async function GET(request: Request) {
+async function handler(request: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });
   }
@@ -313,3 +314,5 @@ export async function GET(request: Request) {
     phaseAlignmentDetected,
   });
 }
+
+export const GET = withCronRun("milestone-scan", handler);

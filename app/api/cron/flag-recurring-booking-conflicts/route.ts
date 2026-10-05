@@ -4,6 +4,7 @@ import { sendPushToProfile } from "@/lib/send-push";
 import { resolveBlockedRangesForDate, bookingFitsAvailability, type AvailabilityWindow } from "@/lib/booking-slots";
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { formatInTimezone } from "@/lib/format-in-timezone";
+import { withCronRun } from "@/lib/cron-monitor";
 
 // acuity_replacement_gap_audit_sept16.md — recurring bookings, Q4's
 // confirmed answer: flag a future occurrence for the coach to resolve
@@ -12,7 +13,7 @@ import { formatInTimezone } from "@/lib/format-in-timezone";
 // daily — a coach editing their own availability windows/exceptions
 // doesn't need this re-checked within minutes, and this avoids hooking
 // into every different availability-editing UI flow individually.
-export async function GET(request: Request) {
+async function handler(request: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });
   }
@@ -111,3 +112,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ ok: true, flaggedCount });
 }
+
+export const GET = withCronRun("flag-recurring-booking-conflicts", handler);

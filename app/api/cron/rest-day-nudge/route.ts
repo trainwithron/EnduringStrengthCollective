@@ -4,6 +4,7 @@ import { sendPushToProfile } from "@/lib/send-push";
 import { getGroupCoachTimezone, dateKeyInZone, nowInZone } from "@/lib/timezone";
 import { loadProgramDayContexts, resolveSessionsForDate } from "@/lib/program-day-contexts";
 import { isHabitDueOn } from "@/lib/habits";
+import { withCronRun } from "@/lib/cron-monitor";
 
 // Triggered daily by the Vercel Cron entry in vercel.json. No user
 // session involved — auth is the CRON_SECRET header, same pattern as
@@ -17,7 +18,7 @@ import { isHabitDueOn } from "@/lib/habits";
 // group they're in, never one per group. Like coach-digest, this fires
 // at one fixed UTC time rather than per-athlete-timezone — a stated,
 // accepted limitation, not solved here.
-export async function GET(request: Request) {
+async function handler(request: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });
   }
@@ -103,3 +104,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ athletes: groupIdsByAthlete.size, sent: results.length, results });
 }
+
+export const GET = withCronRun("rest-day-nudge", handler);

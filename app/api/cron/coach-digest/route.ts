@@ -3,13 +3,14 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendPushToProfile } from "@/lib/send-push";
 import { findThreadsNeedingReply } from "@/lib/notification-priority";
 import { DEFAULT_COACH_TIMEZONE, nowInZone } from "@/lib/timezone";
+import { withCronRun } from "@/lib/cron-monitor";
 
 // Triggered daily by the Vercel Cron entry in vercel.json. No user
 // session involved — auth is the CRON_SECRET header, same pattern as
 // app/api/oura/sync/route.ts. Sends AT MOST ONE consolidated push per
 // coach per day, across every group they coach — never one push per
 // group, and never a push at all when there's genuinely nothing new.
-export async function GET(request: Request) {
+async function handler(request: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });
   }
@@ -147,3 +148,5 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ coaches: results.length, results });
 }
+
+export const GET = withCronRun("coach-digest", handler);
