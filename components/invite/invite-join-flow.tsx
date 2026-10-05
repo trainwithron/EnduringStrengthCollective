@@ -117,14 +117,29 @@ export function InviteJoinFlow({
       return;
     }
 
-    const { error: joinError } = await supabase.from("group_memberships").insert({
-      group_id: groupId,
-      profile_id: user.id,
-      role: "athlete",
-    });
+    // The join is checked against the actual invite code on the server. Falls
+    // back to the old direct insert only where that function isn't installed
+    // yet (it is removed once the policy that allowed it is tightened).
+    const { error: rpcError } = await supabase.rpc("join_group_with_invite", { _code: code });
+    let joinError: { message?: string; code?: string } | null = rpcError;
+    if (rpcError && (rpcError.code === "PGRST202" || /could not find the function/i.test(rpcError.message ?? ""))) {
+      const { error: insertError } = await supabase.from("group_memberships").insert({
+        group_id: groupId,
+        profile_id: user.id,
+        role: "athlete",
+      });
+      joinError = insertError;
+    }
 
     if (joinError) {
-      setError("Couldn't join the group. Try again.");
+      const msg = joinError.message ?? "";
+      if (/invite_used|already has a client/i.test(msg)) {
+        setError("This invite has already been used. Ask your coach for a new link.");
+      } else if (/invite_expired|invite_invalid/i.test(msg)) {
+        setError("This invite has expired or isn't valid any more. Ask your coach for a new link.");
+      } else {
+        setError("Couldn't join the group. Try again.");
+      }
       setSubmitting(false);
       return;
     }

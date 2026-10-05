@@ -19,7 +19,7 @@ interface AssignedProgramOption {
   isActive: boolean;
 }
 
-type View = "menu" | "assign" | "assigned";
+type View = "menu" | "assign" | "assigned" | "assign-done";
 
 // The client-profile counterpart to program-card-menu.tsx's "Assign to
 // Client" — same duplicateProgram engine, same portal-dropdown shell,
@@ -43,6 +43,7 @@ export function ClientProgrammingMenu({
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
   const [sharedPrograms, setSharedPrograms] = useState<SharedProgramOption[] | null>(null);
   const [assignedPrograms, setAssignedPrograms] = useState<AssignedProgramOption[] | null>(null);
+  const [newCopy, setNewCopy] = useState<{ id: string; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -127,7 +128,9 @@ export function ClientProgrammingMenu({
       setError(result.error);
       return;
     }
-    router.push(`/groups/${groupId}/programs/${result.programId}`);
+    // Show that it worked first; don't throw the coach into the copy's builder.
+    setNewCopy({ id: result.programId, name: program.name });
+    setView("assign-done");
   }
 
   return (
@@ -216,6 +219,31 @@ export function ClientProgrammingMenu({
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {view === "assign-done" && newCopy && (
+            <div className="p-3">
+              <p className="font-body text-sm text-chalk">
+                &ldquo;{newCopy.name}&rdquo; is now {athleteFullName}&apos;s own copy. Changes you make to it will not affect anyone else.
+              </p>
+              <a
+                href={`/groups/${groupId}/programs/${newCopy.id}`}
+                className="block w-full h-11 mt-2.5 bg-rust text-graphite font-body text-sm font-medium text-center leading-[44px]"
+              >
+                Open their copy
+              </a>
+              <button
+                type="button"
+                onClick={() => {
+                  setView(null);
+                  setNewCopy(null);
+                  router.refresh();
+                }}
+                className="w-full h-11 mt-1.5 border border-steel/30 text-steel font-body text-sm"
+              >
+                Done
+              </button>
             </div>
           )}
 

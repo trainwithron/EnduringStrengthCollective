@@ -29,6 +29,7 @@ export function CancelBookingButton({
   const router = useRouter();
 
   async function handleCancel() {
+    if (!window.confirm("Cancel this session? Your session credit comes back to your balance.")) return;
     setSubmitting(true);
     const supabase = createBrowserClient();
 
@@ -60,7 +61,7 @@ export function CancelBookingButton({
         {rescheduleHref && (
           <Link
             href={rescheduleHref}
-            className="h-8 px-3 flex items-center border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors"
+            className="h-11 px-3 flex items-center border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors"
           >
             Reschedule
           </Link>
@@ -69,7 +70,7 @@ export function CancelBookingButton({
           type="button"
           onClick={handleCancel}
           disabled={submitting}
-          className="h-8 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
+          className="h-11 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
         >
           {submitting ? "Cancelling…" : "Booked ✓ Cancel"}
         </button>

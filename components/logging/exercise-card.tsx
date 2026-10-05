@@ -5,6 +5,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
 import { TRACKED_FIELD_DEFS, ACTUAL_COLUMN, ACTUAL_PROP, fieldDef, type TrackedField } from "@/lib/exercise-fields";
 import { ExerciseSetGrid } from "./exercise-set-grid";
+import { classifyEquipmentType } from "@/lib/equipment-classifier";
 import { ExerciseVideoThread } from "./exercise-video-thread";
 import { ExerciseAthleteNote } from "./exercise-athlete-note";
 import { EquipmentVisual } from "./equipment-visual";
@@ -393,6 +394,7 @@ export function ExerciseCard({
         sets={exercise.sets}
         trackedFields={exercise.trackedFields}
         readOnly={readOnly}
+        weightOptional={classifyEquipmentType(exercise.exerciseName) === "bodyweight"}
         onSetChange={(setId, patch) => {
           const set = exercise.sets.find((s) => s.id === setId);
           const wasCompleted = set?.status === "completed";

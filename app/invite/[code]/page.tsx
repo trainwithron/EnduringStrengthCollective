@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createServerClient } from "@/lib/supabase/server";
 import { InviteJoinFlow } from "@/components/invite/invite-join-flow";
 
@@ -26,8 +27,15 @@ export default async function InvitePage(
             Invite not available
           </h1>
           <p className="font-body text-steel text-sm mt-2 max-w-sm">
-            This invite link is invalid or has expired. Ask your coach for a new one.
+            This invite link has expired, or someone has already used it. Ask your coach to send you a
+            new link. If you already joined, sign in instead.
           </p>
+          <Link
+            href="/login"
+            className="inline-flex items-center justify-center h-11 px-6 mt-5 bg-rust text-graphite font-body text-sm font-medium"
+          >
+            Sign in
+          </Link>
         </div>
       </main>
     );

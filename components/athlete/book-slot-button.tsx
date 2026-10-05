@@ -20,10 +20,12 @@ export function BookSlotButton({
   endAt: string;
 }) {
   const [submitting, setSubmitting] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
   async function handleBook() {
+    setConfirming(false);
     setSubmitting(true);
     setError(null);
     const supabase = createBrowserClient();
@@ -58,13 +60,38 @@ export function BookSlotButton({
     router.refresh();
   }
 
+  // Booking spends a session credit, so a second tap confirms it.
+  if (confirming && !submitting) {
+    return (
+      <div className="flex flex-col items-end gap-1.5">
+        <span className="font-body text-xs text-chalk">Book this time? Uses 1 session credit.</span>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setConfirming(false)}
+            className="h-11 px-4 border border-steel/30 text-steel font-body text-sm"
+          >
+            Not now
+          </button>
+          <button
+            type="button"
+            onClick={handleBook}
+            className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium"
+          >
+            Confirm
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col items-end gap-1">
       <button
         type="button"
-        onClick={handleBook}
+        onClick={() => setConfirming(true)}
         disabled={submitting}
-        className="h-8 px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
+        className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
       >
         {submitting ? "Booking…" : "Book"}
       </button>

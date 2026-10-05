@@ -203,6 +203,22 @@ export function mergeIdenticalSetRows(rows: ParsedImportRow[]): ParsedImportRow[
   return merged;
 }
 
+// "90", "90s", "90 sec", "2 min", "1:30" -> seconds. Anything else (a range,
+// a note like "as needed") is not guessed at; the prescription just has no
+// rest target.
+export function parseRestSeconds(text: string | null | undefined): number | null {
+  if (!text) return null;
+  const t = text.trim().toLowerCase();
+  const clock = t.match(/^(\d+):(\d{2})$/);
+  if (clock) return parseInt(clock[1], 10) * 60 + parseInt(clock[2], 10);
+  const m = t.match(/^(\d+(?:\.\d+)?)\s*(s|sec|secs|seconds?|m|min|mins|minutes?)?$/);
+  if (!m) return null;
+  const n = parseFloat(m[1]);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const unit = m[2] ?? "s";
+  return Math.round(unit.startsWith("m") ? n * 60 : n);
+}
+
 export interface ImportedExercise {
   exerciseName: string;
   sets: number;
@@ -210,6 +226,7 @@ export interface ImportedExercise {
   weight: number | null;
   rpe: number | null;
   timeSeconds: number | null;
+  restSeconds?: number | null;
 }
 
 export interface ImportedDay {
@@ -249,6 +266,7 @@ export function groupIntoWeeks(rows: ParsedImportRow[]): ImportedWeek[] {
       weight: row.weight,
       rpe: row.rpe,
       timeSeconds: row.timeSeconds,
+      restSeconds: parseRestSeconds(row.rest),
     });
   }
 

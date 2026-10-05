@@ -1,10 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
 import { isStandaloneDisplay } from "@/lib/pwa";
 
 const DISMISSED_KEY = "esc-a2hs-dismissed";
+
+// Only offered inside the signed-in app. On the landing page, login or an
+// invite link it is a distraction before the person has even joined.
+const SIGNED_IN_PREFIXES = ["/groups", "/dashboard", "/sessions", "/partners"];
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -19,7 +24,9 @@ interface BeforeInstallPromptEvent extends Event {
 // route around.
 export function AddToHomeScreenPrompt() {
   const [visible, setVisible] = useState(false);
-  const [platform, setPlatform] = useState<"ios" | "other">("other");
+  const pathname = usePathname();
+  const inApp = SIGNED_IN_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
+  const [platform, setPlatform] = useState<"ios-safari" | "ios-other" | "other">("other");
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
@@ -31,8 +38,11 @@ export function AddToHomeScreenPrompt() {
     }
     if (isStandaloneDisplay()) return;
 
-    const isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
-    setPlatform(isIos ? "ios" : "other");
+    const ua = window.navigator.userAgent;
+    const isIos = /iphone|ipad|ipod/i.test(ua);
+    // Only Safari can add to the iPhone home screen; Chrome/Firefox on iOS cannot.
+    const isIosSafari = isIos && !/crios|fxios|edgios|opios/i.test(ua);
+    setPlatform(isIos ? (isIosSafari ? "ios-safari" : "ios-other") : "other");
     setVisible(true);
 
     function handleBeforeInstallPrompt(e: Event) {
@@ -61,7 +71,7 @@ export function AddToHomeScreenPrompt() {
     dismiss();
   }
 
-  if (!visible) return null;
+  if (!visible || !inApp) return null;
 
   return (
     // Deliberately NOT `fixed` — nearly every page here already has a
@@ -82,8 +92,10 @@ export function AddToHomeScreenPrompt() {
         <p className="font-body text-xs text-steel mt-0.5">
           {deferredPrompt
             ? "Get one-tap access, just like an app."
-            : platform === "ios"
-            ? "Tap the Share icon, then \"Add to Home Screen.\""
+            : platform === "ios-safari"
+            ? "In Safari, tap the Share icon, then \"Add to Home Screen.\""
+            : platform === "ios-other"
+            ? "Open this page in Safari first. Only Safari can add apps to an iPhone home screen."
             : "Open your browser menu and choose \"Add to Home Screen\" or \"Install app.\""}
         </p>
       </div>

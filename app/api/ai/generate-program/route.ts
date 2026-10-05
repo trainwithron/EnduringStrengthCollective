@@ -135,6 +135,9 @@ function isValidRow(row: any): row is ParsedImportRow {
   );
 }
 
+// AI generation can take well over the platform default; without this the request is cut off mid-way.
+export const maxDuration = 120;
+
 export async function POST(request: Request) {
   const supabase = await createServerClient();
   const {

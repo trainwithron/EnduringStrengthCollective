@@ -5,6 +5,8 @@ interface GroupHubHeaderProps {
   name: string;
   description: string | null;
   memberCount: number;
+  // One-on-one groups are a single person; "1 member" is noise there.
+  hideMemberCount?: boolean;
   isCoach: boolean;
   groupId: string;
   coachId?: string;
@@ -17,6 +19,7 @@ export function GroupHubHeader({
   name,
   description,
   memberCount,
+  hideMemberCount,
   isCoach,
   groupId,
   coachId,
@@ -27,9 +30,13 @@ export function GroupHubHeader({
   return (
     <header className="px-5 pt-8 pb-6 border-b border-steel/20">
       <div className="flex items-start justify-between gap-3">
-        <p className="font-body text-xs tracking-wide text-steel">
-          {memberCount} {memberCount === 1 ? "member" : "members"}
-        </p>
+        {hideMemberCount ? (
+          <span />
+        ) : (
+          <p className="font-body text-xs tracking-wide text-steel">
+            {memberCount} {memberCount === 1 ? "member" : "members"}
+          </p>
+        )}
         {notifications && viewerId && <NotificationBell initial={notifications} viewerId={viewerId} />}
       </div>
       {logoUrl && (

@@ -65,7 +65,7 @@ export default async function GuardianPage(
 
         <div className="mt-6 divide-y divide-steel/15 border-y border-steel/15">
           {view.meals.length === 0 ? (
-            <p className="font-body text-sm text-steel py-4">No meal plan set for today yet.</p>
+            <p className="font-body text-sm text-steel py-4">No meal plan has been set for today yet.</p>
           ) : (
             view.meals.map((meal) => (
               <div key={meal.title} className="py-3 flex items-center justify-between gap-3">

@@ -302,11 +302,14 @@ function SetCompletionSync({
   trackedFields,
   readOnly,
   touched,
+  weightOptional,
   onChange,
 }: {
   set: SetLogEntry;
   trackedFields: TrackedField[];
   readOnly: boolean;
+  // Bodyweight movements: reps alone complete the set (no typing 0 lbs).
+  weightOptional: boolean;
   // Whether the athlete has interacted with this set this session.
   touched: boolean;
   onChange: (patch: Partial<SetLogEntry>) => void;
@@ -314,9 +317,9 @@ function SetCompletionSync({
   const { save } = useSetSave();
   useEffect(() => {
     if (readOnly || set.status === "skipped") return;
-    const requiredProps = orderTrackedFields(trackedFields).map(
-      (f) => ACTUAL_PROP[f] as keyof SetLogEntry
-    );
+    const requiredProps = orderTrackedFields(trackedFields)
+      .filter((f) => !(weightOptional && f === "weight"))
+      .map((f) => ACTUAL_PROP[f] as keyof SetLogEntry);
     const allFilled =
       requiredProps.length > 0 &&
       requiredProps.every((prop) => {
@@ -370,8 +373,10 @@ export function ExerciseSetGrid({
   onSetChange,
   priorBest,
   gamificationEnabled = true,
+  weightOptional = false,
 }: {
   sets: SetLogEntry[];
+  weightOptional?: boolean;
   trackedFields: TrackedField[];
   readOnly: boolean;
   onSetChange: (setId: string, patch: Partial<SetLogEntry>) => void;
@@ -534,6 +539,7 @@ export function ExerciseSetGrid({
           trackedFields={trackedFields}
           readOnly={readOnly}
           touched={touchedSetIds.has(set.id)}
+          weightOptional={weightOptional}
           onChange={(patch) => onSetChange(set.id, patch)}
         />
       ))}

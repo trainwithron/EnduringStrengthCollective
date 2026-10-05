@@ -16,7 +16,7 @@ export async function sendPushToProfile(
   const privateKey = process.env.VAPID_PRIVATE_KEY;
   if (!publicKey || !privateKey) return 0;
 
-  webpush.setVapidDetails("mailto:support@enduringstrength.co", publicKey, privateKey);
+  webpush.setVapidDetails(process.env.VAPID_SUBJECT || "mailto:support@enduringstrength.co", publicKey, privateKey);
 
   const { data: subscriptions } = await supabase
     .from("push_subscriptions")

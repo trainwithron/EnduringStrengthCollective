@@ -40,6 +40,7 @@ type View =
   | "assign-self"
   | "assign-position"
   | "assign-position-result"
+  | "assigned"
   | "duplicate-org"
   | "duplicate-group";
 
@@ -68,6 +69,9 @@ export function ProgramCardMenu({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View | null>(null);
+  // Set after a single-client assignment so the coach sees it worked before
+  // anything else happens, instead of being dropped into the copy's builder.
+  const [assigned, setAssigned] = useState<{ programId: string; clientName: string } | null>(null);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
   const [clients, setClients] = useState<ClientOption[] | null>(null);
   const [orgs, setOrgs] = useState<OrgOption[] | null>(null);
@@ -305,7 +309,8 @@ export function ProgramCardMenu({
       `Your coach assigned you a new program: ${programName} — ${client.fullName}`,
       `/groups/${groupId}/programs/${result.programId}`
     );
-    router.push(`/groups/${groupId}/programs/${result.programId}`);
+    setAssigned({ programId: result.programId, clientName: client.fullName });
+    setView("assigned");
   }
 
   async function handleAssignToSelf() {
@@ -616,6 +621,32 @@ export function ProgramCardMenu({
                   </button>
                 ))}
               </div>
+            </div>
+          )}
+
+          {view === "assigned" && assigned && (
+            <div className="p-3">
+              <p className="font-body text-sm text-chalk">
+                Assigned to {assigned.clientName}. They have been notified and now have their own copy.
+              </p>
+              <button
+                type="button"
+                onClick={() => router.push(`/groups/${groupId}/programs/${assigned.programId}`)}
+                className="w-full h-11 mt-2.5 bg-rust text-graphite font-body text-sm font-medium"
+              >
+                Open their copy
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setView(null);
+                  setAssigned(null);
+                  router.refresh();
+                }}
+                className="w-full h-11 mt-1.5 border border-steel/30 text-steel font-body text-sm"
+              >
+                Done
+              </button>
             </div>
           )}
 

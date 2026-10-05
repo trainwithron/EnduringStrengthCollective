@@ -21,6 +21,7 @@ import {
   parseImportRows,
   mergeIdenticalSetRows,
   groupIntoWeeks,
+  parseRestSeconds,
   type ParsedImportRow,
 } from "@/lib/workout-import-parser";
 import {
@@ -86,6 +87,9 @@ interface ImportSummary {
   // credit-metered in the first place, nothing to refund.
   isAiSourced: boolean;
   programId: string;
+  // Days, exercises or sets that failed to save. Non-zero means the program
+  // is incomplete and the coach must check it, not trust it.
+  failedWrites: number;
 }
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -310,9 +314,14 @@ export function ImportWizard({
       const usesTime = parsed.some(
         (r) => normalizeName(r.exerciseName) === key && r.timeSeconds != null
       );
-      const trackedFields: TrackedField[] = usesTime
-        ? [...DEFAULT_TRACKED_FIELDS, "time"]
-        : DEFAULT_TRACKED_FIELDS;
+      const usesRest = parsed.some(
+        (r) => normalizeName(r.exerciseName) === key && parseRestSeconds(r.rest) != null
+      );
+      const trackedFields: TrackedField[] = [
+        ...DEFAULT_TRACKED_FIELDS,
+        ...(usesTime ? (["time"] as TrackedField[]) : []),
+        ...(usesRest ? (["rest"] as TrackedField[]) : []),
+      ];
 
       if (match.exerciseName) {
         resolutions.set(key, { exerciseName: match.exerciseName, trackedFields });
@@ -479,10 +488,11 @@ export function ImportWizard({
     // Finalizing an import never deactivates the client's other programs:
     // several programs can be active at once, activation is per program.
 
+    let failedWrites = 0;
     for (const week of weeks) {
       for (let dayIndex = 0; dayIndex < week.days.length; dayIndex++) {
         const day = week.days[dayIndex];
-        const { data: workoutRow } = await supabase
+        const { data: workoutRow, error: workoutError } = await supabase
           .from("workouts")
           .insert({
             program_id: programRow.id,
@@ -493,14 +503,17 @@ export function ImportWizard({
           })
           .select("id")
           .single();
-        if (!workoutRow) continue;
+        if (!workoutRow || workoutError) {
+          failedWrites += Math.max(1, day.exercises.length);
+          continue;
+        }
 
         for (let exIndex = 0; exIndex < day.exercises.length; exIndex++) {
           const ex = day.exercises[exIndex];
           const resolution = resolutions.get(normalizeName(ex.exerciseName));
           if (!resolution) continue;
 
-          const { data: exerciseRow } = await supabase
+          const { data: exerciseRow, error: exerciseError } = await supabase
             .from("group_workout_exercises")
             .insert({
               workout_id: workoutRow.id,
@@ -511,7 +524,10 @@ export function ImportWizard({
             })
             .select("id")
             .single();
-          if (!exerciseRow) continue;
+          if (!exerciseRow || exerciseError) {
+            failedWrites += 1;
+            continue;
+          }
 
           const setsPayload = Array.from({ length: Math.max(1, ex.sets) }, (_, setOrder) => ({
             group_workout_exercise_id: exerciseRow.id,
@@ -520,9 +536,11 @@ export function ImportWizard({
             target_weight: ex.weight,
             target_rpe: ex.rpe,
             target_time_seconds: ex.timeSeconds,
+            target_rest_seconds: ex.restSeconds ?? null,
           }));
 
-          await supabase.from("group_workout_exercise_sets").insert(setsPayload);
+          const { error: setsError } = await supabase.from("group_workout_exercise_sets").insert(setsPayload);
+          if (setsError) failedWrites += 1;
         }
       }
     }
@@ -542,6 +560,7 @@ export function ImportWizard({
       injuryConsiderations,
       isAiSourced: importData.isAiSourced,
       programId: programRow.id,
+      failedWrites,
     });
     setDoneHref(`/groups/${groupId}/programs/${programRow.id}`);
     setPending(null);
@@ -907,6 +926,14 @@ export function ImportWizard({
           {summary.weekCount === 1 ? "" : "s"} — {summary.matchedCount} exercise
           {summary.matchedCount === 1 ? "" : "s"} matched your existing library.
         </p>
+        {summary.failedWrites > 0 && (
+          <div className="mb-4 border border-rust/60 bg-rust/10 p-3" role="alert">
+            <p className="font-body text-xs text-chalk leading-snug">
+              {summary.failedWrites} {summary.failedWrites === 1 ? "part" : "parts"} of this program did not save,
+              so some days or exercises are missing. Open the program and check every week before assigning it.
+            </p>
+          </div>
+        )}
         {summary.injuryConsiderations && (
           <div className="mb-4 border border-rust/40 bg-rust/5 p-3">
             <p className="font-body text-xs text-rust font-medium mb-1">

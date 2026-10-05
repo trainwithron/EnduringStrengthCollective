@@ -92,7 +92,7 @@ export function MealCheckoffList({
   if (meals.length === 0) {
     return (
       <p className="font-body text-sm text-steel border border-steel/20 p-4">
-        No meal plan set for today yet.
+        Your coach is still setting up your meal plan. It will show up here once it is ready.
       </p>
     );
   }

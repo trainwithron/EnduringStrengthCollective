@@ -42,6 +42,13 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/invite/") ||
     pathname.startsWith("/pr/") ||
     pathname.startsWith("/share/") ||
+    // PWA files are fetched by the browser itself, often with no cookies
+    // (manifest requests are credential-less by default) — redirecting them
+    // to /login breaks "Add to Home Screen" and push registration.
+    pathname === "/manifest.webmanifest" ||
+    pathname === "/sw.js" ||
+    pathname === "/apple-icon" ||
+    pathname.startsWith("/icon") ||
     // guardian_links tokenized read-only view — a caregiver never has a
     // real session, same gotcha already hit for /pr/ and /share/.
     pathname.startsWith("/guardian/") ||

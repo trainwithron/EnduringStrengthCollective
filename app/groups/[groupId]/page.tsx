@@ -98,7 +98,7 @@ export default async function GroupHubPage(
     { data: recentLogs },
     { data: programs },
   ] = await Promise.all([
-    supabase.from("groups").select("id, name, description, organization_id").eq("id", params.groupId).single(),
+    supabase.from("groups").select("id, name, description, organization_id, group_kind").eq("id", params.groupId).single(),
     // Roster with role + most recent completed workout timestamp.
     supabase
       .from("group_memberships")
@@ -533,6 +533,7 @@ export default async function GroupHubPage(
         name={group.name}
         description={group.description}
         memberCount={roster.length}
+        hideMemberCount={(group as { group_kind?: string }).group_kind === "one_on_one"}
         isCoach={renderAsCoach}
         groupId={params.groupId}
         coachId={user?.id}
@@ -547,26 +548,6 @@ export default async function GroupHubPage(
           readAt: n.read_at,
         }))}
       />
-
-      <section className="px-5 pt-6">
-        <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
-          Programs
-        </h2>
-        {programs && programs.length > 0 ? (
-          <ProgramCardList
-            groupId={params.groupId}
-            programs={programs.map((p: any) => ({
-              id: p.id,
-              name: p.name,
-              workoutCount: p.workouts?.[0]?.count ?? 0,
-              coverImagePath: p.cover_image_path ?? null,
-            }))}
-            visualsByProgramId={visualsByProgramId}
-          />
-        ) : (
-          <p className="font-body text-sm text-steel py-2">No programs assigned.</p>
-        )}
-      </section>
 
       {showMobileView && athleteId && (
         <section className="px-5 pt-6">
@@ -641,6 +622,27 @@ export default async function GroupHubPage(
           )}
         </section>
       )}
+
+      {/* Today's workout comes first; the program list is reference. */}
+      <section className="px-5 pt-6">
+        <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+          Programs
+        </h2>
+        {programs && programs.length > 0 ? (
+          <ProgramCardList
+            groupId={params.groupId}
+            programs={programs.map((p: any) => ({
+              id: p.id,
+              name: p.name,
+              workoutCount: p.workouts?.[0]?.count ?? 0,
+              coverImagePath: p.cover_image_path ?? null,
+            }))}
+            visualsByProgramId={visualsByProgramId}
+          />
+        ) : (
+          <p className="font-body text-sm text-steel py-2">Your coach is setting up your program. It will show up here as soon as it is ready.</p>
+        )}
+      </section>
 
       <RosterList
         members={roster}

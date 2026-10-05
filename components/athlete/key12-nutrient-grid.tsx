@@ -31,7 +31,7 @@ export function Key12NutrientGrid({
       </div>
 
       {totalIngredientCount === 0 ? (
-        <p className="font-body text-sm text-steel">No meal plan set for today yet.</p>
+        <p className="font-body text-sm text-steel">Your coach is still setting up your meal plan. It will show up here once it is ready.</p>
       ) : (
         <>
           {isPartial && (

@@ -116,7 +116,7 @@ export default async function MacroCalculatorPage(
           href={`/groups/${params.groupId}/nutrition`}
           className="inline-block mt-6 font-body text-sm text-rust"
         >
-          Open Nutrition to build a meal plan from these macros &rarr;
+          Your coach sets your meal plan. See what is planned today &rarr;
         </Link>
       </section>
 

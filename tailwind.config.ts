@@ -31,6 +31,10 @@ export default {
         // Conditioning) where rust and moss are already spoken for —
         // colorblind-safety checked, see program-card-visuals.
         blue: "#4A7A9E",
+        // Warm caution/neutral-emphasis tone for non-primary highlights (unsaved,
+        // low readiness) so rust stays reserved for the primary action.
+        // Merges into the default amber scale, so amber-400 etc. still work.
+        amber: { DEFAULT: "#D9A441" },
       },
       fontFamily: {
         // Same var()-reference trick as the colors above — lets the

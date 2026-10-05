@@ -50,6 +50,9 @@ Rules:
 const VALID_SLOTS = ["breakfast", "lunch", "dinner", "snack", "any"];
 const VALID_ARCHETYPES = ["omnivore", "vegetarian", "vegan", "carnivore", "keto", "paleo"];
 
+// AI generation can take well over the platform default; without this the request is cut off mid-way.
+export const maxDuration = 120;
+
 export async function POST(request: Request) {
   const supabase = await createServerClient();
   const {

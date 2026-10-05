@@ -186,3 +186,22 @@ describe("mergeIdenticalSetRows", () => {
     expect(mergeIdenticalSetRows([])).toEqual([]);
   });
 });
+
+describe("parseRestSeconds", () => {
+  it("reads common rest formats as seconds", async () => {
+    const { parseRestSeconds } = await import("./workout-import-parser");
+    expect(parseRestSeconds("90")).toBe(90);
+    expect(parseRestSeconds("90s")).toBe(90);
+    expect(parseRestSeconds("2 min")).toBe(120);
+    expect(parseRestSeconds("1:30")).toBe(90);
+    expect(parseRestSeconds("1.5 min")).toBe(90);
+  });
+  it("does not guess at anything else", async () => {
+    const { parseRestSeconds } = await import("./workout-import-parser");
+    expect(parseRestSeconds("as needed")).toBeNull();
+    expect(parseRestSeconds("60-90")).toBeNull();
+    expect(parseRestSeconds("")).toBeNull();
+    expect(parseRestSeconds(null)).toBeNull();
+    expect(parseRestSeconds("0")).toBeNull();
+  });
+});
