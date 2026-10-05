@@ -6,6 +6,7 @@ import { calorieSeriesWithStanding } from "@/lib/macro-resolution";
 import { fetchStandingTarget } from "@/lib/standing-macros";
 import { ClientCardGrid } from "@/components/coach/desktop/client-card-grid";
 import { UnavailableState } from "@/components/ui/unavailable-state";
+import { GroupInvitesPanel, type GroupInviteRow } from "@/components/coach/desktop/group-invites-panel";
 import { AddClientButton } from "@/components/coach/desktop/add-client-button";
 import { SwappableTerm } from "@/components/coach/swappable-term";
 import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
@@ -52,7 +53,7 @@ export default async function ClientsPage(
 
   const { data: group } = await supabase
     .from("groups")
-    .select("name, team_mode")
+    .select("name, team_mode, group_kind")
     .eq("id", params.groupId)
     .single();
 
@@ -108,6 +109,37 @@ export default async function ClientsPage(
   for (const row of taggedPhaseRows ?? []) {
     phaseByAthleteId.set(row.athlete_id, row.phase as MilestonePhaseTag);
   }
+
+  // This group's invite links (live, expired and cancelled). The revoked_at column comes from a
+  // later database update; without it the list simply has no "cancelled" state.
+  const inviteSelect = "id, code, created_at, expires_at";
+  let inviteQuery = await supabase
+    .from("group_invites")
+    .select(`${inviteSelect}, revoked_at`)
+    .eq("group_id", params.groupId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+  if (inviteQuery.error) {
+    inviteQuery = (await supabase
+      .from("group_invites")
+      .select(inviteSelect)
+      .eq("group_id", params.groupId)
+      .order("created_at", { ascending: false })
+      .limit(50)) as typeof inviteQuery;
+  }
+  const groupInvites: GroupInviteRow[] = ((inviteQuery.data ?? []) as unknown as {
+    id: string;
+    code: string;
+    created_at: string;
+    expires_at: string | null;
+    revoked_at?: string | null;
+  }[]).map((r) => ({
+    id: r.id,
+    code: r.code,
+    createdAt: r.created_at,
+    expiresAt: r.expires_at,
+    revokedAt: r.revoked_at ?? null,
+  }));
 
   // Clients who haven't signed in yet: which of them already has a live invite link.
   const unclaimedIds = (memberships ?? [])
@@ -284,6 +316,17 @@ export default async function ClientsPage(
           </div>
         </div>
       )}
+
+      <GroupInvitesPanel
+        groupId={params.groupId}
+        createdBy={user.id}
+        invites={groupInvites}
+        oneOnOneClientName={
+          (group as { group_kind?: string } | null)?.group_kind === "one_on_one" && athletes.length > 0
+            ? athletes[0].fullName
+            : null
+        }
+      />
 
       {rosterError ? (
         <UnavailableState what="your clients" />

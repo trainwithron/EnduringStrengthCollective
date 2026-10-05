@@ -18,6 +18,7 @@ import { ClientProgrammingMenu } from "@/components/coach/client-programming-men
 import { MinorConsentControl } from "@/components/coach/minor-consent-control";
 import { ClientSignInPanel } from "@/components/coach/client-signin-panel";
 import { claimStatus } from "@/lib/client-claim";
+import { claimLinkDetail } from "@/lib/invite-state";
 import { GuardianShareButton } from "@/components/coach/guardian-share-button";
 import { NutritionPhaseControl } from "@/components/coach/nutrition-phase-control";
 import { SettingsGroup } from "@/components/shared/settings-group";
@@ -349,15 +350,37 @@ export default async function AthleteProfilePage(
 
   // A client the coach created before they ever signed in: the sign-in
   // checklist (and whether an invite link already exists) shows on top.
-  const { data: latestInviteRow } = profile?.claimed_at
-    ? { data: null }
-    : await supabase
-        .from("client_invites")
-        .select("expires_at, used_at")
-        .eq("athlete_id", params.athleteId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+  // revoked_at comes from a later database update; without it the "cancelled" state just can't be told
+  // apart from "used".
+  const fetchLatestInvite = async (columns: string) =>
+    profile?.claimed_at
+      ? { data: null, error: null }
+      : await supabase
+          .from("client_invites")
+          .select(columns)
+          .eq("athlete_id", params.athleteId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+  let latestInviteResult = await fetchLatestInvite("created_at, expires_at, used_at, revoked_at");
+  if (latestInviteResult.error) latestInviteResult = await fetchLatestInvite("created_at, expires_at, used_at");
+  const latestInviteRow = latestInviteResult.data as unknown as {
+    created_at: string;
+    expires_at: string;
+    used_at: string | null;
+    revoked_at?: string | null;
+  } | null;
+  const signInDetail = claimLinkDetail({
+    claimedAt: profile?.claimed_at ?? null,
+    latestInvite: latestInviteRow
+      ? {
+          createdAt: latestInviteRow.created_at,
+          expiresAt: latestInviteRow.expires_at,
+          usedAt: latestInviteRow.used_at,
+          revokedAt: latestInviteRow.revoked_at ?? null,
+        }
+      : null,
+  });
   const signInStatus = claimStatus({
     claimedAt: profile?.claimed_at ?? null,
     latestInvite: latestInviteRow ? { expiresAt: latestInviteRow.expires_at, usedAt: latestInviteRow.used_at } : null,
@@ -881,6 +904,7 @@ export default async function AthleteProfilePage(
               athleteId={params.athleteId}
               clientName={profile?.full_name ?? "Client"}
               status={signInStatus}
+              linkDetail={signInDetail}
             />
           )}
           {(hasAboutInfo || parQAnswers.length > 0 || !!intake) && (

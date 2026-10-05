@@ -25,11 +25,20 @@ export async function POST(request: Request) {
   if (!client.ok) return NextResponse.json({ error: client.error }, { status: client.status });
 
   // Retire earlier unused links so only the newest one works.
-  await serviceRole
+  const retiredAt = new Date().toISOString();
+  const { error: retireError } = await serviceRole
     .from("client_invites")
-    .update({ used_at: new Date().toISOString() })
+    .update({ used_at: retiredAt, revoked_at: retiredAt, revoked_by: user.id })
     .eq("athlete_id", athleteId)
     .is("used_at", null);
+  if (retireError) {
+    // revoked_* columns not there yet: retire the old link the way this always worked.
+    await serviceRole
+      .from("client_invites")
+      .update({ used_at: retiredAt })
+      .eq("athlete_id", athleteId)
+      .is("used_at", null);
+  }
 
   const token = generateClaimToken();
   const expiresAt = new Date(Date.now() + CLAIM_LINK_LIFETIME_DAYS * 24 * 60 * 60 * 1000).toISOString();

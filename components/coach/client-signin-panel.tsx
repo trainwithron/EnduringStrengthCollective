@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Circle } from "lucide-react";
 import { buildClaimSms, CLAIM_STATUS_LABEL, smsHref, type ClaimStatus } from "@/lib/client-claim";
+import { CLAIM_LINK_STATE_LABEL, type ClaimLinkDetail } from "@/lib/invite-state";
 
 // The coach's per-client sign-in checklist for a client who hasn't signed in
 // yet: account created -> invite link created -> client signed in. The coach
@@ -14,18 +15,22 @@ export function ClientSignInPanel({
   athleteId,
   clientName,
   status,
+  linkDetail,
   coachFirstName,
 }: {
   groupId: string;
   athleteId: string;
   clientName: string;
   status: Exclude<ClaimStatus, "active">;
+  // What happened to the latest link: working (and for how long), expired, cancelled, or never made.
+  linkDetail?: ClaimLinkDetail;
   coachFirstName?: string | null;
 }) {
   const router = useRouter();
   const [linkStatus, setLinkStatus] = useState<ClaimStatus>(status);
   const [link, setLink] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [detail, setDetail] = useState<ClaimLinkDetail | undefined>(linkDetail);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showEmail, setShowEmail] = useState(false);
@@ -49,9 +54,34 @@ export function ClientSignInPanel({
       if (!res.ok) throw new Error(data.error || "Couldn't create the link.");
       setLink(data.link);
       setLinkStatus("invite_created");
+      setDetail({ state: "live", daysLeft: 14, createdAt: new Date().toISOString() });
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't create the link.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function cancelLink() {
+    if (busy) return;
+    if (!window.confirm("Cancel this sign-in link? It will stop working. You can make a new one any time.")) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/clients/invite-revoke", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ groupId, athleteId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Couldn't cancel the link.");
+      setLink(null);
+      setLinkStatus("not_signed_in");
+      setDetail({ state: "revoked", daysLeft: null, createdAt: detail?.createdAt ?? null });
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't cancel the link.");
     } finally {
       setBusy(false);
     }
@@ -107,6 +137,18 @@ export function ClientSignInPanel({
         first sign-in.
       </p>
 
+      {detail && detail.state !== "claimed" && (
+        <p className="font-body text-sm text-chalk mt-3">
+          {CLAIM_LINK_STATE_LABEL[detail.state]}
+          {detail.state === "live" && detail.daysLeft != null
+            ? `, ${detail.daysLeft} ${detail.daysLeft === 1 ? "day" : "days"} left`
+            : ""}
+          {detail.createdAt && detail.state !== "not_sent"
+            ? ` · made ${new Date(detail.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+            : ""}
+        </p>
+      )}
+
       <ol className="mt-3 space-y-1.5">
         {steps.map((s) => (
           <li key={s.label} className="flex items-start gap-2 font-body text-sm">
@@ -154,8 +196,23 @@ export function ClientSignInPanel({
           disabled={busy}
           className="mt-4 h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-50"
         >
-          {busy ? "Creating…" : inviteCreated ? "Create a new invite link" : "Create invite link"}
+          {busy ? "Creating…" : inviteCreated ? "Make a new link (cancels the old one)" : "Create invite link"}
         </button>
+      )}
+      {!link && inviteCreated && (
+        <>
+          <p className="font-body text-xs text-steel mt-2 max-w-[56ch]">
+            A link can&apos;t be shown again once you leave this page. If you lost it, make a new one.
+          </p>
+          <button
+            type="button"
+            onClick={cancelLink}
+            disabled={busy}
+            className="h-11 mt-1 font-body text-sm text-steel underline underline-offset-2 disabled:opacity-50"
+          >
+            Cancel this link
+          </button>
+        </>
       )}
       {error && (
         <p className="font-body text-xs text-rust mt-2" role="alert">
