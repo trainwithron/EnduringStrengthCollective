@@ -14,6 +14,33 @@ import { LIFT_OFF_MONTHLY_CREDITS } from "@/lib/coach-credits";
 import type Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+// A purchase puts sessions on the account. New databases record it as a purchase in the session ledger; until
+// that exists this falls back to the plain balance change, so a payment is never lost over bookkeeping.
+async function grantPurchasedCredits(
+  supabase: SupabaseClient,
+  athleteId: string,
+  groupId: string,
+  credits: number,
+  note: string
+): Promise<{ error: { message: string } | null }> {
+  const grant = await supabase.rpc("grant_session_credits", {
+    p_athlete_id: athleteId,
+    p_group_id: groupId,
+    p_delta: credits,
+    p_kind: "purchased",
+    p_note: note,
+  });
+  if (!grant.error) return { error: null };
+  const missing = /could not find the function|does not exist/i.test(grant.error.message);
+  if (!missing) return { error: grant.error };
+  const { error } = await supabase.rpc("adjust_session_credits", {
+    p_athlete_id: athleteId,
+    p_group_id: groupId,
+    p_delta: credits,
+  });
+  return { error };
+}
+
 // Package-Program Linking (package_program_linking_scoping.md) — fires
 // duplicateProgram() on genuine FIRST enrollment only, never on a
 // recurring renewal (a subscription's repeat invoice.paid events don't
@@ -440,11 +467,7 @@ export async function POST(request: Request) {
             throw insertError;
           }
 
-          const { error: rpcError } = await supabase.rpc("adjust_session_credits", {
-            p_athlete_id: athleteId,
-            p_group_id: groupId,
-            p_delta: credits,
-          });
+          const { error: rpcError } = await grantPurchasedCredits(supabase, athleteId, groupId, credits, "Package purchased");
           if (rpcError) throw rpcError;
 
           const stripeFeeCents = await getRealStripeFeeCents(stripe, session.payment_intent);
@@ -582,11 +605,7 @@ export async function POST(request: Request) {
           throw grantError;
         }
 
-        const { error: rpcError } = await supabase.rpc("adjust_session_credits", {
-          p_athlete_id: athleteId,
-          p_group_id: groupId,
-          p_delta: pkg.sessions_granted,
-        });
+        const { error: rpcError } = await grantPurchasedCredits(supabase, athleteId, groupId, pkg.sessions_granted, "Membership renewed");
         if (rpcError) throw rpcError;
 
         const invoiceStripeFeeCents = await getRealStripeFeeCentsForInvoice(stripe, invoice.id!);

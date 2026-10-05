@@ -8,6 +8,8 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { AthleteNotesEditor } from "@/components/coach/athlete-notes-editor";
 import { SessionCreditsControl } from "@/components/coach/session-credits-control";
 import { AssignSessionsControl } from "@/components/coach/assign-sessions-control";
+import { SessionLedgerList } from "@/components/coach/session-ledger-list";
+import type { LedgerEntry } from "@/lib/session-ledger";
 import { SwipeDirectionSetting } from "@/components/athlete/swipe-direction-setting";
 import { GoalConfirmationControl } from "@/components/coach/goal-confirmation-control";
 import { PackageAssignmentControl } from "@/components/coach/package-assignment-control";
@@ -790,14 +792,22 @@ export default async function AthleteProfilePage(
   const sorenessTrend = (wellnessRows ?? []).map((r) => ({ date: r.log_date, value: r.soreness }));
   const energyTrend = (wellnessRows ?? []).map((r) => ({ date: r.log_date, value: r.energy }));
 
-  // Recent hand-assigned sessions. Until the adjustments table exists the select errors and this is just empty.
-  const { data: sessionGrantRows } = await supabase
-    .from("session_credit_adjustments")
-    .select("id, delta, note, created_at")
+  // The session ledger (migration 0246). Until it exists the select errors and the list is simply empty.
+  const { data: ledgerRows } = await supabase
+    .from("session_credit_ledger")
+    .select("id, kind, amount, balance_after, note, created_at")
     .eq("athlete_id", params.athleteId)
     .eq("group_id", params.groupId)
     .order("created_at", { ascending: false })
-    .limit(5);
+    .limit(40);
+  const ledgerEntries: LedgerEntry[] = (ledgerRows ?? []).map((r) => ({
+    id: r.id as string,
+    kind: r.kind as LedgerEntry["kind"],
+    amount: r.amount as number,
+    balanceAfter: r.balance_after as number,
+    note: (r.note as string | null) ?? null,
+    createdAt: r.created_at as string,
+  }));
 
   const initials = (profile?.full_name ?? "?")
     .split(" ")
@@ -1269,13 +1279,11 @@ export default async function AthleteProfilePage(
                 groupId={params.groupId}
                 clientName={profile?.full_name ?? "this client"}
                 initialBalance={creditsRow?.balance ?? 0}
-                recent={(sessionGrantRows ?? []).map((r) => ({
-                  id: r.id as string,
-                  delta: r.delta as number,
-                  note: (r.note as string | null) ?? null,
-                  createdAt: r.created_at as string,
-                }))}
               />
+            </SettingsGroup>
+
+            <SettingsGroup label="Session ledger">
+              <SessionLedgerList balance={creditsRow?.balance ?? 0} entries={ledgerEntries.slice(0, 10)} />
             </SettingsGroup>
 
             <SettingsGroup label="Workout Logging">

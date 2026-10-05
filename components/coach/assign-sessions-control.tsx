@@ -3,13 +3,6 @@
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 
-export interface SessionAssignment {
-  id: string;
-  delta: number;
-  note: string | null;
-  createdAt: string;
-}
-
 // Gives a client a number of sessions in one step ("12", with an optional note), no purchase involved. The
 // client's balance, the calendar and booking all read the same session_credits row a purchased package fills,
 // so nothing else needs to know the sessions were assigned by hand. Adds only; nothing is deducted.
@@ -18,13 +11,11 @@ export function AssignSessionsControl({
   groupId,
   clientName,
   initialBalance,
-  recent,
 }: {
   athleteId: string;
   groupId: string;
   clientName: string;
   initialBalance: number;
-  recent: SessionAssignment[];
 }) {
   const [balance, setBalance] = useState(initialBalance);
   const [amount, setAmount] = useState("");
@@ -32,7 +23,6 @@ export function AssignSessionsControl({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [history, setHistory] = useState(recent);
 
   async function assign() {
     const n = Number(amount);
@@ -88,9 +78,6 @@ export function AssignSessionsControl({
     setBusy(false);
     const newBalance = typeof data === "number" ? data : balance + n;
     setBalance(newBalance);
-    setHistory((prev) =>
-      [{ id: `new-${Date.now()}`, delta: n, note: trimmed || null, createdAt: new Date().toISOString() }, ...prev].slice(0, 5)
-    );
     setAmount("");
     setNote("");
     setMessage(`Added ${n}. ${clientName} now has ${newBalance}.`);
@@ -144,16 +131,6 @@ export function AssignSessionsControl({
         <p className="font-body text-xs text-chalk mt-2" role="status">
           {message}
         </p>
-      )}
-      {history.length > 0 && (
-        <ul className="mt-3 space-y-1">
-          {history.map((h) => (
-            <li key={h.id} className="font-body text-xs text-steel">
-              +{h.delta} on {new Date(h.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-              {h.note ? ` — ${h.note}` : ""}
-            </li>
-          ))}
-        </ul>
       )}
     </div>
   );

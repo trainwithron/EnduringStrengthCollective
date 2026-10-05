@@ -1,27 +1,86 @@
--- "Assign sessions": a coach gives a client a number of sessions with an optional note (for example "12 sessions,
--- paid in person"), with no purchase involved. The client's balance, the calendar and in-app booking then work
--- exactly as they do for a purchased package, because the balance is the same session_credits row.
+-- Session credit ledger and "Assign sessions".
 --
--- Every assignment is recorded in session_credit_adjustments so there is a trail of who added what and why.
--- Only adds; removing sessions stays with the existing minus control. Nothing is deducted automatically.
+-- A coach gives a client a number of sessions with an optional note (for example "12 sessions, paid in person"),
+-- with no purchase involved. The client's balance, the calendar and in-app booking then work exactly as they do for
+-- a purchased package, because the balance is the same session_credits row.
+--
+-- Every change to a balance is recorded in session_credit_ledger (who, when, why, and the balance after), so a coach
+-- can look back at "sold on this date, delivered since then". 0248 writes the other kinds of entry (delivered,
+-- waived, booked, refund, adjusted); this migration creates the table, the single internal function that all of them
+-- go through, and the assign action.
 
-create table if not exists public.session_credit_adjustments (
+create table if not exists public.session_credit_ledger (
   id uuid primary key default uuid_generate_v4(),
   athlete_id uuid not null references public.profiles(id) on delete cascade,
   group_id uuid not null references public.groups(id) on delete cascade,
-  delta int not null check (delta > 0),
+  kind text not null check (kind in ('assigned', 'purchased', 'booked', 'delivered', 'waived', 'refund', 'adjusted', 'opening', 'expired')),
+  -- Signed: sessions added are positive, sessions used are negative. Waived entries are 0.
+  amount int not null,
+  balance_after int not null,
   note text,
-  created_by uuid not null references public.profiles(id),
+  booking_id uuid references public.bookings(id) on delete set null,
+  created_by uuid references public.profiles(id) on delete set null,
   created_at timestamptz not null default now()
 );
-create index if not exists session_credit_adjustments_athlete_idx
-  on public.session_credit_adjustments (athlete_id, group_id, created_at desc);
+create index if not exists session_credit_ledger_athlete_idx
+  on public.session_credit_ledger (athlete_id, group_id, created_at desc);
 
-alter table public.session_credit_adjustments enable row level security;
--- Coaches of the group and the client themselves can read it; rows are written only by the function below.
-create policy "session_credit_adjustments_select" on public.session_credit_adjustments for select
+alter table public.session_credit_ledger enable row level security;
+-- Coaches of the group and the client themselves can read it; rows are written only by the functions below.
+create policy "session_credit_ledger_select" on public.session_credit_ledger for select
   to authenticated
   using (athlete_id = (select auth.uid()) or public.is_group_coach(group_id));
+
+-- Opening balances: existing balances have no history, so each starts with one row saying where it stood when the
+-- ledger began.
+insert into public.session_credit_ledger (athlete_id, group_id, kind, amount, balance_after, note)
+select athlete_id, group_id, 'opening', balance, balance, 'Balance when the ledger started'
+from public.session_credits
+where not exists (
+  select 1 from public.session_credit_ledger l
+  where l.athlete_id = session_credits.athlete_id and l.group_id = session_credits.group_id
+);
+
+-- The ONE place a balance changes and a ledger row is written. No floor: a balance below zero means the client is
+-- owed sessions-worth of training that has not been paid for yet, which a coach must be able to see rather than
+-- have silently clamped to zero. Not callable by clients or coaches directly; the functions that call it do their
+-- own authorization.
+create or replace function public.apply_session_credit_change(
+  p_athlete_id uuid,
+  p_group_id uuid,
+  p_delta int,
+  p_kind text,
+  p_note text default null,
+  p_booking_id uuid default null,
+  p_created_by uuid default null
+)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_balance int;
+  v_grants boolean := p_delta > 0 and p_kind in ('assigned', 'purchased', 'adjusted');
+begin
+  insert into public.session_credits (athlete_id, group_id, balance, last_granted_at)
+  values (p_athlete_id, p_group_id, p_delta, case when v_grants then now() else null end)
+  on conflict (athlete_id, group_id)
+  do update set
+    balance = public.session_credits.balance + p_delta,
+    last_granted_at = case when v_grants then now() else public.session_credits.last_granted_at end,
+    updated_at = now()
+  returning balance into v_balance;
+
+  insert into public.session_credit_ledger (athlete_id, group_id, kind, amount, balance_after, note, booking_id, created_by)
+  values (p_athlete_id, p_group_id, p_kind, p_delta, v_balance, nullif(trim(coalesce(p_note, '')), ''), p_booking_id,
+          coalesce(p_created_by, auth.uid()));
+
+  return v_balance;
+end;
+$$;
+
+revoke all on function public.apply_session_credit_change(uuid, uuid, int, text, text, uuid, uuid) from public, anon, authenticated;
 
 create or replace function public.assign_session_credits(
   p_athlete_id uuid,
@@ -34,8 +93,6 @@ language plpgsql
 security definer
 set search_path = public
 as $$
-declare
-  v_balance int;
 begin
   if auth.uid() is null or not public.is_group_coach(p_group_id) then
     raise exception 'not authorized to assign sessions';
@@ -50,16 +107,7 @@ begin
     raise exception 'that person is not a client in this group';
   end if;
 
-  insert into public.session_credits (athlete_id, group_id, balance)
-  values (p_athlete_id, p_group_id, p_amount)
-  on conflict (athlete_id, group_id)
-  do update set balance = public.session_credits.balance + p_amount, updated_at = now()
-  returning balance into v_balance;
-
-  insert into public.session_credit_adjustments (athlete_id, group_id, delta, note, created_by)
-  values (p_athlete_id, p_group_id, p_amount, nullif(trim(coalesce(p_note, '')), ''), auth.uid());
-
-  return v_balance;
+  return public.apply_session_credit_change(p_athlete_id, p_group_id, p_amount, 'assigned', p_note, null, auth.uid());
 end;
 $$;
 

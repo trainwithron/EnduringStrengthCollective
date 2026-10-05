@@ -67,6 +67,16 @@ export async function GET(request: Request) {
       .eq("balance", row.balance); // real optimistic guard against a concurrent grant/spend since this row was read
     if (updateError) continue;
 
+    // Best-effort: the ledger table exists once migration 0246 is applied.
+    await supabase.from("session_credit_ledger").insert({
+      athlete_id: row.athlete_id,
+      group_id: row.group_id,
+      kind: "expired",
+      amount: -row.balance,
+      balance_after: 0,
+      note: "Unused sessions expired",
+    });
+
     await supabase.from("session_credit_expirations").insert({
       athlete_id: row.athlete_id,
       group_id: row.group_id,

@@ -20,7 +20,7 @@ export function SessionCreditsControl({
     // A balance is money the client paid for. One stray tap on a small
     // button must not add or remove a session without a second look.
     const verb = delta < 0 ? "Remove 1 session credit from" : "Add 1 session credit to";
-    if (!window.confirm(`${verb} this client? Their balance goes from ${balance} to ${Math.max(0, balance + delta)}.`)) {
+    if (!window.confirm(`${verb} this client? Their balance goes from ${balance} to ${balance + delta}.`)) {
       return;
     }
 
@@ -32,7 +32,7 @@ export function SessionCreditsControl({
     // the background instead of the +/- waiting on a round-trip. The
     // authoritative balance corrects this once the RPC resolves, in case
     // it clamped (e.g. hit the zero floor) or genuinely failed.
-    setBalance((prev) => Math.max(0, prev + delta));
+    setBalance((prev) => prev + delta);
     const supabase = createBrowserClient();
     supabase
       .rpc("adjust_session_credits", {
@@ -62,13 +62,13 @@ export function SessionCreditsControl({
         <button
           type="button"
           onClick={() => adjust(-1)}
-          disabled={balance === 0}
           aria-label="Remove one session credit"
           className="w-11 h-11 flex items-center justify-center border border-steel/30 text-steel font-body text-lg active:border-rust active:text-rust transition-colors disabled:opacity-40"
         >
           &minus;
         </button>
-        <span className="font-display text-lg w-6 text-center">{balance}</span>
+        <span className="font-display text-lg min-w-6 text-center">{balance}</span>
+        {balance < 0 && <span className="font-body text-xs text-rust">Owed {Math.abs(balance)}</span>}
         <button
           type="button"
           onClick={() => adjust(1)}

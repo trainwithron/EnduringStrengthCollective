@@ -12,6 +12,7 @@ import { AddDayEventForm } from "@/components/coach/desktop/add-day-event-form";
 import { getActiveProgramForAthlete, getAllProgramWorkouts, getScheduledWorkouts, dateKeyOf } from "@/lib/athlete-day-schedule";
 import { BookSlotButton } from "@/components/athlete/book-slot-button";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
+import { MarkAttendedControl, type CreditState } from "@/components/coach/mark-attended-control";
 import { RescheduleSlotButton } from "@/components/athlete/reschedule-slot-button";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
@@ -475,6 +476,21 @@ export default async function CoachDayDetailPage(
     clientMembership ? getActiveProgramForAthlete(supabase, params.groupId, clientId!) : Promise.resolve(null),
   ]);
 
+  // Settlement state (migration 0248). If those columns are not there yet this lookup errors and the Mark attended
+  // control simply does not appear.
+  const settlementById = new Map<string, { credit_state: CreditState; attended_at: string | null }>();
+  if ((bookingRows ?? []).length > 0) {
+    const { data: settlementRows, error: settlementError } = await supabase
+      .from("bookings")
+      .select("id, credit_state, attended_at")
+      .in("id", (bookingRows ?? []).map((b) => b.id));
+    if (!settlementError) {
+      for (const r of settlementRows ?? []) {
+        settlementById.set(r.id as string, { credit_state: r.credit_state as CreditState, attended_at: (r.attended_at as string | null) ?? null });
+      }
+    }
+  }
+
   const slots = generateSlotsForDate(date, windows, blockedRanges, timezone);
   const bookingByTime = new Map(
     (bookingRows ?? []).map((b) => [new Date(b.start_at).getTime(), b as any])
@@ -620,6 +636,13 @@ export default async function CoachDayDetailPage(
                       Booked — {(booking.profiles as any)?.full_name ?? "Client"}
                     </span>
                     {booking.needs_coach_resolution && <RecurringConflictBadge bookingId={booking.id} />}
+                    {settlementById.has(booking.id) && start.getTime() <= Date.now() + 12 * 3600 * 1000 && (
+                      <MarkAttendedControl
+                        bookingId={booking.id}
+                        initialAttended={settlementById.get(booking.id)!.attended_at !== null}
+                        initialState={settlementById.get(booking.id)!.credit_state}
+                      />
+                    )}
                     {start.getTime() < Date.now() ? (
                       <MarkNoShowToggle bookingId={booking.id} initialNoShow={booking.no_show ?? false} />
                     ) : (
