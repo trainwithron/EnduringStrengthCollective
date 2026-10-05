@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { dispatchSms } from "@/lib/sms-dispatch";
+import { getCallerGroupRole } from "@/lib/group-access";
 
 // SMS mirror of lib/notify-low-session-balance.ts's existing push
 // alert — same tier thresholds (3/1/0), same recipients (the group's
@@ -28,7 +29,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing athleteId or groupId." }, { status: 400 });
   }
 
+  // Only the client themselves (their own balance just changed) or a coach of the group may ask for this alert,
+  // and the client must belong to the group. Without this any signed-in user could probe balances and text coaches.
+  const role = await getCallerGroupRole(supabase, user.id, groupId);
+  if (!role || (role === "athlete" && user.id !== athleteId)) {
+    return NextResponse.json({ error: "Not allowed." }, { status: 403 });
+  }
+
   const serviceRole = createServiceRoleClient();
+
+  const { data: athleteMember } = await serviceRole
+    .from("group_memberships")
+    .select("profile_id")
+    .eq("group_id", groupId)
+    .eq("profile_id", athleteId)
+    .eq("role", "athlete")
+    .maybeSingle();
+  if (!athleteMember) return NextResponse.json({ error: "Not allowed." }, { status: 403 });
 
   const { data: creditsRow } = await serviceRole
     .from("session_credits")
@@ -75,8 +92,9 @@ export async function POST(request: Request) {
       referenceId: `${athleteId}:${groupId}:${balance}:${todayKey}:${recipientId}`,
       body,
     });
-    results.push({ recipientId, ...result });
+    results.push(result);
   }
 
-  return NextResponse.json({ results });
+  // Deliberately no recipient ids in the answer: the caller only needs to know whether anything went out.
+  return NextResponse.json({ sent: results.length > 0 });
 }

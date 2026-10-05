@@ -656,7 +656,8 @@ export function MealPlanGenerator({
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ action: "nutrition_plan", trigger: "auto_validator_failure", referenceId }),
         }).catch(() => null);
-        if (refundRes?.ok) {
+        const refundJson = refundRes?.ok ? await refundRes.json().catch(() => null) : null;
+        if (refundJson?.refunded) {
           setAiSuggestAllError("Credit refunded — AI couldn't generate any suggestions right now.");
         }
       }
