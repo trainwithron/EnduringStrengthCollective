@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { dispatchSms } from "@/lib/sms-dispatch";
+import { getCallerGroupRole } from "@/lib/group-access";
 
 // Fired right after book_session() succeeds, from the same 3 call
 // sites as lib/notify-booking-confirmed.ts's push version (self-book,
@@ -32,33 +33,34 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing athleteId, groupId, or startAt." }, { status: 400 });
   }
 
-  // Only the athlete themself or a coach of that group can trigger this —
-  // it texts a real person, so any signed-in user must not be able to aim
-  // it at someone else's athleteId.
-  if (user.id !== athleteId) {
-    const { data: callerMembership } = await supabase
-      .from("group_memberships")
-      .select("role")
-      .eq("group_id", groupId)
-      .eq("profile_id", user.id)
-      .maybeSingle();
-    if (callerMembership?.role !== "coach") {
-      return NextResponse.json({ error: "Not allowed." }, { status: 403 });
-    }
+  // Only the athlete themself or a coach of that group can trigger this, and only for a booking that really
+  // exists: it texts a real person, so a signed-in user must not be able to aim it at someone else's athleteId,
+  // name a group they are not in, or invent a time.
+  const role = await getCallerGroupRole(supabase, user.id, groupId);
+  if (!role || (role === "athlete" && user.id !== athleteId)) {
+    return NextResponse.json({ error: "Not allowed." }, { status: 403 });
   }
 
   const serviceRole = createServiceRoleClient();
 
-  const { data: coachRow } = await serviceRole
-    .from("group_memberships")
-    .select("profile_id, profiles ( full_name )")
+  const { data: booking } = await serviceRole
+    .from("bookings")
+    .select("coach_id")
+    .eq("athlete_id", athleteId)
     .eq("group_id", groupId)
-    .eq("role", "coach")
-    .limit(1)
+    .eq("start_at", startAt)
+    .eq("status", "confirmed")
+    .maybeSingle();
+  if (!booking) return NextResponse.json({ error: "Not allowed." }, { status: 403 });
+
+  const { data: coachRow } = await serviceRole
+    .from("profiles")
+    .select("id, full_name")
+    .eq("id", booking.coach_id)
     .maybeSingle();
   if (!coachRow) return NextResponse.json({ sent: false, reason: "no_coach" });
 
-  const coachName = (coachRow as any).profiles?.full_name ?? "your coach";
+  const coachName = coachRow.full_name ?? "your coach";
   const when = new Date(startAt).toLocaleString(undefined, {
     weekday: "short",
     month: "short",
@@ -68,7 +70,7 @@ export async function POST(request: Request) {
   });
 
   const result = await dispatchSms(serviceRole, {
-    coachId: coachRow.profile_id,
+    coachId: coachRow.id,
     athleteId,
     messageType: "booking_confirmation",
     referenceId: `${athleteId}:${groupId}:${startAt}`,

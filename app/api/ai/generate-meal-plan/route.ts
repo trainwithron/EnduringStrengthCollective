@@ -60,6 +60,17 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
+  // Meal suggestions are a coach tool. A signed-in client has no use for it, and every call spends the platform's
+  // AI budget, so it requires coaching at least one group.
+  const { data: coachRow } = await supabase
+    .from("group_memberships")
+    .select("group_id")
+    .eq("profile_id", user.id)
+    .eq("role", "coach")
+    .limit(1)
+    .maybeSingle();
+  if (!coachRow) return NextResponse.json({ error: "Only coaches can generate meal suggestions." }, { status: 403 });
+
   if (!isAiConfigured()) {
     return NextResponse.json(
       { error: "AI meal suggestions aren't configured yet — ask your admin to add an ANTHROPIC_API_KEY." },
@@ -85,6 +96,11 @@ export async function POST(request: Request) {
     typeof fatTarget !== "number"
   ) {
     return NextResponse.json({ error: "Missing or invalid meal target." }, { status: 400 });
+  }
+
+  const tooLongText = (v: unknown) => typeof v === "string" && v.length > 500;
+  if (tooLongText(dietaryRestrictions) || tooLongText(favoriteFoods)) {
+    return NextResponse.json({ error: "Keep restrictions and favorites under 500 characters." }, { status: 400 });
   }
 
   const userText = `Meal slot: ${mealSlot}

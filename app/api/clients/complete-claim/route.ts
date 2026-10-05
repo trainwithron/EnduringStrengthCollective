@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { isPlaceholderEmail, validateClaimEmail, validateNewPassword } from "@/lib/client-claim";
+import { rateLimitResponse } from "@/lib/rate-limit";
 
 // Called by the set-password page once a client has chosen their password.
 // It only ever acts on the signed-in person's OWN account, and it does the
@@ -18,6 +19,10 @@ export async function POST(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
+  // Typing an email here can reveal whether it already has an account, so cap attempts per person.
+  const limited = await rateLimitResponse("complete-claim", user.id, 20, 3600);
+  if (limited) return limited;
 
   const body = await request.json().catch(() => ({}));
   const password = typeof body.password === "string" ? body.password : "";

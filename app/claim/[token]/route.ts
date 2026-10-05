@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { hashClaimToken } from "@/lib/client-claim";
+import { clientIp, rateLimitAllows } from "@/lib/rate-limit";
 
 // The public landing for a client's claim link.
 //
@@ -90,6 +91,7 @@ function tokenLooksValid(token: string | undefined): token is string {
 export async function GET(request: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   const origin = new URL(request.url).origin;
+  if (!(await rateLimitAllows(`claim:${clientIp(request)}`, 60, 600))) return NextResponse.redirect(`${origin}/claim-invalid`);
   if (!tokenLooksValid(token)) return NextResponse.redirect(`${origin}/claim-invalid`);
 
   const { invite } = await findUsableInvite(token);
@@ -102,6 +104,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
   const { token } = await params;
   const origin = new URL(request.url).origin;
   const invalid = () => NextResponse.redirect(`${origin}/claim-invalid`, 303);
+  if (!(await rateLimitAllows(`claim:${clientIp(request)}`, 60, 600))) return invalid();
   if (!tokenLooksValid(token)) return invalid();
 
   const { serviceRole, invite } = await findUsableInvite(token);

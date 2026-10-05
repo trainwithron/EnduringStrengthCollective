@@ -21,13 +21,16 @@ const NOOP_HANDLE: UsageHandle = { complete: async () => {} };
 // Reserves a log row at call START (atomically enforcing the burst limit
 // and any monthly ceiling), so concurrent requests can't all slip past
 // before any of them finish. Throws AiRateLimitedError when denied.
-// Fails OPEN on infrastructure problems (no service key, DB error): cost
-// logging must never be the reason a coach's request breaks.
+// For a metered (enforced) feature this fails CLOSED on infrastructure problems (no service key, DB error):
+// if the limit cannot be checked, the call is refused rather than run unbounded. Free, system-run features
+// (never limited) still fail open, so logging trouble never breaks them.
 export async function reserveAiCall(meta: AiCallMeta): Promise<UsageHandle> {
+  const enforced = isEnforced(meta.feature);
   let supabase;
   try {
     supabase = createServiceRoleClient();
   } catch {
+    if (enforced) throw new AiRateLimitedError("unavailable");
     return NOOP_HANDLE;
   }
   try {
@@ -40,11 +43,17 @@ export async function reserveAiCall(meta: AiCallMeta): Promise<UsageHandle> {
       p_burst_features: burstBucketFor(meta.feature),
       p_monthly_ceiling: monthlyCeilingFor(meta.feature),
     });
-    if (error) return NOOP_HANDLE;
+    if (error) {
+      if (enforced) throw new AiRateLimitedError("unavailable");
+      return NOOP_HANDLE;
+    }
     const row = Array.isArray(data) ? data[0] : data;
     if (row?.denied_reason) throw new AiRateLimitedError(row.denied_reason);
     const logId: string | undefined = row?.log_id;
-    if (!logId) return NOOP_HANDLE;
+    if (!logId) {
+      if (enforced) throw new AiRateLimitedError("unavailable");
+      return NOOP_HANDLE;
+    }
     return {
       complete: async (result) => {
         try {
@@ -65,6 +74,7 @@ export async function reserveAiCall(meta: AiCallMeta): Promise<UsageHandle> {
     };
   } catch (err) {
     if (err instanceof AiRateLimitedError) throw err;
+    if (enforced) throw new AiRateLimitedError("unavailable");
     return NOOP_HANDLE;
   }
 }

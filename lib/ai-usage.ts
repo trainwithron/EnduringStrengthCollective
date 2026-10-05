@@ -87,12 +87,14 @@ export interface AiCallMeta {
 }
 
 export class AiRateLimitedError extends Error {
-  reason: "burst" | "monthly_ceiling";
-  constructor(reason: "burst" | "monthly_ceiling") {
+  reason: "burst" | "monthly_ceiling" | "unavailable";
+  constructor(reason: "burst" | "monthly_ceiling" | "unavailable") {
     super(
       reason === "burst"
         ? "You're sending AI requests too quickly — wait a minute and try again."
-        : "You've reached this month's limit for this AI feature. It resets on the 1st of next month."
+        : reason === "unavailable"
+          ? "AI is briefly unavailable. Try again in a moment."
+          : "You've reached this month's limit for this AI feature. It resets on the 1st of next month."
     );
     this.name = "AiRateLimitedError";
     this.reason = reason;

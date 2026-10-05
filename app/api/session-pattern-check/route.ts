@@ -4,6 +4,7 @@ import { callClaude, extractJson, isAiConfigured } from "@/lib/anthropic-client"
 import { validateNoHallucinatedNumbers } from "@/lib/coach-briefing-numeral-guard";
 import { gatherSessionPatternFindings } from "@/lib/session-pattern-spotter-gather";
 import { sendPushToProfile } from "@/lib/send-push";
+import { getCallerGroupRole } from "@/lib/group-access";
 
 // Session Pattern Spotter
 // (habit_spotter_and_post_workout_coach_page_research_sept19.md) — runs
@@ -32,6 +33,28 @@ export async function POST(request: Request) {
   const { sessionId, athleteId, groupId } = body;
   if (!sessionId || !athleteId || !groupId) {
     return NextResponse.json({ error: "sessionId, athleteId, and groupId are required." }, { status: 400 });
+  }
+
+  // The note is only ever written for a session that really finished, in this group, for this athlete, and only
+  // when the caller is that athlete or a coach of the group. Without this any signed-in user could plant a "checked"
+  // row against someone else's session (blocking the real one), write notifications to coaches, and spend AI calls.
+  const role = await getCallerGroupRole(supabase, user.id, groupId);
+  if (!role || (role === "athlete" && user.id !== athleteId)) {
+    return NextResponse.json({ error: "Not allowed." }, { status: 403 });
+  }
+  const { data: session } = await supabase
+    .from("athlete_sessions")
+    .select("id, status, completed_at")
+    .eq("id", sessionId)
+    .eq("athlete_id", athleteId)
+    .eq("group_id", groupId)
+    .maybeSingle();
+  const recentlyCompleted =
+    session?.status === "completed" &&
+    session.completed_at &&
+    Date.now() - new Date(session.completed_at as string).getTime() <= 6 * 60 * 60 * 1000;
+  if (!recentlyCompleted) {
+    return NextResponse.json({ error: "Not allowed." }, { status: 403 });
   }
 
   const { data: coachMembership } = await supabase

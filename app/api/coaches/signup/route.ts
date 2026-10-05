@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { createOrganization } from "@/lib/org-creation";
 import { toFriendlyAuthEmailError } from "@/lib/auth-email-error";
+import { rateLimitResponse, clientIp } from "@/lib/rate-limit";
 
 // Self-service coach signup — a brand-new person, no pre-existing
 // invite/relationship, creating their own account AND their own
@@ -23,7 +24,11 @@ import { toFriendlyAuthEmailError } from "@/lib/auth-email-error";
 // same mailer that already reliably delivers the client/coach invite
 // emails elsewhere in this app, no new email infrastructure needed.
 export async function POST(request: Request) {
-  const { fullName, orgName, email, password } = await request.json();
+  // Public route that creates an account and an organization: a few per address per hour is plenty for real people.
+  const limited = await rateLimitResponse("coach-signup", clientIp(request), 5, 3600);
+  if (limited) return limited;
+
+  const { fullName, orgName, email, password } = await request.json().catch(() => ({}));
   const trimmedName = typeof fullName === "string" ? fullName.trim() : "";
   const trimmedOrgName = typeof orgName === "string" ? orgName.trim() : "";
   const trimmedEmail = typeof email === "string" ? email.trim() : "";
@@ -31,6 +36,12 @@ export async function POST(request: Request) {
 
   if (!trimmedName || !trimmedOrgName || !trimmedEmail) {
     return NextResponse.json({ error: "Missing name, organization name, or email." }, { status: 400 });
+  }
+  if (trimmedName.length > 120 || trimmedOrgName.length > 120 || trimmedEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+    return NextResponse.json({ error: "Check your name, organization name and email." }, { status: 400 });
+  }
+  if (pw.length > 200) {
+    return NextResponse.json({ error: "That password is too long." }, { status: 400 });
   }
   if (pw.length < 6) {
     return NextResponse.json({ error: "Password must be at least 6 characters." }, { status: 400 });

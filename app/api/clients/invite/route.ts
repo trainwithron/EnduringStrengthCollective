@@ -5,6 +5,7 @@ import { toFriendlyAuthEmailError } from "@/lib/auth-email-error";
 import { placeholderEmailFor } from "@/lib/client-claim";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatch";
 import { checkOneOnOneGroupHasRoom } from "@/lib/group-kind-guard";
+import { rateLimitResponse } from "@/lib/rate-limit";
 
 // Creates a client BEFORE they've ever signed in: a real auth account and
 // profile, silently — no email is sent, so nothing reaches them until the
@@ -39,6 +40,11 @@ export async function POST(request: Request) {
   if (membership?.role !== "coach") {
     return NextResponse.json({ error: "Only coaches can add clients." }, { status: 403 });
   }
+
+  // Each call creates an account, and a coach who types emails can tell which already have one. A generous
+  // per-coach cap keeps real use (adding a roster) free while stopping scripted probing.
+  const limited = await rateLimitResponse("client-invite", user.id, 60, 3600);
+  if (limited) return limited;
 
   const serviceRole = createServiceRoleClient();
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { advanceDispatch } from "@/lib/trainer-dispatch-advance";
+import { rateLimitResponse, clientIp } from "@/lib/rate-limit";
 
 const VALID_GOAL_TYPES = [
   "weight_loss",
@@ -21,6 +22,10 @@ const VALID_GOAL_TYPES = [
 // reimplement in plpgsql — a deliberate, noted deviation, not an
 // oversight.
 export async function POST(request: Request) {
+  // Public and unauthenticated, and each accepted request notifies a trainer: cap it per address.
+  const limited = await rateLimitResponse("dispatch-submit", clientIp(request), 6, 3600);
+  if (limited) return limited;
+
   let body: any;
   try {
     body = await request.json();
@@ -50,6 +55,20 @@ export async function POST(request: Request) {
   }
   if (!VALID_GOAL_TYPES.includes(goalType)) {
     return NextResponse.json({ error: "A valid goal is required." }, { status: 400 });
+  }
+
+  const tooLong = (v: unknown, max: number) => typeof v === "string" && v.length > max;
+  if (
+    tooLong(prospectName, 120) ||
+    tooLong(prospectEmail, 254) ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(prospectEmail.trim()) ||
+    tooLong(prospectPhone, 40) ||
+    tooLong(prospectTimezone, 64) ||
+    tooLong(goalCustomLabel, 120) ||
+    tooLong(message, 2000) ||
+    organizationId.length > 64
+  ) {
+    return NextResponse.json({ error: "Please check the details you entered." }, { status: 400 });
   }
 
   const supabase = createServiceRoleClient();
