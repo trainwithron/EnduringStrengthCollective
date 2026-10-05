@@ -9,6 +9,8 @@ import { AthleteNotesEditor } from "@/components/coach/athlete-notes-editor";
 import { SessionCreditsControl } from "@/components/coach/session-credits-control";
 import { AssignSessionsControl } from "@/components/coach/assign-sessions-control";
 import { SessionLedgerList } from "@/components/coach/session-ledger-list";
+import { ClientSeriesPanel, type SeriesView } from "@/components/coach/client-series-panel";
+import { getGroupCoachTimezone } from "@/lib/timezone";
 import type { LedgerEntry } from "@/lib/session-ledger";
 import { SwipeDirectionSetting } from "@/components/athlete/swipe-direction-setting";
 import { GoalConfirmationControl } from "@/components/coach/goal-confirmation-control";
@@ -809,6 +811,62 @@ export default async function AthleteProfilePage(
     createdAt: r.created_at as string,
   }));
 
+  // Weekly schedules for this client (recurring_booking_series, 0210 + 0259) and what is still booked ahead for each. If the
+  // newer columns are not there yet the first select errors and is retried with the original columns.
+  const scheduleColumns = "id, mode, status, weekday, start_time, duration_minutes, occurrences_total";
+  let seriesResult = await supabase
+    .from("recurring_booking_series")
+    .select(scheduleColumns)
+    .eq("athlete_id", params.athleteId)
+    .eq("group_id", params.groupId)
+    .order("created_at", { ascending: false })
+    .limit(20);
+  if (seriesResult.error) {
+    seriesResult = (await supabase
+      .from("recurring_booking_series")
+      .select("id, status, weekday, start_time, duration_minutes, occurrences_total")
+      .eq("athlete_id", params.athleteId)
+      .eq("group_id", params.groupId)
+      .order("created_at", { ascending: false })
+      .limit(20)) as unknown as typeof seriesResult;
+  }
+  const seriesRows = (seriesResult.data ?? []) as unknown as {
+    id: string;
+    mode?: string;
+    status: string;
+    weekday: number;
+    start_time: string;
+    duration_minutes: number;
+    occurrences_total: number | null;
+  }[];
+  const upcomingBySeries = new Map<string, { bookingId: string; startIso: string }[]>();
+  if (seriesRows.length > 0) {
+    const { data: upcomingRows } = await supabase
+      .from("bookings")
+      .select("id, recurring_series_id, start_at")
+      .in("recurring_series_id", seriesRows.map((r) => r.id))
+      .eq("status", "confirmed")
+      .gt("start_at", new Date().toISOString())
+      .order("start_at", { ascending: true })
+      .limit(400);
+    for (const b of (upcomingRows ?? []) as { id: string; recurring_series_id: string; start_at: string }[]) {
+      const list = upcomingBySeries.get(b.recurring_series_id) ?? [];
+      list.push({ bookingId: b.id, startIso: b.start_at });
+      upcomingBySeries.set(b.recurring_series_id, list);
+    }
+  }
+  const scheduleViews: SeriesView[] = seriesRows.map((r) => ({
+    id: r.id,
+    mode: r.mode === "ongoing" ? "ongoing" : "fixed",
+    status: r.status as SeriesView["status"],
+    weekday: r.weekday,
+    startTime: String(r.start_time).slice(0, 5),
+    durationMinutes: r.duration_minutes,
+    occurrencesTotal: r.occurrences_total,
+    upcoming: upcomingBySeries.get(r.id) ?? [],
+  }));
+  const scheduleTimezone = await getGroupCoachTimezone(supabase, params.groupId);
+
   const initials = (profile?.full_name ?? "?")
     .split(" ")
     .map((p: string) => p[0])
@@ -1279,6 +1337,16 @@ export default async function AthleteProfilePage(
                 groupId={params.groupId}
                 clientName={profile?.full_name ?? "this client"}
                 initialBalance={creditsRow?.balance ?? 0}
+              />
+            </SettingsGroup>
+
+            <SettingsGroup label="Weekly schedule">
+              <ClientSeriesPanel
+                groupId={params.groupId}
+                athleteId={params.athleteId}
+                athleteName={profile?.full_name ?? "this client"}
+                timezone={scheduleTimezone}
+                series={scheduleViews}
               />
             </SettingsGroup>
 

@@ -165,11 +165,13 @@ export const HOWTOS: HowTo[] = [
       "every week", "same time every week", "book a client weekly", "standing appointment", "recurring booking", "weekly booking",
     ],
     steps: [
-      { text: "Open the Calendar and click the day of the first session.", href: "/groups/{groupId}/calendar", linkLabel: "Calendar" },
-      { text: "Book the first slot for the client. Next to it, press Book weekly and choose how many weeks, from 1 to 12, then Confirm." },
-      { text: "Each week is booked on its own, so one that cannot be booked is reported without cancelling the rest." },
+      { text: "Open Clients and pick the client.", href: "/groups/{groupId}/clients", linkLabel: "Clients" },
+      { text: "On their profile, find Weekly schedule and press New weekly schedule. Choose the first day, the time and the length." },
+      { text: "Choose a number of weeks (up to 52), or No end date to keep it booked 12 weeks ahead automatically." },
+      { text: "Check the list of dates. Any that clash with something are marked, and you can untick any date. Then press Book." },
+      { text: "Later you can Pause, End or Add weeks, and change just one session or this one and the rest." },
     ],
-    note: "The repeat is capped at 12 weeks today.",
+    note: "From the Calendar you can also click a client's open time and choose Repeat weekly.",
   },
   {
     id: "athlete-start-workout",

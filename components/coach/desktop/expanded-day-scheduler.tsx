@@ -8,6 +8,8 @@ import type { DraggedClient } from "./draggable-client-name";
 import type { CalendarEventEntry } from "./calendar-grid";
 import { notifyBookingConfirmed } from "@/lib/notify-booking-confirmed";
 import { mirrorGoogleCalendarEvent } from "@/lib/mirror-google-calendar-event";
+import { SeriesScheduleForm } from "@/components/coach/series-schedule-form";
+import { formatInTimezone } from "@/lib/format-in-timezone";
 
 // A full day view shown when a client is dropped onto a calendar day —
 // replaces the old cramped time-slot dropdown with everything already
@@ -48,6 +50,9 @@ export function ExpandedDayScheduler({
   const [adjustingCredits, setAdjustingCredits] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
+  // The slot the coach picked, waiting for a confirm: book it once, or repeat it weekly.
+  const [pending, setPending] = useState<{ start: Date; durationMinutes: number } | null>(null);
+  const [repeating, setRepeating] = useState(false);
 
   const daySlots = generateSlotsForDate(
     date,
@@ -149,7 +154,7 @@ export function ExpandedDayScheduler({
           <button
             type="button"
             onClick={() => adjustCredits(-1)}
-            disabled={adjustingCredits || balance === 0}
+            disabled={adjustingCredits}
             className="w-8 h-8 flex items-center justify-center border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors disabled:opacity-40"
           >
             &minus;
@@ -163,10 +168,8 @@ export function ExpandedDayScheduler({
           >
             +
           </button>
-          {balance === 0 && (
-            <span className="font-body text-xs text-rust">
-              Add a credit before booking, or adjust it here.
-            </span>
+          {balance < 0 && (
+            <span className="font-body text-xs text-steel">Owed {Math.abs(balance)}. You can still schedule.</span>
           )}
         </div>
 
@@ -217,11 +220,7 @@ export function ExpandedDayScheduler({
           {assignError && (
             <p className="font-body text-xs text-rust mb-2">{assignError}</p>
           )}
-          {balance <= 0 ? (
-            <p className="font-body text-sm text-rust">
-              No sessions remaining — add a credit above to book.
-            </p>
-          ) : daySlots.length === 0 ? (
+          {daySlots.length === 0 ? (
             <p className="font-body text-sm text-steel">No open hours this day.</p>
           ) : (
             <div className="grid grid-cols-3 gap-2">
@@ -233,7 +232,11 @@ export function ExpandedDayScheduler({
                     key={idx}
                     type="button"
                     disabled={taken || assigning}
-                    onClick={() => handleAssignSlot(slot.start, slot.durationMinutes)}
+                    onClick={() => {
+                      setAssignError(null);
+                      setRepeating(false);
+                      setPending({ start: slot.start, durationMinutes: slot.durationMinutes });
+                    }}
                     className="flex items-center justify-between h-9 px-2.5 font-body text-xs border border-steel/20 text-chalk disabled:opacity-30 active:border-rust active:text-rust"
                   >
                     {label}
@@ -241,6 +244,56 @@ export function ExpandedDayScheduler({
                   </button>
                 );
               })}
+            </div>
+          )}
+
+          {pending && (
+            <div className="mt-4 border border-rust/40 p-4" role="group" aria-label="Confirm session">
+              <p className="font-body text-sm text-chalk">
+                {client.fullName}: {formatInTimezone(pending.start, timezone, "dateTime")} · {pending.durationMinutes} min
+              </p>
+              {repeating ? (
+                <div className="mt-3">
+                  <SeriesScheduleForm
+                    groupId={groupId}
+                    athleteId={client.athleteId}
+                    athleteName={client.fullName}
+                    timezone={timezone}
+                    initialStartIso={pending.start.toISOString()}
+                    defaultDurationMinutes={pending.durationMinutes}
+                    onCancel={() => {
+                      setRepeating(false);
+                      setPending(null);
+                      onAssigned();
+                    }}
+                  />
+                </div>
+              ) : (
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    disabled={assigning}
+                    onClick={async () => {
+                      await handleAssignSlot(pending.start, pending.durationMinutes);
+                      setPending(null);
+                    }}
+                    className="bg-rust text-graphite font-display font-bold uppercase tracking-wide px-4 py-2 disabled:opacity-40"
+                  >
+                    {assigning ? "Booking…" : "Book this session"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={assigning}
+                    onClick={() => setRepeating(true)}
+                    className="border border-steel/40 text-chalk font-body text-sm px-4 py-2 disabled:opacity-40"
+                  >
+                    Repeat weekly…
+                  </button>
+                  <button type="button" onClick={() => setPending(null)} className="font-body text-sm text-steel">
+                    Cancel
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

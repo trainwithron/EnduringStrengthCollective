@@ -155,7 +155,7 @@ const COACH_DESKTOP: [string, string][] = [
   ["how do i set a balance to 0", "/groups/g1/clients"],
   ["how do i mark a session attended", "/groups/g1/calendar"],
   ["how do i create a package", "/groups/g1/business/packages"],
-  ["how do i book weekly sessions", "/groups/g1/calendar"],
+  ["how do i book weekly sessions", "/groups/g1/clients"],
   ["how do i assign a program to a client", "/groups/g1/programs"],
   ["how do i send a client their sign in link", "/groups/g1/clients"],
   ["how do i set a standing macro target", "/groups/g1/clients"],
