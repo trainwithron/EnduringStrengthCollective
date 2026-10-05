@@ -20,6 +20,7 @@ import {
   ClipboardList,
   Building2,
   Layers,
+  Link2,
   Home,
   MonitorPlay,
   Activity,
@@ -102,6 +103,7 @@ type Active =
   | "sms-settings"
   | "zapier"
   | "session-types"
+  | "booking-page"
   | "session-ledger"
   | "resources"
   | "quick-tips"
@@ -504,6 +506,7 @@ export function CoachDesktopShell({
         { key: "packages", label: "Packages", href: `/groups/${groupId}/business/packages`, icon: Layers },
         { key: "waiver", label: "Waiver", href: `/groups/${groupId}/business/waiver`, icon: ClipboardList },
         { key: "availability", label: "Availability", href: `/groups/${groupId}/availability`, icon: CalendarClock },
+        { key: "booking-page", label: "Booking Page", href: `/groups/${groupId}/business/booking-page`, icon: Link2 },
         { key: "support", label: "Support", href: `/groups/${groupId}/business/support`, icon: HeartHandshake },
         { key: "leads", label: "Leads", href: `/groups/${groupId}/business/leads`, icon: UserPlus },
         { key: "sms-settings", label: "SMS Notifications", href: `/groups/${groupId}/business/sms-settings`, icon: MessageCircle },

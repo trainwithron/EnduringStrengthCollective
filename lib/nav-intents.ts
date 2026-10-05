@@ -102,6 +102,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   D({ id: "business", label: "Business", path: "/groups/{groupId}/business", roles: ["coach"], devices: ["desktop"], synonyms: ["business", "revenue", "income", "money", "mrr", "business dashboard", "earnings", "how much am i making", "payments overview"] }),
   D({ id: "packages", label: "Packages", path: "/groups/{groupId}/business/packages", roles: ["coach"], devices: ["desktop"], synonyms: ["packages", "pricing", "create a package", "add a package", "session packs", "memberships", "subscriptions", "prices", "set my prices"] }),
   D({ id: "session-ledger", label: "Session ledger", path: "/groups/{groupId}/business/session-ledger", roles: ["coach"], devices: ["desktop"], synonyms: ["session ledger", "ledger", "who owes sessions", "session balances", "credit balances", "balances", "sessions owed", "owed sessions"] }),
+  D({ id: "booking-page", label: "Booking page", path: "/groups/{groupId}/business/booking-page", roles: ["coach"], devices: ["desktop"], synonyms: ["booking page", "public booking page", "booking link", "online booking", "my booking link", "book with me link", "share my booking page", "let people book", "booking site", "scheduling page", "calendly"] }),
   D({ id: "session-types", label: "Session types", path: "/groups/{groupId}/business/session-types", roles: ["coach"], devices: ["desktop"], synonyms: ["session types", "session type", "types of sessions"] }),
   D({ id: "leads", label: "Leads", path: "/groups/{groupId}/business/leads", roles: ["coach"], devices: ["desktop"], synonyms: ["leads", "prospects", "inquiries", "new leads", "gym visitors"] }),
   D({ id: "sms-settings", label: "Text message settings", path: "/groups/{groupId}/business/sms-settings", roles: ["coach"], devices: ["desktop"], synonyms: ["sms", "text messages", "text settings", "texting", "sms settings", "text notifications"] }),
@@ -274,7 +275,9 @@ export function resolveNavigation(message: string, ctx: NavContext): NavResult {
 
   // How-to questions: curated steps, with the destination as a chip as well.
   const howtos = findHowTos(norm, ctx.role, ctx.device);
-  if (howtos.length > 0 && (wantsHowTo || howtos[0].score >= 24)) {
+  // Without "how do I" wording, a how-to only wins over a place when it matches more strongly ("booking page" is the page).
+  const bestPlaceScore = NAV_DESTINATIONS.filter((d) => applicable(d, ctx) && !d.needsAthlete).reduce((m, d) => Math.max(m, scoreDestination(d, norm, tokens)), 0);
+  if (howtos.length > 0 && (wantsHowTo || (howtos[0].score >= 24 && howtos[0].score > bestPlaceScore))) {
     const top = howtos[0];
     if (ctx.device === "phone" && top.howto.desktopOnly) {
       return {
