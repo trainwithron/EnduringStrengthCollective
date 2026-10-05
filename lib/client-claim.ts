@@ -4,18 +4,8 @@ import { createHash, randomBytes } from "crypto";
 // silently (no email is sent), builds everything for them, and later hands
 // over a single-use claim link. The pieces here are pure so they're testable.
 
-// The account needs an email address to exist; when the coach doesn't have
-// one yet it gets a placeholder that can never receive mail, replaced with
-// the client's real email when they claim the account.
-export const PLACEHOLDER_EMAIL_DOMAIN = "pending.invalid";
-
-export function placeholderEmailFor(seed: string): string {
-  return `client-${seed.replace(/[^a-z0-9]/gi, "").slice(0, 16).toLowerCase()}@${PLACEHOLDER_EMAIL_DOMAIN}`;
-}
-
-export function isPlaceholderEmail(email: string | null | undefined): boolean {
-  return !!email && email.toLowerCase().endsWith(`@${PLACEHOLDER_EMAIL_DOMAIN}`);
-}
+// The placeholder address helpers live in ./placeholder-email (no server-only imports, so the edge middleware can use them too).
+export { PLACEHOLDER_EMAIL_DOMAIN, placeholderEmailFor, isPlaceholderEmail } from "./placeholder-email";
 
 // A claim link is a full account credential sent by text message, so it is short-lived.
 // A new one is a single tap for the coach.

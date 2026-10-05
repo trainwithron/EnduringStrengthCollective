@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { shouldResumeClaim } from "@/lib/claim-resume";
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -133,6 +134,16 @@ export async function updateSession(request: NextRequest) {
       redirectResponse.cookies.set(cookie);
     });
     return redirectResponse;
+  }
+
+  // Pick up where a pre-set-up client left off: signed in with their claim link but never chose a password (still on the placeholder
+  // address), they go back to that screen from anywhere in the app instead of landing in an account they cannot sign in to again.
+  if (user && shouldResumeClaim(user.email, pathname)) {
+    const resumeResponse = NextResponse.redirect(new URL("/set-password", request.url));
+    response.cookies.getAll().forEach((cookie) => {
+      resumeResponse.cookies.set(cookie);
+    });
+    return resumeResponse;
   }
 
   // Hard gate: a client added via the Add Client flow (profiles.intake_required)
