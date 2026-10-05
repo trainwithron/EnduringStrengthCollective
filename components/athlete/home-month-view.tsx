@@ -83,6 +83,7 @@ export function HomeMonthView({
                 >
                   {summary.workout.status === "locked" && <Lock className="w-2 h-2 shrink-0" />}
                   {summary.workout.title}
+                  {(summary.sessionCount ?? 0) > 1 && <span className="text-steel shrink-0">+{(summary.sessionCount ?? 0) - 1}</span>}
                 </span>
               )}
               {summary?.workout.status === "done" && (

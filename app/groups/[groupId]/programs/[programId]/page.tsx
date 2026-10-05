@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { UnavailableState } from "@/components/ui/unavailable-state";
 import { ProgramBuilderDesktop } from "@/components/coach/desktop/program-builder-desktop";
+import { ProgramRoleControl } from "@/components/coach/program-role-control";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import {
   computeScheduledDates,
@@ -252,6 +253,19 @@ async function CoachProgramBuilder({
   const supabase = await createServerClient();
   const data = await getProgramBuilderData(supabase, { groupId, programId, coachId });
 
+  // Label and order come from a later migration; until it is applied the read fails and the
+  // control just explains that. Nothing else depends on it.
+  const { data: roleRow, error: roleError } = await supabase
+    .from("programs")
+    .select("label, sort_order")
+    .eq("id", programId)
+    .maybeSingle();
+  const roleInfo = {
+    available: !roleError,
+    label: (roleRow as { label?: string | null } | null)?.label ?? null,
+    sortOrder: (roleRow as { sort_order?: number | null } | null)?.sort_order ?? null,
+  };
+
   if (!data) {
     return (
       <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
@@ -273,6 +287,12 @@ async function CoachProgramBuilder({
         />
       )}
       <ProgrammingSpotterPanel programId={programId} flags={data.spotterFlags} />
+      <ProgramRoleControl
+        programId={programId}
+        initialLabel={roleInfo.label}
+        initialSortOrder={roleInfo.sortOrder}
+        available={roleInfo.available}
+      />
       <ProgramBuilderDesktop
         programId={programId}
         groupId={groupId}

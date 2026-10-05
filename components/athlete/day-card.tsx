@@ -3,6 +3,7 @@ import { Lock, Check } from "lucide-react";
 import { TodayWidget, type TodayMacros, type TodayHabit } from "./today-widget";
 import { WeightLogWidget, type WeightLogEntry } from "./weight-log-widget";
 import type { DayWorkoutInfo } from "@/lib/athlete-day-schedule";
+import type { DaySession } from "@/lib/program-day-contexts";
 import { computeReadinessAverage, type WellnessCheckinValues } from "@/lib/wellness";
 
 // One date's worth of Home content. `isToday` is the one flag that
@@ -18,6 +19,7 @@ export function DayCard({
   dateLabel,
   isToday,
   workout,
+  sessions = [],
   macros,
   habits,
   weightLogs,
@@ -29,7 +31,10 @@ export function DayCard({
   dateKey: string;
   dateLabel: string;
   isToday: boolean;
+  // The fallback for a day with nothing in any program (rest day, no program, etc.).
   workout: DayWorkoutInfo;
+  // One entry per active program that has something on this day, in the coach's order.
+  sessions?: DaySession[];
   macros: TodayMacros | null;
   habits: TodayHabit[];
   weightLogs: WeightLogEntry[];
@@ -44,6 +49,7 @@ export function DayCard({
         dateLabel={dateLabel}
         isToday={isToday}
         workout={workout}
+        sessions={sessions}
         canBook={canBook}
         wellnessCheckin={isToday ? wellnessCheckin ?? null : null}
       />
@@ -66,6 +72,7 @@ function WorkoutSection({
   dateLabel,
   isToday,
   workout,
+  sessions,
   canBook,
   wellnessCheckin,
 }: {
@@ -74,6 +81,7 @@ function WorkoutSection({
   dateLabel: string;
   isToday: boolean;
   workout: DayWorkoutInfo;
+  sessions: DaySession[];
   canBook: boolean;
   wellnessCheckin?: WellnessCheckinValues | null;
 }) {
@@ -82,6 +90,68 @@ function WorkoutSection({
       Feeling {Math.round(computeReadinessAverage(wellnessCheckin))}/5 today
     </span>
   ) : null;
+
+  // Two or more programs on the same day: one labelled card each, the first thing to do is the
+  // primary action, finished ones collapse to a single checked line.
+  if (sessions.length > 1) {
+    const firstPlannedIndex = sessions.findIndex((x) => x.status === "planned");
+    return (
+      <div className="border border-steel/20">
+        <p className="font-body text-xs text-steel uppercase tracking-wide px-4 pt-4">
+          {dateLabel}
+          {readinessChip}
+        </p>
+        {sessions.map((x, i) => (
+          <div key={x.programId} className={i === 0 ? "px-4 pb-4 pt-2" : "px-4 py-4 border-t border-steel/15"}>
+            {x.status === "done" ? (
+              <Link
+                href={`/groups/${groupId}/workouts/${x.workoutId}`}
+                className="flex items-center gap-2 min-h-11 font-body text-sm text-steel"
+              >
+                <Check className="w-4 h-4 text-positive shrink-0" strokeWidth={3} />
+                <span className="min-w-0">
+                  <span className="uppercase tracking-wide text-xs">{x.heading}</span>
+                  <span className="block text-chalk">{x.title} — done</span>
+                </span>
+              </Link>
+            ) : (
+              <>
+                <p className="font-body text-xs text-rust uppercase tracking-wide">{x.heading}</p>
+                <p className="font-display font-bold text-xl uppercase leading-none mt-1">{x.title}</p>
+                <div className="mt-3">
+                  {x.status === "planned" && (
+                    <Link
+                      href={`/groups/${groupId}/workouts/${x.workoutId}`}
+                      className={
+                        isToday && i === firstPlannedIndex
+                          ? "w-full h-11 flex items-center justify-center bg-rust text-graphite font-display uppercase text-sm font-bold"
+                          : isToday
+                          ? "w-full h-11 flex items-center justify-center border border-rust text-rust font-display uppercase text-sm font-bold"
+                          : "font-body text-sm text-rust"
+                      }
+                    >
+                      {isToday ? "Start workout" : "View planned workout"}
+                    </Link>
+                  )}
+                  {x.status === "missed" && <p className="font-body text-sm text-steel">Not logged.</p>}
+                  {x.status === "locked" && (
+                    <p className="font-body text-sm text-steel flex items-center gap-1.5">
+                      <Lock className="w-3.5 h-3.5" /> Unlocks {dateLabel}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Exactly one program has something today: the same card as always, showing it.
+  if (sessions.length === 1) {
+    workout = sessions[0];
+  }
 
   if (workout.status === "no-program") {
     return (

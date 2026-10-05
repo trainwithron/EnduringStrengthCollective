@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { computeScheduledDates, isLocked, isSameDay, type VisibilityWindow } from "./program-schedule";
+import { getActivePrograms } from "./active-programs";
 
 // Shared program-schedule resolution for the athlete Home Day/Week/Month
 // calendar — the same personal-over-shared precedence used by
@@ -14,46 +15,24 @@ export interface ActiveProgramInfo {
   visibilityWindow: VisibilityWindow;
 }
 
+// ONE program, for the callers that can only deal with one (the coach's calendar
+// assign list). Several programs can be active at once, so this is "the first in the
+// coach's order", never "the personal one if there is one" — that hid the shared main
+// program as soon as a personal mobility program was assigned. Anything that decides what
+// the athlete sees or starts should use loadProgramDayContexts / getTodaysSessions instead.
 export async function getActiveProgramForAthlete(
   supabase: SupabaseClient,
   groupId: string,
   athleteId: string
 ): Promise<ActiveProgramInfo | null> {
-  const { data: personalProgram } = await supabase
-    .from("programs")
-    .select("id, start_date, training_days, visibility_window")
-    .eq("group_id", groupId)
-    .eq("athlete_id", athleteId)
-    .eq("is_active", true)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const { data: sharedProgram } = personalProgram
-    ? { data: null }
-    : await supabase
-        .from("programs")
-        .select("id, start_date, training_days, visibility_window")
-        .eq("group_id", groupId)
-        .is("athlete_id", null)
-        .eq("is_active", true)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-  const program = (personalProgram ?? sharedProgram) as {
-    id: string;
-    start_date: string | null;
-    training_days: number[] | null;
-    visibility_window: string | null;
-  } | null;
-
+  const programs = await getActivePrograms(supabase, groupId, athleteId);
+  const program = programs[0];
   if (!program) return null;
   return {
     id: program.id,
-    startDate: program.start_date,
-    trainingDays: program.training_days,
-    visibilityWindow: (program.visibility_window as VisibilityWindow) ?? "day",
+    startDate: program.startDate,
+    trainingDays: program.trainingDays,
+    visibilityWindow: program.visibilityWindow,
   };
 }
 

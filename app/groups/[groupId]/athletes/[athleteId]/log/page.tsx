@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
-import { getTodaysWorkoutId } from "@/lib/todays-workout";
+import { getTodaysSessions, workoutResultFromSessions } from "@/lib/todays-workout";
 
 // Coach-only: the entry point for logging an in-person session on a
 // client's behalf. Jumps straight to today's due workout when there is
@@ -41,11 +41,16 @@ export default async function LogForClientPage(
     );
   }
 
-  const todays = await getTodaysWorkoutId(supabase, {
+  const todaySessions = await getTodaysSessions(supabase, {
     groupId: params.groupId,
     athleteId: params.athleteId,
   });
-  if (todays.status === "ready") {
+  const todays = workoutResultFromSessions(todaySessions);
+  const readyCards = todaySessions.cards.filter((c) => c.status === "ready");
+  // Several programs have something today (main plus mobility, say): let the coach pick which
+  // one they are logging instead of silently opening whichever comes first.
+  const chooseProgram = !todaySessions.overrideWorkoutId && readyCards.length >= 2;
+  if (todays.status === "ready" && !chooseProgram) {
     redirect(`/groups/${params.groupId}/athletes/${params.athleteId}/log/${todays.workoutId}`);
   }
 
@@ -54,6 +59,39 @@ export default async function LogForClientPage(
     .select("full_name")
     .eq("id", params.athleteId)
     .single();
+
+  if (chooseProgram) {
+    return (
+      <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
+        <header className="px-5 pt-8 pb-6 border-b border-steel/20">
+          <Link
+            href={`/groups/${params.groupId}/athletes/${params.athleteId}`}
+            className="font-body text-xs text-steel uppercase tracking-wide"
+          >
+            &larr; Back to profile
+          </Link>
+          <p className="font-body text-xs text-rust uppercase tracking-wide mt-3">
+            Logging for {athleteProfile?.full_name ?? "this client"}
+          </p>
+          <h1 className="font-display font-bold text-3xl leading-tight mt-3 uppercase">Which session?</h1>
+        </header>
+        <ul className="px-5 pt-6 space-y-3">
+          {readyCards.map((c) => (
+            <li key={c.programId} className="border border-steel/20 p-4">
+              <p className="font-body text-xs text-rust uppercase tracking-wide">{c.heading}</p>
+              <p className="font-display font-bold text-xl uppercase leading-none mt-1">{c.title}</p>
+              <Link
+                href={`/groups/${params.groupId}/athletes/${params.athleteId}/log/${c.workoutId}`}
+                className="mt-3 w-full h-11 flex items-center justify-center bg-rust text-graphite font-display uppercase text-sm font-bold"
+              >
+                Log this session
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </main>
+    );
+  }
 
   const { data: activeProgram } = await supabase
     .from("programs")

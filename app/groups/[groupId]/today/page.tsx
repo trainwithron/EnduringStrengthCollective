@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
-import { getTodaysWorkoutId } from "@/lib/todays-workout";
+import { getTodaysSessions, workoutResultFromSessions } from "@/lib/todays-workout";
+import Link from "next/link";
+import { Check } from "lucide-react";
 import { formatShortDate } from "@/lib/program-schedule";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
@@ -31,12 +33,18 @@ export default async function TodayPage(
 
   const effective = await getEffectiveAthlete(params.groupId, user.id);
 
-  const result = await getTodaysWorkoutId(supabase, {
+  const sessions = await getTodaysSessions(supabase, {
     groupId: params.groupId,
     athleteId: effective.athleteId,
   });
+  const result = workoutResultFromSessions(sessions);
 
-  if (result.status === "ready") {
+  // One program with something to do: straight into it, as always. Two or more (a main
+  // program plus mobility or a warm-up): show them all, labelled, instead of choosing for
+  // the athlete and hiding the rest.
+  const showList = !sessions.overrideWorkoutId && sessions.cards.length >= 2;
+
+  if (result.status === "ready" && !showList) {
     redirect(`/groups/${params.groupId}/workouts/${result.workoutId}`);
   }
 
@@ -55,6 +63,46 @@ export default async function TodayPage(
       .eq("id", effective.athleteId)
       .maybeSingle();
     actingAsFullName = profile?.full_name ?? "Client";
+  }
+
+  if (showList) {
+    const firstReady = sessions.cards.findIndex((x) => x.status === "ready");
+    return (
+      <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
+        {effective.isActingAsOther && (
+          <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
+        )}
+        <header className="px-5 pt-8 pb-4">
+          <h1 className="font-display font-bold text-3xl leading-none uppercase">Today</h1>
+        </header>
+        <ul className="px-5 space-y-3">
+          {sessions.cards.map((c, i) => (
+            <li key={c.programId} className="border border-steel/20 p-4">
+              <p className="font-body text-xs text-rust uppercase tracking-wide">{c.heading}</p>
+              <p className="font-display font-bold text-xl uppercase leading-none mt-1">{c.title}</p>
+              {c.status === "done" ? (
+                <Link
+                  href={`/groups/${params.groupId}/workouts/${c.workoutId}`}
+                  className="mt-3 flex items-center gap-2 min-h-11 font-body text-sm text-positive"
+                >
+                  <Check className="w-4 h-4" strokeWidth={3} /> Done. View workout
+                </Link>
+              ) : (
+                <Link
+                  href={`/groups/${params.groupId}/workouts/${c.workoutId}`}
+                  className={`mt-3 w-full h-11 flex items-center justify-center font-display uppercase text-sm font-bold ${
+                    i === firstReady ? "bg-rust text-graphite" : "border border-rust text-rust"
+                  }`}
+                >
+                  Start workout
+                </Link>
+              )}
+            </li>
+          ))}
+        </ul>
+        <BottomTabBar groupId={params.groupId} />
+      </main>
+    );
   }
 
   return (

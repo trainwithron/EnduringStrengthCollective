@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendPushToProfile } from "@/lib/send-push";
 import { getGroupCoachTimezone, dateKeyInZone, nowInZone } from "@/lib/timezone";
-import { getActiveProgramForAthlete, getScheduledWorkouts, resolveDayWorkout } from "@/lib/athlete-day-schedule";
+import { loadProgramDayContexts, resolveSessionsForDate } from "@/lib/program-day-contexts";
 import { isHabitDueOn } from "@/lib/habits";
 
 // Triggered daily by the Vercel Cron entry in vercel.json. No user
@@ -46,16 +46,15 @@ export async function GET(request: Request) {
       const todayKey = dateKeyInZone(timezone);
       const today = nowInZone(timezone);
 
-      const program = await getActiveProgramForAthlete(supabase, groupId, athleteId);
-      if (!program) continue;
-      const scheduledWorkouts = await getScheduledWorkouts(supabase, program);
-      // Unscheduled ("playlist mode") programs have no calendar dates at
-      // all, so "rest day" isn't a real concept for them — matches the
-      // existing design decision in athlete-day-schedule.ts.
-      if (scheduledWorkouts.length === 0) continue;
-
-      const dayInfo = resolveDayWorkout(scheduledWorkouts, new Set(), today, today, program.visibilityWindow);
-      if (dayInfo.status !== "rest") continue;
+      // Several programs can be active (main, mobility, warm-up). It is only a rest day if none of
+      // the scheduled ones has something today. Unscheduled ("playlist mode") programs have no
+      // calendar dates, so "rest day" isn't a real concept for them.
+      const contexts = await loadProgramDayContexts(supabase, groupId, athleteId);
+      const scheduledContexts = contexts.filter((c) => !c.unscheduled && c.scheduled.length > 0);
+      if (scheduledContexts.length === 0) continue;
+      if (contexts.some((c) => c.unscheduled)) continue;
+      const hasSomethingToday = resolveSessionsForDate(scheduledContexts, new Set(), today, today, true).length > 0;
+      if (hasSomethingToday) continue;
 
       // Same pending-item detection as the rest-timer gate: a real due
       // habit not yet completed, or no wellness check-in today — never

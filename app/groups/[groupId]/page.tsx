@@ -30,16 +30,16 @@ import { dateKeyInZone, getGroupCoachTimezone, nowInZone } from "@/lib/timezone"
 import { resolveDayMacros, calorieTargetForDate, standingForDate } from "@/lib/macro-resolution";
 import { resolveDayMacroTarget } from "@/lib/todays-macros";
 import { fetchStandingTarget } from "@/lib/standing-macros";
+import { dateKeyOf, parseDateKey, type DayWorkoutInfo } from "@/lib/athlete-day-schedule";
 import {
-  getActiveProgramForAthlete,
-  getScheduledWorkouts,
-  getAllProgramWorkouts,
-  resolveDayWorkout,
-  resolveNextUnloggedWorkout,
-  dateKeyOf,
-  parseDateKey,
-  type ScheduledWorkoutEntry,
-} from "@/lib/athlete-day-schedule";
+  contextWorkoutIds,
+  emptyDayInfo,
+  loadProgramDayContexts,
+  resolveSessionsForDate,
+  summarizeSessions,
+  type DaySession,
+  type ProgramDayContext,
+} from "@/lib/program-day-contexts";
 import type { RosterMember } from "@/lib/types";
 import type { TodayMacros, TodayHabit } from "@/components/athlete/today-widget";
 import type { WeightLogEntry } from "@/components/athlete/weight-log-widget";
@@ -259,11 +259,15 @@ export default async function GroupHubPage(
     : new Map();
   const visualsByProgramId = Object.fromEntries(visualsMap);
 
-  let dayWorkout: ReturnType<typeof resolveDayWorkout> = {
+  let dayWorkout: DayWorkoutInfo = {
     status: "no-program",
     workoutId: null,
     title: null,
   };
+  // Every active program with something on the shown day (a client can run a main program,
+  // a mobility program and a warm-up flow at once). dayWorkout above is only the fallback
+  // for a day with nothing in any of them.
+  let daySessions: DaySession[] = [];
   let dayMacros: TodayMacros | null = null;
   let dayHabits: TodayHabit[] = [];
   let weightLogs: WeightLogEntry[] = [];
@@ -283,13 +287,10 @@ export default async function GroupHubPage(
   let isUnscheduledProgram = false;
 
   if (showMobileView && athleteId) {
-    const program = await getActiveProgramForAthlete(supabase, params.groupId, athleteId);
-    isUnscheduledProgram = !!program && (!program.startDate || !program.trainingDays || program.trainingDays.length === 0);
-    const scheduledWorkouts: ScheduledWorkoutEntry[] =
-      program && !isUnscheduledProgram ? await getScheduledWorkouts(supabase, program) : [];
-    const allWorkouts = program && isUnscheduledProgram ? await getAllProgramWorkouts(supabase, program.id) : [];
-    const workoutIdsForLogCheck =
-      scheduledWorkouts.length > 0 ? scheduledWorkouts.map((w) => w.workoutId) : allWorkouts.map((w) => w.id);
+    const programContexts = await loadProgramDayContexts(supabase, params.groupId, athleteId);
+    // Week and Month need dates to plot; they are only unavailable when NO active program has a schedule.
+    isUnscheduledProgram = programContexts.length > 0 && programContexts.every((c) => c.unscheduled);
+    const workoutIdsForLogCheck = contextWorkoutIds(programContexts);
 
     const [{ data: logRows }, { data: habitRows }] = await Promise.all([
       workoutIdsForLogCheck.length > 0
@@ -303,7 +304,6 @@ export default async function GroupHubPage(
         .eq("active", true),
     ]);
     const loggedIds = new Set((logRows ?? []).map((l) => l.workout_id));
-    const visibilityWindow = program?.visibilityWindow ?? "day";
 
     // Coach's booking availability — reused by Day view's rest-day link,
     // same "additive, only if the coach has configured hours" gate as
@@ -324,11 +324,8 @@ export default async function GroupHubPage(
     }
 
     if (view === "day") {
-      dayWorkout = isUnscheduledProgram
-        ? isToday
-          ? resolveNextUnloggedWorkout(allWorkouts, loggedIds)
-          : { status: "unscheduled", workoutId: null, title: null }
-        : resolveDayWorkout(scheduledWorkouts, loggedIds, targetDate, today, visibilityWindow);
+      daySessions = resolveSessionsForDate(programContexts, loggedIds, targetDate, today, isToday);
+      dayWorkout = summarizeSessions(daySessions, emptyDayInfo(programContexts, isToday));
 
       const [macroResult, mealPlanResult, standingTarget, { data: dueLogRows }] = await Promise.all([
         macrosEnabled
@@ -435,10 +432,9 @@ export default async function GroupHubPage(
             athleteId,
             macrosEnabled,
             dates: rangeDates,
-            scheduledWorkouts,
+            programContexts,
             loggedIds,
             today,
-            visibilityWindow,
             habitDefs: habitRows ?? [],
           });
     } else if (!isUnscheduledProgram) {
@@ -450,10 +446,9 @@ export default async function GroupHubPage(
         athleteId,
         macrosEnabled,
         dates: rangeDates,
-        scheduledWorkouts,
+        programContexts,
         loggedIds,
         today,
-        visibilityWindow,
         habitDefs: habitRows ?? [],
       });
       monthSummaryByDateKey = new Map(summaries.map((s) => [s.dateKey, s]));
@@ -616,6 +611,7 @@ export default async function GroupHubPage(
                 }
                 isToday={isToday}
                 workout={dayWorkout}
+                sessions={daySessions}
                 macros={dayMacros}
                 habits={dayHabits}
                 weightLogs={weightLogs}
@@ -713,19 +709,17 @@ async function computeRangeSummaries(
     athleteId,
     macrosEnabled,
     dates,
-    scheduledWorkouts,
+    programContexts,
     loggedIds,
     today,
-    visibilityWindow,
     habitDefs,
   }: {
     athleteId: string;
     macrosEnabled: boolean;
     dates: Date[];
-    scheduledWorkouts: ScheduledWorkoutEntry[];
+    programContexts: ProgramDayContext[];
     loggedIds: Set<string>;
     today: Date;
-    visibilityWindow: "day" | "week" | "month" | "full";
     habitDefs: { id: string; title: string; weekdays: number[] }[];
   }
 ): Promise<HomeDaySummary[]> {
@@ -777,13 +771,15 @@ async function computeRangeSummaries(
 
   return dates.map((date) => {
     const dateKey = dateKeyOf(date);
-    const workout = resolveDayWorkout(scheduledWorkouts, loggedIds, date, today, visibilityWindow);
+    const sessions = resolveSessionsForDate(programContexts, loggedIds, date, today, false);
+    const workout = summarizeSessions(sessions, emptyDayInfo(programContexts, false));
     const dueHabits = habitDefs.filter((h) => isHabitDueOn(h.weekdays, date));
     const habitsCompleted = dueHabits.filter((h) => completedByHabitAndDate.has(`${h.id}|${dateKey}`)).length;
     return {
       dateKey,
       date,
       workout,
+      sessionCount: sessions.length,
       macroCalories: calorieTargetForDate(dateKey, caloriesByDate, standingForDate(standingTarget, dateKey), planCaloriesByDate),
       habitsDue: dueHabits.length,
       habitsCompleted,
