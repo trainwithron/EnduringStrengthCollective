@@ -18,4 +18,14 @@ check("precheck after: refuses a second run (already applied is false, block gon
 for (let i = 1; i <= 2; i++) {
   try { await db.exec(read("apply-now-0264-0265-0266-0253.sql")); check(`apply-now-0264-0265-0266-0253.sql run ${i}`, true); } catch (e) { check(`apply-now run ${i}: ${e.message}`, false); }
 }
+const pre67 = async () => (await db.query(read("apply-0267-precheck.sql"))).rows;
+const p67 = await pre67();
+check("0267 precheck: every row is true once 0266 is applied", p67.length === 5 && p67.every((r) => r.ok));
+for (let i = 1; i <= 2; i++) {
+  try { await db.exec(read("apply-0267.sql")); check(`apply-0267.sql run ${i}`, true); } catch (e) { check(`apply-0267 run ${i}: ${e.message}`, false); }
+}
+// Re-running 0266 afterwards loses the logging; the header says to re-run 0267, which restores it.
+await db.exec(read("apply-now-0264-0265-0266-0253.sql"));
+await db.exec(read("apply-0267.sql"));
+check("0267 can be re-applied after 0266 is re-run", true);
 process.exit(failures ? 1 : 0);
