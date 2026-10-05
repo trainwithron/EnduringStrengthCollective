@@ -22,7 +22,7 @@ function filesUnder(rel: string): string[] {
 export function visibleText(source: string): string[] {
   const noComments = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
   const out: string[] = [];
-  for (const m of noComments.matchAll(/(["'`])((?:\\.|(?!\1)[^\\])*?)\1/gs)) out.push(m[2].replace(/\s+/g, " ").trim());
+  for (const m of noComments.matchAll(/(["'`])((?:\\.|(?!\1)[^\\])*?)\1/g)) out.push(m[2].replace(/\s+/g, " ").trim());
   for (const m of noComments.matchAll(/[>}]([^<>{}]+)[<{]/g)) out.push(m[1].replace(/\s+/g, " ").trim());
   return out.filter((t) => t.length > 0);
 }
