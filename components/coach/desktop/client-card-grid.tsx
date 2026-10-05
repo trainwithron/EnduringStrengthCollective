@@ -626,6 +626,12 @@ export function ClientCardGrid({
                   <span className="font-body text-xs text-steel">{status.text}</span>
                 </span>
 
+                {member.signInStatus && member.signInStatus !== "active" && (
+                  <span className="font-body text-xs text-amber-400 bg-amber-400/10 border border-amber-400/30 rounded-token-pill px-2 py-0.5">
+                    {member.signInStatus === "invite_created" ? "Invite link created" : "Not signed in yet"}
+                  </span>
+                )}
+
                 {lowReadinessAthleteIds?.has(member.profileId) && (
                   <span className="font-body text-[11px] text-amber-400 bg-amber-400/10 border border-amber-400/30 rounded-token-pill px-1.5 py-0.5">
                     ⚠ Low readiness

@@ -72,6 +72,8 @@ export function AddClientButton({
   const [submitting, setSubmitting] = useState(false);
   const [directError, setDirectError] = useState<string | null>(null);
   const [directSuccess, setDirectSuccess] = useState(false);
+  // Where the silently-created client's profile lives (to open it next).
+  const [createdClient, setCreatedClient] = useState<{ groupId: string; profileId: string } | null>(null);
 
   // Caches the group created for the "new 1-on-1 group" destination so a
   // failed first attempt (e.g. the invite email hitting a rate limit) and a
@@ -276,16 +278,10 @@ export function AddClientButton({
       if (!res.ok) throw new Error(data.error || "Couldn't add this client.");
 
       setDirectSuccess(true);
+      setCreatedClient({ groupId: targetGroupId, profileId: data.profileId });
       setFullName("");
       setEmail("");
-      // A different destination than the group currently being viewed
-      // won't show the new client here even after a refresh — send the
-      // coach straight to where the client actually landed.
-      if (targetGroupId !== groupId) {
-        router.push(`/groups/${targetGroupId}/clients`);
-      } else {
-        router.refresh();
-      }
+      router.refresh();
     } catch (err) {
       setDirectError(err instanceof Error ? err.message : "Couldn't add this client.");
     } finally {
@@ -297,6 +293,7 @@ export function AddClientButton({
     setOpen(false);
     setLink(null);
     setDirectSuccess(false);
+    setCreatedClient(null);
     setMode("link");
     setDestination("current");
     setSelectedExistingGroupId("");
@@ -427,19 +424,31 @@ export function AddClientButton({
         )
       ) : directSuccess ? (
         <div>
-          <p className="font-body text-sm text-positive">
-            Client added — they&apos;ll get an email to set their password. You can already assign
-            a program to them.
+          <p className="font-body text-sm text-positive">Client added. Nothing was sent to them.</p>
+          <p className="font-body text-xs text-steel mt-1.5">
+            Build their programs, schedule and meal plans now. When you&apos;re ready, create their invite link from
+            their profile and send it yourself.
           </p>
-          <button type="button" onClick={handleClose} className="font-body text-xs text-rust mt-3">
-            Done
-          </button>
+          <div className="flex items-center gap-4 mt-3">
+            {createdClient && (
+              <button
+                type="button"
+                onClick={() => router.push(`/groups/${createdClient.groupId}/athletes/${createdClient.profileId}`)}
+                className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium"
+              >
+                Open their profile
+              </button>
+            )}
+            <button type="button" onClick={handleClose} className="font-body text-xs text-steel">
+              Done
+            </button>
+          </div>
         </div>
       ) : (
         <form onSubmit={handleDirectSubmit} className="space-y-3">
           <p className="font-body text-xs text-steel">
-            A real account exists immediately — build/assign a program before they&apos;ve ever
-            logged in.
+            A real account is created right away, with no email sent. Build their program and schedule before they
+            ever sign in, then give them a link when you&apos;re ready.
           </p>
           <div>
             <label htmlFor="client-name" className="font-body text-xs text-steel">
@@ -456,12 +465,11 @@ export function AddClientButton({
           </div>
           <div>
             <label htmlFor="client-email" className="font-body text-xs text-steel">
-              Email
+              Email (optional)
             </label>
             <input
               id="client-email"
               type="email"
-              required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full h-10 mt-1 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-sm focus:outline-none focus:border-rust"

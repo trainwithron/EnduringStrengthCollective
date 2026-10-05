@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { isPlaceholderEmail } from "@/lib/client-claim";
 
 export default function SetPasswordPage() {
   return (
@@ -16,6 +17,10 @@ function SetPasswordForm() {
   const router = useRouter();
   const [checking, setChecking] = useState(true);
   const [hasSession, setHasSession] = useState(false);
+  // A client the coach set up before they ever signed in has a placeholder
+  // address; they enter their real email here.
+  const [needsEmail, setNeedsEmail] = useState(false);
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -27,6 +32,7 @@ function SetPasswordForm() {
     const supabase = createBrowserClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
       setHasSession(!!user);
+      setNeedsEmail(isPlaceholderEmail(user?.email));
       setChecking(false);
     });
   }, []);
@@ -44,6 +50,20 @@ function SetPasswordForm() {
     const { error: updateError } = await supabase.auth.updateUser({ password });
     if (updateError) {
       setError(updateError.message);
+      setSubmitting(false);
+      return;
+    }
+
+    // Records that they've signed in and, for a coach-created account, saves
+    // the real email they entered (server-side, for their own account only).
+    const claimRes = await fetch("/api/clients/complete-claim", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    if (!claimRes.ok) {
+      const data = await claimRes.json().catch(() => ({}));
+      setError(data.error || "Couldn't finish setting up your account — try again.");
       setSubmitting(false);
       return;
     }
@@ -101,7 +121,7 @@ function SetPasswordForm() {
         <div>
           <h1 className="font-display uppercase text-2xl font-bold">Link invalid or expired</h1>
           <p className="font-body text-steel text-sm mt-2 max-w-sm">
-            Ask your coach to resend your invite.
+            Sign-in links work once and expire. Ask your coach to send you a new one.
           </p>
         </div>
       </main>
@@ -117,6 +137,24 @@ function SetPasswordForm() {
         <p className="font-body text-steel text-sm text-center mt-2 mb-6">
           One last step — pick a password and you&apos;re in.
         </p>
+
+        {needsEmail && (
+          <div className="mb-4">
+            <label htmlFor="email" className="font-body text-xs text-steel uppercase tracking-wide">
+              Your email
+            </label>
+            <input
+              id="email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full h-11 mt-1 bg-surface border border-steel/30 text-chalk px-3 font-body focus:outline-none focus:border-rust"
+            />
+            <p className="font-body text-xs text-steel mt-1">You'll use this to sign in and reset your password.</p>
+          </div>
+        )}
 
         <label htmlFor="password" className="font-body text-xs text-steel uppercase tracking-wide">
           Password

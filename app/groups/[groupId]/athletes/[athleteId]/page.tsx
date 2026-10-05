@@ -13,6 +13,8 @@ import { ChangeClientGroupControl } from "@/components/coach/change-client-group
 import { AddSocialOnlyMembershipControl } from "@/components/coach/add-social-only-membership-control";
 import { ClientProgrammingMenu } from "@/components/coach/client-programming-menu";
 import { MinorConsentControl } from "@/components/coach/minor-consent-control";
+import { ClientSignInPanel } from "@/components/coach/client-signin-panel";
+import { claimStatus } from "@/lib/client-claim";
 import { GuardianShareButton } from "@/components/coach/guardian-share-button";
 import { NutritionPhaseControl } from "@/components/coach/nutrition-phase-control";
 import { SettingsGroup } from "@/components/shared/settings-group";
@@ -102,7 +104,7 @@ export default async function AthleteProfilePage(
     supabase
       .from("group_memberships")
       .select(
-        "joined_at, client_tier, private_from_org, profiles ( id, full_name, avatar_url, exercise_swipe_direction )"
+        "joined_at, client_tier, private_from_org, profiles ( id, full_name, avatar_url, exercise_swipe_direction, claimed_at )"
       )
       .eq("group_id", params.groupId)
       .eq("profile_id", params.athleteId)
@@ -329,6 +331,22 @@ export default async function AthleteProfilePage(
   }
 
   const profile = athleteMembership.profiles as any;
+
+  // A client the coach created before they ever signed in: the sign-in
+  // checklist (and whether an invite link already exists) shows on top.
+  const { data: latestInviteRow } = profile?.claimed_at
+    ? { data: null }
+    : await supabase
+        .from("client_invites")
+        .select("expires_at, used_at")
+        .eq("athlete_id", params.athleteId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+  const signInStatus = claimStatus({
+    claimedAt: profile?.claimed_at ?? null,
+    latestInvite: latestInviteRow ? { expiresAt: latestInviteRow.expires_at, usedAt: latestInviteRow.used_at } : null,
+  });
   // Same gate used everywhere else this tier's feature set is hidden —
   // group-tier clients don't get macro/meal-plan programming at all.
   const macrosEnabled = athleteMembership.client_tier !== "group";
@@ -818,8 +836,16 @@ export default async function AthleteProfilePage(
         </div>
       </div>
 
-      <div className="grid grid-cols-[320px_1fr] gap-10 items-start">
-        <div className="space-y-8">
+      <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6 lg:gap-10 items-start">
+        <div className="space-y-8 min-w-0">
+          {signInStatus !== "active" && (
+            <ClientSignInPanel
+              groupId={params.groupId}
+              athleteId={params.athleteId}
+              clientName={profile?.full_name ?? "Client"}
+              status={signInStatus}
+            />
+          )}
           {(hasAboutInfo || parQAnswers.length > 0 || !!intake) && (
             <RosterSection
               title="Personal Info"

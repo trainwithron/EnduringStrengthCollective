@@ -2,8 +2,19 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { toFriendlyAuthEmailError } from "@/lib/auth-email-error";
+import { placeholderEmailFor } from "@/lib/client-claim";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatch";
 
+// Creates a client BEFORE they've ever signed in: a real auth account and
+// profile, silently — no email is sent, so nothing reaches them until the
+// coach chooses to hand over a claim link (see /api/clients/invite-link).
+// Everything the coach builds (programs, schedule, credits, meal plans,
+// notes) attaches to the real profile id from this moment, so it's all in
+// place when the client first signs in.
+//
+// Only a name is required. Without an email the account gets a placeholder
+// address that can never receive mail; the client enters their real one
+// when they claim the account.
 export async function POST(request: Request) {
   const supabase = await createServerClient();
   const {
@@ -14,8 +25,8 @@ export async function POST(request: Request) {
   const { groupId, fullName, email } = await request.json();
   const trimmedName = typeof fullName === "string" ? fullName.trim() : "";
   const trimmedEmail = typeof email === "string" ? email.trim() : "";
-  if (!groupId || !trimmedName || !trimmedEmail) {
-    return NextResponse.json({ error: "Missing groupId, fullName, or email." }, { status: 400 });
+  if (!groupId || !trimmedName) {
+    return NextResponse.json({ error: "Missing groupId or fullName." }, { status: 400 });
   }
 
   const { data: membership } = await supabase
@@ -29,33 +40,36 @@ export async function POST(request: Request) {
   }
 
   const serviceRole = createServiceRoleClient();
-  const origin = request.headers.get("origin") ?? new URL(request.url).origin;
 
-  // Creates the real auth.users row and sends Supabase's own invite
-  // email in one call — profiles.id is a hard FK to auth.users, so there
-  // is no way to create a client record without a genuine account behind
-  // it. The person sets their own password whenever they get to it via
-  // the link this sends; until then, the coach can already build/assign
-  // a program for them.
-  const { data: invited, error: inviteError } = await serviceRole.auth.admin.inviteUserByEmail(
-    trimmedEmail,
-    {
-      data: { full_name: trimmedName },
-      redirectTo: `${origin}/set-password`,
+  const { data: created, error: createError } = await serviceRole.auth.admin.createUser({
+    email: trimmedEmail || placeholderEmailFor(crypto.randomUUID()),
+    email_confirm: true,
+    user_metadata: { full_name: trimmedName },
+  });
+
+  if (createError || !created?.user) {
+    const raw = createError?.message ?? "Couldn't add this client.";
+    if (/already|registered|exists/i.test(raw)) {
+      return NextResponse.json(
+        {
+          error:
+            "That email already has an account. Use an invite link instead so they join with their own login.",
+        },
+        { status: 409 }
+      );
     }
-  );
-
-  if (inviteError || !invited?.user) {
-    const { error, status } = toFriendlyAuthEmailError(inviteError?.message ?? "Couldn't invite this client.");
+    const { error, status } = toFriendlyAuthEmailError(raw);
     return NextResponse.json({ error }, { status });
   }
 
-  const newUserId = invited.user.id;
+  const newUserId = created.user.id;
 
+  // claimed_at = null marks the account as not yet signed into.
   const { error: profileError } = await serviceRole
     .from("profiles")
-    .insert({ id: newUserId, full_name: trimmedName, intake_required: true });
+    .insert({ id: newUserId, full_name: trimmedName, intake_required: true, claimed_at: null });
   if (profileError) {
+    await serviceRole.auth.admin.deleteUser(newUserId).catch(() => {});
     return NextResponse.json({ error: `Couldn't create their profile: ${profileError.message}` }, { status: 502 });
   }
 
@@ -76,8 +90,8 @@ export async function POST(request: Request) {
   await dispatchWebhookEvent(serviceRole, {
     coachId: user.id,
     eventType: "client_added",
-    payload: { athleteId: newUserId, fullName: trimmedName, email: trimmedEmail, groupId },
+    payload: { athleteId: newUserId, fullName: trimmedName, email: trimmedEmail || null, groupId },
   });
 
-  return NextResponse.json({ profileId: newUserId });
+  return NextResponse.json({ profileId: newUserId, groupId });
 }

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { claimStatus } from "@/lib/client-claim";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ClientCardGrid } from "@/components/coach/desktop/client-card-grid";
@@ -79,7 +80,7 @@ export default async function ClientsPage(
     supabase
       .from("group_memberships")
       .select(
-        "role, profiles ( id, full_name, avatar_url ), profile_id, client_tier, position_id, group_positions!group_memberships_position_id_fkey ( name )"
+        "role, profiles ( id, full_name, avatar_url, claimed_at ), profile_id, client_tier, position_id, group_positions!group_memberships_position_id_fkey ( name )"
       )
       .eq("group_id", params.groupId),
     supabase.rpc("get_last_workout_per_athlete", { p_group_id: params.groupId }),
@@ -105,7 +106,29 @@ export default async function ClientsPage(
     phaseByAthleteId.set(row.athlete_id, row.phase as MilestonePhaseTag);
   }
 
+  // Clients who haven't signed in yet: which of them already has a live invite link.
+  const unclaimedIds = (memberships ?? [])
+    .filter((m: any) => m.role === "athlete" && !m.profiles?.claimed_at)
+    .map((m: any) => m.profile_id as string);
+  const latestInviteByAthlete = new Map<string, { expiresAt: string; usedAt: string | null }>();
+  if (unclaimedIds.length > 0) {
+    const { data: inviteRows } = await supabase
+      .from("client_invites")
+      .select("athlete_id, expires_at, used_at, created_at")
+      .in("athlete_id", unclaimedIds)
+      .order("created_at", { ascending: false });
+    for (const r of inviteRows ?? []) {
+      if (!latestInviteByAthlete.has(r.athlete_id)) {
+        latestInviteByAthlete.set(r.athlete_id, { expiresAt: r.expires_at, usedAt: r.used_at });
+      }
+    }
+  }
+
   const roster: RosterMember[] = (memberships ?? []).map((m: any) => ({
+    signInStatus: claimStatus({
+      claimedAt: m.profiles?.claimed_at ?? null,
+      latestInvite: latestInviteByAthlete.get(m.profile_id) ?? null,
+    }),
     profileId: m.profile_id,
     fullName: m.profiles?.full_name ?? "Unknown",
     avatarUrl: m.profiles?.avatar_url ?? null,

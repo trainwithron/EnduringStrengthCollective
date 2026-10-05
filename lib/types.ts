@@ -11,6 +11,9 @@ export type MemberRole = "coach" | "athlete";
 export type ClientTier = "one_on_one" | "online" | "group" | null;
 
 export interface RosterMember {
+  // For a client the coach created before they ever signed in: where they are
+  // in the sign-in checklist (active = signed in, the normal case).
+  signInStatus?: "not_signed_in" | "invite_created" | "active";
   profileId: string;
   fullName: string;
   avatarUrl: string | null;
