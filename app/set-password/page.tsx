@@ -152,7 +152,7 @@ function SetPasswordForm() {
               onChange={(e) => setEmail(e.target.value)}
               className="w-full h-11 mt-1 bg-surface border border-steel/30 text-chalk px-3 font-body focus:outline-none focus:border-rust"
             />
-            <p className="font-body text-xs text-steel mt-1">You'll use this to sign in and reset your password.</p>
+            <p className="font-body text-xs text-steel mt-1">You&apos;ll use this to sign in and reset your password.</p>
           </div>
         )}
 
