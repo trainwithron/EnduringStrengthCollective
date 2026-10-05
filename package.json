@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:sql": "node scripts/sql-tests/group-sessions.test.mjs && node scripts/sql-tests/settlement.test.mjs && node scripts/sql-tests/rehearsal.mjs"
+    "test:sql": "node scripts/sql-tests/group-sessions.test.mjs && node scripts/sql-tests/settlement.test.mjs && node scripts/sql-tests/rehearsal.mjs && node scripts/sql-tests/paste-files.test.mjs"
   },
   "dependencies": {
     "@daily-co/daily-js": "^0.92.2",
