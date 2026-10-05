@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { SetSaveBanner, SetSaveProvider } from "./set-save-context";
 import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
 import { ExerciseSwipeCarousel } from "./exercise-swipe-carousel";
 import { ExerciseVerticalCarousel } from "./exercise-vertical-carousel";
@@ -214,7 +215,7 @@ export function SessionLogger({
   }
 
   return (
-    <>
+    <SetSaveProvider>
       {!isCompleted && (
         <RestTimerBar
           sessionId={sessionId}
@@ -227,6 +228,7 @@ export function SessionLogger({
           todayDate={todayDate}
         />
       )}
+      <SetSaveBanner />
       <section className="px-5 pt-4">
       {showDiscovery && (
         <SwipeDirectionDiscovery
@@ -343,6 +345,6 @@ export function SessionLogger({
         />
       )}
       </section>
-    </>
+    </SetSaveProvider>
   );
 }

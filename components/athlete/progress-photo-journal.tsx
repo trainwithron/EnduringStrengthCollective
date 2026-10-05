@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { localDateKey } from "@/lib/timezone";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
 const MAX_BYTES = 15 * 1024 * 1024;
@@ -91,7 +92,7 @@ export function ProgressPhotoJournal({ athleteId, groupId }: { athleteId: string
       athlete_id: athleteId,
       group_id: groupId,
       storage_path: path,
-      taken_date: new Date().toISOString().slice(0, 10),
+      taken_date: localDateKey(),
     });
     if (insertError) {
       setError("Uploaded, but couldn't save it to your journal — try again.");

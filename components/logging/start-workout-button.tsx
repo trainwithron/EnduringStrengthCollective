@@ -87,6 +87,58 @@ export function StartWorkoutButton({
       now
     );
 
+    // The sets each template exercise starts with. An explicit per-set
+    // target_weight/target_reps is a real coach decision, so it still
+    // pre-fills for real. A progression-rule "goal" (Exercise Progressions'
+    // live computed suggestion) is never committed here as if the athlete
+    // had already reported it — it's already shown as the pre-start "Goal: ..."
+    // preview (pre-start-exercise-row.tsx); the athlete reports what they
+    // actually did, for both fields.
+    function setsFor(ex: TemplateExercise) {
+      return ex.sets.length > 0
+        ? ex.sets.map((target) => ({
+            set_order: target.setOrder,
+            weight: target.targetWeight ?? null,
+            reps: parseRepsTarget(target.targetReps),
+          }))
+        : [{ set_order: 0, weight: null, reps: null }];
+    }
+
+    // One atomic call: session + exercises + sets all land together or not at
+    // all, and starting again after a dropped connection reuses (and fills in)
+    // the same session instead of leaving an empty one behind. Falls back to
+    // the old three-step insert only where the function isn't installed yet.
+    const { data: sessionId, error: rpcError } = await supabase.rpc("start_workout_session", {
+      p_workout_id: workoutId,
+      p_group_id: groupId,
+      p_athlete_id: athleteId,
+      p_logged_by_coach: loggedByCoach ?? false,
+      p_session_type_id: sessionTypeId || null,
+      p_deduct_session_credit: !!loggedByCoach && deductCredit,
+      p_booking_id: bookingId,
+      p_exercises: exercises.map((ex) => ({
+        group_workout_exercise_id: ex.id,
+        exercise_name: ex.exerciseName,
+        exercise_order: ex.exerciseOrder,
+        movement_pattern_id: ex.movementPatternId ?? null,
+        tracked_fields: ex.trackedFields,
+        sets: setsFor(ex),
+      })),
+    });
+
+    if (!rpcError && sessionId) {
+      router.push(`/sessions/${sessionId}`);
+      return;
+    }
+
+    const functionMissing =
+      rpcError?.code === "PGRST202" || /could not find the function/i.test(rpcError?.message ?? "");
+    if (!functionMissing) {
+      setStarting(false);
+      setError("Couldn't start the workout — check your connection and try again.");
+      return;
+    }
+
     const { data: session, error: sessionError } = await supabase
       .from("athlete_sessions")
       .insert({
@@ -101,11 +153,6 @@ export function StartWorkoutButton({
       .select("id")
       .single();
 
-    // Silently doing nothing here reads as "the button doesn't work" —
-    // a real, reported symptom that turned out to actually be a stale
-    // cached page hiding an already-started session (see
-    // RefreshOnBfcacheRestore), but a genuine failure here (a network
-    // blip, etc.) deserves the same visible feedback either way.
     if (sessionError || !session) {
       setStarting(false);
       setError("Couldn't start the workout — check your connection and try again.");
@@ -113,11 +160,8 @@ export function StartWorkoutButton({
     }
 
     // Copy the template into the athlete's own mutable rows — later
-    // swaps/additions here never touch group_workout_exercises. Batched
-    // into two bulk inserts (one for every exercise, one for every set)
-    // instead of two round trips per exercise — a 6-exercise workout was
-    // previously 12 sequential requests blocking "Starting…" the whole time.
-    const { data: insertedExercises } = await supabase
+    // swaps/additions here never touch group_workout_exercises.
+    const { data: insertedExercises, error: exError } = await supabase
       .from("session_exercises")
       .insert(
         exercises.map((ex) => ({
@@ -138,34 +182,19 @@ export function StartWorkoutButton({
     const allSets = exercises.flatMap((ex) => {
       const sessionExerciseId = sessionExerciseIdByTemplateId.get(ex.id);
       if (!sessionExerciseId) return [];
-
-      return ex.sets.length > 0
-        ? ex.sets.map((target) => ({
-            session_exercise_id: sessionExerciseId,
-            set_order: target.setOrder,
-            // An explicit per-set target_weight/target_reps is a real
-            // coach decision, so it still pre-fills for real. A
-            // progression-rule "goal" (Exercise Progressions' live
-            // computed suggestion) is never committed here as if the
-            // athlete had already reported it — it's already shown as
-            // the pre-start "Goal: ..." preview (pre-start-exercise-row.tsx)
-            // from this same goalByExerciseId data, same as weight; the
-            // athlete reports what they actually did, for both fields.
-            weight: target.targetWeight ?? null,
-            reps: parseRepsTarget(target.targetReps),
-          }))
-        : [
-            {
-              session_exercise_id: sessionExerciseId,
-              set_order: 0,
-              weight: null,
-              reps: null,
-            },
-          ];
+      return setsFor(ex).map((st) => ({ session_exercise_id: sessionExerciseId, ...st }));
     });
 
+    let setsError = null;
     if (allSets.length > 0) {
-      await supabase.from("set_logs").insert(allSets);
+      ({ error: setsError } = await supabase.from("set_logs").insert(allSets));
+    }
+
+    // A half-built session is worse than none: say so instead of opening it.
+    if (exError || setsError) {
+      setStarting(false);
+      setError("The workout only partly started. Tap Start workout again to finish setting it up.");
+      return;
     }
 
     router.push(`/sessions/${session.id}`);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { createBrowserClient } from "@/lib/supabase/client";
+import { useSetSave } from "./set-save-context";
 import type { SetLogEntry } from "@/lib/types";
 import {
   ACTUAL_COLUMN,
@@ -130,6 +130,7 @@ function GridCell({
   field,
   readOnly,
   onChange,
+  onTouched,
   setNumber,
   locked,
 }: {
@@ -137,6 +138,9 @@ function GridCell({
   field: TrackedField;
   readOnly: boolean;
   onChange: (patch: Partial<SetLogEntry>) => void;
+  // The athlete interacted with this set (focused/blurred/swiped a cell) —
+  // only then may a prefilled-from-the-program set count as done.
+  onTouched: () => void;
   setNumber: number;
   // Obstacle-unlock mechanic (lib/obstacle-unlock.ts, Phase 1 of the
   // gamified-logging thread) — only ever true for the weight cell of an
@@ -147,6 +151,8 @@ function GridCell({
 }) {
   const prop = ACTUAL_PROP[field] as keyof SetLogEntry;
   const value = set[prop];
+  const { save, failedIds } = useSetSave();
+  const unsaved = failedIds.has(set.id);
   const [draft, setDraft] = useState(value === null || value === undefined ? "" : String(value));
   const def = fieldDef(field);
   const isNumeric = def.kind === "number" || field === "reps"; // logged reps is always a real integer
@@ -194,37 +200,26 @@ function GridCell({
     const needsConfirmWrite = field === "weight" && !set.weightConfirmed;
     if (next === value && !needsConfirmWrite) return;
 
-    const previousWeightConfirmed = set.weightConfirmed;
     // Apply the change to this exercise's real set data immediately — the
     // completion-sync effect (and everything downstream of it: the
     // checkmark, the rest timer) reacts to this right away instead of
-    // waiting on the write below. The write itself still happens, just in
-    // the background.
+    // waiting on the write below.
     onChange({
       [prop]: next,
       ...(field === "weight" ? { weightConfirmed: next != null } : {}),
     } as Partial<SetLogEntry>);
 
-    const supabase = createBrowserClient();
+    // The write goes through the save queue: the typed value STAYS on screen
+    // if the connection is bad, retries with backoff, and shows as "not
+    // saved" until it lands (it used to silently revert).
     const payload: Record<string, unknown> = { [ACTUAL_COLUMN[field]]: next };
     if (field === "weight") payload.weight_confirmed = next != null;
-    supabase
-      .from("set_logs")
-      .update(payload)
-      .eq("id", set.id)
-      .then(({ error }) => {
-        if (!error) return;
-        // A genuine write failure — revert to the last known-good value
-        // rather than leaving the UI showing something that was never
-        // actually saved.
-        onChange({
-          [prop]: value,
-          ...(field === "weight" ? { weightConfirmed: previousWeightConfirmed } : {}),
-        } as Partial<SetLogEntry>);
-      });
+    save(set.id, payload);
   }
 
   function handleBlur() {
+    // Focusing and leaving a cell is the athlete confirming this set.
+    onTouched();
     const next = draft.trim() === "" ? null : isNumeric ? Number(draft) : draft.trim();
     commit(next);
   }
@@ -233,6 +228,7 @@ function GridCell({
     if (draft.trim() !== "" || suggestion == null) return;
     setDraft(String(suggestion));
     vibrateConfirm();
+    onTouched();
     commit(suggestion);
   }, !readOnly && draft.trim() === "" && suggestion != null);
 
@@ -258,11 +254,20 @@ function GridCell({
         onBlur={handleBlur}
         {...swipe}
         className={`w-16 h-10 rounded-token-pill font-body text-sm text-center focus:outline-none focus:border-rust disabled:opacity-60 touch-pan-y ${
+          unsaved ? "border-2 border-amber-400/70 " : ""
+        }${
           showLock
             ? "bg-surface border-2 border-dashed border-rust/70 text-chalk/50"
             : "bg-surface border border-steel/30 text-chalk"
         }`}
       />
+      {unsaved && (
+        <span
+          aria-hidden="true"
+          title="Not saved yet"
+          className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-400 border border-graphite pointer-events-none"
+        />
+      )}
       {showLock && (
         <>
           {/* A real veil over the number, not just a frame around it — dims
@@ -296,13 +301,17 @@ function SetCompletionSync({
   set,
   trackedFields,
   readOnly,
+  touched,
   onChange,
 }: {
   set: SetLogEntry;
   trackedFields: TrackedField[];
   readOnly: boolean;
+  // Whether the athlete has interacted with this set this session.
+  touched: boolean;
   onChange: (patch: Partial<SetLogEntry>) => void;
 }) {
+  const { save } = useSetSave();
   useEffect(() => {
     if (readOnly || set.status === "skipped") return;
     const requiredProps = orderTrackedFields(trackedFields).map(
@@ -316,25 +325,20 @@ function SetCompletionSync({
       });
 
     function persist(patch: Partial<SetLogEntry>) {
-      const previousStatus = set.status;
       // Flip the status right away — this is what the checkmark and the
-      // rest-timer trigger key off, so they shouldn't wait on this write
-      // (itself already the SECOND round-trip after the field commit
-      // above) to show anything.
+      // rest-timer trigger key off. The write is queued (and retried), never
+      // reverted: reverting on failure made this effect fire again forever.
       onChange(patch);
-      const supabase = createBrowserClient();
       const payload: Record<string, unknown> = { ...patch };
       if (patch.status === "completed") payload.completed_at = new Date().toISOString();
-      supabase
-        .from("set_logs")
-        .update(payload)
-        .eq("id", set.id)
-        .then(({ error }) => {
-          if (error) onChange({ status: previousStatus });
-        });
+      save(set.id, payload);
     }
 
-    if (allFilled && set.status !== "completed") {
+    // A set that merely arrived pre-filled from the program's targets is NOT
+    // done: it only completes once the athlete has touched it. (It used to
+    // complete itself on load, so a client could tap Complete without doing a
+    // thing and log the whole program.)
+    if (allFilled && set.status !== "completed" && touched) {
       persist({ status: "completed" });
     } else if (!allFilled && set.status === "completed") {
       persist({ status: "pending" });
@@ -353,6 +357,7 @@ function SetCompletionSync({
     set.pace,
     set.status,
     readOnly,
+    touched,
   ]);
 
   return null;
@@ -374,6 +379,17 @@ export function ExerciseSetGrid({
   gamificationEnabled?: boolean;
 }) {
   const fields = orderTrackedFields(trackedFields);
+  const { save } = useSetSave();
+  // Sets the athlete has interacted with (see SetCompletionSync).
+  const [touchedSetIds, setTouchedSetIds] = useState<Set<string>>(new Set());
+  function markTouched(...ids: string[]) {
+    setTouchedSetIds((prev) => {
+      if (ids.every((id) => prev.has(id))) return prev;
+      const next = new Set(prev);
+      for (const id of ids) next.add(id);
+      return next;
+    });
+  }
 
   // Obstacle-unlock (Phase 1 of the gamified-logging thread,
   // lib/obstacle-unlock.ts) — re-derived from the exercise's real current
@@ -424,22 +440,23 @@ export function ExerciseSetGrid({
     const value = first[prop];
     if (value == null) return;
     const rest = sets.slice(1);
+    // Filling the row replaces whatever the other sets already hold — ask first
+    // if that would overwrite numbers the athlete entered.
+    const overwrites = rest.filter((s) => s[prop] != null && s[prop] !== value).length;
+    if (
+      overwrites > 0 &&
+      !window.confirm(
+        `Replace the ${fieldDef(field).label} you already entered on ${overwrites} other ${overwrites === 1 ? "set" : "sets"} with set 1's value?`
+      )
+    ) {
+      return;
+    }
     // Fill every other set's cell immediately — the bulk write happens in
     // the background instead of the whole row waiting on it.
     for (const s of rest) onSetChange(s.id, { [prop]: value } as Partial<SetLogEntry>);
-
-    const supabase = createBrowserClient();
-    supabase
-      .from("set_logs")
-      .update({ [ACTUAL_COLUMN[field]]: value })
-      .in(
-        "id",
-        rest.map((s) => s.id)
-      )
-      .then(({ error }) => {
-        if (!error) return;
-        for (const s of rest) onSetChange(s.id, { [prop]: s[prop] } as Partial<SetLogEntry>);
-      });
+    markTouched(first.id, ...rest.map((s) => s.id));
+    // Each set's change goes through the save queue (retried, never reverted).
+    for (const s of rest) save(s.id, { [ACTUAL_COLUMN[field]]: value });
   }
 
   // Real usage feedback: the old handle sat at the far left of the row,
@@ -516,6 +533,7 @@ export function ExerciseSetGrid({
           set={set}
           trackedFields={trackedFields}
           readOnly={readOnly}
+          touched={touchedSetIds.has(set.id)}
           onChange={(patch) => onSetChange(set.id, patch)}
         />
       ))}
@@ -552,6 +570,7 @@ export function ExerciseSetGrid({
                 field={field}
                 readOnly={readOnly}
                 setNumber={i + 1}
+                onTouched={() => markTouched(set.id)}
                 onChange={(patch) => onSetChange(set.id, patch)}
                 locked={field === "weight" && !unlocked}
               />

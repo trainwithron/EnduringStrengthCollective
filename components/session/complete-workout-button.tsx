@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { localDateKey } from "@/lib/timezone";
+import { useSetSave } from "@/components/logging/set-save-context";
 import { useRouter } from "next/navigation";
 import { notifyPush } from "@/lib/push-notify";
 import { isHighPriorityClient } from "@/lib/notification-priority";
@@ -69,6 +71,8 @@ export function CompleteWorkoutButton({
   const [rpeNudge, setRpeNudge] = useState<{ athleteId: string; groupId: string; navHref: string } | null>(null);
   const [rpeSubmitting, setRpeSubmitting] = useState(false);
 
+  const { flush: flushSets } = useSetSave();
+
   function finishNavigation(navHref: string) {
     router.push(navHref);
   }
@@ -86,7 +90,7 @@ export function CompleteWorkoutButton({
       {
         athlete_id: weightNudge.athleteId,
         group_id: weightNudge.groupId,
-        logged_date: new Date().toISOString().slice(0, 10),
+        logged_date: localDateKey(),
         weight: value,
       },
       { onConflict: "athlete_id,logged_date" }
@@ -107,6 +111,41 @@ export function CompleteWorkoutButton({
     setSubmitting(true);
     setError(null);
     const supabase = createBrowserClient();
+
+    // Anything still waiting to save (a bad gym signal) must land BEFORE we
+    // total the workout — the server counts only what's actually saved.
+    const allSaved = await flushSets();
+    if (!allSaved) {
+      setError("Some sets haven't saved yet — check your signal, then tap Complete again. Nothing you entered is lost.");
+      setSubmitting(false);
+      return;
+    }
+
+    // A lost response followed by another tap must not complete (and post,
+    // notify, deduct) a second time: if this session is already completed,
+    // just take them to the card it already has.
+    const { data: existingSession } = await supabase
+      .from("athlete_sessions")
+      .select("status, group_id")
+      .eq("id", sessionId)
+      .maybeSingle();
+    if (existingSession?.status === "completed") {
+      const { data: existingLog } = await supabase
+        .from("workout_logs")
+        .select("id")
+        .eq("session_id", sessionId)
+        .maybeSingle();
+      const { data: existingPost } = existingLog
+        ? await supabase
+            .from("posts")
+            .select("id")
+            .eq("workout_log_id", existingLog.id)
+            .eq("post_type", "workout_summary")
+            .maybeSingle()
+        : { data: null };
+      finishNavigation(existingPost ? `/share/${existingPost.id}` : `/groups/${existingSession.group_id}`);
+      return;
+    }
 
     // All the real work — marking the session completed and computing
     // volume/sets/PRs from the actual set_logs rows — happens server-side
@@ -225,7 +264,16 @@ export function CompleteWorkoutButton({
 
     let postId: string | null = null;
     if (shouldPost) {
-      const { data: post } = await supabase
+      // One card per workout, even if completion ran twice.
+      const { data: alreadyPosted } = await supabase
+        .from("posts")
+        .select("id")
+        .eq("workout_log_id", result.workout_log_id)
+        .eq("post_type", "workout_summary")
+        .maybeSingle();
+      const { data: post } = alreadyPosted
+        ? { data: alreadyPosted }
+        : await supabase
         .from("posts")
         .insert({
           group_id: result.group_id,
@@ -261,7 +309,7 @@ export function CompleteWorkoutButton({
 
   async function checkWeightThenNavigate(athleteId: string, groupId: string, navHref: string) {
     const supabase = createBrowserClient();
-    const todayKey = new Date().toISOString().slice(0, 10);
+    const todayKey = localDateKey();
     const { data: todayLog } = await supabase
       .from("body_weight_logs")
       .select("id")
@@ -404,7 +452,7 @@ export function CompleteWorkoutButton({
             </button>
           </div>
           <p className="font-body text-[11px] text-steel mt-2">
-            Everything you&apos;ve already entered is saved either way.
+            Only the sets you&apos;ve filled in count toward this workout.
           </p>
         </div>
       )}

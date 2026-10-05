@@ -15,6 +15,7 @@ import { parseNumericReps } from "@/lib/program-card-visuals";
 import { computePriorBest } from "@/lib/obstacle-unlock";
 import { computeVolumeHistory } from "@/lib/exercise-volume-history";
 import { ExitWorkoutButton } from "@/components/session/exit-workout-button";
+import { ResumeWorkoutButton } from "@/components/session/resume-workout-button";
 
 export default async function SessionPage(
   props: {
@@ -518,6 +519,7 @@ export default async function SessionPage(
         <h1 className="font-display font-bold text-3xl leading-none mt-1 uppercase">
           {(session as any).workouts?.title ?? "Workout"}
         </h1>
+        {session.status === "abandoned" && <ResumeWorkoutButton sessionId={session.id} />}
         {/* Coach-only, mid-logging escape hatch — Ron's own real scenario:
             ran out of time in person and needed a quick way to hand the
             rest off. The client can already resume this exact session

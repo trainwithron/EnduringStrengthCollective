@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { localDateKey } from "@/lib/timezone";
 import { getDirectComparison, getBonusAnimalLine } from "@/lib/transformation-joke-bank";
 
 export interface JournalPhotoOption {
@@ -56,7 +57,7 @@ export function TransformationCardCreator({
         starting_weight: startingWeight,
         current_weight: currentWeight,
         window_start_date: windowStartDate,
-        window_end_date: new Date().toISOString().slice(0, 10),
+        window_end_date: localDateKey(),
         humor_enabled: humorEnabled,
         before_photo_id: beforePhotoId || null,
         after_photo_id: afterPhotoId || null,

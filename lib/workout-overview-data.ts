@@ -68,9 +68,11 @@ export async function getWorkoutOverviewData(
         .single(),
       supabase
         .from("athlete_sessions")
-        .select("id, status")
+        .select("id, status, session_exercises(count)")
         .eq("workout_id", workoutId)
         .eq("athlete_id", athleteId)
+        .order("started_at", { ascending: false })
+        .limit(1)
         .maybeSingle(),
       supabase
         .from("group_memberships")
@@ -329,6 +331,15 @@ export async function getWorkoutOverviewData(
     videoUrlByExerciseId,
     goalByExerciseId,
     suggestedWeightBySetId,
-    existingSession: existingSessionRow,
+    // A session left empty by a dropped connection (no exercises copied in)
+    // isn't resumable — treat it as "not started" so Start fills it in.
+    existingSession:
+      existingSessionRow &&
+      !(
+        existingSessionRow.status === "in_progress" &&
+        (existingSessionRow.session_exercises?.[0]?.count ?? 0) === 0
+      )
+        ? { id: existingSessionRow.id, status: existingSessionRow.status }
+        : null,
   };
 }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { localDateKey } from "@/lib/timezone";
 import { computeNewlyCrossedThresholds } from "@/lib/transformation-milestones";
 
 export interface WeightLogEntry {
@@ -12,7 +13,7 @@ export interface WeightLogEntry {
 }
 
 function todayIso() {
-  return new Date().toISOString().slice(0, 10);
+  return localDateKey();
 }
 
 export function WeightLogWidget({

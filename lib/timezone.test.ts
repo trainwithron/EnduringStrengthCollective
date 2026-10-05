@@ -81,3 +81,12 @@ describe("nowInZone / dateKeyInZone", () => {
     expect(zoned.getUTCMinutes()).toBe(30);
   });
 });
+
+describe("localDateKey", () => {
+  it("uses the device's own calendar day, not UTC's", async () => {
+    const { localDateKey } = await import("./timezone");
+    // Constructed from local fields, so it is "Oct 5, 9:30pm" wherever tests run.
+    expect(localDateKey(new Date(2026, 9, 5, 21, 30))).toBe("2026-10-05");
+    expect(localDateKey(new Date(2026, 0, 1, 0, 5))).toBe("2026-01-01");
+  });
+});

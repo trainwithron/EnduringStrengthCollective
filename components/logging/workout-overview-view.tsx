@@ -98,9 +98,7 @@ export function WorkoutOverviewView({
             href={`/sessions/${existingSession.id}`}
             className="block w-full h-14 bg-rust text-graphite font-display uppercase text-lg font-bold text-center leading-[56px] active:bg-rust/80 transition-colors"
           >
-            {existingSession.status === "completed" || existingSession.status === "abandoned"
-              ? "View workout"
-              : "Resume workout"}
+            {existingSession.status === "completed" ? "View workout" : "Resume workout"}
           </Link>
         ) : (
           <StartWorkoutButton

@@ -175,6 +175,18 @@ export function ExerciseCard({
 
   async function handleRemoveField(field: TrackedField) {
     if (fieldsBusy) return;
+    // Dropping a metric clears it on every set — including sets already
+    // logged. Never do that without asking.
+    const prop = ACTUAL_PROP[field] as keyof SetLogEntry;
+    const filled = exercise.sets.filter((s) => s[prop] !== null && s[prop] !== undefined).length;
+    if (
+      filled > 0 &&
+      !window.confirm(
+        `Remove ${fieldDef(field).label}? This clears the ${fieldDef(field).label} you've already entered on ${filled} ${filled === 1 ? "set" : "sets"}.`
+      )
+    ) {
+      return;
+    }
     setFieldsBusy(true);
     try {
       const nextFields = exercise.trackedFields.filter((f) => f !== field);
@@ -188,7 +200,6 @@ export function ExerciseCard({
           .in("id", setIds);
       }
       onTrackedFieldsChange(nextFields);
-      const prop = ACTUAL_PROP[field] as keyof SetLogEntry;
       for (const set of exercise.sets) {
         onSetChange(set.id, { [prop]: null } as Partial<SetLogEntry>);
       }

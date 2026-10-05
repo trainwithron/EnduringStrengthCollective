@@ -13,6 +13,16 @@
 // zone into the real UTC instant it represents), and it stays consistent
 // with this app's existing zero-date-dependency approach.
 
+// "YYYY-MM-DD" for the device's OWN calendar day (browser code only). A
+// logged date written with new Date().toISOString().slice(0, 10) is UTC's
+// date, which flips to "tomorrow" for a US athlete after ~7-8pm — so their
+// evening weigh-in or photo landed on the wrong day.
+export function localDateKey(d: Date = new Date()): string {
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
 export const DEFAULT_COACH_TIMEZONE = "America/New_York";
 
 // "YYYY-MM-DD" + "HH:MM" (optionally "HH:MM:SS") in `timeZone` -> the real
