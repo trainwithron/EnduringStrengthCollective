@@ -38,6 +38,8 @@ First, stop applying more of them.
 4. **If data was lost or changed wrongly**, use the backup (section 5) to recover just those rows rather than restoring everything.
 5. Never edit an applied migration file to "fix" history. Add a new file and update `supabase/live-migrations.txt` plus `node scripts/migration-map.mjs`.
 
+Before applying a batch, rehearse it: `node scripts/sql-tests/rehearsal.mjs` builds a copy of the live schema in memory, applies the pending migrations one at a time in the planned order, and runs a behaviour test for each (who can read or write what, what a lockout does, what a refund returns). It writes `supabase/REHEARSAL.md`, a table of which migrations applied cleanly and which have behaviour proven. When you add a migration, add it to `PLAN_ORDER` in `scripts/sql-tests/harness.mjs` and write its test in `scripts/sql-tests/rehearsal/`. It does not use real data or real Supabase Auth, so it proves the SQL, not the production database.
+
 Migrations that need care and must be applied in the documented order: those that drop things (`0252`, `0253`) wait until the code that no longer needs them is live.
 
 ## 4. A secret has leaked

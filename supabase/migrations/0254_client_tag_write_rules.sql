@@ -24,6 +24,24 @@ as $$
   );
 $$;
 
+-- Is this person a client in some group of this organization? Security definer because the owner or admin who assigns a tag is often not a
+-- member of that group, so they cannot see its memberships under their own row security. Only answers for organization members.
+create or replace function public.athlete_in_org(target_athlete_id uuid, target_org_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.is_org_member(target_org_id)
+    and exists (
+      select 1 from public.group_memberships gm
+      join public.groups g on g.id = gm.group_id
+      where gm.profile_id = target_athlete_id
+        and g.organization_id = target_org_id
+    );
+$$;
+
 drop policy if exists "client_tags_write_org_member" on public.client_tags;
 create policy "client_tags_insert_owner_admin" on public.client_tags for insert
   to authenticated with check (public.is_org_owner_or_admin(organization_id));
@@ -42,12 +60,7 @@ create policy "client_tag_assignments_insert" on public.client_tag_assignments f
       where t.id = tag_id
         and public.is_org_member(t.organization_id)
         and (not t.gates_revenue_split or public.is_org_owner_or_admin(t.organization_id))
-        and exists (
-          select 1 from public.group_memberships gm
-          join public.groups g on g.id = gm.group_id
-          where gm.profile_id = client_tag_assignments.athlete_id
-            and g.organization_id = t.organization_id
-        )
+        and public.athlete_in_org(client_tag_assignments.athlete_id, t.organization_id)
     )
   );
 
