@@ -10,6 +10,8 @@ import { AskSpotChatPanel } from "@/components/coach/ask-spot-chat-panel";
 import { QuickPaymentPanel } from "./quick-payment-panel";
 import { SpotBuilderPanel } from "./spot-builder-panel";
 import { SpotClientsGroupsPanel } from "./spot-clients-groups-panel";
+import { PushNotificationToggle } from "@/components/athlete/push-notification-toggle";
+import { createBrowserClient } from "@/lib/supabase/client";
 
 type TileKey = "clients" | "business" | "calendar" | "program" | "ask-spot" | "quick-payment";
 
@@ -46,6 +48,13 @@ export function CoachSpotHub({
   const [open, setOpen] = useState(!!initialAthleteId);
   const [view, setView] = useState<"grid" | TileKey>(initialAthleteId ? "program" : "grid");
   const [builderOpen, setBuilderOpen] = useState(!!initialAthleteId);
+  const [profileId, setProfileId] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    // Only needed for the notification tile's test message.
+    createBrowserClient()
+      .auth.getUser()
+      .then(({ data }) => setProfileId(data.user?.id));
+  }, []);
   const panelId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -199,6 +208,10 @@ export function CoachSpotHub({
                       </button>
                     );
                   })}
+                  {/* Shows only while notifications are off and could be turned on. */}
+                  <div className="col-span-2">
+                    <PushNotificationToggle variant="tile" profileId={profileId} />
+                  </div>
                 </div>
               )}
               {view === "clients" && (

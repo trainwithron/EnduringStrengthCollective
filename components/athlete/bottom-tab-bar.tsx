@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Home, CalendarDays, MessagesSquare, Settings, Apple, Users, Menu } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { hasSocialTabAccess } from "@/lib/social-access";
+import { usePushStatus } from "@/lib/use-push-status";
 
 // Home/Workout merge (mobile_home_workout_tab_merge_idea.md, locked
 // 2026-09-14): Home itself is now today's workout — a hero CTA at the
@@ -39,6 +40,9 @@ export function BottomTabBar({
   onMoreClick?: () => void;
 }) {
   const pathname = usePathname();
+  // A small dot on Settings while notifications could be switched on but aren't — the way to
+  // reach the toggle is right there. Not shown where the device can't do push at all.
+  const { state: pushState } = usePushStatus();
 
   // social_only_group_membership_idea.md — real rewire, 2026-09-16:
   // Feed used to hide based only on the CURRENT group's own
@@ -152,10 +156,18 @@ export function BottomTabBar({
         const Icon = tab.icon;
         const content = (
           <>
-            <Icon
-              className={`w-5 h-5 ${isActive ? "text-rust" : "text-steel"}`}
-              strokeWidth={2.5}
-            />
+            <span className="relative">
+              <Icon
+                className={`w-5 h-5 ${isActive ? "text-rust" : "text-steel"}`}
+                strokeWidth={2.5}
+              />
+              {variant === "athlete" && tab.key === "settings" && pushState === "off" && (
+                <span
+                  aria-label="Notifications are off"
+                  className="absolute -top-0.5 -right-1 w-2.5 h-2.5 rounded-full bg-amber border border-graphite"
+                />
+              )}
+            </span>
             <span
               className={`font-body text-xs uppercase tracking-wide ${
                 isActive ? "text-rust" : "text-steel"

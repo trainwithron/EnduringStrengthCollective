@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import { FirstRunGuideCard } from "@/components/athlete/first-run-guide-card";
+import { PushNotificationToggle } from "@/components/athlete/push-notification-toggle";
 import { UnavailableState } from "@/components/ui/unavailable-state";
 import { createServerClient } from "@/lib/supabase/server";
 import { GroupHubHeader } from "@/components/group/group-hub-header";
@@ -70,7 +72,7 @@ function isValidDateKey(value: string | undefined): value is string {
 export default async function GroupHubPage(
   props: {
     params: Promise<{ groupId: string }>;
-    searchParams: Promise<{ view?: string; date?: string; month?: string }>;
+    searchParams: Promise<{ view?: string; date?: string; month?: string; welcome?: string }>;
   }
 ) {
   const params = await props.params;
@@ -460,6 +462,27 @@ export default async function GroupHubPage(
 
   const orgTheme = await getViewerOrgTheme(params.groupId);
 
+  // First-run guide eligibility. The client themselves only (not a coach, not a coach acting as
+  // them), on the phone-style Home, and only once the waiver intake is out of the way.
+  let guideEligible = false;
+  let guideDismissed = false;
+  if (user && !isCoach && !isActingAsOther && showMobileView) {
+    const [{ data: guideProfile }, { data: guideIntake }] = await Promise.all([
+      supabase.from("profiles").select("intake_required").eq("id", user.id).maybeSingle(),
+      supabase.from("client_intake").select("completed_at").eq("athlete_id", user.id).maybeSingle(),
+    ]);
+    if (!guideProfile?.intake_required || guideIntake?.completed_at) {
+      guideEligible = true;
+      // Read on its own so a deployment without the column yet just means "not dismissed".
+      const { data: dismissedRow, error: dismissedError } = await supabase
+        .from("profiles")
+        .select("guide_dismissed_at")
+        .eq("id", user.id)
+        .maybeSingle();
+      guideDismissed = !dismissedError && !!dismissedRow?.guide_dismissed_at;
+    }
+  }
+
   // "The Spot" (coach_only_widget_hub_the_spot.md) — a coach-only widget
   // rail on top of the true-mirror View-As-Client screen. Only ever
   // computed while genuinely acting as someone — a real athlete, or a
@@ -553,6 +576,18 @@ export default async function GroupHubPage(
           readAt: n.read_at,
         }))}
       />
+
+      {/* First-run guide: shown to the client themselves (never to a coach acting as them) once the
+          intake waiver is done, until both steps are finished or they say "Not now". After that, a
+          small chip stays while notifications are still off. */}
+      {guideEligible && user && !guideDismissed && (
+        <FirstRunGuideCard
+          profileId={user.id}
+          serverDismissed={false}
+          scrollIntoView={searchParams.welcome === "1"}
+        />
+      )}
+      {guideEligible && user && guideDismissed && <PushNotificationToggle variant="chip" profileId={user.id} />}
 
       {showMobileView && athleteId && (
         <section className="px-5 pt-6">

@@ -171,6 +171,12 @@ export default async function SettingsPage(
       </section>
 
       <section className="px-5 pt-8 space-y-6">
+        {/* Notifications first: it is the one switch that decides whether the coach can reach this
+            person at all, so it should not be buried below Profile. */}
+        <SettingsGroup label="Notifications">
+          <PushNotificationToggle variant="settings" profileId={user.id} />
+        </SettingsGroup>
+
         {isCoach && (
           <SettingsGroup label="Coaching" highlight>
             <Link
@@ -213,10 +219,7 @@ export default async function SettingsPage(
           />
         </SettingsGroup>
 
-        <SettingsGroup label="Notifications & Devices">
-          <div className="pb-4 border-b border-steel/20">
-            <PushNotificationToggle />
-          </div>
+        <SettingsGroup label="Text messages & devices">
           {/* Consent is the person's own to give, so it is never shown (or
               writable) while a coach is acting as them. */}
           {!isCoach && !effective.isActingAsOther && (

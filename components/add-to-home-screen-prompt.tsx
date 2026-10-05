@@ -4,6 +4,14 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
 import { isStandaloneDisplay } from "@/lib/pwa";
+import { detectPlatform, type DevicePlatform } from "@/lib/first-run-guide";
+import {
+  getDeferredInstallPrompt,
+  isGuideActive,
+  runInstallPrompt,
+  startInstallPromptCapture,
+  subscribeInstallPrompt,
+} from "@/lib/install-prompt-store";
 
 const DISMISSED_KEY = "esc-a2hs-dismissed";
 
@@ -11,47 +19,41 @@ const DISMISSED_KEY = "esc-a2hs-dismissed";
 // invite link it is a distraction before the person has even joined.
 const SIGNED_IN_PREFIXES = ["/groups", "/dashboard", "/sessions", "/partners"];
 
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-}
-
 // Shows a "put this on your home screen" banner so clients find the app
 // again as an icon, not a bookmark buried in browser history. Android/Chrome
 // gets a real one-tap install via the browser's own beforeinstallprompt
 // event; iOS Safari has no such API at all, so it gets manual instructions
 // instead — that's a platform limitation, not something a web app can
-// route around.
+// route around. While the first-run guide card is on screen it does this job,
+// so the banner steps aside.
 export function AddToHomeScreenPrompt() {
-  const [visible, setVisible] = useState(false);
   const pathname = usePathname();
   const inApp = SIGNED_IN_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
-  const [platform, setPlatform] = useState<"ios-safari" | "ios-other" | "other">("other");
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [visible, setVisible] = useState(false);
+  const [platform, setPlatform] = useState<DevicePlatform>("desktop");
+  const [hasDeferred, setHasDeferred] = useState(false);
+  const [guideOn, setGuideOn] = useState(false);
 
   useEffect(() => {
+    startInstallPromptCapture();
+    const sync = () => {
+      setHasDeferred(!!getDeferredInstallPrompt());
+      setGuideOn(isGuideActive());
+    };
+    sync();
+    const unsubscribe = subscribeInstallPrompt(sync);
+
     try {
-      if (localStorage.getItem(DISMISSED_KEY)) return;
+      if (localStorage.getItem(DISMISSED_KEY)) return unsubscribe;
     } catch {
       // localStorage unavailable — just proceed, worst case the banner
       // can't be dismissed permanently this session.
     }
-    if (isStandaloneDisplay()) return;
+    if (isStandaloneDisplay()) return unsubscribe;
 
-    const ua = window.navigator.userAgent;
-    const isIos = /iphone|ipad|ipod/i.test(ua);
-    // Only Safari can add to the iPhone home screen; Chrome/Firefox on iOS cannot.
-    const isIosSafari = isIos && !/crios|fxios|edgios|opios/i.test(ua);
-    setPlatform(isIos ? (isIosSafari ? "ios-safari" : "ios-other") : "other");
+    setPlatform(detectPlatform(window.navigator.userAgent));
     setVisible(true);
-
-    function handleBeforeInstallPrompt(e: Event) {
-      e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
-      setVisible(true);
-    }
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-    return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    return unsubscribe;
   }, []);
 
   function dismiss() {
@@ -64,14 +66,11 @@ export function AddToHomeScreenPrompt() {
   }
 
   async function handleInstallClick() {
-    if (!deferredPrompt) return;
-    await deferredPrompt.prompt();
-    await deferredPrompt.userChoice;
-    setDeferredPrompt(null);
+    await runInstallPrompt();
     dismiss();
   }
 
-  if (!visible || !inApp) return null;
+  if (!visible || !inApp || guideOn) return null;
 
   return (
     // Deliberately NOT `fixed` — nearly every page here already has a
@@ -90,7 +89,7 @@ export function AddToHomeScreenPrompt() {
           Add this to your home screen
         </p>
         <p className="font-body text-xs text-steel mt-0.5">
-          {deferredPrompt
+          {hasDeferred
             ? "Get one-tap access, just like an app."
             : platform === "ios-safari"
             ? "In Safari, tap the Share icon, then \"Add to Home Screen.\""
@@ -99,11 +98,11 @@ export function AddToHomeScreenPrompt() {
             : "Open your browser menu and choose \"Add to Home Screen\" or \"Install app.\""}
         </p>
       </div>
-      {deferredPrompt && (
+      {hasDeferred && (
         <button
           type="button"
           onClick={handleInstallClick}
-          className="h-9 px-4 bg-rust text-graphite font-body text-sm font-medium shrink-0"
+          className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium shrink-0"
         >
           Install
         </button>
@@ -112,7 +111,7 @@ export function AddToHomeScreenPrompt() {
         type="button"
         onClick={dismiss}
         aria-label="Dismiss"
-        className="w-9 h-9 flex items-center justify-center text-steel active:text-rust transition-colors shrink-0"
+        className="w-11 h-11 flex items-center justify-center text-steel active:text-rust transition-colors shrink-0"
       >
         <X className="w-4 h-4" />
       </button>

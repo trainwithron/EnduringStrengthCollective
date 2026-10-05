@@ -102,14 +102,14 @@ function SetPasswordForm() {
         .maybeSingle();
 
       if (!intake?.completed_at) {
-        const next = membership ? `/groups/${membership.group_id}` : "/";
+        const next = membership ? `/groups/${membership.group_id}?welcome=1` : "/";
         router.push(`/intake?next=${encodeURIComponent(next)}`);
         router.refresh();
         return;
       }
     }
 
-    router.push(membership ? `/groups/${membership.group_id}` : "/");
+    router.push(membership ? `/groups/${membership.group_id}?welcome=1` : "/");
     router.refresh();
   }
 

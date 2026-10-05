@@ -55,3 +55,32 @@ export async function unsubscribeFromPush(): Promise<void> {
     body: JSON.stringify({ endpoint }),
   });
 }
+
+// The browser's own permission answer, so the UI can say "you turned this off
+// in your phone settings" instead of a generic failure. "unsupported" covers
+// browsers with no Push API at all (including an iPhone Safari tab).
+export function getPushPermission(): "granted" | "denied" | "default" | "unsupported" {
+  if (!isPushSupported() || typeof Notification === "undefined") return "unsupported";
+  return Notification.permission;
+}
+
+// Sends a real push to this person's own devices, so they see it arrive.
+export async function sendTestPush(profileId: string): Promise<boolean> {
+  try {
+    const res = await fetch("/api/push/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        profileId,
+        title: "Notifications are on",
+        body: "This is how your coach's messages will reach you.",
+        url: "/",
+      }),
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    return (data.sent ?? 0) > 0;
+  } catch {
+    return false;
+  }
+}
