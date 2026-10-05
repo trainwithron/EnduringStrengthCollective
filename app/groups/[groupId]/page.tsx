@@ -21,6 +21,7 @@ import {
 import { ProgramCardList } from "@/components/athlete/program-card-list";
 import { HomeThread } from "@/components/athlete/home-thread";
 import { buildHomeThread } from "@/lib/home-thread";
+import { mealProgress, mealProgressLine } from "@/lib/meal-progress";
 import { computeProgramCardVisuals } from "@/lib/program-card-data";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
@@ -285,6 +286,8 @@ export default async function GroupHubPage(
   // No workout logged yet: the wellness check-in becomes a plain card under the workout, not a full-screen block.
   let isFirstDay = false;
   let homeThreadLines: string[] = [];
+  let mealLine: string | null = null;
+  let sessionsLeft: number | null = null;
   let weekDays: HomeDaySummary[] = [];
   let monthSummaryByDateKey = new Map<string, HomeDaySummary>();
   let weekRangeStart = targetDate;
@@ -332,6 +335,20 @@ export default async function GroupHubPage(
         .select("id", { count: "exact", head: true })
         .eq("coach_id", coachMembership.profile_id);
       canBook = (count ?? 0) > 0;
+      if (canBook) {
+        // How many sessions the client has left, shown next to "Book a session". Failure just leaves it off.
+        try {
+          const { data: creditRow } = await supabase
+            .from("session_credits")
+            .select("balance")
+            .eq("athlete_id", athleteId)
+            .eq("group_id", params.groupId)
+            .maybeSingle();
+          sessionsLeft = typeof creditRow?.balance === "number" ? creditRow.balance : null;
+        } catch {
+          sessionsLeft = null;
+        }
+      }
     }
 
     if (view === "day") {
@@ -423,6 +440,25 @@ export default async function GroupHubPage(
         (mealPlanResult.data?.meals as any) ?? null,
         standingForDate(standingTarget, targetDateKey)
       ).target;
+
+      // Meals checked off today, when the client has a meal plan for the day. Any failure just leaves the line out.
+      if (isToday && macrosEnabled && Array.isArray(mealPlanResult.data?.meals)) {
+        try {
+          const { data: loggedMeals } = await supabase
+            .from("food_log_entries")
+            .select("meal_slot")
+            .eq("athlete_id", athleteId)
+            .eq("log_date", targetDateKey);
+          mealLine = mealProgressLine(
+            mealProgress(
+              (mealPlanResult.data!.meals as any[]).filter((m) => m?.spec?.id),
+              (loggedMeals ?? []).map((l: any) => ({ mealSlot: l.meal_slot }))
+            )
+          );
+        } catch {
+          mealLine = null;
+        }
+      }
 
       const dueHabitDefs = (habitRows ?? []).filter((h) => isHabitDueOn(h.weekdays, targetDate));
       const completedIds = new Set(
@@ -717,6 +753,8 @@ export default async function GroupHubPage(
                 weightLogs={weightLogs}
                 canBook={canBook}
                 wellnessCheckin={wellnessCheckin}
+                mealLine={mealLine}
+                sessionsLeft={sessionsLeft}
               />
               {isToday && isFirstDay && (
                 <WellnessCheckinPopup

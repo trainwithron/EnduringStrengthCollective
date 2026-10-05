@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import Link from "next/link";
 import { Check } from "lucide-react";
 
 export interface TodayMacros {
@@ -28,6 +29,8 @@ export function TodayWidget({
   macros,
   habits,
   pinnedLinks,
+  mealLine,
+  mealHref,
 }: {
   todayDate: string;
   macros: TodayMacros | null;
@@ -37,6 +40,9 @@ export function TodayWidget({
   // (e.g. an intra-workout supplement on a heavy-training day).
   // Optional/undefined for any caller that hasn't fetched it.
   pinnedLinks?: PinnedProShopLink[];
+  // "Meals logged: 2 of 4" and where to log the rest.
+  mealLine?: string | null;
+  mealHref?: string;
 }) {
   const [state, setState] = useState(habits);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +68,7 @@ export function TodayWidget({
   }
 
   const hasMacros = macros && (macros.calories != null || macros.proteinG != null);
-  if (!hasMacros && state.length === 0) return null;
+  if (!hasMacros && state.length === 0 && !mealLine) return null;
 
   return (
     <div className="border border-steel/20 p-4">
@@ -90,6 +96,18 @@ export function TodayWidget({
           </div>
         </div>
         </>
+      )}
+
+      {mealLine && (
+        <p className={`font-body text-sm ${state.length > 0 ? "mb-3" : ""}`}>
+          {mealHref ? (
+            <Link href={mealHref} className="text-chalk underline underline-offset-2">
+              {mealLine}
+            </Link>
+          ) : (
+            mealLine
+          )}
+        </p>
       )}
 
       {error && (

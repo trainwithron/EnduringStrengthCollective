@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { sessionBalanceLine } from "@/lib/session-credit-copy";
 import { Lock, Check } from "lucide-react";
 import { TodayWidget, type TodayMacros, type TodayHabit } from "./today-widget";
 import { WeightLogWidget, type WeightLogEntry } from "./weight-log-widget";
@@ -26,6 +27,8 @@ export function DayCard({
   canBook,
   wellnessCheckin,
   nextLabel = null,
+  mealLine = null,
+  sessionsLeft = null,
 }: {
   groupId: string;
   athleteId: string;
@@ -43,6 +46,10 @@ export function DayCard({
   wellnessCheckin?: WellnessCheckinValues | null;
   // "Tomorrow" or a weekday: the next workout, shown on the condensed done card.
   nextLabel?: string | null;
+  // "Meals logged: 2 of 4", when there is a meal plan today.
+  mealLine?: string | null;
+  // The client's sessions left, shown beside "Book a session" when they have any.
+  sessionsLeft?: number | null;
 }) {
   return (
     <div className="space-y-4">
@@ -54,13 +61,14 @@ export function DayCard({
         workout={workout}
         sessions={sessions}
         canBook={canBook}
+        sessionsLeft={sessionsLeft}
         wellnessCheckin={isToday ? wellnessCheckin ?? null : null}
         nextLabel={nextLabel}
       />
 
       {isToday ? (
         <>
-          <TodayWidget todayDate={dateKey} macros={macros} habits={habits} />
+          <TodayWidget todayDate={dateKey} macros={macros} habits={habits} mealLine={mealLine ?? null} mealHref={`/groups/${groupId}/nutrition`} />
           <WeightLogWidget athleteId={athleteId} groupId={groupId} initialLogs={weightLogs} />
         </>
       ) : (
@@ -78,6 +86,7 @@ function WorkoutSection({
   workout,
   sessions,
   canBook,
+  sessionsLeft,
   wellnessCheckin,
   nextLabel,
 }: {
@@ -88,6 +97,7 @@ function WorkoutSection({
   workout: DayWorkoutInfo;
   sessions: DaySession[];
   canBook: boolean;
+  sessionsLeft?: number | null;
   wellnessCheckin?: WellnessCheckinValues | null;
   nextLabel?: string | null;
 }) {
@@ -243,6 +253,9 @@ function WorkoutSection({
           >
             Book a session with your coach &rarr;
           </Link>
+        )}
+        {canBook && sessionsLeft != null && sessionsLeft > 0 && (
+          <p className="font-body text-xs text-steel mt-1">{sessionBalanceLine(sessionsLeft)}</p>
         )}
       </div>
     );
