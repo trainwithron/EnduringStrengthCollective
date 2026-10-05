@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 const CHECK_INTERVAL_MS = 1000;
 const REFRESH_AFTER_MS = 5000;
-const RELOAD_AFTER_MS = 9000;
+const SECOND_REFRESH_AFTER_MS = 10000;
 const MARKER_SELECTOR = "[data-loading-fallback]";
 
 // Root cause (verified live in production, 2026-09-15): on a hard/direct
@@ -54,9 +54,12 @@ export function LoadingWatchdog() {
 
       const stuckFor = Date.now() - stuckSinceRef.current;
 
-      if (stuckFor >= RELOAD_AFTER_MS && !reloadedRef.current) {
+      // Never window.location.reload(): a hard reload throws away anything the
+      // person has typed, and a slow connection is not a stuck page. A second soft
+      // refresh is the most this does.
+      if (stuckFor >= SECOND_REFRESH_AFTER_MS && !reloadedRef.current) {
         reloadedRef.current = true;
-        window.location.reload();
+        router.refresh();
       } else if (stuckFor >= REFRESH_AFTER_MS && !refreshedRef.current) {
         refreshedRef.current = true;
         router.refresh();

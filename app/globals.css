@@ -1,8 +1,31 @@
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&family=Oswald:wght@500;700&family=Bebas+Neue&family=Anton&family=Roboto:wght@400;500;600&family=Work+Sans:wght@400;500;600&family=Nunito+Sans:wght@400;600;700&display=swap');
+/* Fonts load from a <link> in app/layout.tsx (not a CSS @import, which delays first paint). */
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* People who ask their device for less motion get none from the app's own
+   decorative animation; state changes still happen, they just don't move. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* iOS Safari zooms the whole page when a focused text field is smaller than 16px,
+   and does not zoom back out. Phones only, so desktop density is unchanged. */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
 
 /* Recap & Up Next's card-swap reveal (components/coach/desktop/recap-and-up-next.tsx)
    — a discrete click shrinks today's recap into a pinned header and pops

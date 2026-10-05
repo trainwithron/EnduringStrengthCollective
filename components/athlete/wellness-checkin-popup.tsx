@@ -109,10 +109,13 @@ export function WellnessCheckinPopup({
   return (
     <div
       role="dialog"
+      aria-modal="true"
       aria-label="Wellness check-in"
-      className="fixed inset-0 z-40 bg-graphite flex items-center justify-center p-6"
+      // overflow-y-auto + my-auto: on a short phone (or with the keyboard up) the
+      // form scrolls instead of its Save and Skip buttons ending up off-screen.
+      className="fixed inset-0 z-40 bg-graphite overflow-y-auto p-6 flex"
     >
-      <div className="w-full max-w-sm">
+      <div className="w-full max-w-sm mx-auto my-auto">
         <WellnessCheckinWidget
           athleteId={athleteId}
           groupId={groupId}
@@ -127,14 +130,14 @@ export function WellnessCheckinPopup({
         <button
           type="button"
           onClick={handleSkip}
-          className="w-full text-center font-body text-xs text-steel mt-3"
+          className="w-full h-11 text-center font-body text-sm text-steel mt-2"
         >
           Skip for today
         </button>
         <button
           type="button"
           onClick={handleSnooze}
-          className="w-full text-center font-body text-xs text-steel mt-2"
+          className="w-full h-11 text-center font-body text-sm text-steel"
         >
           Don&apos;t ask for a week
         </button>

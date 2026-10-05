@@ -222,7 +222,7 @@ export function IntakeForm({
               <p className="font-body text-sm mb-2">
                 {i + 1}. {question}
               </p>
-              <div className="flex gap-2">
+              <div className="flex gap-2" role="group" aria-label={`Question ${i + 1}`}>
                 {(["Yes", "No"] as const).map((label) => {
                   const value = label === "Yes";
                   const selected = answers[question] === value;
@@ -230,8 +230,9 @@ export function IntakeForm({
                     <button
                       key={label}
                       type="button"
+                      aria-pressed={selected}
                       onClick={() => setAnswers((prev) => ({ ...prev, [question]: value }))}
-                      className={`h-9 px-4 font-body text-sm border ${
+                      className={`h-11 px-5 font-body text-sm border ${
                         selected ? "bg-rust border-rust text-graphite" : "border-steel/30 text-steel"
                       }`}
                     >
