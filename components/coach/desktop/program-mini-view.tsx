@@ -32,6 +32,8 @@ export function ProgramMiniView({ groupId }: { groupId: string }) {
         .eq("group_id", groupId)
         .eq("is_active", true)
         .is("athlete_id", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (!program) {

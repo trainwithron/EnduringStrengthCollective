@@ -25,6 +25,8 @@ export async function getActiveProgramForAthlete(
     .eq("group_id", groupId)
     .eq("athlete_id", athleteId)
     .eq("is_active", true)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   const { data: sharedProgram } = personalProgram
@@ -35,6 +37,8 @@ export async function getActiveProgramForAthlete(
         .eq("group_id", groupId)
         .is("athlete_id", null)
         .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
   const program = (personalProgram ?? sharedProgram) as {

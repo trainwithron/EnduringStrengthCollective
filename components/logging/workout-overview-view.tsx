@@ -109,6 +109,7 @@ export function WorkoutOverviewView({
             athleteId={athleteId}
             loggedByCoach={loggedByCoach}
             sessionTypes={sessionTypes}
+            clientName={loggingForName}
             exercises={exercises.map((ex) => ({
               id: ex.id,
               exerciseName: ex.exerciseName,

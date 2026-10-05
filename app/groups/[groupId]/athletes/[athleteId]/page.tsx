@@ -119,6 +119,8 @@ export default async function AthleteProfilePage(
       .eq("group_id", params.groupId)
       .eq("athlete_id", params.athleteId)
       .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle(),
     supabase
       .from("programs")
@@ -126,6 +128,8 @@ export default async function AthleteProfilePage(
       .eq("group_id", params.groupId)
       .is("athlete_id", null)
       .eq("is_active", true)
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle(),
     // Stats (total count, volume, PRs) need every logged workout to
     // stay accurate, and the displayed history below is just the first

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { useOrgGroupIds } from "@/lib/use-org-group-ids";
 import {
   computeRealIncomeThisMonth,
   computeRealMRR,
@@ -37,10 +38,13 @@ interface ExpandedBusinessData {
 // mini-view with genuinely fixed content regardless of card size, so
 // it's the one that needed an actual `expanded` branch.
 export function BusinessMiniDashboard({ groupId, expanded = false }: { groupId: string; expanded?: boolean }) {
+  // Every group the coach has in this organization (not just the one in the URL).
+  const groupIds = useOrgGroupIds(groupId);
   const [data, setData] = useState<MiniBusinessData | null>(null);
   const [expandedData, setExpandedData] = useState<ExpandedBusinessData | null>(null);
 
   useEffect(() => {
+    if (!groupIds) return;
     let cancelled = false;
     async function run() {
       const supabase = createBrowserClient();
@@ -56,7 +60,7 @@ export function BusinessMiniDashboard({ groupId, expanded = false }: { groupId: 
           supabase
             .from("credit_purchases")
             .select("amount_cents, created_at, athlete_id")
-            .eq("group_id", groupId),
+            .in("group_id", groupIds!),
           // Quick Payment (mobile_more_tab_condensed_widget_hub_sept30.md)
           // — real money received, a separate table from credit_purchases
           // (no session credits granted), but it still belongs in "income
@@ -64,12 +68,12 @@ export function BusinessMiniDashboard({ groupId, expanded = false }: { groupId: 
           supabase
             .from("coach_quick_payments")
             .select("amount_cents, created_at, athlete_id")
-            .eq("group_id", groupId),
+            .in("group_id", groupIds!),
           supabase
             .from("membership_subscriptions")
             .select("price_cents, status, athlete_id")
-            .eq("group_id", groupId),
-          supabase.from("group_memberships").select("profile_id").eq("group_id", groupId).eq("role", "athlete"),
+            .in("group_id", groupIds!),
+          supabase.from("group_memberships").select("profile_id").in("group_id", groupIds!).eq("role", "athlete"),
         ]);
 
       const incomeThisMonth = computeRealIncomeThisMonth(
@@ -101,12 +105,12 @@ export function BusinessMiniDashboard({ groupId, expanded = false }: { groupId: 
     return () => {
       cancelled = true;
     };
-  }, [groupId]);
+  }, [groupIds]);
 
   // Fetched lazily, only once the card is actually big enough to show
   // it — no point paying for this query at the default compact size.
   useEffect(() => {
-    if (!expanded) return;
+    if (!expanded || !groupIds) return;
     let cancelled = false;
     async function run() {
       const supabase = createBrowserClient();
@@ -114,9 +118,9 @@ export function BusinessMiniDashboard({ groupId, expanded = false }: { groupId: 
       const { data: memberRows } = await supabase
         .from("group_memberships")
         .select("profile_id")
-        .eq("group_id", groupId)
+        .in("group_id", groupIds!)
         .eq("role", "athlete");
-      const athleteIds = (memberRows ?? []).map((m: any) => m.profile_id);
+      const athleteIds = [...new Set((memberRows ?? []).map((m: any) => m.profile_id as string))];
 
       const { data: logRows } =
         athleteIds.length > 0
@@ -124,7 +128,7 @@ export function BusinessMiniDashboard({ groupId, expanded = false }: { groupId: 
               .from("workout_logs")
               .select("athlete_id, created_at")
               .in("athlete_id", athleteIds)
-              .eq("group_id", groupId)
+              .in("group_id", groupIds!)
               .order("created_at", { ascending: false })
           : { data: [] };
 
@@ -150,7 +154,7 @@ export function BusinessMiniDashboard({ groupId, expanded = false }: { groupId: 
     return () => {
       cancelled = true;
     };
-  }, [groupId, expanded]);
+  }, [groupIds, expanded]);
 
   return (
     <div className="space-y-3">
@@ -160,7 +164,7 @@ export function BusinessMiniDashboard({ groupId, expanded = false }: { groupId: 
           being viewed, which a coach with more than one group has no way
           to tell apart otherwise. */}
       <p className="font-body text-[10px] uppercase tracking-wide text-steel -mt-1">
-        This group only
+        Whole organization
       </p>
       <div className="grid grid-cols-2 gap-2">
         <div className="border border-steel/20 p-2.5">

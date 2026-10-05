@@ -286,6 +286,8 @@ export async function getLoggingConsistency(
     .eq("group_id", athlete.groupId)
     .eq("athlete_id", athlete.athleteId)
     .eq("is_active", true)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
   const { data: sharedProgram } = personalProgram
     ? { data: null }
@@ -295,6 +297,8 @@ export async function getLoggingConsistency(
         .eq("group_id", athlete.groupId)
         .is("athlete_id", null)
         .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
   const program = personalProgram ?? sharedProgram;
 

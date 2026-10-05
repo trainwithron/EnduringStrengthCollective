@@ -99,6 +99,8 @@ export async function gatherMacroSuggestion(
     .select("id, start_date, training_days")
     .eq("group_id", groupId)
     .eq("is_active", true)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
   if (!program?.start_date || !program.training_days?.length) return null;
 

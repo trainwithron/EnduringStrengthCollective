@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { prefersAthleteStyleView } from "@/lib/pwa-server";
 
 export const ACTING_AS_COOKIE = "acting_as_athlete";
 
@@ -34,7 +35,10 @@ export function resolveActingAs(
 }
 
 // Resolves "which athlete's data should this page load" for a coach who
-// may be standing in a client's mobile experience. The cookie only ever
+// may be standing in a client's mobile experience. Act-as is a PHONE-only
+// tool (it is how a coach logs in person for a client): outside the
+// phone/mobile-mode view the cookie is ignored, so a desktop browser can
+// never render the athlete mirror, whatever cookie is lying around. The cookie only ever
 // changes *which id a page queries with* — every read/write still goes
 // through the same RLS policies (coach-or-self) that already govern this
 // data, so a stale or forged cookie value just yields empty results, not
@@ -43,6 +47,9 @@ export async function getEffectiveAthlete(
   groupId: string,
   realUserId: string
 ): Promise<EffectiveAthlete> {
+  if (!(await prefersAthleteStyleView())) {
+    return { athleteId: realUserId, realUserId, isActingAsOther: false };
+  }
   const cookieStore = await cookies();
   const raw = cookieStore.get(ACTING_AS_COOKIE)?.value;
   return resolveActingAs(raw, groupId, realUserId);

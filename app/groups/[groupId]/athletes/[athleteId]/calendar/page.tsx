@@ -111,6 +111,8 @@ export default async function ClientCalendarPage(
     .select("id, start_date, training_days")
     .eq("group_id", params.groupId)
     .eq("is_active", true)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   const workoutByDateKey = new Map<string, { id: string; title: string }>();

@@ -209,7 +209,7 @@ function ProgramCard({
           <ProgramCardMenu programId={program.id} programName={program.name} groupId={groupId} />
         </div>
         <div className="mt-auto flex items-center justify-between pt-2 border-t border-steel/15">
-          <ProgramActiveToggle programId={program.id} groupId={groupId} isActive={program.isActive} />
+          <ProgramActiveToggle programId={program.id} isActive={program.isActive} />
           <Link href={`/groups/${groupId}/programs/${program.id}`} className="font-body text-xs text-rust">
             Open &rarr;
           </Link>

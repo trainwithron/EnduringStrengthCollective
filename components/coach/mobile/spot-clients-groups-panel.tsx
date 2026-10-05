@@ -178,6 +178,14 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated }: { groupId: stri
     setPendingClient(client);
   }
 
+  // Primary action: the explicit in-person log route (athlete comes from
+  // the URL, coach-role checked, "Logging for X", marked coach-logged).
+  function logSessionFor(client: ClientOption) {
+    if (busy) return;
+    onNavigated();
+    router.push(`/groups/${client.groupId}/athletes/${client.id}/log`);
+  }
+
   async function confirmActAsClient() {
     if (!pendingClient || busy) return;
     const client = pendingClient;
@@ -387,27 +395,43 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated }: { groupId: stri
             const status = clientActivityStatus(c.lastWorkoutAt);
             const tier = computeQuietTier({ lastLoggedAt: c.lastWorkoutAt ? new Date(c.lastWorkoutAt) : null, now: new Date(), trainingDays: c.trainingDays });
             return (
-              <button
-                key={c.id}
-                type="button"
-                disabled={busy}
-                onClick={() => requestActAsClient(c)}
-                className="w-full flex items-center gap-2.5 px-2 py-2 border border-steel/15 disabled:opacity-50 active:bg-surface/60 active:border-rust/50 transition-colors"
-              >
-                {c.avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={c.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-graphite border border-steel/30 flex items-center justify-center shrink-0">
-                    <span className="font-display text-xs text-chalk">{initialsOf(c.fullName)}</span>
-                  </div>
-                )}
-                <span className="font-body text-sm text-chalk truncate flex-1 text-left min-w-0">{c.fullName}</span>
-                <span className="font-body text-[11px] text-steel shrink-0 flex items-center gap-1">
-                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${status.dotClass}`} />
-                  {tier !== "none" ? QUIET_TIER_LABEL[tier] : status.text}
-                </span>
-              </button>
+              <div key={c.id} className="border border-steel/15 px-2 py-2">
+                <div className="flex items-center gap-2.5">
+                  {c.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={c.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-graphite border border-steel/30 flex items-center justify-center shrink-0">
+                      <span className="font-display text-xs text-chalk">{initialsOf(c.fullName)}</span>
+                    </div>
+                  )}
+                  <span className="font-body text-sm text-chalk truncate flex-1 text-left min-w-0">{c.fullName}</span>
+                  <span className="font-body text-[11px] text-steel shrink-0 flex items-center gap-1">
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${status.dotClass}`} />
+                    {tier !== "none" ? QUIET_TIER_LABEL[tier] : status.text}
+                  </span>
+                </div>
+                <div className="mt-2 flex items-center gap-2">
+                  {/* Primary: the explicit in-person log route ("Logging for X",
+                      marked coach-logged, no credit spent unless chosen). */}
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => logSessionFor(c)}
+                    className="flex-1 h-9 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-50 active:bg-rust/80"
+                  >
+                    Log session
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => requestActAsClient(c)}
+                    className="h-9 px-3 border border-steel/30 text-steel font-body text-xs disabled:opacity-50 active:border-rust/50"
+                  >
+                    View as client
+                  </button>
+                </div>
+              </div>
             );
           })}
         </div>

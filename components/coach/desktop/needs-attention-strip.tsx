@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { useOrgGroupIds } from "@/lib/use-org-group-ids";
 import { NeedsAttentionPanel, type NeedsAttentionItem } from "./needs-attention-panel";
 import { pickIdleSlotContent, type IdleSlotContent } from "@/lib/shell-idle-content";
 
@@ -22,13 +23,15 @@ const CATEGORY_LABEL: Record<IdleSlotContent["category"], string> = {
 // categories instead of going blank — a real recent PR when one exists,
 // else a deterministic-per-day pick from the idle content bank.
 export function NeedsAttentionStrip({ coachId, groupId }: { coachId: string; groupId: string }) {
+  const groupIds = useOrgGroupIds(groupId);
   const [items, setItems] = useState<NeedsAttentionItem[] | null>(null);
   const [idleContent, setIdleContent] = useState<IdleSlotContent | null>(null);
 
   useEffect(() => {
+    if (!groupIds || groupIds.length === 0) return;
     let cancelled = false;
     async function run() {
-      const res = await fetch(`/api/coach/needs-attention?groupId=${groupId}`);
+      const res = await fetch(`/api/coach/needs-attention?groupIds=${groupIds!.join(",")}`);
       const data = await res.json().catch(() => ({ items: [] }));
       if (cancelled) return;
       const realItems: NeedsAttentionItem[] = data.items ?? [];
@@ -44,7 +47,7 @@ export function NeedsAttentionStrip({ coachId, groupId }: { coachId: string; gro
         const { data: prRows } = await supabase
           .from("workout_logs")
           .select("new_prs, created_at, profiles ( full_name )")
-          .eq("group_id", groupId)
+          .in("group_id", groupIds!)
           .gt("created_at", sevenDaysAgo)
           .not("new_prs", "is", null)
           .order("created_at", { ascending: false })
@@ -71,7 +74,7 @@ export function NeedsAttentionStrip({ coachId, groupId }: { coachId: string; gro
     return () => {
       cancelled = true;
     };
-  }, [coachId, groupId]);
+  }, [coachId, groupId, groupIds]);
 
   if (items === null) return null; // Still loading — no flash of empty state.
 

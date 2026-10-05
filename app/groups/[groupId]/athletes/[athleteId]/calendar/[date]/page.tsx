@@ -81,6 +81,8 @@ export default async function ClientCalendarDayPage(
     .select("id, start_date, training_days")
     .eq("group_id", params.groupId)
     .eq("is_active", true)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   let programWorkoutTitle: string | null = null;

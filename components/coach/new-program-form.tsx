@@ -54,20 +54,9 @@ export function NewProgramForm({
       return;
     }
 
-    // Single-active-program rule, scoped correctly (same split as
-    // lib/program-duplication.ts and import-wizard.tsx's own deactivate
-    // query): a personal program only steps down this same client's
-    // other personal programs; a shared program only steps down other
-    // shared ones — never crosses that line in either direction.
-    let deactivateQuery = supabase
-      .from("programs")
-      .update({ is_active: false })
-      .eq("group_id", groupId)
-      .neq("id", program.id);
-    deactivateQuery = athleteId
-      ? deactivateQuery.eq("athlete_id", athleteId)
-      : deactivateQuery.is("athlete_id", null);
-    await deactivateQuery;
+    // A coach can run several programs for one client at once (main work,
+    // mobility, a warm-up flow), so creating a program never deactivates
+    // another — activation is per program.
 
     // The program page itself is the inline builder now — "+ Add Week"
     // right there creates the first day.

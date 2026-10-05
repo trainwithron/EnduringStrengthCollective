@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   LayoutGrid,
   Dumbbell,
@@ -42,7 +41,6 @@ import {
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
 import { ViewAsClientButton } from "@/components/coach/desktop/view-as-client-button";
-import { ViewModeToggle } from "@/components/coach/view-mode-toggle";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { TerminologyProvider } from "@/components/coach/terminology-provider";
 import { SwappableTerm } from "@/components/coach/swappable-term";
@@ -180,17 +178,6 @@ export function CoachDesktopShell({
   // redesign.md) — the rail + list panel need the viewer's own id for
   // the pinned Needs Attention strip's fetch.
   const [coachId, setCoachId] = useState<string | null>(null);
-  // stale_client_name_header_bug.md, root cause #2 — a coach standing in
-  // a client's mobile experience ("View as Client") can end up with that
-  // state still active up to 12 hours later on desktop, with no signal
-  // in the persistent chrome (only the ~15 individual pages that happen
-  // to check the httpOnly cookie themselves show a banner, and plenty of
-  // real desktop pages — Dashboard, Clients, Programs, Business — never
-  // did). Checked here instead, once, so it's visible everywhere the
-  // shell renders regardless of whether that specific page's own data
-  // fetch cares about acting-as state.
-  const [actingAsName, setActingAsName] = useState<string | null>(null);
-  const router = useRouter();
 
   useEffect(() => {
     setLayoutMode(readLayoutMode());
@@ -257,26 +244,20 @@ export function CoachDesktopShell({
     };
   }, [groupId]);
 
-  // stale_client_name_header_bug.md, root cause #2 — see actingAsName's
-  // own comment above. The httpOnly acting-as cookie can't be read here
-  // directly, so this asks the one place that can (a small GET on the
-  // same route the mobile "View as Client" picker already posts to).
+  // Desktop never acts as a client (act-as is a phone-only tool for logging
+  // in person), and the athlete mirror ignores the cookie off-phone — so a
+  // leftover cookie is cleared the first time a real desktop-width page
+  // loads, instead of lingering and resurfacing on the phone later.
   useEffect(() => {
-    let cancelled = false;
-    async function run() {
-      try {
-        const res = await fetch(`/api/coach/act-as?groupId=${encodeURIComponent(groupId)}`);
-        const data = await res.json();
-        if (!cancelled) setActingAsName(data.isActingAsOther ? data.athleteName : null);
-      } catch {
-        // Network hiccup — fail closed (no banner) rather than crash the shell.
-      }
+    try {
+      if (!window.matchMedia("(min-width: 1024px)").matches) return;
+      if (window.sessionStorage.getItem("act-as-cleared") === "1") return;
+      window.sessionStorage.setItem("act-as-cleared", "1");
+      fetch("/api/coach/act-as", { method: "DELETE" }).catch(() => {});
+    } catch {
+      // Storage/matchMedia unavailable — harmless; the cookie is ignored on desktop anyway.
     }
-    run();
-    return () => {
-      cancelled = true;
-    };
-  }, [groupId]);
+  }, []);
 
   // Platform-admin-only "Organizations" link — visible only to the one
   // account flagged profiles.is_platform_admin, so an ordinary coach never
@@ -309,12 +290,6 @@ export function CoachDesktopShell({
       cancelled = true;
     };
   }, []);
-
-  async function handleExitActingAs() {
-    await fetch("/api/coach/act-as", { method: "DELETE" });
-    setActingAsName(null);
-    router.refresh();
-  }
 
   // Remembers the last group this coach actually looked at, so the
   // cross-group Home dashboard (app/dashboard/page.tsx) can default its
@@ -685,58 +660,6 @@ export function CoachDesktopShell({
         </div>
       </header>
 
-      {/* stale_client_name_header_bug.md, root cause #1 — a 1-on-1
-          client's relationship IS a groups row named after them, so
-          clicking into one silently changes "current group" to that
-          client with only a small singular/plural badge word as the
-          signal. That's too easy to miss (this is exactly what produced
-          Ron's "Enduring Strength Co. > Johann Gorsek [Client]"
-          breadcrumb confusion) — a real, unmissable, persistent banner
-          instead, with a one-click way back to the coach's actual
-          org/team context. */}
-      {/* Both stacked in one sticky container (rather than each being
-          independently sticky) since they're two independent conditions
-          that can both be true at once — a coach acting-as-client
-          inside a one-on-one group's own shell — and each being
-          separately `sticky top-14` would overlap instead of stacking. */}
-      {(groupKind === "one_on_one" || actingAsName) && (
-        <div className="sticky top-14 z-20">
-          {groupKind === "one_on_one" && (
-            <div className="flex items-center justify-between gap-3 px-3 md:px-4 py-1.5 bg-rust/10 border-b border-rust/30">
-              <p className="font-body text-xs text-rust truncate">
-                You&apos;re in <span className="font-medium">{groupName}</span>&apos;s workspace, not{" "}
-                {orgName ?? "your team"}&apos;s.
-              </p>
-              <Link
-                href="/dashboard"
-                className="shrink-0 font-body text-xs text-rust underline underline-offset-2"
-              >
-                Back to Home
-              </Link>
-            </div>
-          )}
-
-          {/* stale_client_name_header_bug.md, root cause #2 — a real,
-              shell-wide "Viewing as" signal, not just the ~15 pages that
-              separately checked for this before. Not gated on `active`,
-              so it shows on Dashboard/Clients/Programs/Business too. */}
-          {actingAsName && (
-            <div className="flex items-center justify-between gap-3 px-3 md:px-4 py-1.5 bg-yellow-500/10 border-b border-yellow-500/30">
-              <p className="font-body text-xs text-yellow-500 truncate">
-                Viewing as <span className="font-medium">{actingAsName}</span>.
-              </p>
-              <button
-                type="button"
-                onClick={handleExitActingAs}
-                className="shrink-0 font-body text-xs text-yellow-500 underline underline-offset-2"
-              >
-                Exit
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-
       <div className="flex">
         {/* Concept 8 "Familiar" shell redesign — Discord/YouTube-inspired
             icon rail (always 64px, never collapses) + a resizable/
@@ -805,13 +728,6 @@ export function CoachDesktopShell({
                     document.body
                   )}
               </button>
-              <ViewModeToggle
-                targetMode="mobile"
-                label="Client-Facing Mode"
-                title="Client-Facing Mode — preview your own generic client shell (not a specific client's data; for that, use View as Client)"
-                collapsed
-                groupId={groupId}
-              />
               {isPlatformAdmin && (
                 <>
                   <Link

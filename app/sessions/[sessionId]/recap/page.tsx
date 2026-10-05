@@ -78,6 +78,8 @@ export default async function SessionRecapPage(props: { params: Promise<{ sessio
     .eq("group_id", session.group_id)
     .eq("athlete_id", session.athlete_id)
     .eq("is_active", true)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   const { data: sharedProgram } = personalProgram
@@ -88,6 +90,8 @@ export default async function SessionRecapPage(props: { params: Promise<{ sessio
         .eq("group_id", session.group_id)
         .is("athlete_id", null)
         .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
   const program = personalProgram ?? sharedProgram;

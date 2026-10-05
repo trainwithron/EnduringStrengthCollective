@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { useOrgGroupIds } from "@/lib/use-org-group-ids";
 import { daysSinceOf, clientActivityStatus } from "@/lib/client-activity-status";
 import { initialsOf } from "@/lib/initials";
 
 interface MiniRosterMember {
   athleteId: string;
+  groupId: string;
   fullName: string;
   lastWorkoutAt: string | null;
 }
@@ -25,26 +27,34 @@ interface MiniRosterMember {
 // but "steel" everywhere else) once it stopped being updated alongside
 // the other two.
 export function RosterMiniList({ groupId }: { groupId: string }) {
+  // Every client in every group the coach has in this organization.
+  const groupIds = useOrgGroupIds(groupId);
   const [members, setMembers] = useState<MiniRosterMember[] | null>(null);
 
   useEffect(() => {
+    if (!groupIds) return;
     let cancelled = false;
     async function run() {
       const supabase = createBrowserClient();
       const { data: memberRows } = await supabase
         .from("group_memberships")
-        .select("profile_id, profiles ( full_name )")
-        .eq("group_id", groupId)
+        .select("group_id, profile_id, profiles ( full_name )")
+        .in("group_id", groupIds!)
         .eq("role", "athlete");
 
-      const athleteIds = (memberRows ?? []).map((m: any) => m.profile_id);
+      // One row per person (a client can sit in a team and their own group).
+      const firstGroupByAthlete = new Map<string, string>();
+      for (const m of (memberRows ?? []) as any[]) {
+        if (!firstGroupByAthlete.has(m.profile_id)) firstGroupByAthlete.set(m.profile_id, m.group_id);
+      }
+      const athleteIds = [...firstGroupByAthlete.keys()];
       const { data: logRows } =
         athleteIds.length > 0
           ? await supabase
               .from("workout_logs")
               .select("athlete_id, created_at")
               .in("athlete_id", athleteIds)
-              .eq("group_id", groupId)
+              .in("group_id", groupIds!)
               .order("created_at", { ascending: false })
           : { data: [] };
 
@@ -53,11 +63,18 @@ export function RosterMiniList({ groupId }: { groupId: string }) {
         if (!lastByAthlete.has(row.athlete_id)) lastByAthlete.set(row.athlete_id, row.created_at);
       }
 
-      const list: MiniRosterMember[] = (memberRows ?? []).map((m: any) => ({
-        athleteId: m.profile_id,
-        fullName: m.profiles?.full_name ?? "Client",
-        lastWorkoutAt: lastByAthlete.get(m.profile_id) ?? null,
-      }));
+      const seenPeople = new Set<string>();
+      const list: MiniRosterMember[] = [];
+      for (const m of (memberRows ?? []) as any[]) {
+        if (seenPeople.has(m.profile_id)) continue;
+        seenPeople.add(m.profile_id);
+        list.push({
+          athleteId: m.profile_id,
+          groupId: firstGroupByAthlete.get(m.profile_id) ?? m.group_id,
+          fullName: m.profiles?.full_name ?? "Client",
+          lastWorkoutAt: lastByAthlete.get(m.profile_id) ?? null,
+        });
+      }
       list.sort((a, b) => daysSinceOf(b.lastWorkoutAt) - daysSinceOf(a.lastWorkoutAt));
 
       if (!cancelled) setMembers(list);
@@ -66,7 +83,7 @@ export function RosterMiniList({ groupId }: { groupId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [groupId]);
+  }, [groupIds]);
 
   if (members === null) {
     return <p className="font-body text-xs text-steel px-1">Loading…</p>;
@@ -80,7 +97,7 @@ export function RosterMiniList({ groupId }: { groupId: string }) {
       {members.map((m) => (
         <Link
           key={m.athleteId}
-          href={`/groups/${groupId}/athletes/${m.athleteId}`}
+          href={`/groups/${m.groupId}/athletes/${m.athleteId}`}
           className="flex items-center gap-2.5 px-1.5 py-2 hover:bg-surface/40 transition-colors"
         >
           <span className="relative shrink-0 w-7 h-7 rounded-full bg-surface border border-steel/30 flex items-center justify-center font-body text-[10px] text-steel">

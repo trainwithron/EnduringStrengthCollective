@@ -32,6 +32,7 @@ export function StartWorkoutButton({
   exercises,
   loggedByCoach,
   sessionTypes,
+  clientName,
 }: {
   workoutId: string;
   groupId: string;
@@ -49,10 +50,16 @@ export function StartWorkoutButton({
   // treats that as the implicit default 1-credit training session, so a
   // coach who never creates a type sees nothing different here.
   sessionTypes?: { id: string; name: string; creditCost: number }[];
+  // Shown in the credit choice below ("from Sawyer's balance").
+  clientName?: string;
 }) {
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sessionTypeId, setSessionTypeId] = useState<string>("");
+  // A coach logging in person never spends a session credit unless they
+  // choose to here (default OFF) — see migration 0231.
+  const [deductCredit, setDeductCredit] = useState(false);
+  const selectedCost = sessionTypes?.find((t) => t.id === sessionTypeId)?.creditCost ?? 1;
   const router = useRouter();
 
   async function handleStart() {
@@ -88,6 +95,7 @@ export function StartWorkoutButton({
         athlete_id: athleteId,
         logged_by_coach: loggedByCoach ?? false,
         session_type_id: sessionTypeId || null,
+        deduct_session_credit: !!loggedByCoach && deductCredit,
         booking_id: bookingId,
       })
       .select("id")
@@ -173,14 +181,26 @@ export function StartWorkoutButton({
             onChange={(e) => setSessionTypeId(e.target.value)}
             className="h-8 bg-surface border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"
           >
-            <option value="">Training session (1 credit)</option>
+            <option value="">Training session</option>
             {sessionTypes.map((t) => (
               <option key={t.id} value={t.id}>
-                {t.name} ({t.creditCost} {t.creditCost === 1 ? "credit" : "credits"})
+                {t.name}
               </option>
             ))}
           </select>
         </div>
+      )}
+      {loggedByCoach && (
+        <label className="mb-2 flex items-center justify-center gap-2 font-body text-xs text-steel">
+          <input
+            type="checkbox"
+            checked={deductCredit}
+            onChange={(e) => setDeductCredit(e.target.checked)}
+            className="h-4 w-4 accent-rust"
+          />
+          Use {selectedCost} session {selectedCost === 1 ? "credit" : "credits"}
+          {clientName ? " from " + clientName + "'s balance" : " from their balance"}
+        </label>
       )}
       {error && (
         <p className="font-body text-xs text-rust mb-2 text-center" role="alert">

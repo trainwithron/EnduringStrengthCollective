@@ -476,20 +476,8 @@ export function ImportWizard({
       );
     }
 
-    // Single-active-program rule, scoped correctly (same split as
-    // lib/program-duplication.ts's own deactivate query): a personal
-    // program only steps down this same client's other personal
-    // programs; a shared program only steps down other shared ones —
-    // never crosses that line in either direction.
-    let deactivateQuery = supabase
-      .from("programs")
-      .update({ is_active: false })
-      .eq("group_id", groupId)
-      .neq("id", programRow.id);
-    deactivateQuery = athleteId
-      ? deactivateQuery.eq("athlete_id", athleteId)
-      : deactivateQuery.is("athlete_id", null);
-    await deactivateQuery;
+    // Finalizing an import never deactivates the client's other programs:
+    // several programs can be active at once, activation is per program.
 
     for (const week of weeks) {
       for (let dayIndex = 0; dayIndex < week.days.length; dayIndex++) {
