@@ -36,9 +36,8 @@ function clampBottom(value: number): number {
 // app's own already-established "Spot" assistant branding rather than
 // inventing a new term, so the two surfaces stop sharing one name.
 //
-// Desktop-only entry point. Mobile's own entry point is the new "More"
-// edge drawer instead (coach-more-drawer.tsx, which folds Ask Spot in as
-// one of its tiles, rendering the exact same AskSpotChatPanel content
+// Desktop-only entry point. Mobile's own entry point is the Spotlight hub
+// (coach-spot-hub.tsx, which has Ask Spot as one of its tiles, rendering the exact same AskSpotChatPanel content
 // component below — not a second copy of the chat logic) —
 // mobile_more_tab_condensed_widget_hub_sept30.md. This component itself
 // stays desktop-only now; it previously also mounted standalone in

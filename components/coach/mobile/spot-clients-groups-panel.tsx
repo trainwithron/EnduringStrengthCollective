@@ -18,6 +18,13 @@ import { initialsOf } from "@/lib/initials";
 // that athlete, reusing the exact fetch/act-as logic that used to live in
 // ViewAsClientPicker) and Groups (tap = switch into that group as coach,
 // reusing GroupSwitcher's own fetch/switch/create logic, mobile-styled).
+//
+// Scoped per Ron's 2026-10-05 structure decisions: only organizations the
+// coach actually COACHES in appear here (an org he merely owns/administers
+// never does), each org is its own world, the org switcher shows only for
+// a coach in 2+ orgs, one-on-one clients are listed first as people, then
+// the team/social groups, and nothing is listed twice (a 1:1 client's own
+// solo group is not also a "group").
 
 type GroupKind = "one_on_one" | "social" | "team";
 const GROUP_KIND_LABELS: Record<GroupKind, string> = { one_on_one: "1-on-1", social: "Social", team: "Groups" };
@@ -25,6 +32,7 @@ const GROUP_KIND_ORDER: GroupKind[] = ["team", "social", "one_on_one"];
 
 interface ClientOption {
   id: string;
+  orgId: string;
   fullName: string;
   groupId: string;
   avatarUrl: string | null;
@@ -34,10 +42,13 @@ interface ClientOption {
 
 interface CoachedGroupOption {
   id: string;
+  orgId: string;
   name: string;
   focusTag: string | null;
   kind: GroupKind;
 }
+
+const SELECTED_ORG_KEY = "spot-selected-org";
 
 async function getCurrentOrgId(supabase: ReturnType<typeof createBrowserClient>, groupId: string): Promise<string | null> {
   const { data } = await supabase.from("groups").select("organization_id").eq("id", groupId).maybeSingle();
@@ -48,6 +59,8 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated }: { groupId: stri
   const router = useRouter();
   const [clients, setClients] = useState<ClientOption[] | null>(null);
   const [groups, setGroups] = useState<CoachedGroupOption[] | null>(null);
+  const [orgs, setOrgs] = useState<{ id: string; name: string }[]>([]);
+  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
   const [pickingOwnGroup, setPickingOwnGroup] = useState(false);
   // overnight_comprehensive_polish_pass_sept19_20.md, finding #2 — this
   // tap starts real account impersonation (the coach sees and writes as
@@ -73,49 +86,63 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated }: { groupId: stri
       if (!user) return;
 
       const [{ data: coachedGroups }, currentOrgId] = await Promise.all([
-        supabase.from("group_memberships").select("group_id, groups ( id, name, focus_tag, group_kind )").eq("profile_id", user.id).eq("role", "coach"),
+        supabase
+          .from("group_memberships")
+          .select("group_id, groups ( id, name, focus_tag, group_kind, organization_id, organizations ( name ) )")
+          .eq("profile_id", user.id)
+          .eq("role", "coach"),
         getCurrentOrgId(supabase, groupId),
       ]);
 
-      const groupIds = (coachedGroups ?? []).map((g: any) => g.group_id);
       if (!cancelled) setMyGroups((coachedGroups ?? []).map((g: any) => ({ groupId: g.group_id, name: g.groups?.name ?? "Group" })));
 
-      const byId = new Map<string, CoachedGroupOption>();
-      for (const row of coachedGroups ?? []) {
-        const g = (row as any).groups;
-        if (g) byId.set(g.id, { id: g.id, name: g.name, focusTag: g.focus_tag ?? null, kind: (g.group_kind ?? "team") as GroupKind });
+      // Only groups this person actually coaches, in any org they coach in.
+      const orgById = new Map<string, string>();
+      const allGroups: CoachedGroupOption[] = [];
+      for (const row of (coachedGroups ?? []) as any[]) {
+        const g = row.groups;
+        if (!g?.organization_id) continue;
+        orgById.set(g.organization_id, g.organizations?.name ?? "Organization");
+        allGroups.push({ id: g.id, orgId: g.organization_id, name: g.name, focusTag: g.focus_tag ?? null, kind: (g.group_kind ?? "team") as GroupKind });
+      }
+      const orgList = [...orgById.entries()].map(([id, name]) => ({ id, name })).sort((x, y) => x.name.localeCompare(y.name));
+
+      let remembered: string | null = null;
+      try {
+        remembered = window.localStorage.getItem(SELECTED_ORG_KEY);
+      } catch {
+        // Storage can be unavailable (private mode) — fall back to the current group's org.
+      }
+      const preferred = [remembered, currentOrgId].find((id) => id && orgById.has(id)) ?? orgList[0]?.id ?? null;
+      if (!cancelled) {
+        setOrgs(orgList);
+        setSelectedOrgId(preferred);
+        setGroups(allGroups.sort((x, y) => x.name.localeCompare(y.name)));
       }
 
-      const { data: membership } = currentOrgId
-        ? await supabase.from("organization_memberships").select("organization_id, role").eq("organization_id", currentOrgId).eq("profile_id", user.id).maybeSingle()
-        : { data: null };
-      if (membership && (membership.role === "owner" || membership.role === "admin")) {
-        const { data: orgGroups } = await supabase.from("groups").select("id, name, focus_tag, group_kind").eq("organization_id", membership.organization_id).order("name");
-        for (const g of orgGroups ?? []) {
-          byId.set(g.id, { id: g.id, name: g.name, focusTag: g.focus_tag ?? null, kind: (g.group_kind ?? "team") as GroupKind });
-        }
-      }
-      if (!cancelled) setGroups([...byId.values()].sort((a, b) => a.name.localeCompare(b.name)));
-
-      if (groupIds.length === 0) {
+      // Clients = the people in this coach's one-on-one groups (a 1:1
+      // client's own group is bookkeeping, not a "group" to list).
+      const soloGroups = allGroups.filter((g) => g.kind === "one_on_one");
+      if (soloGroups.length === 0) {
         if (!cancelled) setClients([]);
         return;
       }
+      const orgByGroup = new Map(soloGroups.map((g) => [g.id, g.orgId]));
 
       const { data: memberRows } = await supabase
         .from("group_memberships")
         .select("group_id, profile_id, profiles ( id, full_name, avatar_url )")
-        .in("group_id", groupIds)
+        .in("group_id", soloGroups.map((g) => g.id))
         .eq("role", "athlete");
 
       if (cancelled) return;
       const seen = new Set<string>();
-      const rows: { id: string; fullName: string; groupId: string; avatarUrl: string | null }[] = [];
+      const rows: { id: string; orgId: string; fullName: string; groupId: string; avatarUrl: string | null }[] = [];
       for (const row of (memberRows ?? []) as any[]) {
         const id = row.profiles?.id;
         if (!id || seen.has(id)) continue;
         seen.add(id);
-        rows.push({ id, fullName: row.profiles?.full_name ?? "Client", groupId: row.group_id, avatarUrl: row.profiles?.avatar_url ?? null });
+        rows.push({ id, orgId: orgByGroup.get(row.group_id) ?? "", fullName: row.profiles?.full_name ?? "Client", groupId: row.group_id, avatarUrl: row.profiles?.avatar_url ?? null });
       }
 
       const athleteIds = rows.map((r) => r.id);
@@ -216,9 +243,8 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated }: { groupId: stri
       setCreating(false);
       return;
     }
-    const currentOrgId = await getCurrentOrgId(supabase, groupId);
-    const { data: membership } = currentOrgId
-      ? await supabase.from("organization_memberships").select("organization_id").eq("organization_id", currentOrgId).eq("profile_id", user.id).maybeSingle()
+    const { data: membership } = selectedOrgId
+      ? await supabase.from("organization_memberships").select("organization_id").eq("organization_id", selectedOrgId).eq("profile_id", user.id).maybeSingle()
       : { data: null };
     if (!membership) {
       setCreating(false);
@@ -240,8 +266,25 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated }: { groupId: stri
     router.push(`/groups/${newGroupId}/dashboard`);
   }
 
-  const filteredClients = (clients ?? []).filter((c) => c.fullName.toLowerCase().includes(query.trim().toLowerCase()));
-  const groupSections = GROUP_KIND_ORDER.map((kind) => ({ kind, label: GROUP_KIND_LABELS[kind], list: (groups ?? []).filter((g) => g.kind === kind) }));
+  const filteredClients = (clients ?? []).filter(
+    (c) => c.orgId === selectedOrgId && c.fullName.toLowerCase().includes(query.trim().toLowerCase())
+  );
+  // Team and social groups only: a one-on-one group is its client, listed above.
+  const LISTED_GROUP_KINDS: GroupKind[] = ["team", "social"];
+  const groupSections = LISTED_GROUP_KINDS.map((kind) => ({
+    kind,
+    label: GROUP_KIND_LABELS[kind],
+    list: (groups ?? []).filter((g) => g.orgId === selectedOrgId && g.kind === kind),
+  }));
+
+  function selectOrg(id: string) {
+    setSelectedOrgId(id);
+    try {
+      window.localStorage.setItem(SELECTED_ORG_KEY, id);
+    } catch {
+      // Non-fatal.
+    }
+  }
 
   if (pendingClient) {
     return (
@@ -309,6 +352,23 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated }: { groupId: stri
         </p>
       )}
 
+      {orgs.length >= 2 && (
+        <div className="flex gap-1.5 overflow-x-auto" role="tablist" aria-label="Organization">
+          {orgs.map((o) => (
+            <button
+              key={o.id}
+              type="button"
+              role="tab"
+              aria-selected={o.id === selectedOrgId}
+              onClick={() => selectOrg(o.id)}
+              className={`h-8 px-3 shrink-0 whitespace-nowrap font-body text-xs border ${o.id === selectedOrgId ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"}`}
+            >
+              {o.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div>
         <p className="font-body text-[10px] text-steel uppercase tracking-wide mb-1.5">Clients</p>
         <input
@@ -320,7 +380,9 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated }: { groupId: stri
         />
         <div className="max-h-48 overflow-y-auto space-y-1">
           {clients === null && <p className="font-body text-sm text-steel px-1 py-2">Loading…</p>}
-          {clients?.length === 0 && <p className="font-body text-sm text-steel px-1 py-2">No clients yet.</p>}
+          {clients !== null && filteredClients.length === 0 && (
+            <p className="font-body text-sm text-steel px-1 py-2">{query.trim() ? "No match." : "No one-on-one clients yet."}</p>
+          )}
           {filteredClients.map((c) => {
             const status = clientActivityStatus(c.lastWorkoutAt);
             const tier = computeQuietTier({ lastLoggedAt: c.lastWorkoutAt ? new Date(c.lastWorkoutAt) : null, now: new Date(), trainingDays: c.trainingDays });
@@ -359,7 +421,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated }: { groupId: stri
             (section) =>
               section.list.length > 0 && (
                 <div key={section.kind}>
-                  <p className="font-body text-[10px] text-steel/70 uppercase tracking-wide px-1">{section.label}</p>
+                  {section.kind !== "team" && <p className="font-body text-[10px] text-steel/70 uppercase tracking-wide px-1">{section.label}</p>}
                   {section.list.map((g) => (
                     <button
                       key={g.id}

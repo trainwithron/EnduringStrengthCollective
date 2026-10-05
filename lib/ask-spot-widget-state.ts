@@ -3,10 +3,9 @@
 // syncing across devices. Same read/write-with-fallback shape as
 // lib/card-size.ts's localStorage wrapper, and the same
 // caller-supplies-its-own-key convention — desktop's Ask Spot tab
-// (collective-intelligence-chat.tsx) and mobile's "More" drawer
-// (coach-more-drawer.tsx) each persist their own edge position under
-// their own key rather than sharing one, even though both reuse this
-// same read/write logic.
+// (collective-intelligence-chat.tsx) persists its own edge position under
+// its own key (the mobile "More" edge drawer that used to share this logic
+// was replaced by the Spotlight hub).
 export interface AskSpotWidgetState {
   side: "left" | "right";
   bottomOffsetPx: number;

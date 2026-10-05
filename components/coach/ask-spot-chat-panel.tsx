@@ -13,8 +13,8 @@ interface ChatMessage {
 // (mobile_more_tab_condensed_widget_hub_sept30.md) so the exact same
 // chat can render both inside the desktop edge-tab
 // (collective-intelligence-chat.tsx, which keeps its own header/drag
-// gestures) and as one inline tile of the mobile "More" drawer
-// (coach-more-drawer.tsx) — one real chat thread implementation, two
+// gestures) and as the Ask Spot tile of the mobile Spotlight hub
+// (coach-spot-hub.tsx) — one real chat thread implementation, two
 // different surrounding shells, not two copies of this logic.
 export function AskSpotChatPanel() {
   const [threadId, setThreadId] = useState<string | null>(null);

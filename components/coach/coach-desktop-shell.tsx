@@ -65,6 +65,7 @@ import {
 } from "@/lib/coach-shell-panel-storage";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CoachMoreSheet } from "@/components/coach/mobile/coach-more-sheet";
+import { CoachSpotHub } from "@/components/coach/mobile/coach-spot-hub";
 
 function NavBadge({ count, collapsed }: { count: number; collapsed?: boolean }) {
   if (count <= 0) return null;
@@ -637,7 +638,7 @@ export function CoachDesktopShell({
             label is easy to miss when your eyes are on the main content,
             and picking up someone else's client/program by mistake is a
             real risk this exists to head off. */}
-        <div className="flex items-center gap-1.5 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0 max-w-[36%] lg:max-w-none">
           {/* "You're in: org -> group" — a coach who administers more than
               one organization otherwise has no reliable way to tell which
               org's data/branding a page belongs to just by looking, which
@@ -862,6 +863,8 @@ export function CoachDesktopShell({
             the full legacy sidebarContent list. Desktop/tablet keeps the
             rail + list panel above, unchanged. */}
         <div className="lg:hidden">
+          {/* The Spotlight hub: the single phone entry, on every coach page. */}
+          <CoachSpotHub groupId={groupId} />
           <BottomTabBar
             groupId={groupId}
             variant="coach"
