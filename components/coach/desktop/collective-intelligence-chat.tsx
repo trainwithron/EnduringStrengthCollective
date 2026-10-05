@@ -201,7 +201,7 @@ export function CollectiveIntelligenceChat() {
           <p className="font-body text-xs text-steel uppercase tracking-wide font-bold">
             Ask Spot
           </p>
-          <p className="font-body text-xs text-steel mt-0.5">Ask about a specific client or exercise.</p>
+          <p className="font-body text-xs text-steel mt-0.5">Find a page, learn how to do something, or ask about a client.</p>
         </div>
         <ChevronIcon
           className="w-4 h-4 text-steel shrink-0"
