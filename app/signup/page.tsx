@@ -2,18 +2,29 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { LegalAcceptance } from "@/components/legal/legal-acceptance";
+import { LegalLinks } from "@/components/legal/legal-links";
 
 export default function SignupPage() {
   const [fullName, setFullName] = useState("");
   const [orgName, setOrgName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [legalAccepted, setLegalAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (password.length < 8) {
+      setError("Use a password of at least 8 characters.");
+      return;
+    }
+    if (!legalAccepted) {
+      setError("Please tick the box to agree before continuing.");
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
@@ -21,7 +32,7 @@ export default function SignupPage() {
       const res = await fetch("/api/coaches/signup", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ fullName, orgName, email, password }),
+        body: JSON.stringify({ fullName, orgName, email, password, acceptedLegal: true }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Couldn't create your account.");
@@ -115,12 +126,14 @@ export default function SignupPage() {
               type="password"
               autoComplete="new-password"
               required
-              minLength={6}
+              minLength={8}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full h-11 mt-1 bg-surface border border-steel/30 text-chalk px-3 font-body focus:outline-none focus:border-rust"
             />
           </div>
+
+          <LegalAcceptance checked={legalAccepted} onChange={setLegalAccepted} />
 
           {error && (
             <p className="font-body text-sm text-rust" role="alert">
@@ -143,6 +156,7 @@ export default function SignupPage() {
             Sign in
           </Link>
         </p>
+        <LegalLinks className="mt-6" />
       </div>
     </main>
   );

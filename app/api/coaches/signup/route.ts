@@ -4,6 +4,8 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { createOrganization } from "@/lib/org-creation";
 import { toFriendlyAuthEmailError } from "@/lib/auth-email-error";
 import { rateLimitResponse, clientIp } from "@/lib/rate-limit";
+import { SIGNUP_DOCUMENTS } from "@/lib/legal";
+import { recordLegalAcceptances } from "@/lib/legal-record";
 import { appOrigin } from "@/lib/app-url";
 
 // Self-service coach signup — a brand-new person, no pre-existing
@@ -29,7 +31,8 @@ export async function POST(request: Request) {
   const limited = await rateLimitResponse("coach-signup", clientIp(request), 5, 3600);
   if (limited) return limited;
 
-  const { fullName, orgName, email, password } = await request.json().catch(() => ({}));
+  const body = await request.json().catch(() => ({}));
+  const { fullName, orgName, email, password } = body;
   const trimmedName = typeof fullName === "string" ? fullName.trim() : "";
   const trimmedOrgName = typeof orgName === "string" ? orgName.trim() : "";
   const trimmedEmail = typeof email === "string" ? email.trim() : "";
@@ -41,11 +44,14 @@ export async function POST(request: Request) {
   if (trimmedName.length > 120 || trimmedOrgName.length > 120 || trimmedEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
     return NextResponse.json({ error: "Check your name, organization name and email." }, { status: 400 });
   }
+  if (body.acceptedLegal !== true) {
+    return NextResponse.json({ error: "Please agree to the terms and the beta notice to continue." }, { status: 400 });
+  }
   if (pw.length > 200) {
     return NextResponse.json({ error: "That password is too long." }, { status: 400 });
   }
-  if (pw.length < 6) {
-    return NextResponse.json({ error: "Password must be at least 6 characters." }, { status: 400 });
+  if (pw.length < 8) {
+    return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
   }
 
   const serviceRole = createServiceRoleClient();
@@ -64,6 +70,14 @@ export async function POST(request: Request) {
   }
 
   const newUserId = created.user.id;
+
+  // Record what they agreed to (version, time, address, device). A missing table never stops a signup.
+  await recordLegalAcceptances(serviceRole, {
+    profileId: newUserId,
+    documents: SIGNUP_DOCUMENTS,
+    ip: clientIp(request) === "unknown" ? null : clientIp(request),
+    userAgent: request.headers.get("user-agent"),
+  }).catch(() => false);
 
   const { error: profileError } = await serviceRole
     .from("profiles")

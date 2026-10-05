@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { isPlaceholderEmail, validateClaimEmail, validateNewPassword } from "@/lib/client-claim";
 import { loadStartInputs, pickStartGroup } from "@/lib/start-group";
+import { LegalAcceptance } from "@/components/legal/legal-acceptance";
+import { LegalLinks } from "@/components/legal/legal-links";
+import { LEGAL_VERSIONS } from "@/lib/legal";
+import { recordLegalConsentNow } from "@/lib/legal-client";
 
 export default function SetPasswordPage() {
   return (
@@ -26,6 +30,9 @@ function SetPasswordForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Shown once: only when this person has not already accepted the current beta notice.
+  const [needsLegal, setNeedsLegal] = useState(false);
+  const [legalAccepted, setLegalAccepted] = useState(false);
 
   useEffect(() => {
     // The invite email's link establishes a real session client-side
@@ -35,6 +42,17 @@ function SetPasswordForm() {
     supabase.auth.getUser().then(({ data: { user } }) => {
       setHasSession(!!user);
       setNeedsEmail(isPlaceholderEmail(user?.email));
+      if (user) {
+        // If the table is not there yet this errors and the box is simply shown, which is the safe default.
+        supabase
+          .from("legal_acceptances")
+          .select("id")
+          .eq("profile_id", user.id)
+          .eq("document", "beta_notice")
+          .eq("version", LEGAL_VERSIONS.beta_notice)
+          .maybeSingle()
+          .then(({ data, error: acceptedError }) => setNeedsLegal(!!acceptedError || !data));
+      }
       setChecking(false);
     });
   }, []);
@@ -52,6 +70,10 @@ function SetPasswordForm() {
         setError(emailError);
         return;
       }
+    }
+    if (needsLegal && !legalAccepted) {
+      setError("Please tick the box to agree before continuing.");
+      return;
     }
     setSubmitting(true);
     setError(null);
@@ -72,6 +94,8 @@ function SetPasswordForm() {
       setSubmitting(false);
       return;
     }
+
+    if (needsLegal) await recordLegalConsentNow();
 
     const {
       data: { user },
@@ -192,6 +216,12 @@ function SetPasswordForm() {
           className="w-full h-11 mt-1 bg-surface border border-steel/30 text-chalk px-3 font-body focus:outline-none focus:border-rust"
         />
 
+        {needsLegal && (
+          <div className="mt-4">
+            <LegalAcceptance checked={legalAccepted} onChange={setLegalAccepted} />
+          </div>
+        )}
+
         <p className="font-body text-xs text-steel mt-4 max-w-[44ch]">
           On an iPhone: finish this step first, then add the app to your Home Screen, then sign in once inside the
           app. The Home Screen app doesn&apos;t share your sign-in from Safari.
@@ -210,6 +240,7 @@ function SetPasswordForm() {
         >
           {submitting ? "Saving…" : "Set password & continue"}
         </button>
+        <LegalLinks className="mt-5" />
       </form>
     </main>
   );

@@ -6,6 +6,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { PAR_Q_QUESTIONS } from "@/lib/par-q-questions";
 import { DEFAULT_WAIVER_TEXT } from "@/lib/intake-waiver";
 import { isUnder13 } from "@/lib/coppa";
+import { LegalLinks } from "@/components/legal/legal-links";
 
 type Step = "dob" | "blocked" | "form";
 
@@ -138,6 +139,19 @@ export function IntakeForm({
       setSubmitting(false);
       return;
     }
+
+    // Keep the exact text that was signed, with the version, time, address and device. Best effort: the signature
+    // itself is already saved above, and a missing table never blocks the client.
+    void fetch("/api/legal/accept", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        documents: ["waiver"],
+        waiverText: waiverPdfUrl
+          ? `Signed the waiver document at ${waiverPdfUrl} (name typed: ${signedName.trim()})`
+          : `${waiverText || DEFAULT_WAIVER_TEXT}\n\nSigned by typing: ${signedName.trim()}`,
+      }),
+    }).catch(() => {});
 
     setDone(true);
     router.push(nextUrl);
@@ -319,6 +333,7 @@ export function IntakeForm({
       >
         {submitting ? "Saving…" : "Submit & continue"}
       </button>
+      <LegalLinks className="mt-4" />
     </div>
   );
 }

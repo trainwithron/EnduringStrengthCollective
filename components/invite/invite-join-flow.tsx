@@ -3,6 +3,9 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { LegalAcceptance } from "@/components/legal/legal-acceptance";
+import { LegalLinks } from "@/components/legal/legal-links";
+import { flushLegalConsent, rememberLegalConsent } from "@/lib/legal-client";
 
 type Mode = "signup" | "login";
 type Phase = "checking" | "guest" | "authed" | "awaiting-confirmation";
@@ -68,6 +71,11 @@ export function InviteJoinFlow({
   const [authedEmail, setAuthedEmail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [legalAccepted, setLegalAccepted] = useState(false);
+
+  useEffect(() => {
+    if (phase === "authed") void flushLegalConsent();
+  }, [phase]);
   const router = useRouter();
 
   useEffect(() => {
@@ -162,6 +170,12 @@ export function InviteJoinFlow({
         setSubmitting(false);
         return;
       }
+      if (!legalAccepted) {
+        setError("Please tick the box to agree before continuing.");
+        setSubmitting(false);
+        return;
+      }
+      rememberLegalConsent();
 
       window.localStorage.setItem(
         `invite_pending_signup_${code}`,
@@ -192,6 +206,7 @@ export function InviteJoinFlow({
           .from("profiles")
           .insert({ id: data.user.id, full_name: trimmedName, intake_required: true });
         window.localStorage.removeItem(`invite_pending_signup_${code}`);
+        await flushLegalConsent();
         setAuthedEmail(data.user.email ?? null);
         setPhase("authed");
         setSubmitting(false);
@@ -360,6 +375,8 @@ export function InviteJoinFlow({
           />
         </div>
 
+        {mode === "signup" && <LegalAcceptance checked={legalAccepted} onChange={setLegalAccepted} />}
+
         {error && (
           <p className="font-body text-sm text-rust" role="alert">
             {error}
@@ -379,6 +396,7 @@ export function InviteJoinFlow({
             ? "Create account & join"
             : "Sign in & join"}
         </button>
+        <LegalLinks className="mt-2" />
       </form>
     </div>
   );

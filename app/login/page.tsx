@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { LegalLinks } from "@/components/legal/legal-links";
 import { isStandaloneDisplay, isMobileUserAgent } from "@/lib/pwa";
 import { loadStartInputs, parseLastGroupCookie, pickStartGroup } from "@/lib/start-group";
 
@@ -141,6 +142,7 @@ function LoginForm() {
             Create your organization
           </Link>
         </p>
+        <LegalLinks className="mt-6" />
       </div>
     </main>
   );

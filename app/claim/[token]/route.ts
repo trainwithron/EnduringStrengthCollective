@@ -50,6 +50,7 @@ function continuePage(action: string, message?: string) {
 <h1>Welcome</h1>
 <p>Tap Continue to sign in and set up your account.</p>
 ${message ? `<p class="err">${message}</p>` : ""}
+<p style="font-size:12px;margin-top:20px"><a href="/beta" style="color:#908B7E">Beta notice</a> &nbsp; <a href="/terms" style="color:#908B7E">Terms</a> &nbsp; <a href="/privacy" style="color:#908B7E">Privacy</a></p>
 <form method="post" action="${escapeAttr(action)}" onsubmit="var b=this.querySelector('button');if(b.dataset.sent){return false;}b.dataset.sent='1';setTimeout(function(){b.disabled=true},0);"><button type="submit">Continue</button></form>
 </main></body></html>`);
 }

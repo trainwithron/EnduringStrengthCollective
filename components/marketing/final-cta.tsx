@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LegalLinks } from "@/components/legal/legal-links";
 
 export function FinalCta() {
   return (
@@ -17,6 +18,7 @@ export function FinalCta() {
         >
           Get started
         </Link>
+        <LegalLinks className="mt-10" />
       </div>
     </section>
   );
