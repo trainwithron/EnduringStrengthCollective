@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { loadReupState } from "@/lib/reup-server";
 import { ReupCard } from "@/components/athlete/reup-card";
 import { FirstRunGuideCard } from "@/components/athlete/first-run-guide-card";
@@ -508,6 +509,22 @@ export default async function GroupHubPage(
     }
   }
 
+  // Upcoming small-group sessions with this client's coach, as a link to the Classes page. Any failure (or the feature not being
+  // switched on yet) just means no link.
+  let upcomingClasses = 0;
+  if (user && !isCoach && !isActingAsOther && showMobileView) {
+    try {
+      const { count } = await supabase
+        .from("group_sessions")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "scheduled")
+        .gte("start_at", new Date().toISOString());
+      upcomingClasses = count ?? 0;
+    } catch {
+      upcomingClasses = 0;
+    }
+  }
+
   // "The Spot" (coach_only_widget_hub_the_spot.md) — a coach-only widget
   // rail on top of the true-mirror View-As-Client screen. Only ever
   // computed while genuinely acting as someone — a real athlete, or a
@@ -622,6 +639,11 @@ export default async function GroupHubPage(
           {view === "day" && (
             <div className="space-y-4">
               {reupState && <ReupCard state={reupState} />}
+              {upcomingClasses > 0 && (
+                <Link href={`/groups/${params.groupId}/classes`} className="block border border-steel/30 bg-surface/40 px-4 py-3 font-body text-sm text-chalk">
+                  Group sessions: {upcomingClasses} coming up &rarr;
+                </Link>
+              )}
               {isToday && !isFirstDay && (
                 <WellnessCheckinPopup
                   athleteId={athleteId}

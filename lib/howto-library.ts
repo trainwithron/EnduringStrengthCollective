@@ -191,6 +191,23 @@ export const HOWTOS: HowTo[] = [
     note: "People who book don't need an account. They get a private link to change or cancel, and show up in Clients as a new client who hasn't signed in yet.",
   },
   {
+    id: "group-session",
+    title: "Run a small-group session with spots",
+    roles: ["coach"],
+    desktopOnly: true,
+    keywords: [
+      "group session", "schedule a group session", "small group session", "run a class", "set up a class", "class with a limit", "limited spots",
+      "capacity", "waiting list", "waitlist", "add a group class", "schedule a class", "small group training",
+    ],
+    steps: [
+      { text: "Open Group Sessions.", href: "/groups/{groupId}/group-sessions", linkLabel: "Group Sessions" },
+      { text: "Under New group session, give it a name, pick the day, time and length, and set the number of spots. The time is blocked in your calendar." },
+      { text: "Your clients see it on their Classes page and join with one tap. A client who joins uses one session. When it is full, the next people wait and move in when someone leaves." },
+      { text: "On the class you can add or remove people, change the spots, mark who attended, or cancel it (everyone is told and any session used is returned)." },
+    ],
+    note: "A client you add yourself is not charged until you mark them attended.",
+  },
+  {
     id: "remind-reup",
     title: "Remind a client to re-up, or put them on hold",
     roles: ["coach"],
@@ -218,6 +235,17 @@ export const HOWTOS: HowTo[] = [
       { text: "Open Today's workout.", href: "/groups/{groupId}/today", linkLabel: "Today's workout" },
       { text: "Start the workout and fill in each set as you go. Sets save as you complete them." },
       { text: "When you are done, finish the workout with the button at the bottom. Your coach sees it." },
+    ],
+  },
+  {
+    id: "athlete-join-class",
+    title: "Join a group class",
+    roles: ["athlete"],
+    keywords: ["join a class", "sign up for a class", "group class", "group session", "small group", "how do i join a class", "classes"],
+    steps: [
+      { text: "Open Classes.", href: "/groups/{groupId}/classes", linkLabel: "Classes" },
+      { text: "Tap Join on a class with spots left. It uses one session from your account." },
+      { text: "If the class is full, join the waiting list. You move in automatically if a spot opens, and you are told." },
     ],
   },
   {

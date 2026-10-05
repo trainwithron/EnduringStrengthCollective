@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:sql": "node scripts/sql-tests/group-sessions.test.mjs && node scripts/sql-tests/settlement.test.mjs"
   },
   "dependencies": {
     "@daily-co/daily-js": "^0.92.2",
@@ -27,6 +28,7 @@
     "zipcodes": "^8.0.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@types/node": "^20.16.10",
     "@types/qrcode": "^1.5.6",
     "@types/react": "19.2.18",
