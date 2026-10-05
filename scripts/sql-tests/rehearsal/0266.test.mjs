@@ -100,6 +100,18 @@ export default {
       await db.query(`insert into auth.users (id, email) values ($1, 'second.signup@example.com')`, [stranger]);
       let r = await asUser(stranger, `insert into public.profiles (id, full_name, is_platform_admin, intake_required) values ($1, 'Fresh signup', true, true) returning is_platform_admin, intake_required`, [stranger]);
       h.check("a brand-new account's profile is never created as platform admin, and the invite flow's intake_required on insert still works", r.rows?.[0]?.is_platform_admin === false && r.rows[0].intake_required === true, JSON.stringify(r));
+      // INSERT is covered as well as UPDATE: admin forced false, claimed marker cleared, waiver gate forced on, whatever the row says.
+      await h.asSuper();
+      const third = (await db.query(`select gen_random_uuid() as id`)).rows[0].id;
+      await db.query(`insert into auth.users (id, email) values ($1, 'third.signup@example.com')`, [third]);
+      r = await asUser(third, `insert into public.profiles (id, full_name, is_platform_admin, intake_required, claimed_at) values ($1, 'Sneaky', true, false, now()) returning is_platform_admin, intake_required, claimed_at`, [third]);
+      h.check("INSERT guard: a self-created profile with admin true, intake_required false and claimed_at set comes out as admin false, intake_required true, claimed_at null", r.rows?.[0]?.is_platform_admin === false && r.rows[0].intake_required === true && r.rows[0].claimed_at === null, JSON.stringify(r));
+      await h.asSuper();
+      const fourth = (await db.query(`select gen_random_uuid() as id`)).rows[0].id;
+      await db.query(`insert into auth.users (id, email) values ($1, 'fourth.signup@example.com')`, [fourth]);
+      await h.asService();
+      r = await tryQ(db, `insert into public.profiles (id, full_name, is_platform_admin, intake_required) values ($1, 'Server made', true, false) returning is_platform_admin, intake_required`, [fourth]);
+      h.check("INSERT guard: the service role can still create an admin or a profile without the waiver gate (server routes, SQL editor)", r.rows?.[0]?.is_platform_admin === true && r.rows[0].intake_required === false, JSON.stringify(r));
       await h.asService();
       await db.query(`update public.profiles set intake_required = false, claimed_at = now() where id = $1`, [stranger]);
       p = await row(`select intake_required, claimed_at from public.profiles where id = $1`, [stranger]);

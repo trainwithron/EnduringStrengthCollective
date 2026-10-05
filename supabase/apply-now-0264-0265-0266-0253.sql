@@ -78,8 +78,11 @@ as $$
 begin
   if auth.role() in ('authenticated', 'anon') then
     if tg_op = 'INSERT' then
+      -- A profile an end user creates for themselves is a client's: never an admin, never already claimed, and always through the
+      -- waiver gate (the invite page is the only browser code that inserts one, and it sets intake_required itself).
       new.is_platform_admin := false;
       new.claimed_at := null;
+      new.intake_required := true;
     else
       new.intake_required := old.intake_required;
       new.claimed_at := old.claimed_at;

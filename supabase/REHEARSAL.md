@@ -33,7 +33,7 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0263 | yes | yes | 57 | 0259 ongoing series, 0260 re-up fields, 0261 public booking tables, 0262 cron runs, 0263 group sessions |
 | 0264 | yes | yes | 6 | 0264 clients cannot edit their own session balance |
 | 0265 | yes | yes | 11 | 0265 bookings: direct writes are coach-only, booking functions still work |
-| 0266 | yes | yes | 26 | 0266 client-writable columns that should be coach-only |
+| 0266 | yes | yes | 28 | 0266 client-writable columns that should be coach-only |
 | 0238 | yes | yes | 24 | invite links: join_group_with_invite, revoked links, closing the loose self-join |
 | 0252 | yes | yes | 29 | 0251/0252 kiosk PINs: hashed, lockout and escalation |
 | 0253 | yes | yes | 23 | 0253 anon share policies closed; 0254 client tag write rules |
