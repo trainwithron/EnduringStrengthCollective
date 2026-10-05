@@ -123,8 +123,14 @@ export default async function MessagesPage(props: { params: Promise<{ groupId: s
     if (!showMobileView) {
       return (
         <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="messages">
-          <div className="pb-6 border-b border-steel/20 mb-6">
+          <div className="pb-6 border-b border-steel/20 mb-6 flex items-center justify-between">
             <h1 className="font-display font-bold text-3xl uppercase leading-none">Messages</h1>
+            <Link
+              href={`/groups/${params.groupId}/messages/announce`}
+              className="h-9 px-4 border border-rust/40 text-rust font-body text-sm flex items-center"
+            >
+              Message all clients
+            </Link>
           </div>
           {list}
         </CoachDesktopShell>
@@ -135,8 +141,14 @@ export default async function MessagesPage(props: { params: Promise<{ groupId: s
       <main className="min-h-screen bg-graphite text-chalk font-body">
         <CoachMobileShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} activeOverride="messages">
           <div className="pb-24">
-            <header className="px-5 pt-8 pb-6 border-b border-steel/20">
+            <header className="px-5 pt-8 pb-6 border-b border-steel/20 flex items-center justify-between gap-3">
               <h1 className="font-display font-bold text-3xl uppercase leading-none">Messages</h1>
+              <Link
+                href={`/groups/${params.groupId}/messages/announce`}
+                className="h-9 px-3 border border-rust/40 text-rust font-body text-xs flex items-center shrink-0"
+              >
+                Message all
+              </Link>
             </header>
             {list}
           </div>
