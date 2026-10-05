@@ -6,7 +6,7 @@
 export type LegalDocument = "beta_notice" | "terms" | "privacy" | "refunds" | "waiver";
 
 export const LEGAL_VERSIONS: Record<LegalDocument, string> = {
-  beta_notice: "2026-10-05-draft-1",
+  beta_notice: "2026-10-05-draft-2",
   terms: "2026-10-05-placeholder-1",
   privacy: "2026-10-05-placeholder-1",
   refunds: "2026-10-05-placeholder-1",
@@ -35,11 +35,15 @@ export const DRAFT_BANNER =
 
 export const BETA_NOTICE_PARAGRAPHS: string[] = [
   "This app is an early version (a beta). It is being built and tested with real people while we make it better, so things will change, and some things may not work the way you expect.",
-  "Please do not rely on it as your only record. Keep your own notes of anything important, such as your training numbers and any payments, until we tell you the beta is over.",
-  "Your training, health and contact details are stored so the app can work for you and your coach. Your coach can see what you log. Some features send details such as workout notes, nutrition entries and, for the coach's assistant features, client names to an AI service in order to produce suggestions. We are working to send less personal detail than that.",
+  "Adults only for now. Please do not enter real information for anyone under 18. Anyone under 13 is blocked from using the app unless a parent or guardian's consent has been verified.",
+  "Beta means data could be lost. Please do not rely on the app as your only record. Keep your own backups and notes of anything important, such as your training numbers and any payments, until we tell you the beta is over.",
+  "What is stored: your name, email and, if you give them, your phone number and date of birth. Also your health questionnaire answers, your weight, wellness check-ins, training and nutrition logs, your messages, and any photos or videos you choose to share.",
+  "Who can see it: your coach, and the people who run your coach's organization. During the beta, the platform operator can also read training data across organizations in order to give support, unless a client has been marked private. We plan to tighten this, and we are telling you about it now rather than later.",
+  "AI features: some features send text such as workout notes, nutrition entries and, for the coach's assistant features, client names to an AI provider, Anthropic, in order to produce suggestions. What the AI writes is a draft for your coach to review, not a decision. We are working to send less personal detail than that.",
+  "Text messages are optional and are off unless you turn them on. Reply STOP to any text to stop them, and HELP for help.",
   "The app and what it suggests are not medical advice. Check with a qualified professional before changing your training or nutrition if you have an injury, an illness or a medical condition, and stop if something hurts.",
-  "You can ask for a copy of your data or ask us to delete your account from your settings, or by writing to us.",
-  "If something breaks or seems wrong, please tell us. Your feedback is how the app gets better.",
+  "You can export your data or delete your account in Settings. When you delete your account, your personal details, check-ins, posts and messages are erased, but some records, such as workout logs and your coach's own notes and payment records, may stay with your coach, no longer linked to you.",
+  "If you ever see someone else's data, please tell us right away using the report button or by writing to us. If something else breaks or seems wrong, please tell us too. Your feedback is how the app gets better.",
 ];
 
 export const PLACEHOLDER_SECTIONS: Record<"terms" | "privacy" | "refunds", { heading: string; body: string }[]> = {
@@ -60,7 +64,7 @@ export const PLACEHOLDER_SECTIONS: Record<"terms" | "privacy" | "refunds", { hea
     },
     {
       heading: "AI features",
-      body: "Some features send text such as workout notes, nutrition entries and, for coach assistant features, client names to an AI provider to generate suggestions. The final policy will list the providers we use.",
+      body: "Some features send text such as workout notes, nutrition entries and, for coach assistant features, client names to an AI provider (currently Anthropic) to generate suggestions. What the AI writes is a draft your coach reviews. The final policy will list every provider we use.",
     },
     {
       heading: "Your choices",
