@@ -30,6 +30,26 @@ export function clientSteps(clientCount: number): number {
   return Math.max(1, Math.ceil(clientCount / CLIENT_STEP_SIZE));
 }
 
+// Free-access (beta) orgs get this share of the standard allowance unless the platform admin sets their own scale:
+// 0.3 is about 30 program generations and 60 meal plans a month. Mirrors coach_ai_multiplier() in migration 0250.
+export const BETA_ALLOWANCE_SCALE = 0.3;
+// Under this many clients a coach gets a prorated share of one step (never below a quarter), so a coach with no
+// clients yet can still build programs but not at full volume.
+export const SMALL_COACH_CLIENTS = 25;
+
+export interface AllowanceScaleInput {
+  exempt?: boolean;
+  scale?: number | null;
+}
+
+// The one number every AI limit is scaled by. Mirrors coach_ai_multiplier() in migration 0250.
+export function aiMultiplier(clientCount: number, opts: AllowanceScaleInput = {}): number {
+  if (opts.scale != null) return opts.scale;
+  if (opts.exempt) return BETA_ALLOWANCE_SCALE;
+  if (clientCount < SMALL_COACH_CLIENTS) return Math.max(0.25, clientCount / SMALL_COACH_CLIENTS);
+  return clientSteps(clientCount);
+}
+
 export type AiFeature =
   // coach/athlete-triggered (burst-limited)
   | "program_generation"
@@ -58,7 +78,9 @@ interface FeaturePolicy {
 }
 
 const POLICY: Record<AiFeature, FeaturePolicy> = {
-  program_generation: { enforce: true },
+  // A failed or cut-off generation is not charged, but every attempt is logged, so a monthly ceiling of 1.5x the
+  // included generations (per step, scaled like the allowance) stops failed attempts from being unlimited free spend.
+  program_generation: { enforce: true, monthlyCeiling: 150 },
   program_chat: { enforce: true },
   program_import_photo: { enforce: true },
   session_nl: { enforce: true },
@@ -130,8 +152,8 @@ export function currentAllowancePeriod(now: Date = new Date()): string {
 // Included generations for a coach's row at their current client count.
 // A row from an earlier month has effectively reset (spend_ai_action
 // zeroes it on next spend).
-export function allowanceLimit(action: AllowanceAction, clientCount: number): number {
-  return AI_ALLOWANCE_PER_STEP[action] * clientSteps(clientCount);
+export function allowanceLimit(action: AllowanceAction, clientCount: number, opts: AllowanceScaleInput = {}): number {
+  return Math.ceil(AI_ALLOWANCE_PER_STEP[action] * aiMultiplier(clientCount, opts));
 }
 
 export function allowanceUsed(
@@ -147,9 +169,10 @@ export function allowanceRemaining(
   action: AllowanceAction,
   row: { allowance_period: string | null; program_used: number | null; mealplan_used: number | null } | null,
   clientCount: number,
-  now: Date = new Date()
+  now: Date = new Date(),
+  opts: AllowanceScaleInput = {}
 ): number {
-  return Math.max(0, allowanceLimit(action, clientCount) - allowanceUsed(action, row, now));
+  return Math.max(0, allowanceLimit(action, clientCount, opts) - allowanceUsed(action, row, now));
 }
 
 // First day of next month, UTC, as a date key — when the allowance resets.

@@ -44,3 +44,13 @@ export function lastReupDate(entries: LedgerEntry[]): string | null {
   if (reups.length === 0) return null;
   return reups.reduce((latest, e) => (e.createdAt > latest ? e.createdAt : latest), reups[0].createdAt);
 }
+
+// What a booking has cost the client so far: delivered entries (negative) plus any refunds already returned for it.
+// undo_booking_attended (migration 0248) refunds exactly this and no more, so settle, undo, settle, undo can never
+// mint credits and cancel then undo returns nothing twice. Returns 0 when nothing is outstanding.
+export function outstandingForBooking(entries: { kind: LedgerKind; amount: number; bookingId: string | null }[], bookingId: string): number {
+  const net = entries
+    .filter((e) => e.bookingId === bookingId && (e.kind === "delivered" || e.kind === "refund"))
+    .reduce((sum, e) => sum + e.amount, 0);
+  return Math.max(0, -net);
+}

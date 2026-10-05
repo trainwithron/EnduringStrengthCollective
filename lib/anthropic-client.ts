@@ -32,6 +32,10 @@ export interface ClaudeCallOptions {
   meta: AiCallMeta;
 }
 
+export const MAX_INPUT_CHARS = 150_000;
+export const MAX_IMAGE_BASE64_CHARS = 8_000_000; // about 6 MB of image
+export const MAX_OUTPUT_TOKENS = 32_000;
+
 export class AiNotConfiguredError extends Error {
   constructor() {
     super("AI features aren't configured yet — an ANTHROPIC_API_KEY is needed on the server.");
@@ -66,6 +70,16 @@ export async function callClaude({
 }: ClaudeCallOptions): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) throw new AiNotConfiguredError();
+
+  // One ceiling on a single call, whichever route made it: a route that forgets its own input check cannot send an
+  // enormous prompt, ask for an enormous answer, or attach an enormous image on the platform's bill.
+  if (userText.length > MAX_INPUT_CHARS || system.length > MAX_INPUT_CHARS) {
+    throw new Error("That request is too large to send. Try a shorter one.");
+  }
+  if (image && image.base64Data.length > MAX_IMAGE_BASE64_CHARS) {
+    throw new Error("That image is too large. Try a smaller one.");
+  }
+  maxTokens = Math.min(Math.max(1, maxTokens), MAX_OUTPUT_TOKENS);
 
   const content: Record<string, unknown>[] = [];
   if (image) {

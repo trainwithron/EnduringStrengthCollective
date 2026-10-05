@@ -147,3 +147,25 @@ describe("writeSetLogRow", () => {
     expect(await writeSetLogRow(client({ data: null, error: { message: "boom" } }), "s1", {})).toBe(false);
   });
 });
+
+describe("discard", () => {
+  it("drops pending saves for removed sets so they stop blocking completion", async () => {
+    const calls: string[] = [];
+    const saver = new SetLogSaver({
+      write: async (id) => {
+        calls.push(id);
+        return false; // the row was deleted: zero rows updated
+      },
+      backoffMs: [],
+      schedule: () => 0,
+      cancel: () => {},
+    });
+    saver.queue("gone", { reps: 5 });
+    await Promise.resolve();
+    expect(saver.unsaved).toEqual(["gone"]);
+    saver.discard(["gone", "never-queued"]);
+    expect(saver.unsaved).toEqual([]);
+    expect(saver.failed).toEqual([]);
+    expect(await saver.flush()).toBe(true);
+  });
+});

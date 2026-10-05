@@ -68,6 +68,23 @@ export class SetLogSaver {
     void this.run(id);
   }
 
+  // Forget pending changes for sets that no longer exist (an exercise was removed). Without this a write for a deleted
+  // row updates zero rows, counts as a failure, and blocks Complete workout forever.
+  discard(ids: string[]): void {
+    let changed = false;
+    for (const id of ids) {
+      const entry = this.entries.get(id);
+      if (!entry) continue;
+      if (entry.timer) {
+        this.cancel(entry.timer);
+        entry.timer = null;
+      }
+      this.entries.delete(id);
+      changed = true;
+    }
+    if (changed) this.notify();
+  }
+
   // Try everything unsaved again now (manual "Retry now", or the network is back).
   retryAll(): void {
     for (const [id, entry] of this.entries) {

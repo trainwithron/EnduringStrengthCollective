@@ -5,6 +5,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
 import { TRACKED_FIELD_DEFS, ACTUAL_COLUMN, ACTUAL_PROP, fieldDef, type TrackedField } from "@/lib/exercise-fields";
 import { ExerciseSetGrid } from "./exercise-set-grid";
+import { useSetSave } from "./set-save-context";
 import { classifyEquipmentType } from "@/lib/equipment-classifier";
 import { ExerciseVideoThread } from "./exercise-video-thread";
 import { ExerciseAthleteNote } from "./exercise-athlete-note";
@@ -50,6 +51,7 @@ export function ExerciseCard({
   onSetCompleted?: (set: SetLogEntry) => void;
   gamificationEnabled?: boolean;
 }) {
+  const { discard: discardPendingSaves } = useSetSave();
   const [swapping, setSwapping] = useState(false);
   const [nameDraft, setNameDraft] = useState(exercise.exerciseName);
   const [swapBusy, setSwapBusy] = useState(false);
@@ -267,7 +269,10 @@ export function ExerciseCard({
                 {exercise.isAdded && onDelete && (
                   <button
                     type="button"
-                    onClick={onDelete}
+                    onClick={() => {
+                      discardPendingSaves(exercise.sets.map((s) => s.id));
+                      onDelete();
+                    }}
                     disabled={deleting}
                     className="font-body text-xs text-rust disabled:opacity-40"
                   >

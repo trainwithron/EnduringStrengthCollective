@@ -37,18 +37,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 
-  const { data: athleteMembership } = await supabase
-    .from("group_memberships")
-    .select("kiosk_pin")
-    .eq("group_id", groupId)
-    .eq("profile_id", athleteId)
-    .eq("role", "athlete")
-    .maybeSingle();
-
-  if (!athleteMembership?.kiosk_pin) {
+  // The PIN is checked in the database against its hash, which also counts wrong tries and locks the athlete's PIN
+  // after five (migration 0251). Until that exists the older plain-column check is used.
+  const { data: verdict, error: verifyError } = await supabase.rpc("verify_kiosk_pin", {
+    p_group_id: groupId,
+    p_athlete_id: athleteId,
+    p_pin: String(pin),
+  });
+  if (verifyError) {
+    if (!/could not find the function|does not exist/i.test(verifyError.message)) {
+      return NextResponse.json({ error: "Couldn't check that PIN — try again." }, { status: 500 });
+    }
+    const { data: legacy } = await supabase
+      .from("group_memberships")
+      .select("kiosk_pin")
+      .eq("group_id", groupId)
+      .eq("profile_id", athleteId)
+      .eq("role", "athlete")
+      .maybeSingle();
+    if (!legacy?.kiosk_pin) {
+      return NextResponse.json({ error: "No PIN set for this athlete yet — ask your coach." }, { status: 400 });
+    }
+    if (legacy.kiosk_pin !== pin) {
+      return NextResponse.json({ error: "Wrong PIN — try again." }, { status: 401 });
+    }
+  } else if (verdict === "no_pin") {
     return NextResponse.json({ error: "No PIN set for this athlete yet — ask your coach." }, { status: 400 });
-  }
-  if (athleteMembership.kiosk_pin !== pin) {
+  } else if (verdict === "locked") {
+    return NextResponse.json({ error: "Too many wrong tries. Try again later, or ask your coach." }, { status: 429 });
+  } else if (verdict !== "ok") {
     return NextResponse.json({ error: "Wrong PIN — try again." }, { status: 401 });
   }
 

@@ -20,7 +20,8 @@ export type SmsDispatchReason =
   | "minor_no_guardian_consent"
   | "quiet_hours"
   | "already_sent"
-  | "send_failed";
+  | "send_failed"
+  | "daily_cap";
 
 export interface SmsDispatchResult {
   sent: boolean;
@@ -128,6 +129,16 @@ export async function dispatchSms(
   if (isWithinQuietHours(nowInZone(zone), config.quiet_hours_start, config.quiet_hours_end)) {
     return { sent: false, reason: "quiet_hours" };
   }
+
+  // A per-coach daily ceiling, so a bug or a flood of events can never run up a text bill: the platform pays for
+  // these. Adjustable with SMS_DAILY_CAP_PER_COACH (default 40 a day).
+  const dailyCap = Number(process.env.SMS_DAILY_CAP_PER_COACH) > 0 ? Number(process.env.SMS_DAILY_CAP_PER_COACH) : 40;
+  const { count: sentToday } = await supabase
+    .from("sms_log")
+    .select("id", { count: "exact", head: true })
+    .eq("coach_id", params.coachId)
+    .gte("sent_at", new Date(Date.now() - 24 * 3600 * 1000).toISOString());
+  if ((sentToday ?? 0) >= dailyCap) return { sent: false, reason: "daily_cap" };
 
   const { error: logError } = await supabase.from("sms_log").insert({
     coach_id: params.coachId,

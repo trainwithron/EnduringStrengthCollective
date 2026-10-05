@@ -40,3 +40,33 @@ describe("session ledger helpers", () => {
     expect(ledgerKindLabel("waived")).toBe("Not charged");
   });
 });
+
+import { outstandingForBooking } from "./session-ledger";
+
+describe("outstandingForBooking (what an undo may give back)", () => {
+  const e = (kind: "delivered" | "refund" | "booked" | "adjusted", amount: number, bookingId = "b1") => ({ kind, amount, bookingId });
+
+  it("settle then undo returns the one session, and a second undo returns nothing", () => {
+    expect(outstandingForBooking([e("delivered", -1)], "b1")).toBe(1);
+    expect(outstandingForBooking([e("delivered", -1), e("refund", 1)], "b1")).toBe(0);
+  });
+
+  it("settle, undo, settle, undo never returns more than was taken", () => {
+    const afterSecondSettle = [e("delivered", -1), e("refund", 1), e("delivered", -1)];
+    expect(outstandingForBooking(afterSecondSettle, "b1")).toBe(1);
+    expect(outstandingForBooking([...afterSecondSettle, e("refund", 1)], "b1")).toBe(0);
+  });
+
+  it("settle, cancel (which refunds), then undo returns nothing", () => {
+    expect(outstandingForBooking([e("delivered", -1), e("refund", 1)], "b1")).toBe(0);
+  });
+
+  it("a session type that costs two is returned as two", () => {
+    expect(outstandingForBooking([e("delivered", -2)], "b1")).toBe(2);
+  });
+
+  it("ignores other bookings and other kinds, and never goes negative", () => {
+    expect(outstandingForBooking([e("delivered", -1, "other"), e("booked", -1), e("adjusted", -1)], "b1")).toBe(0);
+    expect(outstandingForBooking([e("refund", 1)], "b1")).toBe(0);
+  });
+});

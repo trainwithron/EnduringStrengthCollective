@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { validateClaimEmail } from "@/lib/client-claim";
+import { rateLimitResponse } from "@/lib/rate-limit";
+import { isSendGridConfigured, sendEmail } from "@/lib/sendgrid";
 
 // A coach correcting the email on a client's account AFTER the client has
 // claimed it (a wrong-but-valid address no verification email caught). Before the
@@ -14,6 +16,9 @@ export async function POST(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
+  const limited = await rateLimitResponse("correct-email", user.id, 10, 3600);
+  if (limited) return limited;
 
   const { groupId, athleteId, email, emailConfirm } = await request.json();
   if (!groupId || !athleteId) return NextResponse.json({ error: "Missing groupId or athleteId." }, { status: 400 });
@@ -40,6 +45,25 @@ export async function POST(request: Request) {
     .maybeSingle();
   if (member?.role !== "athlete") return NextResponse.json({ error: "Client not found in this group." }, { status: 404 });
 
+  // A login email is the client's own. If they also belong to a group this coach does not coach (another coach's
+  // client, a second organization), one coach must not be able to change how they sign in.
+  const { data: callerGroups } = await serviceRole
+    .from("group_memberships")
+    .select("group_id")
+    .eq("profile_id", user.id)
+    .eq("role", "coach");
+  const coachedIds = new Set((callerGroups ?? []).map((g) => g.group_id as string));
+  const { data: clientGroups } = await serviceRole.from("group_memberships").select("group_id").eq("profile_id", athleteId);
+  if ((clientGroups ?? []).some((g) => !coachedIds.has(g.group_id as string))) {
+    return NextResponse.json(
+      { error: "This client is also in a group you don't coach, so their sign-in email can only be changed by them. Ask them to change it in their settings." },
+      { status: 403 }
+    );
+  }
+
+  const { data: before } = await serviceRole.auth.admin.getUserById(athleteId);
+  const oldEmail = before?.user?.email ?? null;
+
   const { error } = await serviceRole.auth.admin.updateUserById(athleteId, { email: trimmed, email_confirm: true });
   if (error) {
     // GoTrue reports a duplicate only as a generic failure, so check the list ourselves. This caller is a
@@ -65,6 +89,15 @@ export async function POST(request: Request) {
     body: "Your coach updated the email address on your account. You now sign in with the new one.",
     link_path: `/groups/${groupId}`,
   });
+
+  // Tell the OLD address too, when email can be sent: if the change was not wanted, that is where they will see it.
+  if (oldEmail && !oldEmail.endsWith("@pending.invalid") && isSendGridConfigured()) {
+    await sendEmail(
+      oldEmail,
+      "Your sign-in email was changed",
+      "Your coach changed the email address you sign in with. If you did not expect this, contact your coach right away."
+    ).catch(() => false);
+  }
 
   return NextResponse.json({ ok: true, email: trimmed });
 }

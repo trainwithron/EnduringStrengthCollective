@@ -15,7 +15,12 @@ export async function GET(_request: Request, props: { params: Promise<{ postId: 
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  const shared = await getSharedWorkout(params.postId);
+  // Only someone who can already see this post (a member of its group) gets it; the post is looked up with the
+  // viewer's own access first, because the shared-workout reader itself is public by link.
+  const { data: visible } = await supabase.from("posts").select("id").eq("id", params.postId).maybeSingle();
+  if (!visible) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const shared = await getSharedWorkout(params.postId, { fullName: true });
   if (!shared) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   return NextResponse.json(shared);

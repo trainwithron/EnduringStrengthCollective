@@ -40,11 +40,13 @@ begin
     raise exception 'Not authorized to adjust these session credits';
   end if;
 
-  if auth.uid() = p_athlete_id and p_delta > 0 then
-    raise exception 'not authorized to increase your own session credits directly';
+  -- A client never changes their own balance directly, up or down: bookings, cancellations and rescheduling go through
+  -- their own functions. (With no floor, a client pushing their own balance negative would otherwise be possible.)
+  if auth.uid() = p_athlete_id then
+    raise exception 'not authorized to change your own session credits directly';
   end if;
 
-  if auth.uid() <> p_athlete_id and not public.is_group_coach(p_group_id) then
+  if auth.role() is distinct from 'service_role' and not public.is_group_coach(p_group_id) then
     raise exception 'not authorized to adjust these session credits';
   end if;
 
@@ -125,7 +127,8 @@ begin
   -- Only a client booking for themselves needs a credit. A coach can always schedule.
   if v_is_self then
     select balance into v_balance from public.session_credits
-      where athlete_id = p_athlete_id and group_id = p_group_id;
+      where athlete_id = p_athlete_id and group_id = p_group_id
+      for update;
     if coalesce(v_balance, 0) <= 0 then
       raise exception 'no session credits remaining';
     end if;
@@ -194,7 +197,8 @@ begin
 
   select athlete_id, group_id, coach_id, status, credit_state, start_at, end_at
     into v_athlete_id, v_group_id, v_coach_id, v_status, v_state, v_start_at, v_end_at
-  from public.bookings where id = p_booking_id;
+  from public.bookings where id = p_booking_id
+  for update;
 
   if v_athlete_id is null then
     raise exception 'booking not found';
@@ -237,7 +241,16 @@ $function$;
 
 -- ---- settling at delivery ------------------------------------------------------------------------------------------
 -- Internal: settle one booking exactly once. Returns true when a credit was taken.
-create or replace function public.settle_booking_internal(p_booking_id uuid, p_cost int, p_note text, p_by uuid)
+drop function if exists public.settle_booking_internal(uuid, int, text, uuid);
+
+create or replace function public.settle_booking_internal(
+  p_booking_id uuid,
+  p_cost int,
+  p_note text,
+  p_by uuid,
+  p_expected_athlete uuid default null,
+  p_expected_group uuid default null
+)
 returns boolean
 language plpgsql
 security definer
@@ -248,6 +261,11 @@ declare
 begin
   select * into v_b from public.bookings where id = p_booking_id for update;
   if not found or v_b.status <> 'confirmed' then
+    return false;
+  end if;
+  -- A logged session may only settle a booking that is really that client's, in that group.
+  if (p_expected_athlete is not null and v_b.athlete_id <> p_expected_athlete)
+     or (p_expected_group is not null and v_b.group_id <> p_expected_group) then
     return false;
   end if;
   if v_b.attended_at is not null then
@@ -264,7 +282,7 @@ begin
   return false; -- prepaid or waived: attended, nothing more to take
 end;
 $$;
-revoke all on function public.settle_booking_internal(uuid, int, text, uuid) from public, anon, authenticated;
+revoke all on function public.settle_booking_internal(uuid, int, text, uuid, uuid, uuid) from public, anon, authenticated;
 
 -- One-tap "Mark as attended" for a coach. Returns true when a credit was taken.
 create or replace function public.mark_booking_attended(p_booking_id uuid)
@@ -306,14 +324,17 @@ begin
   if auth.role() is distinct from 'service_role' and (auth.uid() is null or not public.is_group_coach(v_b.group_id)) then
     raise exception 'not authorized to change this session';
   end if;
-  if v_b.attended_at is null then
+  if v_b.attended_at is null or v_b.status <> 'confirmed' then
     return false;
   end if;
 
   if v_b.credit_state = 'settled' then
+    -- What this booking has actually cost the client so far: every delivered entry minus every refund already given
+    -- back for it (an earlier undo, a cancellation). Refunding anything more would mint credits, so a repeated
+    -- settle and undo can only ever return what is outstanding. lib/session-ledger.ts outstandingForBooking mirrors this.
     select coalesce(-sum(amount), 0) into v_taken
     from public.session_credit_ledger
-    where booking_id = p_booking_id and kind = 'delivered';
+    where booking_id = p_booking_id and kind in ('delivered', 'refund');
     if v_taken > 0 then
       perform public.apply_session_credit_change(v_b.athlete_id, v_b.group_id, v_taken, 'refund', 'Undid attended', p_booking_id, auth.uid());
     end if;
@@ -373,7 +394,7 @@ declare
   end if;$old$;
   v_new text := $new$  if v_session.logged_by_coach and v_session.booking_id is not null then
     -- The session is on the calendar and the coach logged it: settle that booking (once, never twice).
-    v_credit_consumed := public.settle_booking_internal(v_session.booking_id, v_credit_cost, 'Workout logged', auth.uid());
+    v_credit_consumed := public.settle_booking_internal(v_session.booking_id, v_credit_cost, 'Workout logged', auth.uid(), v_session.athlete_id, v_session.group_id);
   elsif v_session.logged_by_coach and v_session.deduct_session_credit and v_credit_cost > 0 then
     -- Not tied to a booking: follows the explicit choice made when the session was started.
     perform public.apply_session_credit_change(v_session.athlete_id, v_session.group_id, -v_credit_cost, 'delivered', 'Workout logged', null, auth.uid());
@@ -447,5 +468,94 @@ begin
   end loop;
 
   return query select v_series_id, v_booked, v_failed;
+end;
+$function$;
+
+-- ---- rescheduling: the late fee goes through the internal function ---------------------------------------------------
+-- The client reschedules their own booking, and a late change takes one more session. That used to call
+-- adjust_session_credits as the client, which clients can no longer do; same function otherwise, as live.
+create or replace function public.reschedule_booking(p_booking_id uuid, p_new_start_at timestamp with time zone, p_new_end_at timestamp with time zone)
+returns void
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+declare
+  v_athlete_id uuid;
+  v_group_id uuid;
+  v_coach_id uuid;
+  v_status text;
+  v_start_at timestamptz;
+  v_end_at timestamptz;
+  v_window_hours int;
+  v_buffer_minutes int;
+  v_minimum_notice_hours int;
+begin
+  if auth.role() = 'service_role' then
+    null;
+  elsif auth.uid() is null then
+    raise exception 'Not authorized to reschedule this booking';
+  end if;
+
+  select athlete_id, group_id, coach_id, status, start_at, end_at
+    into v_athlete_id, v_group_id, v_coach_id, v_status, v_start_at, v_end_at
+  from public.bookings where id = p_booking_id
+  for update;
+
+  if v_athlete_id is null then
+    raise exception 'booking not found';
+  end if;
+  if auth.uid() <> v_athlete_id then
+    raise exception 'not authorized to reschedule this booking';
+  end if;
+  if v_status <> 'confirmed' then
+    raise exception 'booking is not in a reschedulable state';
+  end if;
+
+  if p_new_end_at <= p_new_start_at then
+    raise exception 'invalid time range';
+  end if;
+
+  select coalesce(bp.buffer_minutes, 0), coalesce(bp.minimum_notice_hours, 0)
+    into v_buffer_minutes, v_minimum_notice_hours
+  from public.coach_booking_policies bp where bp.coach_id = v_coach_id;
+  v_buffer_minutes := coalesce(v_buffer_minutes, 0);
+  v_minimum_notice_hours := coalesce(v_minimum_notice_hours, 0);
+
+  if (p_new_start_at - now()) < make_interval(hours => v_minimum_notice_hours) then
+    raise exception 'that session needs more advance notice';
+  end if;
+
+  if exists (
+    select 1 from public.bookings b
+    where b.coach_id = v_coach_id
+      and b.id <> p_booking_id
+      and b.status = 'confirmed'
+      and b.start_at < (p_new_end_at + make_interval(mins => v_buffer_minutes))
+      and b.end_at > (p_new_start_at - make_interval(mins => v_buffer_minutes))
+  ) or exists (
+    select 1 from public.discovery_bookings d
+    where d.coach_id = v_coach_id
+      and d.status = 'confirmed'
+      and d.start_at < (p_new_end_at + make_interval(mins => v_buffer_minutes))
+      and d.end_at > (p_new_start_at - make_interval(mins => v_buffer_minutes))
+  ) then
+    raise exception 'that slot was just taken';
+  end if;
+
+  select coalesce(
+    (select cancellation_window_hours from public.coach_booking_policies where coach_id = v_coach_id),
+    24
+  ) into v_window_hours;
+
+  update public.bookings
+    set start_at = p_new_start_at, end_at = p_new_end_at, reminder_sent_at = null
+    where id = p_booking_id;
+
+  if (v_start_at - now()) < make_interval(hours => v_window_hours) then
+    perform public.apply_session_credit_change(v_athlete_id, v_group_id, -1, 'adjusted', 'Late reschedule', p_booking_id, auth.uid());
+  end if;
+
+  perform public.offer_freed_slot_to_waitlist(v_coach_id, v_start_at, v_end_at);
 end;
 $function$;

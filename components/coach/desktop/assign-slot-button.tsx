@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { checkAndNotifyLowSessionBalance } from "@/lib/notify-low-session-balance";
 import { notifyBookingConfirmed } from "@/lib/notify-booking-confirmed";
 import { mirrorGoogleCalendarEvent } from "@/lib/mirror-google-calendar-event";
 
@@ -51,7 +50,6 @@ export function AssignSlotButton({
       return;
     }
 
-    checkAndNotifyLowSessionBalance(athleteId, groupId);
     notifyBookingConfirmed(athleteId, groupId, startAt);
     if (bookingId) mirrorGoogleCalendarEvent(bookingId);
     router.refresh();

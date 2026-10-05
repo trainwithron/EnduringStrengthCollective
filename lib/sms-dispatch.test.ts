@@ -10,6 +10,7 @@ function fakeSupabase(opts: {
   rpcError?: boolean;
   smsEnabled?: boolean;
   logInsertError?: boolean;
+  sentToday?: number;
 }) {
   const calls = { rpc: [] as unknown[], logInserts: [] as unknown[] };
   const client = {
@@ -35,6 +36,7 @@ function fakeSupabase(opts: {
       }
       if (table === "sms_log") {
         return {
+          select: () => ({ eq: () => ({ gte: async () => ({ count: opts.sentToday ?? 0 }) }) }),
           insert: async (row: unknown) => {
             calls.logInserts.push(row);
             return { error: opts.logInsertError ? { message: "dup" } : null };
@@ -169,5 +171,31 @@ describe("dispatchSms consent gate", () => {
     });
     expect(await dispatchSms(client, { ...base, athleteId: "a1" })).toEqual({ sent: false, reason: "already_sent" });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("dispatchSms daily cap", () => {
+  const prevKey = process.env.TWILIO_ACCOUNT_SID;
+  beforeEach(() => {
+    process.env.TWILIO_ACCOUNT_SID = "AC_test";
+    process.env.TWILIO_AUTH_TOKEN = "tok";
+    process.env.TWILIO_FROM_NUMBER = "+15555550100";
+  });
+  afterEach(() => {
+    if (prevKey === undefined) delete process.env.TWILIO_ACCOUNT_SID;
+    else process.env.TWILIO_ACCOUNT_SID = prevKey;
+  });
+
+  it("stops texting once a coach reaches the daily cap, without writing a log row", async () => {
+    const { client, calls } = fakeSupabase({ smsEnabled: true, sentToday: 40 });
+    const result = await dispatchSms(client, {
+      coachId: "coach-1",
+      messageType: "low_credit_alert",
+      referenceId: "cap-1",
+      body: "hi",
+      recipientPhone: "+15555550123",
+    });
+    expect(result).toEqual({ sent: false, reason: "daily_cap" });
+    expect(calls.logInserts).toHaveLength(0);
   });
 });

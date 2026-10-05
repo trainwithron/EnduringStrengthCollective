@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { KioskPinManager } from "@/components/coach/desktop/kiosk-pin-manager";
+import { loadKioskPinStatus } from "@/lib/kiosk-pin-status";
 
 // The admin surface for Kiosk Check-In — separate from the locked-down
 // /kiosk screen itself on purpose: PINs are viewed/reset here, on the
@@ -46,15 +47,16 @@ export default async function KioskSettingsPage(
 
   const { data: memberships } = await supabase
     .from("group_memberships")
-    .select("profile_id, kiosk_pin, profiles ( full_name )")
+    .select("profile_id, profiles ( full_name )")
     .eq("group_id", params.groupId)
     .eq("role", "athlete");
+  const pinStatus = await loadKioskPinStatus(supabase, params.groupId);
 
   const roster = (memberships ?? [])
     .map((m: any) => ({
       athleteId: m.profile_id as string,
       fullName: (m.profiles?.full_name as string | null) ?? "Unknown",
-      kioskPin: m.kiosk_pin as string | null,
+      hasPin: pinStatus.get(m.profile_id as string) ?? false,
     }))
     .sort((a, b) => a.fullName.localeCompare(b.fullName));
 

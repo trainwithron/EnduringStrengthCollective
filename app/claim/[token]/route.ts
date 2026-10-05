@@ -50,7 +50,7 @@ function continuePage(action: string, message?: string) {
 <h1>Welcome</h1>
 <p>Tap Continue to sign in and set up your account.</p>
 ${message ? `<p class="err">${message}</p>` : ""}
-<form method="post" action="${escapeAttr(action)}"><button type="submit">Continue</button></form>
+<form method="post" action="${escapeAttr(action)}" onsubmit="var b=this.querySelector('button');if(b.dataset.sent){return false;}b.dataset.sent='1';setTimeout(function(){b.disabled=true},0);"><button type="submit">Continue</button></form>
 </main></body></html>`);
 }
 
@@ -147,6 +147,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ tok
     return retry(consumeError.message);
   }
   if (!consumed) {
+    // Another request used the link first. If that happened a moment ago it is almost certainly this same person
+    // tapping twice, and both requests signed in the same account in the same browser: signing out here would sign
+    // the winner out too, so carry on to the same next step. Anything older than that is a genuine reuse.
+    const { data: used } = await serviceRole
+      .from("client_invites")
+      .select("used_at")
+      .eq("id", invite.id)
+      .maybeSingle();
+    const usedAt = used?.used_at ? new Date(used.used_at as string).getTime() : 0;
+    if (usedAt > 0 && Date.now() - usedAt <= 20_000) {
+      return NextResponse.redirect(`${origin}/set-password`, 303);
+    }
     await supabase.auth.signOut();
     return invalid();
   }

@@ -11,6 +11,7 @@ import { isLowReadiness } from "./wellness";
 import { detectMatchedLoadTrend, type ExerciseSessionPoint } from "./matched-load-trend";
 import { computeEngagement, computeEstimatedMRR } from "./business-metrics";
 import { computeHabitCompliance, computeCompliancePct } from "./habits";
+import { formatInTimezone, timezoneForProfiles } from "@/lib/format-in-timezone";
 
 export interface DashboardGroupInfo {
   id: string;
@@ -493,12 +494,11 @@ export async function getCoachDashboardData(
         };
       } else if (bookingRows && bookingRows.length > 0) {
         const next = bookingRows[0] as any;
+        // In the coach's own time zone (this runs on the server, which is UTC).
+        const nextTime = formatInTimezone(next.start_at, await timezoneForProfiles(supabase, [coachId]), "time");
         heroEmptyState = {
           kind: "next_session",
-          text: `Next up: ${next.profiles?.full_name ?? "a client"} at ${new Date(next.start_at).toLocaleTimeString(
-            "en-US",
-            { hour: "numeric", minute: "2-digit" }
-          )}.`,
+          text: `Next up: ${next.profiles?.full_name ?? "a client"} at ${nextTime}.`,
           href: null,
         };
       } else {

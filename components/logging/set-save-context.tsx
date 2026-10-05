@@ -11,6 +11,8 @@ interface SetSaveApi {
   failedIds: Set<string>;
   unsavedCount: number;
   retryAll: () => void;
+  // Drop pending saves for sets that were deleted.
+  discard: (setIds: string[]) => void;
   // Try everything pending right now; true only if all of it saved.
   flush: () => Promise<boolean>;
 }
@@ -26,6 +28,7 @@ const FALLBACK: SetSaveApi = {
   failedIds: new Set(),
   unsavedCount: 0,
   retryAll: () => {},
+  discard: () => {},
   flush: async () => true,
 };
 
@@ -71,10 +74,11 @@ export function SetSaveProvider({ children }: { children: React.ReactNode }) {
   const save = useCallback((id: string, payload: Record<string, unknown>) => saver.queue(id, payload), [saver]);
   const retryAll = useCallback(() => saver.retryAll(), [saver]);
   const flush = useCallback(() => saver.flush(), [saver]);
+  const discard = useCallback((ids: string[]) => saver.discard(ids), [saver]);
 
   const api = useMemo<SetSaveApi>(
-    () => ({ save, failedIds, unsavedCount, retryAll, flush }),
-    [save, failedIds, unsavedCount, retryAll, flush]
+    () => ({ save, failedIds, unsavedCount, retryAll, discard, flush }),
+    [save, failedIds, unsavedCount, retryAll, discard, flush]
   );
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;

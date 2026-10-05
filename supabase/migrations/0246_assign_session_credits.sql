@@ -112,3 +112,52 @@ end;
 $$;
 
 grant execute on function public.assign_session_credits(uuid, uuid, int, text) to authenticated;
+
+-- Match the balance to what the client really has, for example back to zero for a client who ended up at -2 because
+-- they pay elsewhere. Recorded in the ledger as an adjustment showing the change, the new balance, and who did it.
+create or replace function public.set_session_balance(
+  p_athlete_id uuid,
+  p_group_id uuid,
+  p_target int,
+  p_note text default null
+)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_current int;
+  v_delta int;
+begin
+  if auth.uid() is null or not public.is_group_coach(p_group_id) then
+    raise exception 'not authorized to set this balance';
+  end if;
+  if p_target is null or p_target < -500 or p_target > 500 then
+    raise exception 'balance must be between -500 and 500';
+  end if;
+  if not exists (
+    select 1 from public.group_memberships
+    where group_id = p_group_id and profile_id = p_athlete_id and role = 'athlete'
+  ) then
+    raise exception 'that person is not a client in this group';
+  end if;
+
+  select balance into v_current from public.session_credits
+    where athlete_id = p_athlete_id and group_id = p_group_id
+    for update;
+  v_current := coalesce(v_current, 0);
+  v_delta := p_target - v_current;
+  if v_delta = 0 then
+    return v_current;
+  end if;
+
+  return public.apply_session_credit_change(
+    p_athlete_id, p_group_id, v_delta, 'adjusted',
+    coalesce(nullif(trim(coalesce(p_note, '')), ''), 'Balance set from ' || v_current || ' to ' || p_target),
+    null, auth.uid()
+  );
+end;
+$$;
+
+grant execute on function public.set_session_balance(uuid, uuid, int, text) to authenticated;

@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatch";
 import { getCallerGroupRole } from "@/lib/group-access";
+import { rateLimitAllows } from "@/lib/rate-limit";
 
 // Only these two events can be raised from a browser. client_added and package_purchased are dispatched by the
 // server routes that actually perform them (clients/invite, the Stripe webhook), never from here.
@@ -45,6 +46,12 @@ export async function POST(request: Request) {
   const ownsIt = log && (log.athlete_id === user.id || role === "coach");
   if (!log || log.group_id !== groupId || !fresh || !ownsIt) {
     return NextResponse.json({ error: "Not allowed." }, { status: 403 });
+  }
+
+  // Once per workout log per event: inside the 30-minute window the same real log could otherwise be announced again
+  // and again.
+  if (!(await rateLimitAllows(`webhook-dispatch:${eventType}:${log.id}`, 1, 24 * 3600))) {
+    return NextResponse.json({ dispatched: 0, duplicate: true });
   }
 
   const prs = (log.new_prs as string[] | null) ?? [];

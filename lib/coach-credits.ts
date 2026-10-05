@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   AI_ALLOWANCE_PER_STEP,
   allowanceLimit,
+  type AllowanceScaleInput,
   allowanceUsed,
   clientSteps,
   nextAllowanceReset,
@@ -76,6 +77,30 @@ export interface AiUsageSummary {
   resetsOn: string; // YYYY-MM-DD, first of next month UTC
 }
 
+// The coach's org billing state as it affects AI limits: a free-access (beta) org gets a smaller allowance, and the
+// platform admin can set an org's own scale (organization_billing.ai_allowance_scale, migration 0250). Read under the
+// coach's own session. If the scale column is not there yet this falls back to just the exempt flag.
+async function readAllowanceScale(supabase: SupabaseClient, coachId: string): Promise<AllowanceScaleInput> {
+  const { data: memberships } = await supabase.from("organization_memberships").select("organization_id").eq("profile_id", coachId);
+  const orgIds = (memberships ?? []).map((m) => m.organization_id as string);
+  if (orgIds.length === 0) return {};
+  type BillingRow = { billing_exempt: boolean | null; ai_allowance_scale?: number | null };
+  let rows: BillingRow[] = [];
+  const full = await supabase.from("organization_billing").select("billing_exempt, ai_allowance_scale").in("organization_id", orgIds);
+  if (!full.error) {
+    rows = (full.data as BillingRow[] | null) ?? [];
+  } else {
+    const basic = await supabase.from("organization_billing").select("billing_exempt").in("organization_id", orgIds);
+    rows = (basic.data as BillingRow[] | null) ?? [];
+  }
+  // Same pick as coach_ai_multiplier(): prefer an org that is not free-access.
+  const sorted = [...rows].sort((a, b) => Number(!!a.billing_exempt) - Number(!!b.billing_exempt));
+  const orgsWithoutRow = orgIds.length > rows.length;
+  const pick = orgsWithoutRow ? { billing_exempt: false, ai_allowance_scale: null } : sorted[0];
+  if (!pick) return {};
+  return { exempt: !!pick.billing_exempt, scale: pick.ai_allowance_scale ?? null };
+}
+
 export async function getAiUsage(supabase: SupabaseClient, coachId: string): Promise<AiUsageSummary> {
   const [{ data: row }, { data: coachedRows }] = await Promise.all([
     supabase
@@ -85,6 +110,7 @@ export async function getAiUsage(supabase: SupabaseClient, coachId: string): Pro
       .maybeSingle(),
     supabase.from("group_memberships").select("group_id").eq("profile_id", coachId).eq("role", "coach"),
   ]);
+  const scaleOpts = await readAllowanceScale(supabase, coachId);
   const groupIds = (coachedRows ?? []).map((r) => r.group_id as string);
   let clients = 0;
   if (groupIds.length > 0) {
@@ -103,11 +129,11 @@ export async function getAiUsage(supabase: SupabaseClient, coachId: string): Pro
     steps: clientSteps(clients),
     program: {
       used: allowanceUsed("program_generation", row ?? null),
-      limit: allowanceLimit("program_generation", clients),
+      limit: allowanceLimit("program_generation", clients, scaleOpts),
     },
     mealplan: {
       used: allowanceUsed("nutrition_plan", row ?? null),
-      limit: allowanceLimit("nutrition_plan", clients),
+      limit: allowanceLimit("nutrition_plan", clients, scaleOpts),
     },
     resetsOn: nextAllowanceReset(),
   };

@@ -1,4 +1,4 @@
-import { createServerClient } from "@/lib/supabase/server";
+import { publicDisplayName } from "@/lib/public-name";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { estimateOneRepMax } from "@/lib/one-rep-max";
 import { parseNumericPaceSecondsPerUnit, formatPaceSecondsToClock } from "@/lib/progression-models";
@@ -11,8 +11,14 @@ import { computeRelativeStrengthMilestone } from "@/lib/relative-strength-milest
 // Shared by the public /share/[postId] page and the in-feed expanded
 // card (fetched via /api/workout-share/[postId]) so both surfaces
 // compute "top lifts" / PR list / totals identically from one place.
-export async function getSharedWorkout(postId: string) {
-  const supabase = await createServerClient();
+//
+// Public by link: whoever holds the post's (unguessable) id can see the card, and nothing else is readable by the
+// public. Reads use the service role on the server so no table needs a public (anon) read policy, which used to let
+// anyone with the public key list every shared workout, author and set in the database (migration 0253 removes those
+// policies). Only the fields the card shows are returned, with the name shortened to first name and last initial
+// unless the caller is a member of the group (fullName).
+export async function getSharedWorkout(postId: string, opts: { fullName?: boolean } = {}) {
+  const supabase = createServiceRoleClient();
 
   const { data: post } = await supabase
     .from("posts")
@@ -390,7 +396,9 @@ export async function getSharedWorkout(postId: string) {
   return {
     authorId: post.author_id as string,
     groupId: post.group_id,
-    athleteName: (post.profiles as any)?.full_name ?? "An athlete",
+    athleteName: opts.fullName
+      ? (post.profiles as any)?.full_name ?? "An athlete"
+      : publicDisplayName((post.profiles as any)?.full_name),
     athleteAvatarUrl: (post.profiles as any)?.avatar_url ?? null,
     groupName: group?.name ?? "Spotlight Coaching",
     workoutCardBackgroundMode: (org?.workout_card_background_mode as "default_rotation" | "custom" | null) ?? "default_rotation",

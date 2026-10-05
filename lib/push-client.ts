@@ -26,14 +26,16 @@ export async function subscribeToPush(): Promise<void> {
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
   if (!publicKey) throw new Error("Push notifications aren't configured.");
 
-  const registration = await navigator.serviceWorker.register("/sw.js");
+  await navigator.serviceWorker.register("/sw.js");
+  // Subscribing before the worker is active fails on a first visit, so wait until it is ready.
+  const registration = await navigator.serviceWorker.ready;
   const subscription = await registration.pushManager.subscribe({
     userVisibleOnly: true,
     applicationServerKey: urlBase64ToUint8Array(publicKey),
   });
 
   const json = subscription.toJSON();
-  await fetch("/api/push/subscribe", {
+  const res = await fetch("/api/push/subscribe", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -42,6 +44,12 @@ export async function subscribeToPush(): Promise<void> {
       authKey: json.keys?.auth,
     }),
   });
+  if (!res.ok) {
+    // The server never stored it, so this device would show notifications as "on" but never receive one. Undo the
+    // browser subscription and say so.
+    await subscription.unsubscribe().catch(() => false);
+    throw new Error("Couldn't turn notifications on. Please try again.");
+  }
 }
 
 export async function unsubscribeFromPush(): Promise<void> {

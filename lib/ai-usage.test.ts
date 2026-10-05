@@ -12,6 +12,7 @@ import {
   nextAllowanceReset,
   AI_BURST_LIMIT_PER_MINUTE,
   MEAL_SLOT_MONTHLY_CEILING_PER_STEP,
+  aiMultiplier,
 } from "./ai-usage";
 
 describe("burst policy", () => {
@@ -30,7 +31,8 @@ describe("burst policy", () => {
     expect(burstLimitFor("meal_plan_slot")).toBeGreaterThan(AI_BURST_LIMIT_PER_MINUTE);
     expect(burstBucketFor("meal_plan_slot")).toEqual(["meal_plan_slot"]);
     expect(monthlyCeilingFor("meal_plan_slot")).toBe(MEAL_SLOT_MONTHLY_CEILING_PER_STEP);
-    expect(monthlyCeilingFor("program_generation")).toBeNull();
+    // Failed attempts are logged but not charged, so program generation has a ceiling of 1.5x its allowance.
+    expect(monthlyCeilingFor("program_generation")).toBe(150);
   });
 
   it("shares one bucket across ordinary features, excluding meal slots and system calls", () => {
@@ -86,5 +88,32 @@ describe("allowance", () => {
     expect(allowanceRemaining("nutrition_plan", row, 100, now)).toBe(0);
     // more clients, bigger allowance, same usage
     expect(allowanceRemaining("nutrition_plan", row, 150, now)).toBe(150);
+  });
+});
+
+describe("allowance scaling", () => {
+  it("keeps one full step from 25 to 100 clients and one per 100 after that", () => {
+    expect(aiMultiplier(25)).toBe(1);
+    expect(aiMultiplier(100)).toBe(1);
+    expect(aiMultiplier(101)).toBe(2);
+    expect(aiMultiplier(250)).toBe(3);
+  });
+
+  it("gives a coach with few clients a prorated share, never below a quarter", () => {
+    expect(aiMultiplier(0)).toBe(0.25);
+    expect(aiMultiplier(5)).toBe(0.25);
+    expect(aiMultiplier(10)).toBeCloseTo(0.4);
+    expect(allowanceLimit("program_generation", 0)).toBe(25);
+    expect(allowanceLimit("nutrition_plan", 0)).toBe(50);
+  });
+
+  it("free-access orgs get about 30 programs and 60 meal plans, whatever their client count", () => {
+    expect(allowanceLimit("program_generation", 500, { exempt: true })).toBe(30);
+    expect(allowanceLimit("nutrition_plan", 500, { exempt: true })).toBe(60);
+  });
+
+  it("an explicit org scale wins over everything", () => {
+    expect(allowanceLimit("program_generation", 0, { exempt: true, scale: 0.1 })).toBe(10);
+    expect(allowanceLimit("program_generation", 0, { scale: 2 })).toBe(200);
   });
 });
