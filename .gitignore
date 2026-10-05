@@ -25,3 +25,6 @@ next-env.d.ts
 
 .vercel
 .env*
+
+# Database and storage backups (scripts/backup.mjs) hold real client data. Never commit them.
+/backups/

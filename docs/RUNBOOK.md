@@ -61,7 +61,17 @@ Then: check Vercel and Supabase logs for use you do not recognize, tell affected
 
 ## 5. Backups
 
-See `scripts/backup.mjs` (database and storage copy) and the schedule you set for it. Supabase also keeps its own daily backups on paid plans: Project Settings, Database, Backups. Know where your copies are before you need them.
+`scripts/backup.mjs` copies the database (pg_dump) and every storage bucket to a folder on your machine, keeps the newest 14 dated copies, and checks the dump can be read back. It only reads from Supabase.
+
+```
+DATABASE_URL="postgresql://..." NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node scripts/backup.mjs --out D:/spotlight-backups
+```
+
+- Needs PostgreSQL client tools (pg_dump, pg_restore) installed. `DATABASE_URL` is the connection string from Supabase, Project Settings, Database.
+- **Schedule it** nightly (Windows Task Scheduler, cron, or a scheduled GitHub Action) and have the scheduler alert on a non-zero exit. A backup nobody runs is not a backup.
+- Backups hold real client data. The `backups/` folder is ignored by git; keep copies on an encrypted disk and a second place off this machine.
+- Supabase also keeps its own daily backups on paid plans: Project Settings, Database, Backups. Know where all your copies are before you need them.
+- **Test a restore** into a scratch project once now and after any big change (section 6).
 
 ## 6. Restore into a new project
 
