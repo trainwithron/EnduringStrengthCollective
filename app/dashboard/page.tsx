@@ -26,6 +26,7 @@ import {
 } from "@/components/coach/desktop/collective-intelligence-panel";
 import { StuckDesktopModeBanner } from "@/components/coach/desktop/stuck-desktop-mode-banner";
 import { TerminologyFirstRunCard } from "@/components/coach/desktop/terminology-first-run-card";
+import { GettingStartedCard } from "@/components/coach/desktop/getting-started-card";
 
 interface GroupRow {
   id: string;
@@ -470,6 +471,10 @@ export default async function CoachHomePage() {
       </div>
 
       {allGroups[0] && <TerminologyFirstRunCard groupId={allGroups[0].id} />}
+
+      {clientCards.length === 0 && teamCards.length === 0 && socialCards.length === 0 && allGroups[0] && (
+        <GettingStartedCard groupId={(allGroups.find((g) => g.group_kind !== "one_on_one") ?? allGroups[0]).id} />
+      )}
 
       <div className="mb-6">
         <DashboardHero flag={dashboardData.heroFlag} emptyState={dashboardData.heroEmptyState} />

@@ -7,6 +7,7 @@ import { InviteCoachForm } from "@/components/coach/desktop/invite-coach-form";
 import { TransferOwnershipButton } from "@/components/coach/desktop/transfer-ownership-button";
 import { WorkoutCardBackgroundSettings } from "@/components/coach/desktop/workout-card-background-settings";
 import { DispatchSettings } from "@/components/coach/desktop/dispatch-settings";
+import { MarketplaceListingToggle } from "@/components/coach/desktop/marketplace-listing-toggle";
 import { ClientTagManager } from "@/components/coach/desktop/client-tag-manager";
 import { TerminologySettingsPanel } from "@/components/coach/desktop/terminology-settings-panel";
 import { CoachCreditsPanel } from "@/components/coach/desktop/coach-credits-panel";
@@ -101,6 +102,13 @@ export default async function BrandingPage(
     .select(
       "id, slug, name, owner_id, created_at, button_shape, accent_color, background_color, text_color, font_display, font_body, logo_url, app_icon_url, workout_card_background_mode, workout_card_background_url, dispatch_ttl_minutes, zip_code"
     )
+    .eq("id", orgMembership.organization_id)
+    .maybeSingle();
+
+  // Separate so a database without the setting yet still renders the page (the toggle is then hidden).
+  const { data: listingRow, error: listingError } = await supabase
+    .from("organizations")
+    .select("listed_in_marketplace")
     .eq("id", orgMembership.organization_id)
     .maybeSingle();
 
@@ -242,6 +250,12 @@ export default async function BrandingPage(
 
       {tab === "team" ? (
         <div>
+          <MarketplaceListingToggle
+            organizationId={orgMembership.organization_id}
+            initialListed={!!listingRow?.listed_in_marketplace}
+            canEdit={isOwnerOrAdmin}
+            available={!listingError && !!listingRow}
+          />
           <div className="border border-steel/20 p-4 mb-8 grid grid-cols-1 sm:grid-cols-2 gap-6">
             <div>
               <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">

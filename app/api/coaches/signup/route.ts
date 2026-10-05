@@ -109,7 +109,9 @@ export async function POST(request: Request) {
     });
     if (resendError) console.error("Couldn't send signup confirmation email:", resendError.message);
 
-    return NextResponse.json({ groupId, pendingConfirmation: true });
+    // If the email could not be sent (the mail service limits how many go out per hour), say so, so the person is not left
+    // waiting. Their account exists either way and the page offers to send it again.
+    return NextResponse.json({ groupId, pendingConfirmation: true, confirmationEmailSent: !resendError });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Couldn't set up your organization." },

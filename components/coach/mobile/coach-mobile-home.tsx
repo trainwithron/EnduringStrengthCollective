@@ -206,7 +206,29 @@ export async function CoachMobileHome({
           </section>
         )}
 
-        {!topDue && !soloAthlete && (
+        {!topDue && !soloAthlete && (rosterRows ?? []).length === 0 && (
+          <section className="px-5 pb-6">
+            <div className="border border-steel/20 p-4">
+              <p className="font-body text-sm text-chalk">Welcome. Two things get you started:</p>
+              <div className="mt-3 flex flex-col gap-2">
+                <Link
+                  href={`/groups/${groupId}/clients`}
+                  className="h-11 flex items-center justify-center bg-rust text-graphite font-display uppercase text-sm font-bold"
+                >
+                  Add your first client
+                </Link>
+                <Link
+                  href={`/groups/${groupId}/programs/new`}
+                  className="h-11 flex items-center justify-center border border-steel/40 text-chalk font-display uppercase text-sm font-bold"
+                >
+                  Build your first program
+                </Link>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {!topDue && !soloAthlete && (rosterRows ?? []).length > 0 && (
           <section className="px-5 pb-6">
             <p className="font-body text-sm text-steel border border-steel/20 p-4">
               No clients due today.

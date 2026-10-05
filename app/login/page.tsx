@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { LegalLinks } from "@/components/legal/legal-links";
+import { friendlySignInError } from "@/lib/sign-in-errors";
 import { isStandaloneDisplay, isMobileUserAgent } from "@/lib/pwa";
 import { loadStartInputs, parseLastGroupCookie, pickStartGroup } from "@/lib/start-group";
 
@@ -21,8 +22,21 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [canResend, setCanResend] = useState(false);
+  const [resendNote, setResendNote] = useState<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  async function resendConfirmation() {
+    setResendNote(null);
+    const res = await fetch("/api/auth/resend-confirmation", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    const body = await res.json().catch(() => ({}));
+    setResendNote(res.ok ? "Sent. Check your inbox and spam folder." : body.error ?? "We could not send the email. Try again in a few minutes.");
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -36,7 +50,10 @@ function LoginForm() {
     });
 
     if (signInError || !data.user) {
-      setError(signInError?.message ?? "Sign in failed.");
+      const friendly = friendlySignInError(signInError?.message);
+      setError(friendly.message);
+      setCanResend(friendly.canResend);
+      setResendNote(null);
       setSubmitting(false);
       return;
     }
@@ -120,6 +137,18 @@ function LoginForm() {
             <p className="font-body text-sm text-rust" role="alert">
               {error}
             </p>
+          )}
+          {canResend && (
+            <div>
+              <button
+                type="button"
+                onClick={resendConfirmation}
+                className="font-body text-sm text-rust underline underline-offset-2"
+              >
+                Send the confirmation email again
+              </button>
+              {resendNote && <p className="font-body text-xs text-steel mt-1">{resendNote}</p>}
+            </div>
           )}
 
           <button

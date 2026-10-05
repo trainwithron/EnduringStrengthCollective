@@ -4,6 +4,8 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { loadStartInputs, pickStartGroup } from "@/lib/start-group";
+import { isStandaloneDisplay, isMobileUserAgent } from "@/lib/pwa";
 
 export default function ConfirmEmailPage() {
   return (
@@ -32,13 +34,14 @@ function ConfirmEmailStatus() {
         return;
       }
       setHasSession(true);
-      const { data: membership } = await supabase
-        .from("group_memberships")
-        .select("group_id")
-        .eq("profile_id", user.id)
-        .limit(1)
-        .maybeSingle();
-      router.push(membership ? `/groups/${membership.group_id}/branding` : "/");
+      // Home, not a settings page: the desktop Home for a coach at a computer, the phone Home for a phone or the installed app.
+      const membership = pickStartGroup(await loadStartInputs(supabase, user.id));
+      if (!membership) {
+        router.push("/");
+      } else {
+        const phone = membership.role !== "coach" || isStandaloneDisplay() || isMobileUserAgent();
+        router.push(phone ? `/groups/${membership.group_id}` : "/dashboard");
+      }
       router.refresh();
     });
   }, [router]);
@@ -50,15 +53,11 @@ function ConfirmEmailStatus() {
       <div className="max-w-sm">
         <h1 className="font-display uppercase text-2xl font-bold">Link invalid or expired</h1>
         <p className="font-body text-steel text-sm mt-2">
-          Try{" "}
-          <Link href="/signup" className="text-rust">
-            signing up
-          </Link>{" "}
-          again, or{" "}
+          This link has expired or was already used. If you already confirmed, just{" "}
           <Link href="/login" className="text-rust">
             sign in
-          </Link>{" "}
-          if you already confirmed.
+          </Link>
+          . If not, sign in with your email and password and we will offer to send a new confirmation email.
         </p>
       </div>
     </main>

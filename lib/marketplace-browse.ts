@@ -46,7 +46,7 @@ export async function findRankedCoaches(
   // org for its real zip_code and to profiles for a display name.
   const { data: memberRows } = await supabase
     .from("organization_memberships")
-    .select("profile_id, organization_id, profiles ( full_name ), organizations ( name, zip_code )")
+    .select("profile_id, organization_id, profiles ( full_name ), organizations ( name, zip_code, listed_in_marketplace )")
     .in("role", ["owner", "admin", "coach"]);
   if (!memberRows || memberRows.length === 0) return [];
 
@@ -64,6 +64,8 @@ export async function findRankedCoaches(
     const row = rawRow as any;
     const coachId: string = row.profile_id;
     const orgZip: string | null = row.organizations?.zip_code ?? null;
+    // Opt-in: an organization is listed only after its owner or admin turns it on (migration 0256).
+    if (!row.organizations?.listed_in_marketplace) continue;
 
     // Real per-coach program library — same "created_by" scoping
     // lib/trainer-dispatch-gather.ts's own findAndRankAvailableTrainers

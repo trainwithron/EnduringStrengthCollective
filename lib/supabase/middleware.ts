@@ -39,6 +39,7 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/login") ||
     pathname.startsWith("/signup") ||
     pathname === "/beta" ||
+    pathname.startsWith("/api/auth/resend-confirmation") ||
     pathname === "/terms" ||
     pathname === "/privacy" ||
     pathname === "/refunds" ||

@@ -54,7 +54,7 @@ export function AddClientButton({
   const [mode, setMode] = useState<Mode>("link");
 
   // Destination-picker state
-  const [destination, setDestination] = useState<Destination>("current");
+  const [destination, setDestination] = useState<Destination>("new");
   const [orgGroups, setOrgGroups] = useState<OrgGroupOption[] | null>(null);
   const [loadingOrgGroups, setLoadingOrgGroups] = useState(false);
   const [selectedExistingGroupId, setSelectedExistingGroupId] = useState<string>("");
@@ -296,7 +296,7 @@ export function AddClientButton({
     setDirectSuccess(false);
     setCreatedClient(null);
     setMode("link");
-    setDestination("current");
+    setDestination("new");
     setSelectedExistingGroupId("");
     setNewGroupName("");
     setDestinationError(null);
@@ -333,10 +333,14 @@ export function AddClientButton({
           }}
           className="w-full h-9 mt-1 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"
         >
-          <option value="current">{groupName}</option>
-          <option value="existing">Another group…</option>
-          <option value="new">Create a new 1-on-1 group…</option>
+          <option value="new">A one-on-one client (their own space)</option>
+          <option value="current">Add to the group: {groupName}</option>
+          <option value="existing">Add to another group…</option>
         </select>
+        <p className="font-body text-xs text-steel mt-1.5 leading-snug">
+          Most coaching clients are one-on-one: each gets their own private space with you. Pick a group instead if this
+          person should train with others.
+        </p>
         {destination === "existing" && (
           <select
             value={selectedExistingGroupId}

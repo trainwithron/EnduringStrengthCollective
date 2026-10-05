@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
+import { FeedbackButton } from "@/components/feedback/feedback-button";
 import { ViewAsClientButton } from "@/components/coach/desktop/view-as-client-button";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { TerminologyProvider } from "@/components/coach/terminology-provider";
@@ -754,6 +755,7 @@ export function CoachDesktopShell({
                   </Link>
                 </>
               )}
+              <FeedbackButton variant="icon" />
               <DownloadAppButton collapsed />
               <div className="w-11 flex items-center justify-center">
                 <SignOutButton />

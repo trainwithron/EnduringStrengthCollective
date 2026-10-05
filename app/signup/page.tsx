@@ -14,6 +14,7 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
+  const [emailNote, setEmailNote] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -41,10 +42,24 @@ export default function SignupPage() {
       // there's nothing to redirect into yet — the confirmation link
       // (sent to the address just entered) is what gets them signed in.
       setSubmittedEmail(email);
+      if (data.confirmationEmailSent === false) {
+        setEmailNote("We could not send the email just now. Use the button below to send it again in a few minutes.");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't create your account.");
       setSubmitting(false);
     }
+  }
+
+  async function resend() {
+    setEmailNote(null);
+    const res = await fetch("/api/auth/resend-confirmation", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: submittedEmail }),
+    });
+    const body = await res.json().catch(() => ({}));
+    setEmailNote(res.ok ? "Sent again. Check your inbox and spam folder." : body.error ?? "We could not send it. Try again in a few minutes.");
   }
 
   if (submittedEmail) {
@@ -55,6 +70,17 @@ export default function SignupPage() {
           <p className="font-body text-steel text-sm mt-3">
             We sent a confirmation link to <span className="text-chalk">{submittedEmail}</span>. Click it
             to activate your account and sign in — your organization is already set up and waiting.
+          </p>
+          <button type="button" onClick={resend} className="font-body text-sm text-rust underline underline-offset-2 mt-4">
+            Send the email again
+          </button>
+          {emailNote && <p className="font-body text-xs text-steel mt-2">{emailNote}</p>}
+          <p className="font-body text-xs text-steel mt-4">
+            Wrong address?{" "}
+            <button type="button" onClick={() => { setSubmittedEmail(null); setSubmitting(false); }} className="text-rust underline underline-offset-2">
+              Go back
+            </button>{" "}
+            (if it was already used, <Link href="/login" className="text-rust">sign in</Link>).
           </p>
         </div>
       </main>

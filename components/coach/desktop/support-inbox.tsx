@@ -59,6 +59,20 @@ export function SupportInbox({
       return;
     }
 
+    // Tell the platform admin right away (a push, and an email once a sender is set up). Best effort: the request is saved.
+    void fetch("/api/feedback", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        kind: "problem",
+        message: `Support request: ${trimmedSubject}
+
+${trimmedBody}`,
+        pagePath: window.location.pathname,
+        viewport: `${window.innerWidth}x${window.innerHeight}`,
+      }),
+    }).catch(() => {});
+
     setRequests((prev) => [
       {
         id: request.id,
