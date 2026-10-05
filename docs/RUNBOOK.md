@@ -78,7 +78,7 @@ DATABASE_URL="postgresql://..." NEXT_PUBLIC_SUPABASE_URL=... SUPABASE_SERVICE_RO
 Use this when the project is lost or beyond repair.
 
 1. Create a new Supabase project (same region).
-2. **Schema**: apply `supabase/migrations/*.sql` in order against it (the MIGRATION_MAP lists any fixes that were applied straight to the old database and are not saved as files; reapply those by hand).
+2. **Schema**: apply `supabase/migrations/*.sql` in order against it. A full-chain test (`node scripts/sql-tests/chain.mjs`) found three files that do not apply from an empty database: `0030` (drops a policy that only exists live; use `drop policy if exists`), `0248` (rewrites `complete_workout_session` by exact live text and will stop with "credit block not found"; restore the live function definition from the dump instead) and `0251` (needs the pgcrypto extension enabled). `0049` also looks up the real owner account by email, so create that user first, or restore from the database dump instead of replaying migrations (the MIGRATION_MAP lists any fixes that were applied straight to the old database and are not saved as files; reapply those by hand).
 3. **Data**: restore the latest dump from your backup (`pg_restore` or `psql`), data only, into the new database.
 4. **Storage**: copy the buckets from your storage backup into the same bucket names.
 5. **Auth**: users live in the database dump (`auth.users`). Confirm sign-in works and password reset emails send (section 8).
