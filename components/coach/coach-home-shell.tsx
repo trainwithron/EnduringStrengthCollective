@@ -39,7 +39,11 @@ export function CoachHomeShell({ orgName, children }: { orgName: string; childre
       <main className="flex-1 px-8 py-8 max-w-5xl">{children}</main>
       {/* Same "available everywhere" mount as CoachDesktopShell, so the
           brand-new-coach fallback branch of Home isn't missing it. */}
-      <CollectiveIntelligenceChat />
+      {/* Desktop-only edge tab: on phones the Spotlight hub is the single entry,
+          so hide this one below lg (position:fixed still hides with its wrapper). */}
+      <div className="hidden lg:block">
+        <CollectiveIntelligenceChat />
+      </div>
     </div>
     </TerminologyProvider>
   );

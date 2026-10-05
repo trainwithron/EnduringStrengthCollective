@@ -880,7 +880,11 @@ export function CoachDesktopShell({
           audit gap — the component's own design intent was always
           "available everywhere," it just was never actually wired in
           anywhere but Home). Self-contained, no props needed. */}
-      <CollectiveIntelligenceChat />
+      {/* Desktop-only edge tab: on phones the Spotlight hub is the single entry,
+          so hide this one below lg (position:fixed still hides with its wrapper). */}
+      <div className="hidden lg:block">
+        <CollectiveIntelligenceChat />
+      </div>
     </div>
     </TerminologyProvider>
   );
