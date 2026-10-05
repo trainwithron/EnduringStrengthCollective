@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { parseGarminWebhookPayload } from "@/lib/garmin";
+import { secretsMatch } from "@/lib/webhook-secret";
 
 // The receiving side of Garmin's push architecture — registered as this
 // app's callback URL with Garmin at partner-approval time. No user
@@ -15,21 +16,26 @@ import { parseGarminWebhookPayload } from "@/lib/garmin";
 // deliveries (confirmed directly — see lib/garmin.ts's header comment).
 // GARMIN_WEBHOOK_SECRET below is this app's own defensive placeholder —
 // a shared value this app would give Garmin at partner-registration
-// time, checked as a query param or header the same way many webhook
-// providers support, NOT a confirmed Garmin-specific mechanism. Fails
-// closed (rejects everything) if unset, same "missing config never
-// silently trusts input" discipline as every other integration in this
-// app. Replace with whatever real verification Garmin's partner API
-// reference actually specifies once that access exists.
+// time, sent in the x-garmin-webhook-secret HEADER (never in the URL:
+// a secret in a query string ends up in access logs and referrers).
+// NOT a confirmed Garmin-specific mechanism. Compared in constant time
+// and fails closed (rejects everything) if unset, same "missing config
+// never silently trusts input" discipline as every other integration in
+// this app. Replace with whatever real verification Garmin's partner API
+// reference actually specifies once that access exists. The route is
+// listed as public in lib/supabase/middleware.ts, because without that
+// every delivery would be redirected to the login page.
 export async function POST(request: Request) {
   const configuredSecret = process.env.GARMIN_WEBHOOK_SECRET;
   if (!configuredSecret) {
     return NextResponse.json({ error: "Garmin webhook isn't configured." }, { status: 503 });
   }
-  const { searchParams } = new URL(request.url);
-  const providedSecret = request.headers.get("x-garmin-webhook-secret") ?? searchParams.get("secret");
-  if (providedSecret !== configuredSecret) {
+  if (!secretsMatch(request.headers.get("x-garmin-webhook-secret"), configuredSecret)) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+  // Nothing legitimate is this large; refuse before reading it.
+  if (Number(request.headers.get("content-length") ?? 0) > 2_000_000) {
+    return NextResponse.json({ error: "Payload too large." }, { status: 413 });
   }
 
   const body = await request.json().catch(() => null);

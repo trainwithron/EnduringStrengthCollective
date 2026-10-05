@@ -85,6 +85,8 @@ export async function updateSession(request: NextRequest) {
     // of reaching the route handler, silently breaking credit/subscription
     // grants in every environment, including production.
     pathname.startsWith("/api/stripe/webhook") ||
+    // Garmin's servers push device data here with no login; the route itself checks a shared secret header.
+    pathname.startsWith("/api/garmin/webhook") ||
     // Twilio posts inbound texts (STOP/START/HELP) here with no session;
     // its X-Twilio-Signature check inside the route is the real auth.
     pathname.startsWith("/api/twilio/inbound") ||
