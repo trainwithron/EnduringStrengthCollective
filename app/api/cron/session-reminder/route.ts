@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendPushToProfile } from "@/lib/send-push";
 import { dispatchSms } from "@/lib/sms-dispatch";
+import { formatInTimezone, timezoneForProfiles } from "@/lib/format-in-timezone";
 
 // acuity_replacement_gap_audit_sept16.md — the single clearest,
 // highest-value gap against Acuity: zero reminder/confirmation infra
@@ -49,10 +50,12 @@ export async function GET(request: Request) {
   let smsSent = 0;
   for (const booking of upcoming ?? []) {
     const coachName = (booking as any).profiles?.full_name ?? "your coach";
-    const when = new Date(booking.start_at).toLocaleTimeString(undefined, {
-      hour: "numeric",
-      minute: "2-digit",
-    });
+    // In the client's own time zone (this runs in UTC): their profile first, then their coach's.
+    const when = formatInTimezone(
+      booking.start_at,
+      await timezoneForProfiles(supabase, [booking.athlete_id, booking.coach_id]),
+      "time"
+    );
     const count = await sendPushToProfile(
       supabase,
       booking.athlete_id,

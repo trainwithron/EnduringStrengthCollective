@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
+import { loadStartInputs, parseLastGroupCookie, pickStartGroup } from "@/lib/start-group";
 import { createServerClient } from "@/lib/supabase/server";
 import { prefersAthleteStyleView, isMobileUserAgent } from "@/lib/pwa-server";
 import { CoachHomeShell } from "@/components/coach/coach-home-shell";
@@ -84,19 +85,9 @@ export default async function CoachHomePage() {
   // squeezed desktop shell again instead of a loop, which is the correct
   // tradeoff (annoying beats broken).
   if (await prefersAthleteStyleView()) {
-    const lastGroupCookie = (await cookies()).get("last_group")?.value;
-    let target = coachedGroupRows[0].group_id;
-    if (lastGroupCookie) {
-      try {
-        const parsed = JSON.parse(decodeURIComponent(lastGroupCookie));
-        if (parsed?.id && coachedGroupRows.some((g) => g.group_id === parsed.id)) {
-          target = parsed.id;
-        }
-      } catch {
-        // Malformed cookie — keep the fallback.
-      }
-    }
-    redirect(`/groups/${target}`);
+    const lastGroupId = parseLastGroupCookie((await cookies()).get("last_group")?.value);
+    const start = pickStartGroup(await loadStartInputs(supabase, user.id, lastGroupId));
+    redirect(`/groups/${start?.group_id ?? coachedGroupRows[0].group_id}`);
   }
 
   // Real bug from Ron's own phone, screenshot confirmed: a coach who
@@ -132,6 +123,12 @@ export default async function CoachHomePage() {
   const { data: coachProfileRow } = await supabase
     .from("coach_profiles")
     .select("bio, photo_url")
+    .eq("coach_id", user.id)
+    .maybeSingle();
+  // Separate on purpose: until migration 0249 is applied this select errors and the field is just empty.
+  const { data: completionMessageRow } = await supabase
+    .from("coach_profiles")
+    .select("completion_message")
     .eq("coach_id", user.id)
     .maybeSingle();
   const { data: org } = primaryOrgMembership
@@ -465,6 +462,7 @@ export default async function CoachHomePage() {
         coachName={viewerProfile?.full_name ?? "Coach"}
         initialBio={coachProfileRow?.bio ?? null}
         initialPhotoUrl={coachProfileRow?.photo_url ?? null}
+        initialCompletionMessage={completionMessageRow?.completion_message ?? null}
       />
       <div className="flex items-center justify-between mb-6">
         <h1 className="font-display font-bold text-2xl uppercase">Home</h1>

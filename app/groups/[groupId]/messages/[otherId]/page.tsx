@@ -117,10 +117,10 @@ export default async function MessageThreadPage(
       )}
       <header className="px-5 pt-8 pb-4 border-b border-steel/20">
         <Link
-          href={`/groups/${params.groupId}/messages`}
+          href={viewerIsCoach ? `/groups/${params.groupId}/messages` : `/groups/${params.groupId}/settings`}
           className="font-body text-xs text-steel uppercase tracking-wide"
         >
-          &larr; All messages
+          {viewerIsCoach ? "\u2190 All messages" : "\u2190 Back"}
         </Link>
         {viewerIsCoach ? (
           <h1 className="font-display font-bold text-2xl uppercase leading-none mt-2">{otherName}</h1>

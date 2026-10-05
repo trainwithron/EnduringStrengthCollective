@@ -33,6 +33,8 @@ import { fetchStandingHistory } from "@/lib/standing-macros";
 import { dateKeyOf, parseDateKey, type DayWorkoutInfo } from "@/lib/athlete-day-schedule";
 import {
   contextWorkoutIds,
+  findNextWorkoutDate,
+  nextWorkoutLabel,
   emptyDayInfo,
   loadProgramDayContexts,
   resolveSessionsForDate,
@@ -274,6 +276,9 @@ export default async function GroupHubPage(
   let wellnessCheckin: WellnessCheckinValues | null = null;
   let lifeImpactPrompt: string | null = null;
   let canBook = false;
+  let nextWorkoutText: string | null = null;
+  // No workout logged yet: the wellness check-in becomes a plain card under the workout, not a full-screen block.
+  let isFirstDay = false;
   let weekDays: HomeDaySummary[] = [];
   let monthSummaryByDateKey = new Map<string, HomeDaySummary>();
   let weekRangeStart = targetDate;
@@ -326,6 +331,18 @@ export default async function GroupHubPage(
     if (view === "day") {
       daySessions = resolveSessionsForDate(programContexts, loggedIds, targetDate, today, isToday);
       dayWorkout = summarizeSessions(daySessions, emptyDayInfo(programContexts, isToday));
+      if (isToday) {
+        const { count: priorWorkoutCount } = await supabase
+          .from("workout_logs")
+          .select("id", { count: "exact", head: true })
+          .eq("athlete_id", athleteId)
+          .eq("group_id", params.groupId);
+        isFirstDay = (priorWorkoutCount ?? 0) === 0;
+      }
+      const todayAllDone = daySessions.length > 0 && daySessions.every((x) => x.status === "done");
+      if (isToday && todayAllDone) {
+        nextWorkoutText = nextWorkoutLabel(findNextWorkoutDate(programContexts, loggedIds, today), today);
+      }
 
       const [macroResult, mealPlanResult, standingTarget, { data: dueLogRows }] = await Promise.all([
         macrosEnabled
@@ -591,7 +608,7 @@ export default async function GroupHubPage(
 
           {view === "day" && (
             <div className="space-y-4">
-              {isToday && (
+              {isToday && !isFirstDay && (
                 <WellnessCheckinPopup
                   athleteId={athleteId}
                   groupId={params.groupId}
@@ -612,19 +629,30 @@ export default async function GroupHubPage(
                 isToday={isToday}
                 workout={dayWorkout}
                 sessions={daySessions}
+                nextLabel={nextWorkoutText}
                 macros={dayMacros}
                 habits={dayHabits}
                 weightLogs={weightLogs}
                 canBook={canBook}
                 wellnessCheckin={wellnessCheckin}
               />
+              {isToday && isFirstDay && (
+                <WellnessCheckinPopup
+                  inline
+                  athleteId={athleteId}
+                  groupId={params.groupId}
+                  todayDate={todayKey}
+                  initialCheckin={wellnessCheckin}
+                  lifeImpactPrompt={lifeImpactPrompt}
+                />
+              )}
             </div>
           )}
 
           {view === "week" && isUnscheduledProgram && (
             <p className="font-body text-sm text-steel max-w-[50ch]">
               Your program isn&apos;t scheduled by date — Week and Month views need a start date
-              and training days set. Check the Workout tab for what&apos;s next.
+              and training days set. Your next workout is on Today.
             </p>
           )}
           {view === "week" && !isUnscheduledProgram && (
@@ -641,7 +669,7 @@ export default async function GroupHubPage(
           {view === "month" && isUnscheduledProgram && (
             <p className="font-body text-sm text-steel max-w-[50ch]">
               Your program isn&apos;t scheduled by date — Week and Month views need a start date
-              and training days set. Check the Workout tab for what&apos;s next.
+              and training days set. Your next workout is on Today.
             </p>
           )}
           {view === "month" && !isUnscheduledProgram && (

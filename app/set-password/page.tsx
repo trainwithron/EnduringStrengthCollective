@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { isPlaceholderEmail, validateClaimEmail, validateNewPassword } from "@/lib/client-claim";
+import { loadStartInputs, pickStartGroup } from "@/lib/start-group";
 
 export default function SetPasswordPage() {
   return (
@@ -81,12 +82,7 @@ function SetPasswordForm() {
     }
 
     // Same "find their first group, route in" logic as app/login/page.tsx.
-    const { data: membership } = await supabase
-      .from("group_memberships")
-      .select("group_id")
-      .eq("profile_id", user.id)
-      .limit(1)
-      .maybeSingle();
+    const membership = pickStartGroup(await loadStartInputs(supabase, user.id));
 
     // New clients added via the Add Client flow are flagged
     // intake_required — send them to the PAR-Q+/waiver intake first,

@@ -25,6 +25,7 @@ export function DayCard({
   weightLogs,
   canBook,
   wellnessCheckin,
+  nextLabel = null,
 }: {
   groupId: string;
   athleteId: string;
@@ -40,6 +41,8 @@ export function DayCard({
   weightLogs: WeightLogEntry[];
   canBook: boolean;
   wellnessCheckin?: WellnessCheckinValues | null;
+  // "Tomorrow" or a weekday: the next workout, shown on the condensed done card.
+  nextLabel?: string | null;
 }) {
   return (
     <div className="space-y-4">
@@ -52,6 +55,7 @@ export function DayCard({
         sessions={sessions}
         canBook={canBook}
         wellnessCheckin={isToday ? wellnessCheckin ?? null : null}
+        nextLabel={nextLabel}
       />
 
       {isToday ? (
@@ -75,6 +79,7 @@ function WorkoutSection({
   sessions,
   canBook,
   wellnessCheckin,
+  nextLabel,
 }: {
   groupId: string;
   dateKey: string;
@@ -84,12 +89,42 @@ function WorkoutSection({
   sessions: DaySession[];
   canBook: boolean;
   wellnessCheckin?: WellnessCheckinValues | null;
+  nextLabel?: string | null;
 }) {
   const readinessChip = wellnessCheckin ? (
     <span className="font-body text-xs text-steel border border-steel/30 px-2 py-0.5 ml-2">
       Feeling {Math.round(computeReadinessAverage(wellnessCheckin))}/5 today
     </span>
   ) : null;
+
+  // Everything for today is finished: one big check in a small card, so the day reads as done and the rest of Home
+  // (nutrition, calendar) is right below it. Nobody does the same workout twice in a day.
+  const finished = sessions.length > 0 ? sessions : workout.workoutId ? [workout] : [];
+  if (isToday && finished.length > 0 && finished.every((x) => x.status === "done")) {
+    const titles = finished.map((x) => x.title).filter(Boolean).join(" + ");
+    return (
+      <div className="border border-positive/40 p-4 flex items-center gap-3">
+        <span className="w-11 h-11 shrink-0 rounded-full bg-positive/15 flex items-center justify-center">
+          <Check className="w-6 h-6 text-positive" strokeWidth={3} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="font-display font-bold text-xl uppercase leading-none">Done for today</p>
+          <p className="font-body text-xs text-steel mt-1 truncate">
+            {titles}
+            {nextLabel ? ` · Next: ${nextLabel}` : ""}
+          </p>
+        </div>
+        {finished[0].workoutId && (
+          <Link
+            href={`/groups/${groupId}/workouts/${finished[0].workoutId}`}
+            className="font-body text-xs text-steel underline underline-offset-2 shrink-0"
+          >
+            View
+          </Link>
+        )}
+      </div>
+    );
+  }
 
   // Two or more programs on the same day: one labelled card each, the first thing to do is the
   // primary action, finished ones collapse to a single checked line.
@@ -161,8 +196,7 @@ function WorkoutSection({
           {readinessChip}
         </p>
         <p className="font-body text-sm text-steel mt-2">
-          No active program in this group yet, or you&apos;ve completed every workout in it — set
-          one up from the Coach Dashboard.
+          No program is assigned to you right now. Your coach will add one.
         </p>
       </div>
     );
@@ -180,7 +214,7 @@ function WorkoutSection({
           {readinessChip}
         </p>
         <p className="font-body text-sm text-steel mt-2">
-          Your program isn&apos;t scheduled by date — check the Workout tab for what&apos;s next.
+          Your program isn&apos;t scheduled by date, so there is nothing on this day. Your next workout is on Today.
         </p>
       </div>
     );
@@ -225,13 +259,16 @@ function WorkoutSection({
       <p className="font-display font-bold text-xl uppercase leading-none mt-1">{workout.title}</p>
 
       <div className="mt-3">
-        {workout.status === "done" && (
+        {workout.status === "done" && workout.workoutId && (
           <Link
             href={`/groups/${groupId}/workouts/${workout.workoutId}`}
             className="font-body text-sm text-positive"
           >
             Completed — view workout
           </Link>
+        )}
+        {workout.status === "done" && !workout.workoutId && (
+          <p className="font-body text-sm text-positive">You finished every workout in this program.</p>
         )}
         {workout.status === "missed" && (
           <p className="font-body text-sm text-steel">Not logged.</p>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { appOriginBrowser } from "@/lib/app-url";
 
 function randomCode(length = 10) {
   // Excludes visually ambiguous characters (0/O, 1/l/I) since this gets
@@ -49,7 +50,7 @@ export function InviteAthleteButton({
       return;
     }
 
-    setLink(`${window.location.origin}/invite/${code}`);
+    setLink(`${appOriginBrowser()}/invite/${code}`);
     setGenerating(false);
   }
 

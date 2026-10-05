@@ -3,6 +3,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendPushToProfile } from "@/lib/send-push";
 import { resolveBlockedRangesForDate, bookingFitsAvailability, type AvailabilityWindow } from "@/lib/booking-slots";
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
+import { formatInTimezone } from "@/lib/format-in-timezone";
 
 // acuity_replacement_gap_audit_sept16.md — recurring bookings, Q4's
 // confirmed answer: flag a future occurrence for the coach to resolve
@@ -95,7 +96,7 @@ export async function GET(request: Request) {
     if (!bookingFitsAvailability(bookingDate, windows, blockedRanges, timezone)) {
       await supabase.from("bookings").update({ needs_coach_resolution: true }).eq("id", booking.id);
       const athleteName = nameByAthlete.get(booking.athlete_id) ?? "a client";
-      const body = `A recurring booking for ${athleteName} on ${bookingDate.toLocaleDateString()} no longer fits your available hours — resolve it.`;
+      const body = `A recurring booking for ${athleteName} on ${formatInTimezone(bookingDate, timezone, "dateTime")} no longer fits your available hours — resolve it.`;
       await supabase.from("notifications").insert({
         profile_id: booking.coach_id,
         group_id: booking.group_id,

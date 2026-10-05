@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { appOriginBrowser } from "@/lib/app-url";
 
 export interface DiscoveryCallRow {
   id: string;
@@ -28,7 +29,7 @@ export function DiscoveryCallsPanel({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const link = typeof window !== "undefined" ? `${window.location.origin}/book/${coachId}` : "";
+  const link = typeof window !== "undefined" ? `${appOriginBrowser()}/book/${coachId}` : "";
 
   async function handleCopy() {
     if (!link) return;

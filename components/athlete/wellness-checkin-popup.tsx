@@ -76,6 +76,7 @@ export function WellnessCheckinPopup({
   initialCheckin,
   onSaved,
   lifeImpactPrompt = null,
+  inline = false,
 }: {
   athleteId: string;
   groupId: string;
@@ -83,6 +84,8 @@ export function WellnessCheckinPopup({
   initialCheckin: WellnessCheckinValues | null;
   onSaved?: (values: WellnessCheckinValues) => void;
   lifeImpactPrompt?: string | null;
+  // A new client's first day: a plain card below their workout instead of a full-screen block in front of it.
+  inline?: boolean;
 }) {
   const [checkin, setCheckin] = useState(initialCheckin);
   const [dismissed, setDismissed] = useState(true); // default hidden until the effect below confirms it's actually needed, so SSR/hydration never briefly flashes the overlay for someone who already checked in or already dismissed it earlier today
@@ -104,6 +107,27 @@ export function WellnessCheckinPopup({
   function handleSnooze() {
     writeSnooze();
     setSnoozed(true);
+  }
+
+  if (inline) {
+    return (
+      <div className="border border-steel/20 p-4">
+        <WellnessCheckinWidget
+          athleteId={athleteId}
+          groupId={groupId}
+          todayDate={todayDate}
+          initialCheckin={null}
+          onSaved={(values) => {
+            setCheckin(values);
+            onSaved?.(values);
+          }}
+          lifeImpactPrompt={lifeImpactPrompt}
+        />
+        <button type="button" onClick={handleSkip} className="w-full h-11 text-center font-body text-sm text-steel mt-1">
+          Skip for today
+        </button>
+      </div>
+    );
   }
 
   return (

@@ -91,3 +91,28 @@ describe("summarizeSessions and emptyDayInfo", () => {
     expect(emptyDayInfo([ctx({ id: "x", unscheduled: true })], false).status).toBe("unscheduled");
   });
 });
+
+import { findNextWorkoutDate, nextWorkoutLabel } from "./program-day-contexts";
+
+describe("next workout after today is done", () => {
+  const today = new Date(2026, 9, 6); // Tue Oct 6
+
+  it("finds the next scheduled day and words it as a weekday or Tomorrow", () => {
+    const thursday = new Date(2026, 9, 8);
+    const next = findNextWorkoutDate([ctx({ id: "main", date: thursday })], new Set(), today);
+    expect(next?.getDate()).toBe(8);
+    expect(nextWorkoutLabel(next, today)).toBe("Thursday");
+    expect(nextWorkoutLabel(new Date(2026, 9, 7), today)).toBe("Tomorrow");
+  });
+
+  it("is null when nothing is coming up or the program has no dates", () => {
+    expect(findNextWorkoutDate([ctx({ id: "p", unscheduled: true })], new Set(), today)).toBeNull();
+    expect(nextWorkoutLabel(null, today)).toBeNull();
+  });
+
+  it("skips a day whose workout is already logged", () => {
+    const thursday = new Date(2026, 9, 8);
+    const c = ctx({ id: "main", date: thursday, wid: "w-thu" });
+    expect(findNextWorkoutDate([c], new Set(["w-thu"]), today)).toBeNull();
+  });
+});

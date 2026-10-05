@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { appOriginBrowser } from "@/lib/app-url";
 
 // calorie_tracking_ux_research_and_plan.md — hard-gated on
 // minor_consent.verified (passed in, not re-checked here) so this can
@@ -74,7 +75,7 @@ export function GuardianShareButton({
   }
 
   if (token) {
-    const url = typeof window !== "undefined" ? `${window.location.origin}/guardian/${token}` : `/guardian/${token}`;
+    const url = typeof window !== "undefined" ? `${appOriginBrowser()}/guardian/${token}` : `/guardian/${token}`;
     return (
       <div className="space-y-2">
         <p className="font-body text-xs text-steel uppercase tracking-wide">Parent view link</p>

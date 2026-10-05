@@ -4,6 +4,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { createOrganization } from "@/lib/org-creation";
 import { toFriendlyAuthEmailError } from "@/lib/auth-email-error";
 import { rateLimitResponse, clientIp } from "@/lib/rate-limit";
+import { appOrigin } from "@/lib/app-url";
 
 // Self-service coach signup — a brand-new person, no pre-existing
 // invite/relationship, creating their own account AND their own
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
   }
 
   const serviceRole = createServiceRoleClient();
-  const origin = request.headers.get("origin") ?? new URL(request.url).origin;
+  const origin = appOrigin(request);
 
   const { data: created, error: createError } = await serviceRole.auth.admin.createUser({
     email: trimmedEmail,

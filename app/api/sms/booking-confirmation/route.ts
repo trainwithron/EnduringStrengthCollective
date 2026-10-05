@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { dispatchSms } from "@/lib/sms-dispatch";
 import { getCallerGroupRole } from "@/lib/group-access";
+import { formatInTimezone, timezoneForProfiles } from "@/lib/format-in-timezone";
 
 // Fired right after book_session() succeeds, from the same 3 call
 // sites as lib/notify-booking-confirmed.ts's push version (self-book,
@@ -61,13 +62,7 @@ export async function POST(request: Request) {
   if (!coachRow) return NextResponse.json({ sent: false, reason: "no_coach" });
 
   const coachName = coachRow.full_name ?? "your coach";
-  const when = new Date(startAt).toLocaleString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  const when = formatInTimezone(startAt, await timezoneForProfiles(serviceRole, [athleteId, booking.coach_id]), "dateTime");
 
   const result = await dispatchSms(serviceRole, {
     coachId: coachRow.id,

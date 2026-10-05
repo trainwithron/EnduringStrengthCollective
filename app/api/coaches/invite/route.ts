@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { toFriendlyAuthEmailError } from "@/lib/auth-email-error";
+import { appOrigin } from "@/lib/app-url";
 
 // Which org-level role an invite can grant. "owner" is set once at
 // org creation and never assigned through this flow.
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
   }
 
   const serviceRole = createServiceRoleClient();
-  const origin = request.headers.get("origin") ?? new URL(request.url).origin;
+  const origin = appOrigin(request);
 
   const { data: invited, error: inviteError } = await serviceRole.auth.admin.inviteUserByEmail(
     trimmedEmail,

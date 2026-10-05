@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { daysLeft, groupInviteState, shouldListGroupInvite, type GroupInviteState } from "@/lib/invite-state";
+import { appOriginBrowser } from "@/lib/app-url";
 
 export interface GroupInviteRow {
   id: string;
@@ -100,7 +101,7 @@ export function GroupInvitesPanel({
 
   async function copy(invite: GroupInviteRow) {
     try {
-      await navigator.clipboard.writeText(`${window.location.origin}/invite/${invite.code}`);
+      await navigator.clipboard.writeText(`${appOriginBrowser()}/invite/${invite.code}`);
       setCopiedId(invite.id);
       setTimeout(() => setCopiedId(null), 2000);
     } catch {

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getStripeClient, isStripeConfigured } from "@/lib/stripe";
+import { appOrigin } from "@/lib/app-url";
 
 // Quick Payment (mobile_more_tab_condensed_widget_hub_sept30.md) — a
 // coach-initiated one-off charge to a specific client. Deliberately the
@@ -90,7 +91,7 @@ export async function POST(request: Request) {
         .insert({ profile_id: athleteId, stripe_customer_id: stripeCustomerId });
     }
 
-    const origin = request.headers.get("origin") ?? new URL(request.url).origin;
+    const origin = appOrigin(request);
     const trimmedDescription =
       typeof description === "string" ? description.trim().slice(0, 200) : "";
 

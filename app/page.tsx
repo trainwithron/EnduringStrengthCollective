@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
+import { cookies } from "next/headers";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
+import { loadStartInputs, parseLastGroupCookie, pickStartGroup } from "@/lib/start-group";
 import { Hero } from "@/components/marketing/hero";
 import { FeatureGrid } from "@/components/marketing/feature-grid";
 import { Differentiation } from "@/components/marketing/differentiation";
@@ -21,12 +23,8 @@ export default async function HomePage() {
   } = await supabase.auth.getUser();
 
   if (user) {
-    const { data: membership } = await supabase
-      .from("group_memberships")
-      .select("group_id, role")
-      .eq("profile_id", user.id)
-      .limit(1)
-      .single();
+    const lastGroupId = parseLastGroupCookie((await cookies()).get("last_group")?.value);
+    const membership = pickStartGroup(await loadStartInputs(supabase, user.id, lastGroupId));
 
     if (membership) {
       const wantsMobileHome = membership.role !== "coach" || (await prefersAthleteStyleView());

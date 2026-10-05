@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { loadUnclaimedClient } from "@/lib/client-claim-server";
 import { CLAIM_LINK_LIFETIME_HOURS, generateClaimToken, hashClaimToken } from "@/lib/client-claim";
+import { appOrigin } from "@/lib/app-url";
 
 // Mints a single-use claim link for a client who hasn't signed in yet. The
 // coach decides when to create it and sends it themselves (a text from their
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
   });
   if (error) return NextResponse.json({ error: "Couldn't create the link — try again." }, { status: 500 });
 
-  const origin = request.headers.get("origin") ?? new URL(request.url).origin;
+  const origin = appOrigin(request);
   return NextResponse.json({
     link: `${origin}/claim/${token}`,
     expiresAt,

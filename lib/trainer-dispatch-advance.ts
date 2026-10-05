@@ -5,6 +5,7 @@ import { resolveBlockedRangesForDate, type AvailabilityWindow } from "./booking-
 import { sendPushToProfile } from "./send-push";
 import { sendEmail } from "./sendgrid";
 import { DEFAULT_COACH_TIMEZONE } from "./timezone";
+import { formatInTimezone } from "@/lib/format-in-timezone";
 
 // org_calendar_spotter_trainer_dispatch_scoping_sept19.md — the I/O
 // orchestration for the cascade itself: start it, advance it on
@@ -126,7 +127,7 @@ export async function acceptDispatchStep(supabase: SupabaseClient, stepId: strin
 
   const { data: request } = await supabase
     .from("org_trainer_dispatch_requests")
-    .select("id, organization_id, prospect_name, prospect_email, prospect_phone, message, requested_start_at, status")
+    .select("id, organization_id, prospect_name, prospect_email, prospect_phone, prospect_timezone, message, requested_start_at, status")
     .eq("id", step.request_id)
     .single();
   if (!request || request.status !== "pending") return { ok: false, error: "This request is no longer open." };
@@ -198,7 +199,7 @@ export async function acceptDispatchStep(supabase: SupabaseClient, stepId: strin
     await sendEmail(
       request.prospect_email,
       "You're booked!",
-      `Hi ${request.prospect_name}, ${trainerProfile?.full_name ?? "your trainer"} confirmed your session request for ${requestedStartAt.toLocaleString()}. See you then!`
+      `Hi ${request.prospect_name}, ${trainerProfile?.full_name ?? "your trainer"} confirmed your session request for ${formatInTimezone(requestedStartAt, request.prospect_timezone, "dateTime")}. See you then!`
     );
   }
 

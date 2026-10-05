@@ -46,26 +46,21 @@ async function recordMilestone(
     .limit(1)
     .maybeSingle();
 
-  const linkPath = `/share/milestone/${inserted.id}`;
+  // Private by default. The public /share/milestone/{id} page names the athlete with a health-adjacent headline and
+  // needs no sign-in, so nothing sends that link to anyone until the athlete chooses to share it. The milestone is
+  // still recorded, and the coach hears about it in the app with a link to the client's own profile (coach only).
+  // The athlete is not notified here: telling them is a separate step once they can opt in to sharing.
+  const coachLinkPath = `/groups/${groupId}/athletes/${athleteId}`;
 
-  await supabase.from("notifications").insert([
-    { profile_id: athleteId, group_id: groupId, type: "milestone_celebration", body: athleteBody, link_path: linkPath },
-    ...(coachRow
-      ? [
-          {
-            profile_id: coachRow.profile_id,
-            group_id: groupId,
-            type: "milestone_celebration",
-            body: coachBody,
-            link_path: linkPath,
-          },
-        ]
-      : []),
-  ]);
-
-  await sendPushToProfile(supabase, athleteId, "Milestone reached", athleteBody, linkPath);
   if (coachRow) {
-    await sendPushToProfile(supabase, coachRow.profile_id, "Client milestone", coachBody, linkPath);
+    await supabase.from("notifications").insert({
+      profile_id: coachRow.profile_id,
+      group_id: groupId,
+      type: "milestone_celebration",
+      body: coachBody,
+      link_path: coachLinkPath,
+    });
+    await sendPushToProfile(supabase, coachRow.profile_id, "Client milestone", coachBody, coachLinkPath);
   }
   return true;
 }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import QRCode from "qrcode";
 import { QrCode } from "lucide-react";
+import { appOriginBrowser } from "@/lib/app-url";
 
 // equipment_qr_decal_scoping_sept19.md — generates a QR sticker a coach
 // can print and stick on the actual piece of gym equipment. Encodes a
@@ -14,7 +15,7 @@ export function ExerciseQrCodeButton({ exerciseId, exerciseName }: { exerciseId:
   const [scanUrl, setScanUrl] = useState("");
 
   async function handleOpen() {
-    const url = `${window.location.origin}/scan/${exerciseId}`;
+    const url = `${appOriginBrowser()}/scan/${exerciseId}`;
     setScanUrl(url);
     setOpen(true);
     if (!dataUrl) {

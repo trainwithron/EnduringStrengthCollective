@@ -1,5 +1,6 @@
 import webpush from "web-push";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { safePushPath } from "@/lib/push-url";
 
 // Shared by the authenticated /api/push/send route and the headless
 // coach-digest cron route — takes whichever Supabase client the caller
@@ -30,7 +31,7 @@ export async function sendPushToProfile(
     try {
       await webpush.sendNotification(
         { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth_key } },
-        JSON.stringify({ title, body, url })
+        JSON.stringify({ title, body, url: safePushPath(url) })
       );
       sent += 1;
     } catch (err: any) {

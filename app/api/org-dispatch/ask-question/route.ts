@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { askDispatchQuestion } from "@/lib/trainer-dispatch-advance";
+import { appOrigin } from "@/lib/app-url";
 
 export async function POST(request: Request) {
   const supabase = await createServerClient();
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not your request." }, { status: 403 });
   }
 
-  const origin = request.headers.get("origin") ?? new URL(request.url).origin;
+  const origin = appOrigin(request);
   const serviceRole = createServiceRoleClient();
   const result = await askDispatchQuestion(serviceRole, stepId, question.trim(), origin);
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });

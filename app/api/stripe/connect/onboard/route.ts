@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getStripeClient, isStripeConfigured } from "@/lib/stripe";
+import { appOrigin } from "@/lib/app-url";
 
 // Creates (or reuses) a Stripe Express connected account for the calling
 // coach and returns a fresh onboarding link — the coach completes the
@@ -59,7 +60,7 @@ export async function POST(request: Request) {
         .eq("profile_id", user.id);
     }
 
-    const origin = request.headers.get("origin") ?? new URL(request.url).origin;
+    const origin = appOrigin(request);
     const accountLink = await stripe.accountLinks.create({
       account: accountId,
       refresh_url: `${origin}/groups/${groupId}/revenue-splits`,

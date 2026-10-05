@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getStripeClient, isStripeConfigured } from "@/lib/stripe";
+import { appOrigin } from "@/lib/app-url";
 
 export async function POST(request: Request) {
   const supabase = await createServerClient();
@@ -30,7 +31,7 @@ export async function POST(request: Request) {
 
   try {
     const stripe = getStripeClient();
-    const origin = request.headers.get("origin") ?? new URL(request.url).origin;
+    const origin = appOrigin(request);
     const session = await stripe.billingPortal.sessions.create({
       customer: customer.stripe_customer_id,
       return_url: origin,

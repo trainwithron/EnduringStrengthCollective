@@ -14,6 +14,7 @@ import { HumorArchetypeCard } from "@/components/share/humor-archetype-card";
 import { pickScenicBackground, SCENIC_BACKGROUNDS } from "@/lib/scenic-backgrounds";
 import { pickHumorArchetype } from "@/lib/humor-archetypes";
 import { pickShareCardStyle } from "@/lib/share-card-style";
+import { buildCoachCongrats, firstNameOf } from "@/lib/coach-congrats";
 
 // Deliberately public — no auth check. Every completed workout gets a
 // shareable card now, not just PRs, so a client can post it (and tag the
@@ -75,6 +76,49 @@ export default async function ShareWorkoutPage(
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // For the athlete themselves, right after finishing: a line from their coach, in the coach's voice, and the way
+  // back to Home. Other viewers of the shared link see only the card.
+  const viewerIsAuthor = !!user && user.id === shared.authorId;
+  let coachCongrats: { coachFirstName: string; text: string } | null = null;
+  let viewerSeesFeed = true;
+  if (viewerIsAuthor) {
+    const [{ data: coachRow }, { data: viewerMembership }] = await Promise.all([
+      supabase
+        .from("group_memberships")
+        .select("profile_id, profiles ( full_name )")
+        .eq("group_id", shared.groupId)
+        .eq("role", "coach")
+        .order("joined_at", { ascending: true })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("group_memberships")
+        .select("client_tier")
+        .eq("group_id", shared.groupId)
+        .eq("profile_id", user.id)
+        .maybeSingle(),
+    ]);
+    // One-on-one clients do not have a Team Feed to continue to.
+    viewerSeesFeed = viewerMembership?.client_tier !== "one_on_one";
+    if (coachRow) {
+      const coachProfile = coachRow.profiles as unknown as { full_name: string | null } | null;
+      // Until migration 0249 is applied this select errors and the default line is used.
+      const { data: customRow } = await supabase
+        .from("coach_profiles")
+        .select("completion_message")
+        .eq("coach_id", coachRow.profile_id)
+        .maybeSingle();
+      coachCongrats = {
+        coachFirstName: firstNameOf(coachProfile?.full_name) || "Your coach",
+        text: buildCoachCongrats({
+          athleteFirstName: firstNameOf(shared.athleteName),
+          customMessage: (customRow?.completion_message as string | null | undefined) ?? null,
+          hadPr: shared.celebratePrs.length > 0,
+        }),
+      };
+    }
+  }
 
   const volumeEquivalence =
     shared.totalSetsCompleted != null && shared.totalSetsCompleted > 0
@@ -292,14 +336,29 @@ export default async function ShareWorkoutPage(
             a real bordered secondary button of its own, visually
             distinct from both Share above it and the quiet
             customization toggles (background/lift picks) below it. */}
+        {coachCongrats && (
+          <div className="mt-6 border border-steel/30 p-4">
+            <p className="font-body text-xs text-steel uppercase tracking-wide">From {coachCongrats.coachFirstName}</p>
+            <p className="font-body text-base text-chalk mt-1.5 leading-snug">{coachCongrats.text}</p>
+          </div>
+        )}
+
         <div className="mt-6 space-y-2.5">
           <ShareWorkoutButton postId={params.postId} title={shareTitle} size="large" />
           {user && (
             <Link
-              href={`/groups/${shared.groupId}/feed`}
+              href={`/groups/${shared.groupId}`}
               className="w-full h-11 flex items-center justify-center border border-steel/30 text-chalk font-body text-sm font-medium active:border-rust active:text-rust transition-colors"
             >
-              Continue to Team Feed &rarr;
+              Back to Home
+            </Link>
+          )}
+          {user && viewerIsAuthor && viewerSeesFeed && (
+            <Link
+              href={`/groups/${shared.groupId}/feed`}
+              className="block text-center font-body text-xs text-steel underline underline-offset-2 pt-1"
+            >
+              Team Feed
             </Link>
           )}
         </div>

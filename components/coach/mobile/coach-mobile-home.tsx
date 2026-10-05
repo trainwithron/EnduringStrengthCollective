@@ -6,7 +6,6 @@ import { getTodaysDueRoster } from "@/lib/todays-due-roster";
 import { getTodaysWorkoutId } from "@/lib/todays-workout";
 import { computeRealIncomeInRange, computeRealMRR } from "@/lib/business-metrics";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
-import { ViewAsClientEntryPoint } from "@/components/athlete/view-as-client-entry-point";
 import { ViewModeToggle } from "@/components/coach/view-mode-toggle";
 import { TodayWidget, type TodayMacros } from "@/components/athlete/today-widget";
 import { CoachHomeComplications } from "./coach-home-complications";
@@ -119,7 +118,6 @@ export async function CoachMobileHome({
         </header>
 
         <div className="px-5 pb-5 flex items-center gap-2">
-          <ViewAsClientEntryPoint />
           <ViewModeToggle targetMode="desktop" label="Desktop Mode" variant="button" groupId={groupId} />
         </div>
 

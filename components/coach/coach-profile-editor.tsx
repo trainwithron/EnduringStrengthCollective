@@ -17,20 +17,23 @@ export function CoachProfileEditor({
   coachName,
   initialBio,
   initialPhotoUrl,
+  initialCompletionMessage = null,
 }: {
   coachId: string;
   coachName: string;
   initialBio: string | null;
   initialPhotoUrl: string | null;
+  initialCompletionMessage?: string | null;
 }) {
   const [bio, setBio] = useState(initialBio ?? "");
   const [photoUrl, setPhotoUrl] = useState(initialPhotoUrl);
+  const [completionMessage, setCompletionMessage] = useState(initialCompletionMessage ?? "");
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
 
-  async function persist(patch: { bio?: string; photo_url?: string | null }) {
+  async function persist(patch: { bio?: string; photo_url?: string | null; completion_message?: string | null }) {
     const supabase = createBrowserClient();
     await supabase.from("coach_profiles").upsert({ coach_id: coachId, ...patch, updated_at: new Date().toISOString() }, { onConflict: "coach_id" });
   }
@@ -38,6 +41,12 @@ export function CoachProfileEditor({
   async function handleBioBlur() {
     setSaving(true);
     await persist({ bio: bio.trim() });
+    setSaving(false);
+  }
+
+  async function handleCompletionBlur() {
+    setSaving(true);
+    await persist({ completion_message: completionMessage.trim() || null });
     setSaving(false);
   }
 
@@ -105,6 +114,19 @@ export function CoachProfileEditor({
             placeholder="A short bio your clients will see when they tap your name…"
             className="w-full bg-graphite border border-steel/30 text-chalk px-3 py-2 font-body text-sm focus:outline-none focus:border-rust resize-none"
           />
+          <label className="block">
+            <span className="font-body text-xs text-steel block mb-1">
+              Your message to a client after a workout (optional). Use {"{name}"} for their first name.
+            </span>
+            <textarea
+              value={completionMessage}
+              onChange={(e) => setCompletionMessage(e.target.value.slice(0, 280))}
+              onBlur={handleCompletionBlur}
+              rows={2}
+              placeholder="{name}, you just did something hard. I'm proud of you."
+              className="w-full bg-graphite border border-steel/30 text-chalk px-3 py-2 font-body text-sm focus:outline-none focus:border-rust resize-none"
+            />
+          </label>
           {saving && <p className="font-body text-xs text-steel">Saving…</p>}
           {error && (
             <p className="font-body text-xs text-rust" role="alert">

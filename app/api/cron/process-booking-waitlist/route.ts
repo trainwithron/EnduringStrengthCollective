@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendPushToProfile } from "@/lib/send-push";
+import { formatInTimezone, timezoneForProfiles } from "@/lib/format-in-timezone";
 
 // acuity_replacement_gap_audit_sept16.md — waitlists. The instant "a
 // slot just freed up" moment is handled synchronously inside
@@ -31,13 +32,11 @@ export async function GET(request: Request) {
 
   let pushed = 0;
   for (const entry of toPush ?? []) {
-    const when = new Date(entry.slot_start_at).toLocaleString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
+    const when = formatInTimezone(
+      entry.slot_start_at,
+      await timezoneForProfiles(supabase, [entry.athlete_id]),
+      "dateTime"
+    );
     const body = `A spot just opened up for ${when} — book now before it's gone.`;
     await sendPushToProfile(supabase, entry.athlete_id, "Waitlist spot open", body, `/groups/${entry.group_id}/calendar`);
     await supabase.from("booking_waitlist_entries").update({ push_sent_at: now.toISOString() }).eq("id", entry.id);

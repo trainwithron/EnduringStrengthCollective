@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getStripeClient, isStripeConfigured } from "@/lib/stripe";
 import { CREDIT_PACK_CREDITS } from "@/lib/coach-credits";
+import { appOrigin } from "@/lib/app-url";
 
 // credit_topup_low_tier_monetization_idea.md — a coach buying their OWN
 // AI credits/Lift Off from the platform, genuinely distinct from
@@ -68,7 +69,7 @@ export async function POST(request: Request) {
       await serviceRole.from("stripe_customers").insert({ profile_id: user.id, stripe_customer_id: stripeCustomerId });
     }
 
-    const origin = request.headers.get("origin") ?? new URL(request.url).origin;
+    const origin = appOrigin(request);
     const purchaseKind = kind === "credit_pack" ? "coach_credit_pack" : "coach_lift_off";
 
     const session = await stripe.checkout.sessions.create({

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { isStandaloneDisplay, isMobileUserAgent } from "@/lib/pwa";
+import { loadStartInputs, parseLastGroupCookie, pickStartGroup } from "@/lib/start-group";
 
 export default function LoginPage() {
   return (
@@ -54,12 +55,13 @@ function LoginForm() {
     // coach on a phone — installed app or just a browser tab — land on the
     // mobile group hub instead. Logging your own training doesn't need the
     // desktop tools, and that's most coaches' first-ever open of this app.
-    const { data: membership } = await supabase
-      .from("group_memberships")
-      .select("group_id, role")
-      .eq("profile_id", data.user.id)
-      .limit(1)
-      .single();
+    const lastGroupCookie = document.cookie
+      .split("; ")
+      .find((c) => c.startsWith("last_group="))
+      ?.slice("last_group=".length);
+    const membership = pickStartGroup(
+      await loadStartInputs(supabase, data.user.id, parseLastGroupCookie(lastGroupCookie))
+    );
 
     if (membership) {
       const wantsMobileHome =

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { Copy, Check } from "lucide-react";
+import { appOriginBrowser } from "@/lib/app-url";
 
 // org_calendar_spotter_trainer_dispatch_scoping_sept19.md — the two
 // coach-facing controls this feature needs: the public intake link to
@@ -22,7 +23,7 @@ export function DispatchSettings({
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const intakeUrl = typeof window !== "undefined" ? `${window.location.origin}/join/${orgSlug}` : `/join/${orgSlug}`;
+  const intakeUrl = typeof window !== "undefined" ? `${appOriginBrowser()}/join/${orgSlug}` : `/join/${orgSlug}`;
 
   async function persistTtl(next: number) {
     setSaving(true);

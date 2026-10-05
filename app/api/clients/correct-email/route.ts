@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     group_id: groupId,
     type: "email_changed",
     body: "Your coach updated the email address on your account. You now sign in with the new one.",
-    link_path: null,
+    link_path: `/groups/${groupId}`,
   });
 
   return NextResponse.json({ ok: true, email: trimmed });

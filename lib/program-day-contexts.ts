@@ -87,6 +87,32 @@ export function resolveSessionsForDate(
   return out;
 }
 
+// The next day (within two weeks after today) that has a workout still to do, across every active program, or null.
+// Playlist-style programs have no dates, so they never produce one.
+export function findNextWorkoutDate(
+  contexts: ProgramDayContext[],
+  loggedIds: Set<string>,
+  today: Date,
+  daysAhead = 14
+): Date | null {
+  for (let i = 1; i <= daysAhead; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() + i);
+    const sessions = resolveSessionsForDate(contexts, loggedIds, d, today, false);
+    if (sessions.some((s) => s.status === "planned" || s.status === "locked")) return d;
+  }
+  return null;
+}
+
+// "Tomorrow" or the weekday ("Thursday") for the line under a finished workout.
+export function nextWorkoutLabel(next: Date | null, today: Date): string | null {
+  if (!next) return null;
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  if (next.toDateString() === tomorrow.toDateString()) return "Tomorrow";
+  return next.toLocaleDateString("en-US", { weekday: "long" });
+}
+
 // What a day looks like when there is nothing to list: no program at all, only
 // playlist-style programs on a past or future date, or simply a rest day.
 export function emptyDayInfo(contexts: ProgramDayContext[], isToday: boolean): DayWorkoutInfo {

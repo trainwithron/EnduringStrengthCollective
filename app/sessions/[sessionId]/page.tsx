@@ -16,6 +16,7 @@ import { computePriorBest } from "@/lib/obstacle-unlock";
 import { computeVolumeHistory } from "@/lib/exercise-volume-history";
 import { ExitWorkoutButton } from "@/components/session/exit-workout-button";
 import { ResumeWorkoutButton } from "@/components/session/resume-workout-button";
+import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 
 export default async function SessionPage(
   props: {
@@ -459,7 +460,8 @@ export default async function SessionPage(
   // it freely. Only ever computed for the athlete's own session (a coach
   // logging a client's session in-person sees no gate) and only when
   // something is genuinely pending today — never invented to fill space.
-  const todayKey = new Date().toISOString().slice(0, 10);
+  // The coach's calendar day, like Home, not the server's UTC day, which flips to tomorrow in the evening.
+  const todayKey = dateKeyInZone(await getGroupCoachTimezone(supabase, session.group_id));
   let pendingGateTask: PendingGateTask | null = null;
   if (isOwnSession && session.status === "in_progress") {
     const [{ data: habitRows }, { data: wellnessRow }] = await Promise.all([
