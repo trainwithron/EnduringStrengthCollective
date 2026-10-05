@@ -30,7 +30,7 @@ export function validateSetFieldInput(field: TrackedField, raw: string): SetFiel
   if (!Number.isFinite(n)) return { ok: false, message: `${rule.label} needs a number.` };
   if (rule.integer && !Number.isInteger(n)) return { ok: false, message: `${rule.label} must be a whole number.` };
   if (n < rule.min || n > rule.max) {
-    return { ok: false, message: `${rule.label} must be between ${rule.min} and ${rule.max}.` };
+    return { ok: false, message: `${rule.label} must be ${rule.min} to ${rule.max}.` };
   }
   return { ok: true, value: n };
 }

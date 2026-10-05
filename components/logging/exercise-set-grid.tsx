@@ -279,7 +279,7 @@ function GridCell({
       {invalid && (
         <p
           role="alert"
-          className="absolute top-full left-1/2 -translate-x-1/2 mt-1 z-20 w-40 bg-graphite border border-rust px-2 py-1 font-body text-xs text-chalk text-center"
+          className="absolute top-full left-1/2 -translate-x-1/2 mt-0.5 z-20 w-max max-w-[10rem] bg-graphite border border-rust px-2 py-1 font-body text-xs text-chalk text-center"
         >
           {invalid}
         </p>
