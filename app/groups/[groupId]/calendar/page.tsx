@@ -246,7 +246,7 @@ export default async function CoachCalendarPage(
               <p className="font-body text-sm text-chalk">
                 {selected.fullName} —{" "}
                 <span className="text-steel">
-                  {selected.balance} {selected.balance === 1 ? "credit" : "credits"} left
+                  {selected.balance} {selected.balance === 1 ? "session" : "sessions"} left
                 </span>
               </p>
               <p className="font-body text-xs text-steel mt-1">Tap a date to see and book open sessions.</p>
@@ -1110,7 +1110,7 @@ export default async function CoachCalendarPage(
           </h2>
           <p className="font-body text-xs text-steel mb-2">
             Drag a name onto a day to book them, or click a name then click a
-            date. Use +/- to quickly adjust session credits.
+            date. Use +/- to quickly adjust sessions.
           </p>
           <CalendarClientList
             clients={clients}

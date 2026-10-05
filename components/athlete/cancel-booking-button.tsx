@@ -29,7 +29,7 @@ export function CancelBookingButton({
   const router = useRouter();
 
   async function handleCancel() {
-    if (!window.confirm("Cancel this session? Your session credit comes back to your balance.")) return;
+    if (!window.confirm("Cancel this session? Your session goes back to your balance.")) return;
     setSubmitting(true);
     const supabase = createBrowserClient();
 

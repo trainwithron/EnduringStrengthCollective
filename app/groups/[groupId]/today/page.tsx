@@ -52,7 +52,7 @@ export default async function TodayPage(
     result.status === "locked"
       ? `Your next workout unlocks on ${formatShortDate(result.unlocksOn)}.`
       : isCoach
-      ? "No active program in this group yet, or you've completed every workout in it — set one up from the Coach Dashboard."
+      ? "No active program in this group yet, or you've completed every workout in it — set one up from Programs."
       : "No program assigned yet, or you've completed every workout in it. Check with your coach.";
 
   let actingAsFullName: string | null = null;

@@ -65,7 +65,7 @@ export function BookSlotButton({
   if (confirming && !submitting) {
     return (
       <div className="flex flex-col items-end gap-1.5">
-        <span className="font-body text-xs text-chalk">Book this time? Uses 1 session credit.</span>
+        <span className="font-body text-xs text-chalk">Book this time? Uses 1 session.</span>
         <div className="flex items-center gap-2">
           <button
             type="button"

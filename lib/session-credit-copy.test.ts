@@ -3,7 +3,8 @@ import { sessionBalanceLine, NO_SESSIONS_LINE } from "./session-credit-copy";
 
 describe("sessionBalanceLine", () => {
   it("shows the count when sessions are available", () => {
-    expect(sessionBalanceLine(12)).toBe("Session credits available: 12");
+    expect(sessionBalanceLine(12)).toBe("12 sessions left");
+    expect(sessionBalanceLine(1)).toBe("1 session left");
   });
   it("stays neutral at zero and below", () => {
     expect(sessionBalanceLine(0)).toBe(NO_SESSIONS_LINE);

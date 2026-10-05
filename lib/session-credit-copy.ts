@@ -6,5 +6,5 @@ export const NO_PACKAGES_LINE = "Your coach hasn't added sessions yet. Message t
 export const CANT_BOOK_NO_SESSIONS = "You don't have a session to book with yet. Your coach can add one.";
 
 export function sessionBalanceLine(balance: number): string {
-  return balance > 0 ? `Session credits available: ${balance}` : NO_SESSIONS_LINE;
+  return balance > 0 ? `${balance} ${balance === 1 ? "session" : "sessions"} left` : NO_SESSIONS_LINE;
 }
