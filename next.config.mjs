@@ -1,3 +1,5 @@
+import { buildSecurityHeaders } from "./security-headers.mjs";
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
@@ -9,6 +11,17 @@ const nextConfig = {
     staleTimes: {
       dynamic: 0,
     },
+  },
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: buildSecurityHeaders({
+          isProd: process.env.NODE_ENV === "production",
+          supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+        }),
+      },
+    ];
   },
 };
 
