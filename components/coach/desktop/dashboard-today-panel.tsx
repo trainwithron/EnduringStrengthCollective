@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { TodayBooking } from "@/lib/dashboard-data";
 
 export function DashboardTodayPanel({ bookings }: { bookings: TodayBooking[] }) {
@@ -10,7 +11,18 @@ export function DashboardTodayPanel({ bookings }: { bookings: TodayBooking[] }) 
         <div className="space-y-2">
           {bookings.map((b) => (
             <div key={b.id} className="flex items-center justify-between">
-              <p className="font-body text-sm text-chalk">{b.athleteName}</p>
+              <p className="font-body text-sm text-chalk">
+                {b.athleteName}
+                {b.needsPayment && (
+                  <Link
+                    href={`/groups/${b.groupId}/athletes/${b.athleteId}`}
+                    className="ml-2 font-body text-xs text-rust border border-rust/50 rounded-token-pill px-1.5 py-0.5"
+                    title="Out of sessions. Open their profile to add sessions or send a reminder."
+                  >
+                    Needs payment
+                  </Link>
+                )}
+              </p>
               <p className="font-body text-xs text-steel">
                 {new Date(b.startAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })} · {b.groupName}
               </p>

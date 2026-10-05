@@ -1,4 +1,5 @@
 // Server-only data orchestration behind the coach Home dashboard redesign
+import { needsPayment } from "@/lib/reup";
 // (coach_dashboard_redesign_scoping.md). Pairs with the tested pure libs
 // (team-pulse.ts, quiet-client-tier.ts, coach-hero-priority.ts) the same
 // way lib/leaderboard-data.ts pairs with lib/leaderboard.ts — this file
@@ -55,9 +56,21 @@ export interface DashboardStatTiles {
 
 export interface TodayBooking {
   id: string;
+  athleteId: string;
+  groupId: string;
+  // The client has run out of sessions (and is not on hold): a prompt for the day itself.
+  needsPayment: boolean;
   athleteName: string;
   groupName: string;
   startAt: string;
+}
+
+// A client at zero sessions or below, not on hold. Listed on the coach's Home so they can remind or hold in one tap.
+export interface NeedsPaymentRow {
+  athleteId: string;
+  groupId: string;
+  name: string;
+  balance: number;
 }
 
 export interface HeroEmptyState {
@@ -72,6 +85,7 @@ export interface CoachDashboardData {
   teamPulses: TeamPulseResult[];
   statTiles: DashboardStatTiles;
   todayBookings: TodayBooking[];
+  needsPayment: NeedsPaymentRow[];
   weekNarrative: string;
   quietTierByAthlete: Map<string, QuietTier>;
 }
@@ -113,6 +127,7 @@ export async function getCoachDashboardData(
       teamPulses: [],
       statTiles: { rosterSize: 0, activeThisWeekPct: 0, needsAttentionCount: 0, estimatedMrr: 0, tiles: [] },
       todayBookings: [],
+      needsPayment: [],
       weekNarrative: "No clients yet — invite your first one to get started.",
       quietTierByAthlete: new Map(),
     };
@@ -158,7 +173,7 @@ export async function getCoachDashboardData(
       .eq("active", true),
     supabase
       .from("bookings")
-      .select("id, group_id, start_at, status, profiles!bookings_athlete_id_fkey ( full_name )")
+      .select("id, athlete_id, group_id, start_at, status, profiles!bookings_athlete_id_fkey ( full_name )")
       .eq("coach_id", coachId)
       .in("group_id", allGroupIds)
       .eq("status", "confirmed")
@@ -332,6 +347,25 @@ export async function getCoachDashboardData(
     });
   }
   const athletes = [...athleteByProfileId.values()];
+
+  // Clients who have run out of sessions (migration 0260 adds the hold flag; without it nobody is on hold).
+  let owedResult: any = await supabase
+    .from("session_credits")
+    .select("athlete_id, group_id, balance, payment_hold")
+    .in("group_id", allGroupIds)
+    .lte("balance", 0);
+  if (owedResult.error) {
+    owedResult = await supabase.from("session_credits").select("athlete_id, group_id, balance").in("group_id", allGroupIds).lte("balance", 0);
+  }
+  const needsPaymentRows: NeedsPaymentRow[] = ((owedResult.data ?? []) as { athlete_id: string; group_id: string; balance: number; payment_hold?: boolean | null }[])
+    .filter((r) => needsPayment(r.balance, r.payment_hold) && athleteByProfileId.has(r.athlete_id))
+    .map((r) => ({
+      athleteId: r.athlete_id,
+      groupId: r.group_id,
+      name: athleteByProfileId.get(r.athlete_id)?.fullName ?? "Client",
+      balance: r.balance,
+    }))
+    .sort((a, b) => a.balance - b.balance || a.name.localeCompare(b.name));
 
   const heroFlags: (HeroFlag & { href: string })[] = [];
   const quietTierByAthlete = new Map<string, QuietTier>();
@@ -654,8 +688,12 @@ export async function getCoachDashboardData(
           needsAttentionCount > 0 ? ` — ${needsAttentionCount} need${needsAttentionCount === 1 ? "s" : ""} a check-in` : ""
         }.`;
 
+  const needsPaymentIds = new Set(needsPaymentRows.map((r) => r.athleteId));
   const todayBookings: TodayBooking[] = (bookingRows ?? []).map((b: any) => ({
     id: b.id,
+    athleteId: b.athlete_id,
+    groupId: b.group_id,
+    needsPayment: needsPaymentIds.has(b.athlete_id),
     athleteName: b.profiles?.full_name ?? "A client",
     groupName: groupNameById.get(b.group_id) ?? "Group",
     startAt: b.start_at,
@@ -667,6 +705,7 @@ export async function getCoachDashboardData(
     teamPulses,
     statTiles,
     todayBookings,
+    needsPayment: needsPaymentRows,
     weekNarrative,
     quietTierByAthlete,
   };

@@ -174,6 +174,23 @@ export const HOWTOS: HowTo[] = [
     note: "From the Calendar you can also click a client's open time and choose Repeat weekly.",
   },
   {
+    id: "remind-reup",
+    title: "Remind a client to re-up, or put them on hold",
+    roles: ["coach"],
+    keywords: [
+      "remind a client to pay", "remind a client to re up", "remind to re up", "remind them to pay", "needs payment", "who needs to pay",
+      "client ran out of sessions", "out of sessions", "client has no sessions left", "re up", "reup", "put a client on hold",
+      "stop reminding a client", "comped client", "who owes me", "send a payment reminder", "payment reminder",
+    ],
+    steps: [
+      { text: "Open Home. Clients who have run out of sessions are listed under Needs payment, the most owed first.", href: "/dashboard", linkLabel: "Home" },
+      { text: "Press Remind to send them a notification. A client is never reminded more than once every 3 days." },
+      { text: "Press Hold for a client who is comped, on a break, or pays another way. They leave the list and are never reminded." },
+      { text: "The same buttons are on each client's card on the Clients page, where you can also filter to Needs payment." },
+    ],
+    note: "You can turn reminders off for everyone on the Availability page.",
+  },
+  {
     id: "athlete-start-workout",
     title: "Start today's workout",
     roles: ["athlete"],

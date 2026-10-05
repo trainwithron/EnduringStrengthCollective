@@ -416,6 +416,9 @@ describe("how-to answers", () => {
     ["how do i assign a program to a client", "assign-program"],
     ["how do i create a package", "create-package"],
     ["how do i book a client weekly", "book-weekly"],
+    ["how do i remind a client to pay", "remind-reup"],
+    ["who needs payment", "remind-reup"],
+    ["how do i put a client on hold", "remind-reup"],
     ["how do i schedule recurring sessions", "book-weekly"],
   ];
   it.each(cases)("%s", (q, id) => {

@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import { loadReupState } from "@/lib/reup-server";
+import { ReupCard } from "@/components/athlete/reup-card";
 import { FirstRunGuideCard } from "@/components/athlete/first-run-guide-card";
 import { PushNotificationToggle } from "@/components/athlete/push-notification-toggle";
 import { UnavailableState } from "@/components/ui/unavailable-state";
@@ -495,6 +497,17 @@ export default async function GroupHubPage(
     }
   }
 
+  // A client whose sessions have run out gets a one-tap re-up (or "message your coach"), and a prompt on the day a session is
+  // booked. Never shown to a coach, or to a coach acting as the client. Any failure just means no card.
+  let reupState: Awaited<ReturnType<typeof loadReupState>> = null;
+  if (user && !isCoach && !isActingAsOther && showMobileView && athleteId) {
+    try {
+      reupState = await loadReupState(supabase, athleteId, params.groupId);
+    } catch {
+      reupState = null;
+    }
+  }
+
   // "The Spot" (coach_only_widget_hub_the_spot.md) — a coach-only widget
   // rail on top of the true-mirror View-As-Client screen. Only ever
   // computed while genuinely acting as someone — a real athlete, or a
@@ -608,6 +621,7 @@ export default async function GroupHubPage(
 
           {view === "day" && (
             <div className="space-y-4">
+              {reupState && <ReupCard state={reupState} />}
               {isToday && !isFirstDay && (
                 <WellnessCheckinPopup
                   athleteId={athleteId}

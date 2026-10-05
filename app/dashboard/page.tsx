@@ -17,6 +17,7 @@ import { DashboardHero } from "@/components/coach/desktop/dashboard-hero";
 import { PulseTabs } from "@/components/coach/desktop/pulse-tabs";
 import { DashboardStatTiles } from "@/components/coach/desktop/dashboard-stat-tiles";
 import { DashboardTodayPanel } from "@/components/coach/desktop/dashboard-today-panel";
+import { NeedsPaymentPanel } from "@/components/coach/desktop/needs-payment-panel";
 import { DashboardWeekNarrative } from "@/components/coach/desktop/dashboard-week-narrative";
 import { DashboardAutoRefresh } from "@/components/coach/desktop/dashboard-auto-refresh";
 import { DashboardTileGrid } from "@/components/coach/desktop/dashboard-tile-grid";
@@ -501,6 +502,8 @@ export default async function CoachHomePage() {
       <OrgNotificationsPanel initialNotifications={orgNotifications} />
 
       <NeedsReplyPanel coachId={user.id} threads={needsReplyThreads} />
+
+      <NeedsPaymentPanel rows={dashboardData.needsPayment} />
 
       <DashboardTileGrid
         initialOrder={(layoutRow?.tile_order as string[] | undefined) ?? []}

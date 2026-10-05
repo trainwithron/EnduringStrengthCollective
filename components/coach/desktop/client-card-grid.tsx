@@ -9,6 +9,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { CardSizeToggle } from "@/components/coach/desktop/card-size-toggle";
 import { readCardSize, writeCardSize, type CardSize } from "@/lib/card-size";
 import { isLowReadiness } from "@/lib/wellness";
+import { coachBalanceLabel, needsPayment } from "@/lib/reup";
 import { daysSinceOf, clientActivityStatus } from "@/lib/client-activity-status";
 import { initialsOf } from "@/lib/initials";
 import { getIntegrityRollupForGroup, type AthleteIntegrityResult } from "@/lib/session-integrity-data";
@@ -100,6 +101,12 @@ export function ClientCardGrid({
   // finding, not just a rendering optimization.
   const [creditsByAthleteId, setCreditsByAthleteId] = useState<Map<string, number>>(new Map());
   const [lowReadinessAthleteIds, setLowReadinessAthleteIds] = useState<Set<string>>(new Set());
+  // Clients at zero sessions or below (the hold flag arrives with migration 0260). One small query for the whole group, so the
+  // count and the filter cover every page, not only the one on screen.
+  const [owedByAthleteId, setOwedByAthleteId] = useState<Map<string, { balance: number; hold: boolean }>>(new Map());
+  const [paymentFilter, setPaymentFilter] = useState(false);
+  const [reupBusyId, setReupBusyId] = useState<string | null>(null);
+  const [reupNote, setReupNote] = useState<{ id: string; text: string; error: boolean } | null>(null);
   const [integrityByAthleteId, setIntegrityByAthleteId] = useState<Map<string, AthleteIntegrityResult>>(
     new Map()
   );
@@ -126,19 +133,83 @@ export function ClientCardGrid({
     setRows(members);
   }, [members]);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      const supabase = createBrowserClient();
+      let result: any = await supabase.from("session_credits").select("athlete_id, balance, payment_hold").eq("group_id", groupId).lte("balance", 0);
+      if (result.error) {
+        result = await supabase.from("session_credits").select("athlete_id, balance").eq("group_id", groupId).lte("balance", 0);
+      }
+      if (cancelled) return;
+      const map = new Map<string, { balance: number; hold: boolean }>();
+      for (const r of result.data ?? []) map.set(r.athlete_id, { balance: r.balance, hold: !!r.payment_hold });
+      setOwedByAthleteId(map);
+    }
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [groupId, members]);
+
+  async function reupAction(member: RosterMember, action: "remind" | "hold" | "resume") {
+    setReupBusyId(member.profileId);
+    setReupNote(null);
+    try {
+      const res = await fetch(action === "remind" ? "/api/reup/remind" : "/api/reup/hold", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(
+          action === "remind"
+            ? { groupId, athleteId: member.profileId }
+            : { groupId, athleteId: member.profileId, hold: action === "hold" }
+        ),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setReupNote({ id: member.profileId, text: data.error ?? "That didn't work.", error: true });
+        return;
+      }
+      if (action === "remind") {
+        setReupNote({ id: member.profileId, text: data.message ?? "Reminder sent.", error: false });
+      } else {
+        setOwedByAthleteId((prev) => {
+          const next = new Map(prev);
+          const cur = next.get(member.profileId);
+          if (cur) next.set(member.profileId, { ...cur, hold: action === "hold" });
+          return next;
+        });
+        setReupNote({ id: member.profileId, text: action === "hold" ? "On hold. No reminders." : "Back in the count.", error: false });
+      }
+    } catch {
+      setReupNote({ id: member.profileId, text: "That didn't work. Try again.", error: true });
+    } finally {
+      setReupBusyId(null);
+    }
+  }
+
   function handleSizeChange(next: CardSize) {
     setSize(next);
     writeCardSize(STORAGE_KEY, next);
   }
 
   const isOnlyCoach = rows.filter((m) => m.role === "coach").length === 1;
+  const needsPaymentCount = rows.filter((m) => {
+    const owed = owedByAthleteId.get(m.profileId);
+    return m.role === "athlete" && !!owed && needsPayment(owed.balance, owed.hold);
+  }).length;
 
   const trimmedSearch = search.trim().toLowerCase();
   const filteredRows = rows
     .filter((m) => tierFilter === "all" || m.clientTier === tierFilter)
     .filter((m) => goalFilter === "all" || m.nutritionPhase === goalFilter)
     .filter((m) => positionFilter === "all" || m.positionId === positionFilter)
-    .filter((m) => !trimmedSearch || m.fullName.toLowerCase().includes(trimmedSearch));
+    .filter((m) => !trimmedSearch || m.fullName.toLowerCase().includes(trimmedSearch))
+    .filter((m) => {
+      if (!paymentFilter) return true;
+      const owed = owedByAthleteId.get(m.profileId);
+      return !!owed && needsPayment(owed.balance, owed.hold);
+    });
 
   const sortedRows = useMemo(
     () =>
@@ -163,7 +234,7 @@ export function ClientCardGrid({
   // now-mismatched page number.
   useEffect(() => {
     setPage(0);
-  }, [sortMode, tierFilter, goalFilter, positionFilter, trimmedSearch]);
+  }, [sortMode, tierFilter, goalFilter, positionFilter, trimmedSearch, paymentFilter]);
 
   useEffect(() => {
     let cancelled = false;
@@ -491,6 +562,18 @@ export function ClientCardGrid({
             >
               A–Z
             </button>
+            {(needsPaymentCount > 0 || paymentFilter) && (
+              <button
+                type="button"
+                onClick={() => setPaymentFilter((v) => !v)}
+                aria-pressed={paymentFilter}
+                className={`font-body text-xs px-2 py-1 border ${
+                  paymentFilter ? "text-rust border-rust" : "text-steel border-steel/30"
+                }`}
+              >
+                Needs payment ({needsPaymentCount})
+              </button>
+            )}
           </div>
           <CardSizeToggle size={size} onChange={handleSizeChange} />
         </div>
@@ -595,7 +678,9 @@ export function ClientCardGrid({
         <div className={`grid ${GRID_CLASS[size]}`}>
           {pageRows.map((member) => {
             const status = clientActivityStatus(member.lastWorkoutAt);
-            const credits = creditsByAthleteId.get(member.profileId) ?? 0;
+            const credits = creditsByAthleteId.get(member.profileId) ?? null;
+            const owed = owedByAthleteId.get(member.profileId);
+            const owesNow = !!owed && needsPayment(owed.balance, owed.hold);
             return (
               <div
                 key={member.profileId}
@@ -698,8 +783,55 @@ export function ClientCardGrid({
                     <option value="online">Online</option>
                     <option value="group">Group</option>
                   </select>
-                  <span className="font-body text-xs text-steel whitespace-nowrap">{credits} credits</span>
+                  <span className={`font-body text-xs whitespace-nowrap ${credits !== null && credits <= 0 && !owed?.hold ? "text-rust" : "text-steel"}`}>
+                    {coachBalanceLabel(credits)}
+                  </span>
                 </div>
+
+                {owed && (
+                  <div className="flex flex-wrap items-center justify-center gap-2 w-full">
+                    {owed.hold ? (
+                      <>
+                        <span className="font-body text-xs text-steel border border-steel/30 rounded-token-pill px-2 py-0.5">On hold</span>
+                        <button
+                          type="button"
+                          disabled={reupBusyId === member.profileId}
+                          onClick={() => reupAction(member, "resume")}
+                          className="font-body text-xs text-steel underline disabled:opacity-40"
+                        >
+                          Resume
+                        </button>
+                      </>
+                    ) : (
+                      owesNow && (
+                        <>
+                          <span className="font-body text-xs text-rust border border-rust/50 rounded-token-pill px-2 py-0.5">Needs payment</span>
+                          <button
+                            type="button"
+                            disabled={reupBusyId === member.profileId}
+                            onClick={() => reupAction(member, "remind")}
+                            className="font-body text-xs text-chalk underline disabled:opacity-40"
+                          >
+                            Remind
+                          </button>
+                          <button
+                            type="button"
+                            disabled={reupBusyId === member.profileId}
+                            onClick={() => reupAction(member, "hold")}
+                            className="font-body text-xs text-steel underline disabled:opacity-40"
+                          >
+                            Hold
+                          </button>
+                        </>
+                      )
+                    )}
+                  </div>
+                )}
+                {reupNote?.id === member.profileId && (
+                  <p className={`font-body text-xs ${reupNote.error ? "text-rust" : "text-steel"}`} role={reupNote.error ? "alert" : "status"}>
+                    {reupNote.text}
+                  </p>
+                )}
 
                 <div className="relative flex items-center justify-center gap-3 w-full pt-2 mt-1 border-t border-steel/15">
                   <Link

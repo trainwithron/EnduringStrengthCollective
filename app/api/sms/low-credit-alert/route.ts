@@ -3,19 +3,18 @@ import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { dispatchSms } from "@/lib/sms-dispatch";
 import { getCallerGroupRole } from "@/lib/group-access";
+import { tierForBalance } from "@/lib/reup";
+import { lowBalanceMessage } from "@/lib/low-balance-messages";
 
 // SMS mirror of lib/notify-low-session-balance.ts's existing push
 // alert — same tier thresholds (3/1/0), same recipients (the group's
 // coach(es) + the org owner), same "re-read the real balance rather
-// than trust a caller-supplied value" defensiveness. Each recipient's
+// than trust a caller-supplied value" defensiveness. The client only
+// calls this after /api/credits/low-balance-check says a new tier was just
+// crossed, so a text goes out once per crossing. Each recipient's
 // own coach_sms_config gates and receives this independently — the
 // coach and the org owner can each opt in/out and use their own phone
 // number, they aren't a single shared "business" config.
-const TIER_MESSAGES: Record<number, (name: string) => string> = {
-  3: (name) => `${name} has 3 sessions left — worth a renewal check-in soon.`,
-  1: (name) => `${name} is down to their last session. Good time to start the renewal conversation.`,
-  0: (name) => `${name} just used their final session. Start the renewal conversation now.`,
-};
 
 export async function POST(request: Request) {
   const supabase = await createServerClient();
@@ -55,8 +54,8 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   const balance = creditsRow?.balance;
-  const messageFor = balance !== undefined && balance !== null ? TIER_MESSAGES[balance] : undefined;
-  if (!messageFor) return NextResponse.json({ sent: false, reason: "no_tier_match" });
+  const tier = balance !== undefined && balance !== null ? tierForBalance(balance) : null;
+  if (tier === null || balance === undefined || balance === null) return NextResponse.json({ sent: false, reason: "no_tier_match" });
 
   const [{ data: athleteProfile }, { data: coachRows }, { data: group }] = await Promise.all([
     serviceRole.from("profiles").select("full_name").eq("id", athleteId).maybeSingle(),
@@ -77,7 +76,7 @@ export async function POST(request: Request) {
   }
 
   const todayKey = new Date().toISOString().slice(0, 10);
-  const body = messageFor(athleteName);
+  const body = lowBalanceMessage(tier, athleteName, balance).body;
   const results = [];
   for (const recipientId of recipients) {
     const { data: config } = await serviceRole
