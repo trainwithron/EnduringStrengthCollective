@@ -78,7 +78,10 @@ as $function$
 declare
   v_uid uuid := auth.uid();
   v_ignore text[] := array['status', 'created_by', 'confirmed_at', 'confirmed_by'];
+  -- What the two sides agree on. A coach's own tags on a confirmed goal (a note, the main lift, the weight class flag) are not part of the agreement.
+  v_tags text[] := array['status', 'created_by', 'confirmed_at', 'confirmed_by', 'priority_note', 'main_lift_movement_pattern_id', 'weight_class_flag'];
   v_changed boolean;
+  v_agreed_changed boolean;
 begin
   if coalesce(auth.role(), '') not in ('authenticated', 'anon') then
     return new;
@@ -88,6 +91,7 @@ begin
   new.group_id := old.group_id;
   new.created_at := old.created_at;
   v_changed := (to_jsonb(new) - v_ignore) is distinct from (to_jsonb(old) - v_ignore);
+  v_agreed_changed := (to_jsonb(new) - v_tags) is distinct from (to_jsonb(old) - v_tags);
 
   if v_uid = old.athlete_id and not coalesce(public.is_group_coach(old.group_id), false) then
     -- The client answering a goal that is waiting on them.
@@ -126,13 +130,18 @@ begin
     if old.created_by <> old.athlete_id and new.status = 'confirmed' and old.status is distinct from 'confirmed' then
       raise exception 'Only the client can confirm a goal their coach suggested.';
     end if;
-    if old.status = 'proposed' and v_changed then
-      -- Changing a goal that is still being agreed makes the coach its author, so it goes to the client.
+    if (old.status = 'proposed' and v_changed) or (old.status = 'confirmed' and new.status = 'confirmed' and v_agreed_changed) then
+      -- Changing a goal that is still being agreed, or the date or type of one the client already confirmed, makes the coach its author, so it goes
+      -- (back) to the client to agree to. A note, the main lift or the weight class flag on a confirmed goal stay the coach's to set.
       new.status := 'proposed';
       new.created_by := v_uid;
       new.confirmed_at := null;
       new.confirmed_by := null;
       return new;
+    end if;
+    if new.status is distinct from 'confirmed' then
+      new.confirmed_at := null;
+      new.confirmed_by := null;
     end if;
     if new.status = 'confirmed' and old.status is distinct from 'confirmed' then
       new.confirmed_at := now();

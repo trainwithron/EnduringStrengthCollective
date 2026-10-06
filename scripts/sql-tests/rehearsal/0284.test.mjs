@@ -146,6 +146,35 @@ export default {
       await h.asSuper();
       h.check("another coach of the group cannot confirm a goal a coach suggested either", /Only the client can confirm/.test(coach2.error ?? "") && (await goal(h, g7)).status === "proposed", JSON.stringify(coach2));
 
+      // ---- a coach changing what the client agreed to reopens it
+      await h.as(s.coach);
+      const p8 = await mk(s.coach, s.ann);
+      await h.asSuper();
+      const g8 = p8.rows[0].id;
+      await h.as(s.ann);
+      await tryQ(db, `update public.client_goals set status = 'confirmed' where id = $1`, [g8]);
+      await h.as(s.coach);
+      const tagOnly = await tryQ(db, `update public.client_goals set priority_note = 'rear delts', weight_class_flag = true where id = $1`, [g8]);
+      await h.asSuper();
+      const c8a = await goal(h, g8);
+      h.check("a coach's note or flags on a confirmed goal leave it confirmed by the client", !tagOnly.error && c8a.status === "confirmed" && c8a.confirmed_by === s.ann, JSON.stringify({ tagOnly, c8a }));
+      await h.as(s.coach);
+      const dateChange = await tryQ(db, `update public.client_goals set target_date = '2028-01-01' where id = $1`, [g8]);
+      await h.asSuper();
+      const c8b = await goal(h, g8);
+      h.check("a coach changing the date or type of a confirmed goal sends it back to the client: proposed again, authored by the coach, confirmation cleared", !dateChange.error && c8b.status === "proposed" && c8b.created_by === s.coach && c8b.confirmed_by === null, JSON.stringify({ dateChange, c8b }));
+      await h.as(s.coach);
+      const p9 = await mk(s.coach, s.ann);
+      await h.asSuper();
+      const g9 = p9.rows[0].id;
+      await h.as(s.ann);
+      await tryQ(db, `update public.client_goals set status = 'confirmed' where id = $1`, [g9]);
+      await h.as(s.coach);
+      await tryQ(db, `update public.client_goals set status = 'declined' where id = $1`, [g9]);
+      await h.asSuper();
+      const c9 = await goal(h, g9);
+      h.check("when a goal stops being confirmed, who confirmed it and when are cleared", c9.status === "declined" && c9.confirmed_by === null, JSON.stringify(c9));
+
       // ---- what already worked still works
       await h.as(s.ann);
       const p5 = await mk(s.ann, s.ann);
