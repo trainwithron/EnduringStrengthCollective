@@ -149,6 +149,16 @@ for (const s of steps) {
   const kept = (await db.query("select count(*)::int as n from public.programs where group_id = '060017b5-e613-4204-a101-c6a14c3a9630' and name = 'christmas_abs_program'")).rows[0].n;
   const backup = (await db.query("select jsonb_array_length(payload -> 'programs') as programs, jsonb_array_length(payload -> 'workouts') as workouts, jsonb_array_length(payload -> 'sets') as sets from public.cleanup_backups")).rows;
   check("step 31: both groups are deleted, the copy survives in The Home Team, and the backup holds both programs, their workouts and sets", gone === 0 && kept === 1 && backup.length === 1 && backup[0].programs === 2 && backup[0].workouts === 3 && backup[0].sets === 4, JSON.stringify({ gone, kept, backup }));
+  // The restore file puts both groups back from the backup (and refuses to run on top of groups that exist); the groups are then deleted again so nothing later depends on them.
+  const savedKeys = (await db.query("select count(*)::int as n from public.cleanup_backups, jsonb_object_keys(payload)")).rows[0].n;
+  check("step 31: the backup also holds wellness check-ins, view state and Spotter dismissals", savedKeys === 11, savedKeys);
+  const er = await run("apply/restore-step31-from-backup.sql");
+  const back = (await db.query("select (select count(*)::int from public.groups where id in ('b292055b-edc6-4171-ad2b-a89d65dcd8db', 'c368ab0b-ccab-442e-a42e-38fb22293182')) as g, (select count(*)::int from public.programs where group_id in ('b292055b-edc6-4171-ad2b-a89d65dcd8db', 'c368ab0b-ccab-442e-a42e-38fb22293182')) as p, (select count(*)::int from public.workouts where group_id in ('b292055b-edc6-4171-ad2b-a89d65dcd8db', 'c368ab0b-ccab-442e-a42e-38fb22293182')) as w, (select count(*)::int from public.group_workout_exercise_sets s join public.group_workout_exercises x on x.id = s.group_workout_exercise_id where x.group_id in ('b292055b-edc6-4171-ad2b-a89d65dcd8db', 'c368ab0b-ccab-442e-a42e-38fb22293182')) as s")).rows[0];
+  check("restore-step31-from-backup.sql puts both groups, their programs, workouts and sets back" + (er ? ": " + er : ""), !er && back.g === 2 && back.p === 2 && back.w === 3 && back.s === 4, JSON.stringify(back));
+  const er2 = await run("apply/restore-step31-from-backup.sql");
+  check("restore-step31-from-backup.sql refuses when the groups already exist (" + er2 + ")", !!er2 && /already exists/.test(er2));
+  await db.exec("rollback");
+  await db.exec("delete from public.groups where id in ('b292055b-edc6-4171-ad2b-a89d65dcd8db', 'c368ab0b-ccab-442e-a42e-38fb22293182')");
 }
 // Step 26 left The Home Team in Coast2Coast Fitness (it was applied again after its undo): the group keeps its program and the coach.
 {

@@ -32,14 +32,16 @@ export async function loadSharedSource(supabase: SupabaseClient, id: string, log
     .maybeSingle();
   if (!log || !(log as any).athlete_id) return null;
 
-  const { data: profile } = await supabase.from("profiles").select("full_name, avatar_url").eq("id", (log as any).athlete_id).maybeSingle();
+  const { data: profile } = await supabase.from("profiles").select("full_name, avatar_url, feed_broadcast_level").eq("id", (log as any).athlete_id).maybeSingle();
+  // The client's own sharing level still applies: "check-in only" and "PRs only" show less on the card; "private" (no post) shows it in full, as the post code does.
+  const level = (profile as any)?.feed_broadcast_level;
   return {
     post: {
       id: (log as any).id,
       post_type: "workout_summary",
       created_at: (log as any).created_at,
       group_id: (log as any).group_id,
-      broadcast_level: "full",
+      broadcast_level: level === "prs_only" || level === "checkin_only" ? level : "full",
       author_id: (log as any).athlete_id,
       shared_exercise_names: null,
       profiles: profile ?? null,

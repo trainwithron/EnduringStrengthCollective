@@ -32,6 +32,15 @@ describe("the card source", () => {
     expect(r?.workoutLog).toEqual({ session_id: "s", new_prs: ["Back Squat"], total_volume: 4800, total_sets_completed: 6 });
   });
 
+  it("keeps to the client's own sharing level when the card is built from the log: check-in only and PRs only show less, private shows in full", async () => {
+    const log = { id: "l1", athlete_id: "a", group_id: "g", session_id: "s", new_prs: [], total_volume: 1, total_sets_completed: 1, created_at: "2026-10-06T12:00:00Z" };
+    const level = async (feed_broadcast_level: string) => (await loadSharedSource(fakeDb({ posts: null, workout_logs: log, profiles: { full_name: "Sam", feed_broadcast_level } }), "l1"))?.post.broadcast_level;
+    expect(await level("checkin_only")).toBe("checkin_only");
+    expect(await level("prs_only")).toBe("prs_only");
+    expect(await level("private")).toBe("full");
+    expect(await level("full")).toBe("full");
+  });
+
   it("does not build a card from a bare workout id: only a signed link opens a card the client did not post", async () => {
     const log = { id: "l1", athlete_id: "a", group_id: "g", session_id: "s", new_prs: [], total_volume: 1, total_sets_completed: 1, created_at: "2026-10-06T12:00:00Z" };
     expect(await loadSharedSource(fakeDb({ posts: null, workout_logs: log, profiles: { full_name: "Sam" } }), "l1", false)).toBeNull();

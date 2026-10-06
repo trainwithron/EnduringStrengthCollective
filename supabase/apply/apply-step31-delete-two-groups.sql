@@ -25,7 +25,7 @@ $guard$;
 -- Deletes the two groups Ron chose to remove: Main Group (Coast2Coast Fitness, its program is now copied into The Home Team) and the stray "Coast to Coast"
 -- group (Enduring Strength Co., an unused 4-week program). It refuses, and nothing is deleted, if either group has a client, a logged workout, a booking, a
 -- session record, a purchase or a session balance, or if the copy in The Home Team is missing or does not match. Before deleting it saves everything in both
--- groups (the groups, programs, workouts, exercises, sets, notes, progressions and memberships) as one record in cleanup_backups, so it can be restored by hand.
+-- groups (the groups, programs, workouts, exercises, sets, notes, progressions, memberships, wellness check-ins, view state and Spotter dismissals) as one record in cleanup_backups, so it can be restored by hand.
 create table if not exists public.cleanup_backups (
   id uuid primary key default uuid_generate_v4(),
   taken_at timestamptz not null default now(),
@@ -65,7 +65,10 @@ begin
     'workouts', (select coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb) from public.workouts x where x.group_id = any (g)),
     'exercises', (select coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb) from public.group_workout_exercises x where x.group_id = any (g)),
     'sets', (select coalesce(jsonb_agg(to_jsonb(s)), '[]'::jsonb) from public.group_workout_exercise_sets s where s.group_workout_exercise_id in (select id from public.group_workout_exercises where group_id = any (g))),
-    'notes', (select coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb) from public.workout_notes x where x.group_id = any (g))
+    'notes', (select coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb) from public.workout_notes x where x.group_id = any (g)),
+    'wellness_checkins', (select coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb) from public.wellness_checkins x where x.group_id = any (g)),
+    'coach_view_state', (select coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb) from public.coach_view_state x where x.group_id = any (g)),
+    'programming_spotter_dismissals', (select coalesce(jsonb_agg(to_jsonb(x)), '[]'::jsonb) from public.programming_spotter_dismissals x where x.program_id in (select id from public.programs where group_id = any (g)))
   );
 
   delete from public.groups where id = any (g);
