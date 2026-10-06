@@ -7,6 +7,7 @@ import { splitPrsByBaseline } from "@/lib/pr-fatigue";
 import { computeHabitCompliance, computeCompliancePct, type HabitLogRow } from "@/lib/habits";
 import { shouldShowCompoundCelebration, buildCompoundCelebrationText } from "@/lib/compound-celebration";
 import { computeRelativeStrengthMilestone } from "@/lib/relative-strength-milestone";
+import { believableDurationSeconds } from "@/lib/share-image";
 
 // Shared by the public /share/[postId] page and the in-feed expanded
 // card (fetched via /api/workout-share/[postId]) so both surfaces
@@ -393,6 +394,22 @@ export async function getSharedWorkout(postId: string, opts: { fullName?: boolea
     }
   }
 
+  // How long the session took, for the card's time stat. Only a believable length is shown: under a minute or over
+  // six hours is almost always a forgotten Finish button, not a real workout, and a made-up number would be worse than none.
+  let durationSeconds: number | null = null;
+  if (workoutLog.session_id && broadcastLevel === "full") {
+    const { data: sessionRow } = await supabase
+      .from("athlete_sessions")
+      .select("started_at, completed_at, duration_seconds")
+      .eq("id", workoutLog.session_id)
+      .maybeSingle();
+    durationSeconds = believableDurationSeconds(
+      sessionRow?.duration_seconds as number | null | undefined,
+      sessionRow?.started_at as string | null | undefined,
+      sessionRow?.completed_at as string | null | undefined
+    );
+  }
+
   return {
     authorId: post.author_id as string,
     groupId: post.group_id,
@@ -420,6 +437,7 @@ export async function getSharedWorkout(postId: string, opts: { fullName?: boolea
     celebratePrs,
     baselinePrs,
     createdAt: post.created_at,
+    durationSeconds,
   };
 }
 
