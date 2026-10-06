@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, CalendarDays, MessagesSquare, Settings, Apple, Users, Menu } from "lucide-react";
+import { Home, CalendarDays, MessagesSquare, Mail, Settings, Apple, Users, Menu } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { hasSocialTabAccess } from "@/lib/social-access";
 import { usePushStatus } from "@/lib/use-push-status";
@@ -136,8 +136,8 @@ export function BottomTabBar({
 
   const coachTabs: { key: TabKey; label: string; href: string | null; icon: typeof Home }[] = [
     { key: "home", label: "Home", href: `/groups/${groupId}`, icon: Home },
-    { key: "roster", label: "Roster", href: `/groups/${groupId}/clients`, icon: Users },
-    { key: "messages", label: "Messages", href: `/groups/${groupId}/messages`, icon: MessagesSquare },
+    { key: "roster", label: "Clients", href: `/groups/${groupId}/clients`, icon: Users },
+    { key: "messages", label: "Messages", href: `/groups/${groupId}/messages`, icon: Mail },
     { key: "calendar", label: "Calendar", href: `/groups/${groupId}/calendar`, icon: CalendarDays },
     { key: "more", label: "More", href: null, icon: Menu },
   ];

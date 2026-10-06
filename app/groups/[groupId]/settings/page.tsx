@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
+import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { SignOutButton } from "@/components/group/sign-out-button";
@@ -111,7 +112,7 @@ export default async function SettingsPage(
         .maybeSingle(),
       supabase
         .from("groups")
-        .select("gamification_enabled")
+        .select("gamification_enabled, name")
         .eq("id", params.groupId)
         .maybeSingle(),
       supabase
@@ -298,7 +299,12 @@ export default async function SettingsPage(
         </div>
       </section>
 
-      <BottomTabBar groupId={params.groupId} activeOverride="settings" />
+      {/* A coach gets their own tabs and Spotlight button here, not the client tab bar. */}
+      {isCoach && !effective.isActingAsOther ? (
+        <CoachMobileShell groupId={params.groupId} groupName={(group as { name?: string } | null)?.name ?? "Coaching"}>{null}</CoachMobileShell>
+      ) : (
+        <BottomTabBar groupId={params.groupId} activeOverride="settings" />
+      )}
     </main>
   );
 }

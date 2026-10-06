@@ -24,6 +24,11 @@ import {
   Zap,
   Wallet,
   Tag,
+  Settings,
+  Calculator,
+  Link2,
+  Users2,
+  Lightbulb,
 } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { SignOutButton } from "@/components/group/sign-out-button";
@@ -58,6 +63,8 @@ function Item({ href, label, icon: Icon }: { href: string; label: string; icon: 
 
 export function CoachNavLinksList({ groupId, groupName }: { groupId: string; groupName: string }) {
   const [teamMode, setTeamMode] = useState(false);
+  // A one-on-one space has no team feed, so the entry is hidden there (the desktop menu does the same).
+  const [groupKind, setGroupKind] = useState<string | null>(null);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
 
   useEffect(() => {
@@ -65,11 +72,12 @@ export function CoachNavLinksList({ groupId, groupName }: { groupId: string; gro
     async function run() {
       const supabase = createBrowserClient();
       const [{ data: group }, { data: userData }] = await Promise.all([
-        supabase.from("groups").select("team_mode").eq("id", groupId).maybeSingle(),
+        supabase.from("groups").select("team_mode, group_kind").eq("id", groupId).maybeSingle(),
         supabase.auth.getUser(),
       ]);
       if (cancelled) return;
       setTeamMode(group?.team_mode ?? false);
+      setGroupKind((group as { group_kind?: string } | null)?.group_kind ?? null);
       if (userData.user) {
         const { data: profile } = await supabase
           .from("profiles")
@@ -96,6 +104,7 @@ export function CoachNavLinksList({ groupId, groupName }: { groupId: string; gro
       <Item href={`/groups/${groupId}/exercise-library`} label="Exercise Library" icon={Dumbbell} />
       <Item href={`/groups/${groupId}/recipes`} label="Recipe Hub" icon={ChefHat} />
       <Item href={`/groups/${groupId}/nutrition`} label="Meal Plans" icon={Salad} />
+      <Item href={`/groups/${groupId}/tools/macro-calculator`} label="Macro Calculator" icon={Calculator} />
       {teamMode && (
         <>
           <Item href={`/groups/${groupId}/team`} label="Depth Chart" icon={ClipboardList} />
@@ -108,6 +117,8 @@ export function CoachNavLinksList({ groupId, groupName }: { groupId: string; gro
       <Item href={`/groups/${groupId}/business/packages`} label="Packages" icon={Layers} />
       <Item href={`/groups/${groupId}/business/waiver`} label="Waiver" icon={ClipboardList} />
       <Item href={`/groups/${groupId}/availability`} label="Availability" icon={CalendarClock} />
+      <Item href={`/groups/${groupId}/business/booking-page`} label="Booking Page" icon={Link2} />
+      <Item href={`/groups/${groupId}/group-sessions`} label="Group Sessions" icon={Users2} />
       <Item href={`/groups/${groupId}/business/support`} label="Support" icon={HeartHandshake} />
       <Item href={`/groups/${groupId}/business/leads`} label="Leads" icon={UserPlus} />
       <Item href={`/groups/${groupId}/business/sms-settings`} label="SMS Notifications" icon={MessageCircle} />
@@ -117,12 +128,14 @@ export function CoachNavLinksList({ groupId, groupName }: { groupId: string; gro
       <Item href={`/groups/${groupId}/branding`} label="Organization" icon={Palette} />
 
       <GroupHeader label="Engage" icon={Flag} />
-      <Item href={`/groups/${groupId}/feed`} label="Team Feed" icon={MessagesSquare} />
+      {groupKind !== "one_on_one" && <Item href={`/groups/${groupId}/feed`} label="Team Feed" icon={MessagesSquare} />}
       <Item href={`/groups/${groupId}/challenges`} label="Challenges" icon={Flag} />
       <Item href={`/groups/${groupId}/records`} label="Hall of Fame" icon={Trophy} />
       <Item href={`/groups/${groupId}/resources`} label="Resources" icon={HeartHandshake} />
+      <Item href={`/groups/${groupId}/quick-tips`} label="Quick Tips" icon={Lightbulb} />
 
       <GroupHeader label="Account" icon={MonitorPlay} />
+      <Item href={`/groups/${groupId}/settings`} label="Settings" icon={Settings} />
       <a
         href={`/groups/${groupId}/display`}
         target="_blank"
@@ -133,7 +146,7 @@ export function CoachNavLinksList({ groupId, groupName }: { groupId: string; gro
         Display Mode
       </a>
       <div className="px-5 py-1.5">
-        <ViewModeToggle targetMode="mobile" label="Client-Facing Mode" groupId={groupId} />
+        <ViewModeToggle targetMode="mobile" label="Phone layout" groupId={groupId} />
       </div>
       {isPlatformAdmin && (
         <>
