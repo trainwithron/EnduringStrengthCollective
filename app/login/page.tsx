@@ -100,7 +100,7 @@ function LoginForm() {
           Sign In
         </h1>
         <p className="font-body text-steel text-sm text-center mt-2 mb-8">
-          Sign in to your team
+          Sign in to see your training
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -169,7 +169,7 @@ function LoginForm() {
         <p className="font-body text-sm text-steel text-center mt-2">
           New coach?{" "}
           <Link href="/signup" className="text-rust">
-            Create your organization
+            Create your coaching account
           </Link>
         </p>
         <LegalLinks className="mt-6" />

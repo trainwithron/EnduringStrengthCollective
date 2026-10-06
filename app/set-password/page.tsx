@@ -166,7 +166,7 @@ function SetPasswordForm() {
           Set your password
         </h1>
         <p className="font-body text-steel text-sm text-center mt-2 mb-6">
-          One last step — pick a password and you&apos;re in.
+          Choose a password. If your coach asks for a short health form, it comes next.
         </p>
 
         {needsEmail && (

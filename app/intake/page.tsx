@@ -72,8 +72,8 @@ export default async function IntakePage(
           Before you get started
         </h1>
         <p className="font-body text-sm text-steel mb-8">
-          {org?.name ?? "Your coach"} needs a quick health screening and waiver on file before
-          you can access your program.
+          {org?.name ?? "Your coach"} asks every client for a short health form and a signed waiver before
+          you start. It takes about three minutes.
         </p>
 
         <IntakeForm
