@@ -42,6 +42,13 @@ const steps = JSON.parse(readFileSync(new URL("../../supabase/apply/steps.json",
 for (const s of steps) {
   // Live today: step 13 was applied before it was fixed, so the internal functions are open to signed-in users. Reproduce that before step 24.
   if (s.n === "24") await db.exec(functionAclOpenSql());
+  if (s.n === "23") {
+    // The probe: applies 0281 inside a transaction, tries the four cases, and ends with an intentional error that carries the answer and rolls everything back.
+    const probe = await run("apply/check-step23-probe.sql");
+    check("check-step23-probe.sql answers: " + probe, !!probe && /PROBE RESULT/.test(probe) && /server booking left them set aside: true/.test(probe) && /client message brought them back: true/.test(probe) && /coach message left them set aside: true/.test(probe) && /ordinary booking brought them back: true/.test(probe) && !/error:/.test(probe));
+    const gone = (await db.query("select to_regclass('public.client_inactive') as t")).rows[0].t;
+    check("check-step23-probe.sql leaves nothing behind (0281 itself was rolled back)", gone === null);
+  }
   const base = `apply/apply-step${s.n}-${s.slug}`;
   const rows = await pre(`${base}-precheck.sql`);
   const bad = rows.filter((r) => !r.ok).map((r) => r.check_name);

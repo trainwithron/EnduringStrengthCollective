@@ -4,6 +4,7 @@
 // scripts/sql-tests/paste-files.test.mjs applies every step in order on the live-equivalent schema and checks each precheck is true first.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { checkSql as functionAclCheckSql, undoSql as functionAclUndoSql } from "./function-acl.mjs";
+import { probeSql as step23ProbeSql } from "./step23-probe.mjs";
 
 const root = new URL("../supabase/", import.meta.url);
 const outDir = new URL("apply/", root);
@@ -743,5 +744,6 @@ for (const s of STEPS) {
   writeFileSync(new URL("check-step13-probe.sql", outDir), sql);
 }
 writeFileSync(new URL("check-function-acl.sql", outDir), functionAclCheckSql());
+writeFileSync(new URL("check-step23-probe.sql", outDir), step23ProbeSql(migrationSql("0281")));
 writeFileSync(new URL("steps.json", outDir), JSON.stringify(STEPS.map((s) => ({ n: s.n, slug: s.slug, migrations: s.migrations, rows: s.rows.length })), null, 1));
 console.log(`wrote ${STEPS.length} steps to supabase/apply/`);
