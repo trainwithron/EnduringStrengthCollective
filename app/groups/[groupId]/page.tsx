@@ -718,6 +718,12 @@ export default async function GroupHubPage(
             <div className="space-y-4">
               {isToday && <HomeThread lines={homeThreadLines} />}
               {reupState && <ReupCard state={reupState} />}
+              {isToday && !isCoach && !isActingAsOther && (
+                // The one place a client reaches their coach: it was three taps deep (Settings, More, Messages).
+                <Link href={`/groups/${params.groupId}/messages`} className="block font-body text-sm text-chalk underline underline-offset-2">
+                  Message your coach
+                </Link>
+              )}
               {upcomingClasses > 0 && (
                 <Link href={`/groups/${params.groupId}/classes`} className="block border border-steel/30 bg-surface/40 px-4 py-3 font-body text-sm text-chalk">
                   Group sessions: {upcomingClasses} coming up &rarr;

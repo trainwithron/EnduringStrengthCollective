@@ -6,6 +6,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { LegalAcceptance } from "@/components/legal/legal-acceptance";
 import { LegalLinks } from "@/components/legal/legal-links";
 import { flushLegalConsent, rememberLegalConsent } from "@/lib/legal-client";
+import { friendlySignInError } from "@/lib/sign-in-errors";
 
 type Mode = "signup" | "login";
 type Phase = "checking" | "guest" | "authed" | "awaiting-confirmation";
@@ -164,7 +165,7 @@ export function InviteJoinFlow({
     setResendNote(null);
     const { error: resendError } = await createBrowserClient().auth.resend({
       type: "signup",
-      email,
+      email: email.trim().toLowerCase(),
       options: { emailRedirectTo: `${window.location.origin}/invite/${code}` },
     });
     if (resendError) setError(resendError.message);
@@ -198,7 +199,8 @@ export function InviteJoinFlow({
       );
 
       const { data, error: signUpError } = await supabase.auth.signUp({
-        email,
+        // A trailing space or capital from a phone keyboard must not make a different address.
+        email: email.trim().toLowerCase(),
         password,
         options: {
           // Stored on the auth user itself, so it's available regardless of
@@ -211,7 +213,13 @@ export function InviteJoinFlow({
       });
 
       if (signUpError) {
-        setError(signUpError.message);
+        setError(
+          /already registered|already exists/i.test(signUpError.message)
+            ? "That email already has an account. Tap 'I have an account' to sign in."
+            : /rate limit|too many/i.test(signUpError.message)
+            ? "Too many tries. Wait a few minutes and try again."
+            : "We couldn't create the account. Check your email and password and try again."
+        );
         setSubmitting(false);
         return;
       }
@@ -235,12 +243,12 @@ export function InviteJoinFlow({
 
     // mode === "login"
     const { data, error: signInError } = await supabase.auth.signInWithPassword({
-      email,
+      email: email.trim().toLowerCase(),
       password,
     });
 
     if (signInError || !data.user) {
-      setError(signInError?.message ?? "Sign in failed.");
+      setError(friendlySignInError(signInError?.message).message);
       setSubmitting(false);
       return;
     }

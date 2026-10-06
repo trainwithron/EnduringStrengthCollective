@@ -48,7 +48,8 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
     name,
     short_name: shortNameFor(name),
     description: `Group training platform for ${name}.`,
-    start_url: "/",
+    // The installed icon opens here: a signed-out visitor goes straight to sign-in (see app/page.tsx), not the sales page.
+    start_url: "/?source=pwa",
     display: "standalone",
     background_color: theme.backgroundColor,
     theme_color: theme.backgroundColor,
