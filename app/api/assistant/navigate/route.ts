@@ -4,6 +4,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { resolveNavigation, type NavContext, type RosterClient } from "@/lib/nav-intents";
 import { normalizeForLog } from "@/lib/nav-query-log";
+import { proposeAction } from "@/lib/assistant-actions-server";
 
 // Ask Spot's free first step. A "take me to ...", "how do I ..." or "open Jordan's profile" request is answered here from the
 // app's own route table and how-to library, with no AI call, so it costs nothing and works when AI is off or out of credits.
@@ -55,6 +56,38 @@ export async function POST(request: Request) {
       .filter((r) => r.fullName);
   }
 
+  // A plain settings command ("set my buffer to 10 minutes") is turned into one typed action and shown as a before/after card; nothing changes until the
+  // coach confirms it (app/api/assistant/action). Only for coaches, and only for the small set of settings in lib/assistant-actions.ts.
+  if (role === "coach") {
+    try {
+      const proposal = await proposeAction(supabase, user.id, message, groupId);
+      if (proposal) {
+        if (!proposal.ok) return NextResponse.json({ kind: "unsure", text: proposal.message, chips: [], steps: [], intentIds: [] });
+        return NextResponse.json({ kind: "action", card: proposal.card });
+      }
+    } catch {
+      return NextResponse.json({ kind: "unsure", text: "I couldn't set that up right now, so nothing was changed. You can change it by hand in your settings.", chips: [], steps: [], intentIds: [] });
+    }
+  }
+
+  // Each client's current program (their own copy when they have one, else the group's), so "Johann's program" opens the right screen. Ids only.
+  const clientPrograms: Record<string, { programId: string; groupId: string }> = {};
+  if (role === "coach" && roster.length > 0) {
+    const { data: programRows } = await supabase
+      .from("programs")
+      .select("id, group_id, athlete_id")
+      .in("group_id", coachGroupIds)
+      .eq("is_active", true)
+      .limit(1000);
+    const rows = (programRows ?? []) as { id: string; group_id: string; athlete_id: string | null }[];
+    for (const c of roster) {
+      const own = rows.find((r) => r.athlete_id === c.id && r.group_id === c.groupId);
+      const shared = rows.find((r) => r.athlete_id === null && r.group_id === c.groupId);
+      const pick = own ?? shared;
+      if (pick) clientPrograms[c.id] = { programId: pick.id, groupId: pick.group_id };
+    }
+  }
+
   const athleteFromPath = pagePath.match(new RegExp(`/athletes/(${UUID})`))?.[1] ?? null;
   const ctx: NavContext = {
     role,
@@ -62,6 +95,7 @@ export async function POST(request: Request) {
     groupId,
     currentAthleteId: athleteFromPath && roster.some((r) => r.id === athleteFromPath) ? athleteFromPath : null,
     roster,
+    clientPrograms,
   };
 
   const result = resolveNavigation(message, ctx);
@@ -82,5 +116,27 @@ export async function POST(request: Request) {
   if (result.kind === "howto") {
     return NextResponse.json({ kind: "howto", text: result.text, steps: result.steps, note: result.note ?? null, chips: result.chips });
   }
-  return NextResponse.json({ kind: result.kind, text: result.text, chips: result.chips });
+  // "What did Johann say in that last chat?": show the last few messages as they were written, no AI. They are shown as plain text, never acted on.
+  let preview: { clientName: string; messages: { fromClient: boolean; body: string; at: string }[] } | null = null;
+  if (result.kind === "navigate" && result.intentIds[0] === "client-messages" && result.chips.length === 1) {
+    const person = roster.find((r) => result.chips[0].href.includes(r.id));
+    if (person) {
+      try {
+        const { data: rows } = await supabase
+          .from("direct_messages")
+          .select("sender_id, body, created_at")
+          .eq("group_id", person.groupId ?? groupId)
+          .or(`and(sender_id.eq.${user.id},recipient_id.eq.${person.id}),and(sender_id.eq.${person.id},recipient_id.eq.${user.id})`)
+          .order("created_at", { ascending: false })
+          .limit(5);
+        const list = ((rows ?? []) as { sender_id: string; body: string; created_at: string }[])
+          .reverse()
+          .map((m) => ({ fromClient: m.sender_id === person.id, body: String(m.body).slice(0, 400), at: m.created_at }));
+        if (list.length > 0) preview = { clientName: person.fullName, messages: list };
+      } catch {
+        // No preview; the button to the full chat is still there.
+      }
+    }
+  }
+  return NextResponse.json({ kind: result.kind, text: result.text, chips: result.chips, confirm: result.kind === "navigate" ? result.confirm ?? null : null, preview });
 }

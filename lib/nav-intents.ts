@@ -5,6 +5,7 @@
 // Every destination below must be a real page; lib/nav-intents.test.ts checks each path against the app's route table so a
 // renamed or removed page fails the tests instead of quietly sending people nowhere.
 import { findHowTos, type HowTo } from "@/lib/howto-library";
+import { rankClientsByName } from "@/lib/client-name-match";
 
 export type NavRole = "coach" | "athlete";
 export type NavDevice = "desktop" | "phone";
@@ -21,6 +22,8 @@ export interface NavDestination {
   devices?: NavDevice[];
   synonyms: string[];
   needsAthlete?: boolean;
+  // How it reads after a client's name ("Johann's program"). Left out: the lower-cased label.
+  short?: string;
 }
 
 export interface NavChip {
@@ -49,10 +52,13 @@ export interface NavContext {
   currentAthleteId?: string | null;
   // The coach's roster, for resolving names. Names only; the caller never sends anything else.
   roster?: RosterClient[];
+  // Each client's current program (the personal copy when they have one, else the group's), so "Johann's program" opens it. Ids only.
+  clientPrograms?: Record<string, { programId: string; groupId: string }>;
 }
 
 export type NavResult =
-  | { kind: "navigate"; text: string; chips: NavChip[]; intentIds: string[] }
+  // `confirm`: the place belongs to a named client, so it is shown as a question the coach answers with one tap (or Enter) before the screen opens, never a silent jump.
+  | { kind: "navigate"; text: string; chips: NavChip[]; intentIds: string[]; confirm?: { question: string } }
   | { kind: "howto"; text: string; chips: NavChip[]; howto: HowTo; steps: HowToStepView[]; note?: string; intentIds: string[] }
   | { kind: "unsure"; text: string; chips: NavChip[]; intentIds: string[] }
   // A question about the person's own data. Carries the main places so there is still somewhere to go if the assistant is off.
@@ -121,9 +127,14 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   D({ id: "referrals", label: "Referrals", path: "/groups/{groupId}/referrals", roles: ["coach"], devices: ["desktop"], synonyms: ["referrals", "referral links", "referral partners"] }),
   D({ id: "find-a-coach", label: "Find a coach", path: "/find-a-coach", roles: ["coach", "athlete"], synonyms: ["find a coach", "coach directory", "marketplace", "find me a coach"] }),
   // ---- A client's own pages (coach) ----
-  D({ id: "client-profile", label: "Client profile", path: "/groups/{groupId}/athletes/{athleteId}", roles: ["coach"], needsAthlete: true, synonyms: ["profile", "client profile", "their profile", "open profile", "go to profile", "view profile", "page", "overview", "balance", "sessions left", "sign in link", "sign-in link", "claim link"] }),
+  D({ id: "client-profile", label: "Client profile", path: "/groups/{groupId}/athletes/{athleteId}", roles: ["coach"], needsAthlete: true, synonyms: ["profile", "client profile", "their profile", "open profile", "go to profile", "view profile", "page", "overview", "sign in link", "sign-in link", "claim link"] }),
   D({ id: "client-calendar", label: "Client calendar", path: "/groups/{groupId}/athletes/{athleteId}/calendar", roles: ["coach"], needsAthlete: true, devices: ["desktop"], synonyms: ["calendar", "schedule", "their calendar", "habits", "macros calendar", "schedule weekly", "weekly", "book weekly", "recurring", "repeat sessions", "plan their week"] }),
   D({ id: "client-history", label: "Client history", path: "/groups/{groupId}/athletes/{athleteId}/history", roles: ["coach"], needsAthlete: true, synonyms: ["history", "workout history", "logs", "past workouts", "their workouts", "what they did"] }),
+  D({ id: "client-program", label: "Program", short: "program", path: "/groups/{groupId}/athletes/{athleteId}", roles: ["coach"], needsAthlete: true, synonyms: ["program", "their program", "workout plan", "training plan", "plan", "programming", "what are they doing", "their training"] }),
+  D({ id: "client-nutrition", label: "Nutrition", short: "nutrition", path: "/groups/{groupId}/athletes/{athleteId}/calendar", phonePath: "/groups/{groupId}/athletes/{athleteId}", roles: ["coach"], needsAthlete: true, synonyms: ["nutrition", "macros", "their macros", "meal plan", "food log", "diet", "what are they eating", "calories"] }),
+  D({ id: "client-messages", label: "Messages", short: "messages", path: "/groups/{groupId}/messages/{athleteId}", roles: ["coach"], needsAthlete: true, synonyms: ["messages", "message", "chat", "conversation", "thread", "last chat", "texts", "inbox", "what did they say", "said"] }),
+  D({ id: "client-goals", label: "Goals", short: "goals", path: "/groups/{groupId}/athletes/{athleteId}", roles: ["coach"], needsAthlete: true, synonyms: ["goal", "goals", "their goal", "what are they working toward", "suggest a goal"] }),
+  D({ id: "client-balance", label: "Session balance", short: "session balance", path: "/groups/{groupId}/athletes/{athleteId}", roles: ["coach"], needsAthlete: true, synonyms: ["balance", "sessions left", "session balance", "credits", "how many sessions", "assign sessions", "add sessions"] }),
   D({ id: "client-log", label: "Log an in-person session", path: "/groups/{groupId}/athletes/{athleteId}/log", roles: ["coach"], needsAthlete: true, synonyms: ["log session", "log a session", "log workout", "log in person", "in person session", "log for them", "start their workout", "log a workout for"] }),
 ];
 
@@ -183,6 +194,18 @@ function resolvePath(d: NavDestination, ctx: NavContext, athleteId: string | nul
 
 // Which clients a message names. A first name that belongs to one client, or a full or last name, counts.
 export function findClientMentions(norm: string, roster: RosterClient[]): RosterClient[] {
+  // Tolerant of the way a name is really said or typed (a first name, a nickname, a slip like "Johan"); everyone within a hair of the best match is returned, so
+  // two clients with the same first name are both offered and the coach picks. Only people on the roster it was given.
+  const ranked = rankClientsByName(norm, roster, 6);
+  if (ranked.length > 0) {
+    const top = ranked[0].score;
+    return ranked.filter((r) => r.score >= top - 0.07).map((r) => r.client);
+  }
+  return [];
+}
+
+// The older exact-match rule, kept only as the fallback reference for the tests that describe it.
+export function findClientMentionsExact(norm: string, roster: RosterClient[]): RosterClient[] {
   const tokens = new Set(norm.split(" "));
   const byFirst = new Map<string, RosterClient[]>();
   for (const c of roster) {
@@ -243,7 +266,9 @@ const CLOSE = 4;
 
 function chipFor(d: NavDestination, ctx: NavContext, athleteId: string | null, labelOverride?: string): NavChip | null {
   const clientGroup = athleteId ? ctx.roster?.find((r) => r.id === athleteId)?.groupId ?? ctx.groupId : ctx.groupId;
-  const href = resolvePath(d, ctx, athleteId, clientGroup);
+  // A client's program opens the program itself when it is known (their personal copy, else the group's), and their profile otherwise.
+  const program = d.id === "client-program" && athleteId ? ctx.clientPrograms?.[athleteId] : undefined;
+  const href = program ? `/groups/${program.groupId}/programs/${program.programId}` : resolvePath(d, ctx, athleteId, clientGroup);
   if (!href) return null;
   return { label: labelOverride ?? d.label, href };
 }
@@ -314,28 +339,42 @@ export function resolveNavigation(message: string, ctx: NavContext): NavResult {
     };
   }
 
-  // A named client: their profile, calendar, history or the in-person log, by the other words in the message.
+  // A named client: their profile, program, calendar, nutrition, messages, history, goals, balance or the in-person log, by the other words in the message.
+  // The place is shown as a question (`confirm`) so the coach says yes with one tap or Enter; two people who fit are both offered, never guessed between.
   const clientId = mentions.length === 1 ? mentions[0].id : thisClient;
-  if (mentions.length > 1) {
-    const profile = NAV_DESTINATIONS.find((d) => d.id === "client-profile")!;
-    const chips = mentions
-      .slice(0, 4)
-      .map((m) => chipFor(profile, ctx, m.id, `${m.fullName}'s profile`))
-      .filter((c): c is NavChip => !!c);
-    if (chips.length > 0) {
-      return { kind: "navigate", text: "More than one client matches. Which one?", chips, intentIds: ["client-profile"] };
-    }
-  }
-  if (clientId) {
+  const pickClientDest = () => {
     const clientDests = NAV_DESTINATIONS.filter((d) => d.needsAthlete && applicable(d, ctx));
     const scored = clientDests
       .map((d) => ({ d, score: scoreDestination(d, norm, tokens) }))
       .filter((x) => !(ctx.device === "phone" && x.d.devices && !x.d.devices.includes("phone")))
       .sort((a, b) => b.score - a.score);
-    const pick = scored[0] && scored[0].score >= CLOSE ? scored[0].d : clientDests.find((d) => d.id === "client-profile")!;
+    return scored[0] && scored[0].score >= CLOSE ? scored[0].d : clientDests.find((d) => d.id === "client-profile")!;
+  };
+  const shortOf = (d: NavDestination) => d.short ?? d.label.toLowerCase();
+  if (mentions.length > 1) {
+    const pick = pickClientDest();
+    const chips = mentions
+      .slice(0, 4)
+      .map((m) => chipFor(pick, ctx, m.id, `${m.fullName}'s ${shortOf(pick)}`))
+      .filter((c): c is NavChip => !!c);
+    if (chips.length > 0) {
+      return { kind: "navigate", text: "More than one client matches. Which one?", chips, intentIds: [pick.id] };
+    }
+  }
+  if (clientId) {
+    const pick = pickClientDest();
     const name = roster.find((r) => r.id === clientId)?.fullName ?? "this client";
-    const chip = chipFor(pick, ctx, clientId, `${name}: ${pick.label.toLowerCase()}`);
-    if (chip) return { kind: "navigate", text: "Here you go.", chips: [chip], intentIds: [pick.id] };
+    const chip = chipFor(pick, ctx, clientId, `${name}'s ${shortOf(pick)}`);
+    const named = mentions.length === 1;
+    if (chip) {
+      return {
+        kind: "navigate",
+        text: named ? `${name}'s ${shortOf(pick)}: is this what you're looking for?` : "Here you go.",
+        chips: [chip],
+        intentIds: [pick.id],
+        ...(named ? { confirm: { question: `${name}'s ${shortOf(pick)}: is this what you're looking for?` } } : {}),
+      };
+    }
   }
 
   // A plain destination.

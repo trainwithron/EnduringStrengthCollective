@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Send } from "lucide-react";
 
 interface Chip {
@@ -15,6 +16,20 @@ interface Step {
   linkLabel?: string;
 }
 
+// A settings change Ask Spot is about to make: what it is now and what it will be. Nothing changes until the coach says yes.
+interface ActionCard {
+  title: string;
+  beforeText: string;
+  afterText: string;
+  token: string;
+  confirmLabel: string;
+}
+
+interface MessagePreview {
+  clientName: string;
+  messages: { fromClient: boolean; body: string; at: string }[];
+}
+
 interface ChatMessage {
   role: "coach" | "assistant";
   body: string;
@@ -23,6 +38,12 @@ interface ChatMessage {
   chips?: Chip[];
   // The question to send to the assistant if the person wants an answer from their data instead.
   askAi?: string;
+  // "Johann's program: is this what you're looking for?" One tap (or Enter) opens it; "Not that one" closes it.
+  confirm?: { href: string; state: "open" | "closed" };
+  card?: ActionCard & { state: "open" | "done" | "cancelled" };
+  // After a change: the signed token that puts it back, valid for an hour and only while the setting still has the value the change set.
+  undoToken?: string | null;
+  preview?: MessagePreview;
 }
 
 // The actual "Ask Spot" chat content — message list, input, send — with
@@ -44,6 +65,7 @@ export function AskSpotChatPanel() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -70,6 +92,62 @@ export function AskSpotChatPanel() {
         setMessages((prev) => [...prev, { role: "assistant", body: "In the meantime, these are the main places:", chips: fallbackChips }]);
       }
     }
+  }
+
+  function patchMessage(index: number, patch: Partial<ChatMessage>) {
+    setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, ...patch } : m)));
+  }
+
+  async function runAction(index: number, op: "confirm" | "undo", token: string) {
+    if (sending) return;
+    setSending(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/assistant/action", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ op, token }),
+      });
+      const data = await response.json().catch(() => ({ ok: false, message: "Something went wrong. Nothing was changed." }));
+      if (op === "confirm" && data.ok) patchMessage(index, { card: { ...(messages[index].card as ActionCard), state: "done" } });
+      if (op === "undo") patchMessage(index, { undoToken: null });
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", body: data.message ?? "Something went wrong. Nothing was changed.", undoToken: data.ok && op === "confirm" ? data.undoToken : null },
+      ]);
+      // A change of the word for clients is shown everywhere; refresh so every screen says it.
+      if (data.ok && data.reload) router.refresh();
+    } catch {
+      setError("That didn't go through. Nothing was changed.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  // The newest thing waiting on a yes. Enter in an empty box answers it.
+  function pendingIndex(): number {
+    const i = messages.length - 1;
+    const m = messages[i];
+    if (!m) return -1;
+    if (m.card?.state === "open") return i;
+    if (m.confirm?.state === "open") return i;
+    return -1;
+  }
+
+  function answerYes() {
+    const i = pendingIndex();
+    if (i < 0) return false;
+    const m = messages[i];
+    if (m.card?.state === "open") {
+      runAction(i, "confirm", m.card.token);
+      return true;
+    }
+    if (m.confirm?.state === "open") {
+      patchMessage(i, { confirm: { ...m.confirm, state: "closed" } });
+      router.push(m.confirm.href);
+      return true;
+    }
+    return false;
   }
 
   async function handleSend(forcedQuestion?: string) {
@@ -106,8 +184,22 @@ export function AskSpotChatPanel() {
             ]);
             return;
           }
+          if (data.kind === "action" && data.card) {
+            setMessages((prev) => [...prev, { role: "assistant", body: data.card.title, card: { ...data.card, state: "open" } }]);
+            return;
+          }
           if (data.kind === "navigate") {
-            setMessages((prev) => [...prev, { role: "assistant", body: data.text, chips: data.chips }]);
+            const single = data.confirm && data.chips?.length === 1;
+            setMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                body: data.text,
+                chips: single ? undefined : data.chips,
+                confirm: single ? { href: data.chips[0].href, state: "open" } : undefined,
+                preview: data.preview ?? undefined,
+              },
+            ]);
             return;
           }
           if (data.kind === "unsure") {
@@ -131,8 +223,8 @@ export function AskSpotChatPanel() {
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-0">
         {messages.length === 0 && (
           <p className="font-body text-xs text-steel">
-            Try: &quot;Open Alice&apos;s profile&quot;, &quot;How do I assign sessions?&quot; or &quot;How has Alice&apos;s squat been
-            trending?&quot;
+            Try: &quot;Open Alice&apos;s profile&quot;, &quot;Set my buffer to 10 minutes&quot;, &quot;What did Alice say in our last chat?&quot; or
+            &quot;How has Alice&apos;s squat been trending?&quot;
           </p>
         )}
         {messages.map((m, i) => (
@@ -174,6 +266,71 @@ export function AskSpotChatPanel() {
                   ))}
                 </div>
               )}
+              {m.preview && (
+                <div className="mt-2 border border-steel/30 divide-y divide-steel/20">
+                  {m.preview.messages.map((pm, k) => (
+                    <div key={k} className="px-2 py-1.5">
+                      <p className="text-[11px] text-steel">{pm.fromClient ? m.preview!.clientName : "You"}</p>
+                      <p className="whitespace-pre-wrap break-words">{pm.body}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {m.confirm && m.confirm.state === "open" && (
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <button type="button" onClick={() => answerYes()} className="inline-flex items-center h-8 px-3 bg-rust text-graphite font-body text-xs font-medium">
+                    Yes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => patchMessage(i, { confirm: { ...m.confirm!, state: "closed" } })}
+                    className="inline-flex items-center h-8 px-3 border border-steel/40 text-steel font-body text-xs"
+                  >
+                    Not that one
+                  </button>
+                </div>
+              )}
+              {m.card && (
+                <div className="mt-2 space-y-2">
+                  <p className="text-xs text-steel">
+                    Now: <span className="text-chalk">{m.card.beforeText}</span>
+                  </p>
+                  <p className="text-xs text-steel">
+                    After: <span className="text-chalk">{m.card.afterText}</span>
+                  </p>
+                  {m.card.state === "open" && (
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={sending}
+                        onClick={() => runAction(i, "confirm", m.card!.token)}
+                        className="inline-flex items-center h-8 px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
+                      >
+                        {m.card.confirmLabel}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={sending}
+                        onClick={() => patchMessage(i, { card: { ...m.card!, state: "cancelled" } })}
+                        className="inline-flex items-center h-8 px-3 border border-steel/40 text-steel font-body text-xs"
+                      >
+                        No
+                      </button>
+                    </div>
+                  )}
+                  {m.card.state === "cancelled" && <p className="text-xs text-steel">Left as it was.</p>}
+                </div>
+              )}
+              {m.undoToken && (
+                <button
+                  type="button"
+                  disabled={sending}
+                  onClick={() => runAction(i, "undo", m.undoToken!)}
+                  className="mt-2 inline-flex items-center h-8 px-3 border border-rust text-rust font-body text-xs font-medium disabled:opacity-40"
+                >
+                  Undo
+                </button>
+              )}
               {m.askAi && (
                 <button
                   type="button"
@@ -197,7 +354,10 @@ export function AskSpotChatPanel() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") handleSend();
+            if (e.key === "Enter") {
+              if (!input.trim() && answerYes()) return;
+              handleSend();
+            }
           }}
           placeholder="Ask a question…"
           className="flex-1 h-9 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"

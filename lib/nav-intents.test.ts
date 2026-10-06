@@ -7,7 +7,7 @@ import { HOWTOS } from "@/lib/howto-library";
 const ROOT = path.resolve(__dirname, "..");
 
 function routeExists(template: string): boolean {
-  const rel = template.replace("{groupId}", "[groupId]").replace("{athleteId}", "[athleteId]").replace(/^\//, "");
+  const rel = template.replace("{groupId}", "[groupId]").replace("/messages/{athleteId}", "/messages/[otherId]").replace("{athleteId}", "[athleteId]").replace(/^\//, "");
   return fs.existsSync(path.join(ROOT, "app", rel, "page.tsx"));
 }
 
@@ -468,5 +468,62 @@ describe("data questions go to the assistant", () => {
   ];
   it.each(data)("%s", (q) => {
     expect(resolveNavigation(q, coachDesktop).kind).toBe("data");
+  });
+});
+
+// Ron, Oct 6: "pull up Johann's program", "let me see Johann's calendar", "what does Johann's nutrition look like?" opens a small question, and a yes opens the screen.
+describe("a named client: the place is asked as a question, never a silent jump", () => {
+  const people = [
+    { id: "c-johann", fullName: "Johann Gorsik", groupId: "g9" },
+    { id: "c-alice", fullName: "Alice Athlete", groupId: "g1" },
+    { id: "c-karina", fullName: "Karina Ramirez", groupId: "g2" },
+  ];
+  const ctx: NavContext = { role: "coach", device: "desktop", groupId: "g1", roster: people, clientPrograms: { "c-johann": { programId: "p-77", groupId: "g9" } } };
+
+  it("pull up Johann's program asks 'is this what you're looking for?' and opens his program", () => {
+    const r = resolveNavigation("pull up Johann's program", ctx);
+    expect(r.kind).toBe("navigate");
+    if (r.kind !== "navigate") return;
+    expect(r.confirm?.question).toBe("Johann Gorsik's program: is this what you're looking for?");
+    expect(r.chips[0].href).toBe("/groups/g9/programs/p-77");
+  });
+  it("a client with no program known opens their profile, where the program is", () => {
+    const r = resolveNavigation("pull up Alice's program", ctx);
+    expect(r.kind === "navigate" && r.chips[0].href).toBe("/groups/g1/athletes/c-alice");
+  });
+  it("each place a coach asks for: calendar, nutrition, messages, history, goals, balance", () => {
+    const href = (m: string) => {
+      const r = resolveNavigation(m, ctx);
+      return r.kind === "navigate" ? r.chips[0].href : null;
+    };
+    expect(href("let me see Johann's calendar")).toBe("/groups/g9/athletes/c-johann/calendar");
+    expect(href("Johann's nutrition")).toBe("/groups/g9/athletes/c-johann/calendar");
+    expect(href("open Johann's messages")).toBe("/groups/g9/messages/c-johann");
+    expect(href("Karina's workout history")).toBe("/groups/g2/athletes/c-karina/history");
+    expect(href("Karina's goals")).toBe("/groups/g2/athletes/c-karina");
+    expect(href("Karina's session balance")).toBe("/groups/g2/athletes/c-karina");
+  });
+  it("a name said loosely still finds the person: a first name, a slip, a nickname", () => {
+    for (const m of ["pull up Johan's program", "johann program", "show Johan Gorsik's program"]) {
+      const r = resolveNavigation(m, ctx);
+      expect(r.kind === "navigate" && r.confirm?.question).toBe("Johann Gorsik's program: is this what you're looking for?");
+    }
+  });
+  it("two clients who fit are both offered with the same place, never guessed between", () => {
+    const two: NavContext = { ...ctx, roster: [...people, { id: "c-johann2", fullName: "Johann Weber", groupId: "g1" }] };
+    const r = resolveNavigation("pull up Johann's program", two);
+    expect(r.kind).toBe("navigate");
+    if (r.kind !== "navigate") return;
+    expect(r.text).toBe("More than one client matches. Which one?");
+    expect(r.confirm).toBeUndefined();
+    expect(r.chips.map((c) => c.label).sort()).toEqual(["Johann Gorsik's program", "Johann Weber's program"]);
+  });
+  it("only the coach's own roster is ever searched", () => {
+    const r = resolveNavigation("pull up Sam's program", ctx);
+    expect(r.kind === "navigate" && r.confirm).toBeFalsy();
+  });
+  it("the plain places still work with no confirmation", () => {
+    const r = resolveNavigation("show me my calendar", ctx);
+    expect(r.kind === "navigate" && r.confirm).toBeUndefined();
   });
 });
