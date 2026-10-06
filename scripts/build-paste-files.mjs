@@ -664,6 +664,20 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["no window already has hours where the end is not after the start", "not exists (select 1 from public.coach_availability_windows where end_time <= start_time)"],
     ],
   },
+  {
+    n: "33",
+    slug: "0288",
+    title: "0288 two bookings that overlap at different minutes can no longer both be saved at the same instant (a lock per coach, then a second overlap check before a confirmed future booking is saved or moved)",
+    migrations: ["0288"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing visible changes. A booking, a confirmed request, a weekly schedule or the public discovery form that would overlap another session (with your gap) is refused with the usual 'that slot was just taken', even if two arrive at the same moment. History is never re-checked. Run this after step 32.",
+    undo: "drop trigger if exists bookings_guard_overlap on public.bookings;\ndrop trigger if exists discovery_bookings_guard_overlap on public.discovery_bookings;\ndrop function if exists public.guard_booking_overlap();",
+    undoWhy: "Only if bookings misbehave after step 33. Removes the extra overlap check and its lock; the booking functions' own overlap checks stay.",
+    rows: [
+      ["bookings and discovery_bookings exist", `${has.table("bookings")} and ${has.table("discovery_bookings")}`],
+      ["0288 is not already applied (the overlap guard is not there yet)", "not exists (select 1 from pg_trigger where tgname = 'bookings_guard_overlap')"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
