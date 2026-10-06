@@ -12,7 +12,6 @@ describe("buildMoreSections", () => {
       "/groups/g1/tools/one-rep-max",
       "/groups/g1/tools/macro-calculator",
       "/partners",
-      "/share/journey/a1",
       "/groups/g1/progress-photos",
       "/groups/g1/resources",
       "/groups/g1/quick-tips",
@@ -41,5 +40,16 @@ describe("buildMoreSections", () => {
     expect(sections.every((s) => s.links.length > 0)).toBe(true);
     const hrefs = sections.flatMap((s) => s.links.map((l) => l.href));
     expect(new Set(hrefs).size).toBe(hrefs.length);
+  });
+});
+
+describe("the public progress page is off", () => {
+  it("is not linked from the athlete More list, and the page never reads data", async () => {
+    const { readFileSync } = await import("node:fs");
+    const hrefs = flat({ ...base, historyImportEnabled: true }).map((l) => l.href);
+    expect(hrefs.some((h) => h.includes("/share/journey"))).toBe(false);
+    const page = readFileSync(new URL("../app/share/journey/[athleteId]/page.tsx", import.meta.url), "utf8");
+    expect(page).toContain("const JOURNEY_PAGE_OPEN = false;");
+    expect(page.indexOf("if (!JOURNEY_PAGE_OPEN)")).toBeLessThan(page.indexOf("await getJourneyRecap"));
   });
 });

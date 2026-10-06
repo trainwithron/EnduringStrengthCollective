@@ -6,7 +6,9 @@ import { getVolumeEquivalence } from "@/lib/volume-equivalence";
 import { pickGymJoke } from "@/lib/gym-jokes";
 import { getSharedWorkout } from "@/lib/shared-workout";
 import { PrListToggle } from "@/components/share/pr-list-toggle";
-import { ShareWorkoutButton } from "@/components/share/share-workout-button";
+import { ShareActions } from "@/components/share/share-actions";
+import { OneScreenCard } from "@/components/share/one-screen-card";
+import { buildShareImageModel } from "@/lib/share-image";
 import { CustomizeSharePanel } from "@/components/share/customize-share-panel";
 import { BackgroundPicker } from "@/components/share/background-picker";
 import { VolumeLiftRig } from "@/components/share/volume-lift-rig";
@@ -159,8 +161,41 @@ export default async function ShareWorkoutPage(
   const humorArchetype = cardStyle === "humor" ? pickHumorArchetype(params.postId) : null;
   const headline = shared.celebratePrs.length > 0 ? "New PR 🎉" : "Workout Complete 💪";
 
+  // The one-screen card and the picture people post are built from the same model, so they always agree.
+  const imageInput = {
+    groupName: shared.groupName,
+    athleteName: shared.athleteName,
+    prCount: shared.celebratePrs.length,
+    totalVolume: shared.totalVolume,
+    totalSets: shared.totalSetsCompleted,
+    durationSeconds: shared.durationSeconds,
+    topLifts: shared.topLifts,
+    weekStreak: shared.weekStreak,
+    totalWorkoutCount: shared.totalWorkoutCount,
+    createdAt: shared.createdAt,
+    background: scenicBackground?.key ?? null,
+  };
+  const screenModel = buildShareImageModel({ ...imageInput, showName: true });
+  const screenBackground = useOrgCustomImage ? (
+    // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL
+    <img src={shared.workoutCardBackgroundUrl!} alt="" className="absolute inset-0 w-full h-full object-cover" />
+  ) : scenicBackground ? (
+    <ScenicBackground background={scenicBackground.key} />
+  ) : null;
+
   return (
-    <main className="min-h-screen bg-graphite text-chalk font-body flex items-center justify-center px-6 py-16">
+    <main id="top" className="bg-graphite text-chalk font-body">
+      <section className="h-[100dvh] min-h-[540px] max-w-md mx-auto flex flex-col gap-3 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-[max(12px,env(safe-area-inset-bottom))]">
+        <OneScreenCard
+          model={screenModel}
+          background={screenBackground}
+          coachLine={coachCongrats}
+          hasPr={shared.celebratePrs.length > 0}
+        />
+        <ShareActions input={imageInput} title={shareTitle} homeHref={user ? `/groups/${shared.groupId}` : null} />
+      </section>
+
+      <section id="full-workout" className="min-h-screen flex items-center justify-center px-6 py-16">
       <div className="relative w-full max-w-sm rounded-[22px] overflow-hidden border border-chalk/[0.06] bg-gradient-to-b from-[#2E2B28] to-surface shadow-[0_1px_0_rgba(237,232,224,.05)_inset,0_22px_44px_-18px_rgba(0,0,0,.65),0_2px_10px_rgba(0,0,0,.35)] before:content-[''] before:absolute before:inset-0 before:rounded-[22px] before:shadow-[0_1px_0_rgba(237,232,224,.08)_inset] before:pointer-events-none">
         {cardStyle === "scenic" ? (
           <div className="relative h-[180px] px-7 pt-8 pb-5 flex flex-col justify-end text-center">
@@ -341,7 +376,12 @@ export default async function ShareWorkoutPage(
         )}
 
         <div className="mt-6 space-y-2.5">
-          <ShareWorkoutButton postId={params.postId} title={shareTitle} size="large" />
+          <a
+            href="#top"
+            className="w-full h-12 flex items-center justify-center bg-rust text-graphite font-display uppercase text-sm font-bold rounded-[14px]"
+          >
+            Share your picture
+          </a>
           {user && (
             <Link
               href={`/groups/${shared.groupId}`}
@@ -377,6 +417,7 @@ export default async function ShareWorkoutPage(
         </p>
         </div>
       </div>
+      </section>
     </main>
   );
 }

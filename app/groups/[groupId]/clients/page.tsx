@@ -13,6 +13,8 @@ import { SwappableTerm } from "@/components/coach/swappable-term";
 import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { CoachRosterMobile } from "@/components/coach/mobile/coach-roster-mobile";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
+import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
+import { mergeRosterAcrossGroups, type RosterRowAcrossGroups } from "@/lib/coach-roster";
 import type { RosterMember } from "@/lib/types";
 import {
   classifyNutritionTrend,
@@ -194,6 +196,71 @@ export default async function ClientsPage(
   // this branch never uses — same pattern app/groups/[groupId]/page.tsx
   // already uses to skip its own desktop-only work.
   if (await prefersAthleteStyleView()) {
+    // Coach-level list: every client across the groups this coach coaches in this organization, not only the group the coach is
+    // standing in (a one-on-one client lives in their own group, so a single group shows one person). The coach's own groups only;
+    // the database refuses anything else.
+    const coachedGroups = groupsInOrgOf(await getCoachedGroups(supabase, user.id), params.groupId);
+    const scopeGroups = coachedGroups.length > 0 ? coachedGroups : [{ id: params.groupId, kind: "team" as const }];
+    const scopeIds = scopeGroups.map((g) => g.id);
+    const kindByGroup = new Map(scopeGroups.map((g) => [g.id, g.kind]));
+    const [{ data: scopeMemberships }, scopeLastRows] = await Promise.all([
+      supabase
+        .from("group_memberships")
+        .select("role, profile_id, group_id, client_tier, profiles ( id, full_name, avatar_url, claimed_at )")
+        .in("group_id", scopeIds)
+        .eq("role", "athlete"),
+      Promise.all(scopeIds.map((id) => supabase.rpc("get_last_workout_per_athlete", { p_group_id: id }))),
+    ]);
+    const scopeLast = new Map<string, string>();
+    for (const res of scopeLastRows) {
+      for (const row of (res.data ?? []) as { athlete_id: string; last_logged_at: string }[]) {
+        const prev = scopeLast.get(row.athlete_id);
+        if (!prev || row.last_logged_at > prev) scopeLast.set(row.athlete_id, row.last_logged_at);
+      }
+    }
+    const scopeUnclaimed = Array.from(
+      new Set(
+        ((scopeMemberships ?? []) as any[]).filter((m) => !m.profiles?.claimed_at).map((m) => m.profile_id as string)
+      )
+    );
+    const scopeInviteByAthlete = new Map<string, { expiresAt: string; usedAt: string | null; revokedAt: string | null }>();
+    if (scopeUnclaimed.length > 0) {
+      const loadInvites = (columns: string) =>
+        supabase.from("client_invites").select(columns).in("athlete_id", scopeUnclaimed).order("created_at", { ascending: false });
+      let inviteRes = await loadInvites("athlete_id, expires_at, used_at, created_at, revoked_at");
+      if (inviteRes.error) inviteRes = await loadInvites("athlete_id, expires_at, used_at, created_at");
+      for (const r of (inviteRes.data ?? []) as unknown as {
+        athlete_id: string;
+        expires_at: string;
+        used_at: string | null;
+        revoked_at?: string | null;
+      }[]) {
+        if (!scopeInviteByAthlete.has(r.athlete_id)) {
+          scopeInviteByAthlete.set(r.athlete_id, { expiresAt: r.expires_at, usedAt: r.used_at, revokedAt: r.revoked_at ?? null });
+        }
+      }
+    }
+    const phoneClients = mergeRosterAcrossGroups(
+      ((scopeMemberships ?? []) as any[]).map(
+        (m): RosterRowAcrossGroups => ({
+          groupId: m.group_id as string,
+          groupKind: kindByGroup.get(m.group_id) ?? "team",
+          member: {
+            signInStatus: claimStatus({
+              claimedAt: m.profiles?.claimed_at ?? null,
+              latestInvite: scopeInviteByAthlete.get(m.profile_id) ?? null,
+            }),
+            profileId: m.profile_id,
+            fullName: m.profiles?.full_name ?? "Unknown",
+            avatarUrl: m.profiles?.avatar_url ?? null,
+            role: "athlete",
+            lastWorkoutAt: scopeLast.get(m.profile_id) ?? null,
+            clientTier: m.client_tier ?? null,
+          },
+        })
+      )
+    );
+
     return (
       <CoachMobileShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} activeOverride="roster">
         <div className="min-h-screen bg-graphite text-chalk font-body pb-24 px-5 pt-8">
@@ -203,12 +270,12 @@ export default async function ClientsPage(
                 <SwappableTerm termKey="client" form="plural" className="capitalize" />
               </h1>
               <p className="font-body text-sm text-steel mt-1">
-                {athletes.length} {athletes.length === 1 ? "client" : "clients"}
+                {phoneClients.length} {phoneClients.length === 1 ? "client" : "clients"}
               </p>
             </div>
             <AddClientButton groupId={params.groupId} groupName={group?.name ?? "This group"} createdBy={user.id} defaultOpen={openAdd} />
           </div>
-          <CoachRosterMobile groupId={params.groupId} members={athletes} />
+          <CoachRosterMobile groupId={params.groupId} members={phoneClients} />
         </div>
       </CoachMobileShell>
     );
