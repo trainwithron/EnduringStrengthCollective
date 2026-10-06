@@ -1068,7 +1068,7 @@ export default async function CoachCalendarPage(
 
       {calendarSpotterFindings.length > 0 && (
         <div className="mb-6">
-          <CalendarSpotterPanel findings={calendarSpotterFindings} />
+          <CalendarSpotterPanel findings={calendarSpotterFindings} groupId={params.groupId} />
         </div>
       )}
 
