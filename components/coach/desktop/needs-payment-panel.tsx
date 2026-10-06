@@ -12,6 +12,8 @@ export function NeedsPaymentPanel({ rows }: { rows: NeedsPaymentRow[] }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<{ id: string; text: string; error: boolean } | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const [holdingAll, setHoldingAll] = useState(false);
+  const [holdAllNote, setHoldAllNote] = useState<string | null>(null);
 
   if (list.length === 0) return null;
   const visible = showAll ? list : list.slice(0, 5);
@@ -39,9 +41,37 @@ export function NeedsPaymentPanel({ rows }: { rows: NeedsPaymentRow[] }) {
     }
   }
 
+  // For a coach who bills outside the app (Acuity, cash, a gym): put everyone on this list on hold in one go. A held client leaves the list, is
+  // never reminded, and never sees a re-up prompt. Each one can be taken off hold from the Clients page.
+  async function holdAll() {
+    if (!window.confirm(`Put all ${list.length} on hold? They leave this list, are never reminded, and don't see a re-up prompt. You can take a hold off from the Clients page.`)) return;
+    setHoldingAll(true);
+    setHoldAllNote(null);
+    const failed: string[] = [];
+    for (const row of list) {
+      try {
+        const res = await fetch("/api/reup/hold", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ groupId: row.groupId, athleteId: row.athleteId, hold: true }) });
+        if (!res.ok) failed.push(row.athleteId);
+      } catch {
+        failed.push(row.athleteId);
+      }
+    }
+    setList((prev) => prev.filter((r) => failed.includes(r.athleteId)));
+    setHoldAllNote(failed.length === 0 ? "Done. Everyone is on hold." : `${failed.length} could not be put on hold. Try those again one by one.`);
+    setHoldingAll(false);
+  }
+
   return (
     <section className="border border-steel/25 bg-surface p-4 mb-6" aria-label="Needs payment">
-      <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">Needs payment ({list.length})</h2>
+      <div className="flex items-baseline justify-between gap-3 mb-3">
+        <h2 className="font-display uppercase text-sm tracking-wide text-steel">Needs payment ({list.length})</h2>
+        {list.length > 1 && (
+          <button type="button" onClick={holdAll} disabled={holdingAll} className="font-body text-xs text-steel underline disabled:opacity-40">
+            {holdingAll ? "Holding…" : "Hold all"}
+          </button>
+        )}
+      </div>
+      {holdAllNote && <p className="font-body text-xs text-steel mb-2" role="status">{holdAllNote}</p>}
       <ul className="divide-y divide-steel/15">
         {visible.map((r) => (
           <li key={r.athleteId} className="py-2.5">

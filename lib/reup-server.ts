@@ -17,8 +17,11 @@ export interface ReupState {
 }
 
 export async function loadReupState(supabase: any, athleteId: string, groupId: string): Promise<ReupState | null> {
-  const { data: credits } = await supabase.from("session_credits").select("balance").eq("athlete_id", athleteId).eq("group_id", groupId).maybeSingle();
-  if (!credits || credits.balance > 0) return null;
+  // A client the coach has put on hold (comped, on a break, billed another way, such as through Acuity) never sees a re-up prompt. If the hold
+  // column is not there yet (migration 0260), fall back to reading the balance alone.
+  let { data: credits, error: creditsError } = await supabase.from("session_credits").select("balance, payment_hold").eq("athlete_id", athleteId).eq("group_id", groupId).maybeSingle();
+  if (creditsError) ({ data: credits } = await supabase.from("session_credits").select("balance").eq("athlete_id", athleteId).eq("group_id", groupId).maybeSingle());
+  if (!credits || credits.balance > 0 || credits.payment_hold === true) return null;
 
   const now = new Date();
   const [{ data: purchases }, { data: assigned }, tz, { data: nextBooking }] = await Promise.all([
