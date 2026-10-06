@@ -17,10 +17,11 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
 
-  const body = await request.json();
-  const { checkKind, patternKey, headline, action, detail } = body;
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object") return NextResponse.json({ error: "Send a JSON body." }, { status: 400 });
+  const { checkKind, patternKey, headline, action, detail } = body as Record<string, unknown>;
 
-  if (!checkKind || !patternKey || !headline) {
+  if (typeof checkKind !== "string" || typeof patternKey !== "string" || typeof headline !== "string" || !checkKind || !patternKey || !headline || checkKind.length > 60 || patternKey.length > 200 || headline.length > 400) {
     return NextResponse.json({ error: "checkKind, patternKey, and headline are required." }, { status: 400 });
   }
   if (action !== "confirmed" && action !== "denied" && action !== "edited") {

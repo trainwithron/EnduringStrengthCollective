@@ -118,7 +118,7 @@ export function SessionTypeManager({ initialTypes, teamMode = false }: { initial
           })}
         </div>
         <p className="font-body text-xs text-steel mt-2">
-          They are ordinary types you can rename or delete, and they are not shown on your public booking page. Practice and Game cost no session credit.
+          They are ordinary types you can rename or delete, and they are not shown on your public booking page. Practice and Game are set to cost 0 credits when you log a workout as that type. Giving hours or a booked session a type never changes what the booking costs.
         </p>
         {presetError && (
           <p className="font-body text-xs text-rust mt-1" role="alert">

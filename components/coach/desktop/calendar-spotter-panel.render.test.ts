@@ -17,17 +17,23 @@ const iso = (days: number) => new Date(NOW + days * 86400000).toISOString();
 function fakeDb(tables: Record<string, any[]>) {
   return {
     from(table: string) {
+      let range: [number, number] | null = null;
       const chain: any = {
         select: () => chain,
         eq: () => chain,
         in: () => chain,
         gte: () => chain,
         like: () => chain,
+        range: (a: number, b: number) => {
+          range = [a, b];
+          return chain;
+        },
         order: () => chain,
         limit: () => chain,
         then: (resolve: any) => {
           if (tables[table] === undefined && table === "client_inactive") return resolve({ data: null, error: { message: "no table" } });
-          resolve({ data: tables[table] ?? [], error: null });
+          const all = tables[table] ?? [];
+          resolve({ data: range ? all.slice(range[0], range[1] + 1) : all, error: null });
         },
       };
       return chain;

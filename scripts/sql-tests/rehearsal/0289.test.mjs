@@ -55,6 +55,13 @@ export default {
       h.check("the coach can tag their own window", !tagOwn.error && (tagOwn.rows ?? []).length === 1, JSON.stringify(tagOwn));
       h.check("another coach cannot tag someone else's hours", (tagOthers.rows ?? []).length === 0, JSON.stringify(tagOthers));
 
+      // a window can only carry the coach's own type
+      const foreignType = (await db.query(`insert into public.session_types (coach_id, name, credit_cost) values ($1, 'Theirs', 1) returning id`, [other])).rows[0].id;
+      await h.as(coach);
+      const stolen = await tryQ(db, `update public.coach_availability_windows set session_type_id = $1 where coach_id = $2 and weekday = 2 and start_time = '18:00'`, [foreignType, coach]);
+      await h.asSuper();
+      h.check("a coach cannot put another coach's session type on their own hours", /not yours/.test(stolen.error ?? ""), JSON.stringify(stolen));
+
       // credits are untouched by the tag
       await db.query(`insert into public.session_credits (athlete_id, group_id, balance) values ($1, $2, 5) on conflict (athlete_id, group_id) do update set balance = 5`, [ann, group]);
       await h.as(coach);

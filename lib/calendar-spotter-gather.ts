@@ -7,6 +7,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { attendanceDismissalKey, isAttendanceDismissed } from "./calendar-spotter-dismiss";
 import { fetchInactiveKeys, inactiveKey } from "./inactive-ids";
+import { pageAll } from "./page-all";
 import {
   detectAttendanceGap,
   detectFlakyAttendancePattern,
@@ -36,13 +37,18 @@ export async function gatherCalendarSpotterFindings(
   const { groupId, coachId } = params;
   const since = new Date(Date.now() - LOOKBACK_DAYS * 86400000).toISOString();
 
-  const { data: rows } = await supabase
+  // Read a page at a time: a busy group can have more than the 1000 rows one request returns, and a silent cut would give wrong "hasn't attended" findings.
+  const { rows } = await pageAll((a, b) =>
+    supabase
     .from("bookings")
     .select("id, athlete_id, start_at, status, no_show, late_cancel, recurring_series_id, session_types ( name ), profiles!bookings_athlete_id_fkey ( full_name )")
     .eq("group_id", groupId)
-    .gte("start_at", since);
+    .gte("start_at", since)
+    .order("id", { ascending: true })
+    .range(a, b)
+  );
 
-  if (!rows || rows.length === 0) return [];
+  if (rows.length === 0) return [];
 
   const byAthlete = new Map<string, { name: string; bookings: AttendanceBooking[] }>();
   const nextByAthlete = new Map<string, { id: string; startAt: string; recurringSeriesId: string | null; sessionTypeName: string | null }>();

@@ -31,12 +31,36 @@ $guard$;
 --    change the type of any booking afterwards. bookings.session_type_id already exists (0261); bookings.session_type (in person / video) is the separate
 --    video-call switch and is not touched. The type does not change what a session costs: credits are untouched.
 --  * The hours are the coach's local wall clock, so the trigger reads the booking on the coach's own clock (America/New_York until they set one, as everywhere).
+--  * A window can only carry one of the coach's OWN session types: a trigger refuses a type that belongs to another coach (the foreign key alone only checks that
+--    the type exists), so a coach who learns another coach's type id cannot attach it to their hours (Assistant's review).
 -- Needs coach_availability_windows (0023), session_types (0180), bookings.session_type_id (0261), coach_time_zone (0278). Re-runnable.
 
 alter table public.coach_availability_windows
   add column if not exists session_type_id uuid references public.session_types(id) on delete set null;
 
 create index if not exists coach_availability_windows_session_type_id_idx on public.coach_availability_windows (session_type_id);
+
+create or replace function public.guard_window_session_type()
+returns trigger
+language plpgsql
+security definer
+set search_path to 'public'
+as $function$
+begin
+  if new.session_type_id is not null
+     and not exists (select 1 from public.session_types st where st.id = new.session_type_id and st.coach_id = new.coach_id) then
+    raise exception 'that session type is not yours';
+  end if;
+  return new;
+end;
+$function$;
+
+revoke all on function public.guard_window_session_type() from public, anon, authenticated;
+
+drop trigger if exists coach_availability_windows_guard_type on public.coach_availability_windows;
+create trigger coach_availability_windows_guard_type
+  before insert or update of session_type_id on public.coach_availability_windows
+  for each row execute function public.guard_window_session_type();
 
 create or replace function public.tag_booking_session_type()
 returns trigger
