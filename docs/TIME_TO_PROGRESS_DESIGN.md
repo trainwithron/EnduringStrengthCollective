@@ -1,4 +1,4 @@
-# "Time to progress?" — design (final plan, Ron's answers in; not built yet)
+# "Time to progress?" — design, and what is built (branch care-time-to-progress)
 
 ## The principle
 
@@ -84,7 +84,19 @@ It reuses what exists, with no new system and no new table:
 - **It seeds a goal the two of them agree on:** next to the reply the coach has one tap, "Turn this into a goal", which opens the existing coach-suggested goal form (migration 0284) pre-filled with the client's own words. The client confirms, changes it or says not now, exactly as with any suggested goal, so the coach and client agree before anything changes.
 - It is never a form the client must fill in, and a client who does not answer is not chased.
 
-## What needs building (after the release and paste queue)
+## What is built (Oct 6), and what is not
+
+Built, no migration (the coach's answers are kept in their own feedback rows, kind `progress`):
+
+- `lib/progress-look.ts` (pure, tested): the same-load look, effort (none / flat / settled / falling), the rough over-target hint, main-lift test, workout cards (main card, delayed accessory card), the collapsed count with at most 3 cards oldest first, the per-coach threshold (3, +1 per Yes deliberate up to 6, -1 per applied option back to 3, a number set by hand 2 to 8), how long a card stays away, the wide options list, the coach-voiced note and the help question.
+- `lib/progress-look-gather.ts` + `/api/progress-look`: reads the coach's own clients (their own access, coach only) and applies the suppressions: set aside as inactive, no training in 21 days, deliberate deficit phase, a deload workout or program, a pain or injury note in the last 14 days, a missed set, a program already raising the weight (by its next target, or because a progression model is set for that exercise), effort that is climbing, a client marked as injured, and a deficit phase only if it is from the last 60 days. Every read that can return more than 1000 rows is paged, so a large roster is read completely. Reviewed by Assistant; their three fixes (paging, injury and progression-model suppression, hint uses the top of a rep range) are in. The hint reads the top of a rep range (10 reps on a target of 8-10 is on target) while a missed set reads the low end. The client's own words in "Turn this into a goal" go into the goal's label only, so a coach cannot edit them under the client's agreement.
+- `components/coach/progress-look-panel.tsx` on desktop and phone Home: "N need a look", at most 3 cards, Yes deliberate / Show me options / Not now, "I'll ask after N sessions. Change", the rough-guide switch, Draft a note, Suggest a time, Ask what they need most help with.
+- Options Apply (only on tap, only on a client's OWN program): more load (a step added to each target), a rep, a set, and the note options (slower lowering, pause, tempo, range of motion, harder variation, better control, lower effort) which add the coach's edited line to the exercise's coaching notes for the next workout. A client on the group's shared program is told to give them their own copy first, so nobody else's program changes.
+- A client's profile shows "What {name} said they need most help with" with their reply and "Turn this into a goal" (the existing suggested-goal form, started from their words; they confirm, change or decline). The question and the reply are found in the real conversation, so a draft never sent is never counted.
+
+Not built, on purpose: a client-side "Ask for a quick chat" button (the drafted note invites a reply instead; the coach's "Suggest a time" uses the existing scheduling); "log where it broke" for a missed set (the existing per-exercise athlete note is the place; a missed set simply means no card); the harder-variation option names the next step of the movement-pattern ladder in the draft but does not swap the exercise; the more-load option on an exercise whose next target is blank starts from what the client has been lifting.
+
+## Original build list (kept for reference)
 
 - A pure function `progressLook(points, programTargets, coachThreshold, hasEffort)` and tests, like the matched-load watcher.
 - A gather step on Home for the coach's clients (the same queries the matched-load watcher already makes).

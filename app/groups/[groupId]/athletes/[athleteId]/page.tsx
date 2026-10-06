@@ -17,6 +17,7 @@ import { SwipeDirectionSetting } from "@/components/athlete/swipe-direction-sett
 import { GoalConfirmationControl } from "@/components/coach/goal-confirmation-control";
 import { GoalWaitingOnClient } from "@/components/coach/goal-waiting-on-client";
 import { GoalProposalForm } from "@/components/athlete/goal-proposal-form";
+import { findHelpAnswer } from "@/lib/help-answer";
 import { PackageAssignmentControl } from "@/components/coach/package-assignment-control";
 import { PrivateFromOrgToggle } from "@/components/coach/private-from-org-toggle";
 import { ClientTagAssignmentControl } from "@/components/coach/client-tag-assignment-control";
@@ -864,6 +865,20 @@ export default async function AthleteProfilePage(
   }));
   const scheduleTimezone = await getGroupCoachTimezone(supabase, params.groupId);
 
+  // What the client said they need the most help with: found in the real conversation (the question the coach sent and the client's first reply), never
+  // stored separately and never shown to the client. Soft: if the lookup fails nothing is shown.
+  const { data: threadRows } = await supabase
+    .from("direct_messages")
+    .select("sender_id, body, created_at")
+    .eq("group_id", params.groupId)
+    .or(`and(sender_id.eq.${user.id},recipient_id.eq.${params.athleteId}),and(sender_id.eq.${params.athleteId},recipient_id.eq.${user.id})`)
+    .order("created_at", { ascending: false })
+    .limit(200);
+  const helpAnswer = findHelpAnswer(
+    ((threadRows ?? []) as { sender_id: string; body: string; created_at: string }[]).map((r) => ({ senderId: r.sender_id, body: r.body, createdAt: r.created_at })),
+    user.id,
+    params.athleteId
+  );
   const initials = (profile?.full_name ?? "?")
     .split(" ")
     .map((p: string) => p[0])
@@ -1324,6 +1339,34 @@ export default async function AthleteProfilePage(
                   priorityNote: latestGoalRow.priority_note,
                 }}
               />
+            </section>
+          )}
+
+          {helpAnswer && (
+            <section className="border border-steel/20 p-3">
+              <h2 className="font-body text-xs text-steel uppercase tracking-wide font-bold">
+                What {(profile?.full_name ?? "they").split(" ")[0]} said they need most help with
+              </h2>
+              {helpAnswer.answer ? (
+                <>
+                  <p className="font-body text-sm text-chalk mt-2 whitespace-pre-wrap">{helpAnswer.answer}</p>
+                  <p className="font-body text-xs text-steel mt-1">
+                    Their reply on {new Date(helpAnswer.answeredAt as string).toLocaleDateString("en-US", { month: "short", day: "numeric" })}. Only you see this card.
+                  </p>
+                  {latestGoalRow?.status !== "proposed" && (
+                    <details className="mt-3">
+                      <summary className="font-body text-sm text-rust cursor-pointer">Turn this into a goal</summary>
+                      <div className="mt-3">
+                        <GoalProposalForm athleteId={params.athleteId} groupId={params.groupId} suggestedBy={user.id} fromWords={helpAnswer.answer} />
+                      </div>
+                    </details>
+                  )}
+                </>
+              ) : (
+                <p className="font-body text-xs text-steel mt-2">
+                  You asked on {new Date(helpAnswer.askedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}. No reply yet, and there is no need to chase it.
+                </p>
+              )}
             </section>
           )}
 

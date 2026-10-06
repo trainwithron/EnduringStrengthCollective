@@ -26,6 +26,7 @@ import { NeedsPaymentPanel } from "@/components/coach/desktop/needs-payment-pane
 import { LateChangesPanel } from "@/components/coach/late-changes-panel";
 import { ExpiryCheckInPanel } from "@/components/coach/expiry-checkin-panel";
 import { InactiveClientsPanel } from "@/components/coach/inactive-clients-panel";
+import { ProgressLookPanel } from "@/components/coach/progress-look-panel";
 import { DashboardWeekNarrative } from "@/components/coach/desktop/dashboard-week-narrative";
 import { DashboardAutoRefresh } from "@/components/coach/desktop/dashboard-auto-refresh";
 import { DashboardTileGrid } from "@/components/coach/desktop/dashboard-tile-grid";
@@ -587,6 +588,7 @@ export default async function CoachHomePage() {
       <LateChangesPanel />
       <ExpiryCheckInPanel />
       <InactiveClientsPanel />
+      <ProgressLookPanel />
       <NeedsPaymentPanel rows={dashboardData.needsPayment} />
 
       <DashboardTileGrid

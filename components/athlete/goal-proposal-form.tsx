@@ -11,9 +11,11 @@ import { notifyPush } from "@/lib/push-notify";
 // (sees it, confirms it), never the author. Same preset+Custom pattern
 // already used for the dashboard word-swap presets.
 // A coach can use the same form to SUGGEST a goal to a client (`suggestedBy` = the coach's id): the client then confirms it, changes it or declines it.
-export function GoalProposalForm({ athleteId, groupId, suggestedBy }: { athleteId: string; groupId: string; suggestedBy?: string }) {
-  const [goalType, setGoalType] = useState<GoalType>("weight_loss");
-  const [customLabel, setCustomLabel] = useState("");
+// `fromWords` starts the suggestion from what the client said they need the most help with: a custom goal whose label is their own words. The words stay in the
+// label, not in the coach's note, so a coach can never edit them under the client's agreement.
+export function GoalProposalForm({ athleteId, groupId, suggestedBy, fromWords }: { athleteId: string; groupId: string; suggestedBy?: string; fromWords?: string }) {
+  const [goalType, setGoalType] = useState<GoalType>(fromWords ? "custom" : "weight_loss");
+  const [customLabel, setCustomLabel] = useState(fromWords ? fromWords.trim().slice(0, 200) : "");
   const [priorityNote, setPriorityNote] = useState("");
   const [targetDate, setTargetDate] = useState("");
   const [eventType, setEventType] = useState("");
