@@ -26,18 +26,32 @@ export function daysUntil(date: Date, now: Date): number {
   return Math.ceil((date.getTime() - now.getTime()) / DAY);
 }
 
+// When a client's coach holds expiry (an extension or a pause), the sessions do not vanish at the old date: they expire when the hold ends, so the
+// next prompt comes this many days before THAT date (not the full heads-up window, or a 30 day extension would prompt again at once).
+export const HELD_HEADS_UP_DAYS = 14;
+
+// The date the sessions really expire: the later of the normal date and the end of a hold that is still running.
+export function effectiveExpiry(row: Pick<ExpiringRow, "lastGrantedAt" | "holdUntil">, expiryDays: number, now: Date): { expiresOn: Date; held: boolean } | null {
+  if (!row.lastGrantedAt || expiryDays <= 0) return null;
+  const natural = new Date(new Date(row.lastGrantedAt).getTime() + expiryDays * DAY);
+  const hold = row.holdUntil ? new Date(row.holdUntil) : null;
+  if (hold && hold.getTime() > now.getTime() && hold.getTime() > natural.getTime()) return { expiresOn: hold, held: true };
+  return { expiresOn: natural, held: false };
+}
+
 // Clients whose sessions will expire within the coach's heads-up window. Never includes a balance with nothing left, a coach with no expiry window,
-// a client whose expiry is on hold, or a balance that has already passed its date (the nightly job handles that, and the returning-client prompt
-// covers what comes after).
+// or a balance that has already passed its date (the nightly job handles that, and the returning-client prompt covers what comes after). A client
+// whose expiry is on hold is included again shortly before the hold ends.
 export function expiringSoon(rows: ExpiringRow[], expiryDays: number, headsUpDays: number, now: Date): ExpiringSoon[] {
   if (expiryDays <= 0 || headsUpDays <= 0) return [];
   const out: ExpiringSoon[] = [];
   for (const r of rows) {
-    if (r.balance <= 0 || !r.lastGrantedAt) continue;
-    if (r.holdUntil && new Date(r.holdUntil).getTime() > now.getTime()) continue;
-    const expiresOn = new Date(new Date(r.lastGrantedAt).getTime() + expiryDays * DAY);
+    if (r.balance <= 0) continue;
+    const eff = effectiveExpiry(r, expiryDays, now);
+    if (!eff) continue;
+    const { expiresOn, held } = eff;
     const daysLeft = daysUntil(expiresOn, now);
-    if (daysLeft < 1 || daysLeft > headsUpDays) continue;
+    if (daysLeft < 1 || daysLeft > (held ? Math.min(headsUpDays, HELD_HEADS_UP_DAYS) : headsUpDays)) continue;
     out.push({ athleteId: r.athleteId, groupId: r.groupId, balance: r.balance, expiresOn, daysLeft });
   }
   return out.sort((a, b) => a.daysLeft - b.daysLeft);
@@ -95,6 +109,11 @@ export function isSnoozed(lastDeniedAt: string | null, now: Date): boolean {
 
 export function expiryDismissalKey(athleteId: string, groupId: string, kind: "soon" | "returning"): string {
   return `expiry-${kind}::${athleteId}::${groupId}`;
+}
+
+// "No, leave them expired" is a final answer for that expiry: it stays away for good, and only a later expiry (a different date) asks again.
+export function expiryFinalKey(athleteId: string, groupId: string, expiredOn: Date): string {
+  return `expiry-returning-final::${athleteId}::${groupId}::${expiredOn.toISOString().slice(0, 10)}`;
 }
 
 // The plain sentence a client sees where their balance is shown, so a window is never a surprise.

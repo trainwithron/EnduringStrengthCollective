@@ -4,6 +4,7 @@ import {
   daysUntil,
   expiringSoon,
   expiryDismissalKey,
+  expiryFinalKey,
   expiryWindowLine,
   holdUntilAfterExtension,
   isSnoozed,
@@ -25,11 +26,27 @@ describe("expiringSoon", () => {
     const out = expiringSoon([row({ lastGrantedAt: daysAgo(166) })], 180, 30, now);
     expect(out[0].daysLeft).toBe(14);
   });
-  it("leaves out anyone with nothing left, outside the window, with no expiry window, or with expiry on hold", () => {
+  it("leaves out anyone with nothing left, outside the window, or with no expiry window", () => {
     expect(expiringSoon([row({ balance: 0 })], 180, 30, now)).toEqual([]);
     expect(expiringSoon([row({ lastGrantedAt: daysAgo(100) })], 180, 30, now)).toEqual([]);
     expect(expiringSoon([row()], 0, 30, now)).toEqual([]);
-    expect(expiringSoon([row({ holdUntil: new Date(now.getTime() + 86400000).toISOString() })], 180, 30, now)).toEqual([]);
+  });
+  const inDays = (n: number) => new Date(now.getTime() + n * 86400000).toISOString();
+  it("leaves out a client whose expiry is held until well after the heads-up window", () => {
+    expect(expiringSoon([row({ holdUntil: inDays(60) })], 180, 30, now)).toEqual([]);
+    // A 30 day extension does not bring the prompt straight back.
+    expect(expiringSoon([row({ holdUntil: inDays(44) })], 180, 30, now)).toEqual([]);
+  });
+  it("brings a held client back shortly before the hold ends, using the hold end as the expiry date", () => {
+    // Granted 190 days ago: the normal date passed 10 days ago and the coach held it for 20 more days from then.
+    const out = expiringSoon([row({ lastGrantedAt: daysAgo(190), holdUntil: inDays(10) })], 180, 30, now);
+    expect(out).toHaveLength(1);
+    expect(out[0].daysLeft).toBe(10);
+    expect(out[0].expiresOn.getTime()).toBe(new Date(inDays(10)).getTime());
+  });
+  it("ignores a hold that ends before the normal expiry date (the sessions expire on the normal date)", () => {
+    const out = expiringSoon([row({ holdUntil: inDays(1) })], 180, 30, now);
+    expect(out[0].daysLeft).toBe(14);
   });
   it("includes a client whose hold has run out", () => {
     expect(expiringSoon([row({ holdUntil: daysAgo(1) })], 180, 30, now)).toHaveLength(1);
@@ -81,6 +98,11 @@ describe("snooze, keys and the client's line", () => {
   });
   it("keys soon and returning prompts separately", () => {
     expect(expiryDismissalKey("a", "g", "soon")).not.toBe(expiryDismissalKey("a", "g", "returning"));
+  });
+  it("a final 'leave them expired' answer is tied to that expiry date, so a later expiry asks again", () => {
+    const a = expiryFinalKey("a", "g", new Date("2026-01-10T07:00:00Z"));
+    expect(a).toBe("expiry-returning-final::a::g::2026-01-10");
+    expect(a).not.toBe(expiryFinalKey("a", "g", new Date("2026-09-01T07:00:00Z")));
   });
   it("tells a client the window in plain words, or nothing when sessions do not expire", () => {
     expect(expiryWindowLine(180)).toContain("180 days after your last purchase");

@@ -20,6 +20,7 @@ import { PrivateFromOrgToggle } from "@/components/coach/private-from-org-toggle
 import { ClientTagAssignmentControl } from "@/components/coach/client-tag-assignment-control";
 import { ChangeClientGroupControl } from "@/components/coach/change-client-group-control";
 import { DeleteClientControl } from "@/components/coach/delete-client-control";
+import { SetAsideControl } from "@/components/coach/set-aside-control";
 import { AddSocialOnlyMembershipControl } from "@/components/coach/add-social-only-membership-control";
 import { ClientProgrammingMenu } from "@/components/coach/client-programming-menu";
 import { MinorConsentControl } from "@/components/coach/minor-consent-control";
@@ -1439,6 +1440,10 @@ export default async function AthleteProfilePage(
               athleteName={profile?.full_name ?? "This client"}
               currentGroupId={params.groupId}
             />
+          </section>
+
+          <section>
+            <SetAsideControl athleteId={params.athleteId} groupId={params.groupId} />
           </section>
 
           <section>

@@ -9,6 +9,8 @@ from (
       exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_booking_policies' and column_name = 'credit_expiry_days') and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'session_credits' and column_name = 'last_granted_at')),
     ('0246 and 0248 are applied (the ledger and the internal credit function exist)',
       to_regclass('public.session_credit_ledger') is not null and exists (select 1 from pg_proc where proname = 'apply_session_credit_change' and pronamespace = 'public'::regnamespace)),
+    ('0267 is applied (the audit trail and its session balance trigger exist)',
+      exists (select 1 from pg_proc where proname = 'audit_watch' and pronamespace = 'public'::regnamespace) and exists (select 1 from pg_trigger where tgname = 'session_credits_audit')),
     ('is_org_admin_of_group exists',
       exists (select 1 from pg_proc where proname = 'is_org_admin_of_group' and pronamespace = 'public'::regnamespace)),
     ('0280 is not already applied (the expiry hold column is not there yet)',

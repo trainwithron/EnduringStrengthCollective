@@ -8,6 +8,7 @@ import {
   buildCheckInDraft,
   expiringSoon,
   expiryDismissalKey,
+  expiryFinalKey,
   holdUntilAfterExtension,
   isSnoozed,
   pauseUntil,
@@ -106,29 +107,56 @@ export function ExpiryCheckInPanel() {
         if (!expiredOn.has(k)) expiredOn.set(k, new Date(e.created_at));
       }
 
+      // "No, leave them expired" answers are final for that expiry date.
+      const { data: finals } = await supabase
+        .from("spotter_recommendation_feedback")
+        .select("dismissal_key")
+        .eq("coach_id", user.id)
+        .eq("spotter_kind", "expiry")
+        .like("dismissal_key", "expiry-returning-final::%");
+      const finalKeys = new Set(((finals ?? []) as any[]).map((f) => f.dismissal_key as string));
+
       const athleteIds = Array.from(new Set([...upcoming.map((u) => u.athleteId), ...Array.from(expiredOn.keys()).map((k) => k.split(":")[0])]));
       if (athleteIds.length === 0) return;
-      const [{ data: profiles }, { data: logs }] = await Promise.all([
+      // Each client's latest workout is looked up on its own, so a busy coach's many other clients can never crowd one out of a shared list.
+      const [{ data: profiles }, lastLogRows] = await Promise.all([
         supabase.from("profiles").select("id, full_name").in("id", athleteIds),
-        supabase.from("workout_logs").select("athlete_id, created_at").in("athlete_id", athleteIds).order("created_at", { ascending: false }).limit(2000),
+        Promise.all(
+          athleteIds.map(async (id) => {
+            const { data } = await supabase.from("workout_logs").select("created_at").eq("athlete_id", id).order("created_at", { ascending: false }).limit(1);
+            return [id, ((data ?? [])[0] as any)?.created_at as string | undefined] as const;
+          })
+        ),
       ]);
       const nameById = new Map(((profiles ?? []) as any[]).map((p) => [p.id as string, (p.full_name as string) ?? "Client"]));
       const lastLog = new Map<string, string>();
-      for (const l of (logs ?? []) as any[]) if (!lastLog.has(l.athlete_id)) lastLog.set(l.athlete_id, l.created_at);
+      for (const [id, at] of lastLogRows) if (at) lastLog.set(id, at);
 
       const soonItems: SoonItem[] = upcoming
         .filter((u) => !isSnoozed(lastDenied.get(expiryDismissalKey(u.athleteId, u.groupId, "soon")) ?? null, now))
         .map((u) => ({ ...u, name: nameById.get(u.athleteId) ?? "Client", lastWorkoutAt: lastLog.get(u.athleteId) ?? null }));
 
+      const candidates = Array.from(expiredOn.entries())
+        .map(([k, on]) => {
+          const [athleteId, groupId] = k.split(":");
+          return { athleteId, groupId, on };
+        })
+        .filter((c) => !finalKeys.has(expiryFinalKey(c.athleteId, c.groupId, c.on)))
+        .filter((c) => !isSnoozed(lastDenied.get(expiryDismissalKey(c.athleteId, c.groupId, "returning")) ?? null, now))
+        // Only clients who have been active since the sessions expired can be a returning client; skip the lookup for the rest.
+        .filter((c) => lastLog.get(c.athleteId) && new Date(lastLog.get(c.athleteId) as string).getTime() > c.on.getTime());
+      const lefts = await Promise.all(
+        candidates.map(async (c) => {
+          const { data: left } = await supabase.rpc("reinstatable_expired_credits", { p_athlete_id: c.athleteId, p_group_id: c.groupId });
+          return typeof left === "number" ? left : 0;
+        })
+      );
       const returnItems: ReturnItem[] = [];
-      for (const [k, on] of expiredOn) {
-        const [athleteId, groupId] = k.split(":");
-        if (isSnoozed(lastDenied.get(expiryDismissalKey(athleteId, groupId, "returning")) ?? null, now)) continue;
-        const { data: left } = await supabase.rpc("reinstatable_expired_credits", { p_athlete_id: athleteId, p_group_id: groupId });
-        const lastActivity = lastLog.get(athleteId) ? new Date(lastLog.get(athleteId) as string) : null;
-        const r = returningClient({ athleteId, groupId, expiredOn: on, reinstatable: typeof left === "number" ? left : 0, lastActivityAt: lastActivity, now });
-        if (r) returnItems.push({ ...r, name: nameById.get(athleteId) ?? "Client" });
-      }
+      candidates.forEach((c, i) => {
+        const lastActivity = new Date(lastLog.get(c.athleteId) as string);
+        const r = returningClient({ athleteId: c.athleteId, groupId: c.groupId, expiredOn: c.on, reinstatable: lefts[i], lastActivityAt: lastActivity, now });
+        if (r) returnItems.push({ ...r, name: nameById.get(c.athleteId) ?? "Client" });
+      });
       if (cancelled) return;
       setSoon(soonItems);
       setReturning(returnItems);
@@ -151,6 +179,20 @@ export function ExpiryCheckInPanel() {
     });
     if (kind === "soon") setSoon((p) => p.filter((i) => !(i.athleteId === athleteId && i.groupId === groupId)));
     else setReturning((p) => p.filter((i) => !(i.athleteId === athleteId && i.groupId === groupId)));
+  }
+
+  // A final answer for this expiry: the prompt does not come back for these expired sessions (a later expiry would ask again).
+  async function leaveExpired(item: ReturnItem) {
+    if (!coachId) return;
+    const supabase = createBrowserClient();
+    await supabase.from("spotter_recommendation_feedback").insert({
+      coach_id: coachId,
+      spotter_kind: "expiry",
+      dismissal_key: expiryFinalKey(item.athleteId, item.groupId, item.expiredOn),
+      option_summary: `${item.name} returned; ${item.reinstatable} expired sessions left expired`,
+      action: "denied",
+    });
+    setReturning((p) => p.filter((i) => !(i.athleteId === item.athleteId && i.groupId === item.groupId)));
   }
 
   async function extend(item: SoonItem, days: number | "pause") {
@@ -245,6 +287,7 @@ export function ExpiryCheckInPanel() {
                     placeholder="Note (optional), for example: away until winter"
                     className="w-full h-11 bg-graphite border border-steel/30 text-chalk px-2 font-body text-base sm:text-sm"
                   />
+                  <p className="font-body text-xs text-steel">The note is saved in their session history, which they can see.</p>
                   <div className="flex flex-wrap gap-2">
                     {[30, 60, 90].map((d) => (
                       <button key={d} type="button" disabled={busyKey === key} onClick={() => extend(i, d)} className={`${btn} border-rust text-rust`}>
@@ -277,6 +320,9 @@ export function ExpiryCheckInPanel() {
                 <button type="button" onClick={() => notNow(i.athleteId, i.groupId, "returning", `${i.name} returned; ${i.reinstatable} expired`)} className={`${btn} border-steel/30 text-steel`}>
                   Not now
                 </button>
+                <button type="button" onClick={() => leaveExpired(i)} className={`${btn} border-steel/30 text-steel`}>
+                  No, leave them expired
+                </button>
               </div>
               {openReinstate === key && (
                 <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -296,6 +342,9 @@ export function ExpiryCheckInPanel() {
                   <button type="button" disabled={busyKey === key} onClick={() => reinstate(i)} className={`${btn} bg-rust text-graphite border-rust`}>
                     Give back
                   </button>
+                  <p className="basis-full font-body text-xs text-steel">
+                    Giving sessions back restarts the expiry clock for all of their sessions, not only these. The note is saved in their session history, which they can see.
+                  </p>
                 </div>
               )}
             </li>

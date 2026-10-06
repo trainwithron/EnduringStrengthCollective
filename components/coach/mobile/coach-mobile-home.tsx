@@ -9,6 +9,7 @@ import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { ViewModeToggle } from "@/components/coach/view-mode-toggle";
 import { LateChangesPanel } from "@/components/coach/late-changes-panel";
 import { ExpiryCheckInPanel } from "@/components/coach/expiry-checkin-panel";
+import { InactiveClientsPanel } from "@/components/coach/inactive-clients-panel";
 import { TodayWidget, type TodayMacros } from "@/components/athlete/today-widget";
 import { CoachHomeComplications } from "./coach-home-complications";
 import { CoachMobileShell } from "./coach-mobile-shell";
@@ -126,6 +127,7 @@ export async function CoachMobileHome({
         <div className="px-5">
           <LateChangesPanel />
           <ExpiryCheckInPanel />
+          <InactiveClientsPanel />
         </div>
 
         {/* Priority 1: a workout is due right now — the single most

@@ -14,6 +14,7 @@ import { detectMatchedLoadTrend, type ExerciseSessionPoint } from "./matched-loa
 import { computeEngagement, computeEstimatedMRR } from "./business-metrics";
 import { computeHabitCompliance, computeCompliancePct } from "./habits";
 import { formatInTimezone, timezoneForProfiles } from "@/lib/format-in-timezone";
+import { fetchInactiveKeys, inactiveKey } from "@/lib/inactive-ids";
 
 export interface DashboardGroupInfo {
   id: string;
@@ -338,8 +339,11 @@ export async function getCoachDashboardData(
     string,
     { profileId: string; groupId: string; groupName: string; fullName: string; monthlyRate: number | null; joinedAt: string | null }
   >();
+  // A client the coach has set aside as inactive (0281) is left out of every count and flag below; their data is untouched.
+  const inactiveKeys = await fetchInactiveKeys(supabase, allGroupIds);
   for (const row of athleteRows ?? []) {
     if (athleteByProfileId.has(row.profile_id)) continue;
+    if (inactiveKeys.has(inactiveKey(row.group_id, row.profile_id))) continue;
     const profile = (row as any).profiles;
     athleteByProfileId.set(row.profile_id, {
       profileId: row.profile_id,

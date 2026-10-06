@@ -47,7 +47,8 @@ from (
     ('2026100600277', 'late_change_flagged_for_coach', '0277_late_change_flagged_for_coach.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'bookings' and column_name = 'late_charge_state')),
     ('2026100600278', 'booking_mode', '0278_booking_mode.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_booking_policies' and column_name = 'booking_mode')),
     ('2026100600279', 'booking_requests', '0279_booking_requests.sql', to_regclass('public.booking_requests') is not null),
-    ('2026100600280', 'credit_expiry_human_overrides', '0280_credit_expiry_human_overrides.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'session_credits' and column_name = 'expiry_hold_until'))
+    ('2026100600280', 'credit_expiry_human_overrides', '0280_credit_expiry_human_overrides.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'session_credits' and column_name = 'expiry_hold_until')),
+    ('2026100600281', 'inactive_clients', '0281_inactive_clients.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_memberships' and column_name = 'inactive_at'))
 ) as v(version, name, file, applied)
 where v.applied
 on conflict (version) do nothing;

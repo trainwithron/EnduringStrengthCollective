@@ -25,6 +25,7 @@ import { isLowReadiness } from "@/lib/wellness";
 import { NeedsPaymentPanel } from "@/components/coach/desktop/needs-payment-panel";
 import { LateChangesPanel } from "@/components/coach/late-changes-panel";
 import { ExpiryCheckInPanel } from "@/components/coach/expiry-checkin-panel";
+import { InactiveClientsPanel } from "@/components/coach/inactive-clients-panel";
 import { DashboardWeekNarrative } from "@/components/coach/desktop/dashboard-week-narrative";
 import { DashboardAutoRefresh } from "@/components/coach/desktop/dashboard-auto-refresh";
 import { DashboardTileGrid } from "@/components/coach/desktop/dashboard-tile-grid";
@@ -33,6 +34,7 @@ import {
   type CollectiveIntelligenceItem,
 } from "@/components/coach/desktop/collective-intelligence-panel";
 import { StuckDesktopModeBanner } from "@/components/coach/desktop/stuck-desktop-mode-banner";
+import { fetchInactiveKeys, inactiveKey } from "@/lib/inactive-ids";
 import { TerminologyFirstRunCard } from "@/components/coach/desktop/terminology-first-run-card";
 import { GettingStartedCard } from "@/components/coach/desktop/getting-started-card";
 
@@ -414,7 +416,10 @@ export default async function CoachHomePage() {
       }
     }
 
-    clientCards = (athleteRows ?? []).map((row) => {
+    const inactiveKeys = await fetchInactiveKeys(supabase, soloGroupIds);
+    clientCards = (athleteRows ?? [])
+      .filter((row) => !inactiveKeys.has(inactiveKey(row.group_id, row.profile_id)))
+      .map((row) => {
       const profile = (row as any).profiles;
       const tier = dashboardData.quietTierByAthlete.get(row.profile_id);
       return {
@@ -581,6 +586,7 @@ export default async function CoachHomePage() {
 
       <LateChangesPanel />
       <ExpiryCheckInPanel />
+      <InactiveClientsPanel />
       <NeedsPaymentPanel rows={dashboardData.needsPayment} />
 
       <DashboardTileGrid

@@ -52,6 +52,8 @@ export default {
       const led = await h.rows(`select amount, kind, note from public.session_credit_ledger where athlete_id = $1 and kind = 'adjusted'`, [s.ann]);
       h.check("the coach holds expiry with a note; a hold in the past or beyond five years is refused", !ok.error && !!tooFar.error && !!past.error && !!row.expiry_hold_until, JSON.stringify({ ok, tooFar, past, row }));
       h.check("the hold is in the ledger with the note and moves no sessions", led.length === 1 && led[0].amount === 0 && /Expiry held until/.test(led[0].note) && /Away until winter/.test(led[0].note), JSON.stringify(led));
+      const aud = await h.rows(`select changed from public.audit_log where table_name = 'session_credits' and changed ? 'expiry_hold_until'`);
+      h.check("a hold change is recorded in the audit trail", aud.length >= 1, JSON.stringify(aud));
       await h.as(s.coach);
       await tryQ(db, `select public.set_credit_expiry_hold($1, $2, null, null)`, [s.ann, s.group]);
       await h.asSuper();
@@ -65,6 +67,14 @@ export default {
       // ---- reinstate
       const avail0 = await h.one(`select public.reinstatable_expired_credits($1, $2) as n`, [s.ann, s.group]);
       h.check("what expired and has not been given back: 9", avail0.n === 9, JSON.stringify(avail0));
+      await h.as(s.other);
+      const peekOther = await tryQ(db, `select public.reinstatable_expired_credits($1, $2) as n`, [s.ann, s.group]);
+      await h.as(s.ann);
+      const peekSelf = await tryQ(db, `select public.reinstatable_expired_credits($1, $2) as n`, [s.ann, s.group]);
+      await h.as(s.coach);
+      const peekCoach = await tryQ(db, `select public.reinstatable_expired_credits($1, $2) as n`, [s.ann, s.group]);
+      await h.asSuper();
+      h.check("only the client, the group's coach or the server can read the expired-session count", !!peekOther.error && peekSelf.rows?.[0]?.n === 9 && peekCoach.rows?.[0]?.n === 9, JSON.stringify({ peekOther, peekSelf, peekCoach }));
       await h.as(s.ann);
       const rClient = await tryQ(db, `select public.reinstate_expired_credits($1, $2, 3, null)`, [s.ann, s.group]);
       await h.as(s.other);
@@ -94,9 +104,17 @@ export default {
       await h.asSuper();
       h.check("the coach can undo some of a reinstatement, which logs it", !u2.error && u2.rows?.[0]?.b === 2 && !!uTooMany.error, JSON.stringify({ u2, uTooMany }));
       h.check("after the undo 7 expired sessions are available again", (await h.one(`select public.reinstatable_expired_credits($1, $2) as n`, [s.ann, s.group])).n === 7, "");
+      const rec = await h.rows(`select amount, undone_amount from public.session_credit_reinstatements where athlete_id = $1`, [s.ann]);
+      h.check("the give-back is recorded in its own table, not read from notes", rec.length === 1 && rec[0].amount === 4 && rec[0].undone_amount === 2, JSON.stringify(rec));
+      // sessions bought after the give-back: an undo must not take those
+      await db.query(`select public.apply_session_credit_change($1, $2, 5, 'purchased', 'Bought a pack', null, null)`, [s.ann, s.group]);
+      await h.as(s.coach);
+      const afterBuy = await tryQ(db, `select public.undo_expired_reinstatement($1, $2, 1)`, [s.ann, s.group]);
+      await h.asSuper();
+      h.check("an undo is refused once the client's sessions have changed since the give-back", /changed since/.test(afterBuy.error ?? ""), JSON.stringify(afterBuy));
       await db.query(`update public.session_credits set balance = 1 where athlete_id = $1 and group_id = $2`, [s.ann, s.group]);
       await h.as(s.coach);
-      const used = await tryQ(db, `select public.undo_expired_reinstatement($1, $2, 2)`, [s.ann, s.group]);
+      const used =await tryQ(db, `select public.undo_expired_reinstatement($1, $2, 2)`, [s.ann, s.group]);
       await h.asSuper();
       h.check("an undo is refused when the client has already used those sessions", /already used/.test(used.error ?? ""), JSON.stringify(used));
 
