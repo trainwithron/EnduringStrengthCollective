@@ -9,6 +9,8 @@ export function CalendarPageTabs({
   coachId,
   initialWindows,
   initialTab,
+  sessionLengthEnabled = false,
+  initialBufferMinutes,
   children,
 }: {
   coachId: string;
@@ -18,7 +20,11 @@ export function CalendarPageTabs({
     startTime: string;
     endTime: string;
     slotDurationMinutes: number;
+    sessionMinutes?: number | null;
   }[];
+  // The same three numbers as the Availability page: how often a start is offered, how long a session lasts, and the gap between sessions.
+  sessionLengthEnabled?: boolean;
+  initialBufferMinutes?: number;
   // Lets a deep link (e.g. the Scheduling Spot's "Edit" action) land
   // straight on Availability instead of always defaulting to Schedule.
   initialTab?: Tab;
@@ -56,7 +62,12 @@ export function CalendarPageTabs({
       {tab === "schedule" ? (
         children
       ) : (
-        <AvailabilityManagerDesktop coachId={coachId} initialWindows={initialWindows} />
+        <AvailabilityManagerDesktop
+          coachId={coachId}
+          initialWindows={initialWindows.map((w) => ({ ...w, sessionMinutes: w.sessionMinutes ?? null }))}
+          sessionLengthEnabled={sessionLengthEnabled}
+          initialBufferMinutes={initialBufferMinutes}
+        />
       )}
     </div>
   );

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { STEP_PRESETS, copyTargets, isSessionRuleError, timeToMinutes, validateWindow, windowsOverlap } from "./availability-edit";
+import { STEP_PRESETS, copyTargets, isSessionRuleError, previewSessionTimes, timeToMinutes, timingHint, timingWarning, validateWindow, windowsOverlap } from "./availability-edit";
 
 const win = (id: string, weekday: number, startTime: string, endTime: string) => ({ id, weekday, startTime, endTime });
 
@@ -59,5 +59,32 @@ describe("session length", () => {
     expect(isSessionRuleError('new row for relation "coach_availability_windows" violates check constraint "coach_availability_windows_session_minutes_range"')).toBe(true);
     expect(isSessionRuleError("network error")).toBe(false);
     expect(isSessionRuleError(null)).toBe(false);
+  });
+});
+
+describe("the three numbers, shown plainly", () => {
+  it("previews the first sessions, writing AM or PM only where it changes", () => {
+    expect(previewSessionTimes({ startTime: "06:00", endTime: "17:00", stepMinutes: 60, sessionMinutes: 55 })).toBe("6:00–6:55 AM, 7:00–7:55, 8:00–8:55, …");
+    expect(previewSessionTimes({ startTime: "11:00", endTime: "14:00", stepMinutes: 60, sessionMinutes: 55 })).toBe("11:00–11:55 AM, 12:00–12:55 PM, 1:00–1:55");
+    expect(previewSessionTimes({ startTime: "06:00", endTime: "07:00", stepMinutes: 15, sessionMinutes: 55, count: 4 })).toBe("6:00–6:55 AM");
+  });
+  it("with no session length the session is as long as the slot, and a slot every 55 shows what Ron saw", () => {
+    expect(previewSessionTimes({ startTime: "06:00", endTime: "09:00", stepMinutes: 55 })).toBe("6:00–6:55 AM, 6:55–7:50, 7:50–8:45");
+  });
+  it("shows nothing when the window cannot hold a session or a number is missing", () => {
+    expect(previewSessionTimes({ startTime: "06:00", endTime: "06:30", stepMinutes: 60 })).toBe("");
+    expect(previewSessionTimes({ startTime: "", endTime: "06:30", stepMinutes: 60 })).toBe("");
+  });
+  it("warns, never blocks, when the step is shorter than the session plus the gap", () => {
+    expect(timingWarning({ stepMinutes: 60, sessionMinutes: 55, gapMinutes: 5 })).toBeNull();
+    expect(timingWarning({ stepMinutes: 60, sessionMinutes: 55, gapMinutes: 10 })).toMatch(/leaves 5 minutes between sessions, less than your 10-minute gap/);
+    expect(timingWarning({ stepMinutes: 60, sessionMinutes: 55, gapMinutes: 10 })).toMatch(/slot every 65 minutes or more/i);
+    expect(timingWarning({ stepMinutes: 15, sessionMinutes: 55, gapMinutes: 0 })).toMatch(/starts overlap/);
+    expect(timingWarning({ stepMinutes: 60, gapMinutes: 0 })).toBeNull();
+    expect(timingWarning({ stepMinutes: 55, gapMinutes: 5 })).toMatch(/leaves 0 minutes/);
+  });
+  it("the hint line uses the window's own numbers", () => {
+    expect(timingHint({ stepMinutes: 60, sessionMinutes: 55, gapMinutes: 5 })).toBe("Slot every 60, session 55, gap 5");
+    expect(timingHint({ stepMinutes: 55, gapMinutes: 0 })).toBe("Slot every 55, session 55, gap 0");
   });
 });

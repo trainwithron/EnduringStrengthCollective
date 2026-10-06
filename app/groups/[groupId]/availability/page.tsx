@@ -128,6 +128,7 @@ export default async function AvailabilityPage(
       <TimezoneControl initialTimezone={coachProfile?.timezone ?? null} />
 
       <BookingPolicyControl
+        key={`policy-${policyRow?.buffer_minutes ?? 0}`}
         coachId={user.id}
         initialCancellationHours={policyRow?.cancellation_window_hours ?? 24}
         initialBufferMinutes={policyRow?.buffer_minutes ?? 0}
@@ -143,7 +144,7 @@ export default async function AvailabilityPage(
 
       <AvailabilityExceptionsManager coachId={user.id} initialExceptions={exceptions} />
 
-      <AvailabilityManagerDesktop coachId={user.id} initialWindows={windows} sessionLengthEnabled={sessionLengthEnabled} />
+      <AvailabilityManagerDesktop coachId={user.id} initialWindows={windows} sessionLengthEnabled={sessionLengthEnabled} initialBufferMinutes={policyRow?.buffer_minutes ?? 0} />
 
     </CoachDesktopShell>
   );

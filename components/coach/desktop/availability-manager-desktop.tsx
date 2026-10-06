@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { Copy, Pencil, Trash2 } from "lucide-react";
 import type { AvailabilityWindowRow } from "../availability-manager";
-import { STEP_PRESETS, copyTargets, isSessionRuleError, timeToMinutes, validateWindow, type WindowDraft } from "@/lib/availability-edit";
+import { STEP_PRESETS, copyTargets, isSessionRuleError, previewSessionTimes, timeToMinutes, timingHint, timingWarning, validateWindow, type WindowDraft } from "@/lib/availability-edit";
 
 const RULE_PENDING = "A session longer than the time between starts needs a database update that has not been applied yet. Nothing was changed.";
 
@@ -23,6 +24,105 @@ function StepPresets({ value, onPick }: { value: number | string; onPick: (n: nu
           {n}
         </button>
       ))}
+    </div>
+  );
+}
+
+// The three numbers, unmistakable (Ron, Oct 6): how often a start is offered, how long a session lasts, and the gap left between sessions, with a live
+// preview of the times they make and a warning (never a block) when they fight each other. The gap is the coach's buffer for all their hours: it is saved
+// at once and is the same setting as "Buffer between sessions" under the booking rules.
+function WindowTimingFields({
+  startTime,
+  endTime,
+  step,
+  session,
+  gap,
+  sessionEnabled,
+  gapEnabled,
+  onStep,
+  onSession,
+  onGapChange,
+  onGapCommit,
+  gapBusy,
+  gapError,
+}: {
+  startTime: string;
+  endTime: string;
+  step: number;
+  session: number | null;
+  gap: string;
+  sessionEnabled: boolean;
+  gapEnabled: boolean;
+  onStep: (n: number) => void;
+  onSession: (n: number | null) => void;
+  onGapChange: (v: string) => void;
+  onGapCommit: () => void;
+  gapBusy: boolean;
+  gapError: string | null;
+}) {
+  const gapNumber = gapEnabled && gap.trim() !== "" && Number.isInteger(Number(gap)) ? Number(gap) : 0;
+  const preview = previewSessionTimes({ startTime, endTime, stepMinutes: step, sessionMinutes: sessionEnabled ? session : null });
+  const warning = timingWarning({ stepMinutes: step, sessionMinutes: sessionEnabled ? session : null, gapMinutes: gapNumber });
+  return (
+    <div className="basis-full space-y-2">
+      <div className="flex flex-wrap gap-3">
+        <label className="flex flex-col gap-1">
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Slot every (min)</span>
+          <input type="number" min={5} value={Number.isFinite(step) ? step : ""} onChange={(e) => onStep(Number(e.target.value))} className={`${inputCls} w-24`} />
+          <span className="font-body text-[11px] text-steel max-w-[9rem]">How often a start time is offered</span>
+          <StepPresets value={step} onPick={onStep} />
+        </label>
+        {sessionEnabled && (
+          <label className="flex flex-col gap-1">
+            <span className="font-body text-xs text-steel uppercase tracking-wide">Session length (min)</span>
+            <input
+              type="number"
+              min={5}
+              value={session ?? ""}
+              placeholder="Same as slot"
+              onChange={(e) => onSession(e.target.value === "" ? null : Number(e.target.value))}
+              className={`${inputCls} w-24`}
+            />
+            <span className="font-body text-[11px] text-steel max-w-[9rem]">How long the session lasts</span>
+          </label>
+        )}
+        {gapEnabled && (
+          <label className="flex flex-col gap-1">
+            <span className="font-body text-xs text-steel uppercase tracking-wide">Gap between sessions (min)</span>
+            <input
+              type="number"
+              min={0}
+              max={240}
+              value={gap}
+              onChange={(e) => onGapChange(e.target.value)}
+              onBlur={onGapCommit}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  onGapCommit();
+                }
+              }}
+              disabled={gapBusy}
+              className={`${inputCls} w-24`}
+            />
+            <span className="font-body text-[11px] text-steel max-w-[9rem]">Rest left between sessions (your buffer, for all your hours)</span>
+          </label>
+        )}
+      </div>
+      <p className="font-body text-xs text-steel">
+        {timingHint({ stepMinutes: step, sessionMinutes: sessionEnabled ? session : null, gapMinutes: gapNumber })}
+        {preview ? ` = ${preview}` : ""}
+      </p>
+      {warning && (
+        <p className="font-body text-xs text-rust" role="status">
+          {warning}
+        </p>
+      )}
+      {gapError && (
+        <p className="font-body text-xs text-rust" role="alert">
+          {gapError}
+        </p>
+      )}
     </div>
   );
 }
@@ -52,11 +152,46 @@ export function AvailabilityManagerDesktop({
   coachId,
   initialWindows,
   sessionLengthEnabled = false,
+  initialBufferMinutes,
 }: {
   coachId: string;
   initialWindows: AvailabilityWindowRow[];
   sessionLengthEnabled?: boolean;
+  // The coach's gap between sessions (their buffer). When given, the gap is shown and edited next to the slot step and the session length.
+  initialBufferMinutes?: number;
 }) {
+  const gapEnabled = initialBufferMinutes !== undefined;
+  const [gap, setGap] = useState(String(initialBufferMinutes ?? 0));
+  const [gapBusy, setGapBusy] = useState(false);
+  const [gapError, setGapError] = useState<string | null>(null);
+  const router = useRouter();
+  // Follows the booking rules' own field when that one is changed.
+  useEffect(() => {
+    if (initialBufferMinutes !== undefined) setGap(String(initialBufferMinutes));
+  }, [initialBufferMinutes]);
+
+  async function commitGap() {
+    if (!gapEnabled) return;
+    const n = Number(gap);
+    if (gap.trim() === "" || !Number.isInteger(n) || n < 0 || n > 240) {
+      setGapError("The gap must be a whole number from 0 to 240 minutes.");
+      return;
+    }
+    if (n === initialBufferMinutes) {
+      setGapError(null);
+      return;
+    }
+    setGapBusy(true);
+    setGapError(null);
+    const { error: saveError } = await createBrowserClient().from("coach_booking_policies").upsert({ coach_id: coachId, buffer_minutes: n }, { onConflict: "coach_id" });
+    setGapBusy(false);
+    if (saveError) {
+      setGapError("That didn't save. Nothing was changed. Try again.");
+      return;
+    }
+    router.refresh();
+  }
+
   const COLS = sessionLengthEnabled
     ? "id, weekday, start_time, end_time, slot_duration_minutes, session_minutes"
     : "id, weekday, start_time, end_time, slot_duration_minutes";
@@ -284,30 +419,21 @@ export function AvailabilityManagerDesktop({
                             <span className="font-body text-xs text-steel uppercase tracking-wide">End</span>
                             <input type="time" value={draft.endTime} onChange={(e) => setDraft({ ...draft, endTime: e.target.value })} className={inputCls} />
                           </label>
-                          <label className="flex flex-col gap-1">
-                            <span className="font-body text-xs text-steel uppercase tracking-wide">{sessionLengthEnabled ? "Slot every (min)" : "Minutes/session"}</span>
-                            <input
-                              type="number"
-                              min={5}
-                              value={draft.slotMinutes}
-                              onChange={(e) => setDraft({ ...draft, slotMinutes: Number(e.target.value) })}
-                              className={`${inputCls} w-24`}
-                            />
-                            <StepPresets value={draft.slotMinutes} onPick={(n) => setDraft({ ...draft, slotMinutes: n })} />
-                          </label>
-                          {sessionLengthEnabled && (
-                            <label className="flex flex-col gap-1">
-                              <span className="font-body text-xs text-steel uppercase tracking-wide">Session (min)</span>
-                              <input
-                                type="number"
-                                min={5}
-                                value={draft.sessionMinutes ?? ""}
-                                placeholder="Same"
-                                onChange={(e) => setDraft({ ...draft, sessionMinutes: e.target.value === "" ? null : Number(e.target.value) })}
-                                className={`${inputCls} w-24`}
-                              />
-                            </label>
-                          )}
+                          <WindowTimingFields
+                            startTime={draft.startTime}
+                            endTime={draft.endTime}
+                            step={draft.slotMinutes}
+                            session={draft.sessionMinutes ?? null}
+                            gap={gap}
+                            sessionEnabled={sessionLengthEnabled}
+                            gapEnabled={gapEnabled}
+                            onStep={(n) => setDraft({ ...draft, slotMinutes: n })}
+                            onSession={(n) => setDraft({ ...draft, sessionMinutes: n })}
+                            onGapChange={setGap}
+                            onGapCommit={commitGap}
+                            gapBusy={gapBusy}
+                            gapError={gapError}
+                          />
                           <button type="button" onClick={saveEdit} disabled={rowBusy} className="h-9 px-4 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40">
                             Save
                           </button>
@@ -455,32 +581,21 @@ export function AvailabilityManagerDesktop({
             className={inputCls}
           />
         </label>
-        <label className="flex flex-col gap-1">
-          <span className="font-body text-xs text-steel uppercase tracking-wide">
-            {sessionLengthEnabled ? "Slot every (minutes)" : "Minutes/session"}
-          </span>
-          <input
-            type="number"
-            min={5}
-            value={slotDuration}
-            onChange={(e) => setSlotDuration(e.target.value)}
-            className={inputCls}
-          />
-          <StepPresets value={slotDuration} onPick={(n) => setSlotDuration(String(n))} />
-        </label>
-        {sessionLengthEnabled && (
-          <label className="flex flex-col gap-1">
-            <span className="font-body text-xs text-steel uppercase tracking-wide">Session length (minutes)</span>
-            <input
-              type="number"
-              min={5}
-              value={sessionInput}
-              placeholder="Same as the slot"
-              onChange={(e) => setSessionInput(e.target.value)}
-              className={inputCls}
-            />
-          </label>
-        )}
+        <WindowTimingFields
+          startTime={startTime}
+          endTime={endTime}
+          step={Number(slotDuration)}
+          session={sessionInput.trim() ? Number(sessionInput) : null}
+          gap={gap}
+          sessionEnabled={sessionLengthEnabled}
+          gapEnabled={gapEnabled}
+          onStep={(n) => setSlotDuration(String(n))}
+          onSession={(n) => setSessionInput(n == null ? "" : String(n))}
+          onGapChange={setGap}
+          onGapCommit={commitGap}
+          gapBusy={gapBusy}
+          gapError={gapError}
+        />
         <button
           type="button"
           onClick={handleAdd}
@@ -572,7 +687,7 @@ function SessionLengthForAll({
         </button>
       </div>
       <p className="font-body text-xs text-steel mt-2">
-        Slots keep starting on your slot step; each booking lasts this long. A 55-minute session in 60-minute slots leaves a 5-minute gap. Set the gap rule (buffer) under Booking rules.
+        Slots keep starting on your slot step; each booking lasts this long. A 55-minute session in 60-minute slots leaves a 5-minute gap. The gap between sessions is set in the field next to it when you add or edit a window (it is the same setting as the buffer under Booking rules).
       </p>
       {current.length > 1 && <p className="font-body text-xs text-steel mt-1">Your windows currently differ; picking a length sets it on all of them.</p>}
       {err && (

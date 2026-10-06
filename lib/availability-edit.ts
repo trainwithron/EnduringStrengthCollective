@@ -76,3 +76,65 @@ export function copyTargets(
   }
   return { create, skipped };
 }
+
+// ---- The three numbers, made unmistakable (Ron, Oct 6: he set "Slot every 55" thinking it was the session length) ----
+//   Slot every      how often a bookable start is offered
+//   Session length  how long a booked session lasts (blank = the same as the slot)
+//   Gap             the rest left between two sessions (the coach's buffer, for all their hours)
+// A preview of the resulting times and a warning when the numbers fight each other. The warning never blocks: the coach decides.
+
+function clock12(minutes: number, showPeriod: boolean): string {
+  const total = ((minutes % 1440) + 1440) % 1440;
+  const h24 = Math.floor(total / 60);
+  const m = total % 60;
+  const h = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${h}:${String(m).padStart(2, "0")}${showPeriod ? (h24 < 12 ? " AM" : " PM") : ""}`;
+}
+
+// The first few sessions this window would offer, like "6:00–6:55, 7:00–7:55, 8:00–8:55 AM". The AM or PM is written only where it changes.
+export function previewSessionTimes(input: { startTime: string; endTime: string; stepMinutes: number; sessionMinutes?: number | null; count?: number }): string {
+  const { startTime, endTime, stepMinutes } = input;
+  if (!startTime || !endTime || !Number.isInteger(stepMinutes) || stepMinutes < 1) return "";
+  const length = input.sessionMinutes && input.sessionMinutes > 0 ? input.sessionMinutes : stepMinutes;
+  const start = timeToMinutes(startTime);
+  const end = timeToMinutes(endTime);
+  const count = input.count ?? 3;
+  const parts: string[] = [];
+  let lastPeriod: "AM" | "PM" | null = null;
+  const period = (m: number) => (Math.floor((((m % 1440) + 1440) % 1440) / 60) < 12 ? "AM" : "PM");
+  for (let s = start; s + length <= end && parts.length < count; s += stepMinutes) {
+    const pStart = period(s);
+    const pEnd = period(s + length);
+    // AM or PM appears on the end of a range when it changes from the one before, and on the start only when the range crosses noon or midnight.
+    parts.push(`${clock12(s, pStart !== pEnd)}–${clock12(s + length, pEnd !== lastPeriod)}`);
+    lastPeriod = pEnd;
+  }
+  if (parts.length === 0) return "";
+  let more = false;
+  for (let s = start + count * stepMinutes; s + length <= end; s += stepMinutes) {
+    more = true;
+    break;
+  }
+  return parts.join(", ") + (more ? ", …" : "");
+}
+
+// Null when the numbers agree. Otherwise one plain sentence, never a block.
+export function timingWarning(input: { stepMinutes: number; sessionMinutes?: number | null; gapMinutes: number }): string | null {
+  const { stepMinutes, gapMinutes } = input;
+  const length = input.sessionMinutes && input.sessionMinutes > 0 ? input.sessionMinutes : stepMinutes;
+  if (!Number.isInteger(stepMinutes) || stepMinutes < 1) return null;
+  if (length > stepMinutes) {
+    return `A start is offered every ${stepMinutes} minutes but a session lasts ${length}, so starts overlap: booking one hides the starts it overlaps.`;
+  }
+  const left = stepMinutes - length;
+  if (gapMinutes > left) {
+    return `Slot every ${stepMinutes} with a ${length}-minute session leaves ${left} minutes between sessions, less than your ${gapMinutes}-minute gap, so the next start after a booking is hidden. A slot every ${length + gapMinutes} minutes or more keeps the full gap.`;
+  }
+  return null;
+}
+
+// One line that shows how the three fit, with this window's own numbers.
+export function timingHint(input: { stepMinutes: number; sessionMinutes?: number | null; gapMinutes: number }): string {
+  const length = input.sessionMinutes && input.sessionMinutes > 0 ? input.sessionMinutes : input.stepMinutes;
+  return `Slot every ${input.stepMinutes}, session ${length}, gap ${input.gapMinutes}`;
+}

@@ -1005,6 +1005,9 @@ export default async function CoachCalendarPage(
   const timezone = coachProfile?.timezone ?? DEFAULT_COACH_TIMEZONE;
 
   const sessionIndex = await fetchSessionMinutes(supabase, [user.id]);
+  // The Availability tab shows the same three numbers (slot step, session length, gap) as the Availability page; each hides itself until its database column exists.
+  const sessionProbe = await supabase.from("coach_availability_windows").select("session_minutes").eq("coach_id", user.id).limit(1);
+  const { data: gapPolicy } = await supabase.from("coach_booking_policies").select("buffer_minutes").eq("coach_id", user.id).maybeSingle();
   const availabilityWindows = (windowRows ?? []).map((w) => ({
     id: w.id,
     weekday: w.weekday,
@@ -1077,6 +1080,8 @@ export default async function CoachCalendarPage(
       <CalendarPageTabs
         coachId={user.id}
         initialWindows={availabilityWindows}
+        sessionLengthEnabled={!sessionProbe.error}
+        initialBufferMinutes={gapPolicy?.buffer_minutes ?? 0}
         initialTab={searchParams.tab === "availability" ? "availability" : "schedule"}
       >
       {/* mobile_must_fit_screen_standing_rule — this two-column layout
