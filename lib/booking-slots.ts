@@ -115,8 +115,10 @@ export function resolveBlockedRangesForDate(
   return ranges;
 }
 
-export function formatSlotTime(date: Date): string {
-  return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+// A time of day. Pass the time zone to show it on that clock: these labels are built on the server, which runs in UTC, so without a
+// zone a 6:00 AM Pacific session would read 1:00 PM.
+export function formatSlotTime(date: Date, timeZone?: string): string {
+  return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", ...(timeZone ? { timeZone } : {}) });
 }
 
 // acuity_replacement_gap_audit_sept16.md — minimum-notice booking gap.
