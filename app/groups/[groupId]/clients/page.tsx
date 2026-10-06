@@ -48,7 +48,9 @@ export default async function ClientsPage(
 
   if (membership?.role !== "coach") {
     return (
-      <NoAccess>Only coaches can manage clients.</NoAccess>
+      <NoAccess>
+        Only coaches can manage <SwappableTerm termKey="client" form="plural" />.
+      </NoAccess>
     );
   }
 
@@ -270,7 +272,7 @@ export default async function ClientsPage(
                 <SwappableTerm termKey="client" form="plural" className="capitalize" />
               </h1>
               <p className="font-body text-sm text-steel mt-1">
-                {phoneClients.length} {phoneClients.length === 1 ? "client" : "clients"}
+                {phoneClients.length} <SwappableTerm termKey="client" form={phoneClients.length === 1 ? "singular" : "plural"} />
               </p>
             </div>
             <AddClientButton groupId={params.groupId} groupName={group?.name ?? "This group"} createdBy={user.id} defaultOpen={openAdd} />
@@ -339,7 +341,7 @@ export default async function ClientsPage(
             <SwappableTerm termKey="client" form="plural" className="capitalize" />
           </h1>
           <p className="font-body text-sm text-steel mt-2">
-            {athletes.length} {athletes.length === 1 ? "client" : "clients"}
+            {athletes.length} <SwappableTerm termKey="client" form={athletes.length === 1 ? "singular" : "plural"} />
           </p>
         </div>
         <div className="flex items-center gap-3">

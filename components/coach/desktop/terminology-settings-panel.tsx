@@ -1,12 +1,12 @@
 "use client";
 
 import { SwappableTerm } from "@/components/coach/swappable-term";
+import { TerminologyChooser } from "@/components/coach/desktop/terminology-chooser";
 import { TERM_LABELS, type TermKey } from "@/lib/terminology";
 
-// coach_terminology_word_swap_system_idea.md's canonical discovery home —
-// reuses SwappableTerm as the actual control (same click-a-word mechanic
-// already live everywhere else) rather than a separate dropdown
-// implementation, so there's exactly one place this logic lives.
+// The home of the vocabulary choice (Ron, Oct 6): the word for the people a coach coaches is picked in plain buttons at the top ("What do you call your
+// people?"), and every other word group can be changed in the list below. These are the only places a word is clickable; everywhere else a swapped word reads
+// as ordinary text.
 const TERM_ORDER: TermKey[] = ["client", "group", "coach", "session", "roster", "program"];
 
 const TERM_DESCRIPTIONS: Record<TermKey, string> = {
@@ -21,10 +21,12 @@ const TERM_DESCRIPTIONS: Record<TermKey, string> = {
 export function TerminologySettingsPanel() {
   return (
     <div className="max-w-[70ch]">
+      <h2 className="font-body text-sm font-medium text-chalk mb-2">What do you call your people?</h2>
+      <div className="mb-8">
+        <TerminologyChooser />
+      </div>
       <p className="font-body text-sm text-steel mb-6">
-        This app defaults to personal coaching language (&quot;clients,&quot; &quot;sessions&quot;) —
-        click any word below to change it everywhere it appears: nav, client profiles, Program
-        Builder, the Business dashboard. Applies coach-wide, not just here.
+        Other words: the app defaults to personal coaching language (&quot;sessions,&quot; &quot;programs&quot;). Click a word below to change it everywhere it appears, coach-wide.
       </p>
       <div className="space-y-4">
         {TERM_ORDER.map((key) => (
@@ -37,7 +39,7 @@ export function TerminologySettingsPanel() {
               <p className="font-body text-xs text-steel mt-0.5">{TERM_DESCRIPTIONS[key]}</p>
             </div>
             <div className="font-display text-lg uppercase shrink-0">
-              <SwappableTerm termKey={key} form="plural" />
+              <SwappableTerm termKey={key} form="plural" editable cap />
             </div>
           </div>
         ))}

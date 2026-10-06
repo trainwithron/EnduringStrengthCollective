@@ -3,15 +3,19 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { TermForm, TermKey, TermOverride, TerminologyOverrides } from "@/lib/terminology";
+import { termText } from "@/lib/term-text";
 
 interface TerminologyContextValue {
   overrides: TerminologyOverrides;
   setOverride: (key: TermKey, override: TermOverride | null) => void;
+  // True inside a TerminologyProvider; lets a control (the chooser) reuse the page's own vocabulary when there is one.
+  mounted: boolean;
 }
 
 const TerminologyContext = createContext<TerminologyContextValue>({
   overrides: {},
   setOverride: () => {},
+  mounted: false,
 });
 
 // One coach-wide (per-org) vocabulary preference, fetched once and held
@@ -99,9 +103,16 @@ export function TerminologyProvider({
     }).catch(() => {});
   }
 
-  return <TerminologyContext.Provider value={{ overrides, setOverride }}>{children}</TerminologyContext.Provider>;
+  return <TerminologyContext.Provider value={{ overrides, setOverride, mounted: true }}>{children}</TerminologyContext.Provider>;
 }
 
 export function useTerminology() {
   return useContext(TerminologyContext);
+}
+
+// The coach's own word as a string, for a place that builds text (a button, a placeholder, an empty state): useTerm()("client", "plural", { cap: true }) is
+// "Clients" or "Athletes" or whatever they chose; without cap it is lowercase, for the middle of a sentence.
+export function useTerm() {
+  const { overrides } = useTerminology();
+  return (key: TermKey, form: TermForm = "singular", opts: { cap?: boolean } = {}) => termText(overrides, key, form, opts);
 }

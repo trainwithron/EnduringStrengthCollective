@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { UserPlus } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { useTerm } from "@/components/coach/terminology-provider";
 import { checkOneOnOneGroupHasRoom } from "@/lib/group-kind-guard";
 import { appOriginBrowser } from "@/lib/app-url";
 
@@ -52,6 +53,7 @@ export function AddClientButton({
   // Opens the panel straight away (the Add a client shortcut on the phone Home).
   defaultOpen?: boolean;
 }) {
+  const t = useTerm();
   const router = useRouter();
   const [open, setOpen] = useState(defaultOpen);
   const [mode, setMode] = useState<Mode>("direct");
@@ -231,7 +233,7 @@ export function AddClientButton({
   async function handleGenerateLink() {
     // A link for a new one-on-one client needs the client's name, so their space is not called the same thing as everyone else's.
     if (destination === "new" && !newGroupName.trim()) {
-      setDestinationError("Type the client's name first.");
+      setDestinationError(`Type the ${t("client")}'s name first.`);
       return;
     }
     setGenerating(true);
@@ -292,7 +294,7 @@ export function AddClientButton({
         body: JSON.stringify({ groupId: targetGroupId, fullName, email }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Couldn't add this client.");
+      if (!res.ok) throw new Error(data.error || `Couldn't add this ${t("client")}.`);
 
       setDirectSuccess(true);
       setCreatedClient({ groupId: targetGroupId, profileId: data.profileId });
@@ -300,7 +302,7 @@ export function AddClientButton({
       setEmail("");
       router.refresh();
     } catch (err) {
-      setDirectError(err instanceof Error ? err.message : "Couldn't add this client.");
+      setDirectError(err instanceof Error ? err.message : `Couldn't add this ${t("client")}.`);
     } finally {
       setSubmitting(false);
     }
@@ -327,7 +329,7 @@ export function AddClientButton({
         className="inline-flex items-center gap-2 h-11 px-4 border border-rust text-rust font-body text-sm font-medium active:bg-rust active:text-graphite transition-colors"
       >
         <UserPlus className="w-4 h-4" strokeWidth={2.5} />
-        Add client
+        Add {t("client")}
       </button>
     );
   }
@@ -377,7 +379,7 @@ export function AddClientButton({
             type="text"
             value={newGroupName}
             onChange={(e) => setNewGroupName(e.target.value)}
-            placeholder={fullName || "Client's name"}
+            placeholder={fullName || `${t("client", "possessive", { cap: true })} name`}
             className="w-full h-11 mt-1.5 bg-graphite border border-steel/30 text-chalk px-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
           />
         )}
@@ -445,7 +447,7 @@ export function AddClientButton({
         )
       ) : directSuccess ? (
         <div>
-          <p className="font-body text-sm text-positive">Client added. Nothing was sent to them.</p>
+          <p className="font-body text-sm text-positive">{t("client", "singular", { cap: true })} added. Nothing was sent to them.</p>
           <p className="font-body text-xs text-steel mt-1.5">
             Build their programs, schedule and meal plans now. When you&apos;re ready, create their invite link from
             their profile and send it yourself.
@@ -507,7 +509,7 @@ export function AddClientButton({
               disabled={submitting}
               className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
             >
-              {submitting ? "Adding…" : "Add client"}
+              {submitting ? "Adding…" : `Add ${t("client")}`}
             </button>
             <button type="button" onClick={handleClose} disabled={submitting} className="font-body text-xs text-steel disabled:opacity-40">
               Cancel

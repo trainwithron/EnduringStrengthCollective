@@ -3,13 +3,18 @@
 import { useRef, useState } from "react";
 import { useTerminology } from "./terminology-provider";
 import { resolveTerm, TERM_DEFAULTS, TERM_PRESETS, type TermForm, type TermKey } from "@/lib/terminology";
+import { capFirst } from "@/lib/term-text";
 
 const TOAST_SEEN_KEY = "terminology-toast-seen";
 
+// A swapped word (clients / athletes / players / members, and the other word groups). Ron, Oct 6: it must look finished, so by default it is PLAIN
+// TEXT everywhere: no underline, no hover affordance, proper case where it starts a label ("Clients") and lowercase mid-sentence. The word is chosen once
+// during setup (the first-run card) and changed in Settings ("What do you call your people?"); only those two places pass `editable`, which is the old
+// click-a-word picker below. Ron's earlier direction (a dotted underline on every word) is retired.
+//
 // The inline word-swap affordance (coach_dashboard_redesign_scoping.md,
-// refined per Ron's own direction): a dotted underline, not a dropdown-
-// shaped box — the word looks like plain text until you interact with
-// it. Click reveals a minimal, borderless-feeling inline list (default +
+// refined per Ron's own direction): the picker below — the word looks like
+// plain text until you interact with it. Click reveals a minimal, borderless-feeling inline list (default +
 // presets + a "Custom…" free-text escape hatch) right at the word, not a
 // heavy menu. Picking anything applies as one coach-wide (per-org)
 // preference, wherever this same termKey is used across the app — the
@@ -18,10 +23,16 @@ export function SwappableTerm({
   termKey,
   form = "singular",
   className = "",
+  editable = false,
+  cap = false,
 }: {
   termKey: TermKey;
   form?: TermForm;
   className?: string;
+  // Only the first-run card and the Settings panel make the word clickable.
+  editable?: boolean;
+  // Proper case for a word that starts a label, title, badge or button. (A className of "capitalize", from before this existed, means the same.)
+  cap?: boolean;
 }) {
   const { overrides, setOverride } = useTerminology();
   const [open, setOpen] = useState(false);
@@ -40,7 +51,10 @@ export function SwappableTerm({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const DROPDOWN_WIDTH_PX = 130; // matches min-w-[110px] + its own padding
 
-  const text = resolveTerm(overrides, termKey, form);
+  const asLabel = cap || /(^|\s)capitalize(\s|$)/.test(className);
+  const plainClass = className.replace(/(^|\s)capitalize(?=\s|$)/g, "").trim();
+  const resolved = resolveTerm(overrides, termKey, form);
+  const text = asLabel ? capFirst(resolved) : resolved;
 
   function showToastOnce(newLabel: string) {
     let seen = false;
@@ -97,8 +111,12 @@ export function SwappableTerm({
   // preventDefault does. Confirmed live: without preventDefault here, a
   // real click on a nav SwappableTerm silently navigated the whole nav
   // link instead of just opening the picker.
+  if (!editable) {
+    return <span className={plainClass || undefined}>{text}</span>;
+  }
+
   return (
-    <span className={`relative inline-block ${className}`}>
+    <span className={`relative inline-block ${plainClass}`}>
       <button
         ref={triggerRef}
         type="button"

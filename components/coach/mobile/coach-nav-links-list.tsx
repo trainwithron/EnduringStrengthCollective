@@ -32,6 +32,7 @@ import {
   Lightbulb,
 } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { useTerm } from "@/components/coach/terminology-provider";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
 import { ViewModeToggle } from "@/components/coach/view-mode-toggle";
@@ -66,6 +67,7 @@ function Item({ href, label, icon: Icon }: { href: string; label: string; icon: 
 // switcher is not here: Spotlight > Clients and groups already switches and creates groups, and Clients, Messages and Calendar
 // are coach-level pages that show every client no matter which group the coach last looked at.
 export function CoachNavLinksList({ groupId }: { groupId: string; groupName?: string }) {
+  const t = useTerm();
   const [teamMode, setTeamMode] = useState(false);
   // A one-on-one space has no team feed, so the entry is hidden there (the desktop menu does the same).
   const [groupKind, setGroupKind] = useState<string | null>(null);
@@ -126,7 +128,7 @@ export function CoachNavLinksList({ groupId }: { groupId: string; groupName?: st
             <ChevronDown className="w-4 h-4 transition-transform group-open:rotate-180" strokeWidth={2.25} />
           </summary>
           <div className="pb-2">
-            <GroupHeader label="Clients and sessions" icon={Users2} />
+            <GroupHeader label={`${t("client", "plural", { cap: true })} and ${t("session", "plural")}`} icon={Users2} />
             <Item href={`/groups/${groupId}/business/booking-page`} label="Booking page" icon={Link2} />
             <Item href={`/groups/${groupId}/group-sessions`} label="Group sessions" icon={Users2} />
             <Item href={`/groups/${groupId}/business/session-types`} label="Session types" icon={Tag} />

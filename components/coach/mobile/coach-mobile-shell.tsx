@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CoachMoreSheet } from "./coach-more-sheet";
 import { CoachSpotHub } from "./coach-spot-hub";
+import { TerminologyProvider } from "@/components/coach/terminology-provider";
 
 // Mobile coach chrome: the Spotlight hub (top-center button, the single
 // entry for Clients / Business / Calendar / Program / Ask Spot / Quick
@@ -37,7 +38,7 @@ export function CoachMobileShell({
   const spotBuilderAthleteName = searchParams.get("spotBuilderName");
 
   return (
-    <>
+    <TerminologyProvider groupId={groupId}>
       {children}
       <CoachSpotHub
         key={spotBuilderAthleteId ?? "none"}
@@ -52,6 +53,6 @@ export function CoachMobileShell({
         activeOverride={activeOverride}
         onMoreClick={() => setMoreOpen(true)}
       />
-    </>
+    </TerminologyProvider>
   );
 }

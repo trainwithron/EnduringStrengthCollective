@@ -18,6 +18,7 @@ import { isStripeConfigured } from "@/lib/stripe";
 import { ProfileDetailsEditor } from "@/components/athlete/profile-details-editor";
 import { SwipeDirectionSetting } from "@/components/athlete/swipe-direction-setting";
 import { HideDemosToggle } from "@/components/athlete/hide-demos-toggle";
+import { TerminologyChooser } from "@/components/coach/desktop/terminology-chooser";
 import { SettingsGroup } from "@/components/shared/settings-group";
 import { ExportDataButton } from "@/components/athlete/export-data-button";
 import { FeedBroadcastSettings } from "@/components/athlete/feed-broadcast-settings";
@@ -269,6 +270,13 @@ export default async function SettingsPage(
             <div className="mt-4">
               <HideDemosToggle />
             </div>
+          </SettingsGroup>
+        )}
+
+        {/* The coach's vocabulary: chosen once on Home, and changeable here (also reachable on a phone). */}
+        {isCoach && (
+          <SettingsGroup label="What do you call your people?">
+            <TerminologyChooser groupId={params.groupId} moreHref={`/groups/${params.groupId}/branding?tab=terminology`} />
           </SettingsGroup>
         )}
 

@@ -9,6 +9,8 @@ import { RosterSection } from "@/components/coach/desktop/roster-section";
 import { HomeClientCard, type HomeClientCardData } from "@/components/coach/desktop/home-client-card";
 import { HomeGroupCard, type HomeGroupCardData } from "@/components/coach/desktop/home-group-card";
 import { TeamPulseCard } from "@/components/coach/desktop/team-pulse-card";
+import { SwappableTerm } from "@/components/coach/swappable-term";
+import { useTerm } from "@/components/coach/terminology-provider";
 import type { TeamPulseResult } from "@/lib/dashboard-data";
 
 // Replaces the old team-mode-only side column (home_dashboard_merge_and_
@@ -29,6 +31,7 @@ export function PulseTabs({
   teamCards: HomeGroupCardData[];
   socialCards: HomeGroupCardData[];
 }) {
+  const t = useTerm();
   const [tab, setTab] = useState<"clients" | "groups">("clients");
   // Quiet-client flags the coach has snoozed (a week). Loaded after the page shows; if it cannot load, nothing is hidden.
   const [snoozed, setSnoozed] = useState<Set<string>>(new Set());
@@ -107,7 +110,7 @@ export function PulseTabs({
             tab === "clients" ? "text-chalk border-b-2 border-rust" : "text-steel"
           }`}
         >
-          Client Pulse
+          <SwappableTerm termKey="client" cap /> Pulse
           {clientAttentionCount > 0 && (
             <span className="ml-1.5 text-rust">({clientAttentionCount})</span>
           )}
@@ -175,17 +178,17 @@ export function PulseTabs({
         )}
         {tab === "clients" ? (
           <RosterSection
-            title="1-on-1 Clients"
+            title={`1-on-1 ${t("client", "plural", { cap: true })}`}
             summary={
               clientCards.length === 0
-                ? "No clients yet"
-                : `${clientCards.length} client${clientCards.length === 1 ? "" : "s"}`
+                ? `No ${t("client", "plural")} yet`
+                : `${clientCards.length} ${t("client", clientCards.length === 1 ? "singular" : "plural")}`
             }
             needsAttentionCount={clientAttentionCount}
             defaultExpanded={clientCards.length <= 6}
           >
             {sortedClients.length === 0 ? (
-              <p className="font-body text-sm text-steel">No 1-on-1 clients yet.</p>
+              <p className="font-body text-sm text-steel">No 1-on-1 {t("client", "plural")} yet.</p>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {sortedClients.map((c) => (

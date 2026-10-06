@@ -12,6 +12,7 @@ import { SpotBuilderPanel } from "./spot-builder-panel";
 import { SpotClientsGroupsPanel } from "./spot-clients-groups-panel";
 import { PushNotificationToggle } from "@/components/athlete/push-notification-toggle";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { useTerm } from "@/components/coach/terminology-provider";
 
 type TileKey = "clients" | "business" | "calendar" | "program" | "ask-spot" | "quick-payment";
 
@@ -136,7 +137,10 @@ export function CoachSpotHub({
   }
 
   const activeTile = TILES.find((t) => t.key === view) ?? null;
-  const title = activeTile ? (view === "program" && builderOpen ? "Build with AI" : activeTile.label) : "Spotlight";
+  const t = useTerm();
+  // The tile for the people a coach coaches uses the coach's own word ("Athletes", "Players"...), in proper case as a label.
+  const labelOf = (tile: { key: TileKey; label: string }) => (tile.key === "clients" ? t("client", "plural", { cap: true }) : tile.label);
+  const title = activeTile ? (view === "program" && builderOpen ? "Build with AI" : labelOf(activeTile)) : "Spotlight";
 
   return (
     <>
@@ -204,7 +208,7 @@ export function CoachSpotHub({
                         className="border border-steel/20 p-4 flex flex-col items-center gap-2 active:border-rust active:bg-rust/5 transition-colors"
                       >
                         <Icon className="w-6 h-6 text-rust" strokeWidth={2.25} />
-                        <span className="font-body text-sm text-chalk text-center">{tile.label}</span>
+                        <span className="font-body text-sm text-chalk text-center">{labelOf(tile)}</span>
                       </button>
                     );
                   })}

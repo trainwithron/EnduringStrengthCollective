@@ -21,6 +21,7 @@ import {
   type NutritionWeeklySeries,
 } from "@/lib/nutrition-trend-classifier";
 import { ClientCardNutritionSparkline } from "@/components/coach/desktop/client-card-nutrition-sparkline";
+import { useTerm } from "@/components/coach/terminology-provider";
 
 // A real page of cards, not the whole roster — a stress-test pass found
 // the old unpaginated page taking 18.5s and shipping 1.1MB at 500
@@ -74,6 +75,7 @@ export function ClientCardGrid({
   // the filter/search stay exactly as useful as before for those.
   positions?: { id: string; name: string }[];
 }) {
+  const t = useTerm();
   const [rows, setRows] = useState(members);
   const [error, setError] = useState<string | null>(null);
   // "Make coach" is a rare, higher-consequence action — tucked behind a
@@ -891,7 +893,7 @@ export function ClientCardGrid({
           </button>
           <span className="font-body text-xs text-steel">
             Page {clampedPage + 1} of {totalPages} &middot; {sortedRows.length}{" "}
-            {sortedRows.length === 1 ? "client" : "clients"}
+            {t("client", sortedRows.length === 1 ? "singular" : "plural")}
           </span>
           <button
             type="button"
