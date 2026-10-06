@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { CLIENT_FACING_PATHS, CLIENT_FACING_RULES, VOCABULARY_EXCEPTIONS } from "./vocabulary";
+import { CLIENT_FACING_PATHS, CLIENT_FACING_RULES, PRODUCT_WIDE_EXEMPT_FILES, PRODUCT_WIDE_RULES, VOCABULARY_EXCEPTIONS } from "./vocabulary";
 
 const root = join(__dirname, "..");
 
@@ -48,6 +48,30 @@ describe("one vocabulary: what clients and visitors read", () => {
         for (const text of visibleText(readFileSync(join(root, file), "utf8"))) {
           if (VOCABULARY_EXCEPTIONS.some((e) => e.text === text)) continue;
           if (rule.avoid.some((re) => re.test(text))) offenders.push(`${file.replace(/\\/g, "/")}: "${text.slice(0, 100)}"`);
+        }
+      }
+      expect(offenders, rule.why).toEqual([]);
+    });
+  }
+});
+
+describe("one vocabulary: the whole product", () => {
+  const allFiles = ["app", "components", "lib"].flatMap(filesUnder);
+  const codeish = (t: string) => /^[@./]/.test(t) || /\bimport\b|from "|trainer-dispatch|trainer_|org-trainer/.test(t);
+
+  it("covers the whole app", () => {
+    expect(allFiles.length).toBeGreaterThan(500);
+  });
+
+  for (const rule of PRODUCT_WIDE_RULES) {
+    it(`says ${rule.use}`, () => {
+      const offenders: string[] = [];
+      for (const file of allFiles) {
+        const rel = file.split(String.fromCharCode(92)).join("/");
+        if (PRODUCT_WIDE_EXEMPT_FILES.some((e) => e.file === rel)) continue;
+        for (const text of visibleText(readFileSync(join(root, file), "utf8"))) {
+          if (codeish(text)) continue;
+          if (rule.avoid.some((re) => re.test(text))) offenders.push(`${rel}: "${text.slice(0, 100)}"`);
         }
       }
       expect(offenders, rule.why).toEqual([]);

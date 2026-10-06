@@ -37,7 +37,7 @@ export function TerminologyFirstRunCard({ groupId }: { groupId: string }) {
   return (
     <div className="mb-6 border border-rust/40 bg-surface/60 p-4 flex items-start justify-between gap-4">
       <p className="font-body text-sm text-chalk">
-        Not a personal-trainer shop? You can rename &quot;clients&quot; to &quot;athletes,&quot;
+        Not a personal coaching business? You can rename &quot;clients&quot; to &quot;athletes,&quot;
         &quot;sessions&quot; to &quot;workouts,&quot; and more — coach-wide, everywhere those words
         appear.{" "}
         <Link href={`/groups/${groupId}/branding?tab=terminology`} className="text-rust underline">

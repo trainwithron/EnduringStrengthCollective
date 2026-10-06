@@ -30,7 +30,7 @@ export function CollectiveIntelligencePanel({
   return (
     <div className="border border-steel/20 bg-surface p-5 mb-6">
       <p className="font-body text-xs text-steel uppercase tracking-wide font-bold mb-3">
-        Collective Intelligence
+        Spotter
       </p>
       {items.length === 0 ? (
         <p className="font-body text-sm text-steel">Nothing worth flagging today — a quiet one.</p>

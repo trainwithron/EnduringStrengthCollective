@@ -210,7 +210,7 @@ export default async function BrandingPage(
               tab === "dispatch" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
             }`}
           >
-            Trainer Dispatch
+            Coach Dispatch
           </Link>
         )}
         <Link
@@ -312,7 +312,7 @@ export default async function BrandingPage(
           />
         ) : (
           <p className="font-body text-sm text-steel">
-            Only owners and admins can manage trainer dispatch.
+            Only owners and admins can manage coach dispatch.
           </p>
         )
       ) : tab === "terminology" ? (

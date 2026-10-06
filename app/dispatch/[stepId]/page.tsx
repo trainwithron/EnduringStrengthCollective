@@ -103,7 +103,7 @@ export default async function DispatchStepPage(props: { params: Promise<{ stepId
           <p className="font-body text-sm text-steel mt-6 text-center">You declined this request.</p>
         ) : isExpired || step.status === "expired" ? (
           <p className="font-body text-sm text-steel mt-6 text-center">
-            This offer expired and moved to the next trainer.
+            This offer expired and moved to the next coach.
           </p>
         ) : (
           <DispatchStepActions stepId={step.id} />

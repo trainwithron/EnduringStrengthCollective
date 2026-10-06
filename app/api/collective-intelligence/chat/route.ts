@@ -43,7 +43,7 @@ interface RouterLookupRequest {
   windowDays?: number;
 }
 
-const ROUTER_SYSTEM_PROMPT = `You are the routing layer for Collective Intelligence, a strength-coaching platform's conversational assistant. You never state facts yourself — you only decide which of these whitelisted lookup functions (if any) should run to answer the coach's question:
+const ROUTER_SYSTEM_PROMPT = `You are the routing layer for Ask Spot, a strength-coaching platform's conversational assistant. You never state facts yourself — you only decide which of these whitelisted lookup functions (if any) should run to answer the coach's question:
 
 - last_session_summary(athleteName): that athlete's most recent logged workout.
 - exercise_trend(athleteName, exerciseName): how one athlete's RPE/weight has trended on one specific exercise.
@@ -91,7 +91,7 @@ export async function POST(request: Request) {
     .limit(1)
     .maybeSingle();
   if (!coachMembership) {
-    return NextResponse.json({ error: "Only coaches can use Collective Intelligence chat." }, { status: 403 });
+    return NextResponse.json({ error: "Only coaches can use Ask Spot." }, { status: 403 });
   }
 
   if (!isAiConfigured()) {
@@ -249,7 +249,7 @@ export async function POST(request: Request) {
     { thread_id: threadId, coach_id: user.id, role: "assistant", body: answer, lookups_used: lookupsUsed },
   ]);
   if (insertError) {
-    console.error("Failed to persist Collective Intelligence chat messages:", insertError);
+    console.error("Failed to persist Ask Spot chat messages:", insertError);
   }
   await supabase.from("coach_chat_threads").update({ last_message_at: new Date().toISOString() }).eq("id", threadId);
 

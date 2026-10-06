@@ -83,8 +83,8 @@ export async function advanceDispatch(
       supabase,
       request.organization_id,
       "trainer_dispatch_offer",
-      "No trainer available",
-      `No trainer was available for ${request.prospect_name}'s request — reach out directly.`,
+      "No coach available",
+      `No coach was available for ${request.prospect_name}'s request — reach out directly.`,
       "/dashboard"
     );
     return { status: "no_trainer_available" };
@@ -202,7 +202,7 @@ export async function acceptDispatchStep(supabase: SupabaseClient, stepId: strin
     await sendEmail(
       request.prospect_email,
       "You're booked!",
-      `Hi ${request.prospect_name}, ${trainerProfile?.full_name ?? "your trainer"} confirmed your session request for ${formatInTimezone(requestedStartAt, request.prospect_timezone, "dateTime")}. See you then!`
+      `Hi ${request.prospect_name}, ${trainerProfile?.full_name ?? "your coach"} confirmed your session request for ${formatInTimezone(requestedStartAt, request.prospect_timezone, "dateTime")}. See you then!`
     );
   }
 
@@ -265,8 +265,8 @@ export async function askDispatchQuestion(
     const replyUrl = `${origin}/dispatch-reply/${inserted.reply_token}`;
     await sendEmail(
       request.prospect_email,
-      `A question from ${trainerProfile?.full_name ?? "your trainer"}`,
-      `${trainerProfile?.full_name ?? "Your trainer"} asked: "${question}"\n\nReply here: ${replyUrl}\n\n(Your original time is still being held while you answer.)`
+      `A question from ${trainerProfile?.full_name ?? "your coach"}`,
+      `${trainerProfile?.full_name ?? "Your coach"} asked: "${question}"\n\nReply here: ${replyUrl}\n\n(Your original time is still being held while you answer.)`
     );
   }
 
@@ -274,8 +274,8 @@ export async function askDispatchQuestion(
     supabase,
     request.organization_id,
     "trainer_dispatch_question",
-    "Trainer asked a question",
-    `${trainerProfile?.full_name ?? "A trainer"} asked ${request.prospect_name} a question before accepting.`,
+    "Coach asked a question",
+    `${trainerProfile?.full_name ?? "A coach"} asked ${request.prospect_name} a question before accepting.`,
     "/dashboard"
   );
 

@@ -10,7 +10,7 @@ export const GYM_JOKES: string[] = [
   "Deadlifts and I have a complicated relationship — it's just so hard to let go. 😅",
   "PR stands for Personal Record, but today it also stands for Please Rest. 😴",
   "Whoever said abs are made in the kitchen never met a burrito. 🌯",
-  "I told my trainer I wanted to lift like a pro. He said: complain about everything and leave early. 😂",
+  "I told my coach I wanted to lift like a pro. He said: complain about everything and leave early. 😂",
   "My bench press and my bank account have one thing in common: neither is going up fast enough. 💸",
   "Squats: because someday you'll need to sit down and stand back up without assistance. 🪑",
   "I'm not saying I skipped leg day — I'm saying my shorts still fit from three years ago. 🩳",

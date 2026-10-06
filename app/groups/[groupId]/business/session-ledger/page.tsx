@@ -61,7 +61,7 @@ export default async function SessionLedgerPage(
           <h1 className="font-display font-bold text-3xl uppercase leading-none">Session Ledger</h1>
         </div>
         <p className="font-body text-sm text-steel">
-          Only the organization&apos;s owner can see every trainer&apos;s client session balances in one
+          Only the organization&apos;s owner can see every coach&apos;s client session balances in one
           place. If that&apos;s you and you&apos;re seeing this, check that this group belongs to the
           organization you own.
         </p>
@@ -153,7 +153,7 @@ export default async function SessionLedgerPage(
       <div className="pb-6 border-b border-steel/20 mb-6">
         <h1 className="font-display font-bold text-3xl uppercase leading-none">Session Ledger</h1>
         <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
-          Every client&apos;s real session balance across every trainer in your organization — sorted so
+          Every client&apos;s real session balance across every coach in your organization — sorted so
           the ones closest to running out show up first. A booked session or one logged in person both
           spend a credit the same way.
         </p>
@@ -165,7 +165,7 @@ export default async function SessionLedgerPage(
         <div className="divide-y divide-steel/15 border-y border-steel/15">
           <div className="grid grid-cols-[1fr_180px_140px_120px] gap-3 py-2 font-body text-xs text-steel uppercase tracking-wide">
             <span>Client</span>
-            <span>Trainer</span>
+            <span>Coach</span>
             <span>Group</span>
             <span className="text-right">Sessions left</span>
           </div>

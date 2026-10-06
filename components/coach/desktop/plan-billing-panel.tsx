@@ -103,7 +103,7 @@ export function PlanBillingPanel({
           {!quote.orgAddon && (
             <p className="font-body text-xs text-steel mt-3">
               The Organization add-on ($50/mo) unlocks kiosk check-in, the session ledger, revenue
-              splits, organization branding and multi-trainer oversight.
+              splits, organization branding and multi-coach oversight.
               {e.state === "trial" ? " It's included during your trial." : ""}
             </p>
           )}

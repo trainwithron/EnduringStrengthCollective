@@ -60,11 +60,11 @@ export function DispatchSettings({
   return (
     <div className="mb-8 border border-steel/20 p-4 max-w-xl">
       <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
-        Trainer request page
+        Coach request page
       </p>
       <p className="font-body text-xs text-steel mb-2 max-w-[60ch]">
         Share this link on your website or socials — a prospect requests a day/time and goal, and
-        we cascade the request to whichever of your trainers is actually available, best fit first.
+        we cascade the request to whichever of your coaches is actually available, best fit first.
       </p>
       <div className="flex items-center gap-2">
         <input
@@ -85,7 +85,7 @@ export function DispatchSettings({
 
       <label className="flex items-center gap-2 mt-4">
         <span className="font-body text-xs text-steel uppercase tracking-wide">
-          Trainer response window
+          Coach response window
         </span>
         <input
           type="number"
@@ -96,7 +96,7 @@ export function DispatchSettings({
           disabled={saving}
           className="w-20 h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm disabled:opacity-50"
         />
-        <span className="font-body text-xs text-steel">minutes before moving to the next trainer</span>
+        <span className="font-body text-xs text-steel">minutes before moving to the next coach</span>
       </label>
       {ttlError && (
         <p className="font-body text-xs text-rust mt-2" role="alert">

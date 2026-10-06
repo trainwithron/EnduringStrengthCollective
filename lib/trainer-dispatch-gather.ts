@@ -37,7 +37,7 @@ export async function findAndRankAvailableTrainers(
   for (const m of members as any[]) {
     const trainerId: string = m.profile_id;
     const timezone: string = m.profiles?.timezone ?? DEFAULT_COACH_TIMEZONE;
-    const trainerName: string = m.profiles?.full_name ?? "Trainer";
+    const trainerName: string = m.profiles?.full_name ?? "Coach";
 
     const { data: windowRows } = await supabase
       .from("coach_availability_windows")

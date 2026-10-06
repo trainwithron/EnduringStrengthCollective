@@ -68,7 +68,7 @@ export function OrgTrainerRequestForm({ organizationId, orgName }: { organizatio
         setSubmitting(false);
         return;
       }
-      setResult({ message: data.message ?? `We're finding you a trainer at ${orgName} — you'll hear back shortly.` });
+      setResult({ message: data.message ?? `We're finding you a coach at ${orgName} — you'll hear back shortly.` });
     } catch {
       setError("Something went wrong — check your connection and try again.");
     }
@@ -93,7 +93,7 @@ export function OrgTrainerRequestForm({ organizationId, orgName }: { organizatio
       </h1>
       <p className="font-body text-sm text-steel mt-3 text-center">
         Tell us when you&apos;d like to train and what you&apos;re working toward — we&apos;ll match you with
-        the right trainer.
+        the right coach.
       </p>
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-3">
@@ -194,7 +194,7 @@ export function OrgTrainerRequestForm({ organizationId, orgName }: { organizatio
           disabled={!canSubmit || submitting}
           className="w-full h-12 bg-rust text-graphite font-display uppercase text-sm font-bold disabled:opacity-40"
         >
-          {submitting ? "Sending…" : "Request a trainer"}
+          {submitting ? "Sending…" : "Request a coach"}
         </button>
       </form>
     </div>

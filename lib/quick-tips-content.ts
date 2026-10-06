@@ -35,9 +35,9 @@ export const COACH_QUICK_TIPS: QuickTip[] = [
       "Bio/photo is on Home; social links and per-day link pinning are under Resources → Pro Shop. Both feed the same popup a client sees when they tap your name — worth doing both in one sitting rather than assuming one covers it.",
   },
   {
-    hook: "If you run a multi-trainer org, your dispatch settings have their own tab now.",
+    hook: "If you run a multi-coach org, your dispatch settings have their own tab now.",
     detail:
-      "The response-window timer and your public intake link live under Organization → Trainer Dispatch, not folded into the Team tab — bookmark it once so you're not hunting for it later.",
+      "The response-window timer and your public intake link live under Organization → Coach Dispatch, not folded into the Team tab — bookmark it once so you're not hunting for it later.",
   },
   {
     hook: "A workout your client can't finish isn't a dead end anymore.",

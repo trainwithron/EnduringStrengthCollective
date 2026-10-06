@@ -45,6 +45,14 @@ describe("the nightly job", () => {
     expect(src.indexOf("rest_day_nudges")).toBeLessThan(src.indexOf("sendPushToProfile("));
     expect(src).toContain("if (nudgeError) continue;");
     expect(src).toContain("if (!decision.send) continue;");
-    expect(src.indexOf("if (sent > 0) await supabase.from(\"rest_day_nudges\").insert")).toBeGreaterThan(src.indexOf("sendPushToProfile("));
+    expect(src.indexOf("const { error: recordError } = await supabase.from(\"rest_day_nudges\").insert")).toBeGreaterThan(src.indexOf("sendPushToProfile("));
+  });
+});
+
+describe("a failed record write is not silent", () => {
+  it("is logged and counted so the cap's blind spot shows up", () => {
+    const src = readFileSync(new URL("../app/api/cron/rest-day-nudge/route.ts", import.meta.url), "utf8");
+    expect(src).toContain("recordErrors += 1");
+    expect(src).toContain("recordErrors, results");
   });
 });

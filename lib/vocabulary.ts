@@ -49,3 +49,25 @@ export const CLIENT_FACING_PATHS: string[] = [
 export const VOCABULARY_EXCEPTIONS: { text: string; reason: string }[] = [
   { text: "no session credits", reason: "compares against the database function's own error message; never shown" },
 ];
+
+// Retired or off-vocabulary words anywhere a person can read them (Ron, Oct 6): the coach is a "coach", never a "trainer"; "Collective Intelligence" is
+// retired (the findings are the Spotter, the chat is Ask Spot). Applies to the visible text of the whole app, not only client-facing folders.
+export const PRODUCT_WIDE_RULES: VocabularyRule[] = [
+  {
+    use: "coach (not trainer)",
+    avoid: [/\btrainers?\b/i],
+    why: "The product says \"coach\". (A coach can swap words in their own vocabulary settings; the presets live in lib/terminology.ts.)",
+  },
+  {
+    use: "Spotter or Ask Spot (not Collective Intelligence)",
+    avoid: [/Collective Intelligence/i],
+    why: "\"Collective Intelligence\" is retired: the detectors are the Spotter and the chat is Ask Spot.",
+  },
+];
+
+// Whole files exempt from the product-wide rules, with the reason.
+export const PRODUCT_WIDE_EXEMPT_FILES: { file: string; reason: string }[] = [
+  { file: "lib/vocabulary.ts", reason: "this list names the words it forbids" },
+  { file: "lib/terminology.ts", reason: "the word presets a coach can pick, one of which is \"trainer\"" },
+  { file: "lib/nav-intents.ts", reason: "phrases a coach might type into search, matched, never shown" },
+];

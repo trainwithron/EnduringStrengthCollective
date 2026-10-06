@@ -14,6 +14,11 @@ The words the product uses, so the same thing is never called three names on thr
 | **client** | The coach's word for the people they coach (a coach can swap it for "athlete", "member" and so on in their vocabulary settings, and every coach screen follows). To a client it is "you" and "your coach". | "athlete" in text anyone reads (it is the name of the role in the code). |
 | **Needs payment / Owed 2** | Coach-only: a client at zero sessions or below. A client sees neutral wording ("No sessions on your account right now"). | Saying "owed", "overdue" or a negative number to a client. |
 | **notifications** | The bell, and the full list at Notifications. One place for every role. | "alerts", "inbox" for the same list. |
+| **coach** | The person who runs the business and coaches the clients. | "trainer" (the coach's own word presets in vocabulary settings may offer it, but the product never says it). Enforced for the whole app by `lib/vocabulary.test.ts`. |
+| **Spotlight** | The brand, and the coach's phone hub. | |
+| **Ask Spot** | The chat a coach talks to. | "Collective Intelligence" (retired). |
+| **Spotter** | The quiet detectors and the panel of what they noticed (quiet clients, expiring sessions, a client who may have moved on). They suggest; the coach decides. | "Collective Intelligence" (retired), "alerts". |
+| **group** | A set of clients who train together or share a feed. | "team", except for a real sports team (team-sport mode). |
 | **Find a client** | The coach's search by name, in the header, Ctrl+K. | A different picker on each screen. |
 
 ## How to keep it true

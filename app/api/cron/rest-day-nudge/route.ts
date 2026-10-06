@@ -41,6 +41,7 @@ async function handler(request: Request) {
   }
 
   const results: { athleteId: string; groupId: string; sent: boolean }[] = [];
+  let recordErrors = 0;
 
   for (const [athleteId, groupIds] of groupIdsByAthlete) {
     for (const groupId of groupIds) {
@@ -139,13 +140,20 @@ async function handler(request: Request) {
         restDayNudgeBody(goalLabelFor(goalRow?.goal_type, goalRow?.custom_label)),
         `/groups/${groupId}`
       );
-      if (sent > 0) await supabase.from("rest_day_nudges").insert({ athlete_id: athleteId, group_id: groupId });
+      if (sent > 0) {
+        // If the record cannot be written the cap would never see this nudge, so say so loudly: the monitor counts it and the next run shows it.
+        const { error: recordError } = await supabase.from("rest_day_nudges").insert({ athlete_id: athleteId, group_id: groupId });
+        if (recordError) {
+          console.error("rest-day-nudge: could not record a sent nudge", recordError.message);
+          recordErrors += 1;
+        }
+      }
       results.push({ athleteId, groupId, sent: sent > 0 });
       break; // one push per athlete per day, even if several groups qualify
     }
   }
 
-  return NextResponse.json({ athletes: groupIdsByAthlete.size, sent: results.length, results });
+  return NextResponse.json({ athletes: groupIdsByAthlete.size, sent: results.length, recordErrors, results });
 }
 
 export const GET = withCronRun("rest-day-nudge", handler);

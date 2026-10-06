@@ -107,10 +107,10 @@ export async function gatherSchedulingSpotterFlags(
         const minutes = (new Date(b.end_at).getTime() - new Date(b.start_at).getTime()) / 60000;
         minutesByCoach.set(b.coach_id, (minutesByCoach.get(b.coach_id) ?? 0) + minutes);
       }
-      const nameById = new Map((orgCoachRows ?? []).map((r) => [r.profile_id, (r.profiles as any)?.full_name ?? "A trainer"]));
+      const nameById = new Map((orgCoachRows ?? []).map((r) => [r.profile_id, (r.profiles as any)?.full_name ?? "A coach"]));
       const loads = coachIds.map((id) => ({
         trainerId: id,
-        trainerName: nameById.get(id) ?? "A trainer",
+        trainerName: nameById.get(id) ?? "A coach",
         bookedMinutes: minutesByCoach.get(id) ?? 0,
       }));
       const uneven = detectUnevenTrainerLoad(loads);

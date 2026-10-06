@@ -22,7 +22,7 @@ export function TerminologySettingsPanel() {
   return (
     <div className="max-w-[70ch]">
       <p className="font-body text-sm text-steel mb-6">
-        This app defaults to personal-trainer language (&quot;clients,&quot; &quot;sessions&quot;) —
+        This app defaults to personal coaching language (&quot;clients,&quot; &quot;sessions&quot;) —
         click any word below to change it everywhere it appears: nav, client profiles, Program
         Builder, the Business dashboard. Applies coach-wide, not just here.
       </p>
