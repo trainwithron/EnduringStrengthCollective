@@ -2,6 +2,8 @@ import { defineConfig } from "vitest/config";
 import path from "path";
 
 export default defineConfig({
+  // Lets a test render a real component (renderToStaticMarkup) without the app build.
+  oxc: { jsx: { runtime: "automatic" } },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "."),
