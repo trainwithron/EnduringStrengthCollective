@@ -26,7 +26,7 @@ export function FavoriteStar({
     let cancelled = false;
     async function load() {
       const supabase = createBrowserClient();
-      const { data, error: loadError } = await supabase.from("recipe_favorites").select("recipe_id").eq("profile_id", profileId).eq("recipe_id", key as string).maybeSingle();
+      const { data, error: loadError } = await supabase.from("recipe_favorites").select("recipe_id, kind").eq("profile_id", profileId).eq("recipe_id", key as string).eq("kind", "food").maybeSingle();
       if (cancelled) return;
       if (loadError) setState("unavailable");
       else setState(data ? "on" : "off");

@@ -64,6 +64,12 @@ export default {
       }
       await h.asSuper();
       const total = await h.one(`select count(*)::int as n from public.recipe_favorites where profile_id = $1 and kind = 'food'`, [ann]);
+      await h.as(ann);
+      await tryQ(db, `insert into public.recipe_favorites (profile_id, recipe_id) values ($1, 'a_heart')`, [ann]);
+      const convert = await tryQ(db, `update public.recipe_favorites set kind = 'food', label = 'Sneaky', calories = 100 where profile_id = $1 and recipe_id = 'a_heart'`, [ann]);
+      const negMacro = await tryQ(db, `insert into public.recipe_favorites (profile_id, recipe_id, kind, label, calories, protein_g) values ($1, 'food:neg', 'food', 'Neg', 100, -1)`, [ann]);
+      await h.asSuper();
+      h.check("a heart cannot be changed into a food favorite to get past the 60, and macros cannot be negative", /up to 60/.test(convert.error ?? "") && !!negMacro.error, JSON.stringify({ convert, negMacro }));
       h.check("at most 60 favorite foods per client, refused with a plain message", /up to 60/.test(capError ?? "") && total.n === 60, JSON.stringify({ capError, total }));
     },
   },

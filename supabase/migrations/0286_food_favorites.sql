@@ -4,7 +4,8 @@
 --
 --  * Private to the client, as before: the existing policy only lets a person read and write their own rows, so a coach never sees someone's favorites.
 --    Starring a food signals nothing to the coach, and logging from a favorite is an ordinary log entry.
---  * A food favorite must have a label and calories. At most 60 food favorites per client, so the list stays usable.
+--  * A food favorite must have a label and calories (macros never negative). At most 60 food favorites per client, so the list stays usable (also when
+--    a heart is changed into a food favorite).
 -- Re-runnable. Needs recipe_favorites (0048).
 
 alter table public.recipe_favorites
@@ -20,7 +21,8 @@ alter table public.recipe_favorites add constraint recipe_favorites_kind_check c
 
 alter table public.recipe_favorites drop constraint if exists recipe_favorites_food_snapshot;
 alter table public.recipe_favorites add constraint recipe_favorites_food_snapshot
-  check (kind <> 'food' or (label is not null and btrim(label) <> '' and length(label) <= 200 and calories is not null and calories >= 0));
+  check (kind <> 'food' or (label is not null and btrim(label) <> '' and length(label) <= 200 and calories is not null and calories >= 0
+    and coalesce(protein_g, 0) >= 0 and coalesce(carbs_g, 0) >= 0 and coalesce(fat_g, 0) >= 0));
 
 create index if not exists recipe_favorites_food_idx on public.recipe_favorites (profile_id, kind, created_at desc);
 
@@ -39,5 +41,5 @@ $function$;
 
 drop trigger if exists recipe_favorites_limit_food on public.recipe_favorites;
 create trigger recipe_favorites_limit_food
-  before insert on public.recipe_favorites
+  before insert or update of kind on public.recipe_favorites
   for each row execute function public.limit_food_favorites();
