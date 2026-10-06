@@ -126,7 +126,12 @@ export function GroupSwitcher({
       return;
     }
     const supabase = createBrowserClient();
-    await supabase.from("groups").update({ name: trimmed }).eq("id", groupId);
+    const { error: nameError } = await supabase.from("groups").update({ name: trimmed }).eq("id", groupId);
+    if (nameError) {
+      setError("Couldn't rename that. Nothing was changed.");
+      setNameDraft(groupName);
+      return;
+    }
     setGroups((prev) => prev.map((g) => (g.id === groupId ? { ...g, name: trimmed } : g)));
     router.refresh();
   }
@@ -140,7 +145,14 @@ export function GroupSwitcher({
 
   async function persistKind(targetGroupId: string, kind: GroupKind) {
     const supabase = createBrowserClient();
-    await supabase.from("groups").update({ group_kind: kind }).eq("id", targetGroupId);
+    const { error: kindError } = await supabase.from("groups").update({ group_kind: kind }).eq("id", targetGroupId);
+    if (kindError) {
+      // The database refuses, for example, turning a group with several clients into a one-on-one space. Say so instead of looking changed.
+      setError(/holds one client/i.test(kindError.message) ? "A one-on-one space holds one client. Move the others out first." : "Couldn't change that. Nothing was changed.");
+      router.refresh();
+      return;
+    }
+    setError(null);
     setGroups((prev) => prev.map((g) => (g.id === targetGroupId ? { ...g, kind } : g)));
   }
 

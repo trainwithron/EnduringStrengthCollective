@@ -93,6 +93,16 @@ export default {
         h.check("a history import can still create its historical session (this rehearsal's stand-in)", true, JSON.stringify(hist));
       }
 
+      // the record of blocked writes (0267) is kept: a client trying to flag their own session as coach-logged, or to reopen it, is logged
+      await h.as(ann);
+      await tryQ(db, `update public.athlete_sessions set logged_by_coach = true where id = $1`, [sess]);
+      await tryQ(db, `update public.athlete_sessions set status = 'in_progress' where id = $1`, [sess]);
+      await h.asSuper();
+      const logged = await h.rows(`select changed from public.audit_log where table_name = 'athlete_sessions' and action = 'blocked_write' and row_key = $1`, [sess]);
+      const text = JSON.stringify(logged.map((r) => r.changed));
+      h.check("blocked writes to a session are still recorded after 0274 (the flag attempt and the reopen attempt)", /logged_by_coach/.test(text) && /status/.test(text), text);
+      h.check("finishing a workout is not recorded as a blocked write", !(await h.rows(`select 1 from public.audit_log where table_name = 'athlete_sessions' and action = 'blocked_write' and row_key = $1`, [s2])).length);
+
       // the server can delete everything (account deletion cascades under the service role)
       await h.asService();
       const gone = await tryQ(db, `delete from public.set_logs where session_exercise_id = $1 returning id`, [ex]);

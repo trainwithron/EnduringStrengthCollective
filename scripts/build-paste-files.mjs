@@ -211,7 +211,7 @@ create policy "memberships_insert_coach_or_self" on public.group_memberships for
     sees: "Success. No rows returned.",
     afterwards: "Nothing visible changes. Signed-in people, row security and the server keep working. A signed-out visitor can still open an invite page and still use the discovery-call and gym QR forms (those two are closed later, by step 17, after a deploy). Open the live site signed in as a coach and as a client and check Home, the calendar and one booking.",
     undo: `grant execute on all functions in schema public to public, anon, authenticated, service_role;
-alter default privileges in schema public grant execute on functions to public;
+alter default privileges grant execute on functions to public;
 alter default privileges in schema public grant execute on functions to anon;`,
     undoWhy: "Only if something breaks that worked before step 13 (for example a page that signs the visitor out and shows 'permission denied for function'). Puts function permissions back exactly as they were (everyone can run everything). Tell Spot which page failed.",
     rows: [
@@ -289,6 +289,8 @@ set search_path = public
 as $$
 begin
   if auth.role() in ('authenticated', 'anon') and not coalesce(public.is_group_coach(old.group_id), false) then
+    perform public.audit_blocked('athlete_sessions', old.id::text, to_jsonb(old), to_jsonb(new),
+      array['logged_by_coach', 'deduct_session_credit', 'booking_id', 'is_historical', 'session_type_id', 'athlete_id', 'group_id', 'workout_id']);
     new.logged_by_coach := old.logged_by_coach;
     new.deduct_session_credit := old.deduct_session_credit;
     new.booking_id := old.booking_id;
@@ -304,7 +306,7 @@ $$;`,
     undoWhy: "Only if finishing or logging a workout breaks after step 15. Puts back the previous rule (only edits are blocked after Finish).",
     rows: [
       ["0236 is applied (the completed-workout trigger exists)", `exists (select 1 from pg_trigger where tgname = 'trg_block_edits_to_completed_session')`],
-      ["0266 is applied (the athlete session guard exists)", has.fnName("guard_athlete_session_columns")],
+      ["0266 and 0267 are applied (the athlete session guard exists and records blocked writes)", `coalesce((select position('audit_blocked' in pg_get_functiondef(p.oid)) > 0 from pg_proc p where p.proname = 'guard_athlete_session_columns' and p.pronamespace = 'public'::regnamespace), false)`],
       ["0274 is not already applied (the lock only covers updates today)", `coalesce((select position('tg_op' in pg_get_functiondef(p.oid)) = 0 from pg_proc p where p.proname = 'block_athlete_edits_to_completed_session' and p.pronamespace = 'public'::regnamespace), false)`],
     ],
   },

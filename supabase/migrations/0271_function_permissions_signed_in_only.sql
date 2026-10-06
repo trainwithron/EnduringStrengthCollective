@@ -47,5 +47,8 @@ begin
 end
 $acl$;
 
+-- The public-execute default for new functions is a GLOBAL default (not a per-schema one), so it is revoked globally; the signed-out role's own
+-- per-schema default is revoked too. (Signed-in users and the server keep their per-schema defaults.)
+alter default privileges revoke execute on functions from public;
 alter default privileges in schema public revoke execute on functions from public;
 alter default privileges in schema public revoke execute on functions from anon;

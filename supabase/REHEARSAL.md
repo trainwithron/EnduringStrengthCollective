@@ -41,8 +41,8 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0252 | yes | yes | 29 | 0251/0252 kiosk PINs: hashed, lockout and escalation |
 | 0253 | yes | yes | 23 | 0253 anon share policies closed; 0254 client tag write rules |
 | 0270 | yes | yes | 7 | 0270 group membership insert: a coach can only add their own clients |
-| 0271 | yes | yes | 17 | 0271 function permissions: signed-in and server only; 0272 public forms server-only |
-| 0272 | yes | yes | 17 | 0271 function permissions: signed-in and server only; 0272 public forms server-only |
+| 0271 | yes | yes | 19 | 0271 function permissions: signed-in and server only; 0272 public forms server-only |
+| 0272 | yes | yes | 19 | 0271 function permissions: signed-in and server only; 0272 public forms server-only |
 | 0273 | yes | yes | 14 | 0273 groups and organizations: protected columns |
-| 0274 | yes | yes | 11 | 0274 completed workout lock |
-| 0275 | yes | yes | 7 | 0275 a cancelled or moved week of an ongoing schedule stays skipped |
+| 0274 | yes | yes | 13 | 0274 completed workout lock |
+| 0275 | yes | yes | 8 | 0275 a cancelled or moved week of an ongoing schedule stays skipped |

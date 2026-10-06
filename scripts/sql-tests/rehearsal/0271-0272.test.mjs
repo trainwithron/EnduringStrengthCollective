@@ -62,9 +62,8 @@ export default {
       // functions created from now on are closed by default
       await h.asSuper();
       await db.query(`create function public.zz_new_fn() returns int language sql as $$ select 1 $$`);
-      // (The in-memory database keeps a built-in public-execute default that the real one drops with the same statement, so check the signed-out role's own default.)
-      const acl = await h.one(`select coalesce(proacl::text, '') as acl from pg_proc where proname = 'zz_new_fn'`);
-      h.check("a function created after 0271 is not granted to the signed-out role by default", !/anon=/.test(acl.acl), acl.acl);
+      h.check("a function created after 0271 is not runnable by the signed-out role unless granted on purpose", !(await canRun(h, "anon", "public.zz_new_fn()")));
+      h.check("but signed-in users and the server can run it (their defaults are kept)", (await canRun(h, "authenticated", "public.zz_new_fn()")) && (await canRun(h, "service_role", "public.zz_new_fn()")));
       await db.query(`drop function public.zz_new_fn()`);
     },
 
@@ -74,6 +73,9 @@ export default {
       h.check("nor by a signed-in user straight from the browser", !(await canRun(h, "authenticated", DISCOVERY)) && !(await canRun(h, "authenticated", LEAD)));
       h.check("the server still can", (await canRun(h, "service_role", DISCOVERY)) && (await canRun(h, "service_role", LEAD)));
       h.check("the invite lookup is still open to a signed-out visitor", await canRun(h, "anon", INVITE));
+      // A permanent guard: exactly this list may be runnable by the signed-out role, so a later migration cannot quietly reopen the door.
+      const open = (await h.rows(`select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.prokind = 'f' and has_function_privilege('anon', p.oid, 'execute') order by 1`)).map((r) => r.proname);
+      h.check("after 0272 the only function the signed-out role can run is get_invite_info", open.length === 1 && open[0] === "get_invite_info", JSON.stringify(open));
     },
   },
 };

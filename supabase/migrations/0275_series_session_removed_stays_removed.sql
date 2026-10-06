@@ -7,7 +7,8 @@
 -- time, the original start is added to that schedule's skipped list (once). It deliberately does nothing for the server's own routines (the
 -- service role): pausing, ending, extending and the series tools do their own bookkeeping, and pausing then resuming must still re-book the
 -- weeks it cancelled. Fixed-length schedules are untouched: they are all booked at the start, nothing tops them up.
--- Re-runnable. Needs 0259.
+-- Only while the schedule is still active: when a whole schedule is cancelled (the series is marked cancelled first, then each week), the weeks
+-- are not added one by one. Re-runnable. Needs 0259.
 
 create or replace function public.note_series_session_skipped()
 returns trigger
@@ -26,6 +27,7 @@ begin
            updated_at = now()
      where s.id = new.recurring_series_id
        and s.mode = 'ongoing'
+       and s.status = 'active'
        and not (old.start_at = any (s.skipped_starts));
   end if;
   return new;

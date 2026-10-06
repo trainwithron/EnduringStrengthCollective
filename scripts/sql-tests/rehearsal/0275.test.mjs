@@ -77,6 +77,18 @@ export default {
       r = await h.one(`select cardinality(skipped_starts) as n from public.recurring_booking_series where id = $1`, [ongoing]);
       h.check("a cancellation by the server's own routines (pause, end, the series tools) is not added to the skipped list", r.n === 2, JSON.stringify(r));
 
+      // cancelling the whole schedule marks the series cancelled first, then each week: those weeks are not added one by one
+      await h.asSuper();
+      const whole = (await db.query(`insert into public.recurring_booking_series (coach_id, athlete_id, group_id, weekday, start_time, duration_minutes, occurrences_total, mode) values ($1, $2, (select group_id from public.recurring_booking_series where id = $3), 3, '09:00', 60, null, 'ongoing') returning id`, [coach, ann, ongoing])).rows[0].id;
+      for (const d of [40, 47]) {
+        await db.query(`insert into public.bookings (coach_id, athlete_id, group_id, start_at, end_at, status, credit_state, recurring_series_id) values ($1, $2, (select group_id from public.recurring_booking_series where id = $3), $4, $5, 'confirmed', 'unsettled', $3)`, [coach, ann, whole, at(d), at(d, 1)]);
+      }
+      await h.as(ann);
+      const cs = await tryQ(db, `select public.cancel_recurring_booking_series($1) as n`, [whole]);
+      await h.asSuper();
+      const w = await h.one(`select cardinality(skipped_starts) as n, status from public.recurring_booking_series where id = $1`, [whole]);
+      h.check("cancelling a whole schedule does not add its weeks to the skipped list one by one", !cs.error && cs.rows?.[0]?.n === 2 && w.n === 0 && w.status === "cancelled", JSON.stringify({ cs, w }));
+
       // a coach cancelling through the booking function also marks it
       const extra2 = (await db.query(`insert into public.bookings (coach_id, athlete_id, group_id, start_at, end_at, status, credit_state, recurring_series_id) values ($1, $2, (select group_id from public.recurring_booking_series where id = $3), $4, $5, 'confirmed', 'unsettled', $3) returning id`, [coach, ann, ongoing, at(37), at(37, 1)])).rows[0].id;
       await h.as(coach);

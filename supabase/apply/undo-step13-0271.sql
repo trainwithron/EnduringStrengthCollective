@@ -2,6 +2,6 @@
 -- WHAT YOU SHOULD SEE: "Success. No rows returned."   Then tell Spot, and do not run the step again until Spot says why it failed.
 begin;
 grant execute on all functions in schema public to public, anon, authenticated, service_role;
-alter default privileges in schema public grant execute on functions to public;
+alter default privileges grant execute on functions to public;
 alter default privileges in schema public grant execute on functions to anon;
 commit;

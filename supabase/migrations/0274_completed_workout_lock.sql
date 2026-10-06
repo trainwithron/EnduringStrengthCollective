@@ -49,7 +49,8 @@ create trigger trg_block_edits_to_completed_session
   before insert or update or delete on public.set_logs
   for each row execute function public.block_athlete_edits_to_completed_session();
 
--- A client cannot reopen a completed session (the coach can).
+-- A client cannot reopen a completed session (the coach can). This is 0267's version of the guard (it keeps the record of blocked writes)
+-- plus the reopen rule.
 create or replace function public.guard_athlete_session_columns()
 returns trigger
 language plpgsql
@@ -58,6 +59,8 @@ set search_path = public
 as $$
 begin
   if auth.role() in ('authenticated', 'anon') and not coalesce(public.is_group_coach(old.group_id), false) then
+    perform public.audit_blocked('athlete_sessions', old.id::text, to_jsonb(old), to_jsonb(new),
+      array['logged_by_coach', 'deduct_session_credit', 'booking_id', 'is_historical', 'session_type_id', 'athlete_id', 'group_id', 'workout_id']);
     new.logged_by_coach := old.logged_by_coach;
     new.deduct_session_credit := old.deduct_session_credit;
     new.booking_id := old.booking_id;
@@ -66,7 +69,9 @@ begin
     new.athlete_id := old.athlete_id;
     new.group_id := old.group_id;
     new.workout_id := old.workout_id;
-    if old.status = 'completed' then
+    -- Reopening a completed session is refused and recorded (finishing a session is not a change from "completed", so it is never logged).
+    if old.status = 'completed' and new.status is distinct from old.status then
+      perform public.audit_blocked('athlete_sessions', old.id::text, to_jsonb(old), to_jsonb(new), array['status']);
       new.status := old.status;
     end if;
   end if;

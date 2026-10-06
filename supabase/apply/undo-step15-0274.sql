@@ -45,6 +45,8 @@ set search_path = public
 as $$
 begin
   if auth.role() in ('authenticated', 'anon') and not coalesce(public.is_group_coach(old.group_id), false) then
+    perform public.audit_blocked('athlete_sessions', old.id::text, to_jsonb(old), to_jsonb(new),
+      array['logged_by_coach', 'deduct_session_credit', 'booking_id', 'is_historical', 'session_type_id', 'athlete_id', 'group_id', 'workout_id']);
     new.logged_by_coach := old.logged_by_coach;
     new.deduct_session_credit := old.deduct_session_credit;
     new.booking_id := old.booking_id;

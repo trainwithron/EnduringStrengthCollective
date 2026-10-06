@@ -4,9 +4,7 @@
 import { readFileSync } from "node:fs";
 import { createDb, applyLiveEquivalent } from "./harness.mjs";
 
-const read = (f) => readFileSync(new URL(`../../supabase/${f}`, import.meta.url), "utf8").replace(/
-/g, "
-").replace(/create extension[^;]*;/gi, "");
+const read = (f) => readFileSync(new URL(`../../supabase/${f}`, import.meta.url), "utf8").split(String.fromCharCode(13, 10)).join(String.fromCharCode(10)).replace(/create extension[^;]*;/gi, "");
 const db = await createDb();
 await applyLiveEquivalent(db);
 let failures = 0;
