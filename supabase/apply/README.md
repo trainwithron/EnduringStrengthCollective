@@ -4,7 +4,7 @@ Each step has two files: `apply-stepNN-...-precheck.sql` (read-only, every row m
 
 ## Already applied. NEVER re-run these.
 
-0264, 0265, 0266, 0253, 0248, 0267 (the files in `supabase/`), and steps 01 to 06 (0236, 0249, 0250, 0254, 0240, 0241, 0244, 0255 to 0263, 0251), applied by hand after passing every precheck.
+0264, 0265, 0266, 0253, 0248, 0267 (the files in `supabase/`), and steps 01 to 09 (0236, 0249, 0250, 0254, 0240, 0241, 0244, 0255 to 0263, 0251, 0252, 0237, 0242, 0238), applied by hand after passing every precheck. Steps 07 to 09 were confirmed live on Oct 5 by a read-only check of the database.
 
 Re-running is refused by a guard at the top of each file (it raises before changing anything), but do not rely on it. Why it matters most for `apply-0248.sql`: it replaces `complete_workout_session`, so running it again would silently undo 0236's protection against a double Finish; its first statement checks that the live function is still the 0248 version and refuses otherwise. 0258, 0261, 0262 and 0263 are plain create-table/policy files: a second run would only error, but never re-paste them. (0264, 0265, 0266, 0267, 0253 are re-runnable by design; if you re-run 0266 run 0267 again straight after, because 0266 re-creates the guards without the audit logging.)
 
@@ -12,13 +12,11 @@ Re-running is refused by a guard at the top of each file (it raises before chang
 
 | Order | Step | Migrations | Notes |
 |---|---|---|---|
-| A | step10 | 0268 | guard fixes and audit redaction (ready now; prechecks checked against live) |
-| B | step11 | 0269 | group session fixes (ready now; prechecks checked against live) |
-| 1 | **kiosk test** | | passed Oct 5 (see `supabase/ron-test-kiosk-checkin.md`) |
-| 2 | step07 | 0252 | drops the plain-text PIN column; the live site must be commit 0019772 or later |
-| 3 | step08 | 0237, 0242 | |
-| 4 | **invite-join test** | | `supabase/ron-test-invite-join.md` |
-| 5 | step09 | 0238 | LAST. Only after the invite-join test passed and the live site is commit 0019772 or later. Undo: `undo-step09-0238.sql` |
+| 1 | step10 | 0268 | guard fixes and audit redaction. Not applied yet (checked live Oct 5). Before the deploy. |
+| 2 | step11 | 0269 | group session fixes. Not applied yet (checked live Oct 5). Before the deploy. |
+| 3 | `record-history-applied.sql` | | after 1 and 2; changes no tables |
+
+`undo-step09-0238.sql` stays only as the undo for step 09.
 
 ## Migration history (not applied yet)
 
