@@ -32,7 +32,10 @@ export function migrationFile(prefix) {
   return f;
 }
 
-const readSql = (file) => readFileSync(new URL(file, migrationsDir), "utf8").replace(/create extension[^;]*;/gi, "");
+// Line endings are normalized: on Windows git checks files out with CRLF, and a function body kept with CRLF has a different text (and md5) than the live one.
+const readSql = (file) => readFileSync(new URL(file, migrationsDir), "utf8").replace(/
+/g, "
+").replace(/create extension[^;]*;/gi, "");
 
 export async function createDb() {
   const db = new PGlite({ extensions: { pgcrypto } });
@@ -79,7 +82,9 @@ export async function applyLiveEquivalent(db) {
     }
   }
   // The repo's text of this function differs from live; 0236 and 0248 patch it by exact text, so use the live definition.
-  await db.exec(readFileSync(new URL("complete_workout_session.live.sql", fixturesDir), "utf8"));
+  await db.exec(readFileSync(new URL("complete_workout_session.live.sql", fixturesDir), "utf8").replace(/
+/g, "
+"));
   // The live database has a second, identical recompute trigger on set_logs that no repo migration creates (found by reading live read-only).
   await db.exec("create trigger trg_recompute_workout_log after insert or update or delete on public.set_logs for each row execute function public.recompute_workout_log()");
   return notes;
