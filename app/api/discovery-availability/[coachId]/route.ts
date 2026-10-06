@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { generateSlotsForDate, resolveBlockedRangesForDate } from "@/lib/booking-slots";
 import { zonedTimeToUtc, DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
+import { limitByIp } from "@/lib/public-booking-route";
 
 // Public, unauthenticated endpoint powering the /book/[coachId] prospect
 // self-booking page — a stranger has no session to read
@@ -20,6 +21,10 @@ export async function GET(request: Request, props: { params: Promise<{ coachId: 
     return NextResponse.json({ error: "A date=YYYY-MM-DD query param is required" }, { status: 400 });
   }
 
+  // Anyone can call this, so it is limited, and it only answers for a real coach (it used to return the name and time zone of any profile id).
+  const limited = await limitByIp(request, "discovery-availability", 90, 3600);
+  if (limited) return limited;
+
   const supabase = createServiceRoleClient();
 
   const { data: coach } = await supabase
@@ -28,7 +33,10 @@ export async function GET(request: Request, props: { params: Promise<{ coachId: 
     .eq("id", params.coachId)
     .maybeSingle();
 
-  if (!coach) {
+  const { data: coachRole } = coach
+    ? await supabase.from("group_memberships").select("profile_id").eq("profile_id", coach.id).eq("role", "coach").limit(1).maybeSingle()
+    : { data: null };
+  if (!coach || !coachRole) {
     return NextResponse.json({ error: "Coach not found" }, { status: 404 });
   }
 

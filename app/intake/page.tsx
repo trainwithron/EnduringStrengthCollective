@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { safePushPath } from "@/lib/push-url";
 import { createServerClient } from "@/lib/supabase/server";
 import { IntakeForm } from "@/components/intake/intake-form";
 import { SignOutButton } from "@/components/group/sign-out-button";
@@ -81,7 +82,7 @@ export default async function IntakePage(
           orgName={org?.name ?? null}
           waiverText={org?.waiver_text ?? null}
           waiverPdfUrl={waiverPdfUrl}
-          nextUrl={searchParams.next ?? `/groups/${membership.group_id}`}
+          nextUrl={searchParams.next && safePushPath(searchParams.next) !== "/" ? safePushPath(searchParams.next) : `/groups/${membership.group_id}`}
           initialParQAnswers={(existing?.par_q_answers as { question: string; answer: boolean }[]) ?? []}
           initialWaiverAccepted={existing?.waiver_accepted ?? false}
           initialWaiverSignedName={existing?.waiver_signed_name ?? ""}
