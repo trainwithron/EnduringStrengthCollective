@@ -240,5 +240,17 @@
    "0286"
   ],
   "rows": 2
+ },
+ {
+  "n": "30",
+  "slug": "copy-main-group-program",
+  "migrations": [],
+  "rows": 4
+ },
+ {
+  "n": "31",
+  "slug": "delete-two-groups",
+  "migrations": [],
+  "rows": 5
  }
 ]
