@@ -4,10 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { clampedLeft, clampedWidth } from "@/lib/viewport-clamp";
 import { duplicateProgram } from "@/lib/program-duplication";
 import { ChevronDown } from "lucide-react";
 
 const MENU_WIDTH = 256;
+// Never wider than the screen minus a margin on each side (a phone is narrower than the menu plus its margins).
+function menuWidth(): number {
+  return clampedWidth(MENU_WIDTH, typeof window === "undefined" ? MENU_WIDTH + 32 : window.innerWidth);
+}
 
 interface SharedProgramOption {
   id: string;
@@ -50,7 +55,7 @@ export function ClientProgrammingMenu({
   function openMenu() {
     const rect = buttonRef.current?.getBoundingClientRect();
     if (rect) {
-      setPosition({ top: rect.bottom + 4, left: rect.right - MENU_WIDTH });
+      setPosition({ top: rect.bottom + 4, left: clampedLeft(rect.right - MENU_WIDTH, clampedWidth(MENU_WIDTH, window.innerWidth), window.innerWidth) });
     }
     setView("menu");
   }
@@ -148,7 +153,7 @@ export function ClientProgrammingMenu({
       {view && position && createPortal(
         <div
           ref={menuRef}
-          style={{ position: "fixed", top: position.top, left: position.left, width: MENU_WIDTH }}
+          style={{ position: "fixed", top: position.top, left: position.left, width: menuWidth(), maxHeight: "calc(100vh - 5rem)", overflowY: "auto" }}
           className="bg-surface border border-steel/30 z-50 shadow-lg"
         >
           {error && (

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { clampedLeft, clampedWidth } from "@/lib/viewport-clamp";
 import { matchTopN, type AliasEntry } from "@/lib/exercise-matching";
 
 export function ExerciseNameInput({
@@ -63,7 +64,8 @@ export function ExerciseNameInput({
     function updatePosition() {
       const rect = inputRef.current?.getBoundingClientRect();
       if (rect) {
-        setPosition({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+        const width = clampedWidth(rect.width, window.innerWidth);
+        setPosition({ top: rect.bottom + 4, left: clampedLeft(rect.left, width, window.innerWidth), width });
       }
     }
     updatePosition();
