@@ -44,14 +44,17 @@ export function AddClientButton({
   groupId,
   groupName,
   createdBy,
+  defaultOpen = false,
 }: {
   groupId: string;
   groupName: string;
   createdBy: string;
+  // Opens the panel straight away (the Add a client shortcut on the phone Home).
+  defaultOpen?: boolean;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [mode, setMode] = useState<Mode>("link");
+  const [open, setOpen] = useState(defaultOpen);
+  const [mode, setMode] = useState<Mode>("direct");
 
   // Destination-picker state
   const [destination, setDestination] = useState<Destination>("new");
@@ -212,16 +215,29 @@ export function AddClientButton({
       setDestinationError("Couldn't create the group — try again.");
       return null;
     }
-    await supabase.from("group_memberships").insert({ group_id: newGroupId, profile_id: user.id, role: "coach" });
+    const { error: coachMembershipError } = await supabase
+      .from("group_memberships")
+      .insert({ group_id: newGroupId, profile_id: user.id, role: "coach" });
+    if (coachMembershipError) {
+      // Without this the next step would fail with a confusing permission error and leave an empty space behind.
+      await supabase.from("groups").delete().eq("id", newGroupId);
+      setDestinationError("Couldn't set up their space — try again.");
+      return null;
+    }
     createdGroupIdRef.current = newGroupId;
     return newGroupId;
   }
 
   async function handleGenerateLink() {
+    // A link for a new one-on-one client needs the client's name, so their space is not called the same thing as everyone else's.
+    if (destination === "new" && !newGroupName.trim()) {
+      setDestinationError("Type the client's name first.");
+      return;
+    }
     setGenerating(true);
     setLinkError(null);
 
-    const targetGroupId = await resolveGroupId("New 1-on-1 client");
+    const targetGroupId = await resolveGroupId("New client");
     if (!targetGroupId) {
       setGenerating(false);
       return;
@@ -317,7 +333,7 @@ export function AddClientButton({
   }
 
   return (
-    <div className="border border-steel/30 p-4 max-w-sm bg-surface">
+    <div className="border border-steel/30 p-4 w-full max-w-sm bg-surface">
       <div className="mb-3">
         <label htmlFor="client-destination" className="font-body text-xs text-steel">
           Add to
@@ -331,7 +347,7 @@ export function AddClientButton({
             setDestinationError(null);
             if (next === "existing") loadOrgGroups();
           }}
-          className="w-full h-9 mt-1 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"
+          className="w-full h-11 mt-1 bg-graphite border border-steel/30 text-chalk px-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
         >
           <option value="new">A one-on-one client (their own space)</option>
           <option value="current">Add to the group: {groupName}</option>
@@ -346,7 +362,7 @@ export function AddClientButton({
             value={selectedExistingGroupId}
             onChange={(e) => setSelectedExistingGroupId(e.target.value)}
             disabled={loadingOrgGroups}
-            className="w-full h-9 mt-1.5 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust disabled:opacity-60"
+            className="w-full h-11 mt-1.5 bg-graphite border border-steel/30 text-chalk px-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust disabled:opacity-60"
           >
             {loadingOrgGroups && <option>Loading…</option>}
             {(orgGroups ?? []).map((g) => (
@@ -361,8 +377,8 @@ export function AddClientButton({
             type="text"
             value={newGroupName}
             onChange={(e) => setNewGroupName(e.target.value)}
-            placeholder={fullName || "Group name"}
-            className="w-full h-9 mt-1.5 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"
+            placeholder={fullName || "Client's name"}
+            className="w-full h-11 mt-1.5 bg-graphite border border-steel/30 text-chalk px-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
           />
         )}
         {destinationError && <p className="font-body text-xs text-rust mt-1">{destinationError}</p>}
@@ -374,7 +390,7 @@ export function AddClientButton({
             key={m}
             type="button"
             onClick={() => setMode(m)}
-            className={`h-8 px-3 font-body text-xs border ${
+            className={`h-11 px-3 font-body text-xs border ${
               mode === m ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
             }`}
           >
@@ -392,12 +408,12 @@ export function AddClientButton({
                 readOnly
                 value={link}
                 onFocus={(e) => e.target.select()}
-                className="flex-1 h-10 min-w-0 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none"
+                className="flex-1 h-11 min-w-0 bg-graphite border border-steel/30 text-chalk px-2 font-body text-base sm:text-sm focus:outline-none"
               />
               <button
                 type="button"
                 onClick={handleCopy}
-                className="h-10 px-3 border border-rust text-rust font-body text-xs shrink-0"
+                className="h-11 px-3 border border-rust text-rust font-body text-xs shrink-0"
               >
                 {copied ? "Copied" : "Copy"}
               </button>
@@ -416,7 +432,7 @@ export function AddClientButton({
                 type="button"
                 onClick={handleGenerateLink}
                 disabled={generating}
-                className="h-9 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
+                className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
               >
                 {generating ? "Generating…" : "Generate link"}
               </button>
@@ -465,7 +481,7 @@ export function AddClientButton({
               required
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              className="w-full h-10 mt-1 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-sm focus:outline-none focus:border-rust"
+              className="w-full h-11 mt-1 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
             />
           </div>
           <div>
@@ -477,7 +493,7 @@ export function AddClientButton({
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full h-10 mt-1 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-sm focus:outline-none focus:border-rust"
+              className="w-full h-11 mt-1 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
             />
           </div>
           {directError && (
@@ -489,7 +505,7 @@ export function AddClientButton({
             <button
               type="submit"
               disabled={submitting}
-              className="h-9 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
+              className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
             >
               {submitting ? "Adding…" : "Add client"}
             </button>

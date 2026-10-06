@@ -212,7 +212,7 @@ export async function CoachMobileHome({
               <p className="font-body text-sm text-chalk">Welcome. Two things get you started:</p>
               <div className="mt-3 flex flex-col gap-2">
                 <Link
-                  href={`/groups/${groupId}/clients`}
+                  href={`/groups/${groupId}/clients?add=1`}
                   className="h-11 flex items-center justify-center bg-rust text-graphite font-display uppercase text-sm font-bold"
                 >
                   Add your first client
@@ -242,7 +242,7 @@ export async function CoachMobileHome({
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">Quick actions</h2>
             <div className="grid grid-cols-2 gap-2">
               <Link
-                href={`/groups/${groupId}/clients`}
+                href={`/groups/${groupId}/clients?add=1`}
                 className="h-11 flex items-center justify-center bg-rust text-graphite font-display uppercase text-sm font-bold"
               >
                 Add a client
@@ -251,7 +251,7 @@ export async function CoachMobileHome({
                 href={`/groups/${groupId}/clients`}
                 className="h-11 flex items-center justify-center border border-steel/40 text-chalk font-display uppercase text-sm font-bold"
               >
-                All clients
+                Clients
               </Link>
               <Link
                 href={`/groups/${groupId}/programs`}

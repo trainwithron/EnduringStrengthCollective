@@ -23,9 +23,11 @@ import {
 export default async function ClientsPage(
   props: {
     params: Promise<{ groupId: string }>;
+    searchParams: Promise<{ add?: string }>;
   }
 ) {
   const params = await props.params;
+  const openAdd = (await props.searchParams).add === "1";
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -195,7 +197,7 @@ export default async function ClientsPage(
     return (
       <CoachMobileShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} activeOverride="roster">
         <div className="min-h-screen bg-graphite text-chalk font-body pb-24 px-5 pt-8">
-          <div className="flex items-center justify-between gap-3 mb-5">
+          <div className="flex flex-wrap items-start justify-between gap-3 mb-5">
             <div>
               <h1 className="font-display font-bold text-2xl uppercase leading-none">
                 <SwappableTerm termKey="client" form="plural" className="capitalize" />
@@ -204,7 +206,7 @@ export default async function ClientsPage(
                 {athletes.length} {athletes.length === 1 ? "client" : "clients"}
               </p>
             </div>
-            <AddClientButton groupId={params.groupId} groupName={group?.name ?? "This group"} createdBy={user.id} />
+            <AddClientButton groupId={params.groupId} groupName={group?.name ?? "This group"} createdBy={user.id} defaultOpen={openAdd} />
           </div>
           <CoachRosterMobile groupId={params.groupId} members={athletes} />
         </div>
