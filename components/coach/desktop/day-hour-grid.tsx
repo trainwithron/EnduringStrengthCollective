@@ -33,8 +33,14 @@ function timeStrToMinutes(t: string): number {
   return h * 60 + m;
 }
 
-function dateToMinutes(d: Date): number {
-  return d.getHours() * 60 + d.getMinutes();
+// Minutes since midnight on the COACH's clock. Without a zone this reads the server's (UTC), which would put every session hours
+// away from the availability bands that are written in the coach's own wall-clock times.
+function dateToMinutes(d: Date, timeZone?: string): number {
+  if (!timeZone) return d.getHours() * 60 + d.getMinutes();
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", minute: "numeric", hourCycle: "h23" }).formatToParts(d);
+  const h = Number(parts.find((p) => p.type === "hour")?.value ?? 0) % 24;
+  const m = Number(parts.find((p) => p.type === "minute")?.value ?? 0);
+  return h * 60 + m;
 }
 
 function formatMinutes(min: number): string {
@@ -49,16 +55,18 @@ export function DayHourGrid({
   windows,
   bookings,
   events,
+  timeZone,
 }: {
   windows: GridWindow[];
   bookings: GridBooking[];
   events: GridEvent[];
+  timeZone?: string;
 }) {
   const timedEvents = events.filter((e): e is GridEvent & { time: string } => e.time != null);
 
   const allMinutes = [
     ...windows.flatMap((w) => [timeStrToMinutes(w.startTime), timeStrToMinutes(w.endTime)]),
-    ...bookings.flatMap((b) => [dateToMinutes(b.start), dateToMinutes(b.end)]),
+    ...bookings.flatMap((b) => [dateToMinutes(b.start, timeZone), dateToMinutes(b.end, timeZone)]),
     ...timedEvents.map((e) => timeStrToMinutes(e.time)),
   ];
 
@@ -119,8 +127,8 @@ export function DayHourGrid({
         })}
 
         {bookings.map((b) => {
-          const start = dateToMinutes(b.start);
-          const end = dateToMinutes(b.end);
+          const start = dateToMinutes(b.start, timeZone);
+          const end = dateToMinutes(b.end, timeZone);
           return (
             <div
               key={b.id}

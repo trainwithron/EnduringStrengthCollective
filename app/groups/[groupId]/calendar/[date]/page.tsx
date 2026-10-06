@@ -7,6 +7,8 @@ import { generateSlotsForDate, formatSlotTime, minimumNoticeBlockedRange, isSlot
 import { creditExpiryDate } from "@/lib/credit-expiration";
 import { getBlockedRangesForDate } from "@/lib/availability-exceptions";
 import { zonedTimeToUtc, DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
+import { addDaysToDateKey } from "@/lib/series-schedule";
+import { coachBalanceLabel } from "@/lib/reup";
 import { AssignSlotButton } from "@/components/coach/desktop/assign-slot-button";
 import { AssignWorkoutToDateButton } from "@/components/coach/desktop/assign-workout-to-date-button";
 import { AddDayEventForm } from "@/components/coach/desktop/add-day-event-form";
@@ -193,7 +195,8 @@ export default async function CoachDayDetailPage(
       }));
 
       const zonedDayStart = zonedTimeToUtc(params.date, "00:00", timezone);
-      const zonedDayEnd = new Date(zonedDayStart.getTime() + 24 * 60 * 60 * 1000);
+      // The next local midnight, not +24 hours: a day with a clock change is 23 or 25 hours long.
+      const zonedDayEnd = zonedTimeToUtc(addDaysToDateKey(params.date, 1), "00:00", timezone);
       const bufferMinutes = policyRow?.buffer_minutes ?? 0;
       const minimumNoticeHours = policyRow?.minimum_notice_hours ?? 0;
 
@@ -313,7 +316,7 @@ export default async function CoachDayDetailPage(
                 return (
                   <div key={iso} className="py-3 flex items-center justify-between">
                     <span className="font-body font-medium text-[15px]">
-                      {formatSlotTime(start)}
+                      {formatSlotTime(start, timezone)}
                     </span>
 
                     {isBeingRescheduled ? (
@@ -447,7 +450,7 @@ export default async function CoachDayDetailPage(
   }));
 
   const zonedDayStart = zonedTimeToUtc(params.date, "00:00", timezone);
-  const zonedDayEnd = new Date(zonedDayStart.getTime() + 24 * 60 * 60 * 1000);
+  const zonedDayEnd = zonedTimeToUtc(addDaysToDateKey(params.date, 1), "00:00", timezone);
 
   // Wave 2: blockedRanges/bookingRows need wave 1's timezone but not each
   // other; the credits/program lookups need only clientId (gated on
@@ -457,7 +460,7 @@ export default async function CoachDayDetailPage(
     supabase
       .from("bookings")
       .select(
-        "id, start_at, end_at, athlete_id, session_type, no_show, needs_coach_resolution, profiles!bookings_athlete_id_fkey ( full_name )"
+        "id, start_at, end_at, athlete_id, session_type, no_show, needs_coach_resolution, recurring_series_id, profiles!bookings_athlete_id_fkey ( full_name )"
       )
       .eq("coach_id", user.id)
       .eq("status", "confirmed")
@@ -539,7 +542,36 @@ export default async function CoachDayDetailPage(
     }
   }
 
-  const backHref = `/groups/${params.groupId}/calendar`;
+  const slotStartTimes = new Set(slots.map((sl) => sl.start.getTime()));
+  const otherBookings = (bookingRows ?? []).filter((b: any) => !slotStartTimes.has(new Date(b.start_at).getTime()));
+
+  // One booked session: who, then the controls that settle or change it. Used for sessions on a slot and for ones off the slots.
+  const renderBooked = (booking: any, start: Date) => (
+    <div className="flex flex-wrap items-center gap-2 min-w-0">
+      <span className="font-body text-xs text-steel">Booked — {(booking.profiles as any)?.full_name ?? "Client"}</span>
+      {booking.needs_coach_resolution && <RecurringConflictBadge bookingId={booking.id} />}
+      {settlementById.has(booking.id) && start.getTime() <= Date.now() + 12 * 3600 * 1000 && (
+        <MarkAttendedControl
+          bookingId={booking.id}
+          initialAttended={settlementById.get(booking.id)!.attended_at !== null}
+          initialState={settlementById.get(booking.id)!.credit_state}
+        />
+      )}
+      {start.getTime() < Date.now() ? (
+        <MarkNoShowToggle bookingId={booking.id} initialNoShow={booking.no_show ?? false} />
+      ) : (
+        <CancelBookingButton bookingId={booking.id} viewer="coach" recurringSeriesId={booking.recurring_series_id ?? null} />
+      )}
+      {videoEligibleAthleteIds.has(booking.athlete_id) && (
+        <BookingVideoPanel bookingId={booking.id} initialSessionType={booking.session_type ?? "in_person"} />
+      )}
+    </div>
+  );
+
+  // Back to the calendar with the same client still picked (the phone calendar reads scheduleFor, the desktop one client).
+  const backHref = clientId
+    ? `/groups/${params.groupId}/calendar?client=${clientId}&scheduleFor=${clientId}`
+    : `/groups/${params.groupId}/calendar`;
 
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="calendar">
@@ -554,7 +586,7 @@ export default async function CoachDayDetailPage(
           <p className="font-body text-sm text-steel mt-3">
             Assigning for <span className="text-chalk font-medium">{selectedClient.fullName}</span>
             {" — "}
-            {selectedClient.balance} session{selectedClient.balance === 1 ? "" : "s"} remaining
+            {coachBalanceLabel(selectedClient.balance)}
           </p>
         ) : (
           <p className="font-body text-xs text-steel mt-3">
@@ -588,6 +620,7 @@ export default async function CoachDayDetailPage(
           label: b.profiles?.full_name ?? "Client",
         }))}
         events={(dayEventRows ?? []).map((e) => ({ id: e.id, time: e.event_time, title: e.title }))}
+        timeZone={timezone}
       />
 
       <AddDayEventForm coachId={user.id} dateKey={params.date} />
@@ -610,7 +643,7 @@ export default async function CoachDayDetailPage(
         </div>
       )}
 
-      {slots.length === 0 ? (
+      {slots.length === 0 && (bookingRows ?? []).length === 0 ? (
         <p className="font-body text-sm text-steel py-2">No open hours on this day.</p>
       ) : (
         <div className="divide-y divide-steel/15 max-w-lg">
@@ -618,51 +651,50 @@ export default async function CoachDayDetailPage(
             const iso = start.toISOString();
             const booking = bookingByTime.get(start.getTime());
             const endAt = new Date(start.getTime() + durationMinutes * 60000);
+            // A slot that overlaps a session booked at another time cannot be assigned either.
+            const clash = !booking && (bookingRows ?? []).some((b: any) => new Date(b.start_at) < endAt && new Date(b.end_at) > start);
 
             return (
-              <div key={iso} className="py-3 flex items-center justify-between">
-                <span className="font-body font-medium text-[15px]">{formatSlotTime(start)}</span>
+              <div key={iso} className="py-3 flex flex-wrap items-center justify-between gap-2">
+                <span className="font-body font-medium text-[15px]">{formatSlotTime(start, timezone)}</span>
 
                 {booking ? (
-                  <div className="flex items-center gap-2">
-                    <span className="font-body text-xs text-steel">
-                      Booked — {(booking.profiles as any)?.full_name ?? "Client"}
-                    </span>
-                    {booking.needs_coach_resolution && <RecurringConflictBadge bookingId={booking.id} />}
-                    {settlementById.has(booking.id) && start.getTime() <= Date.now() + 12 * 3600 * 1000 && (
-                      <MarkAttendedControl
-                        bookingId={booking.id}
-                        initialAttended={settlementById.get(booking.id)!.attended_at !== null}
-                        initialState={settlementById.get(booking.id)!.credit_state}
-                      />
-                    )}
-                    {start.getTime() < Date.now() ? (
-                      <MarkNoShowToggle bookingId={booking.id} initialNoShow={booking.no_show ?? false} />
-                    ) : (
-                      <CancelBookingButton bookingId={booking.id} />
-                    )}
-                    {videoEligibleAthleteIds.has(booking.athlete_id) && (
-                      <BookingVideoPanel bookingId={booking.id} initialSessionType={booking.session_type ?? "in_person"} />
-                    )}
-                  </div>
+                  renderBooked(booking, start)
+                ) : clash ? (
+                  <span className="font-body text-xs text-steel">Busy</span>
                 ) : selectedClient ? (
-                  selectedClient.balance > 0 ? (
-                    <AssignSlotButton
-                      coachId={user.id}
-                      athleteId={clientId!}
-                      groupId={params.groupId}
-                      startAt={iso}
-                      endAt={endAt.toISOString()}
-                    />
-                  ) : (
-                    <span className="font-body text-xs text-steel">No sessions remaining</span>
-                  )
+                  <AssignSlotButton
+                    coachId={user.id}
+                    athleteId={clientId!}
+                    groupId={params.groupId}
+                    startAt={iso}
+                    endAt={endAt.toISOString()}
+                  />
                 ) : (
                   <span className="font-body text-xs text-steel">Open</span>
                 )}
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Sessions at a time that is not one of the open slots (booked outside hours, or hours changed since) still need Mark attended
+          and Cancel, so they get their own list instead of vanishing from this page. */}
+      {otherBookings.length > 0 && (
+        <div className="mt-6 max-w-lg">
+          <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">Other sessions today</h2>
+          <div className="divide-y divide-steel/15">
+            {otherBookings.map((b: any) => {
+              const start = new Date(b.start_at);
+              return (
+                <div key={b.id} className="py-3 flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-body font-medium text-[15px]">{formatSlotTime(start, timezone)}</span>
+                  {renderBooked(b, start)}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </CoachDesktopShell>
