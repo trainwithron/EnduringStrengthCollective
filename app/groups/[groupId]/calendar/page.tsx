@@ -16,6 +16,7 @@ import { DEFAULT_COACH_TIMEZONE, dateKeyInZone } from "@/lib/timezone";
 import { formatInTimezone } from "@/lib/format-in-timezone";
 import { getCoachClients } from "@/lib/coach-clients";
 import { coachBalanceLabel } from "@/lib/reup";
+import { formatSlotTime } from "@/lib/booking-slots";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { computeQuietTier, QUIET_TIER_LABEL } from "@/lib/quiet-client-tier";
 import { gatherCalendarSpotterFindings } from "@/lib/calendar-spotter-gather";
@@ -389,25 +390,32 @@ export default async function CoachCalendarPage(
 
     let hasAvailability = false;
     let upcomingBookings: { id: string; start_at: string }[] = [];
+    let displayTz = DEFAULT_COACH_TIMEZONE;
 
     if (coachMembership) {
-      const { count } = await supabase
-        .from("coach_availability_windows")
-        .select("id", { count: "exact", head: true })
-        .eq("coach_id", coachMembership.profile_id);
+      const [{ count }, { data: tzRow }] = await Promise.all([
+        supabase
+          .from("coach_availability_windows")
+          .select("id", { count: "exact", head: true })
+          .eq("coach_id", coachMembership.profile_id),
+        supabase.from("profiles").select("timezone").eq("id", coachMembership.profile_id).maybeSingle(),
+      ]);
       hasAvailability = (count ?? 0) > 0;
+      displayTz = tzRow?.timezone ?? DEFAULT_COACH_TIMEZONE;
+    }
 
-      if (hasAvailability) {
-        const { data: bookingRows } = await supabase
-          .from("bookings")
-          .select("id, start_at")
-          .eq("coach_id", coachMembership.profile_id)
-          .eq("athlete_id", athleteId)
-          .eq("status", "confirmed")
-          .gte("start_at", new Date().toISOString())
-          .order("start_at", { ascending: true });
-        upcomingBookings = bookingRows ?? [];
-      }
+    // A client's own sessions show whether or not the coach has set up open hours (the coach can book anyone at any time), and
+    // whichever coach booked them: the list is this client's, in this group.
+    {
+      const { data: bookingRows } = await supabase
+        .from("bookings")
+        .select("id, start_at")
+        .eq("athlete_id", athleteId)
+        .eq("group_id", params.groupId)
+        .eq("status", "confirmed")
+        .gte("start_at", new Date().toISOString())
+        .order("start_at", { ascending: true });
+      upcomingBookings = bookingRows ?? [];
     }
 
     const today = new Date();
@@ -522,13 +530,7 @@ export default async function CoachCalendarPage(
                 return (
                   <div key={b.id} className="py-2 flex items-center justify-between">
                     <span className="font-body text-sm">
-                      {start.toLocaleDateString("en-US", {
-                        weekday: "short",
-                        month: "short",
-                        day: "numeric",
-                      })}{" "}
-                      &middot;{" "}
-                      {start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                      {formatInTimezone(start, displayTz, "dateTime")}
                     </span>
                     <CancelBookingButton
                       bookingId={b.id}
@@ -773,11 +775,14 @@ export default async function CoachCalendarPage(
       .eq("coach_id", user.id),
   ]);
 
+  // Dates and times on the COACH's clock. This page renders on the server, which runs in UTC: without the zone an evening session lands on
+  // tomorrow's cell and a 6:00 AM one reads 1:00 PM.
+  const bookingTz = coachProfile?.timezone ?? DEFAULT_COACH_TIMEZONE;
   const bookingsByDateKey = new Map<string, { time: string; name: string }[]>();
   for (const b of (bookingRows ?? []) as any[]) {
     const d = new Date(b.start_at);
-    const key = dateKey(d);
-    const time = d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+    const key = dateKeyInZone(bookingTz, d);
+    const time = formatSlotTime(d, bookingTz);
     const name = b.profiles?.full_name ?? "A client";
     if (!bookingsByDateKey.has(key)) bookingsByDateKey.set(key, []);
     bookingsByDateKey.get(key)!.push({ time, name });
@@ -795,22 +800,22 @@ export default async function CoachCalendarPage(
     });
   }
 
-  const clientIds = (memberships ?? []).map((m: any) => m.profile_id);
+  // Every client across the coach's groups, each with their own group (a one-on-one client lives in their own group).
+  const coachClients = await getCoachClients(supabase, user.id, params.groupId);
+  const clientIds = coachClients.map((c) => c.id);
   const { data: creditRows } = await supabase
     .from("session_credits")
-    .select("athlete_id, balance")
-    .eq("group_id", params.groupId)
+    .select("athlete_id, group_id, balance")
     .in("athlete_id", clientIds.length > 0 ? clientIds : [""]);
 
-  const balanceByAthlete = new Map((creditRows ?? []).map((r) => [r.athlete_id, r.balance]));
+  const balanceByClientGroup = new Map((creditRows ?? []).map((r) => [`${r.athlete_id}:${r.group_id}`, r.balance as number]));
 
-  const clients = (memberships ?? [])
-    .map((m: any) => ({
-      profileId: m.profile_id,
-      fullName: m.profiles?.full_name ?? "Unknown",
-      balance: balanceByAthlete.get(m.profile_id) ?? 0,
-    }))
-    .sort((a, b) => a.fullName.localeCompare(b.fullName));
+  const clients = coachClients.map((c) => ({
+    profileId: c.id,
+    fullName: c.fullName,
+    groupId: c.groupId,
+    balance: balanceByClientGroup.get(`${c.id}:${c.groupId}`) ?? 0,
+  }));
 
   const athleteNameById = new Map(clients.map((c) => [c.profileId, c.fullName]));
   const workoutsByDateKey = new Map<string, { title: string; athleteName: string | null }[]>();

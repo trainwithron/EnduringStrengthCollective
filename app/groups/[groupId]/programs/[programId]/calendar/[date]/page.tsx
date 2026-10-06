@@ -216,6 +216,7 @@ export default async function DayDetailPage(
   let bufferBlockingBookings: { id: string; start: Date; end: Date }[] = [];
   let resolvedBufferMinutes = 0;
   let waitlistStatusByTime = new Map<number, "waiting" | "offered">();
+  let timezone: string = DEFAULT_COACH_TIMEZONE;
 
   if (coachMembership) {
     const { data: coachProfile } = await supabase
@@ -223,7 +224,7 @@ export default async function DayDetailPage(
       .select("timezone")
       .eq("id", coachMembership.profile_id)
       .maybeSingle();
-    const timezone = coachProfile?.timezone ?? DEFAULT_COACH_TIMEZONE;
+    timezone = coachProfile?.timezone ?? DEFAULT_COACH_TIMEZONE;
 
     const { data: windowRows } = await supabase
       .from("coach_availability_windows")
@@ -453,7 +454,7 @@ export default async function DayDetailPage(
               return (
                 <div key={iso} className="py-3 flex items-center justify-between">
                   <span className="font-body font-medium text-[15px]">
-                    {formatSlotTime(start)}
+                    {formatSlotTime(start, timezone)}
                   </span>
 
                   {membership.role === "coach" && !isActingAsOther ? (

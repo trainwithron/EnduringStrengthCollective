@@ -4,6 +4,8 @@ export interface DraggedClient {
   athleteId: string;
   fullName: string;
   balance: number;
+  // The client's own group. A one-on-one client lives in their own, and sessions and balances are kept per group.
+  groupId?: string;
 }
 
 export const CLIENT_DRAG_MIME = "application/x-esc-client";

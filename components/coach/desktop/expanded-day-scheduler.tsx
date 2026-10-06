@@ -72,7 +72,7 @@ export function ExpandedDayScheduler({
     const supabase = createBrowserClient();
     const { data: newBalance } = await supabase.rpc("adjust_session_credits", {
       p_athlete_id: client.athleteId,
-      p_group_id: groupId,
+      p_group_id: client.groupId ?? groupId,
       p_delta: delta,
     });
     if (typeof newBalance === "number") setBalance(newBalance);
@@ -96,7 +96,7 @@ export function ExpandedDayScheduler({
     const { data: bookingId, error: bookError } = await supabase.rpc("book_session", {
       p_coach_id: userData.user.id,
       p_athlete_id: client.athleteId,
-      p_group_id: groupId,
+      p_group_id: client.groupId ?? groupId,
       p_start_at: start.toISOString(),
       p_end_at: endAt.toISOString(),
     });
@@ -112,7 +112,7 @@ export function ExpandedDayScheduler({
     }
     // Fire-and-forget — never blocks the booking flow itself on a
     // notification round trip.
-    notifyBookingConfirmed(client.athleteId, groupId, start.toISOString());
+    notifyBookingConfirmed(client.athleteId, client.groupId ?? groupId, start.toISOString());
     if (bookingId) mirrorGoogleCalendarEvent(bookingId);
     onAssigned();
   }
@@ -225,7 +225,7 @@ export function ExpandedDayScheduler({
           ) : (
             <div className="grid grid-cols-3 gap-2">
               {daySlots.map((slot, idx) => {
-                const label = formatSlotTime(slot.start);
+                const label = formatSlotTime(slot.start, timezone);
                 const taken = bookings.some((b) => b.time === label);
                 return (
                   <button
@@ -255,7 +255,7 @@ export function ExpandedDayScheduler({
               {repeating ? (
                 <div className="mt-3">
                   <SeriesScheduleForm
-                    groupId={groupId}
+                    groupId={client.groupId ?? groupId}
                     athleteId={client.athleteId}
                     athleteName={client.fullName}
                     timezone={timezone}

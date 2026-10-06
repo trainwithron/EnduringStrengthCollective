@@ -9,6 +9,8 @@ export interface CalendarClientRow {
   profileId: string;
   fullName: string;
   balance: number;
+  // The client's own group (a one-on-one client lives in their own).
+  groupId: string;
 }
 
 // The main calendar's client roster — same list used for drag-to-schedule,
@@ -33,12 +35,12 @@ export function CalendarClientList({
   );
   const [adjusting, setAdjusting] = useState<string | null>(null);
 
-  async function adjust(profileId: string, delta: number) {
+  async function adjust(profileId: string, delta: number, clientGroupId: string) {
     setAdjusting(profileId);
     const supabase = createBrowserClient();
     const { data: newBalance } = await supabase.rpc("adjust_session_credits", {
       p_athlete_id: profileId,
-      p_group_id: groupId,
+      p_group_id: clientGroupId,
       p_delta: delta,
     });
     if (typeof newBalance === "number") {
@@ -60,9 +62,9 @@ export function CalendarClientList({
         const balance = balances[c.profileId] ?? c.balance;
         return (
           <div key={c.profileId} className="flex items-center justify-between py-2.5 gap-2">
-            <DraggableClientName client={{ athleteId: c.profileId, fullName: c.fullName, balance }}>
+            <DraggableClientName client={{ athleteId: c.profileId, fullName: c.fullName, balance, groupId: c.groupId }}>
               <Link
-                href={`${basePath}?client=${c.profileId}${monthQuery}`}
+                href={`${c.groupId === groupId ? basePath : `/groups/${c.groupId}/calendar`}?client=${c.profileId}${monthQuery}`}
                 className={`font-body text-sm ${isSelected ? "text-rust font-medium" : ""}`}
               >
                 {c.fullName}
@@ -71,7 +73,7 @@ export function CalendarClientList({
             <div className="flex items-center gap-1.5 shrink-0">
               <button
                 type="button"
-                onClick={() => adjust(c.profileId, -1)}
+                onClick={() => adjust(c.profileId, -1, c.groupId)}
                 disabled={adjusting === c.profileId || balance === 0}
                 aria-label={`Remove a session credit from ${c.fullName}`}
                 className="w-5 h-5 flex items-center justify-center border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust disabled:opacity-30"
@@ -87,7 +89,7 @@ export function CalendarClientList({
               </span>
               <button
                 type="button"
-                onClick={() => adjust(c.profileId, 1)}
+                onClick={() => adjust(c.profileId, 1, c.groupId)}
                 disabled={adjusting === c.profileId}
                 aria-label={`Add a session credit to ${c.fullName}`}
                 className="w-5 h-5 flex items-center justify-center border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust disabled:opacity-30"
@@ -95,7 +97,7 @@ export function CalendarClientList({
                 +
               </button>
               <Link
-                href={`/groups/${groupId}/athletes/${c.profileId}/calendar`}
+                href={`/groups/${c.groupId}/athletes/${c.profileId}/calendar`}
                 className="text-rust text-xs font-body ml-1"
               >
                 Open &rarr;

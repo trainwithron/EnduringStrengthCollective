@@ -11,6 +11,7 @@ import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { Lock } from "lucide-react";
 import { sessionBalanceLine } from "@/lib/session-credit-copy";
+import { formatInTimezone } from "@/lib/format-in-timezone";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
@@ -193,18 +194,19 @@ export default async function ProgramCalendarPage(
       .select("id", { count: "exact", head: true })
       .eq("coach_id", coachMembership.profile_id);
     hasAvailability = (count ?? 0) > 0;
+  }
 
-    if (viewingAsAthlete && hasAvailability) {
-      const { data: bookingRows } = await supabase
-        .from("bookings")
-        .select("id, start_at")
-        .eq("coach_id", coachMembership.profile_id)
-        .eq("athlete_id", athleteId)
-        .eq("status", "confirmed")
-        .gte("start_at", new Date().toISOString())
-        .order("start_at", { ascending: true });
-      upcomingBookings = bookingRows ?? [];
-    }
+  // The client's own sessions show whether or not the coach has set up open hours, and whichever coach booked them.
+  if (viewingAsAthlete) {
+    const { data: bookingRows } = await supabase
+      .from("bookings")
+      .select("id, start_at")
+      .eq("athlete_id", athleteId)
+      .eq("group_id", params.groupId)
+      .eq("status", "confirmed")
+      .gte("start_at", new Date().toISOString())
+      .order("start_at", { ascending: true });
+    upcomingBookings = bookingRows ?? [];
   }
 
   if (viewingAsAthlete) {
@@ -308,13 +310,7 @@ export default async function ProgramCalendarPage(
               return (
                 <div key={b.id} className="py-2 flex items-center justify-between">
                   <span className="font-body text-sm">
-                    {start.toLocaleDateString("en-US", {
-                      weekday: "short",
-                      month: "short",
-                      day: "numeric",
-                    })}{" "}
-                    &middot;{" "}
-                    {start.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                    {formatInTimezone(start, timezone, "dateTime")}
                   </span>
                   <CancelBookingButton
                     bookingId={b.id}
