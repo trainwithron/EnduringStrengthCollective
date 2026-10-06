@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { CRON_JOBS, findStaleJobs, shouldAlertForFailures, type CronRunRow } from "@/lib/cron-jobs";
+import { CRON_JOBS, MONITORING_STARTED, findStaleJobs, shouldAlertForFailures, type CronRunRow } from "@/lib/cron-jobs";
 
 describe("job list", () => {
   it("matches vercel.json exactly", () => {
@@ -64,6 +64,26 @@ describe("stale jobs", () => {
   it("a job that has only ever failed counts as not run recently when it is not flagged as failing", () => {
     const rows = allOk().map((r) => (r.job === "coach-briefing" ? { ...r, last_success_at: null } : r));
     expect(findStaleJobs(rows, now)[0]).toMatchObject({ job: "coach-briefing", reason: "not_run_recently" });
+  });
+});
+
+describe("never-run jobs", () => {
+  // Only the busy jobs have a row; the rest have never been called.
+  const rows = (now: Date): CronRunRow[] => CRON_JOBS.filter((j) => j.job === "session-reminder").map((j) => ({ job: j.job, last_success_at: now.toISOString(), last_status: "ok", consecutive_failures: 0 }));
+  const since = MONITORING_STARTED;
+
+  it("is not reported inside the grace period, then is reported for a daily job", () => {
+    const early = new Date(since.getTime() + 24 * 3600000);
+    const late = new Date(since.getTime() + 50 * 3600000);
+    expect(findStaleJobs(rows(early), early, { since })).toEqual([]);
+    const stale = findStaleJobs(rows(late), late, { since });
+    expect(stale.find((s) => s.job === "google-health-sync")).toMatchObject({ reason: "never_run" });
+  });
+  it("gives a weekly job its whole interval before calling it never run", () => {
+    const day4 = new Date(since.getTime() + 4 * 86400000);
+    const day9 = new Date(since.getTime() + 9 * 86400000);
+    expect(findStaleJobs(rows(day4), day4, { since }).some((s) => s.job === "milestone-scan")).toBe(false);
+    expect(findStaleJobs(rows(day9), day9, { since }).some((s) => s.job === "milestone-scan")).toBe(true);
   });
 });
 

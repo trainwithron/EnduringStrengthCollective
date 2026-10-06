@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { findStaleJobs, type CronRunRow } from "@/lib/cron-jobs";
+import { MONITORING_STARTED, findStaleJobs, type CronRunRow } from "@/lib/cron-jobs";
 
 // A plain, unauthenticated status endpoint — for an external uptime
 // monitor (UptimeRobot, Vercel's own status checks, etc.) to hit on a
@@ -31,8 +31,7 @@ export async function GET() {
       if (!cronError && data && data.length > 0) {
         monitoring = true;
         const rows = data as (CronRunRow & { updated_at: string })[];
-        const since = new Date(Math.min(...rows.map((r) => new Date(r.updated_at).getTime())));
-        stale = findStaleJobs(rows, new Date(), { since }).map((s) => ({ job: s.job, reason: s.reason }));
+        stale = findStaleJobs(rows, new Date(), { since: MONITORING_STARTED }).map((s) => ({ job: s.job, reason: s.reason }));
       }
     } catch {
       // Job monitoring is not set up yet: report the database alone.

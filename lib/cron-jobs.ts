@@ -35,6 +35,10 @@ export const CRON_JOBS: CronJob[] = [
   { job: "cron-watchdog", path: "/api/cron/cron-watchdog", maxAgeHours: DAILY },
 ];
 
+// When job monitoring went live (the Oct 5 2026 deploy). A fixed date, not "the oldest row": the busy jobs refresh their row every few
+// minutes, so an oldest-row baseline never ages and a job that is never called would never be noticed.
+export const MONITORING_STARTED = new Date("2026-10-06T02:39:00Z");
+
 export interface CronRunRow {
   job: string;
   last_success_at: string | null;
@@ -56,7 +60,8 @@ export function findStaleJobs(rows: CronRunRow[], now: Date, options: { since?: 
   for (const def of CRON_JOBS) {
     const row = byJob.get(def.job);
     if (!row) {
-      const graceMs = (options.graceHours ?? 48) * 3600000;
+      // Never reported before a job has had its full schedule to run once: a weekly job gets its whole interval, not 48 hours.
+      const graceMs = Math.max((options.graceHours ?? 48), def.maxAgeHours) * 3600000;
       if (options.since && now.getTime() - options.since.getTime() < graceMs) continue;
       out.push({ job: def.job, reason: "never_run", hoursSinceSuccess: null });
       continue;
