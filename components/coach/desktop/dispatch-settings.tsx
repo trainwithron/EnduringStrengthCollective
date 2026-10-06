@@ -21,15 +21,30 @@ export function DispatchSettings({
 }) {
   const [ttlMinutes, setTtlMinutes] = useState(initialTtlMinutes);
   const [saving, setSaving] = useState(false);
+  const [savedTtl, setSavedTtl] = useState(initialTtlMinutes);
+  const [ttlError, setTtlError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   const intakeUrl = typeof window !== "undefined" ? `${appOriginBrowser()}/join/${orgSlug}` : `/join/${orgSlug}`;
 
   async function persistTtl(next: number) {
+    if (!Number.isInteger(next) || next < 1 || next > 1440) {
+      setTtlError("Enter a whole number of minutes from 1 to 1440.");
+      setTtlMinutes(savedTtl);
+      return;
+    }
+    if (next === savedTtl) return;
+    setTtlError(null);
     setSaving(true);
     const supabase = createBrowserClient();
-    await supabase.from("organizations").update({ dispatch_ttl_minutes: next }).eq("id", organizationId);
+    const { error } = await supabase.from("organizations").update({ dispatch_ttl_minutes: next }).eq("id", organizationId);
     setSaving(false);
+    if (error) {
+      setTtlMinutes(savedTtl);
+      setTtlError("That didn't save. The window is back to what it was.");
+      return;
+    }
+    setSavedTtl(next);
   }
 
   async function handleCopy() {
@@ -83,6 +98,11 @@ export function DispatchSettings({
         />
         <span className="font-body text-xs text-steel">minutes before moving to the next trainer</span>
       </label>
+      {ttlError && (
+        <p className="font-body text-xs text-rust mt-2" role="alert">
+          {ttlError}
+        </p>
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 
@@ -27,6 +27,9 @@ export function SuggestionSettings({
   const [leadMode, setLeadMode] = useState<LeadMode>(initialLeadMode);
   const [leadWeekday, setLeadWeekday] = useState(initialLeadWeekday ?? 5);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // What is really saved, so a failed save can put the controls back.
+  const lastSaved = useRef({ mode: initialMode, leadDays: String(initialLeadDays), leadMode: initialLeadMode, leadWeekday: initialLeadWeekday ?? 5 });
 
   async function persist(patch: {
     mode?: "list" | "auto_add";
@@ -35,8 +38,9 @@ export function SuggestionSettings({
     leadWeekday?: number;
   }) {
     setSaving(true);
+    setError(null);
     const supabase = createBrowserClient();
-    await supabase.from("coach_preferences").upsert(
+    const { error: saveError } = await supabase.from("coach_preferences").upsert(
       {
         coach_id: coachId,
         suggestion_mode: patch.mode ?? mode,
@@ -47,6 +51,20 @@ export function SuggestionSettings({
       { onConflict: "coach_id" }
     );
     setSaving(false);
+    if (saveError) {
+      setMode(lastSaved.current.mode);
+      setLeadDays(lastSaved.current.leadDays);
+      setLeadMode(lastSaved.current.leadMode);
+      setLeadWeekday(lastSaved.current.leadWeekday);
+      setError("That didn't save. The settings are back to what they were.");
+      return;
+    }
+    lastSaved.current = {
+      mode: patch.mode ?? mode,
+      leadDays: String(patch.leadDays ?? (Number(leadDays) || 3)),
+      leadMode: patch.leadMode ?? leadMode,
+      leadWeekday: patch.leadWeekday ?? leadWeekday,
+    };
     router.refresh();
   }
 
@@ -55,6 +73,11 @@ export function SuggestionSettings({
       <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
         Suggestion settings
       </p>
+      {error && (
+        <p className="font-body text-xs text-rust mb-2" role="alert">
+          {error}
+        </p>
+      )}
       <div className="flex items-center gap-4 flex-wrap">
         <div className="flex items-center gap-1">
           <button

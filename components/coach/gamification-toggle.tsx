@@ -18,13 +18,20 @@ export function GamificationToggle({
 }) {
   const [enabled, setEnabled] = useState(initialEnabled);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function toggle() {
     const next = !enabled;
     setEnabled(next);
     setSaving(true);
+    setError(null);
     const supabase = createBrowserClient();
-    await supabase.from("groups").update({ gamification_enabled: next }).eq("id", groupId);
+    const { error: saveError } = await supabase.from("groups").update({ gamification_enabled: next }).eq("id", groupId);
+    if (saveError) {
+      // Put the switch back so it shows what is really saved.
+      setEnabled(!next);
+      setError("That didn't save. The switch is back to what it was.");
+    }
     setSaving(false);
   }
 
@@ -44,6 +51,11 @@ export function GamificationToggle({
         aria-label="Gamified logging"
         className="w-5 h-5 shrink-0 accent-rust"
       />
+      {error && (
+        <span className="block font-body text-xs text-rust" role="alert">
+          {error}
+        </span>
+      )}
     </label>
   );
 }
