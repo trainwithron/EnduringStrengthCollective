@@ -71,20 +71,28 @@ export async function POST(request: Request) {
 
   const newUserId = created.user.id;
 
-  // Record what they agreed to (version, time, address, device). A missing table never stops a signup.
-  await recordLegalAcceptances(serviceRole, {
-    profileId: newUserId,
-    documents: SIGNUP_DOCUMENTS,
-    ip: clientIp(request) === "unknown" ? null : clientIp(request),
-    userAgent: request.headers.get("user-agent"),
-  }).catch(() => false);
-
   const { error: profileError } = await serviceRole
     .from("profiles")
     .insert({ id: newUserId, full_name: trimmedName });
   if (profileError) {
     return NextResponse.json({ error: `Couldn't create your profile: ${profileError.message}` }, { status: 502 });
   }
+
+  // Record what they agreed to (version, time, address, device). This has to come AFTER the profile exists: the acceptance row points at the
+  // profile, so recording it first fails and nothing is ever recorded. A failure does not undo the signup (the account exists and they did tick the
+  // box), but it is logged loudly and reported in the response, and the next time they sign in the app asks them to accept again.
+  let legalRecorded = false;
+  try {
+    legalRecorded = await recordLegalAcceptances(serviceRole, {
+      profileId: newUserId,
+      documents: SIGNUP_DOCUMENTS,
+      ip: clientIp(request) === "unknown" ? null : clientIp(request),
+      userAgent: request.headers.get("user-agent"),
+    });
+  } catch (err) {
+    console.error("signup: recording legal acceptance threw:", err instanceof Error ? err.message : err);
+  }
+  if (!legalRecorded) console.error(`signup: legal acceptance NOT recorded for new coach ${newUserId}`);
 
   try {
     const { groupId } = await createOrganization(serviceRole, {
@@ -111,7 +119,7 @@ export async function POST(request: Request) {
 
     // If the email could not be sent (the mail service limits how many go out per hour), say so, so the person is not left
     // waiting. Their account exists either way and the page offers to send it again.
-    return NextResponse.json({ groupId, pendingConfirmation: true, confirmationEmailSent: !resendError });
+    return NextResponse.json({ groupId, pendingConfirmation: true, confirmationEmailSent: !resendError, legalRecorded });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Couldn't set up your organization." },
