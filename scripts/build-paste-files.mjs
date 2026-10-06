@@ -639,6 +639,7 @@ for (const s of STEPS) {
     "-- Sets ONE coach to 'Clients request, I confirm': the coach whose login email is below. CHECK that this is the email you sign in to coaching with.",
     "-- If no account has that email it changes nothing. Every other coach stays on 'I schedule everyone' until they choose.",
     "-- WHAT YOU SHOULD SEE: the first result shows the one coach it will change (one row), the second shows 'request' for that coach.",
+    "do $guard$ begin if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_booking_policies' and column_name = 'booking_mode') then raise exception 'Step 20 (0278) is not applied yet, so there is no booking mode to set. Apply step 20 first. Nothing was changed.'; end if; end $guard$;",
     "select u.id as coach_id, u.email from auth.users u where lower(u.email) = 'trainwithronarnold@gmail.com';",
     "begin;",
     "insert into public.coach_booking_policies (coach_id, booking_mode)",
