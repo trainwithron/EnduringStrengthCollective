@@ -13,6 +13,7 @@ import { addDaysToDateKey } from "@/lib/series-schedule";
 import { coachBalanceLabel } from "@/lib/reup";
 import { AssignSlotButton } from "@/components/coach/desktop/assign-slot-button";
 import { AssignOtherTime } from "@/components/coach/desktop/assign-other-time";
+import { BookingTypeSelect } from "@/components/coach/desktop/booking-type-select";
 import { AssignWorkoutToDateButton } from "@/components/coach/desktop/assign-workout-to-date-button";
 import { AddDayEventForm } from "@/components/coach/desktop/add-day-event-form";
 import { getActiveProgramForAthlete, getAllProgramWorkouts, getScheduledWorkouts, dateKeyOf } from "@/lib/athlete-day-schedule";
@@ -579,6 +580,15 @@ export default async function CoachDayDetailPage(
     clientMembership ? getActiveProgramForAthlete(supabase, params.groupId, clientId!) : Promise.resolve(null),
   ]);
 
+  // The coach's session types and each booked session's type (migration 0261 / 0289). Soft: if the lookup fails the type control simply does not appear.
+  const { data: coachTypeRows } = await supabase.from("session_types").select("id, name").eq("coach_id", user.id).order("created_at", { ascending: true });
+  const coachTypes = (coachTypeRows ?? []) as { id: string; name: string }[];
+  const typeByBooking = new Map<string, string | null>();
+  if (coachTypes.length > 0 && (bookingRows ?? []).length > 0) {
+    const { data: typeRows, error: typeError } = await supabase.from("bookings").select("id, session_type_id").in("id", (bookingRows ?? []).map((b) => b.id));
+    if (!typeError) for (const r of (typeRows ?? []) as { id: string; session_type_id: string | null }[]) typeByBooking.set(r.id, r.session_type_id ?? null);
+  }
+
   // Settlement state (migration 0248). If those columns are not there yet this lookup errors and the Mark attended
   // control simply does not appear.
   const settlementById = new Map<string, { credit_state: CreditState; attended_at: string | null }>();
@@ -657,6 +667,7 @@ export default async function CoachDayDetailPage(
     <div className="flex flex-wrap items-center gap-2 min-w-0">
       <span className="font-body text-xs text-steel">Booked — {(booking.profiles as any)?.full_name ?? "Client"}</span>
       {booking.needs_coach_resolution && <RecurringConflictBadge bookingId={booking.id} />}
+      {typeByBooking.has(booking.id) && <BookingTypeSelect bookingId={booking.id} types={coachTypes} current={typeByBooking.get(booking.id) ?? null} />}
       {settlementById.has(booking.id) && start.getTime() <= Date.now() + 12 * 3600 * 1000 && (
         <MarkAttendedControl
           bookingId={booking.id}

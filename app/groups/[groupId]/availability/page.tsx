@@ -62,6 +62,12 @@ export default async function AvailabilityPage(
   const sessionLengthEnabled = !sessionResult.error;
   const sessionById = new Map(((sessionResult.data ?? []) as { id: string; session_minutes: number | null }[]).map((r) => [r.id, r.session_minutes]));
 
+  // Session type on a window (migration 0289). Until it is applied the select errors and the type choice is simply hidden.
+  const typeResult = await supabase.from("coach_availability_windows").select("id, session_type_id").eq("coach_id", user.id);
+  const sessionTypeEnabled = !typeResult.error;
+  const typeById = new Map(((typeResult.data ?? []) as { id: string; session_type_id: string | null }[]).map((r) => [r.id, r.session_type_id]));
+  const { data: typeRows } = await supabase.from("session_types").select("id, name").eq("coach_id", user.id).order("created_at", { ascending: true });
+
   const windows = (windowRows ?? []).map((w) => ({
     id: w.id,
     weekday: w.weekday,
@@ -69,6 +75,7 @@ export default async function AvailabilityPage(
     endTime: w.end_time,
     slotDurationMinutes: w.slot_duration_minutes,
     sessionMinutes: sessionById.get(w.id) ?? null,
+    sessionTypeId: typeById.get(w.id) ?? null,
   }));
 
   const { data: policyRow } = await supabase
@@ -144,7 +151,7 @@ export default async function AvailabilityPage(
 
       <AvailabilityExceptionsManager coachId={user.id} initialExceptions={exceptions} />
 
-      <AvailabilityManagerDesktop coachId={user.id} initialWindows={windows} sessionLengthEnabled={sessionLengthEnabled} initialBufferMinutes={policyRow?.buffer_minutes ?? 0} />
+      <AvailabilityManagerDesktop coachId={user.id} initialWindows={windows} sessionLengthEnabled={sessionLengthEnabled} initialBufferMinutes={policyRow?.buffer_minutes ?? 0} sessionTypes={(typeRows ?? []) as { id: string; name: string }[]} sessionTypeEnabled={sessionTypeEnabled} />
 
     </CoachDesktopShell>
   );

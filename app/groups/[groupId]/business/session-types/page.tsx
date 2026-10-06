@@ -46,12 +46,16 @@ export default async function SessionTypesPage(
     creditCost: t.credit_cost,
   }));
 
+  // Suggests the team set to a coach who runs a team (any group of theirs with team mode on); they can still add either set.
+  const { data: coachedGroups } = await supabase.from("group_memberships").select("group_id, groups ( team_mode )").eq("profile_id", user.id).eq("role", "coach");
+  const teamMode = ((coachedGroups ?? []) as any[]).some((g) => g.groups?.team_mode === true);
+
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="session-types">
       <div className="pb-6 border-b border-steel/20 mb-6">
         <h1 className="font-display font-bold text-3xl uppercase leading-none">Session Types</h1>
       </div>
-      <SessionTypeManager initialTypes={types} />
+      <SessionTypeManager initialTypes={types} teamMode={teamMode} />
     </CoachDesktopShell>
   );
 }

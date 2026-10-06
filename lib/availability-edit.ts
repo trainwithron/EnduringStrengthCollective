@@ -7,6 +7,7 @@ export interface WindowDraft {
   endTime: string;
   slotMinutes: number; // how often a bookable slot starts (and, unless sessionMinutes is set, how long a session lasts)
   sessionMinutes?: number | null; // how long a booked session lasts when that differs from the step (a 55-minute session in 60-minute slots)
+  sessionTypeId?: string | null; // the coach's own session type this window is for (Online, In person, Practice...); null = any
 }
 
 export interface ExistingWindow {

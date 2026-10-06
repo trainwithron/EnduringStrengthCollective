@@ -127,6 +127,25 @@ function WindowTimingFields({
   );
 }
 
+// Which kind of session these hours are for (optional): the coach's own session types (Online, In person, Weight room, Practice, Game, or their own). A session
+// booked inside tagged hours carries the type. Leave it as "Any" and nothing changes.
+function SessionTypeSelect({ types, value, onChange }: { types: { id: string; name: string }[]; value: string; onChange: (v: string) => void }) {
+  return (
+    <label className="basis-full flex flex-col gap-1">
+      <span className="font-body text-xs text-steel uppercase tracking-wide">Session type (optional)</span>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className={inputCls}>
+        <option value="">Any</option>
+        {types.map((s) => (
+          <option key={s.id} value={s.id}>
+            {s.name}
+          </option>
+        ))}
+      </select>
+      <span className="font-body text-[11px] text-steel">Sessions booked inside these hours are tagged with it. Add types under Business &gt; Session types.</span>
+    </label>
+  );
+}
+
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -140,6 +159,7 @@ const toRow = (d: any): AvailabilityWindowRow => ({
   endTime: d.end_time,
   slotDurationMinutes: d.slot_duration_minutes,
   sessionMinutes: d.session_minutes ?? null,
+  sessionTypeId: d.session_type_id ?? null,
 });
 
 const inputCls = "h-9 px-2 bg-surface border border-steel/30 text-chalk font-body text-xs";
@@ -153,13 +173,19 @@ export function AvailabilityManagerDesktop({
   initialWindows,
   sessionLengthEnabled = false,
   initialBufferMinutes,
+  sessionTypes = [],
+  sessionTypeEnabled = false,
 }: {
   coachId: string;
   initialWindows: AvailabilityWindowRow[];
   sessionLengthEnabled?: boolean;
   // The coach's gap between sessions (their buffer). When given, the gap is shown and edited next to the slot step and the session length.
   initialBufferMinutes?: number;
+  // The coach's own session types and whether windows can carry one (migration 0289). Until then the select is hidden and nothing changes.
+  sessionTypes?: { id: string; name: string }[];
+  sessionTypeEnabled?: boolean;
 }) {
+  const typeNameById = new Map(sessionTypes.map((s) => [s.id, s.name]));
   const gapEnabled = initialBufferMinutes !== undefined;
   const [gap, setGap] = useState(String(initialBufferMinutes ?? 0));
   const [gapBusy, setGapBusy] = useState(false);
@@ -192,15 +218,15 @@ export function AvailabilityManagerDesktop({
     router.refresh();
   }
 
-  const COLS = sessionLengthEnabled
-    ? "id, weekday, start_time, end_time, slot_duration_minutes, session_minutes"
-    : "id, weekday, start_time, end_time, slot_duration_minutes";
+  const COLS =
+    "id, weekday, start_time, end_time, slot_duration_minutes" + (sessionLengthEnabled ? ", session_minutes" : "") + (sessionTypeEnabled ? ", session_type_id" : "");
   const [windows, setWindows] = useState(initialWindows);
   const [weekday, setWeekday] = useState("1");
   const [startTime, setStartTime] = useState("17:00");
   const [endTime, setEndTime] = useState("20:00");
   const [slotDuration, setSlotDuration] = useState("60");
   const [sessionInput, setSessionInput] = useState("");
+  const [typeInput, setTypeInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -233,6 +259,7 @@ export function AvailabilityManagerDesktop({
         end_time: endTime,
         slot_duration_minutes: Number(slotDuration),
         ...(sessionLengthEnabled && sessionInput.trim() ? { session_minutes: Number(sessionInput) } : {}),
+        ...(sessionTypeEnabled && typeInput ? { session_type_id: typeInput } : {}),
       })
       .select(COLS)
       .single();
@@ -262,7 +289,7 @@ export function AvailabilityManagerDesktop({
     setCopyingId(null);
     setNotice(null);
     setEditingId(w.id);
-    setDraft({ weekday: w.weekday, startTime: w.startTime.slice(0, 5), endTime: w.endTime.slice(0, 5), slotMinutes: w.slotDurationMinutes, sessionMinutes: w.sessionMinutes ?? null });
+    setDraft({ weekday: w.weekday, startTime: w.startTime.slice(0, 5), endTime: w.endTime.slice(0, 5), slotMinutes: w.slotDurationMinutes, sessionMinutes: w.sessionMinutes ?? null, sessionTypeId: w.sessionTypeId ?? null });
   }
 
   async function saveEdit() {
@@ -287,6 +314,7 @@ export function AvailabilityManagerDesktop({
         end_time: draft.endTime,
         slot_duration_minutes: draft.slotMinutes,
         ...(sessionLengthEnabled ? { session_minutes: draft.sessionMinutes ?? null } : {}),
+        ...(sessionTypeEnabled ? { session_type_id: draft.sessionTypeId ?? null } : {}),
       })
       .eq("id", editingId)
       .select(COLS)
@@ -333,6 +361,7 @@ export function AvailabilityManagerDesktop({
           end_time: w.endTime,
           slot_duration_minutes: w.slotDurationMinutes,
           ...(sessionLengthEnabled && w.sessionMinutes ? { session_minutes: w.sessionMinutes } : {}),
+          ...(sessionTypeEnabled && w.sessionTypeId ? { session_type_id: w.sessionTypeId } : {}),
         }))
       )
       .select(COLS);
@@ -434,6 +463,9 @@ export function AvailabilityManagerDesktop({
                             gapBusy={gapBusy}
                             gapError={gapError}
                           />
+                          {sessionTypeEnabled && sessionTypes.length > 0 && (
+                            <SessionTypeSelect types={sessionTypes} value={draft.sessionTypeId ?? ""} onChange={(v) => setDraft({ ...draft, sessionTypeId: v || null })} />
+                          )}
                           <button type="button" onClick={saveEdit} disabled={rowBusy} className="h-9 px-4 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40">
                             Save
                           </button>
@@ -464,6 +496,7 @@ export function AvailabilityManagerDesktop({
                           {w.sessionMinutes && w.sessionMinutes !== w.slotDurationMinutes
                             ? `${w.sessionMinutes} min, a slot every ${w.slotDurationMinutes} min`
                             : `${w.slotDurationMinutes} min`}
+                          {w.sessionTypeId && typeNameById.get(w.sessionTypeId) ? ` · ${typeNameById.get(w.sessionTypeId)}` : ""}
                         </td>
                         <td className="py-3 text-right whitespace-nowrap">
                           <button
@@ -596,6 +629,7 @@ export function AvailabilityManagerDesktop({
           gapBusy={gapBusy}
           gapError={gapError}
         />
+        {sessionTypeEnabled && sessionTypes.length > 0 && <SessionTypeSelect types={sessionTypes} value={typeInput} onChange={setTypeInput} />}
         <button
           type="button"
           onClick={handleAdd}

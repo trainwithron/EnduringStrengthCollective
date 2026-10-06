@@ -20,7 +20,7 @@ export interface CalendarSpotterFinding {
   kind: "gap" | "flaky" | "recovery";
   message: string;
   // The client's next confirmed session, so the coach can cancel it from the row (the existing cancel flow, with its refund and late-change rules).
-  nextBooking?: { id: string; startAt: string; recurringSeriesId: string | null } | null;
+  nextBooking?: { id: string; startAt: string; recurringSeriesId: string | null; sessionTypeName?: string | null } | null;
 }
 
 // 60 days back is enough history for both the 14-day gap check and the
@@ -38,14 +38,14 @@ export async function gatherCalendarSpotterFindings(
 
   const { data: rows } = await supabase
     .from("bookings")
-    .select("id, athlete_id, start_at, status, no_show, late_cancel, recurring_series_id, profiles!bookings_athlete_id_fkey ( full_name )")
+    .select("id, athlete_id, start_at, status, no_show, late_cancel, recurring_series_id, session_types ( name ), profiles!bookings_athlete_id_fkey ( full_name )")
     .eq("group_id", groupId)
     .gte("start_at", since);
 
   if (!rows || rows.length === 0) return [];
 
   const byAthlete = new Map<string, { name: string; bookings: AttendanceBooking[] }>();
-  const nextByAthlete = new Map<string, { id: string; startAt: string; recurringSeriesId: string | null }>();
+  const nextByAthlete = new Map<string, { id: string; startAt: string; recurringSeriesId: string | null; sessionTypeName: string | null }>();
   const nowMs = Date.now();
   for (const row of rows as any[]) {
     const entry = byAthlete.get(row.athlete_id) ?? {
@@ -61,7 +61,7 @@ export async function gatherCalendarSpotterFindings(
     byAthlete.set(row.athlete_id, entry);
     if (row.status === "confirmed" && new Date(row.start_at).getTime() > nowMs) {
       const cur = nextByAthlete.get(row.athlete_id);
-      if (!cur || new Date(row.start_at).getTime() < new Date(cur.startAt).getTime()) nextByAthlete.set(row.athlete_id, { id: row.id, startAt: row.start_at, recurringSeriesId: row.recurring_series_id ?? null });
+      if (!cur || new Date(row.start_at).getTime() < new Date(cur.startAt).getTime()) nextByAthlete.set(row.athlete_id, { id: row.id, startAt: row.start_at, recurringSeriesId: row.recurring_series_id ?? null, sessionTypeName: row.session_types?.name ?? null });
     }
   }
 

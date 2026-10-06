@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { Trash2, Plus } from "lucide-react";
+import { PRESET_SETS, missingPresets, type PresetSetKey } from "@/lib/session-type-presets";
 
 export interface SessionTypeRow {
   id: string;
@@ -17,12 +18,13 @@ export interface SessionTypeRow {
 // who wants to log an admin/internal session (a scheduling call, a
 // non-billable check-in) without it silently spending a client's
 // pre-paid credit — set that type's cost to 0.
-export function SessionTypeManager({ initialTypes }: { initialTypes: SessionTypeRow[] }) {
+export function SessionTypeManager({ initialTypes, teamMode = false }: { initialTypes: SessionTypeRow[]; teamMode?: boolean }) {
   const router = useRouter();
   const [types, setTypes] = useState(initialTypes);
   const [name, setName] = useState("");
   const [creditCost, setCreditCost] = useState("1");
   const [busy, setBusy] = useState(false);
+  const [presetError, setPresetError] = useState<string | null>(null);
 
   async function handleAdd() {
     const trimmed = name.trim();
@@ -51,6 +53,33 @@ export function SessionTypeManager({ initialTypes }: { initialTypes: SessionType
     setBusy(false);
   }
 
+  // One tap adds a starter set as ordinary private session types the coach can rename, change or delete (nothing is added twice).
+  async function addPresets(set: PresetSetKey) {
+    const missing = missingPresets(set, types.map((t) => t.name));
+    if (missing.length === 0 || busy) return;
+    setBusy(true);
+    setPresetError(null);
+    const supabase = createBrowserClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) {
+      setBusy(false);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("session_types")
+      .insert(missing.map((p) => ({ coach_id: user.id, name: p.name, credit_cost: p.creditCost, location_kind: p.locationKind, public_visible: false })))
+      .select("id, name, credit_cost");
+    setBusy(false);
+    if (error || !data) {
+      setPresetError("That didn't save. Nothing was added. Try again.");
+      return;
+    }
+    setTypes((prev) => [...prev, ...data.map((d) => ({ id: d.id, name: d.name, creditCost: d.credit_cost }))]);
+    router.refresh();
+  }
+
   async function handleDelete(id: string) {
     if (!window.confirm("Delete this session type? Existing logged sessions keep their history either way.")) return;
     const supabase = createBrowserClient();
@@ -63,8 +92,40 @@ export function SessionTypeManager({ initialTypes }: { initialTypes: SessionType
     <div className="max-w-2xl">
       <p className="font-body text-sm text-steel mb-4 max-w-[60ch]">
         Every in-person session you log spends 1 credit by default — you never have to set anything up. Create a type
-        here only if you want an admin/internal session (a scheduling call, a non-billable check-in) to spend 0.
+        here to tell kinds of sessions apart (Online, In person, Practice, Game...), or an admin/internal session (a
+        scheduling call, a non-billable check-in) that spends 0. A type can be given to a window of hours on Availability,
+        and sessions booked inside those hours carry it.
       </p>
+
+      <div className="mb-5 border border-steel/20 p-3">
+        <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Start from a set</p>
+        <div className="flex flex-wrap gap-2">
+          {(Object.keys(PRESET_SETS) as PresetSetKey[]).map((key) => {
+            const left = missingPresets(key, types.map((t) => t.name));
+            const suggested = (key === "team") === teamMode;
+            return (
+              <button
+                key={key}
+                type="button"
+                disabled={busy || left.length === 0}
+                onClick={() => addPresets(key)}
+                className={`min-h-11 px-4 border font-body text-sm disabled:opacity-40 ${suggested ? "border-rust text-rust" : "border-steel/30 text-chalk"}`}
+              >
+                {PRESET_SETS[key].label}: {PRESET_SETS[key].presets.map((p) => p.name).join(", ")}
+                {left.length === 0 ? " (added)" : ""}
+              </button>
+            );
+          })}
+        </div>
+        <p className="font-body text-xs text-steel mt-2">
+          They are ordinary types you can rename or delete, and they are not shown on your public booking page. Practice and Game cost no session credit.
+        </p>
+        {presetError && (
+          <p className="font-body text-xs text-rust mt-1" role="alert">
+            {presetError}
+          </p>
+        )}
+      </div>
 
       {types.length > 0 && (
         <div className="divide-y divide-steel/15 border-y border-steel/15 mb-4">

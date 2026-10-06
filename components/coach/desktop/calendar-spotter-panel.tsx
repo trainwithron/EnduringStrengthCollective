@@ -84,6 +84,7 @@ export function CalendarSpotterPanel({
                 {f.nextBooking && (
                   <span className="inline-flex items-center gap-2 font-body text-xs text-steel">
                     Next session {fmt(f.nextBooking.startAt)}
+                    {f.nextBooking.sessionTypeName ? ` (${f.nextBooking.sessionTypeName})` : ""}
                     <CancelBookingButton
                       bookingId={f.nextBooking.id}
                       rescheduleHref={groupId ? `/groups/${groupId}/calendar` : "/dashboard"}
