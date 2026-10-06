@@ -1,4 +1,6 @@
+import Link from "next/link";
 import type { CalendarSpotterFinding } from "@/lib/calendar-spotter-gather";
+import { buildComeBackDraft } from "@/lib/attendance-draft";
 
 // scheduling_calendar_spotter_idea.md — "Calendar Spot: [content]" source-
 // label convention (resolved directly with Ron): a label prefix is pure
@@ -8,7 +10,7 @@ import type { CalendarSpotterFinding } from "@/lib/calendar-spotter-gather";
 // memory's resolved branding note — same taste discipline as coach_
 // perceived_value_design_principle.md, just with more room to let the
 // software take credit since the coach (not the athlete) is the audience.
-export function CalendarSpotterPanel({ findings }: { findings: CalendarSpotterFinding[] }) {
+export function CalendarSpotterPanel({ findings, groupId }: { findings: CalendarSpotterFinding[]; groupId?: string }) {
   if (findings.length === 0) return null;
 
   return (
@@ -23,6 +25,14 @@ export function CalendarSpotterPanel({ findings }: { findings: CalendarSpotterFi
               }`}
             />
             <p className="font-body text-sm text-chalk flex-1">{f.message}</p>
+            {f.kind === "gap" && groupId && (
+              <Link
+                href={`/groups/${groupId}/messages/${f.athleteId}?draft=${encodeURIComponent(buildComeBackDraft(f.athleteName.split(" ")[0] ?? ""))}`}
+                className="shrink-0 h-9 px-3 border border-rust text-rust font-body text-xs inline-flex items-center"
+              >
+                Send a note
+              </Link>
+            )}
           </div>
         ))}
       </div>

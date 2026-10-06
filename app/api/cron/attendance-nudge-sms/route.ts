@@ -24,6 +24,11 @@ import { withCronRun } from "@/lib/cron-monitor";
 // window the gap detector itself uses (14 days) before sending another.
 const RENUDGE_COOLDOWN_DAYS = 14;
 
+// A text on a coach's behalf is never sent automatically (Ron, Oct 6): the coach sees the gap on the Calendar page and sends a note they have read, with
+// one tap to a drafted message. This job stays registered so the cron monitor stays green, and only sends if someone turns it on on purpose by setting
+// ATTENDANCE_NUDGE_AUTO_SEND=true (it is not set anywhere).
+const ATTENDANCE_AUTO_SEND_ENABLED = process.env.ATTENDANCE_NUDGE_AUTO_SEND === "true";
+
 async function handler(request: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });
@@ -31,6 +36,10 @@ async function handler(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  }
+
+  if (!ATTENDANCE_AUTO_SEND_ENABLED) {
+    return NextResponse.json({ checked: 0, sent: 0, skipped: "Automatic texts are off. Coaches get a drafted note to send themselves on the Calendar page." });
   }
 
   const supabase = createServiceRoleClient();
