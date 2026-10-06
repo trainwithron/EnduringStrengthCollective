@@ -51,6 +51,12 @@ for (const s of steps) {
     check("step 06: the existing plain PIN was copied across hashed", hashed === 1);
   }
 }
+// The undo for step 09 restores the loose self-join (a signed-in person can add themselves with a valid invite).
+{
+  const e2 = await run("apply/undo-step09-0238.sql");
+  check("undo-step09-0238.sql runs" + (e2 ? ": " + e2 : ""), !e2);
+  await db.exec(read("apply/apply-step09-0238.sql"));
+}
 // Re-running a precheck after its step must flag it as already applied (so nobody applies a step twice by mistake) for the steps that say so.
 for (const n of ["02", "04", "05", "06", "08"]) {
   const s = steps.find((x) => x.n === n);
