@@ -15,15 +15,10 @@ export function SetAsideControl({ athleteId, groupId }: { athleteId: string; gro
     let cancelled = false;
     async function load() {
       const supabase = createBrowserClient();
-      const { data, error: loadError } = await supabase
-        .from("group_memberships")
-        .select("inactive_at")
-        .eq("group_id", groupId)
-        .eq("profile_id", athleteId)
-        .maybeSingle();
+      const { data, error: loadError } = await supabase.from("client_inactive").select("since").eq("group_id", groupId).eq("athlete_id", athleteId).maybeSingle();
       if (cancelled) return;
       if (loadError) setState("unavailable");
-      else setState((data as { inactive_at: string | null } | null)?.inactive_at ? "inactive" : "active");
+      else setState(data ? "inactive" : "active");
     }
     load();
     return () => {
@@ -59,8 +54,8 @@ export function SetAsideControl({ athleteId, groupId }: { athleteId: string; gro
       </p>
       <p className="font-body text-xs text-steel mb-2">
         {state === "inactive"
-          ? "Hidden from your dashboard, quiet-client alerts and counts. Their history, sessions and messages are all still here, and a workout, session or message from them brings them back."
-          : "Hide this client from your dashboard and quiet-client alerts without deleting anything. A workout, session or message from them brings them back."}
+          ? "Hidden from your dashboard, quiet-client alerts and counts. Only you can see this, not the client. Their history, sessions and messages are all still here, and a workout, session or message from them brings them back."
+          : "Hide this client from your dashboard and quiet-client alerts without deleting anything. Only you can see this, not the client. A workout, session or message from them brings them back (a session you schedule for them counts). A weekly schedule you already set up keeps running until you end it."}
       </p>
       {state === "active" && (
         <input

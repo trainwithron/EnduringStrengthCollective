@@ -2,16 +2,56 @@
 -- a member with their history, balance and messages intact, but is hidden from dashboards, quiet-client alerts and counts. It is reversible, and a
 -- new workout, session or message from the client brings them back by itself. Nothing is archived automatically; the app only suggests it.
 --
---  * group_memberships.inactive_at / inactive_note: null means active (every existing client).
+--  * client_inactive(athlete, group, since, note): one row per client set aside. It is a SEPARATE coach-only table, not columns on group_memberships,
+--    because every column on group_memberships is readable by the client and (in team groups) by every other member, and the status and the coach's
+--    private reason must not be. Only the group's coach or an org owner or admin can read it; nobody writes it directly.
 --  * set_client_inactive(athlete, group, inactive, note): the coach (or an org owner or admin) sets or clears it.
---  * resurface_inactive_client(): after a workout log, a booking, or a message FROM the client is added, the client is active again.
--- Needs the group_memberships, workout_logs, bookings and direct_messages tables (0001, 0023, 0140). Re-running replaces the functions again.
+--  * resurface_inactive_client(): after a workout log, a booking, or a message FROM the client is added, the client is active again. Bookings the
+--    server makes by itself (the nightly top-up of a weekly schedule) do not count: a client you set aside stays aside. A weekly schedule already
+--    set up keeps running until it is ended separately.
+--  * client_inactive_events: every set-aside and every bring-back (by the coach, or by the client's own activity) with its time. Nothing reads it today.
+--    It exists so that, when plan limits are enforced, the number of clients can be the HIGH-WATER MARK of active clients during the billing period
+--    (peak concurrent active, or distinct clients active at any moment) rather than a snapshot, so flipping clients off and on in rotation gains nothing.
+--    A client brought back by their own activity counts as active from that moment. Plan limits are not enforced today.
+-- Needs the group_memberships, workout_logs, bookings and direct_messages tables (0001, 0023, 0140) and is_group_coach / is_org_admin_of_group.
+-- Re-running replaces the functions again.
 
-alter table public.group_memberships
-  add column if not exists inactive_at timestamptz,
-  add column if not exists inactive_note text;
+create table if not exists public.client_inactive (
+  athlete_id uuid not null references public.profiles(id) on delete cascade,
+  group_id uuid not null references public.groups(id) on delete cascade,
+  since timestamptz not null default now(),
+  note text,
+  set_by uuid references public.profiles(id) on delete set null,
+  primary key (athlete_id, group_id)
+);
+create index if not exists client_inactive_group_idx on public.client_inactive (group_id);
 
-create index if not exists group_memberships_inactive_idx on public.group_memberships (group_id) where inactive_at is not null;
+alter table public.client_inactive enable row level security;
+revoke all on public.client_inactive from public, anon, authenticated;
+grant select on public.client_inactive to authenticated;
+drop policy if exists "client_inactive_select_coach" on public.client_inactive;
+create policy "client_inactive_select_coach" on public.client_inactive for select
+  to authenticated
+  using (public.is_group_coach(group_id) or public.is_org_admin_of_group(group_id));
+
+create table if not exists public.client_inactive_events (
+  id bigserial primary key,
+  athlete_id uuid not null references public.profiles(id) on delete cascade,
+  group_id uuid not null references public.groups(id) on delete cascade,
+  at timestamptz not null default now(),
+  event text not null check (event in ('set_aside', 'brought_back')),
+  source text not null check (source in ('coach', 'client_activity')),
+  by_profile uuid references public.profiles(id) on delete set null
+);
+create index if not exists client_inactive_events_group_idx on public.client_inactive_events (group_id, at);
+alter table public.client_inactive_events enable row level security;
+revoke all on public.client_inactive_events from public, anon, authenticated;
+revoke all on sequence public.client_inactive_events_id_seq from public, anon, authenticated;
+grant select on public.client_inactive_events to authenticated;
+drop policy if exists "client_inactive_events_select_coach" on public.client_inactive_events;
+create policy "client_inactive_events_select_coach" on public.client_inactive_events for select
+  to authenticated
+  using (public.is_group_coach(group_id) or public.is_org_admin_of_group(group_id));
 
 create or replace function public.set_client_inactive(p_athlete_id uuid, p_group_id uuid, p_inactive boolean, p_note text default null)
 returns void
@@ -26,12 +66,21 @@ begin
   if not (public.is_group_coach(p_group_id) or public.is_org_admin_of_group(p_group_id)) then
     raise exception 'not authorized';
   end if;
-  update public.group_memberships
-    set inactive_at = case when p_inactive then now() else null end,
-        inactive_note = case when p_inactive then nullif(btrim(coalesce(p_note, '')), '') else null end
-    where group_id = p_group_id and profile_id = p_athlete_id and role = 'athlete';
-  if not found then
+  if not exists (select 1 from public.group_memberships where group_id = p_group_id and profile_id = p_athlete_id and role = 'athlete') then
     raise exception 'that client is not in this group';
+  end if;
+  if p_inactive then
+    if not exists (select 1 from public.client_inactive where athlete_id = p_athlete_id and group_id = p_group_id) then
+      insert into public.client_inactive_events (athlete_id, group_id, event, source, by_profile) values (p_athlete_id, p_group_id, 'set_aside', 'coach', auth.uid());
+    end if;
+    insert into public.client_inactive (athlete_id, group_id, since, note, set_by)
+    values (p_athlete_id, p_group_id, now(), nullif(btrim(coalesce(p_note, '')), ''), auth.uid())
+    on conflict (athlete_id, group_id) do update set since = now(), note = excluded.note, set_by = excluded.set_by;
+  else
+    if exists (select 1 from public.client_inactive where athlete_id = p_athlete_id and group_id = p_group_id) then
+      delete from public.client_inactive where athlete_id = p_athlete_id and group_id = p_group_id;
+      insert into public.client_inactive_events (athlete_id, group_id, event, source, by_profile) values (p_athlete_id, p_group_id, 'brought_back', 'coach', auth.uid());
+    end if;
   end if;
 end;
 $function$;
@@ -49,16 +98,22 @@ declare
   v_athlete uuid;
   v_group uuid;
 begin
+  -- The server's own routines (the nightly top-up of a weekly schedule) are not the client coming back.
+  if tg_table_name = 'bookings' and auth.role() = 'service_role' then
+    return new;
+  end if;
   if tg_table_name = 'direct_messages' then
     v_athlete := new.sender_id;
-    v_group := new.group_id;
   else
     v_athlete := new.athlete_id;
-    v_group := new.group_id;
   end if;
-  update public.group_memberships
-    set inactive_at = null, inactive_note = null
-    where group_id = v_group and profile_id = v_athlete and role = 'athlete' and inactive_at is not null;
+  v_group := new.group_id;
+  if v_athlete is null then
+    return new;
+  end if;
+  with gone as (delete from public.client_inactive where athlete_id = v_athlete and group_id = v_group returning 1)
+  insert into public.client_inactive_events (athlete_id, group_id, event, source)
+  select v_athlete, v_group, 'brought_back', 'client_activity' from gone;
   return new;
 end;
 $function$;

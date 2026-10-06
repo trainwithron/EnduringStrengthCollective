@@ -21,7 +21,7 @@ describe("inactive clients: wiring and safety", () => {
     expect(panel).not.toMatch(/unresponsive|lazy|ghost|bad client/i);
   });
   it("stays quiet before the database update (a failed lookup returns without showing anything)", () => {
-    expect(panel).toContain("if (memberError) return;");
+    expect(panel).toContain("if (asideError) return;");
     expect(read("../lib/inactive-ids.ts")).toContain("if (error) return new Set();");
   });
   it("a client set aside is left out of the dashboard counts and cards, and the profile has the control", () => {

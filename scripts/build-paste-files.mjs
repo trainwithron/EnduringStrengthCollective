@@ -495,13 +495,12 @@ drop function if exists public.undo_expired_reinstatement(uuid, uuid, integer);
 drop function if exists public.reinstate_expired_credits(uuid, uuid, integer, text);
 drop function if exists public.set_credit_expiry_hold(uuid, uuid, timestamptz, text);
 drop function if exists public.reinstatable_expired_credits(uuid, uuid);
-drop table if exists public.session_credit_reinstatements;
 drop trigger if exists session_credits_audit on public.session_credits;
 create trigger session_credits_audit after insert or update on public.session_credits
   for each row execute function public.audit_watch('balance,payment_hold', 'insert_too', 'athlete_id,group_id');
 alter table public.coach_booking_policies drop column if exists expiry_heads_up_days;
 alter table public.session_credits drop column if exists expiry_hold_until;`,
-    undoWhy: "Only if something about session balances or the expiry job misbehaves after step 22. It refuses (changes nothing) while any client still has expiry on hold, because removing the hold column would let their sessions expire at the next nightly run: clear the holds first. Otherwise it removes the three override functions, the helper, the give-back record table and the two new columns, and puts the audit trigger back (reinstated sessions stay on balances and in the ledger).",
+    undoWhy: "Only if something about session balances or the expiry job misbehaves after step 22. It refuses (changes nothing) while any client still has expiry on hold, because removing the hold column would let their sessions expire at the next nightly run: clear the holds first. Otherwise it removes the three override functions, the helper, and the two new columns, and puts the audit trigger back. The give-back record table (session_credit_reinstatements) is KEPT on purpose, so applying step 22 again later can never let the same expired sessions be given back twice (reinstated sessions stay on balances and in the ledger).",
     rows: [
       ["0209 is applied (credit expiry exists)", `${has.col("coach_booking_policies", "credit_expiry_days")} and ${has.col("session_credits", "last_granted_at")}`],
       ["0246 and 0248 are applied (the ledger and the internal credit function exist)", `${has.table("session_credit_ledger")} and ${has.fnName("apply_session_credit_change")}`],
@@ -513,23 +512,22 @@ alter table public.session_credits drop column if exists expiry_hold_until;`,
   {
     n: "23",
     slug: "0281",
-    title: "0281 inactive clients: a coach can set a client aside as inactive (reversible, nothing deleted), and a workout, session or message from the client brings them back",
+    title: "0281 inactive clients: a coach can set a client aside as inactive (reversible, nothing deleted, coach-only), and a workout, session or message from the client brings them back",
     migrations: ["0281"],
     sees: "Success. No rows returned.",
-    afterwards: "Nothing visible changes at once. After the code deploy: under Needs your decision a client who has been quiet for about four months with a few other signs gets a neutral card (Send a door-open note, Set aside as inactive, Keep active, Not now), and a client profile gets a Set aside / Bring back control. A set-aside client is hidden from your dashboard and quiet-client alerts; their history, balance and messages stay. Nothing is archived or sent automatically.",
+    afterwards: "Nothing visible changes at once. After the code deploy: under Needs your decision a client who has been quiet for about four months with a few other signs gets a neutral card (Send a door-open note, Set aside as inactive, Keep active, Not now), and a client profile gets a Set aside / Bring back control. A set-aside client is hidden from your dashboard and quiet-client alerts; their history, balance and messages stay. Only you (their coach or an org owner or admin) can see that someone is set aside, never the client or their teammates. Nothing is archived or sent automatically.",
     undo: `drop trigger if exists direct_messages_resurface_client on public.direct_messages;
 drop trigger if exists bookings_resurface_client on public.bookings;
 drop trigger if exists workout_logs_resurface_client on public.workout_logs;
 drop function if exists public.resurface_inactive_client();
 drop function if exists public.set_client_inactive(uuid, uuid, boolean, text);
-drop index if exists public.group_memberships_inactive_idx;
-alter table public.group_memberships drop column if exists inactive_note;
-alter table public.group_memberships drop column if exists inactive_at;`,
-    undoWhy: "Only if set-aside clients or the new triggers misbehave after step 23. Removes the three triggers, the two functions and the two new columns on group memberships. Anyone currently set aside simply shows as active again (nothing else about them changes).",
+drop table if exists public.client_inactive;
+drop table if exists public.client_inactive_events;`,
+    undoWhy: "Only if set-aside clients or the new triggers misbehave after step 23. Removes the three triggers, the two functions, the coach-only set-aside table and its event log. Anyone currently set aside simply shows as active again (nothing else about them changes).",
     rows: [
       ["group_memberships, workout_logs, bookings and direct_messages exist", `${has.table("group_memberships")} and ${has.table("workout_logs")} and ${has.table("bookings")} and ${has.table("direct_messages")}`],
       ["is_org_admin_of_group exists", has.fnName("is_org_admin_of_group")],
-      ["0281 is not already applied (the inactive column is not there yet)", has.noCol("group_memberships", "inactive_at")],
+      ["0281 is not already applied (the set-aside table is not there yet)", has.noTable("client_inactive")],
     ],
   },
 ];
@@ -665,7 +663,7 @@ for (const s of STEPS) {
     m("0278", has.col("coach_booking_policies", "booking_mode")),
     m("0279", has.table("booking_requests")),
     m("0280", has.col("session_credits", "expiry_hold_until")),
-    m("0281", has.col("group_memberships", "inactive_at")),
+    m("0281", has.table("client_inactive")),
   ];
   const values = items.map((i) => `    ('2026100600${i.n.slice(1)}', '${i.file.slice(5, -4)}', '${i.file}', ${i.marker})`).join(",\n");
   const sql = [

@@ -54,12 +54,15 @@ export function InactiveClientsPanel() {
         .from("group_memberships")
         .select("group_id, profile_id, joined_at")
         .in("group_id", groupIds)
-        .eq("role", "athlete")
-        .is("inactive_at", null);
+        .eq("role", "athlete");
       if (memberError) return;
+      // Anyone already set aside is left out. If the table is not there yet (the 0281 update is not applied) the card stays hidden.
+      const { data: aside, error: asideError } = await supabase.from("client_inactive").select("group_id, athlete_id").in("group_id", groupIds);
+      if (asideError) return;
+      const alreadyAside = new Set(((aside ?? []) as { group_id: string; athlete_id: string }[]).map((r) => `${r.group_id}:${r.athlete_id}`));
       const cutoff = new Date(now.getTime() - INACTIVE_AFTER_DAYS * DAY);
       const old = ((members ?? []) as { group_id: string; profile_id: string; joined_at: string | null }[]).filter(
-        (m) => m.profile_id !== user.id && (!m.joined_at || new Date(m.joined_at).getTime() < cutoff.getTime())
+        (m) => m.profile_id !== user.id && !alreadyAside.has(`${m.group_id}:${m.profile_id}`) && (!m.joined_at || new Date(m.joined_at).getTime() < cutoff.getTime())
       );
       if (old.length === 0) return;
       const athleteIds = Array.from(new Set(old.map((m) => m.profile_id)));
