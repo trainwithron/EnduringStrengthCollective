@@ -68,10 +68,7 @@ declare
   v_ls timestamp;
   v_le timestamp;
 begin
-  select coalesce(pr.timezone, 'America/New_York') into v_tz from public.profiles pr where pr.id = p_coach_id;
-  if v_tz is null or not exists (select 1 from pg_timezone_names where name = v_tz) then
-    v_tz := 'America/New_York';
-  end if;
+  v_tz := coalesce(public.coach_time_zone(p_coach_id), 'America/New_York');
   v_ls := p_start at time zone v_tz;
   v_le := p_end at time zone v_tz;
   if v_ls::date <> v_le::date then
@@ -100,8 +97,8 @@ begin
 end;
 $function$;
 
-revoke all on function public.coach_time_is_open(uuid, timestamptz, timestamptz) from public, anon;
-grant execute on function public.coach_time_is_open(uuid, timestamptz, timestamptz) to authenticated, service_role;
+revoke all on function public.coach_time_is_open(uuid, timestamptz, timestamptz) from public, anon, authenticated;
+grant execute on function public.coach_time_is_open(uuid, timestamptz, timestamptz) to service_role;
 
 -- Shared checks for both kinds of request: notice, hours and time off, and a free slot with the buffer.
 create or replace function public.check_booking_request_slot(p_coach_id uuid, p_ignore_booking_id uuid, p_start timestamp with time zone, p_end timestamp with time zone)
@@ -149,8 +146,8 @@ begin
 end;
 $function$;
 
-revoke all on function public.check_booking_request_slot(uuid, uuid, timestamptz, timestamptz) from public, anon;
-grant execute on function public.check_booking_request_slot(uuid, uuid, timestamptz, timestamptz) to authenticated, service_role;
+revoke all on function public.check_booking_request_slot(uuid, uuid, timestamptz, timestamptz) from public, anon, authenticated;
+grant execute on function public.check_booking_request_slot(uuid, uuid, timestamptz, timestamptz) to service_role;
 
 create or replace function public.request_booking(p_coach_id uuid, p_athlete_id uuid, p_group_id uuid, p_start_at timestamp with time zone, p_end_at timestamp with time zone)
 returns uuid
@@ -180,6 +177,11 @@ begin
   if p_start_at <= now() then
     raise exception 'that time has already passed';
   end if;
+  if public.coach_time_zone(p_coach_id) is null then
+    raise exception 'your coach has not set a time zone yet';
+  end if;
+  -- Lock the client's row so two requests at the same moment cannot both pass the cap.
+  perform 1 from public.profiles where id = p_athlete_id for update;
   if (select count(*) from public.booking_requests where athlete_id = p_athlete_id and status = 'pending') >= 3 then
     raise exception 'you already have 3 requests waiting for your coach';
   end if;
@@ -194,8 +196,7 @@ begin
     raise exception 'you already asked for that time; your coach has not answered yet';
   end;
 
-  select coalesce(pr.timezone, 'America/New_York') into v_tz from public.profiles pr where pr.id = p_coach_id;
-  if v_tz is null or not exists (select 1 from pg_timezone_names where name = v_tz) then v_tz := 'America/New_York'; end if;
+  v_tz := coalesce(public.coach_time_zone(p_coach_id), 'America/New_York');
   select full_name into v_name from public.profiles where id = p_athlete_id;
   insert into public.notifications (profile_id, group_id, type, body, link_path)
   values (p_coach_id, p_group_id, 'booking_request',
@@ -248,6 +249,10 @@ begin
   elsif public.coach_booking_mode(v_coach_id) <> 'request' then
     raise exception 'your coach schedules your sessions';
   end if;
+  if public.coach_time_zone(v_coach_id) is null then
+    raise exception 'your coach has not set a time zone yet';
+  end if;
+  perform 1 from public.profiles where id = v_athlete_id for update;
   if (select count(*) from public.booking_requests where athlete_id = v_athlete_id and status = 'pending') >= 3 then
     raise exception 'you already have 3 requests waiting for your coach';
   end if;
@@ -262,8 +267,7 @@ begin
     raise exception 'you already asked to move this session; your coach has not answered yet';
   end;
 
-  select coalesce(pr.timezone, 'America/New_York') into v_tz from public.profiles pr where pr.id = v_coach_id;
-  if v_tz is null or not exists (select 1 from pg_timezone_names where name = v_tz) then v_tz := 'America/New_York'; end if;
+  v_tz := coalesce(public.coach_time_zone(v_coach_id), 'America/New_York');
   select full_name into v_name from public.profiles where id = v_athlete_id;
   insert into public.notifications (profile_id, group_id, type, body, link_path)
   values (v_coach_id, v_group_id, 'booking_request',
@@ -307,8 +311,7 @@ begin
     raise exception 'this request was already answered';
   end if;
 
-  select coalesce(pr.timezone, 'America/New_York') into v_tz from public.profiles pr where pr.id = r.coach_id;
-  if v_tz is null or not exists (select 1 from pg_timezone_names where name = v_tz) then v_tz := 'America/New_York'; end if;
+  v_tz := coalesce(public.coach_time_zone(r.coach_id), 'America/New_York');
   v_when := to_char(r.new_start_at at time zone v_tz, 'Dy Mon FMDD, FMHH12:MI AM');
 
   if r.kind = 'move' then
@@ -316,6 +319,10 @@ begin
     -- The session was cancelled, has started, or was moved some other way since the client asked: the request just closes.
     if v_b.id is null or v_b.status <> 'confirmed' or v_b.start_at <= now() or v_b.start_at <> r.from_start_at then
       update public.booking_requests set status = 'cancelled', decided_at = now(), decided_by = auth.uid() where id = r.id;
+      insert into public.notifications (profile_id, group_id, type, body, link_path)
+      values (r.athlete_id, r.group_id, 'request_decision',
+        'Your session changed, so your request to move it was closed. You can ask again.',
+        '/groups/' || r.group_id::text || '/calendar');
       return 'closed';
     end if;
   end if;
@@ -333,6 +340,10 @@ begin
 
   if r.new_start_at <= now() then
     update public.booking_requests set status = 'expired', decided_at = now(), decided_by = auth.uid() where id = r.id;
+    insert into public.notifications (profile_id, group_id, type, body, link_path)
+    values (r.athlete_id, r.group_id, 'request_decision',
+      'The time you asked for (' || v_when || ') has passed, so your request was closed. You can ask for another time.',
+      '/groups/' || r.group_id::text || '/calendar');
     return 'closed';
   end if;
 
@@ -368,6 +379,8 @@ begin
   if r.kind = 'new' then
     if not public.is_training_client_of_group(r.group_id, r.athlete_id) then
       update public.booking_requests set status = 'cancelled', decided_at = now(), decided_by = auth.uid() where id = r.id;
+      insert into public.notifications (profile_id, group_id, type, body, link_path)
+      values (r.athlete_id, r.group_id, 'request_decision', 'Your request was closed. Message your coach if you still need a session.', '/groups/' || r.group_id::text || '/calendar');
       return 'closed';
     end if;
     -- Booked the way a coach books: no session is taken until it is attended.
@@ -382,7 +395,7 @@ begin
       set start_at = r.new_start_at, end_at = r.new_end_at, reminder_sent_at = null
       where id = r.booking_id;
     -- Same rule as a direct move (0277), judged when the client ASKED: inside the cancellation window it is flagged for Charge or Waive.
-    if (r.from_start_at - r.created_at) < make_interval(hours => v_window_hours) then
+    if (r.from_start_at - r.created_at) < make_interval(hours => v_window_hours) and v_b.credit_state in ('prepaid', 'settled', 'unsettled') then
       update public.bookings set late_change_kind = 'reschedule', late_charge_state = 'flagged' where id = r.booking_id;
       select full_name into v_name from public.profiles where id = r.athlete_id;
       insert into public.notifications (profile_id, group_id, type, body, link_path)
@@ -444,8 +457,7 @@ begin
     for update
   loop
     update public.booking_requests set status = 'expired', decided_at = now() where id = r.id;
-    select coalesce(pr.timezone, 'America/New_York') into v_tz from public.profiles pr where pr.id = r.coach_id;
-    if v_tz is null or not exists (select 1 from pg_timezone_names where name = v_tz) then v_tz := 'America/New_York'; end if;
+    v_tz := coalesce(public.coach_time_zone(r.coach_id), 'America/New_York');
     insert into public.notifications (profile_id, group_id, type, body, link_path)
     values (r.athlete_id, r.group_id, 'request_decision',
       'Your request for ' || to_char(r.new_start_at at time zone v_tz, 'Dy Mon FMDD, FMHH12:MI AM') || ' was not answered in time, so it has lapsed. Message your coach if you still need it.',
@@ -485,6 +497,7 @@ declare
   v_buffer_minutes int;
   v_minimum_notice_hours int;
   v_athlete_name text;
+  v_credit_state text;
 begin
   if auth.role() = 'service_role' then
     null;
@@ -492,8 +505,8 @@ begin
     raise exception 'Not authorized to reschedule this booking';
   end if;
 
-  select athlete_id, group_id, coach_id, status, start_at, end_at
-    into v_athlete_id, v_group_id, v_coach_id, v_status, v_start_at, v_end_at
+  select athlete_id, group_id, coach_id, status, start_at, end_at, credit_state
+    into v_athlete_id, v_group_id, v_coach_id, v_status, v_start_at, v_end_at, v_credit_state
   from public.bookings where id = p_booking_id
   for update;
 
@@ -556,7 +569,7 @@ begin
     set start_at = p_new_start_at, end_at = p_new_end_at, reminder_sent_at = null
     where id = p_booking_id;
 
-  if (v_start_at - now()) < make_interval(hours => v_window_hours) then
+  if (v_start_at - now()) < make_interval(hours => v_window_hours) and v_credit_state in ('prepaid', 'settled', 'unsettled') then
     -- A late move is FLAGGED for the coach, who decides whether it counts (Charge or Waive). No session is taken automatically.
     update public.bookings
       set late_change_kind = 'reschedule', late_charge_state = 'flagged'

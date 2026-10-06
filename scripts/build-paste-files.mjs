@@ -432,8 +432,9 @@ ${fnFrom0218("join_booking_waitlist")}
 
 drop function if exists public.assert_client_may_book_directly(uuid, uuid, uuid);
 drop function if exists public.coach_booking_mode(uuid);
+drop function if exists public.coach_time_zone(uuid);
 alter table public.coach_booking_policies drop column if exists booking_mode;`,
-    undoWhy: "Only if booking a session breaks after step 20. Puts book_session, the weekly-schedule function and the waiting-list function back to the previous versions (clients can book themselves again) and removes the mode column and its two helper functions.",
+    undoWhy: "Only if booking a session breaks after step 20. Puts book_session, the weekly-schedule function and the waiting-list function back to the previous versions (clients can book themselves again) and removes the mode column and its three helper functions.",
     rows: [
       ["0248 is applied (book_session settles credits)", `${has.fnName("book_session")} and ${has.col("bookings", "credit_state")}`],
       ["coach_booking_policies exists", has.table("coach_booking_policies")],
@@ -473,7 +474,7 @@ alter table public.notifications add constraint notifications_type_check
       ["0278 is applied (the booking mode exists)", `${has.col("coach_booking_policies", "booking_mode")} and ${has.fnName("coach_booking_mode")}`],
       ["coach_availability_windows, coach_availability_exceptions and discovery_bookings exist", `${has.table("coach_availability_windows")} and ${has.table("coach_availability_exceptions")} and ${has.table("discovery_bookings")}`],
       ["is_org_admin_of_group and offer_freed_slot_to_waitlist exist", `${has.fnName("is_org_admin_of_group")} and ${has.fnName("offer_freed_slot_to_waitlist")}`],
-      ["0279 is not already applied (the live reschedule_booking is exactly the step 19 version, and there is no request table yet)", `${md5Is("reschedule_booking(uuid, timestamptz, timestamptz)", "1df6fdc5b7ed651158e1d39b99312519")} and ${has.noTable("booking_requests")}`],
+      ["0279 is not already applied (the live reschedule_booking is exactly the step 19 version, and there is no request table yet)", `${md5Is("reschedule_booking(uuid, timestamptz, timestamptz)", "1283df1e48a57927374db97199ad00eb")} and ${has.noTable("booking_requests")}`],
     ],
   },
 ];

@@ -14,5 +14,5 @@ from (
     ('is_org_admin_of_group and offer_freed_slot_to_waitlist exist',
       exists (select 1 from pg_proc where proname = 'is_org_admin_of_group' and pronamespace = 'public'::regnamespace) and exists (select 1 from pg_proc where proname = 'offer_freed_slot_to_waitlist' and pronamespace = 'public'::regnamespace)),
     ('0279 is not already applied (the live reschedule_booking is exactly the step 19 version, and there is no request table yet)',
-      coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = '1df6fdc5b7ed651158e1d39b99312519' from pg_proc p where p.oid = to_regprocedure('public.reschedule_booking(uuid, timestamptz, timestamptz)')), false) and to_regclass('public.booking_requests') is null)
+      coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = '1283df1e48a57927374db97199ad00eb' from pg_proc p where p.oid = to_regprocedure('public.reschedule_booking(uuid, timestamptz, timestamptz)')), false) and to_regclass('public.booking_requests') is null)
 ) as checks(check_name, ok);

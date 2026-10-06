@@ -109,6 +109,11 @@ export default async function AvailabilityPage(
         </p>
       </div>
 
+      {!coachProfile?.timezone && (
+        <p className="font-body text-sm text-rust border border-rust/40 bg-rust/5 p-3 mb-4 max-w-md" role="status">
+          Set your time zone below. Until you do, clients cannot send you a booking request, and your hours are read in Eastern time.
+        </p>
+      )}
       <TimezoneControl initialTimezone={coachProfile?.timezone ?? null} />
 
       <BookingPolicyControl

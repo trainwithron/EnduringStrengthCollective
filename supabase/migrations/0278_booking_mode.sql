@@ -5,17 +5,36 @@
 -- Existing coaches start as 'coach_schedules' (the safest). A coach changes it on the Availability page; Ron sets his to 'request'.
 --
 --  * coach_booking_policies.booking_mode (default 'coach_schedules').
+--  * coach_time_zone(coach): the coach's profile zone, or null when none is set. create_recurring_booking_series uses it (America/New_York when null,
+--    the app default) instead of its old UTC fallback, so a coach with no zone no longer gets weekly sessions on UTC time.
 --  * coach_booking_mode(coach): the mode, 'coach_schedules' when the coach has no policy row.
 --  * assert_client_may_book_directly(coach, athlete, group): refuses a client booking directly unless the mode is 'free'. A coach acting for
 --    a client, a coach booking themselves (a self-coach account) and the server's own routines are never refused.
 --  * book_session, create_recurring_booking_series and join_booking_waitlist call it first. Each is the live text with only that call added
 --    (the paste step checks the live text first). A weekly schedule or a waiting-list join is also a way to book, so they follow the same rule.
 --  * Moving an existing session is handled in step 21 (reschedule_booking).
+-- The helper functions are internal: signed-in users cannot execute them, only the booking functions (which run as their owner) call them.
 -- Needs 0248, 0218 and 0208 (coach_booking_policies). Re-running replaces the functions again.
 
 alter table public.coach_booking_policies
   add column if not exists booking_mode text not null default 'coach_schedules'
     check (booking_mode in ('free', 'request', 'coach_schedules'));
+
+-- The coach's own time zone from their profile, or null when none is set (or it is not a real zone). One place, so every booking function agrees;
+-- the screens' default for a coach with none is America/New_York (lib/timezone.ts).
+create or replace function public.coach_time_zone(p_coach_id uuid)
+returns text
+language sql
+stable
+security definer
+set search_path to 'public'
+as $function$
+  select pr.timezone from public.profiles pr
+  where pr.id = p_coach_id and pr.timezone is not null and exists (select 1 from pg_timezone_names n where n.name = pr.timezone);
+$function$;
+
+revoke all on function public.coach_time_zone(uuid) from public, anon, authenticated;
+grant execute on function public.coach_time_zone(uuid) to service_role;
 
 create or replace function public.coach_booking_mode(p_coach_id uuid)
 returns text
@@ -27,8 +46,9 @@ as $function$
   select coalesce((select bp.booking_mode from public.coach_booking_policies bp where bp.coach_id = p_coach_id), 'coach_schedules');
 $function$;
 
-revoke all on function public.coach_booking_mode(uuid) from public, anon;
-grant execute on function public.coach_booking_mode(uuid) to authenticated, service_role;
+-- Internal: only the booking functions (which run as their owner) call it, so signed-in users cannot ask it about another coach.
+revoke all on function public.coach_booking_mode(uuid) from public, anon, authenticated;
+grant execute on function public.coach_booking_mode(uuid) to service_role;
 
 -- Raises when a client acting for themselves may not book directly under this coach's booking mode. A coach acting for a client, a coach
 -- booking themselves as their own client (a self-coach account), and the server's own routines are never refused.
@@ -57,8 +77,8 @@ begin
 end;
 $function$;
 
-revoke all on function public.assert_client_may_book_directly(uuid, uuid, uuid) from public, anon;
-grant execute on function public.assert_client_may_book_directly(uuid, uuid, uuid) to authenticated, service_role;
+revoke all on function public.assert_client_may_book_directly(uuid, uuid, uuid) from public, anon, authenticated;
+grant execute on function public.assert_client_may_book_directly(uuid, uuid, uuid) to service_role;
 
 -- ---- booking ----
 create or replace function public.book_session(p_coach_id uuid, p_athlete_id uuid, p_group_id uuid, p_start_at timestamp with time zone, p_end_at timestamp with time zone)
@@ -185,10 +205,7 @@ begin
   end if;
 
   -- The coach's own time zone, so "8:00 every Tuesday" stays 8:00 when the clocks change.
-  select coalesce(pr.timezone, 'UTC') into v_tz from public.profiles pr where pr.id = p_coach_id;
-  if v_tz is null or not exists (select 1 from pg_timezone_names where name = v_tz) then
-    v_tz := 'UTC';
-  end if;
+  v_tz := coalesce(public.coach_time_zone(p_coach_id), 'America/New_York');
 
   insert into public.recurring_booking_series (coach_id, athlete_id, group_id, weekday, start_time, duration_minutes, occurrences_total)
   values (p_coach_id, p_athlete_id, p_group_id, extract(dow from p_first_start_at at time zone v_tz)::smallint, (p_first_start_at at time zone v_tz)::time, p_duration_minutes, p_occurrences_total)

@@ -23,6 +23,7 @@ async function setup(db, h, label, mode) {
   await h.member(group, ann);
   await h.member(group, bob);
   await h.asSuper();
+  await db.query(`update public.profiles set timezone = 'America/New_York' where id = $1`, [coach]);
   await db.query(`insert into public.coach_booking_policies (coach_id, cancellation_window_hours, booking_mode) values ($1, 24, $2) on conflict (coach_id) do update set cancellation_window_hours = 24, booking_mode = $2`, [coach, mode]);
   for (let wd = 0; wd <= 6; wd++) {
     await db.query(`insert into public.coach_availability_windows (coach_id, weekday, start_time, end_time, slot_duration_minutes) values ($1, $2, '08:00', '20:00', 60)`, [coach, wd]);
@@ -76,6 +77,14 @@ export default {
       const askFree = await ask(db, sFree, sFree.ann, day(9));
       await h.asSuper();
       h.check("free mode: asking is refused ('you can book this directly')", /book this directly/.test(askFree.error ?? ""), JSON.stringify(askFree));
+
+      // a coach with no time zone set is refused with a plain message
+      const sNoTz = await setup(db, h, "R3b", "request");
+      await db.query(`update public.profiles set timezone = null where id = $1`, [sNoTz.coach]);
+      await h.as(sNoTz.ann);
+      const noTz = await ask(db, sNoTz, sNoTz.ann, day(10));
+      await h.asSuper();
+      h.check("a request to a coach who has not set a time zone is refused in plain words", /has not set a time zone/.test(noTz.error ?? ""), JSON.stringify(noTz));
 
       // ---- a NEW request
       await h.as(s.ann);
@@ -213,6 +222,25 @@ export default {
       await h.asSuper();
       h.check("if the session was cancelled meanwhile, the request just closes", gc.rows?.[0]?.r === "closed", JSON.stringify(gc));
 
+      // a late move of a session the coach already waived is not flagged (direct or confirmed)
+      const sF = await setup(db, h, "R4", "free");
+      const waived = await booking(db, sF, sF.ann, soon(3), "waived");
+      await h.as(sF.ann);
+      await tryQ(db, `select * from public.reschedule_booking($1, $2, $3)`, [waived, day(5), plus(day(5), 1)]);
+      await h.asSuper();
+      h.check("a late direct move of a waived session is not flagged", (await h.one(`select late_charge_state from public.bookings where id = $1`, [waived])).late_charge_state === null, "");
+      const waivedReq = await booking(db, s, s.ann, soon(3), "waived");
+      await h.as(s.ann);
+      const wr = await tryQ(db, `select public.request_booking_move($1, $2, $3) as id`, [waivedReq, day(30), plus(day(30), 1)]);
+      await h.as(s.coach);
+      await tryQ(db, `select public.resolve_booking_request($1, true)`, [wr.rows?.[0]?.id]);
+      await h.asSuper();
+      h.check("a confirmed late move of a waived session is not flagged either", (await h.one(`select late_charge_state from public.bookings where id = $1`, [waivedReq])).late_charge_state === null, "");
+
+      // the client is told when a request closes because the session changed
+      const closedNote = await h.rows(`select body from public.notifications where profile_id = $1 and type = 'request_decision' and body like '%session changed%'`, [s.ann]);
+      h.check("a request that closes because the session changed tells the client", closedNote.length >= 1, JSON.stringify(closedNote));
+
       // row security and privileges
       await h.as(s.other);
       const strangers = await tryQ(db, `select count(*)::int as n from public.booking_requests`);
@@ -222,6 +250,8 @@ export default {
       h.check("an unrelated coach sees no requests and a client cannot write one directly", strangers.rows?.[0]?.n === 0 && !!forged.error, JSON.stringify({ strangers, forged }));
       const priv = await h.one(`select has_function_privilege('anon', 'public.request_booking(uuid, uuid, uuid, timestamptz, timestamptz)', 'execute') as a, has_function_privilege('anon', 'public.resolve_booking_request(uuid, boolean)', 'execute') as b, has_function_privilege('authenticated', 'public.expire_stale_booking_requests()', 'execute') as c`);
       h.check("the request functions are closed to the signed-out role and expiry is server-only", priv.a === false && priv.b === false && priv.c === false, JSON.stringify(priv));
+      const internal = await h.one(`select has_function_privilege('authenticated', 'public.coach_time_is_open(uuid, timestamptz, timestamptz)', 'execute') as a, has_function_privilege('authenticated', 'public.check_booking_request_slot(uuid, uuid, timestamptz, timestamptz)', 'execute') as b`);
+      h.check("the two slot-check helpers are not executable by signed-in users (no probing another coach's availability)", internal.a === false && internal.b === false, JSON.stringify(internal));
     },
   },
 };

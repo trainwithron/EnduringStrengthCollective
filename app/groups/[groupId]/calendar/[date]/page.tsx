@@ -249,6 +249,8 @@ export default async function CoachDayDetailPage(
         .maybeSingle();
       // Until the database update that adds the switch is applied, the select errors and booking behaves as before.
       if (!sb.error) bookingMode = ((sb.data?.booking_mode as string | null) ?? "coach_schedules") as typeof bookingMode;
+    // A coach (booking for a client they are viewing as, or for themselves) is never refused: they book directly.
+    if (membership.role === "coach") bookingMode = "free";
     }
     if (bookingMode === "coach_schedules") {
       slots = slots.filter((s) => bookingByTime.get(s.start.getTime())?.athlete_id === athleteId);

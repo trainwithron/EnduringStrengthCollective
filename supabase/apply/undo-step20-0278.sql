@@ -1,4 +1,4 @@
--- UNDO for step 20 (0278). Only if booking a session breaks after step 20. Puts book_session, the weekly-schedule function and the waiting-list function back to the previous versions (clients can book themselves again) and removes the mode column and its two helper functions.
+-- UNDO for step 20 (0278). Only if booking a session breaks after step 20. Puts book_session, the weekly-schedule function and the waiting-list function back to the previous versions (clients can book themselves again) and removes the mode column and its three helper functions.
 -- WHAT YOU SHOULD SEE: "Success. No rows returned."   Then tell Spot, and do not run the step again until Spot says why it failed.
 begin;
 create or replace function public.book_session(p_coach_id uuid, p_athlete_id uuid, p_group_id uuid, p_start_at timestamp with time zone, p_end_at timestamp with time zone)
@@ -194,5 +194,6 @@ $function$;
 
 drop function if exists public.assert_client_may_book_directly(uuid, uuid, uuid);
 drop function if exists public.coach_booking_mode(uuid);
+drop function if exists public.coach_time_zone(uuid);
 alter table public.coach_booking_policies drop column if exists booking_mode;
 commit;

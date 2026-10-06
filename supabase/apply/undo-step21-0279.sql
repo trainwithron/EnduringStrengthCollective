@@ -18,6 +18,7 @@ declare
   v_buffer_minutes int;
   v_minimum_notice_hours int;
   v_athlete_name text;
+  v_credit_state text;
 begin
   if auth.role() = 'service_role' then
     null;
@@ -25,8 +26,8 @@ begin
     raise exception 'Not authorized to reschedule this booking';
   end if;
 
-  select athlete_id, group_id, coach_id, status, start_at, end_at
-    into v_athlete_id, v_group_id, v_coach_id, v_status, v_start_at, v_end_at
+  select athlete_id, group_id, coach_id, status, start_at, end_at, credit_state
+    into v_athlete_id, v_group_id, v_coach_id, v_status, v_start_at, v_end_at, v_credit_state
   from public.bookings where id = p_booking_id
   for update;
 
@@ -80,7 +81,7 @@ begin
     set start_at = p_new_start_at, end_at = p_new_end_at, reminder_sent_at = null
     where id = p_booking_id;
 
-  if (v_start_at - now()) < make_interval(hours => v_window_hours) then
+  if (v_start_at - now()) < make_interval(hours => v_window_hours) and v_credit_state in ('prepaid', 'settled', 'unsettled') then
     -- A late move is FLAGGED for the coach, who decides whether it counts (Charge or Waive). No session is taken automatically.
     update public.bookings
       set late_change_kind = 'reschedule', late_charge_state = 'flagged'

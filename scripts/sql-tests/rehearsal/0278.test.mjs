@@ -90,8 +90,20 @@ export default {
       h.check("another coach's setting does not apply, and a client cannot change their coach's mode", !!stillOff.error, JSON.stringify({ selfSet, stillOff }));
       const bad = await tryQ(db, `update public.coach_booking_policies set booking_mode = 'anything' where coach_id = $1`, [s.coach]);
       h.check("an unknown mode is rejected by the database", !!bad.error, JSON.stringify(bad));
-      const anon = await h.one(`select has_function_privilege('anon', 'public.coach_booking_mode(uuid)', 'execute') as a, has_function_privilege('anon', 'public.assert_client_may_book_directly(uuid, uuid, uuid)', 'execute') as b`);
-      h.check("the new functions are closed to the signed-out role", anon.a === false && anon.b === false, JSON.stringify(anon));
+      const priv = await h.one(`select
+          has_function_privilege('anon', 'public.coach_booking_mode(uuid)', 'execute') as a,
+          has_function_privilege('authenticated', 'public.coach_booking_mode(uuid)', 'execute') as b,
+          has_function_privilege('authenticated', 'public.assert_client_may_book_directly(uuid, uuid, uuid)', 'execute') as c,
+          has_function_privilege('authenticated', 'public.coach_time_zone(uuid)', 'execute') as d,
+          has_function_privilege('service_role', 'public.coach_booking_mode(uuid)', 'execute') as e`);
+      h.check("the internal helpers are closed to signed-out and signed-in users (one coach cannot ask about another), open to the server", priv.a === false && priv.b === false && priv.c === false && priv.d === false && priv.e === true, JSON.stringify(priv));
+      await h.asSuper();
+      const tzNone = await h.one(`select public.coach_time_zone($1) as z`, [s.coach]);
+      await db.query(`update public.profiles set timezone = 'America/Los_Angeles' where id = $1`, [s.coach]);
+      const tzSet = await h.one(`select public.coach_time_zone($1) as z`, [s.coach]);
+      await db.query(`update public.profiles set timezone = 'Not/AZone' where id = $1`, [s.coach]);
+      const tzBad = await h.one(`select public.coach_time_zone($1) as z`, [s.coach]);
+      h.check("coach_time_zone: the profile zone, or null when none is set or it is not a real zone", tzNone.z === null && tzSet.z === "America/Los_Angeles" && tzBad.z === null, JSON.stringify({ tzNone, tzSet, tzBad }));
     },
   },
 };
