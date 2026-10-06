@@ -3,15 +3,24 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import Link from "next/link";
 import { detectTrainingIntent } from "@/lib/training-intent";
+import { clientNameInProgramName, type NamedClient } from "@/lib/program-client-name";
 
 export function NewProgramForm({
   groupId,
   createdBy,
   athleteId,
+  groupName,
+  sharedGroup,
+  soloClients,
 }: {
   groupId: string;
   createdBy: string;
+  groupName: string;
+  // True for a team or social group: a program made here (not for one person) is visible to everyone in it.
+  sharedGroup: boolean;
+  soloClients: NamedClient[];
   // Personal-program mode (injury_pain_science_research_and_ai_gap_
   // sept15.md's "Build with AI" entry point also preserves this on the
   // "Start blank" tab) — real bug found during the same-night regression
@@ -24,12 +33,18 @@ export function NewProgramForm({
   const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [shareAnyway, setShareAnyway] = useState(false);
   const router = useRouter();
+  const namedClient = sharedGroup && !athleteId ? clientNameInProgramName(name, soloClients) : null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmedName = name.trim();
     if (!trimmedName) return;
+    if (namedClient && !shareAnyway) {
+      setError(`This looks like ${namedClient.fullName}'s program. Build it in their own space, or tick the box to share it with everyone in ${groupName}.`);
+      return;
+    }
 
     setSubmitting(true);
     setError(null);
@@ -95,6 +110,22 @@ export function NewProgramForm({
           className="w-full mt-1 bg-surface border border-steel/30 text-chalk px-3 py-2 font-body focus:outline-none focus:border-rust resize-none"
         />
       </div>
+
+      {namedClient && (
+        <div className="border border-yellow-500/40 bg-yellow-500/5 p-3" role="note">
+          <p className="font-body text-sm text-chalk">
+            That looks like {namedClient.fullName}&apos;s name. A program made here is shared with everyone in {groupName}, so they
+            would see it.
+          </p>
+          <Link href={`/groups/${namedClient.groupId}/programs/new`} className="inline-block mt-2 font-body text-sm text-rust underline">
+            Build it in {namedClient.fullName}&apos;s own space instead
+          </Link>
+          <label className="flex items-start gap-2 mt-3 font-body text-xs text-steel cursor-pointer">
+            <input type="checkbox" checked={shareAnyway} onChange={(e) => setShareAnyway(e.target.checked)} className="mt-0.5 w-4 h-4 accent-rust" />
+            I mean to share this with everyone in {groupName}
+          </label>
+        </div>
+      )}
 
       {error && (
         <p className="font-body text-sm text-rust" role="alert">

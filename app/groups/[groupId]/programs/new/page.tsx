@@ -38,9 +38,19 @@ export default async function NewProgramPage(
 
   const { data: group } = await supabase
     .from("groups")
-    .select("name")
+    .select("name, group_kind")
     .eq("id", params.groupId)
     .single();
+
+  // The coach's one-on-one clients, so naming a program after one of them in a shared group can be caught.
+  const { data: soloRows } = await supabase
+    .from("group_memberships")
+    .select("group_id, profiles ( full_name ), groups!inner ( group_kind )")
+    .eq("role", "athlete")
+    .eq("groups.group_kind", "one_on_one");
+  const soloClients = (soloRows ?? [])
+    .map((r: any) => ({ fullName: (r.profiles?.full_name ?? "") as string, groupId: r.group_id as string }))
+    .filter((c) => c.fullName);
 
   // Surfaced right here instead of only reachable via a separate "Import
   // or build with AI" page (live_walkthrough_round2_findings.md) — same
@@ -112,7 +122,14 @@ export default async function NewProgramPage(
 
       {method === "blank" ? (
         <div className="max-w-lg">
-          <NewProgramForm groupId={params.groupId} createdBy={user.id} athleteId={athleteId} />
+          <NewProgramForm
+            groupId={params.groupId}
+            createdBy={user.id}
+            athleteId={athleteId}
+            groupName={group?.name ?? "this group"}
+            sharedGroup={(group as { group_kind?: string } | null)?.group_kind !== "one_on_one"}
+            soloClients={soloClients}
+          />
         </div>
       ) : (
         <>
