@@ -477,6 +477,27 @@ alter table public.notifications add constraint notifications_type_check
       ["0279 is not already applied (the live reschedule_booking is exactly the step 19 version, and there is no request table yet)", `${md5Is("reschedule_booking(uuid, timestamptz, timestamptz)", "1283df1e48a57927374db97199ad00eb")} and ${has.noTable("booking_requests")}`],
     ],
   },
+  {
+    n: "22",
+    slug: "0280",
+    title: "0280 credit expiry kept human: a coach can hold expiry for one client, give back sessions that expired (up to what expired, logged, undoable), and sets how early they are prompted",
+    migrations: ["0280"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing visible changes at once. After the code deploy: under Needs your decision a client whose sessions expire within 30 days gets a one-line check-in (Message them, Extend or pause expiry, Not now); a returning client whose sessions already expired gets a Reinstate prompt. Nothing is extended, reinstated or sent automatically. The nightly expiry job skips a client whose expiry you hold.",
+    undo: `drop function if exists public.undo_expired_reinstatement(uuid, uuid, integer);
+drop function if exists public.reinstate_expired_credits(uuid, uuid, integer, text);
+drop function if exists public.set_credit_expiry_hold(uuid, uuid, timestamptz, text);
+drop function if exists public.reinstatable_expired_credits(uuid, uuid);
+alter table public.coach_booking_policies drop column if exists expiry_heads_up_days;
+alter table public.session_credits drop column if exists expiry_hold_until;`,
+    undoWhy: "Only if something about session balances or the expiry job misbehaves after step 22. Removes the three override functions, the helper and the two new columns (any holds set are lost; reinstated sessions stay on balances and in the ledger).",
+    rows: [
+      ["0209 is applied (credit expiry exists)", `${has.col("coach_booking_policies", "credit_expiry_days")} and ${has.col("session_credits", "last_granted_at")}`],
+      ["0246 and 0248 are applied (the ledger and the internal credit function exist)", `${has.table("session_credit_ledger")} and ${has.fnName("apply_session_credit_change")}`],
+      ["is_org_admin_of_group exists", has.fnName("is_org_admin_of_group")],
+      ["0280 is not already applied (the expiry hold column is not there yet)", has.noCol("session_credits", "expiry_hold_until")],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -609,6 +630,7 @@ for (const s of STEPS) {
     m("0277", has.col("bookings", "late_charge_state")),
     m("0278", has.col("coach_booking_policies", "booking_mode")),
     m("0279", has.table("booking_requests")),
+    m("0280", has.col("session_credits", "expiry_hold_until")),
   ];
   const values = items.map((i) => `    ('2026100600${i.n.slice(1)}', '${i.file.slice(5, -4)}', '${i.file}', ${i.marker})`).join(",\n");
   const sql = [

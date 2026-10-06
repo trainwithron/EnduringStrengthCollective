@@ -10,9 +10,11 @@ import { getEffectiveAthlete } from "@/lib/acting-as";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 
 export default async function MessageThreadPage(
-  props: { params: Promise<{ groupId: string; otherId: string }> }
+  props: { params: Promise<{ groupId: string; otherId: string }>; searchParams: Promise<{ draft?: string }> }
 ) {
   const params = await props.params;
+  // A drafted note (the coach's expiry check-in) opens in the box; capped, and only ever shown for the coach to edit.
+  const initialDraft = ((await props.searchParams).draft ?? "").slice(0, 600);
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -114,6 +116,7 @@ export default async function MessageThreadPage(
             otherId={params.otherId}
             otherName={otherName}
             initialMessages={messages ?? []}
+            initialDraft={viewerIsCoach ? initialDraft : ""}
           />
         </div>
       </CoachDesktopShell>
@@ -150,6 +153,7 @@ export default async function MessageThreadPage(
           otherId={params.otherId}
           otherName={otherName}
           initialMessages={messages ?? []}
+          initialDraft={viewerIsCoach ? initialDraft : ""}
           fixedComposer
         />
       </div>

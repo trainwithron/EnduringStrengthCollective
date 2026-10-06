@@ -5,6 +5,7 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { AvailabilityManagerDesktop } from "@/components/coach/desktop/availability-manager-desktop";
 import { BookingPolicyControl } from "@/components/coach/desktop/booking-policy-control";
 import { ReupNudgeToggle } from "@/components/coach/desktop/reup-nudge-toggle";
+import { ExpiryHeadsUpControl } from "@/components/coach/desktop/expiry-heads-up-control";
 import { BookingModeSelect, type BookingMode } from "@/components/coach/desktop/booking-mode-select";
 import { AvailabilityExceptionsManager } from "@/components/coach/desktop/availability-exceptions-manager";
 import { TimezoneControl } from "@/components/coach/desktop/timezone-control";
@@ -74,6 +75,10 @@ export default async function AvailabilityPage(
   const nudgeResult = await supabase.from("coach_booking_policies").select("reup_nudges_enabled").eq("coach_id", user.id).maybeSingle();
   const reupNudgesEnabled: boolean | null = nudgeResult.error ? null : (nudgeResult.data?.reup_nudges_enabled ?? true);
 
+  // Heads-up days before sessions expire (migration 0280). Until it is applied the select errors and the setting is simply hidden.
+  const headsUpResult = await supabase.from("coach_booking_policies").select("expiry_heads_up_days").eq("coach_id", user.id).maybeSingle();
+  const expiryHeadsUpDays: number | null = headsUpResult.error ? null : ((headsUpResult.data?.expiry_heads_up_days as number | null) ?? 30);
+
   // How clients book (migration 0278). Until it is applied the select errors and the setting is simply hidden.
   const bookingModeResult = await supabase.from("coach_booking_policies").select("booking_mode").eq("coach_id", user.id).maybeSingle();
   const bookingMode: BookingMode | null = bookingModeResult.error ? null : ((bookingModeResult.data?.booking_mode as BookingMode | null) ?? "coach_schedules");
@@ -123,6 +128,8 @@ export default async function AvailabilityPage(
         initialMinimumNoticeHours={policyRow?.minimum_notice_hours ?? 0}
         initialCreditExpiryDays={policyRow?.credit_expiry_days ?? 0}
       />
+
+      {expiryHeadsUpDays !== null && <ExpiryHeadsUpControl coachId={user.id} initialDays={expiryHeadsUpDays} />}
 
       {bookingMode !== null && <BookingModeSelect coachId={user.id} initialMode={bookingMode} />}
 

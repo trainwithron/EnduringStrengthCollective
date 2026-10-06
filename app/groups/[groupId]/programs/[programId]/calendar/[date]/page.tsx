@@ -3,6 +3,7 @@ import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { generateSlotsForDate, formatSlotTime, minimumNoticeBlockedRange, isSlotBufferBlocked } from "@/lib/booking-slots";
+import { expiryWindowLine } from "@/lib/expiry-checkin";
 import { creditExpiryDate } from "@/lib/credit-expiration";
 import { getBlockedRangesForDate } from "@/lib/availability-exceptions";
 import { zonedTimeToUtc, DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
@@ -213,6 +214,7 @@ export default async function DayDetailPage(
   let bookingsForDay: any[] = [];
   let creditBalance = 0;
   let creditExpiresAt: Date | null = null;
+  let creditExpiryDaysForNote = 0;
   let activeSubscription: { currentPeriodEnd: string | null } | null = null;
   let availablePackages: PackageOption[] = [];
   let bufferBlockingBookings: { id: string; start: Date; end: Date }[] = [];
@@ -295,6 +297,7 @@ export default async function DayDetailPage(
         .maybeSingle();
       creditBalance = creditsRow?.balance ?? 0;
       creditExpiresAt = creditExpiryDate(creditsRow?.last_granted_at ?? null, policyRow?.credit_expiry_days ?? 0);
+      creditExpiryDaysForNote = policyRow?.credit_expiry_days ?? 0;
 
       const { data: waitlistRows } = await supabase
         .from("booking_waitlist_entries")
@@ -410,6 +413,9 @@ export default async function DayDetailPage(
                 </span>
               )}
             </p>
+            {expiryWindowLine(creditExpiryDaysForNote) && (
+              <p className="font-body text-xs text-steel mt-1">{expiryWindowLine(creditExpiryDaysForNote)}</p>
+            )}
             {creditBalance <= 0 && !reschedulingBooking && isStripeConfigured() && (
               <div className="mt-2">
                 <CalendarPurchasePrompt activeSubscription={activeSubscription} packages={availablePackages} />

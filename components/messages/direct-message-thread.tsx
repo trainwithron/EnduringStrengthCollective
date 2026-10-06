@@ -24,6 +24,7 @@ export function DirectMessageThread({
   otherName,
   initialMessages,
   fixedComposer = false,
+  initialDraft = "",
 }: {
   groupId: string;
   viewerId: string;
@@ -32,9 +33,11 @@ export function DirectMessageThread({
   otherName: string;
   initialMessages: MessageRow[];
   fixedComposer?: boolean;
+  // A draft the coach opens the thread with (for example the expiry check-in): shown in the box to edit, never sent by itself.
+  initialDraft?: string;
 }) {
   const [messages, setMessages] = useState<MessageRow[]>(initialMessages);
-  const [body, setBody] = useState("");
+  const [body, setBody] = useState(initialDraft);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);

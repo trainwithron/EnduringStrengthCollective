@@ -106,7 +106,7 @@ export function BookingPolicyControl({
       <div>
         <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">Cancellation policy</p>
         <p className="font-body text-xs text-steel mb-2">
-          A client who cancels or reschedules within this many hours of their session loses that session instead of getting it back.
+          A client who cancels or reschedules within this many hours of their session is flagged to you, and you choose whether it counts as a session (Charge or Waive). Nothing is taken automatically.
         </p>
         <div className="flex items-center gap-2">
           {field("cancellationHours", "Hours before the session")}

@@ -24,6 +24,8 @@ In this order:
 - Not covered: the public booking page and its manage link (/book/<slug>) go through the server's own access and are not governed by the booking mode (a guest is not a client).
 - Notes: a coach who is also their own client counts as a coach and is never refused. A client's direct moves and bookings in a mode that does not allow them get a plain message, so an old screen cannot get around it.
 
+- **Step 22 (0280)**: credit expiry kept human. Adds `session_credits.expiry_hold_until` (the nightly job skips a client whose expiry you hold), `coach_booking_policies.expiry_heads_up_days` (default 30), and `set_credit_expiry_hold`, `reinstate_expired_credits`, `undo_expired_reinstatement` (coach or org admin only, logged in the session ledger with your note; reinstating restarts the expiry clock for what you give back; up to what actually expired and was not given back). Nothing is extended, reinstated or sent automatically. Independent of steps 19 to 21 (needs 0209, 0246, 0248). Undo removes the functions and the two columns.
+
 ## Migration history (needs a re-run)
 
 None of 0236 to 0267 is recorded in `supabase_migrations.schema_migrations` (the newest row is 0247), so `supabase db push` and the dashboard's migration list show them as unapplied. `record-history-applied.sql` inserts the missing rows. It only records a migration whose change is really in the database (each has a check), skips rows already there, and can be run again after steps 07 to 09 to add those. It is safe to run any time; it changes no tables, only the history list. Run it again now that 0270, 0273, 0274, 0275 and 0276 are live (it records those; 0271 and 0272 stay unrecorded until they are applied), and once more after steps 13 and 17.

@@ -21,11 +21,22 @@ async function handler(request: Request) {
 
   const supabase = createServiceRoleClient();
 
-  const { data: creditRows } = await supabase
+  // A coach can hold expiry for one client (migration 0280); before that update the column does not exist and the job reads without it.
+  let creditResult = await supabase
     .from("session_credits")
-    .select("athlete_id, group_id, balance, last_granted_at")
+    .select("athlete_id, group_id, balance, last_granted_at, expiry_hold_until")
     .gt("balance", 0)
     .not("last_granted_at", "is", null);
+  if (creditResult.error) {
+    creditResult = (await supabase
+      .from("session_credits")
+      .select("athlete_id, group_id, balance, last_granted_at")
+      .gt("balance", 0)
+      .not("last_granted_at", "is", null)) as typeof creditResult;
+  }
+  const creditRows = creditResult.data as
+    | { athlete_id: string; group_id: string; balance: number; last_granted_at: string | null; expiry_hold_until?: string | null }[]
+    | null;
 
   if (!creditRows || creditRows.length === 0) {
     return NextResponse.json({ ok: true, expiredCount: 0 });
@@ -58,6 +69,7 @@ async function handler(request: Request) {
   for (const row of creditRows) {
     const coachId = coachIdByGroup.get(row.group_id);
     const creditExpiryDays = coachId ? (expiryDaysByCoach.get(coachId) ?? 0) : 0;
+    if (row.expiry_hold_until && new Date(row.expiry_hold_until).getTime() > now.getTime()) continue;
     if (!isCreditBalanceExpired(row.last_granted_at, creditExpiryDays, now)) continue;
 
     const { error: updateError } = await supabase
