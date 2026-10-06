@@ -975,6 +975,12 @@ export default async function AthleteProfilePage(
           >
             Schedule session
           </Link>
+          <Link
+            href={`/groups/${params.groupId}/messages/${params.athleteId}`}
+            className="inline-flex items-center h-11 font-body text-xs text-chalk border border-steel/40 px-3 font-medium"
+          >
+            Message
+          </Link>
         </div>
       </div>
 
