@@ -41,7 +41,15 @@ function fakeSupabase(db: Record<string, Row[]>, opts: { denyOrgUpdate?: boolean
         rows.push({ ...row });
         return Promise.resolve({ error: null });
       },
-      then: (resolve: any) => resolve({ data: match(), error: null }),
+      then: (resolve: any) => {
+        if (pendingUpdate) {
+          const hit = match();
+          hit.forEach((r) => Object.assign(r, pendingUpdate));
+          pendingUpdate = null;
+          return resolve({ data: hit, error: null });
+        }
+        return resolve({ data: match(), error: null });
+      },
     };
     return chain;
   };
@@ -54,7 +62,103 @@ beforeAll(() => {
 
 const COACH = "coach-1";
 
+describe("expiry is not changed by chat", () => {
+  it("is refused with where to do it, and nothing is read or written", async () => {
+    const db: Record<string, Row[]> = { coach_booking_policies: [{ coach_id: COACH, credit_expiry_days: 180 }] };
+    const res = await proposeAction(fakeSupabase(db), COACH, "set expiry to 18 days", null);
+    expect(res && res.ok).toBe(false);
+    if (res && !res.ok) expect(res.message).toMatch(/Settings/);
+    expect(db.coach_booking_policies[0].credit_expiry_days).toBe(180);
+  });
+});
+
+describe("which organization a word change is for", () => {
+  const orgs = (roles: string[]) => ({
+    organization_memberships: roles.map((role, i) => ({ profile_id: COACH, organization_id: "org" + i, role })),
+    organizations: roles.map((_, i) => ({ id: "org" + i, name: "Org " + i, terminology_overrides: {} })),
+  });
+  it("asks when there is no page group and the coach runs more than one", async () => {
+    const res = await proposeAction(fakeSupabase(orgs(["owner", "admin"])), COACH, "change clients to athletes", null);
+    expect(res && res.ok).toBe(false);
+    if (res && !res.ok) expect(res.message).toMatch(/more than one organization/);
+  });
+  it("uses the only organization the coach owns or administers, and never a plain-coach one", async () => {
+    const res = await proposeAction(fakeSupabase(orgs(["coach", "owner"])), COACH, "change clients to athletes", null);
+    expect(res && res.ok).toBe(true);
+    if (res && res.ok) expect(res.card.title).toContain("Org 1");
+    const none = await proposeAction(fakeSupabase(orgs(["coach"])), COACH, "change clients to athletes", null);
+    expect(none && none.ok).toBe(false);
+  });
+});
+
 describe("a settings change by chat", () => {
+  it("refuses to write when the setting changed since the card, and a replayed confirm does nothing", async () => {
+    const db: Record<string, Row[]> = { coach_booking_policies: [{ coach_id: COACH, buffer_minutes: 5 }] };
+    const sb = fakeSupabase(db);
+    const proposal = await proposeAction(sb, COACH, "set my buffer to 15 minutes", null);
+    if (!proposal || !proposal.ok) throw new Error("no proposal");
+    db.coach_booking_policies[0].buffer_minutes = 20;
+    expect((await confirmAction(sb, COACH, proposal.card.token)).ok).toBe(false);
+    expect(db.coach_booking_policies[0].buffer_minutes).toBe(20);
+    db.coach_booking_policies[0].buffer_minutes = 5;
+    expect((await confirmAction(sb, COACH, proposal.card.token)).ok).toBe(true);
+    // An old card can never overwrite a later hand edit.
+    db.coach_booking_policies[0].buffer_minutes = 40;
+    expect((await confirmAction(sb, COACH, proposal.card.token)).ok).toBe(false);
+    expect(db.coach_booking_policies[0].buffer_minutes).toBe(40);
+  });
+
+  it("free booking carries a plain caution on the card", async () => {
+    const res = await proposeAction(fakeSupabase({ coach_booking_policies: [] }), COACH, "let clients book themselves", null);
+    expect(res && res.ok).toBe(true);
+    if (res && res.ok) expect(res.card.caution).toMatch(/book any open time/);
+  });
+
+  it("session length: changes every window, and undo gives each window its own old length back", async () => {
+    const win = (id: string, minutes: number | null) => ({ id, coach_id: COACH, session_minutes: minutes, start_time: "06:00:00", end_time: "17:00:00" });
+    const db: Record<string, Row[]> = { coach_availability_windows: [win("w1", null), win("w2", 45), win("w3", 60)] };
+    const sb = fakeSupabase(db);
+    const proposal = await proposeAction(sb, COACH, "set my session length to 55 minutes", null);
+    if (!proposal || !proposal.ok) throw new Error("no proposal");
+    expect(proposal.card.beforeText).toBe("different lengths on different days");
+    const done = await confirmAction(sb, COACH, proposal.card.token);
+    if (!done.ok || !done.undoToken) throw new Error("no undo");
+    expect(db.coach_availability_windows.map((w) => w.session_minutes)).toEqual([55, 55, 55]);
+    const undone = await undoAction(sb, COACH, done.undoToken);
+    expect(undone.ok).toBe(true);
+    expect(db.coach_availability_windows.map((w) => w.session_minutes)).toEqual([null, 45, 60]);
+  });
+
+  it("session length: the common case (all windows the same as the slot) undoes too, and a hand edit stops the undo", async () => {
+    const win = (id: string, minutes: number | null) => ({ id, coach_id: COACH, session_minutes: minutes, start_time: "06:00:00", end_time: "17:00:00" });
+    const db: Record<string, Row[]> = { coach_availability_windows: [win("w1", null), win("w2", null)] };
+    const sb = fakeSupabase(db);
+    const p = await proposeAction(sb, COACH, "set my session length to 55 minutes", null);
+    if (!p || !p.ok) throw new Error("no proposal");
+    const done = await confirmAction(sb, COACH, p.card.token);
+    if (!done.ok || !done.undoToken) throw new Error("no undo");
+    expect((await undoAction(sb, COACH, done.undoToken)).ok).toBe(true);
+    expect(db.coach_availability_windows.map((w) => w.session_minutes)).toEqual([null, null]);
+
+    const p2 = await proposeAction(sb, COACH, "set my session length to 50 minutes", null);
+    if (!p2 || !p2.ok) throw new Error("no proposal");
+    const d2 = await confirmAction(sb, COACH, p2.card.token);
+    if (!d2.ok || !d2.undoToken) throw new Error("no undo");
+    db.coach_availability_windows[0].session_minutes = 40;
+    expect((await undoAction(sb, COACH, d2.undoToken)).ok).toBe(false);
+    expect(db.coach_availability_windows[0].session_minutes).toBe(40);
+  });
+
+  it("session length is refused when a window is shorter than it", async () => {
+    const db: Record<string, Row[]> = { coach_availability_windows: [{ id: "w1", coach_id: COACH, session_minutes: null, start_time: "06:00:00", end_time: "06:30:00" }] };
+    const sb = fakeSupabase(db);
+    const p = await proposeAction(sb, COACH, "set my session length to 55 minutes", null);
+    if (!p || !p.ok) throw new Error("no proposal");
+    const res = await confirmAction(sb, COACH, p.card.token);
+    expect(res.ok).toBe(false);
+    expect(db.coach_availability_windows[0].session_minutes).toBeNull();
+  });
+
   it("shows what it is now and what it will be, and changes nothing yet", async () => {
     const db = { coach_booking_policies: [{ coach_id: COACH, buffer_minutes: 0 }] };
     const sb = fakeSupabase(db);
@@ -154,12 +258,13 @@ describe("a settings change by chat", () => {
     const mk = () => ({
       groups: [{ id: "g1", organization_id: "org1" }],
       organization_memberships: [{ profile_id: COACH, organization_id: "org1" }],
-      organizations: [{ id: "org1", terminology_overrides: {} }],
+      organizations: [{ id: "org1", name: "Enduring Strength Co.", terminology_overrides: {} }],
     });
     const db: Record<string, Row[]> = mk();
     const sb = fakeSupabase(db);
     const proposal = await proposeAction(sb, COACH, "change clients to athletes", "g1");
     if (!proposal || !proposal.ok) throw new Error("no proposal");
+    expect(proposal.card.title).toBe('Change the word "clients" to "athletes" in Enduring Strength Co.?');
     const done = await confirmAction(sb, COACH, proposal.card.token);
     expect(done.ok).toBe(true);
     expect(db.organizations[0].terminology_overrides.client).toEqual({ kind: "preset", value: "athlete" });

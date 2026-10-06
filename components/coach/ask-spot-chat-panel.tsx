@@ -23,6 +23,7 @@ interface ActionCard {
   afterText: string;
   token: string;
   confirmLabel: string;
+  caution?: string;
 }
 
 interface MessagePreview {
@@ -124,12 +125,11 @@ export function AskSpotChatPanel() {
     }
   }
 
-  // The newest thing waiting on a yes. Enter in an empty box answers it.
+  // The newest screen-opening question waiting on a yes. Enter in an empty box answers it. A settings change is never answered by a keystroke: it needs a click or tap.
   function pendingIndex(): number {
     const i = messages.length - 1;
     const m = messages[i];
     if (!m) return -1;
-    if (m.card?.state === "open") return i;
     if (m.confirm?.state === "open") return i;
     return -1;
   }
@@ -138,10 +138,6 @@ export function AskSpotChatPanel() {
     const i = pendingIndex();
     if (i < 0) return false;
     const m = messages[i];
-    if (m.card?.state === "open") {
-      runAction(i, "confirm", m.card.token);
-      return true;
-    }
     if (m.confirm?.state === "open") {
       patchMessage(i, { confirm: { ...m.confirm, state: "closed" } });
       router.push(m.confirm.href);
@@ -298,6 +294,7 @@ export function AskSpotChatPanel() {
                   <p className="text-xs text-steel">
                     After: <span className="text-chalk">{m.card.afterText}</span>
                   </p>
+                  {m.card.caution && <p className="text-xs text-rust">{m.card.caution}</p>}
                   {m.card.state === "open" && (
                     <div className="flex flex-wrap gap-2">
                       <button
@@ -355,6 +352,7 @@ export function AskSpotChatPanel() {
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
+              if (e.nativeEvent.isComposing) return;
               if (!input.trim() && answerYes()) return;
               handleSend();
             }

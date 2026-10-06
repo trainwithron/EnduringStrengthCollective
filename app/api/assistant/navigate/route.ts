@@ -60,7 +60,8 @@ export async function POST(request: Request) {
   // coach confirms it (app/api/assistant/action). Only for coaches, and only for the small set of settings in lib/assistant-actions.ts.
   if (role === "coach") {
     try {
-      const proposal = await proposeAction(supabase, user.id, message, groupId);
+      // The page's own group only (never "the first group"), so a word change says which organization it is for and never guesses one.
+      const proposal = await proposeAction(supabase, user.id, message, pathGroup && ownGroupIds.includes(pathGroup) ? pathGroup : null);
       if (proposal) {
         if (!proposal.ok) return NextResponse.json({ kind: "unsure", text: proposal.message, chips: [], steps: [], intentIds: [] });
         return NextResponse.json({ kind: "action", card: proposal.card });

@@ -37,14 +37,20 @@ Pure and deterministic, over the coach's own roster only (the navigate route fet
 "Pull up Johann's program" resolves to that client's current program (their own copy if they have one, else the group's), shown as a card: **"Johann Gorsik's program: is this what you're looking for? [Yes] [Not that one]"**. Yes, or Enter in the empty box, opens it. Places per client: profile, program, calendar, nutrition, messages, history, goals, balance, in-person log. Two people who fit: both are offered as buttons.
 
 ### 3.3 Settings by chat (`lib/assistant-actions.ts`, `lib/assistant-actions-server.ts`, `/api/assistant/action`)
-First set: the word for the people a coach coaches, the gap between sessions, the cancellation window, minimum notice, how long unused sessions last before they expire, session length, and how clients book.
+First set: the word for the people a coach coaches (per organization), the gap between sessions, the cancellation window, minimum notice, session length, and how clients book. Each is fully put back by setting it back; no job reads any of them to act on clients.
+
+**Not by chat: session expiry.** The nightly job applies the *current* window to credits clients already hold, zeroes them and tells each client, so a misheard number would wipe balances and Undo could not give them back. Ask Spot answers any expiry command with where to do it in Settings. (Assistant review, Oct 6.)
 
 Three steps, and nothing is written before the second:
 1. **Propose** (`/api/assistant/navigate`, coaches only). `matchAction` turns a plain command into one typed action ("set my buffer to 10 minutes"). Questions ("how do I change my buffer?") are never commands. The server reads the current value with the coach's own session and returns a before/after card and a **signed token** (HMAC, 10 minutes) that carries the coach, the action, its numbers and the before value.
-2. **Confirm** (`POST /api/assistant/action`, `op: confirm`). Needs that token, for that coach, unexpired. It re-checks the limits (the same limits as the settings screens: buffer 0 to 240, cancellation and notice 0 to 720, expiry 0 to 3650, session 5 to 480), re-reads the setting, then makes the **same write the settings screen makes**, under the coach's own sign-in, so the database's own rules still decide who may change it (the word for clients needs an organization owner or admin; the server reports it plainly when the database refuses). Session length refuses when any window of hours is shorter than the new length.
-3. **Undo** (`op: undo`). A separate signed token (1 hour). It only runs while the setting **still has the value the change set**, so it never overwrites a later edit by hand. A mixed session-length setting cannot be undone safely and says so.
+2. **Confirm** (`POST /api/assistant/action`, `op: confirm`, **a click or tap on the button, never Enter**). Needs that token, for that coach, unexpired, and **refuses unless the setting still has the value the card showed** (so an old or replayed card can never overwrite a later edit). It re-checks the limits (the same limits as the settings screens: buffer 0 to 240, cancellation and notice 0 to 720, expiry 0 to 3650, session 5 to 480), re-reads the setting, then makes the **same write the settings screen makes**, under the coach's own sign-in, so the database's own rules still decide who may change it (the word for clients needs an organization owner or admin; the server reports it plainly when the database refuses). Session length refuses when any window of hours is shorter than the new length.
+3. **Undo** (`op: undo`). A separate signed token (1 hour). It only runs while the setting **still has the value the change set**, so it never overwrites a later edit by hand. A session length goes back **window by window** (each window's previous length rides in the signed token), including windows that were "the same as the slot".
 
-No free-form SQL, no new back door, no service-role client anywhere in this path. Rate limited (180 an hour for the free layer, 60 an hour for actions).
+**Word change names the organization.** The card reads "Change the word 'clients' to 'athletes' in Enduring Strength Co.?" and applies only to that organization, fixed in the token. With no group in the page path and more than one organization owned or administered, Ask Spot asks the coach to open a page inside the one they mean. There is no "first organization" fallback.
+
+**Enter** only answers a "is this what you're looking for?" question (opening a screen is harmless), and not while an input method is composing. A settings card needs the button. Switching booking to "Clients book themselves" shows a plain caution on the card.
+
+No free-form SQL, no new back door, no service-role client anywhere in this path. Rate limited (180 an hour for the free layer, 60 an hour for actions). The token secret is `ASSISTANT_ACTION_SECRET` when set (Ron: add one in Vercel), else `SHARE_LINK_SECRET`, else the service key.
 
 **The record**: each change and each undo writes a row in `spotter_recommendation_feedback` (`spotter_kind = 'assistant_action'`) with the before and after. That table is the coach's own, readable and writable only by them, so this is **a record for the coach, not a tamper-proof audit**. A real audit trail waits for the audit log (section 6).
 
@@ -81,7 +87,7 @@ Dates, then time off (`coach_availability_exceptions`), then the affected sessio
 - **Later**: a dedicated `assistant_actions` table with the token's action, before, after and undone-at, readable by the coach and by a platform admin.
 
 ## 7. Not in the first slice
-Hiding demos, sending messages, the "I'm away" flow, bulk actions, any money, any delete. Beta notice lines (a demo plays from YouTube when tapped; shared workout card links never expire) wait until Ron has read the draft.
+Session expiry (stays in Settings), hiding demos, sending messages, the "I'm away" flow, bulk actions, any money, any delete. Beta notice lines (a demo plays from YouTube when tapped; shared workout card links never expire) wait until Ron has read the draft.
 
 ## 8. Files
 `lib/client-name-match.ts` (+test), `lib/nav-intents.ts` (+test), `lib/signed-token.ts`, `lib/assistant-actions.ts` (+test), `lib/assistant-actions-server.ts` (+test), `app/api/assistant/navigate/route.ts`, `app/api/assistant/action/route.ts`, `components/coach/ask-spot-chat-panel.tsx`.

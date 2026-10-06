@@ -4,7 +4,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 // 'athletes'?") can only be confirmed with exactly what was shown, by the coach it was shown to, within a few minutes: the token carries the coach, the action, its
 // numbers, what the value was before, and an expiry, all signed. Nothing the browser sends can alter them without the signature failing.
 function secret(): string {
-  const s = process.env.SHARE_LINK_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  const s = process.env.ASSISTANT_ACTION_SECRET || process.env.SHARE_LINK_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
   if (!s) throw new Error("No secret is configured for signed tokens.");
   return s;
 }

@@ -6,7 +6,7 @@
 // Only requests that are clearly commands match. A question ("how do I change the buffer?") is left to the how-to library, and an unclear request is never guessed:
 // the answer is "I can't do that yet" with the places to do it by hand.
 
-export type ActionId = "set_term" | "set_buffer" | "set_cancellation_hours" | "set_notice_hours" | "set_expiry_days" | "set_booking_mode" | "set_session_length";
+export type ActionId = "set_term" | "set_buffer" | "set_cancellation_hours" | "set_notice_hours" | "set_booking_mode" | "set_session_length";
 
 export type BookingMode = "free" | "request" | "coach_schedules";
 
@@ -26,7 +26,6 @@ export const ACTION_LIMITS = {
   buffer: { min: 0, max: 240 },
   cancellationHours: { min: 0, max: 720 },
   noticeHours: { min: 0, max: 720 },
-  expiryDays: { min: 0, max: 3650 },
   sessionMinutes: { min: 5, max: 480 },
 } as const;
 
@@ -66,6 +65,16 @@ function matchTerm(text: string): ActionRequest | null {
   return { id: "set_term", params: { term: { kind: "custom", value: word } } };
 }
 
+// Settings that are deliberately NOT changed by chat. Expiry: the nightly job applies the current window to credits clients already hold and tells each of them, so a
+// misheard number would wipe balances and an Undo could not give them back. It stays in Settings, where the effect is visible.
+export const EXPIRY_NOT_BY_CHAT = "Session expiry is changed in Settings, not here: it applies to sessions your clients already have and tells each of them, so I keep it where you can see the effect. Open Settings, then Booking policy.";
+export function refusedSetting(message: string): string | null {
+  const text = norm(message).replace(/[.!?]+$/, "");
+  if (!text || text.length > 200 || QUESTION.test(text)) return null;
+  const mentionsExpiry = /\b(expir\w*)\b/.test(text);
+  return mentionsExpiry && (COMMAND_LEAD.test(text) || /\b(never|no|stop|don'?t)\b/.test(text)) ? EXPIRY_NOT_BY_CHAT : null;
+}
+
 export function matchAction(message: string): ActionRequest | null {
   const text = norm(message).replace(/[.!?]+$/, "");
   if (!text || text.length > 200) return null;
@@ -88,12 +97,6 @@ export function matchAction(message: string): ActionRequest | null {
 
   m = text.match(/\b(?:minimum |min |booking )?(?:booking )?notice\b.*?\b(\d{1,3})\s*(?:hours?|hrs?|h)\b/) ?? text.match(/\b(\d{1,3})\s*(?:hours?|hrs?|h)\b.*\b(?:minimum |booking )?notice\b/);
   if (m && number(m[1]) !== null) return { id: "set_notice_hours", params: { amount: number(m[1])! } };
-
-  if (/\b(?:sessions?|credits?|balances?)\b.*\b(?:never expire|not expire|don'?t expire|stop expiring)\b/.test(text) || /\b(?:turn off|remove|no)\b.*\b(?:expiry|expiration|expire)\b/.test(text)) {
-    return { id: "set_expiry_days", params: { amount: 0 } };
-  }
-  m = text.match(/\b(?:expir\w*)\b.*?\b(\d{1,4})\s*days?\b/) ?? text.match(/\b(\d{1,4})\s*days?\b.*\b(?:expir\w*)\b/);
-  if (m && number(m[1]) !== null) return { id: "set_expiry_days", params: { amount: number(m[1])! } };
 
   m = text.match(/\bsession (?:length|duration|time)\b.*?\b(\d{2,3})\s*(?:min|mins|minutes?)?\b/);
   if (m && number(m[1]) !== null) return { id: "set_session_length", params: { amount: number(m[1])! } };
@@ -123,8 +126,6 @@ export function validateAction(req: ActionRequest): string | null {
       return range(ACTION_LIMITS.cancellationHours, "The cancellation window");
     case "set_notice_hours":
       return range(ACTION_LIMITS.noticeHours, "The minimum notice");
-    case "set_expiry_days":
-      return range(ACTION_LIMITS.expiryDays, "The expiry");
     case "set_session_length":
       return range(ACTION_LIMITS.sessionMinutes, "The session length");
     case "set_booking_mode":
@@ -169,12 +170,6 @@ export function describeAction(req: ActionRequest, before: { amount?: number | n
       return { title: `Set the cancellation window to ${plural(a, "hour", "hours")}?`, beforeText: plural(before.amount ?? 24, "hour", "hours"), afterText: plural(a, "hour", "hours") };
     case "set_notice_hours":
       return { title: `Set the minimum booking notice to ${plural(a, "hour", "hours")}?`, beforeText: plural(before.amount ?? 0, "hour", "hours"), afterText: plural(a, "hour", "hours") };
-    case "set_expiry_days":
-      return {
-        title: a === 0 ? "Stop unused sessions from expiring?" : `Let unused sessions expire ${plural(a, "day", "days")} after the last purchase?`,
-        beforeText: (before.amount ?? 0) === 0 ? "never expire" : `expire after ${plural(before.amount ?? 0, "day", "days")}`,
-        afterText: a === 0 ? "never expire" : `expire after ${plural(a, "day", "days")}`,
-      };
     case "set_session_length":
       return { title: `Set the session length to ${plural(a, "minute", "minutes")} for all your hours?`, beforeText: before.amount ? plural(before.amount, "minute", "minutes") : "the same as the slot", afterText: plural(a, "minute", "minutes") };
     case "set_booking_mode":
@@ -183,4 +178,4 @@ export function describeAction(req: ActionRequest, before: { amount?: number | n
 }
 
 // What the assistant says when it cannot do something yet: plainly, with where to do it by hand. Never a guess.
-export const CANNOT_YET = "I can't do that one yet. I can change your word for your people, the gap between sessions, the cancellation window, minimum notice, how long sessions last before they expire, the session length, and how clients book.";
+export const CANNOT_YET = "I can't do that one yet. I can change your word for your people, the gap between sessions, the cancellation window, minimum notice, the session length, and how clients book.";

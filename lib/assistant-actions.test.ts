@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ACTION_LIMITS, bookingModeText, describeAction, matchAction, validateAction } from "./assistant-actions";
+import { ACTION_LIMITS, bookingModeText, describeAction, matchAction, refusedSetting, validateAction } from "./assistant-actions";
 
 const id = (m: string) => matchAction(m)?.id ?? null;
 
@@ -19,13 +19,11 @@ describe("recognising a plain command", () => {
     expect(matchAction("no buffer")).toEqual({ id: "set_buffer", params: { amount: 0 } });
     expect(matchAction("remove the gap between sessions")).toEqual({ id: "set_buffer", params: { amount: 0 } });
   });
-  it("sets the cancellation window, notice, expiry and session length", () => {
+  it("sets the cancellation window, notice and session length", () => {
     expect(matchAction("set the cancellation window to 12 hours")).toEqual({ id: "set_cancellation_hours", params: { amount: 12 } });
     expect(matchAction("make my cancellation policy 48 hours")).toEqual({ id: "set_cancellation_hours", params: { amount: 48 } });
     expect(matchAction("set minimum notice to 6 hours")).toEqual({ id: "set_notice_hours", params: { amount: 6 } });
     expect(matchAction("change the booking notice to 2 hours")).toEqual({ id: "set_notice_hours", params: { amount: 2 } });
-    expect(matchAction("make unused sessions expire after 90 days")).toEqual({ id: "set_expiry_days", params: { amount: 90 } });
-    expect(matchAction("sessions should never expire")).toEqual({ id: "set_expiry_days", params: { amount: 0 } });
     expect(matchAction("set my session length to 55 minutes")).toEqual({ id: "set_session_length", params: { amount: 55 } });
   });
   it("changes how clients book", () => {
@@ -39,6 +37,14 @@ describe("recognising a plain command", () => {
     for (const m of ["how do I change the buffer?", "what is my buffer", "where do I set the cancellation window", "how do I let clients book themselves", "what should my gap be"]) {
       expect(matchAction(m)).toBeNull();
     }
+  });
+  it("expiry is never changed by chat, and the reply says where to do it", () => {
+    for (const m of ["make unused sessions expire after 90 days", "set expiry to 18 days", "sessions should never expire", "let credits expire after 180 days"]) {
+      expect(matchAction(m)).toBeNull();
+      expect(refusedSetting(m)).toMatch(/Settings/);
+    }
+    expect(refusedSetting("when do sessions expire?")).toBeNull();
+    expect(refusedSetting("set my buffer to 10")).toBeNull();
   });
   it("an unclear or unrelated message is not guessed at", () => {
     for (const m of ["", "show me my calendar", "open Johann's program", "buffer", "make it 5", "change it", "delete all my clients", "refund everyone", "send everyone a message", "change clients to the", "call clients please"]) {
@@ -57,7 +63,6 @@ describe("the numbers follow the same limits as the settings screens", () => {
     expect(validateAction({ id: "set_buffer", params: { amount: ACTION_LIMITS.buffer.max } })).toBeNull();
     expect(validateAction({ id: "set_buffer", params: { amount: 241 } })).toMatch(/0 to 240/);
     expect(validateAction({ id: "set_cancellation_hours", params: { amount: 721 } })).toMatch(/0 to 720/);
-    expect(validateAction({ id: "set_expiry_days", params: { amount: 3651 } })).toMatch(/0 to 3650/);
     expect(validateAction({ id: "set_session_length", params: { amount: 4 } })).toMatch(/5 to 480/);
     expect(validateAction({ id: "set_session_length", params: { amount: 55 } })).toBeNull();
     expect(validateAction({ id: "set_buffer", params: { amount: 2.5 } })).toMatch(/whole number/);
@@ -78,7 +83,6 @@ describe("the before/after card", () => {
     const d = describeAction({ id: "set_buffer", params: { amount: 5 } }, { amount: 0 });
     expect(d).toEqual({ title: "Set the gap between sessions to 5 minutes?", beforeText: "0 minutes", afterText: "5 minutes" });
     expect(describeAction({ id: "set_term", params: { term: { kind: "preset", value: "athlete" } } }, { term: null }).title).toBe('Change the word "clients" to "athletes" everywhere?');
-    expect(describeAction({ id: "set_expiry_days", params: { amount: 0 } }, { amount: 180 })).toMatchObject({ beforeText: "expire after 180 days", afterText: "never expire" });
     expect(describeAction({ id: "set_booking_mode", params: { mode: "free" } }, { mode: "coach_schedules" })).toMatchObject({ beforeText: "I schedule everyone", afterText: "Clients book themselves" });
     expect(bookingModeText(undefined)).toBe("I schedule everyone");
   });
