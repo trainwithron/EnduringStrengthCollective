@@ -117,6 +117,21 @@ export default {
       const ledger = await h.rows(`select amount, kind, note from public.session_credit_ledger where athlete_id = $1 and booking_id = $2`, [s.ann, a]);
       h.check("the charge is in the session ledger with a plain note", ledger.some((l) => l.amount === -1 && /charged by your coach/.test(l.note ?? "")), JSON.stringify(ledger));
 
+      // (f2) a session the coach already waived is not flagged when the client cancels it late
+      const w = await booking(db, s, 3, "waived");
+      await h.as(s.ann);
+      const cw = await tryQ(db, `select public.cancel_booking_and_refund_credit($1)`, [w]);
+      await h.asSuper();
+      row = await h.one(`select status, late_charge_state from public.bookings where id = $1`, [w]);
+      const wNotes = await h.rows(`select count(*)::int as n from public.notifications where profile_id = $1 and type = 'late_change'`, [s.coach]);
+      h.check("a late cancel of a session the coach already waived is not flagged and sends no notice", !cw.error && row.status === "cancelled" && row.late_charge_state === null && wNotes[0].n === 3, JSON.stringify({ cw, row, wNotes }));
+
+      // (f3) the audit log watches the new column; the carriage-return-insensitive md5 used by the paste guards matches
+      const trg = await h.one(`select pg_get_triggerdef(oid) as d from pg_trigger where tgname = 'bookings_audit'`);
+      h.check("bookings_audit now watches late_charge_state as well as credit_state", /late_charge_state/.test(trg.d) && /credit_state/.test(trg.d), trg.d);
+      const crlf = await h.one(`select md5(replace('a' || chr(13) || chr(10) || 'b', chr(13), '')) = md5('a' || chr(10) || 'b') as same`);
+      h.check("the paste guards compare the function text with carriage returns removed, so live Windows line endings do not matter", crlf.same === true, JSON.stringify(crlf));
+
       // (g) the new function is not open to the public or the signed-out role
       const anon = await h.one(`select has_function_privilege('anon', 'public.resolve_late_change(uuid, boolean)', 'execute') as a, has_function_privilege('authenticated', 'public.resolve_late_change(uuid, boolean)', 'execute') as u`);
       h.check("resolve_late_change is closed to the signed-out role and open to signed-in users", anon.a === false && anon.u === true, JSON.stringify(anon));

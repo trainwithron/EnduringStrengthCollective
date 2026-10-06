@@ -156,6 +156,9 @@ end;
 $function$;
 
 drop function if exists public.resolve_late_change(uuid, boolean);
+drop trigger if exists bookings_audit on public.bookings;
+create trigger bookings_audit after insert or update on public.bookings
+  for each row execute function public.audit_watch('credit_state', 'update_only', 'id');
 delete from public.notifications where type = 'late_change';
 alter table public.notifications drop constraint if exists notifications_type_check;
 alter table public.notifications add constraint notifications_type_check

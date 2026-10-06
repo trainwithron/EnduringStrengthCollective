@@ -67,6 +67,20 @@ export default {
       const flag = await h.one(`select coalesce((select self_booking_enabled from public.coach_booking_policies where coach_id = $1), false) as on`, [s.coach]);
       h.check("a client cannot switch self-booking on for their coach", flag.on === false, JSON.stringify({ selfOn, flag }));
 
+      // the weekly-schedule function and the waiting list are behind the same switch
+      await h.as(s.ann);
+      const weekly = await tryQ(db, `select * from public.create_recurring_booking_series($1, $2, $3, $4, 60, 3)`, [s.coach, s.ann, s.group, at(12)]);
+      await h.asSuper();
+      const taken = await h.one(`select id from public.bookings where coach_id = $1 and status = 'confirmed' limit 1`, [s.coach]);
+      await h.as(s.ann);
+      const wait = await tryQ(db, `select public.join_booking_waitlist($1, $2, $3, $4, $5)`, [s.coach, s.ann, s.group, at(7), at(7, 1)]);
+      await h.asSuper();
+      h.check("a client cannot start a weekly schedule or join a waiting list while the switch is off", /your coach schedules your sessions/.test(weekly.error ?? "") && /your coach schedules your sessions/.test(wait.error ?? ""), JSON.stringify({ weekly, wait, taken }));
+      await h.as(s.coach);
+      const coachWeekly = await tryQ(db, `select * from public.create_recurring_booking_series($1, $2, $3, $4, 60, 2)`, [s.coach, s.ann, s.group, at(20)]);
+      await h.asSuper();
+      h.check("a coach can still start a weekly schedule for a client", !coachWeekly.error && coachWeekly.rows?.[0]?.booked_count === 2, JSON.stringify(coachWeekly));
+
       // the coach switches it on
       await h.as(s.coach);
       const turned = await tryQ(db, `insert into public.coach_booking_policies (coach_id, self_booking_enabled) values ($1, true) on conflict (coach_id) do update set self_booking_enabled = true`, [s.coach]);

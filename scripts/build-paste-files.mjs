@@ -14,15 +14,17 @@ for (const f of readdirSync(new URL("migrations/", root))) if (/^\d{4}_/.test(f)
 const migrationSql = (n) => readFileSync(new URL(`migrations/${index[n]}`, root), "utf8").replace(/\r\n/g, "\n").replace(/\s+$/, "");
 
 // The text of one function as 0248 defines it (the version live today), for the undo files of the steps that replace it.
-const fnFrom0248 = (name) => {
-  const text = migrationSql("0248");
+const fnFromMigration = (mig, name) => {
+  const text = migrationSql(mig);
   const start = text.indexOf(`create or replace function public.${name}(`);
-  if (start < 0) throw new Error("0248 has no " + name);
+  if (start < 0) throw new Error(`${mig} has no ${name}`);
   const open = text.indexOf("$function$", start);
   const end = text.indexOf("$function$;", open + 10) + "$function$;".length;
   return text.slice(start, end);
 };
-const md5Is = (sig, md5) => `coalesce((select md5(pg_get_functiondef(p.oid)) = '${md5}' from pg_proc p where p.oid = to_regprocedure('public.${sig}')), false)`;
+const fnFrom0248 = (name) => fnFromMigration("0248", name);
+const fnFrom0218 = (name) => fnFromMigration("0218", name);
+const md5Is = (sig, md5) => `coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = '${md5}' from pg_proc p where p.oid = to_regprocedure('public.${sig}')), false)`;
 
 const has = {
   table: (t) => `to_regclass('public.${t}') is not null`,
@@ -392,6 +394,9 @@ alter table public.notifications add constraint notifications_type_check
 ${fnFrom0248("reschedule_booking")}
 
 drop function if exists public.resolve_late_change(uuid, boolean);
+drop trigger if exists bookings_audit on public.bookings;
+create trigger bookings_audit after insert or update on public.bookings
+  for each row execute function public.audit_watch('credit_state', 'update_only', 'id');
 delete from public.notifications where type = 'late_change';
 alter table public.notifications drop constraint if exists notifications_type_check;
 alter table public.notifications add constraint notifications_type_check
@@ -406,6 +411,7 @@ alter table public.notifications add constraint notifications_type_check
     rows: [
       ["0248 is applied (the credit functions exist)", `${has.fnName("apply_session_credit_change")} and ${has.fnName("settle_booking_internal")} and ${has.col("bookings", "credit_state")}`],
       ["bookings, notifications and coach_booking_policies exist", `${has.table("bookings")} and ${has.table("notifications")} and ${has.table("coach_booking_policies")}`],
+      ["0267 is applied (the audit function exists)", has.fnName("audit_watch")],
       ["0276 is applied (the notification type list includes direct_message)", `exists (select 1 from pg_constraint where conname = 'notifications_type_check' and pg_get_constraintdef(oid) like '%direct_message%')`],
       ["0277 is not already applied (the live cancel and reschedule functions are exactly the versions this step was built from)", `${md5Is("cancel_booking_and_refund_credit(uuid)", "b0485b9332f337b725669193b19f0887")} and ${md5Is("reschedule_booking(uuid, timestamptz, timestamptz)", "f45d1a198654ec4150e6ec958de3b1d1")}`],
     ],
@@ -413,19 +419,22 @@ alter table public.notifications add constraint notifications_type_check
   {
     n: "20",
     slug: "0278",
-    title: "0278 clients can book their own sessions only when the coach switches self-booking on (off by default)",
+    title: "0278 clients can book their own sessions (one at a time, weekly, or by joining a waiting list) only when the coach switches self-booking on (off by default)",
     migrations: ["0278"],
     sees: "Success. No rows returned.",
     afterwards: "From now on a client cannot book their own session unless you switch on 'Let clients book their own sessions' on the Availability page (it is off for everyone). You can still schedule any client. Test: as a throwaway client try to book a session (it must say your coach schedules your sessions); as the coach schedule one for them (it must work).",
     undo: `${fnFrom0248("book_session")}
 
+${fnFrom0248("create_recurring_booking_series")}
+
+${fnFrom0218("join_booking_waitlist")}
+
 alter table public.coach_booking_policies drop column if exists self_booking_enabled;`,
-    undoWhy: "Only if booking a session breaks after step 20. Puts book_session back to the previous version (clients can book themselves again) and removes the switch column.",
+    undoWhy: "Only if booking a session breaks after step 20. Puts book_session, the weekly-schedule function and the waiting-list function back to the previous versions (clients can book themselves again) and removes the switch column.",
     rows: [
       ["0248 is applied (book_session settles credits)", `${has.fnName("book_session")} and ${has.col("bookings", "credit_state")}`],
       ["coach_booking_policies exists", has.table("coach_booking_policies")],
-      ["the live book_session is exactly the version this step was built from", md5Is("book_session(uuid, uuid, uuid, timestamptz, timestamptz)", "da934a4629a0f09580619b7c908ab42a")],
-      ["0278 is not already applied (the switch column is not there yet)", has.noCol("coach_booking_policies", "self_booking_enabled")],
+      ["0278 is not already applied (the live book_session, weekly-schedule and waiting-list functions are exactly the versions this step was built from)", `${md5Is("book_session(uuid, uuid, uuid, timestamptz, timestamptz)", "da934a4629a0f09580619b7c908ab42a")} and ${md5Is("create_recurring_booking_series(uuid, uuid, uuid, timestamptz, integer, integer)", "a14562f9889b8094e99a5403e5423835")} and ${md5Is("join_booking_waitlist(uuid, uuid, uuid, timestamptz, timestamptz)", "f2d3243ac4fcf1876d894178e8a937f7")}`],
     ],
   },
 ];

@@ -10,7 +10,7 @@ begin;
 
 do $guard$
 begin
-  if not ((coalesce((select md5(pg_get_functiondef(p.oid)) = 'b0485b9332f337b725669193b19f0887' from pg_proc p where p.oid = to_regprocedure('public.cancel_booking_and_refund_credit(uuid)')), false) and coalesce((select md5(pg_get_functiondef(p.oid)) = 'f45d1a198654ec4150e6ec958de3b1d1' from pg_proc p where p.oid = to_regprocedure('public.reschedule_booking(uuid, timestamptz, timestamptz)')), false))) then
+  if not ((coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = 'b0485b9332f337b725669193b19f0887' from pg_proc p where p.oid = to_regprocedure('public.cancel_booking_and_refund_credit(uuid)')), false) and coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = 'f45d1a198654ec4150e6ec958de3b1d1' from pg_proc p where p.oid = to_regprocedure('public.reschedule_booking(uuid, timestamptz, timestamptz)')), false))) then
     raise exception 'Step 19 (0277) looks already applied, or the database is not in the state it expects. Nothing was changed. Run the precheck file and send Spot the result.';
   end if;
 end
@@ -105,7 +105,8 @@ begin
     v_should_refund := true;
   end if;
 
-  v_late := v_is_athlete_cancelling and not v_should_refund;
+  -- A session the coach already waived (credit_state 'waived') is never flagged: they chose not to charge it.
+  v_late := v_is_athlete_cancelling and not v_should_refund and v_state in ('prepaid', 'settled', 'unsettled');
 
   update public.bookings set status = 'cancelled' where id = p_booking_id;
 
@@ -240,6 +241,7 @@ as $function$
 declare
   v_athlete_id uuid;
   v_group_id uuid;
+  v_coach_id uuid;
   v_state text;
   v_kind text;
 begin
@@ -247,15 +249,17 @@ begin
     raise exception 'not authorized';
   end if;
 
-  select athlete_id, group_id, late_charge_state, late_change_kind
-    into v_athlete_id, v_group_id, v_state, v_kind
+  select athlete_id, group_id, coach_id, late_charge_state, late_change_kind
+    into v_athlete_id, v_group_id, v_coach_id, v_state, v_kind
   from public.bookings where id = p_booking_id
   for update;
 
   if v_athlete_id is null then
     raise exception 'booking not found';
   end if;
-  if auth.role() is distinct from 'service_role' and not public.is_group_coach(v_group_id) then
+  -- The booking's own coach decides (or an owner or admin of the organization), not just any coach of the group.
+  if auth.role() is distinct from 'service_role'
+     and not ((v_coach_id = auth.uid() and public.is_group_coach(v_group_id)) or public.is_org_admin_of_group(v_group_id)) then
     raise exception 'not authorized';
   end if;
   if v_state is distinct from 'flagged' then
@@ -277,5 +281,10 @@ $function$;
 
 revoke all on function public.resolve_late_change(uuid, boolean) from public, anon;
 grant execute on function public.resolve_late_change(uuid, boolean) to authenticated, service_role;
+
+-- A coach's Charge or Waive changes this column, so it is watched in the audit log like credit_state (0267).
+drop trigger if exists bookings_audit on public.bookings;
+create trigger bookings_audit after insert or update on public.bookings
+  for each row execute function public.audit_watch('credit_state,late_charge_state', 'update_only', 'id');
 
 commit;

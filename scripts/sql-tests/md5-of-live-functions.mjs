@@ -14,8 +14,10 @@ for (const sig of [
   "public.cancel_booking_and_refund_credit(uuid)",
   "public.reschedule_booking(uuid, timestamptz, timestamptz)",
   "public.book_session(uuid, uuid, uuid, timestamptz, timestamptz)",
+  "public.create_recurring_booking_series(uuid, uuid, uuid, timestamptz, int, int)",
+  "public.join_booking_waitlist(uuid, uuid, uuid, timestamptz, timestamptz)",
 ]) {
-  const { rows } = await db.query(`select md5(pg_get_functiondef('${sig}'::regprocedure)) as m`);
+  const { rows } = await db.query(`select md5(replace(pg_get_functiondef('${sig}'::regprocedure), chr(13), '')) as m`);
   console.log(`${sig} ${rows[0].m}`);
 }
 process.exit(0);
