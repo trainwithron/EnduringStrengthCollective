@@ -8,6 +8,14 @@
 
 begin;
 
+do $guard$
+begin
+  if not ((not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'client_tags' and policyname = 'client_tags_insert_owner_admin'))) then
+    raise exception 'Step 01 (0249-0250-0254-0240-0241) looks already applied, or the database is not in the state it expects. Nothing was changed. Run the precheck file and send Spot the result.';
+  end if;
+end
+$guard$;
+
 -- ====================================================================================================
 -- migration 0249_coach_completion_message.sql
 -- ====================================================================================================

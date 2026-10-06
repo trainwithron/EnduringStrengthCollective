@@ -1,8 +1,17 @@
 -- STEP 2 of 2 for migration 0248 (session credit settlement). Run apply-0248-precheck.sql first: every row must say ok = true.
--- One transaction: any error rolls back all of it. Nothing in this file matches or searches existing text: complete_workout_session is replaced as a whole,
--- so pasting through an editor that re-indents cannot make it fail the way the first version did. It needs the live function to be the version the precheck's md5 names.
+-- ALREADY APPLIED. Do not run it again: the guard below refuses if the live complete_workout_session is no longer the version this file was built from,
+-- because running it again would replace the function and silently undo 0236's protection against a double Finish.
+-- One transaction: any error rolls back all of it. Nothing in this file matches or searches existing text.
 
 begin;
+
+do $guard$
+begin
+  if not coalesce((select md5(pg_get_functiondef(p.oid)) = '49fe3d6b3ec9ecb92f44b1087574dfb0' from pg_proc p where p.proname = 'complete_workout_session' and p.pronamespace = 'public'::regnamespace), false) then
+    raise exception 'complete_workout_session is no longer the version 0248 was built from (0248 or 0236 is probably already applied). Running this file again would overwrite it. Nothing was changed.';
+  end if;
+end
+$guard$;
 
 -- Session credits settle when the session actually happens, and can go below zero.
 --

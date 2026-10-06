@@ -8,6 +8,14 @@
 
 begin;
 
+do $guard$
+begin
+  if not ((to_regclass('public.kiosk_pins') is null)) then
+    raise exception 'Step 06 (0251) looks already applied, or the database is not in the state it expects. Nothing was changed. Run the precheck file and send Spot the result.';
+  end if;
+end
+$guard$;
+
 -- ====================================================================================================
 -- migration 0251_kiosk_pins_hashed.sql
 -- ====================================================================================================

@@ -8,6 +8,14 @@
 
 begin;
 
+do $guard$
+begin
+  if not ((not exists (select 1 from pg_indexes where schemaname = 'public' and indexname = 'workout_logs_session_id_key'))) then
+    raise exception 'Step 05 (0236) looks already applied, or the database is not in the state it expects. Nothing was changed. Run the precheck file and send Spot the result.';
+  end if;
+end
+$guard$;
+
 -- ====================================================================================================
 -- migration 0236_workout_session_integrity.sql
 -- ====================================================================================================

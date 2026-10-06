@@ -8,6 +8,14 @@
 
 begin;
 
+do $guard$
+begin
+  if not ((to_regclass('public.coach_booking_pages') is null and to_regclass('public.cron_runs') is null)) then
+    raise exception 'Step 03 (0259-0260-0261-0262) looks already applied, or the database is not in the state it expects. Nothing was changed. Run the precheck file and send Spot the result.';
+  end if;
+end
+$guard$;
+
 -- ====================================================================================================
 -- migration 0259_booking_series_ongoing.sql
 -- ====================================================================================================

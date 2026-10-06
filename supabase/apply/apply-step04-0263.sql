@@ -8,6 +8,14 @@
 
 begin;
 
+do $guard$
+begin
+  if not ((to_regclass('public.group_sessions') is null)) then
+    raise exception 'Step 04 (0263) looks already applied, or the database is not in the state it expects. Nothing was changed. Run the precheck file and send Spot the result.';
+  end if;
+end
+$guard$;
+
 -- ====================================================================================================
 -- migration 0263_group_sessions.sql
 -- ====================================================================================================

@@ -1,21 +1,25 @@
-# Paste files: the order
+# Paste files: status and order
 
 Each step has two files: `apply-stepNN-...-precheck.sql` (read-only, every row must say ok = true) and `apply-stepNN-....sql` (all or nothing). Run the precheck, then the apply file. On any error: run `rollback;` once, copy the red text, send it to Spot, do not retry.
 
-Already applied: 0264, 0265, 0266, 0253, 0248, 0267 (the files in `supabase/`).
+## Already applied. NEVER re-run these.
+
+0264, 0265, 0266, 0253, 0248, 0267 (the files in `supabase/`), and steps 01 to 06 (0236, 0249, 0250, 0254, 0240, 0241, 0244, 0255 to 0263, 0251), applied by hand after passing every precheck.
+
+Re-running is refused by a guard at the top of each file (it raises before changing anything), but do not rely on it. Why it matters most for `apply-0248.sql`: it replaces `complete_workout_session`, so running it again would silently undo 0236's protection against a double Finish; its first statement checks that the live function is still the 0248 version and refuses otherwise. 0258, 0261, 0262 and 0263 are plain create-table/policy files: a second run would only error, but never re-paste them. (0264, 0265, 0266, 0267, 0253 are re-runnable by design; if you re-run 0266 run 0267 again straight after, because 0266 re-creates the guards without the audit logging.)
+
+## Still to run, in this order
 
 | Order | Step | Migrations | Notes |
 |---|---|---|---|
-| 1 | step05 | 0236 | needs 0248 (done) |
-| 2 | step01 | 0249, 0250, 0254, 0240, 0241 | |
-| 3 | step02 | 0244, 0255, 0256, 0257, 0258 | |
-| 4 | step03 | 0259, 0260, 0261, 0262 | |
-| 5 | step04 | 0263 | needs 0246 and 0248 |
-| 6 | step06 | 0251 | kiosk PINs hashed |
-| 7 | **kiosk test** | | `supabase/ron-test-kiosk-checkin.md` |
-| 8 | step07 | 0252 | only after the kiosk test passed and the live site is commit 0019772 or later |
-| 9 | step08 | 0237, 0242 | |
-| 10 | **invite-join test** | | `supabase/ron-test-invite-join.md` |
-| 11 | step09 | 0238 | LAST. Only after the invite-join test passed and the live site is commit 0019772 or later. Undo: `undo-step09-0238.sql` |
+| 1 | **kiosk test** | | passed Oct 5 (see `supabase/ron-test-kiosk-checkin.md`) |
+| 2 | step07 | 0252 | drops the plain-text PIN column; the live site must be commit 0019772 or later |
+| 3 | step08 | 0237, 0242 | |
+| 4 | **invite-join test** | | `supabase/ron-test-invite-join.md` |
+| 5 | step09 | 0238 | LAST. Only after the invite-join test passed and the live site is commit 0019772 or later. Undo: `undo-step09-0238.sql` |
 
-Regenerate with `node scripts/build-paste-files.mjs`; `node scripts/sql-tests/paste-files.test.mjs` applies the whole sequence on the live-equivalent schema.
+## Migration history (not applied yet)
+
+None of 0236 to 0267 is recorded in `supabase_migrations.schema_migrations` (the newest row is 0247), so `supabase db push` and the dashboard's migration list show them as unapplied. `record-history-applied.sql` inserts the missing rows. It only records a migration whose change is really in the database (each has a check), skips rows already there, and can be run again after steps 07 to 09 to add those. It is safe to run any time; it changes no tables, only the history list. Run it once the remaining steps are done (or now and again later).
+
+Regenerate everything with `node scripts/build-paste-files.mjs`; `node scripts/sql-tests/paste-files.test.mjs` applies the whole sequence on the live-equivalent schema, including the guards, the history file and the undo.

@@ -182,13 +182,109 @@ const header = (s, kind) => {
   return lines.join("\n");
 };
 
+// A guard stops a step from being run twice by mistake or on top of newer work: the "not already applied" rows are checked INSIDE the apply file
+// as its first statement, and it raises (so nothing runs) if any is false.
+const guardFor = (s) => {
+  const guards = s.rows.filter(([name]) => /not already applied/.test(name));
+  if (guards.length === 0) return "";
+  const cond = guards.map(([, expr]) => `(${expr})`).join("\n     and ");
+  return [
+    "do $guard$",
+    "begin",
+    `  if not (${cond}) then`,
+    `    raise exception 'Step ${s.n} (${s.slug}) looks already applied, or the database is not in the state it expects. Nothing was changed. Run the precheck file and send Spot the result.';`,
+    "  end if;",
+    "end",
+    "$guard$;",
+    "",
+    "",
+  ].join("\n");
+};
+
 for (const s of STEPS) {
   const base = `apply-step${s.n}-${s.slug}`;
   const values = s.rows.map(([name, expr]) => `    ('${name.replace(/'/g, "''")}',\n      ${expr}`.concat(")")).join(",\n");
   const pre = `${header(s, "precheck")}\nselect check_name, ok\nfrom (\n  values\n${values}\n) as checks(check_name, ok);\n`;
   writeFileSync(new URL(`${base}-precheck.sql`, outDir), pre);
   const body = s.migrations.map((n) => `${bar}\n-- migration ${index[n]}\n${bar}\n\n${migrationSql(n)}\n`).join("\n");
-  writeFileSync(new URL(`${base}.sql`, outDir), `${header(s, "apply")}\n\nbegin;\n\n${body}\ncommit;\n`);
+  writeFileSync(new URL(`${base}.sql`, outDir), `${header(s, "apply")}\n\nbegin;\n\n${guardFor(s)}${body}\ncommit;\n`);
 }
+// ---- apply-0248.sql: already applied; kept so that running it again can never silently undo 0236 ----
+{
+  const guard = [
+    "do $guard$",
+    "begin",
+    "  if not coalesce((select md5(pg_get_functiondef(p.oid)) = '49fe3d6b3ec9ecb92f44b1087574dfb0' from pg_proc p where p.proname = 'complete_workout_session' and p.pronamespace = 'public'::regnamespace), false) then",
+    "    raise exception 'complete_workout_session is no longer the version 0248 was built from (0248 or 0236 is probably already applied). Running this file again would overwrite it. Nothing was changed.';",
+    "  end if;",
+    "end",
+    "$guard$;",
+  ].join("\n");
+  const head = [
+    "-- STEP 2 of 2 for migration 0248 (session credit settlement). Run apply-0248-precheck.sql first: every row must say ok = true.",
+    "-- ALREADY APPLIED. Do not run it again: the guard below refuses if the live complete_workout_session is no longer the version this file was built from,",
+    "-- because running it again would replace the function and silently undo 0236's protection against a double Finish.",
+    "-- One transaction: any error rolls back all of it. Nothing in this file matches or searches existing text.",
+  ].join("\n");
+  writeFileSync(new URL("../apply-0248.sql", outDir), `${head}\n\nbegin;\n\n${guard}\n\n${migrationSql("0248")}\n\ncommit;\n`);
+}
+
+// ---- record-history-applied.sql: put the hand-applied migrations into supabase_migrations.schema_migrations ----
+// One file Ron can run at any time: it records only the migrations whose changes are actually in the database (each has a marker check), skips ones
+// already recorded, and does nothing for the rest, so it can be run again after later steps. Versions are fixed (20261006 + the migration number),
+// so running it again never duplicates.
+{
+  const m = (n, marker) => ({ n, file: index[n], marker });
+  const items = [
+    m("0236", "exists (select 1 from pg_indexes where schemaname = 'public' and indexname = 'workout_logs_session_id_key')"),
+    m("0237", has.fnName("join_group_with_invite")),
+    m("0238", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'group_memberships' and policyname = 'memberships_insert_coach_or_self' and with_check not like '%has_valid_group_invite%')"),
+    m("0240", has.col("profiles", "guide_dismissed_at")),
+    m("0241", has.col("programs", "label")),
+    m("0242", has.col("group_invites", "revoked_at")),
+    m("0244", has.table("client_macro_target_history")),
+    m("0248", has.col("bookings", "credit_state")),
+    m("0249", has.col("coach_profiles", "completion_message")),
+    m("0250", has.col("organization_billing", "ai_allowance_scale")),
+    m("0251", has.table("kiosk_pins")),
+    m("0252", has.noCol("group_memberships", "kiosk_pin")),
+    m("0253", has.noPolicy("posts", "posts_select_public_workout_share")),
+    m("0254", has.policy("client_tags", "client_tags_insert_owner_admin")),
+    m("0255", has.table("legal_acceptances")),
+    m("0256", has.col("organizations", "listed_in_marketplace")),
+    m("0257", has.table("feedback_reports")),
+    m("0258", has.table("nav_query_log")),
+    m("0259", has.col("recurring_booking_series", "mode")),
+    m("0260", has.col("session_credits", "payment_hold")),
+    m("0261", has.table("coach_booking_pages")),
+    m("0262", has.table("cron_runs")),
+    m("0263", has.table("group_sessions")),
+    m("0264", has.policy("session_credits", "credits_update_coach")),
+    m("0265", has.policy("bookings", "bookings_update_coach")),
+    m("0266", "exists (select 1 from pg_trigger where tgname = 'profiles_guard_sensitive_columns')"),
+    m("0267", has.table("audit_log")),
+  ];
+  const values = items.map((i) => `    ('2026100600${i.n.slice(1)}', '${i.file.slice(5, -4)}', '${i.file}', ${i.marker})`).join(",\n");
+  const sql = [
+    "-- Records the migrations Ron applied by hand in the Supabase migration history (supabase_migrations.schema_migrations), so supabase db push and",
+    "-- list_migrations show them as applied. NOT APPLIED YET: run it when you are ready. It records a migration only if its change is actually in the",
+    "-- database (each row has a check), skips ones already recorded, and does nothing for steps not applied yet, so you can run it again after later steps.",
+    '-- WHAT YOU SHOULD SEE: "Success. No rows returned." Then: select version, name from supabase_migrations.schema_migrations order by version desc limit 30;',
+    "-- ON ERROR: nothing was recorded (one transaction). Copy the red text and send it to Spot.",
+    "begin;",
+    "insert into supabase_migrations.schema_migrations (version, name, statements, created_by)",
+    "select v.version, v.name, array['-- applied by hand through the SQL editor; the SQL is supabase/migrations/' || v.file], 'ronarnold4210@gmail.com'",
+    "from (",
+    "  values",
+    values,
+    ") as v(version, name, file, applied)",
+    "where v.applied",
+    "on conflict (version) do nothing;",
+    "commit;",
+    "",
+  ].join("\n");
+  writeFileSync(new URL("record-history-applied.sql", outDir), sql);
+}
+
 writeFileSync(new URL("steps.json", outDir), JSON.stringify(STEPS.map((s) => ({ n: s.n, slug: s.slug, migrations: s.migrations, rows: s.rows.length })), null, 1));
 console.log(`wrote ${STEPS.length} steps to supabase/apply/`);

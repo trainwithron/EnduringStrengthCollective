@@ -10,10 +10,11 @@ You need: a **team** group where you are the coach (the Test Sandbox group is fi
 2. In a **private window** (not signed in), open the link.
    - Expected: the page shows the group name and a sign-up form. If it says the link is invalid or expired, stop and tell Spot.
 3. Sign up with the test email alias and a password. Follow any "confirm your email" step.
-   - Expected: you end up inside the group (the client Home). No "couldn't join" error.
+   - Expected: you are then taken to a page titled "Before you get started" (the health questionnaire and waiver, `/intake`). **That is normal, not a failure**: every new client has to complete it before they can reach the group. The proof that joining worked is the membership row in step 4 (and, if you complete the short form, you land in the group).
+   - A failure is: the invite page says the link is invalid or expired, or sign-up ends in an error before the "Before you get started" page.
 4. Back as coach: the new person appears in the group's client list.
 5. Reuse check: in the private window, sign out, open the same link again while signed in as that same new person.
-   - Expected: it takes you into the group again with no error and no duplicate.
+   - Expected: no error and no duplicate: you land on the same "Before you get started" page (or in the group, if you finished the form). The membership row count in the check below stays at one for this person.
 6. One-on-one limit (optional, only if you have a 1-on-1 group with no client yet): make an invite for it, join with one account, then try a second new account with the same link.
    - Expected: the second one is told the link has already been used.
 

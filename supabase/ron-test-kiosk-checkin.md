@@ -12,7 +12,7 @@ You need: a group where you are the coach, with at least one client in it (the T
 2. Open `/groups/<groupId>/kiosk` (the tablet screen). Tap that client, enter the **right** PIN.
    - Expected: a check-in confirmation. No error.
 3. Back on the kiosk screen, tap the same client and enter a **wrong** PIN four times.
-   - Expected: each time "Wrong PIN, try again."
+   - Expected: each time "Wrong PIN — try again."
 4. Enter a wrong PIN a **fifth** time.
    - Expected: "Too many wrong tries. Try again later, or ask your coach."
 5. Now enter the **right** PIN.

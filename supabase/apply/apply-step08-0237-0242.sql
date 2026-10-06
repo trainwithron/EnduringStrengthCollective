@@ -8,6 +8,15 @@
 
 begin;
 
+do $guard$
+begin
+  if not ((not exists (select 1 from pg_proc where proname = 'join_group_with_invite' and pronamespace = 'public'::regnamespace))
+     and (not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_invites' and column_name = 'revoked_at'))) then
+    raise exception 'Step 08 (0237-0242) looks already applied, or the database is not in the state it expects. Nothing was changed. Run the precheck file and send Spot the result.';
+  end if;
+end
+$guard$;
+
 -- ====================================================================================================
 -- migration 0237_join_group_with_invite.sql
 -- ====================================================================================================

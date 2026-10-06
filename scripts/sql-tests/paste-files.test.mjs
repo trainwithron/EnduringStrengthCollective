@@ -9,7 +9,8 @@ const db = await createDb();
 await applyLiveEquivalent(db);
 let failures = 0;
 const check = (name, ok) => { console.log(`${ok ? "ok  " : "FAIL"} ${name}`); if (!ok) failures++; };
-const run = async (file) => { try { await db.exec(read(file)); return null; } catch (e) { return e.message.split("\n")[0]; } };
+// After an error the editor's transaction is left aborted until "rollback;" (the headers tell Ron to run it), so the test does the same.
+const run = async (file) => { try { await db.exec(read(file)); return null; } catch (e) { await db.exec("rollback").catch(() => {}); return e.message.split("\n")[0]; } };
 const pre = async (file) => (await db.query(read(file))).rows;
 
 // ---- what Ron has already applied ----
@@ -45,11 +46,23 @@ for (const s of steps) {
   e = await run(`${base}.sql`);
   check(`step ${s.n} (${s.slug}) applies` + (e ? `: ${e}` : ""), !e);
   if (s.n === "06") {
+    // The migration-history file records only what is in the database so far (not 0252, 0237, 0238, 0242), and can be run twice.
+    await db.exec("create schema if not exists supabase_migrations; create table if not exists supabase_migrations.schema_migrations (version text primary key, statements text[], name text, created_by text, idempotency_key text, rollback text[])");
+    const eh = await run("apply/record-history-applied.sql");
+    const eh2 = await run("apply/record-history-applied.sql");
+    const recorded = (await db.query("select name from supabase_migrations.schema_migrations")).rows.map((r) => r.name);
+    check("history file after step 06: records the applied ones (23), not 0252/0237/0238/0242, and a second run adds nothing" + (eh || eh2 ? `: ${eh || eh2}` : ""),
+      !eh && !eh2 && recorded.length === 23 && !recorded.some((n) => /^(drop_plaintext_kiosk_pin|join_group_with_invite|close_loose_self_join_policy|invite_revocation)$/.test(n)), recorded.length);
     const ok = (await db.query(`select public.verify_kiosk_pin('00000000-0000-4000-8000-0000000000b1', '00000000-0000-4000-8000-0000000000a2', '4821') as r`).catch(() => null));
     // verify_kiosk_pin needs a signed-in coach; the data check is that the hash exists.
     const hashed = (await db.query(`select count(*)::int as n from public.kiosk_pins where athlete_id = '00000000-0000-4000-8000-0000000000a2'`)).rows[0].n;
     check("step 06: the existing plain PIN was copied across hashed", hashed === 1);
   }
+}
+// Running an already-applied step again is refused by its own guard (nothing changes), including 0248, which would otherwise undo 0236.
+for (const f2 of ["apply/apply-step01-0249-0250-0254-0240-0241.sql", "apply/apply-step04-0263.sql", "apply/apply-step05-0236.sql", "apply/apply-step06-0251.sql", "apply-0248.sql"]) {
+  const err = await run(f2);
+  check(`re-running ${f2.split("/").pop()} is refused by its guard (${err})`, !!err && /already applied|no longer the version|not in the state/.test(err));
 }
 // The undo for step 09 restores the loose self-join (a signed-in person can add themselves with a valid invite).
 {

@@ -8,6 +8,16 @@
 
 begin;
 
+do $guard$
+begin
+  if not ((to_regclass('public.client_macro_target_history') is null)
+     and (to_regclass('public.legal_acceptances') is null)
+     and (to_regclass('public.feedback_reports') is null and to_regclass('public.nav_query_log') is null)) then
+    raise exception 'Step 02 (0244-0255-0256-0257-0258) looks already applied, or the database is not in the state it expects. Nothing was changed. Run the precheck file and send Spot the result.';
+  end if;
+end
+$guard$;
+
 -- ====================================================================================================
 -- migration 0244_macro_target_history_and_rls.sql
 -- ====================================================================================================

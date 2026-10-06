@@ -10,6 +10,14 @@
 
 begin;
 
+do $guard$
+begin
+  if not ((exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'group_memberships' and policyname = 'memberships_insert_coach_or_self'))) then
+    raise exception 'Step 09 (0238) looks already applied, or the database is not in the state it expects. Nothing was changed. Run the precheck file and send Spot the result.';
+  end if;
+end
+$guard$;
+
 -- ====================================================================================================
 -- migration 0238_close_loose_self_join_policy.sql
 -- ====================================================================================================
