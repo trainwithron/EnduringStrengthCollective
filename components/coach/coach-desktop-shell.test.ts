@@ -39,6 +39,12 @@ describe("Home", () => {
     expect(dashboard).toContain('active="home" coachLevel');
     expect(dashboard).toContain('g.group_kind !== "one_on_one"');
   });
+  it("never reads the last_group cookie for Home, so the rail is the same whatever the coach visited last", () => {
+    const home = dashboard.slice(dashboard.indexOf("export default async function CoachHomePage"));
+    const afterContent = home.slice(home.indexOf("let lastGroup"));
+    expect(afterContent).not.toContain('get("last_group")');
+    expect(afterContent).not.toContain("lastGroupCookie");
+  });
 });
 
 describe("client finder wording", () => {

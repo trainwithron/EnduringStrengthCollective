@@ -622,21 +622,12 @@ export default async function CoachHomePage() {
   // identity at all — falling back to the minimal CoachHomeShell (same
   // as the "no last_group cookie yet" case) is the correct behavior here,
   // not a degraded one.
-  const lastGroupCookie = (await cookies()).get("last_group")?.value;
+  // Home never reads the last_group cookie: whatever the coach last visited, Home shows the same coach-level rail. It is anchored on the coach's
+  // first team or social group by name (below), or on a one-on-one group when that is all they have; the anchor only decides where the rail's
+  // links point, never what it shows.
   let lastGroup: { id: string; name: string } | null = null;
-  if (lastGroupCookie) {
-    try {
-      const parsed = JSON.parse(decodeURIComponent(lastGroupCookie));
-      const match = allGroups.find((g) => g.id === parsed?.id && g.group_kind !== "one_on_one");
-      if (match) {
-        lastGroup = { id: match.id, name: parsed.name ?? match.name ?? "Group" };
-      }
-    } catch {
-      // Malformed cookie — fall through to the minimal shell.
-    }
-  }
 
-  // No remembered team or social group: anchor Home's rail on the coach's first team or social group (by name), so the full coach-level rail
+  // Anchor Home's rail on the coach's first team or social group (by name), so the full coach-level rail
   // is always there. Home is the coach's own page, so it shows the business name and never a group or client identity (coachLevel).
   if (!lastGroup) {
     const firstSharedGroup = [...allGroups]
