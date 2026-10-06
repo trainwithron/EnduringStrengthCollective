@@ -15,7 +15,7 @@ interface WorkspaceGroup {
 // The business name in the top bar, as a real menu. It lists coach-level places first (Home, all clients), then the coach's team and social
 // groups (one-on-one client groups are NOT listed: clients are reached through Clients), then other organizations only when the coach belongs
 // to two or more, and a way to create a group. Opening a group goes to that group's page; the rail stays coach-level.
-export function WorkspaceMenu({ groupId, orgName }: { groupId: string; orgName: string }) {
+export function WorkspaceMenu({ groupId, orgName, large = false }: { groupId: string; orgName: string; large?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [groups, setGroups] = useState<WorkspaceGroup[]>([]);
@@ -127,9 +127,13 @@ export function WorkspaceMenu({ groupId, orgName }: { groupId: string; orgName: 
         aria-haspopup="menu"
         aria-expanded={open}
         title={orgName}
-        className="flex items-center gap-1 min-w-0 font-body text-xs md:text-sm text-steel hover:text-chalk"
+        className={
+          large
+            ? "flex items-center gap-1.5 min-w-0 font-display font-bold text-lg md:text-2xl uppercase tracking-wide text-chalk"
+            : "flex items-center gap-1 min-w-0 font-body text-xs md:text-sm text-steel hover:text-chalk"
+        }
       >
-        <span className="truncate max-w-[10rem] md:max-w-[16rem]">{orgName}</span>
+        <span className={large ? "truncate max-w-[18rem] md:max-w-[26rem]" : "truncate max-w-[10rem] md:max-w-[16rem]"}>{orgName}</span>
         <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (

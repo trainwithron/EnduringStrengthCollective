@@ -634,9 +634,28 @@ export default async function CoachHomePage() {
     }
   }
 
+  // No remembered team or social group: anchor Home's rail on the coach's first team or social group (by name), so the full coach-level rail
+  // is always there. Home is the coach's own page, so it shows the business name and never a group or client identity (coachLevel).
+  if (!lastGroup) {
+    const firstSharedGroup = [...allGroups]
+      .filter((g) => g.group_kind !== "one_on_one")
+      .sort((a, b) => String(a.name ?? "").localeCompare(String(b.name ?? "")))[0];
+    if (firstSharedGroup) lastGroup = { id: firstSharedGroup.id, name: firstSharedGroup.name ?? "Group" };
+  }
+
   if (lastGroup) {
     return (
-      <CoachDesktopShell groupId={lastGroup.id} groupName={lastGroup.name} active="home">
+      <CoachDesktopShell groupId={lastGroup.id} groupName={lastGroup.name} active="home" coachLevel>
+        {content}
+      </CoachDesktopShell>
+    );
+  }
+
+  // A coach whose groups are all one-on-one: anchor on one of them, still coach-level (no client identity shown).
+  const anySoloGroup = allGroups[0];
+  if (anySoloGroup) {
+    return (
+      <CoachDesktopShell groupId={anySoloGroup.id} groupName={orgName} active="home" coachLevel>
         {content}
       </CoachDesktopShell>
     );

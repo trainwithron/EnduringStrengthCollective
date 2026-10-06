@@ -25,6 +25,7 @@ import {
   Home,
   MonitorPlay,
   Activity,
+  MoreHorizontal,
   CalendarClock,
   Mail,
   Trophy,
@@ -618,7 +619,7 @@ export function CoachDesktopShell({
             </>
           )}
           {coachLevel && orgName ? (
-            <WorkspaceTitle groupId={groupId} orgName={orgName} />
+            <WorkspaceMenu groupId={groupId} orgName={orgName} large />
           ) : (
             <p className="font-display font-bold text-lg md:text-2xl uppercase tracking-wide truncate">
               {groupName}

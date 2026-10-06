@@ -62,3 +62,25 @@ describe("computeQuietTier — frequency-normalized (scheduled program)", () => 
     expect(computeQuietTier({ lastLoggedAt: LAST_LOGGED, now: strongNow, trainingDays: oneDayWeek })).toBe("strong");
   });
 });
+
+describe("a new client who has not started is not 'gone quiet'", () => {
+  const now = new Date("2026-10-06T12:00:00Z");
+  const daysAgo = (n: number) => new Date(now.getTime() - n * 86400000);
+  it("is not flagged within the first two weeks of being added", () => {
+    expect(computeQuietTier({ lastLoggedAt: null, now, trainingDays: null, addedAt: daysAgo(3), signedIn: true })).toBe("none");
+    expect(computeQuietTier({ lastLoggedAt: null, now, trainingDays: null, addedAt: daysAgo(13), signedIn: true })).toBe("none");
+  });
+  it("is flagged after two weeks if they signed in and still have not started", () => {
+    expect(computeQuietTier({ lastLoggedAt: null, now, trainingDays: null, addedAt: daysAgo(20), signedIn: true })).toBe("strong");
+  });
+  it("is given longer when they have not signed in yet", () => {
+    expect(computeQuietTier({ lastLoggedAt: null, now, trainingDays: null, addedAt: daysAgo(30), signedIn: false })).toBe("none");
+    expect(computeQuietTier({ lastLoggedAt: null, now, trainingDays: null, addedAt: daysAgo(60), signedIn: false })).toBe("strong");
+  });
+  it("keeps the old behavior when the caller does not know when they were added", () => {
+    expect(computeQuietTier({ lastLoggedAt: null, now, trainingDays: null })).toBe("strong");
+  });
+  it("does not change anything for a client who has logged", () => {
+    expect(computeQuietTier({ lastLoggedAt: daysAgo(20), now, trainingDays: null, addedAt: daysAgo(40), signedIn: true })).toBe("strong");
+  });
+});
