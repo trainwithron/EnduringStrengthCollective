@@ -3,6 +3,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 vi.mock("@/lib/supabase/client", () => ({ createBrowserClient: () => ({}) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => {} }) }));
 
 import { AvailabilityManagerDesktop } from "./availability-manager-desktop";
 
