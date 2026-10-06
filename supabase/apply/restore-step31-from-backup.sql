@@ -2,6 +2,7 @@
 -- Puts back, from the most recent record in cleanup_backups, both groups with their memberships, programs, progressions, workouts, exercises, sets, notes,
 -- wellness check-ins, view state and Spotter dismissals, in that order, in one transaction. It refuses (and changes nothing) if there is no backup, or if either
 -- group already exists. The copy of christmas_abs_program in The Home Team is not touched.
+-- Only reliable soon after step 31: it fills columns from the backup, so a NOT NULL column added by a later migration to one of these tables would make it fail (loudly, and nothing is kept).
 -- WHAT YOU SHOULD SEE: "Success. No rows returned."
 begin;
 do $restore$
