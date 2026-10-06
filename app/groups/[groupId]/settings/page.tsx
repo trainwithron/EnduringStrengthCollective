@@ -17,6 +17,7 @@ import { ManageBillingLink } from "@/components/athlete/manage-billing-link";
 import { isStripeConfigured } from "@/lib/stripe";
 import { ProfileDetailsEditor } from "@/components/athlete/profile-details-editor";
 import { SwipeDirectionSetting } from "@/components/athlete/swipe-direction-setting";
+import { HideDemosToggle } from "@/components/athlete/hide-demos-toggle";
 import { SettingsGroup } from "@/components/shared/settings-group";
 import { ExportDataButton } from "@/components/athlete/export-data-button";
 import { FeedBroadcastSettings } from "@/components/athlete/feed-broadcast-settings";
@@ -265,6 +266,9 @@ export default async function SettingsPage(
                 (profile?.exercise_swipe_direction as "vertical" | "horizontal" | null) ?? null
               }
             />
+            <div className="mt-4">
+              <HideDemosToggle />
+            </div>
           </SettingsGroup>
         )}
 

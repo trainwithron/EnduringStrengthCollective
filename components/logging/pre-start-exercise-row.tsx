@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { formatCondensedSets } from "@/lib/exercise-fields";
 import type { WorkoutOverviewExercise } from "@/lib/workout-overview-data";
+import { ExerciseDemoButton } from "./exercise-demo-button";
+import { useDemosHidden } from "./demo-preference";
 
 export function PreStartExerciseRow({
   exercise,
@@ -25,6 +27,7 @@ export function PreStartExerciseRow({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const demosHidden = useDemosHidden();
 
   async function handleSwap(name: string) {
     setBusy(true);
@@ -78,27 +81,27 @@ export function PreStartExerciseRow({
             </p>
           )}
         </div>
-        {exercise.ladder.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setSwapping((v) => !v)}
-            className="shrink-0 font-body text-xs text-steel active:text-rust transition-colors"
-          >
-            Swap Exercise
-          </button>
-        )}
+        <div className="flex items-center gap-3 shrink-0">
+          {!demosHidden && (
+            <ExerciseDemoButton
+              compact
+              title={exercise.exerciseName}
+              youtubeUrl={exercise.youtubeUrl}
+              videoUrl={videoUrl ?? null}
+              videoPath={exercise.videoPath}
+            />
+          )}
+          {exercise.ladder.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setSwapping((v) => !v)}
+              className="shrink-0 font-body text-xs text-steel active:text-rust transition-colors"
+            >
+              Swap Exercise
+            </button>
+          )}
+        </div>
       </div>
-
-      {videoUrl && (
-        <a
-          href={videoUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-body text-xs text-rust inline-block mt-1"
-        >
-          Watch demo &rarr;
-        </a>
-      )}
 
       {swapping && (
         <div className="mt-2 flex flex-wrap gap-1.5">

@@ -12,6 +12,8 @@ import { CompleteWorkoutButton } from "@/components/session/complete-workout-but
 import { RestTimerBar, type PendingGateTask } from "@/components/session/rest-timer-bar";
 import { QuickAddNlButton } from "./quick-add-nl-button";
 import { SessionProgressStrip } from "./session-progress-strip";
+import { DemoLibraryProvider } from "./demo-library-context";
+import type { DemoRow } from "@/lib/exercise-demo";
 
 export function SessionLogger({
   sessionId,
@@ -30,6 +32,7 @@ export function SessionLogger({
   todayDate,
   coachNoteByExerciseName,
   exerciseSwipeDirection,
+  demoLibrary,
 }: {
   sessionId: string;
   isCompleted: boolean;
@@ -56,6 +59,8 @@ export function SessionLogger({
   // horizontal (today's original behavior) for any call site that hasn't
   // been updated to pass it.
   exerciseSwipeDirection?: SwipeDirection | null;
+  // The coach's exercise library (name and demo links) so a demo is found from an exercise's current name, including one added or swapped mid-workout.
+  demoLibrary?: DemoRow[];
 }) {
   const [exercises, setExercises] = useState(initialExercises);
   // Mirrors whichever carousel variant is active's own scroll-position
@@ -215,6 +220,7 @@ export function SessionLogger({
   }
 
   return (
+    <DemoLibraryProvider value={demoLibrary ?? null}>
     <SetSaveProvider>
       {!isCompleted && (
         <RestTimerBar
@@ -346,5 +352,6 @@ export function SessionLogger({
       )}
       </section>
     </SetSaveProvider>
+    </DemoLibraryProvider>
   );
 }

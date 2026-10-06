@@ -1,4 +1,5 @@
 import { getProgressionGoalsBatch } from "@/lib/progressions";
+import { findDemo, type DemoRow } from "@/lib/exercise-demo";
 import { DEFAULT_TRACKED_FIELDS, mapSetRow, type TrackedField } from "@/lib/exercise-fields";
 import { findCorrelatingWeightSuggestion, resolveWeightSuggestion } from "@/lib/set-suggestions";
 import { parseNumericReps } from "@/lib/program-card-visuals";
@@ -119,10 +120,7 @@ export async function getWorkoutOverviewData(
 
   // Exercise video/YouTube is attached on the coach's shared exercise
   // library, keyed by name.
-  const mediaByName = new Map<string, { videoPath: string | null; youtubeUrl: string | null }>();
-  for (const row of libraryResult.data ?? []) {
-    mediaByName.set(row.name, { videoPath: row.video_path, youtubeUrl: row.youtube_url });
-  }
+  const demoRows: DemoRow[] = (libraryResult.data ?? []).map((row: any) => ({ name: row.name, videoPath: row.video_path, youtubeUrl: row.youtube_url }));
 
   // Progression rules are keyed by the coach's original template exercise
   // name (exercise_progressions.exercise_name), never by a per-client
@@ -157,7 +155,8 @@ export async function getWorkoutOverviewData(
 
   const exercises: WorkoutOverviewExercise[] = templateExercises.map((ex: any) => {
     const resolvedName = overrideNameBySlot.get(ex.id) ?? ex.exercise_name;
-    const media = mediaByName.get(resolvedName);
+    // Found by what the exercise is, so a duplicate spelling or a second name for it still shows its demo.
+    const media = findDemo(demoRows, resolvedName);
     const fullLadder = ex.movement_pattern_id ? ladderByPattern.get(ex.movement_pattern_id) ?? [] : [];
     return {
       id: ex.id,

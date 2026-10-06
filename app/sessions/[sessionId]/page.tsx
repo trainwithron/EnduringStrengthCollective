@@ -18,6 +18,7 @@ import { computeVolumeHistory } from "@/lib/exercise-volume-history";
 import { ExitWorkoutButton } from "@/components/session/exit-workout-button";
 import { ResumeWorkoutButton } from "@/components/session/resume-workout-button";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
+import { findDemo, type DemoRow } from "@/lib/exercise-demo";
 
 export default async function SessionPage(
   props: {
@@ -277,6 +278,7 @@ export default async function SessionPage(
     string,
     { videoPath: string | null; youtubeUrl: string | null; equipmentType: string | null }
   >();
+  const demoLibrary: DemoRow[] = [];
   if (coachMembership) {
     const { data: libraryRows } = await supabase
       .from("exercise_library")
@@ -288,17 +290,20 @@ export default async function SessionPage(
         youtubeUrl: row.youtube_url,
         equipmentType: row.equipment_type,
       });
+      demoLibrary.push({ name: row.name, videoPath: row.video_path, youtubeUrl: row.youtube_url });
     }
   }
 
   const exercises: SessionExerciseEntry[] = await Promise.all(
     (sessionExercises ?? []).map(async (se: any) => {
       const media = mediaByName.get(se.exercise_name);
+      // The demo is found by what the exercise is (a duplicate spelling or a second name for it), not only the exact text.
+      const demo = findDemo(demoLibrary, se.exercise_name);
       let videoUrl: string | null = null;
-      if (media?.videoPath) {
+      if (demo?.videoPath) {
         const { data } = await supabase.storage
           .from("exercise-media")
-          .createSignedUrl(media.videoPath, 3600);
+          .createSignedUrl(demo.videoPath, 3600);
         videoUrl = data?.signedUrl ?? null;
       }
 
@@ -310,7 +315,7 @@ export default async function SessionPage(
         isAdded: se.is_added,
         trackedFields: se.tracked_fields ?? DEFAULT_TRACKED_FIELDS,
         videoUrl,
-        youtubeUrl: media?.youtubeUrl ?? null,
+        youtubeUrl: demo?.youtubeUrl ?? null,
         equipmentType: (media?.equipmentType as SessionExerciseEntry["equipmentType"]) ?? null,
         notes: se.group_workout_exercises?.notes ?? null,
         athleteNote: se.athlete_note ?? null,
@@ -558,6 +563,7 @@ export default async function SessionPage(
         todayDate={todayKey}
         coachNoteByExerciseName={coachNoteByExerciseName}
         exerciseSwipeDirection={exerciseSwipeDirection}
+        demoLibrary={demoLibrary}
       />
 
       {isOwnSession && (
