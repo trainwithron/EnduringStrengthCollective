@@ -1,4 +1,6 @@
 import webpush from "web-push";
+import { supportEmail } from "@/lib/legal";
+import { configuredAppUrl } from "@/lib/app-url";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { safePushPath } from "@/lib/push-url";
 
@@ -17,7 +19,7 @@ export async function sendPushToProfile(
   const privateKey = process.env.VAPID_PRIVATE_KEY;
   if (!publicKey || !privateKey) return 0;
 
-  webpush.setVapidDetails(process.env.VAPID_SUBJECT || "mailto:support@enduringstrength.co", publicKey, privateKey);
+  webpush.setVapidDetails(vapidSubject(), publicKey, privateKey);
 
   const { data: subscriptions } = await supabase
     .from("push_subscriptions")
@@ -41,4 +43,13 @@ export async function sendPushToProfile(
     }
   }
   return sent;
+}
+
+// The contact the push services get with every send: VAPID_SUBJECT if set, else the support address, else the app's own address. Never a made-up one.
+export function vapidSubject(): string {
+  const fromEnv = process.env.VAPID_SUBJECT?.trim();
+  if (fromEnv) return fromEnv;
+  const email = supportEmail();
+  if (email) return `mailto:${email}`;
+  return configuredAppUrl() ?? "https://localhost";
 }

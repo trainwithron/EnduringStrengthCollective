@@ -19,7 +19,7 @@ export async function POST(request: Request) {
 
   try {
     const res = await fetch(`https://world.openfoodfacts.org/api/v2/product/${barcode.trim()}.json`, {
-      headers: { "User-Agent": "EnduringStrengthCollective/1.0" },
+      headers: { "User-Agent": "SpotlightCoaching/1.0" },
     });
     if (!res.ok) {
       return NextResponse.json({ error: "Couldn't reach the food database — try again." }, { status: 502 });

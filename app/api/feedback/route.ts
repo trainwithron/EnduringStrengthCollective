@@ -25,7 +25,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "That is a bit long. Keep it under 4000 characters." }, { status: 400 });
   }
   const kind = body.kind === "idea" ? "idea" : "problem";
-  const pagePath = typeof body.pagePath === "string" ? body.pagePath.slice(0, 500) : null;
+  // Path only, whatever the browser sent: a query string or fragment can carry a token, an email or a name.
+  const pagePath = typeof body.pagePath === "string" ? body.pagePath.split("?")[0].split("#")[0].slice(0, 300) : null;
   const viewport = typeof body.viewport === "string" ? body.viewport.slice(0, 40) : null;
   const userAgent = (request.headers.get("user-agent") ?? "").slice(0, 400);
 

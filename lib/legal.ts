@@ -6,7 +6,7 @@
 export type LegalDocument = "beta_notice" | "terms" | "privacy" | "refunds" | "waiver";
 
 export const LEGAL_VERSIONS: Record<LegalDocument, string> = {
-  beta_notice: "2026-10-05-draft-2",
+  beta_notice: "2026-10-05-draft-3",
   terms: "2026-10-05-placeholder-1",
   privacy: "2026-10-05-placeholder-1",
   refunds: "2026-10-05-placeholder-1",
@@ -38,6 +38,7 @@ export const BETA_NOTICE_PARAGRAPHS: string[] = [
   "Adults only for now. Please do not enter real information for anyone under 18. Anyone under 13 is blocked from using the app unless a parent or guardian's consent has been verified.",
   "Beta means data could be lost. Please do not rely on the app as your only record. Keep your own backups and notes of anything important, such as your training numbers and any payments, until we tell you the beta is over.",
   "What is stored: your name, email and, if you give them, your phone number and date of birth. Also your health questionnaire answers, your weight, wellness check-ins, training and nutrition logs, your messages, and any photos or videos you choose to share.",
+  "Help search: when the app's help search cannot answer a question, we keep the wording of that question to improve it, after removing names, email addresses, links and numbers as best we can. It is not linked to your account. Questions it can answer are not kept as text.",
   "Who can see it: your coach, and the people who run your coach's organization. During the beta, the platform operator can also read training data across organizations in order to give support, unless a client has been marked private. We plan to tighten this, and we are telling you about it now rather than later.",
   "AI features: some features send text such as workout notes, nutrition entries and, for the coach's assistant features, client names to an AI provider, Anthropic, in order to produce suggestions. What the AI writes is a draft for your coach to review, not a decision. We are working to send less personal detail than that.",
   "Text messages are optional and are off unless you turn them on. Reply STOP to any text to stop them, and HELP for help.",

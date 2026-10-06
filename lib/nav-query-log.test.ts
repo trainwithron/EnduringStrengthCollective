@@ -22,10 +22,23 @@ describe("normalizeForLog", () => {
   });
 
   it("caps the length", () => {
-    expect(normalizeForLog("word ".repeat(100), roster).length).toBeLessThanOrEqual(200);
+    expect(normalizeForLog("word ".repeat(100), roster).length).toBeLessThanOrEqual(120);
   });
 
   it("works with no roster", () => {
     expect(normalizeForLog("Show my calendar")).toBe("show my calendar");
+  });
+
+  it("removes links, handles and capitalized names the roster does not know", () => {
+    expect(normalizeForLog("send this to Maria Lopez at https://example.com/x or @maria_l")).toBe("send this to {name} at {link} or {handle}");
+  });
+
+  it("removes ids and mixed letter-digit tokens", () => {
+    expect(normalizeForLog("my code is a1b2c3d4e5 and sk12345")).toBe("my code is {word} and {word}");
+    expect(normalizeForLog("abcdefghijklmnopqrstuvwxyz")).toBe("{word}");
+  });
+
+  it("keeps the first word of a sentence even when capitalized", () => {
+    expect(normalizeForLog("Where do I add a client")).toBe("where do i add a client");
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MessageSquarePlus } from "lucide-react";
 
 // "Report a problem or suggest something". Captures the page and screen size automatically so a tester only has to say what
@@ -12,6 +12,42 @@ export function FeedbackButton({ variant = "link" }: { variant?: "icon" | "link"
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The dialog behaves like one: focus moves in when it opens, Tab stays inside, Escape closes, and focus goes back to the button that opened it.
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    openerRef.current = document.activeElement as HTMLElement | null;
+    const focusable = () =>
+      Array.from(dialogRef.current?.querySelectorAll<HTMLElement>("button:not([disabled]), textarea, [href], input, select, [tabindex]:not([tabindex='-1'])") ?? []);
+    (dialogRef.current?.querySelector<HTMLElement>("textarea") ?? focusable()[0])?.focus();
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setOpen(false);
+        setDone(false);
+        setError(null);
+      } else if (e.key === "Tab") {
+        const items = focusable();
+        if (items.length === 0) return;
+        const first = items[0];
+        const last = items[items.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      openerRef.current?.focus?.();
+    };
+  }, [open]);
 
   async function send() {
     if (!message.trim()) {
@@ -27,7 +63,8 @@ export function FeedbackButton({ variant = "link" }: { variant?: "icon" | "link"
         body: JSON.stringify({
           kind,
           message,
-          pagePath: window.location.pathname + window.location.search,
+          // The path only: a query string can carry a token, an email or a name.
+          pagePath: window.location.pathname,
           viewport: `${window.innerWidth}x${window.innerHeight}`,
         }),
       });
@@ -76,7 +113,7 @@ export function FeedbackButton({ variant = "link" }: { variant?: "icon" | "link"
             if (e.target === e.currentTarget) close();
           }}
         >
-          <div className="w-full max-w-md bg-graphite border border-steel/30 p-5 text-chalk">
+          <div ref={dialogRef} className="w-full max-w-md bg-graphite border border-steel/30 p-5 text-chalk">
             {done ? (
               <>
                 <p className="font-display uppercase font-bold text-xl">Thank you</p>
