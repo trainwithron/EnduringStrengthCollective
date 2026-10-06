@@ -12,10 +12,12 @@ Nothing here is pushed, deployed or applied. The Oct 5 evening deploy (head 981e
    *After it ships, try (phone):* Calendar tab, pick a one-on-one client, month Prev/Next, tap a day, **Assign** on a time (even for a client at 0 sessions), Mark attended on a past one, and cancel one week of a weekly schedule.
 4. **Database steps** (paste files `supabase\apply\apply-step12` to `step16`, each with a precheck and an undo file). Ron pastes them himself, in this order, after the review of the paste files is done:
    - step 12 (0270) a coach can only add their own clients to a group
-   - step 13 (0271) database functions are signed-in and server only
    - step 14 (0273) guards on groups and organizations
-   - step 15 (0274) a completed workout is locked against added or deleted sets and against being reopened
    - step 16 (0275) a client's cancelled or moved week of a weekly schedule stays skipped
+   - step 13 (0271) database functions are signed-in and server only
+   - step 15 (0274) a completed workout is locked against added or deleted sets and against being reopened
+   - (reviewed read-only against the live database by the Assistant session; steps 13 and 15 were revised after that review and are being re-checked)
+   - then deploy the care batch (code)
    - **step 17 (0272) only AFTER the care batch is deployed** (it closes the two public forms' database functions to the browser; the care batch moves those forms to server routes)
    Steps 12 to 16 are safe with the code that is live today. After each one, open the live site as a coach and a client and check Home, the calendar and one booking.
 
