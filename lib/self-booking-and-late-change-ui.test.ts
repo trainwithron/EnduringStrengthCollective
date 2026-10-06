@@ -67,3 +67,13 @@ describe("the coach decides flagged changes and requests", () => {
     expect(read("../app/api/cron/process-booking-waitlist/route.ts")).toContain("expire_stale_booking_requests");
   });
 });
+
+describe("a client sees that a request is already waiting", () => {
+  it("both booking-day pages label a requested time instead of offering the button again", () => {
+    for (const p of dayPages) {
+      const src = read(p);
+      expect(src).toContain("requestedTimes");
+      expect(src).toContain("Requested. Waiting for your coach.");
+    }
+  });
+});

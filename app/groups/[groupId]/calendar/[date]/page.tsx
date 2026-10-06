@@ -253,6 +253,16 @@ export default async function CoachDayDetailPage(
     if (bookingMode === "coach_schedules") {
       slots = slots.filter((s) => bookingByTime.get(s.start.getTime())?.athlete_id === athleteId);
     }
+    // Times this client has already asked for (pending requests), so the slot says "Requested" instead of offering the button again.
+    const requestedTimes = new Set<number>();
+    if (bookingMode === "request") {
+      const { data: pendingRows } = await supabase
+        .from("booking_requests")
+        .select("new_start_at")
+        .eq("athlete_id", athleteId)
+        .eq("status", "pending");
+      for (const r of pendingRows ?? []) requestedTimes.add(new Date(r.new_start_at as string).getTime());
+    }
     const backHref = `/groups/${params.groupId}/calendar`;
 
     return (
@@ -379,6 +389,8 @@ export default async function CoachDayDetailPage(
                       )
                     ) : isBufferBlocked ? (
                       <span className="font-body text-xs text-steel">Too close to another session</span>
+                    ) : bookingMode === "request" && requestedTimes.has(start.getTime()) ? (
+                      <span className="font-body text-xs text-chalk">Requested. Waiting for your coach.</span>
                     ) : bookingMode === "request" ? (
                       <RequestSlotButton
                         coachId={coachMembership.profile_id}
