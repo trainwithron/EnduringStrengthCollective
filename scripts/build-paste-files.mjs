@@ -13,6 +13,17 @@ const index = {};
 for (const f of readdirSync(new URL("migrations/", root))) if (/^\d{4}_/.test(f)) index[f.slice(0, 4)] = f;
 const migrationSql = (n) => readFileSync(new URL(`migrations/${index[n]}`, root), "utf8").replace(/\r\n/g, "\n").replace(/\s+$/, "");
 
+// The text of one function as 0248 defines it (the version live today), for the undo files of the steps that replace it.
+const fnFrom0248 = (name) => {
+  const text = migrationSql("0248");
+  const start = text.indexOf(`create or replace function public.${name}(`);
+  if (start < 0) throw new Error("0248 has no " + name);
+  const open = text.indexOf("$function$", start);
+  const end = text.indexOf("$function$;", open + 10) + "$function$;".length;
+  return text.slice(start, end);
+};
+const md5Is = (sig, md5) => `coalesce((select md5(pg_get_functiondef(p.oid)) = '${md5}' from pg_proc p where p.oid = to_regprocedure('public.${sig}')), false)`;
+
 const has = {
   table: (t) => `to_regclass('public.${t}') is not null`,
   noTable: (t) => `to_regclass('public.${t}') is null`,
@@ -369,6 +380,54 @@ alter table public.notifications add constraint notifications_type_check
       ["0276 is not already applied", `not exists (select 1 from pg_trigger where tgname = 'direct_messages_notify')`],
     ],
   },
+  {
+    n: "19",
+    slug: "0277",
+    title: "0277 a client's late cancel or late move is flagged for the coach to Charge or Waive (nothing is taken automatically)",
+    migrations: ["0277"],
+    sees: "Success. No rows returned.",
+    afterwards: "A client cancelling or moving a session inside your cancellation window no longer loses a session by itself. You get a notice ('<name> cancelled a session inside the 24-hour window. Charge it or waive it.') and the item appears under Needs your decision on your dashboard with Charge and Waive buttons. Test with a throwaway client: schedule a session in a few hours, cancel it as the client, check the balance did not change and the notice arrived.",
+    undo: `${fnFrom0248("cancel_booking_and_refund_credit")}
+
+${fnFrom0248("reschedule_booking")}
+
+drop function if exists public.resolve_late_change(uuid, boolean);
+delete from public.notifications where type = 'late_change';
+alter table public.notifications drop constraint if exists notifications_type_check;
+alter table public.notifications add constraint notifications_type_check
+  check (type in (
+    'comment', 'program_assigned', 'macros_assigned', 'partner_request',
+    'partner_request_accepted', 'milestone_celebration', 'gym_visitor_lead',
+    'trainer_dispatch_offer', 'trainer_dispatch_question', 'session_pattern_note',
+    'credits_expired', 'waitlist_slot_offered', 'recurring_booking_conflict',
+    'email_changed', 'direct_message'
+  ));`,
+    undoWhy: "Only if cancelling or moving a booking breaks after step 19. Puts the two booking functions back to the previous version (late changes take a session by themselves again), removes the Charge/Waive function and the notices. The flag columns stay (harmless).",
+    rows: [
+      ["0248 is applied (the credit functions exist)", `${has.fnName("apply_session_credit_change")} and ${has.fnName("settle_booking_internal")} and ${has.col("bookings", "credit_state")}`],
+      ["bookings, notifications and coach_booking_policies exist", `${has.table("bookings")} and ${has.table("notifications")} and ${has.table("coach_booking_policies")}`],
+      ["0276 is applied (the notification type list includes direct_message)", `exists (select 1 from pg_constraint where conname = 'notifications_type_check' and pg_get_constraintdef(oid) like '%direct_message%')`],
+      ["0277 is not already applied (the live cancel and reschedule functions are exactly the versions this step was built from)", `${md5Is("cancel_booking_and_refund_credit(uuid)", "b0485b9332f337b725669193b19f0887")} and ${md5Is("reschedule_booking(uuid, timestamptz, timestamptz)", "f45d1a198654ec4150e6ec958de3b1d1")}`],
+    ],
+  },
+  {
+    n: "20",
+    slug: "0278",
+    title: "0278 clients can book their own sessions only when the coach switches self-booking on (off by default)",
+    migrations: ["0278"],
+    sees: "Success. No rows returned.",
+    afterwards: "From now on a client cannot book their own session unless you switch on 'Let clients book their own sessions' on the Availability page (it is off for everyone). You can still schedule any client. Test: as a throwaway client try to book a session (it must say your coach schedules your sessions); as the coach schedule one for them (it must work).",
+    undo: `${fnFrom0248("book_session")}
+
+alter table public.coach_booking_policies drop column if exists self_booking_enabled;`,
+    undoWhy: "Only if booking a session breaks after step 20. Puts book_session back to the previous version (clients can book themselves again) and removes the switch column.",
+    rows: [
+      ["0248 is applied (book_session settles credits)", `${has.fnName("book_session")} and ${has.col("bookings", "credit_state")}`],
+      ["coach_booking_policies exists", has.table("coach_booking_policies")],
+      ["the live book_session is exactly the version this step was built from", md5Is("book_session(uuid, uuid, uuid, timestamptz, timestamptz)", "da934a4629a0f09580619b7c908ab42a")],
+      ["0278 is not already applied (the switch column is not there yet)", has.noCol("coach_booking_policies", "self_booking_enabled")],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -498,6 +557,8 @@ for (const s of STEPS) {
     m("0274", "coalesce((select position('tg_op' in pg_get_functiondef(p.oid)) > 0 from pg_proc p where p.proname = 'block_athlete_edits_to_completed_session' and p.pronamespace = 'public'::regnamespace), false)"),
     m("0275", "exists (select 1 from pg_trigger where tgname = 'bookings_note_series_skip')"),
     m("0276", "exists (select 1 from pg_trigger where tgname = 'direct_messages_notify')"),
+    m("0277", has.col("bookings", "late_charge_state")),
+    m("0278", has.col("coach_booking_policies", "self_booking_enabled")),
   ];
   const values = items.map((i) => `    ('2026100600${i.n.slice(1)}', '${i.file.slice(5, -4)}', '${i.file}', ${i.marker})`).join(",\n");
   const sql = [

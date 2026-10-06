@@ -236,6 +236,22 @@ export default async function CoachDayDetailPage(
     const bookingByTime = new Map(
       bookingsForDay.map((b) => [new Date(b.start_at).getTime(), b])
     );
+
+    // Clients book themselves only when the coach has switched self-booking on (off by default; the database enforces it too). When it is
+    // off, the open times are not offered; the client still sees their own sessions and can cancel or move them.
+    let selfBookingEnabled = true;
+    if (coachMembership) {
+      const sb = await supabase
+        .from("coach_booking_policies")
+        .select("self_booking_enabled")
+        .eq("coach_id", coachMembership.profile_id)
+        .maybeSingle();
+      // Until the database update that adds the switch is applied, the select errors and booking behaves as before.
+      if (!sb.error) selfBookingEnabled = sb.data?.self_booking_enabled ?? false;
+    }
+    if (!selfBookingEnabled && !reschedulingBooking) {
+      slots = slots.filter((s) => bookingByTime.get(s.start.getTime())?.athlete_id === athleteId);
+    }
     const backHref = `/groups/${params.groupId}/calendar`;
 
     return (
@@ -277,8 +293,8 @@ export default async function CoachDayDetailPage(
                 month: "short",
                 day: "numeric",
               })}{" "}
-              session — moving less than your coach&apos;s cancellation window
-              before that session still uses 1 session.
+              session — moving it less than your coach&apos;s cancellation window
+              before that session lets your coach know, and they decide whether it counts as a session.
             </p>
           )}
         </header>
@@ -291,7 +307,11 @@ export default async function CoachDayDetailPage(
           {!coachMembership ? (
             <p className="font-body text-sm text-steel py-2">No coach found for this group.</p>
           ) : slots.length === 0 ? (
-            <p className="font-body text-sm text-steel py-2">No open hours on this day.</p>
+            <p className="font-body text-sm text-steel py-2">
+              {!selfBookingEnabled && !reschedulingBooking
+                ? "Your coach schedules your sessions. Message them to set one up."
+                : "No open hours on this day."}
+            </p>
           ) : (
             <div className="divide-y divide-steel/15">
               {slots.map(({ start, durationMinutes }) => {

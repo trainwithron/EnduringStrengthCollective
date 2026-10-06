@@ -41,7 +41,7 @@ export function CancelBookingButton({
       viewer === "coach"
         ? "Cancel this session? Anything charged for it is given back."
         : insideWindowHours
-        ? `This is inside your coach's ${insideWindowHours}-hour window, so it will still count as used. Cancel anyway?`
+        ? `This is inside your coach's ${insideWindowHours}-hour window. Your coach will be told and decides whether it counts as a session. Cancel anyway?`
         : "Cancel this session? If it is outside your coach's cancellation window it goes back to your balance.";
     if (!window.confirm(message)) return;
     setSubmitting(true);

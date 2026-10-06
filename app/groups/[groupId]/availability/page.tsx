@@ -5,6 +5,7 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { AvailabilityManagerDesktop } from "@/components/coach/desktop/availability-manager-desktop";
 import { BookingPolicyControl } from "@/components/coach/desktop/booking-policy-control";
 import { ReupNudgeToggle } from "@/components/coach/desktop/reup-nudge-toggle";
+import { SelfBookingToggle } from "@/components/coach/desktop/self-booking-toggle";
 import { AvailabilityExceptionsManager } from "@/components/coach/desktop/availability-exceptions-manager";
 import { TimezoneControl } from "@/components/coach/desktop/timezone-control";
 
@@ -73,6 +74,10 @@ export default async function AvailabilityPage(
   const nudgeResult = await supabase.from("coach_booking_policies").select("reup_nudges_enabled").eq("coach_id", user.id).maybeSingle();
   const reupNudgesEnabled: boolean | null = nudgeResult.error ? null : (nudgeResult.data?.reup_nudges_enabled ?? true);
 
+  // Self-booking switch (migration 0278). Until it is applied the select errors and the switch is simply hidden.
+  const selfBookingResult = await supabase.from("coach_booking_policies").select("self_booking_enabled").eq("coach_id", user.id).maybeSingle();
+  const selfBookingEnabled: boolean | null = selfBookingResult.error ? null : (selfBookingResult.data?.self_booking_enabled ?? false);
+
   const { data: exceptionRows } = await supabase
     .from("coach_availability_exceptions")
     .select("id, kind, label, start_at, end_at, weekday, start_time, end_time")
@@ -113,6 +118,8 @@ export default async function AvailabilityPage(
         initialMinimumNoticeHours={policyRow?.minimum_notice_hours ?? 0}
         initialCreditExpiryDays={policyRow?.credit_expiry_days ?? 0}
       />
+
+      {selfBookingEnabled !== null && <SelfBookingToggle coachId={user.id} initialEnabled={selfBookingEnabled} />}
 
       {reupNudgesEnabled !== null && <ReupNudgeToggle coachId={user.id} initialEnabled={reupNudgesEnabled} />}
 

@@ -7,6 +7,7 @@ import { getTodaysWorkoutId } from "@/lib/todays-workout";
 import { computeRealIncomeInRange, computeRealMRR } from "@/lib/business-metrics";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { ViewModeToggle } from "@/components/coach/view-mode-toggle";
+import { LateChangesPanel } from "@/components/coach/late-changes-panel";
 import { TodayWidget, type TodayMacros } from "@/components/athlete/today-widget";
 import { CoachHomeComplications } from "./coach-home-complications";
 import { CoachMobileShell } from "./coach-mobile-shell";
@@ -119,6 +120,10 @@ export async function CoachMobileHome({
 
         <div className="px-5 pb-5 flex items-center gap-2">
           <ViewModeToggle targetMode="desktop" label="Desktop Mode" variant="button" groupId={groupId} />
+        </div>
+
+        <div className="px-5">
+          <LateChangesPanel />
         </div>
 
         {/* Priority 1: a workout is due right now — the single most

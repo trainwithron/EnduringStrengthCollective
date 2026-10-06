@@ -16,6 +16,11 @@ In this order:
 3. **Step 17 (0272)**, only after the care deploy and step 13.
 4. `record-history-applied.sql` again (see below).
 
+### New (Oct 6), built but NOT applied, review by the Assistant first
+
+- **Step 19 (0277)**: a client's late cancel or late move is FLAGGED for the coach to Charge or Waive; nothing is taken automatically. Replaces `cancel_booking_and_refund_credit` and `reschedule_booking` (the precheck and the guard refuse unless the live functions are exactly the versions it was built from, by md5), adds `resolve_late_change`, two bookings columns and the `late_change` notice type. Undo restores the old functions. Deploy order: the code that shows Needs your decision (this branch) can go first; until the step is applied the panel stays empty.
+- **Step 20 (0278)**: clients can book themselves only if the coach switches it on (per coach, off by default). Replaces `book_session` (md5-guarded). Undo restores the old function and removes the column. IMPORTANT order: apply step 20 and the code together; if the step is applied first, clients simply cannot book until a coach switches it on, which is the intent. If the code is deployed first, nothing changes until the step is applied.
+
 ## Migration history (needs a re-run)
 
 None of 0236 to 0267 is recorded in `supabase_migrations.schema_migrations` (the newest row is 0247), so `supabase db push` and the dashboard's migration list show them as unapplied. `record-history-applied.sql` inserts the missing rows. It only records a migration whose change is really in the database (each has a check), skips rows already there, and can be run again after steps 07 to 09 to add those. It is safe to run any time; it changes no tables, only the history list. Run it again now that 0270, 0273, 0274, 0275 and 0276 are live (it records those; 0271 and 0272 stay unrecorded until they are applied), and once more after steps 13 and 17.

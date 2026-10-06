@@ -43,7 +43,9 @@ from (
     ('2026100600273', 'group_and_organization_column_guards', '0273_group_and_organization_column_guards.sql', exists (select 1 from pg_trigger where tgname = 'groups_guard_columns')),
     ('2026100600274', 'completed_workout_lock', '0274_completed_workout_lock.sql', coalesce((select position('tg_op' in pg_get_functiondef(p.oid)) > 0 from pg_proc p where p.proname = 'block_athlete_edits_to_completed_session' and p.pronamespace = 'public'::regnamespace), false)),
     ('2026100600275', 'series_session_removed_stays_removed', '0275_series_session_removed_stays_removed.sql', exists (select 1 from pg_trigger where tgname = 'bookings_note_series_skip')),
-    ('2026100600276', 'notify_on_direct_message', '0276_notify_on_direct_message.sql', exists (select 1 from pg_trigger where tgname = 'direct_messages_notify'))
+    ('2026100600276', 'notify_on_direct_message', '0276_notify_on_direct_message.sql', exists (select 1 from pg_trigger where tgname = 'direct_messages_notify')),
+    ('2026100600277', 'late_change_flagged_for_coach', '0277_late_change_flagged_for_coach.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'bookings' and column_name = 'late_charge_state')),
+    ('2026100600278', 'self_booking_switch', '0278_self_booking_switch.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_booking_policies' and column_name = 'self_booking_enabled'))
 ) as v(version, name, file, applied)
 where v.applied
 on conflict (version) do nothing;
