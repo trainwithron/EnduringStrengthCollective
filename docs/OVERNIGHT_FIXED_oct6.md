@@ -14,8 +14,9 @@ Nothing here is pushed, deployed or applied. The Oct 5 evening deploy (head 981e
    - step 12 (0270) a coach can only add their own clients to a group
    - step 14 (0273) guards on groups and organizations
    - step 16 (0275) a client's cancelled or moved week of a weekly schedule stays skipped
-   - step 13 (0271) database functions are signed-in and server only
+   - step 13 (0271) database functions are signed-in and server only. After it, paste `supabase\apply\check-step13-probe.sql` (it rolls itself back): it must show anon_can_run = false. Note for later: after any future CREATE EXTENSION run in the SQL editor, grant execute on its functions to authenticated and service_role.
    - step 15 (0274) a completed workout is locked against added or deleted sets and against being reopened
+   - step 18 (0276) a new message gives the recipient an in-app notice (one line per sender while unread, no message text); undo included
    - (reviewed read-only against the live database by the Assistant session; steps 13 and 15 were revised after that review and are being re-checked)
    - then deploy the care batch (code)
    - **step 17 (0272) only AFTER the care batch is deployed** (it closes the two public forms' database functions to the browser; the care batch moves those forms to server routes)
@@ -47,6 +48,9 @@ The Delete client button shipped in the Oct 5 deploy deleted the client's one-on
 | Copy: a **session**, not a "credit", in the picker, billing success, the expiry push and the late-move banner; the wording lint also covers billing, More and the expiry cron; a coach no longer sees My goal and Share my progress; the support page no longer names Ron; deploy checklist brought up to date | 544ac7b |
 | **Job monitoring** can now notice a job that is never called (fixed start date; a weekly job gets its whole week first); tests | 9d92f42 |
 | Sign-in, forgot-password and invite join trim and lowercase the email (a trailing space from a phone no longer reads as a wrong password), friendly sign-up and reset errors; the installed app opened signed out goes to sign-in instead of the sales page | 2fe15cb |
+| A **Message** button on a client's profile and "Message your coach" on the client Home (there was no way to start a conversation from either) | adc60ce |
+| Day-one client copy: set-password, intake, login and sign-up wording, plain error messages | see git log (copy commit on safe) |
+| **Settings switches that said Saved without saving** (text message settings, gamified logging, trainer response window with limits, suggestion settings) now tell the truth and put the switch back when the save fails | b0e8076 |
 
 ## Care batch (CARE), on `overnight-care`
 
@@ -62,7 +66,12 @@ The Delete client button shipped in the Oct 5 deploy deleted the client's one-on
 | **Google Health sync cron** is reachable (it was redirected to /login and never ran) | 1a92395 |
 | **Pushes from a client to their coach now arrive** (the send route checks the pair share a group or organization and sends with the server's access; before, every client-to-coach push, message, video and check-in sent nothing) | 1d6cd74 |
 | **Public forms** (discovery-call page, gym QR form) post to rate-limited server routes that validate first (also needed before step 17) | acfb547 area (see git log) |
-| **Database migrations 0270 to 0275** with real-role rehearsals and paste steps 12 to 17 | see git log |
+| **Mark attended**: fires the low-balance alert like every other path that spends a session, asks before "Don't charge", 44px buttons, plain wording | see git log (mark-attended commit) |
+| **Time zone**: the browser's zone is saved once for the coach (so the calendar, reminders and the daily check use their clock, not New York) | 491331c |
+| **Push subscribe** accepts only the real push services over https and stops returning raw errors; the intake "next" link must be an in-app path; the discovery availability lookup is rate limited and only answers for a real coach | c5258fb |
+| Opening a conversation also clears its bell notice | f572c67 |
+| **AI input limits**: food log 600, recipe 3000, session text 2000, program chat 2000, Collective Intelligence 1000 characters; a plain "too long" message instead of paying for a pasted wall of text | 534c1f0 |
+| **Database migrations 0270 to 0276** with real-role rehearsals and paste steps 12 to 17 | see git log |
 
 ## Needs Ron's decision (one line each, with my recommendation)
 
@@ -77,12 +86,12 @@ The Delete client button shipped in the Oct 5 deploy deleted the client's one-on
 
 ## Queued, not done yet (so nothing is lost)
 
-1. **Messaging**: no in-app notice for a new message (needs a migration: a trigger), a Message button on the client profile, "Message your coach" on the client Home.
-2. **A hold should clear when a client gets sessions again**, Mark attended should fire the low-balance alerts, and a past session still "confirmed" needs a "resolve past sessions" prompt (money; needs your call).
-3. **Silent failed saves** (settings toggles that say Saved but did not save), raw error text shown to users, optimistic deletes with no rollback, the shared friendly-error helper.
-4. **Day-one client path copy** (sign-up, claim, confirm-email, intake wording).
-5. **iPhone layout** (dvh, safe areas, in-app browsers).
-6. **Data and scale**: unbounded reads, long id lists in URLs, history import accuracy, GZCLP and training-max math, food matching.
-7. **AI cost caps** and privacy text (beta notice); account export completeness; accessibility and page titles.
-8. **Security items still open**: `/api/discovery-availability` should require a real coach and a rate limit; push subscribe host allowlist; intake `next` redirect check; cron secret comparison; column guards on other client-writable tables; org-wide leaks (push subscriptions, billing, support tickets).
-9. Duplicates and dead code clean-up.
+Done since the first draft: messaging notice, Message buttons, silent-failed settings saves, day-one client copy, push subscribe, intake redirect, discovery lookup limit, AI input limits.
+
+1. **A hold should clear when a client gets sessions again**, un-waive, and a late-cancel charge rule (money; needs your call, nothing built).
+2. **More silent failed saves** in other screens, raw error text shown to users, optimistic deletes with no rollback, a shared friendly-error helper.
+3. **iPhone layout** (dvh, safe areas, in-app browsers).
+4. **Data and scale**: unbounded reads, long id lists in URLs, history import accuracy, GZCLP and training-max math, food matching.
+5. **AI cost**: monthly ceilings per person for food log and photo parsing, number clamps on parse-workout and generate-program, coach-membership checks on parse-workout, parse-recipe and parse-session-nl; privacy text (beta notice; changing it re-asks everyone, your call); account export completeness; accessibility and page titles.
+6. **Security items still open**: cron secret comparison; column guards on other client-writable tables; org-wide leaks (push subscriptions, billing, support tickets).
+7. Duplicates and dead code clean-up.
