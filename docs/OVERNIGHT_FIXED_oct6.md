@@ -1,26 +1,22 @@
 # Overnight, Oct 5 to 6: what was fixed, and what needs Ron
 
-Nothing here is pushed, deployed or applied. The Oct 5 evening deploy (head 981ee51) is what is live. Every branch keeps tsc, tests and the build green.
+**Status, Oct 6:** the delete hotfix (e49c308) and the safe batch (57feabb) are LIVE (pushed and deployed on Ron's word). Database steps 12, 14, 15, 16 and 18 are APPLIED (Ron pasted them; Spot checked them read-only on the live database). Still NOT applied: step 13 (0271) and step 17 (0272). The care batch code is NOT deployed. Every branch keeps tsc, tests and the build green.
 
 ## SHIP ORDER (plain)
 
-1. **Hotfix: Delete client** (branch `hotfix-delete-client`, one commit, e49c308). Do this first and alone. Until it ships, do not use Delete client on a real client (it deletes the one-on-one space and, with it, the logged workouts and notes the screen says are kept).
+1. **DONE (live): Hotfix: Delete client** (branch `hotfix-delete-client`, one commit, e49c308). Do this first and alone. Until it ships, do not use Delete client on a real client (it deletes the one-on-one space and, with it, the logged workouts and notes the screen says are kept).
    *After it ships, try:* nothing visible; just don't test it on a real client (use a throwaway client if you want to see it).
-2. **Safe batch** (branch `overnight-safe`): wording, labels, missing exits, spacing, phone fixes, sign-in email handling, job-monitoring fix. No database changes, nothing touching money.
+2. **DONE (live): Safe batch** (branch `overnight-safe`): wording, labels, missing exits, spacing, phone fixes, sign-in email handling, job-monitoring fix. No database changes, nothing touching money.
    *After it ships, try (phone):* Home, Add a client (panel opens on Add directly); Spotlight (top button), Clients, tap **Profile** on a client; on a client's profile tap Schedule session (the client is already picked); More list shows Settings, and Settings has your own tabs at the bottom; sign in with a trailing space after your email (it still works).
 3. **Care batch, code** (branch `overnight-care`, on top of safe): the calendar (every client across your groups, times on your clock, controls on every booking), client-to-coach pushes, clock-change days, the public forms moved to server routes, and the other items listed under "Care batch" below. Deploy only on Ron's word.
    *After it ships, try (phone):* Calendar tab, pick a one-on-one client, month Prev/Next, tap a day, **Assign** on a time (even for a client at 0 sessions), Mark attended on a past one, and cancel one week of a weekly schedule.
-4. **Database steps** (paste files `supabase\apply\apply-step12` to `step16`, each with a precheck and an undo file). Ron pastes them himself, in this order, after the review of the paste files is done:
-   - step 12 (0270) a coach can only add their own clients to a group
-   - step 14 (0273) guards on groups and organizations
-   - step 16 (0275) a client's cancelled or moved week of a weekly schedule stays skipped
-   - step 13 (0271) database functions are signed-in and server only. After it, paste `supabase\apply\check-step13-probe.sql` (it rolls itself back): it must show anon_can_run = false. Note for later: after any future CREATE EXTENSION run in the SQL editor, grant execute on its functions to authenticated and service_role.
-   - step 15 (0274) a completed workout is locked against added or deleted sets and against being reopened
-   - step 18 (0276) a new message gives the recipient an in-app notice (one line per sender while unread, no message text); undo included
-   - (reviewed read-only against the live database by the Assistant session; steps 13 and 15 were revised after that review and are being re-checked)
-   - then deploy the care batch (code)
-   - **step 17 (0272) only AFTER the care batch is deployed** (it closes the two public forms' database functions to the browser; the care batch moves those forms to server routes)
-   Steps 12 to 16 are safe with the code that is live today. After each one, open the live site as a coach and a client and check Home, the calendar and one booking.
+4. **Database steps** (paste files in the `supabase\apply` folder, each with a precheck and an undo file). Ron pastes them himself.
+   - APPLIED (Oct 6): step 12 (0270) a coach can only add their own clients to a group; step 14 (0273) guards on groups and organizations; step 15 (0274) a completed workout is locked against added or deleted sets and against being reopened; step 16 (0275) a client's cancelled or moved week of a weekly schedule stays skipped; step 18 (0276) a new message gives the recipient an in-app notice (a second paste of it hit its own guard, harmless).
+   - NEXT, step 13 (0271): database functions are signed-in and server only. No separate test project is needed for the check. First paste `supabase\apply\check-step13-probe.sql` BEFORE step 13 for the baseline (anon_can_run = true: today a new function is open to the public internet), then paste step 13, then paste the probe again: it must show anon_can_run = false, signed_in_can_run = true, server_can_run = true. The probe makes a throwaway function inside one transaction and rolls it back, so nothing stays in the database. Note for later: after any future CREATE EXTENSION run in the SQL editor, grant execute on its functions to authenticated and service_role.
+   - THEN deploy the care batch (code).
+   - **step 17 (0272) only AFTER the care batch is deployed and step 13 is applied** (it closes the two public forms' database functions to the browser; the care batch moves those forms to server routes).
+   - Then paste `record-history-applied.sql` again so the migration list shows 0270, 0273, 0274, 0275, 0276 (and 0271, 0272 once those are applied). It only records a migration whose change is really in the database.
+   After each step, open the live site as a coach and a client and check Home, the calendar and one booking.
 
 ## How the branches fit together
 

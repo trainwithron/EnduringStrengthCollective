@@ -1,4 +1,4 @@
--- RUN AFTER STEP 13 (0271). Read-only in effect: it makes a throwaway function, asks who can run it, and rolls everything back.
+-- RUN ONCE BEFORE STEP 13 (baseline: anon_can_run = true) AND AGAIN AFTER STEP 13 (must show anon_can_run = false). Read-only in effect: it makes a throwaway function, asks who can run it, and rolls everything back, so no test project is needed.
 -- WHAT YOU SHOULD SEE: one row with anon_can_run = false, signed_in_can_run = true, server_can_run = true. If anon_can_run is true, tell Spot.
 begin;
 create function public.zz_probe() returns int language sql as 'select 1';
