@@ -595,6 +595,20 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["0284 is not already applied (the coach proposal rule is not there yet)", has.noPolicy("client_goals", "client_goals_insert_coach")],
     ],
   },
+  {
+    n: "28",
+    slug: "0285",
+    title: "0285 a record of the rest-day nudges sent, so they can be limited to 2 in any 7 days and stopped after 3 with no response",
+    migrations: ["0285"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing visible changes at once. After the code deploy the nightly rest-day nudge sends at most 2 in any 7 days, stops after 3 in a row that got no response (and starts again the next time the client does something), and names the client's own goal when they have one. Until this step is applied the nightly job sends no rest-day nudges at all.",
+    undo: "drop table if exists public.rest_day_nudges;",
+    undoWhy: "Only if the record misbehaves after step 28. Removes the record of sent nudges; the nightly job then sends no rest-day nudges until the table is back.",
+    rows: [
+      ["profiles and groups exist", `${has.table("profiles")} and ${has.table("groups")}`],
+      ["0285 is not already applied (the nudge record is not there yet)", has.noTable("rest_day_nudges")],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -731,6 +745,7 @@ for (const s of STEPS) {
     m("0279", has.table("booking_requests")),
     m("0280", has.col("session_credits", "expiry_hold_until")),
     m("0281", has.table("client_inactive")),
+    m("0285", has.table("rest_day_nudges")),
     m("0284", has.policy("client_goals", "client_goals_insert_coach")),
     m("0283", has.col("coach_availability_windows", "session_minutes")),
     m("0282", "not has_function_privilege('anon', 'public.book_session(uuid, uuid, uuid, timestamptz, timestamptz)', 'execute') and not has_function_privilege('authenticated', 'public.apply_session_credit_change(uuid, uuid, integer, text, text, uuid, uuid)', 'execute')"),
