@@ -131,6 +131,7 @@ export function ExerciseVerticalCarousel({
           {exercises.map((exercise, i) => (
             <button
               key={exercise.id}
+              data-exercise-id={exercise.id}
               type="button"
               onClick={() => jumpToExerciseExpanded(i)}
               className="text-left border border-steel/20 bg-surface/20 p-3 active:border-rust transition-colors"

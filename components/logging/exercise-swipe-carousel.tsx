@@ -200,6 +200,7 @@ export function ExerciseSwipeCarousel({
           return (
             <div
               key={exercise.id}
+              data-exercise-id={exercise.id}
               className="snap-center shrink-0 w-full border border-steel/20 bg-surface/20 p-4"
             >
               <div className="flex items-center justify-between gap-2 mb-2">

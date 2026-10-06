@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { findDemo, youtubeEmbedUrl, type DemoRow } from "./exercise-demo";
+import { findDemo, youtubeEmbedUrl, demoThumbPath, isYoutubeId, youtubeThumbSource, type DemoRow } from "./exercise-demo";
 
 const YT = "https://www.youtube.com/watch?v=abcdefghijk";
 const library: DemoRow[] = [
@@ -70,5 +70,21 @@ describe("the embed link", () => {
   });
   it("is null for something that is not a YouTube link", () => {
     expect(youtubeEmbedUrl("https://example.com/x")).toBeNull();
+  });
+});
+
+describe("the thumbnail", () => {
+  it("is served from our own route, never straight from YouTube's image host", () => {
+    expect(demoThumbPath("https://youtu.be/abcdefghijk")).toBe("/api/demo-thumb/abcdefghijk");
+    expect(demoThumbPath("https://www.youtube.com/watch?v=abcdefghijk&t=5")).toBe("/api/demo-thumb/abcdefghijk");
+    expect(demoThumbPath("https://example.com/x")).toBeNull();
+    expect(demoThumbPath(null)).toBeNull();
+  });
+  it("accepts only a well-formed 11-character video id, so the route cannot be pointed anywhere else", () => {
+    expect(isYoutubeId("abcdefghijk")).toBe(true);
+    expect(isYoutubeId("../../etc/passwd")).toBe(false);
+    expect(isYoutubeId("abc")).toBe(false);
+    expect(isYoutubeId("abcdefghij?")).toBe(false);
+    expect(youtubeThumbSource("abcdefghijk")).toBe("https://i.ytimg.com/vi/abcdefghijk/mqdefault.jpg");
   });
 });

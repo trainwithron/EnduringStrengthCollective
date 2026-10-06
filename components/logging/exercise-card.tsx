@@ -9,7 +9,8 @@ import { useSetSave } from "./set-save-context";
 import { classifyEquipmentType } from "@/lib/equipment-classifier";
 import { ExerciseVideoThread } from "./exercise-video-thread";
 import { ExerciseDemoButton } from "./exercise-demo-button";
-import { useDemoLibrary } from "./demo-library-context";
+import { useDemoLibrary, useOpenDemo } from "./demo-library-context";
+import { DemoThumb } from "./demo-thumb";
 import { useDemosHidden } from "./demo-preference";
 import { findDemo } from "@/lib/exercise-demo";
 import { ExerciseAthleteNote } from "./exercise-athlete-note";
@@ -58,6 +59,7 @@ export function ExerciseCard({
   const { discard: discardPendingSaves } = useSetSave();
   // The demo is found from the exercise's current name (so a swapped or added exercise has one too); a client can hide the button in Settings.
   const demoLibrary = useDemoLibrary();
+  const openDemo = useOpenDemo();
   const demosHidden = useDemosHidden();
   const demo = demoLibrary
     ? findDemo(demoLibrary, exercise.exerciseName)
@@ -297,15 +299,28 @@ export function ExerciseCard({
         )}
       </div>
 
-      {demo && !demosHidden && (
-        <div className="mb-2">
-          <ExerciseDemoButton
-            title={exercise.exerciseName || "Exercise"}
-            youtubeUrl={demo.youtubeUrl}
-            videoUrl={demoLibrary ? null : exercise.videoUrl}
-            videoPath={demo.videoPath}
-            credit={demo.foundAs.trim().toLowerCase() !== exercise.exerciseName.trim().toLowerCase() ? demo.foundAs : null}
-          />
+      {/* The demo thumbnail and "Last time" / history side by side, so one short row has both: glanceable, and a tap opens the demo sheet. */}
+      {((demo && !demosHidden) || lastTime || (exercise.volumeHistory && exercise.volumeHistory.length > 0)) && (
+        <div className="flex items-start gap-3 mb-2">
+          {demo && !demosHidden && openDemo && (
+            <DemoThumb title={exercise.exerciseName || "Exercise"} youtubeUrl={demo.youtubeUrl} onOpen={() => openDemo(exercise.id)} />
+          )}
+          {demo && !demosHidden && !openDemo && (
+            <ExerciseDemoButton
+              title={exercise.exerciseName || "Exercise"}
+              youtubeUrl={demo.youtubeUrl}
+              videoUrl={exercise.videoUrl}
+              videoPath={demo.videoPath}
+            />
+          )}
+          <div className="min-w-0 flex-1">
+            {lastTime && (
+              <p className="font-body text-xs text-steel mb-1">
+                Last time: {lastTime.weight} &times; {lastTime.reps}
+              </p>
+            )}
+            {exercise.volumeHistory && <ExerciseVolumeHistory history={exercise.volumeHistory} />}
+          </div>
         </div>
       )}
 
@@ -338,14 +353,6 @@ export function ExerciseCard({
         initialNote={exercise.athleteNote ?? null}
         readOnly={readOnly}
       />
-
-      {lastTime && (
-        <p className="font-body text-xs text-steel mb-2">
-          Last time: {lastTime.weight} &times; {lastTime.reps}
-        </p>
-      )}
-
-      {exercise.volumeHistory && <ExerciseVolumeHistory history={exercise.volumeHistory} />}
 
       {!readOnly && (
         <div className="relative mb-2">

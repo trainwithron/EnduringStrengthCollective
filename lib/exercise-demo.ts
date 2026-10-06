@@ -79,3 +79,17 @@ export function youtubeEmbedUrl(url: string): string | null {
   const id = extractYoutubeId(url);
   return id ? `https://www.youtube-nocookie.com/embed/${id}?rel=0&playsinline=1` : null;
 }
+
+// The thumbnail on the card. The picture is fetched by our own server (app/api/demo-thumb/[id]/route.ts) so the phone never contacts Google for it.
+export function isYoutubeId(id: string): boolean {
+  return /^[A-Za-z0-9_-]{11}$/.test(id);
+}
+
+export function youtubeThumbSource(id: string): string {
+  return `https://i.ytimg.com/vi/${id}/mqdefault.jpg`;
+}
+
+export function demoThumbPath(youtubeUrl: string | null): string | null {
+  const id = youtubeUrl ? extractYoutubeId(youtubeUrl) : null;
+  return id ? `/api/demo-thumb/${id}` : null;
+}

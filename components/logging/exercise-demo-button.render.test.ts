@@ -39,7 +39,7 @@ describe("the logger shows the demo through the button, from the library, and ho
   });
   it("an exercise added or swapped mid-workout is looked up from its current name, because the card resolves by name from the library", () => {
     const logger = readFileSync(new URL("./session-logger.tsx", import.meta.url), "utf8");
-    expect(logger).toContain("<DemoLibraryProvider value={demoLibrary ?? null}>");
+    expect(logger).toContain("<DemoLibraryProvider value={demoLibrary ? demoBrowser : null}>");
   });
   it("the session page gives the logger the library, and Settings has the hide control for clients", () => {
     expect(readFileSync(new URL("../../app/sessions/[sessionId]/page.tsx", import.meta.url), "utf8")).toContain("demoLibrary={demoLibrary}");

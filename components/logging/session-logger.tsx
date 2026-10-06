@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { SetSaveBanner, SetSaveProvider } from "./set-save-context";
 import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
@@ -13,6 +13,7 @@ import { RestTimerBar, type PendingGateTask } from "@/components/session/rest-ti
 import { QuickAddNlButton } from "./quick-add-nl-button";
 import { SessionProgressStrip } from "./session-progress-strip";
 import { DemoLibraryProvider } from "./demo-library-context";
+import { DemoBrowserSheet } from "./demo-browser-sheet";
 import type { DemoRow } from "@/lib/exercise-demo";
 
 export function SessionLogger({
@@ -63,6 +64,18 @@ export function SessionLogger({
   demoLibrary?: DemoRow[];
 }) {
   const [exercises, setExercises] = useState(initialExercises);
+  // The one demo sheet for the workout: which exercise it is showing (null = closed). Closing it brings the workout back to the exercise it ended on.
+  const [demoExerciseId, setDemoExerciseId] = useState<string | null>(null);
+  const closeDemo = useCallback(() => {
+    const id = demoExerciseId;
+    setDemoExerciseId(null);
+    if (id) {
+      requestAnimationFrame(() =>
+        document.querySelector(`[data-exercise-id="${id}"]`)?.scrollIntoView({ behavior: "smooth", inline: "center", block: "center" })
+      );
+    }
+  }, [demoExerciseId]);
+  const demoBrowser = useMemo(() => ({ library: demoLibrary ?? [], openDemo: (id: string) => setDemoExerciseId(id) }), [demoLibrary]);
   // Mirrors whichever carousel variant is active's own scroll-position
   // state (coach_mobile_v2_feature_spec.md item 4) — built once here so
   // the pinned-strip/next-preview logic never has to live inside either
@@ -220,7 +233,7 @@ export function SessionLogger({
   }
 
   return (
-    <DemoLibraryProvider value={demoLibrary ?? null}>
+    <DemoLibraryProvider value={demoLibrary ? demoBrowser : null}>
     <SetSaveProvider>
       {!isCompleted && (
         <RestTimerBar
@@ -351,6 +364,9 @@ export function SessionLogger({
         />
       )}
       </section>
+      {demoExerciseId && demoLibrary && (
+        <DemoBrowserSheet exercises={exercises} library={demoLibrary} currentId={demoExerciseId} onChange={setDemoExerciseId} onClose={closeDemo} />
+      )}
     </SetSaveProvider>
     </DemoLibraryProvider>
   );
