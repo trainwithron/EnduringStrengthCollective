@@ -1,4 +1,5 @@
 -- STEP 1 of 2 for migration 0248. Paste into the Supabase SQL editor and run on its own. It changes nothing.
+-- apply-0248.sql replaces complete_workout_session as a whole (no text matching), so it must only run when the live function is the version it was built from; the md5 row checks that.
 -- Every row must say ok = true. If any row says false, do NOT run step 2 (apply-0248.sql); send the result back.
 select check_name, ok
 from (
@@ -7,8 +8,8 @@ from (
       to_regprocedure('public.apply_session_credit_change(uuid,uuid,integer,text,text,uuid,uuid)') is not null),
     ('0248 is not already applied (bookings has no credit_state column yet)',
       not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'bookings' and column_name = 'credit_state')),
-    ('complete_workout_session still has the exact credit block 0248 rewrites',
-      coalesce((select pg_get_functiondef(p.oid) like '%if v_session.logged_by_coach and v_session.deduct_session_credit and v_credit_cost > 0 then%set balance = greatest(0, balance - v_credit_cost), updated_at = v_completed_at%'
+    ('complete_workout_session is exactly the version apply-0248.sql was built from (md5 49fe3d6b3ec9ecb92f44b1087574dfb0)',
+      coalesce((select md5(pg_get_functiondef(p.oid)) = '49fe3d6b3ec9ecb92f44b1087574dfb0'
                 from pg_proc p where p.proname = 'complete_workout_session' and p.pronamespace = 'public'::regnamespace), false)),
     ('recurring_booking_series table exists (0210)',
       to_regclass('public.recurring_booking_series') is not null),

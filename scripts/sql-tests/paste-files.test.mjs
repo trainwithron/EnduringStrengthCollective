@@ -13,6 +13,10 @@ const before = await pre();
 check("precheck: every row is true on the live-equivalent schema", before.length === 6 && before.every((r) => r.ok));
 await db.exec(read("apply-0248.sql"));
 check("apply-0248.sql applies", true);
+const p36 = (await db.query(read("apply-0236-precheck.sql"))).rows;
+check("0236 precheck: every row true after 0248", p36.length === 4 && p36.every((r) => r.ok));
+await db.exec(read("apply-0236.sql"));
+check("apply-0236.sql applies", true);
 const after = await pre();
 check("precheck after: refuses a second run (already applied is false, block gone)", after.some((r) => !r.ok));
 for (let i = 1; i <= 2; i++) {

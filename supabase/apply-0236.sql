@@ -1,3 +1,8 @@
+-- STEP 2 of 2 for migration 0236. Run apply-0236-precheck.sql first (after 0248): every row must say ok = true.
+-- One transaction. Nothing in it searches existing text: complete_workout_session is replaced as a whole.
+
+begin;
+
 -- Workout logging data integrity, before real clients log every set.
 --
 -- 1. Completing a workout is idempotent. A lost response followed by a second
@@ -489,3 +494,5 @@ $$;
 
 revoke execute on function public.start_workout_session(uuid, uuid, uuid, boolean, uuid, boolean, uuid, jsonb) from public, anon;
 grant execute on function public.start_workout_session(uuid, uuid, uuid, boolean, uuid, boolean, uuid, jsonb) to authenticated, service_role;
+
+commit;
