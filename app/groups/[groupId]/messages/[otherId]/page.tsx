@@ -78,6 +78,16 @@ export default async function MessageThreadPage(
     .eq("sender_id", params.otherId)
     .is("read_at", null);
 
+  // The bell's "sent you a message" line for this conversation is seen too (it is written by the database when the message arrives,
+  // migration 0276; until that is applied there is nothing to mark and this changes no rows).
+  await supabase
+    .from("notifications")
+    .update({ read_at: new Date().toISOString() })
+    .eq("profile_id", viewerId)
+    .eq("type", "direct_message")
+    .eq("link_path", `/groups/${params.groupId}/messages/${params.otherId}`)
+    .is("read_at", null);
+
   let actingAsFullName: string | null = null;
   if (isActingAsOther) {
     actingAsFullName = viewerName;
