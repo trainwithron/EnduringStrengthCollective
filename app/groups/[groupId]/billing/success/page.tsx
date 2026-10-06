@@ -20,7 +20,7 @@ export default async function BillingSuccessPage(
           ? "Your membership is active. Welcome aboard."
           : isQuickPayment
           ? "Your payment has been received."
-          : "Your session credits have been added to your account and are ready to use."}
+          : "Your sessions have been added to your account and are ready to use."}
       </p>
       <Link
         href={`/groups/${params.groupId}`}

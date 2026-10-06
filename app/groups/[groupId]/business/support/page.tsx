@@ -65,7 +65,7 @@ export default async function SupportPage(
       <div className="pb-6 border-b border-steel/20 mb-6">
         <h1 className="font-display font-bold text-3xl uppercase leading-none">Support</h1>
         <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
-          Billing questions, bugs, anything else — a message here reaches Ron directly and stays
+          Billing questions, bugs, anything else — a message here reaches the Spotlight Coaching team and stays
           on the record, instead of getting lost in a personal inbox.
         </p>
       </div>

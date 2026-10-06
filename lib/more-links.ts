@@ -18,8 +18,9 @@ export function buildMoreSections(opts: {
   historyImportEnabled: boolean;
 }): MoreSection[] {
   const g = `/groups/${opts.groupId}`;
+  // A coach has no goal page of their own and no journey page to share, so those two are for clients only.
   const training: MoreLink[] = [
-    { label: "My goal", hint: "What you are working toward", href: `${g}/goal` },
+    ...(opts.isCoach ? [] : [{ label: "My goal", hint: "What you are working toward", href: `${g}/goal` }]),
     { label: "1RM calculator", hint: "Estimate a max and see your percentages", href: `${g}/tools/one-rep-max` },
     { label: "Hall of fame", hint: "The best lifts in the group", href: `${g}/records` },
   ];
@@ -34,7 +35,7 @@ export function buildMoreSections(opts: {
       links: [
         { label: "Macro calculator", hint: "Work out calories and macros", href: `${g}/tools/macro-calculator` },
         { label: "My progress photos", hint: "Private unless you share them", href: `${g}/progress-photos` },
-        { label: "Share my progress", hint: "A page you can send to anyone", href: `/share/journey/${opts.athleteId}` },
+        ...(opts.isCoach ? [] : [{ label: "Share my progress", hint: "A page you can send to anyone", href: `/share/journey/${opts.athleteId}` }]),
       ],
     },
     {

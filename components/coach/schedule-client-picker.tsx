@@ -35,7 +35,7 @@ export function ScheduleClientPicker({
         <option value="">Select a client…</option>
         {clients.map((c) => (
           <option key={c.id} value={c.id}>
-            {c.fullName} — {c.balance} {c.balance === 1 ? "credit" : "credits"}
+            {c.fullName} — {c.balance < 0 ? `owed ${Math.abs(c.balance)}` : `${c.balance} ${c.balance === 1 ? "session" : "sessions"}`}
           </option>
         ))}
       </select>

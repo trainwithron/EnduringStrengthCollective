@@ -395,7 +395,7 @@ export default async function DayDetailPage(
               day: "numeric",
             })}{" "}
             session — moving less than your coach&apos;s cancellation window
-            before that session still forfeits the credit.
+            before that session still uses 1 session.
           </p>
         )}
       </header>

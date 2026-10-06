@@ -84,7 +84,7 @@ async function handler(request: Request) {
       credits_expired: row.balance,
     });
 
-    const body = `${row.balance} unused session credit${row.balance === 1 ? "" : "s"} expired.`;
+    const body = `${row.balance} unused session${row.balance === 1 ? "" : "s"} expired.`;
     await supabase.from("notifications").insert({
       profile_id: row.athlete_id,
       group_id: row.group_id,
@@ -92,7 +92,7 @@ async function handler(request: Request) {
       body,
       link_path: `/groups/${row.group_id}/settings`,
     });
-    await sendPushToProfile(supabase, row.athlete_id, "Session credits expired", body, `/groups/${row.group_id}/settings`);
+    await sendPushToProfile(supabase, row.athlete_id, "Sessions expired", body, `/groups/${row.group_id}/settings`);
 
     expiredCount++;
   }

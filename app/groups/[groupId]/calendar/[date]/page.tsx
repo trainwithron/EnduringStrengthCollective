@@ -274,7 +274,7 @@ export default async function CoachDayDetailPage(
                 day: "numeric",
               })}{" "}
               session — moving less than your coach&apos;s cancellation window
-              before that session still forfeits the credit.
+              before that session still uses 1 session.
             </p>
           )}
         </header>
@@ -558,7 +558,7 @@ export default async function CoachDayDetailPage(
           </p>
         ) : (
           <p className="font-body text-xs text-steel mt-3">
-            Pick a client from the calendar sidebar to assign them into an open slot.
+            Pick a client from the calendar to assign them into an open slot.
           </p>
         )}
       </div>
