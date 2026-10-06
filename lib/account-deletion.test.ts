@@ -76,10 +76,16 @@ describe("eraseAccount", () => {
     expect(r.ok).toBe(false);
     expect(calls.some((c) => c.startsWith("deleteUser"))).toBe(false);
   });
-  it("removes an emptied one-on-one space after the account is gone", async () => {
+  it("keeps the emptied one-on-one space (renamed) when history is kept, so the kept records are not deleted with it", async () => {
     const { db, calls } = fakeDb();
     await eraseAccount(db, "u1", { eraseHistory: false, deleteEmptyOneOnOneGroups: ["g9"] });
-    expect(calls).toContain("group g9");
-    expect(calls.indexOf("group g9")).toBeGreaterThan(calls.indexOf("deleteUser u1"));
+    expect(calls).not.toContain("delete groups.id");
+    expect(calls).toContain("update-author groups.id");
+  });
+  it("removes the emptied space only when history is erased too, after the account is gone", async () => {
+    const { db, calls } = fakeDb();
+    await eraseAccount(db, "u1", { eraseHistory: true, deleteEmptyOneOnOneGroups: ["g9"] });
+    expect(calls).toContain("delete groups.id");
+    expect(calls.indexOf("delete groups.id")).toBeGreaterThan(calls.indexOf("deleteUser u1"));
   });
 });

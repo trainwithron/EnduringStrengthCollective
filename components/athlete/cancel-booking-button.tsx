@@ -10,6 +10,8 @@ export function CancelBookingButton({
   bookingId,
   rescheduleHref,
   recurringSeriesId,
+  viewer = "client",
+  insideWindowHours,
 }: {
   bookingId: string;
   // When provided, links to the same day-detail page in "move this
@@ -23,14 +25,44 @@ export function CancelBookingButton({
   // unchanged; the whole series is a separate, explicit action, never a
   // side effect of the single-occurrence cancel.
   recurringSeriesId?: string | null;
+  // The coach cancels differently from a client: there is no balance to mention, and a session that belongs to a weekly schedule is
+  // taken off the schedule (skipped) so the nightly top-up does not book it again.
+  viewer?: "coach" | "client";
+  // Set when the client is inside the coach's cancellation window, so the confirm can say it will still count.
+  insideWindowHours?: number | null;
 }) {
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [cancellingSeries, setCancellingSeries] = useState(false);
   const router = useRouter();
 
   async function handleCancel() {
-    if (!window.confirm("Cancel this session? Your session goes back to your balance.")) return;
+    const message =
+      viewer === "coach"
+        ? "Cancel this session? Anything charged for it is given back."
+        : insideWindowHours
+        ? `This is inside your coach's ${insideWindowHours}-hour window, so it will still count as used. Cancel anyway?`
+        : "Cancel this session? If it is outside your coach's cancellation window it goes back to your balance.";
+    if (!window.confirm(message)) return;
     setSubmitting(true);
+    setError(null);
+
+    if (viewer === "coach" && recurringSeriesId) {
+      const res = await fetch("/api/series/occurrence", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ bookingId, action: "skip" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      setSubmitting(false);
+      if (!res.ok) {
+        setError(data.message ?? data.error ?? "That didn't cancel. Nothing was changed.");
+        return;
+      }
+      router.refresh();
+      return;
+    }
+
     const supabase = createBrowserClient();
 
     // One atomic, self-verifying RPC — checks server-side that a real
@@ -39,9 +71,15 @@ export function CancelBookingButton({
     // credit, rather than two separate client-driven steps (which used
     // to let adjust_session_credits be called with a bare +1 and no real
     // cancellation behind it at all).
-    await supabase.rpc("cancel_booking_and_refund_credit", { p_booking_id: bookingId });
+    const { error: cancelError } = await supabase.rpc("cancel_booking_and_refund_credit", { p_booking_id: bookingId });
+    if (cancelError) {
+      setSubmitting(false);
+      setError("That didn't cancel. Nothing was changed. Try again.");
+      return;
+    }
 
     mirrorGoogleCalendarEvent(bookingId);
+    setSubmitting(false);
     router.refresh();
   }
 
@@ -72,9 +110,14 @@ export function CancelBookingButton({
           disabled={submitting}
           className="h-11 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
         >
-          {submitting ? "Cancelling…" : "Booked ✓ Cancel"}
+          {submitting ? "Cancelling…" : viewer === "coach" ? "Cancel" : "Booked ✓ Cancel"}
         </button>
       </div>
+      {error && (
+        <p className="font-body text-xs text-rust max-w-[220px] text-right" role="alert">
+          {error}
+        </p>
+      )}
       {recurringSeriesId && (
         <button
           type="button"
