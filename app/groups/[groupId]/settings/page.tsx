@@ -19,6 +19,7 @@ import { ProfileDetailsEditor } from "@/components/athlete/profile-details-edito
 import { SwipeDirectionSetting } from "@/components/athlete/swipe-direction-setting";
 import { SettingsGroup } from "@/components/shared/settings-group";
 import { ExportDataButton } from "@/components/athlete/export-data-button";
+import { FeedBroadcastSettings } from "@/components/athlete/feed-broadcast-settings";
 import { DeleteAccountButton } from "@/components/athlete/delete-account-button";
 import { GamificationToggle } from "@/components/coach/gamification-toggle";
 import { GoogleCalendarConnection } from "@/components/coach/google-calendar-connection";
@@ -68,12 +69,12 @@ export default async function SettingsPage(
   ] = await Promise.all([
       supabase
         .from("profiles")
-        .select("full_name, avatar_url, exercise_swipe_direction")
+        .select("full_name, avatar_url, exercise_swipe_direction, feed_broadcast_level")
         .eq("id", athleteId)
         .single(),
       supabase
         .from("group_memberships")
-        .select("role, history_import_enabled")
+        .select("role, history_import_enabled, client_tier")
         .eq("group_id", params.groupId)
         .eq("profile_id", athleteId)
         .maybeSingle(),
@@ -263,6 +264,16 @@ export default async function SettingsPage(
               initialDirection={
                 (profile?.exercise_swipe_direction as "vertical" | "horizontal" | null) ?? null
               }
+            />
+          </SettingsGroup>
+        )}
+
+        {/* A group member's workouts post to the group feed by default (accountability); this is the clear way to turn that off. A one-on-one client has no feed, so no control. */}
+        {!isCoach && (membership as { client_tier?: string | null } | null)?.client_tier !== "one_on_one" && (
+          <SettingsGroup label="Sharing to the group feed">
+            <FeedBroadcastSettings
+              profileId={athleteId}
+              initialLevel={((profile as { feed_broadcast_level?: string } | null)?.feed_broadcast_level as "full" | "prs_only" | "checkin_only" | "private" | undefined) ?? "full"}
             />
           </SettingsGroup>
         )}

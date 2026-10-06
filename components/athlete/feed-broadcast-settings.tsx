@@ -8,8 +8,8 @@ type BroadcastLevel = "full" | "prs_only" | "checkin_only" | "private";
 const OPTIONS: { value: BroadcastLevel; label: string; description: string }[] = [
   {
     value: "full",
-    label: "Full session log",
-    description: "Complete volume, sets, and PR detail — today's default.",
+    label: "Share my workouts (default)",
+    description: "Your group sees each finished workout with volume, sets and PRs, so everyone sees you showing up.",
   },
   {
     value: "prs_only",
@@ -24,7 +24,7 @@ const OPTIONS: { value: BroadcastLevel; label: string; description: string }[] =
   {
     value: "private",
     label: "Keep private",
-    description: "Never posts to the feed. Still saved to your own history.",
+    description: "Nothing posts to the group feed. It is still saved to your own history, and you still get your workout card to share.",
   },
 ];
 
@@ -60,7 +60,7 @@ export function FeedBroadcastSettings({
 
   return (
     <div>
-      <p className="font-body text-sm mb-1">What posts to the feed when you finish a workout</p>
+      <p className="font-body text-sm mb-1">What your group sees when you finish a workout</p>
       <p className="font-body text-xs text-steel mb-3">
         {saving ? "Saving…" : "Applies the next time you complete a workout."}
       </p>

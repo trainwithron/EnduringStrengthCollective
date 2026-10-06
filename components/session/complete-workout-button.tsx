@@ -291,7 +291,19 @@ export function CompleteWorkoutButton({
     // Every completed workout gets a celebratory, shareable card instead of
     // silently landing back on the group hub — that's the actual feedback
     // moment a client (or a coach logging in-person) gets after finishing.
-    const navHref = postId ? `/share/${postId}` : `/groups/${result.group_id}`;
+    // The card is built from the workout itself when there is no feed post (a client who keeps their workouts off the group feed, or a one-on-one client).
+    let navHref = `/groups/${result.group_id}`;
+    if (postId) navHref = `/share/${postId}`;
+    else {
+      // The link is signed by the server, so only the client (or their coach) can make it.
+      try {
+        const res = await fetch("/api/share/sign", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ workoutLogId: result.workout_log_id }) });
+        const data = res.ok ? await res.json() : null;
+        if (data?.href) navHref = data.href as string;
+      } catch {
+        // Fall back to Home: the workout itself is saved either way.
+      }
+    }
 
     // RPE comes first (own-session only, same reasoning as the weight
     // nudge below — it's the athlete's own subjective read on the session

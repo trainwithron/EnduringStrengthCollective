@@ -8,6 +8,8 @@ import { computeHabitCompliance, computeCompliancePct, type HabitLogRow } from "
 import { shouldShowCompoundCelebration, buildCompoundCelebrationText } from "@/lib/compound-celebration";
 import { computeRelativeStrengthMilestone } from "@/lib/relative-strength-milestone";
 import { believableDurationSeconds } from "@/lib/share-image";
+import { loadSharedSource } from "@/lib/shared-workout-source";
+import { parseShareParam, verifyShareSignature } from "@/lib/share-token";
 
 // Shared by the public /share/[postId] page and the in-feed expanded
 // card (fetched via /api/workout-share/[postId]) so both surfaces
@@ -21,21 +23,12 @@ import { believableDurationSeconds } from "@/lib/share-image";
 export async function getSharedWorkout(postId: string, opts: { fullName?: boolean } = {}) {
   const supabase = createServiceRoleClient();
 
-  const { data: post } = await supabase
-    .from("posts")
-    .select(
-      `
-      id, post_type, created_at, group_id, broadcast_level, author_id, shared_exercise_names,
-      profiles!posts_author_id_fkey ( full_name, avatar_url ),
-      workout_logs ( session_id, new_prs, total_volume, total_sets_completed )
-    `
-    )
-    .eq("id", postId)
-    .eq("post_type", "workout_summary")
-    .maybeSingle();
-
-  const workoutLog = post?.workout_logs as any;
-  if (!post || !workoutLog) return null;
+  // The id is a feed post's, or a workout log's when the workout has no feed post (see shared-workout-source.ts).
+  // A workout log's card needs the signed form of the link (<log id>.<signature>); a feed post's card is opened by its own id as before.
+  const { id: sharedId, signature } = parseShareParam(postId);
+  const source = await loadSharedSource(supabase, sharedId, verifyShareSignature(sharedId, signature));
+  if (!source) return null;
+  const { post, workoutLog } = source;
 
   const { data: group } = await supabase
     .from("groups")
