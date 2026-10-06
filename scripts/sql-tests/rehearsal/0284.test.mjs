@@ -10,12 +10,14 @@ async function setup(db, h, label) {
   const bob = await h.user(`${label} Bob`);
   const other = await h.user(`${label} Other Coach`);
   const stranger = await h.user(`${label} Stranger`);
+  const coach2 = await h.user(`${label} Second Coach`);
   const org = await h.org(coach);
   const group = await h.group(org, coach, "team", `${label} group`);
   await h.member(group, ann);
   await h.member(group, bob);
+  await h.member(group, coach2, "coach");
   await h.asSuper();
-  return { coach, ann, bob, other, stranger, group };
+  return { coach, ann, bob, other, stranger, coach2, group };
 }
 const goal = async (h, id) => (await h.one(`select status, created_by, confirmed_by, target_date::text as target_date from public.client_goals where id = $1`, [id]));
 const notices = async (h, profile, type) => (await h.rows(`select body from public.notifications where profile_id = $1 and type = $2 order by created_at`, [profile, type]));
@@ -112,6 +114,37 @@ export default {
       await h.asSuper();
       h.check("the client can decline a goal their coach suggested", !no.error && (await goal(h, g4)).status === "declined", JSON.stringify(no));
       h.check("a goal can never be moved to another client", (await h.one(`select athlete_id from public.client_goals where id = $1`, [g4])).athlete_id === s.ann, JSON.stringify(move));
+
+      // ---- a coach cannot get around the rule
+      await h.as(s.coach);
+      const p6 = await mk(s.coach, s.ann);
+      await h.asSuper();
+      const g6 = p6.rows[0].id;
+      await h.as(s.coach);
+      await tryQ(db, `update public.client_goals set created_by = athlete_id where id = $1`, [g6]);
+      const viaAuthor = await tryQ(db, `update public.client_goals set status = 'confirmed' where id = $1`, [g6]);
+      await h.asSuper();
+      const c6 = await goal(h, g6);
+      h.check("a coach cannot make the client the author and then confirm: authorship stays with the coach and the confirm is refused", /Only the client can confirm/.test(viaAuthor.error ?? "") && c6.created_by === s.coach && c6.status === "proposed", JSON.stringify({ viaAuthor, c6 }));
+      await h.as(s.ann);
+      await tryQ(db, `update public.client_goals set status = 'declined' where id = $1`, [g6]);
+      await h.as(s.coach);
+      const afterDecline = await tryQ(db, `update public.client_goals set status = 'confirmed' where id = $1`, [g6]);
+      await h.asSuper();
+      h.check("a coach cannot confirm a goal after the client declined it", /Only the client can confirm/.test(afterDecline.error ?? "") && (await goal(h, g6)).status === "declined", JSON.stringify(afterDecline));
+      await h.as(s.coach);
+      const p7 = await mk(s.coach, s.ann);
+      await h.asSuper();
+      const g7 = p7.rows[0].id;
+      await h.as(s.coach);
+      await tryQ(db, `update public.client_goals set confirmed_by = athlete_id, confirmed_at = now() where id = $1`, [g7]);
+      await h.asSuper();
+      const c7 = await goal(h, g7);
+      h.check("a coach cannot write who confirmed a goal or when, even without changing its status", c7.confirmed_by === null && c7.status === "proposed", JSON.stringify(c7));
+      await h.as(s.coach2);
+      const coach2 = await tryQ(db, `update public.client_goals set status = 'confirmed' where id = $1`, [g7]);
+      await h.asSuper();
+      h.check("another coach of the group cannot confirm a goal a coach suggested either", /Only the client can confirm/.test(coach2.error ?? "") && (await goal(h, g7)).status === "proposed", JSON.stringify(coach2));
 
       // ---- what already worked still works
       await h.as(s.ann);

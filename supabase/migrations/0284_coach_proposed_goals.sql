@@ -96,7 +96,12 @@ begin
   end if;
 
   if coalesce(public.is_group_coach(old.group_id), false) then
-    if old.status = 'proposed' and old.created_by <> old.athlete_id and new.status = 'confirmed' then
+    -- Who authored a goal and who confirmed it are never taken from what a coach sends: only the two intended moves below change them.
+    new.created_by := old.created_by;
+    new.confirmed_at := old.confirmed_at;
+    new.confirmed_by := old.confirmed_by;
+    -- A goal a coach suggested is confirmed only by the client, whatever state it is in (including after the client declined it).
+    if old.created_by <> old.athlete_id and new.status = 'confirmed' and old.status is distinct from 'confirmed' then
       raise exception 'Only the client can confirm a goal their coach suggested.';
     end if;
     if old.status = 'proposed' and v_changed then
