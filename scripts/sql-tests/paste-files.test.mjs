@@ -44,8 +44,15 @@ for (const s of steps) {
   if (s.n === "24") await db.exec(functionAclOpenSql());
   if (s.n === "23") {
     // The probe: applies 0281 inside a transaction, tries the four cases, and ends with an intentional error that carries the answer and rolls everything back.
+    // The probe only ever uses the standing Test Sandbox group: build one with a coach and a client.
+    await db.exec(`
+      insert into public.groups (id, name, created_by, organization_id) select '50000000-0000-0000-0000-000000000002', 'Test Sandbox Group', '00000000-0000-4000-8000-0000000000a1', id from public.organizations where slug = 'pin-org';
+      insert into public.group_memberships (group_id, profile_id, role) values
+        ('50000000-0000-0000-0000-000000000002', '00000000-0000-4000-8000-0000000000a1', 'coach'),
+        ('50000000-0000-0000-0000-000000000002', '00000000-0000-4000-8000-0000000000a2', 'athlete');
+    `);
     const probe = await run("apply/check-step23-probe.sql");
-    check("check-step23-probe.sql answers: " + probe, !!probe && /PROBE RESULT/.test(probe) && /server booking left them set aside: true/.test(probe) && /client message brought them back: true/.test(probe) && /coach message left them set aside: true/.test(probe) && /ordinary booking brought them back: true/.test(probe) && !/error:/.test(probe));
+    check("check-step23-probe.sql answers: " + probe, !!probe && /PROBE RESULT/.test(probe) && /server booking was made and left them set aside: true/.test(probe) && /client message brought them back: true/.test(probe) && /coach message left them set aside: true/.test(probe) && /ordinary booking brought them back: true/.test(probe) && !/error:/.test(probe));
     const gone = (await db.query("select to_regclass('public.client_inactive') as t")).rows[0].t;
     check("check-step23-probe.sql leaves nothing behind (0281 itself was rolled back)", gone === null);
   }
