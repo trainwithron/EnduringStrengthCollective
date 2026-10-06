@@ -3,6 +3,7 @@
 //   node scripts/sql-tests/paste-files.test.mjs   (also part of npm run test:sql)
 import { readFileSync } from "node:fs";
 import { createDb, applyLiveEquivalent } from "./harness.mjs";
+import { undoSql as functionAclOpenSql } from "../function-acl.mjs";
 
 const read = (f) => readFileSync(new URL(`../../supabase/${f}`, import.meta.url), "utf8").split(String.fromCharCode(13, 10)).join(String.fromCharCode(10)).replace(/create extension[^;]*;/gi, "");
 const db = await createDb();
@@ -39,6 +40,8 @@ await db.exec(`
 // ---- the numbered steps ----
 const steps = JSON.parse(readFileSync(new URL("../../supabase/apply/steps.json", import.meta.url), "utf8"));
 for (const s of steps) {
+  // Live today: step 13 was applied before it was fixed, so the internal functions are open to signed-in users. Reproduce that before step 24.
+  if (s.n === "24") await db.exec(functionAclOpenSql());
   const base = `apply/apply-step${s.n}-${s.slug}`;
   const rows = await pre(`${base}-precheck.sql`);
   const bad = rows.filter((r) => !r.ok).map((r) => r.check_name);
@@ -67,6 +70,19 @@ for (const s of steps) {
     const hashed = (await db.query(`select count(*)::int as n from public.kiosk_pins where athlete_id = '00000000-0000-4000-8000-0000000000a2'`)).rows[0].n;
     check("step 06: the existing plain PIN was copied across hashed", hashed === 1);
   }
+}
+// The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
+{
+  const rows = (await db.query(read("apply/check-function-acl.sql"))).rows;
+  check("check-function-acl.sql after step 24: " + rows.length + " rows, all true" + (rows.some((r) => !r.ok) ? " (FALSE: " + rows.filter((r) => !r.ok).map((r) => r.check_name).join("; ") + ")" : ""), rows.length === 3 && rows.every((r) => r.ok));
+  await db.exec("create function public.zz_new_internal(p_id uuid) returns void language plpgsql security definer set search_path = public as $f$ begin delete from public.profiles where id = p_id; end $f$; grant execute on function public.zz_new_internal(uuid) to authenticated");
+  const caught = (await db.query(read("apply/check-function-acl.sql"))).rows;
+  check("check-function-acl.sql catches a new SECURITY DEFINER function with no caller check that signed-in users can run", caught.some((r) => !r.ok && /zz_new_internal/.test(r.check_name)));
+  await db.exec("drop function public.zz_new_internal(uuid)");
+  await db.exec("grant execute on function public.apply_session_credit_change(uuid, uuid, integer, text, text, uuid, uuid) to authenticated");
+  const reopened = (await db.query(read("apply/check-function-acl.sql"))).rows;
+  check("check-function-acl.sql catches a server-only function that is opened to signed-in users again", reopened.some((r) => !r.ok && /server-only/.test(r.check_name)));
+  await db.exec("revoke all on function public.apply_session_credit_change(uuid, uuid, integer, text, text, uuid, uuid) from authenticated");
 }
 // Running an already-applied step again is refused by its own guard (nothing changes), including 0248, which would otherwise undo 0236.
 for (const f2 of ["apply/apply-step01-0249-0250-0254-0240-0241.sql", "apply/apply-step04-0263.sql", "apply/apply-step05-0236.sql", "apply/apply-step06-0251.sql", "apply-0248.sql"]) {

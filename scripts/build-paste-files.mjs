@@ -3,6 +3,7 @@
 //   node scripts/build-paste-files.mjs
 // scripts/sql-tests/paste-files.test.mjs applies every step in order on the live-equivalent schema and checks each precheck is true first.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { checkSql as functionAclCheckSql, undoSql as functionAclUndoSql } from "./function-acl.mjs";
 
 const root = new URL("../supabase/", import.meta.url);
 const outDir = new URL("apply/", root);
@@ -530,6 +531,20 @@ drop table if exists public.client_inactive_events;`,
       ["0281 is not already applied (the set-aside table is not there yet)", has.noTable("client_inactive")],
     ],
   },
+  {
+    n: "24",
+    slug: "0282",
+    title: "0282 URGENT: close again the internal server-only functions that step 13 (0271) opened to every signed-in account (credit changes, booking settlement, audit writers, SMS and rate-limit bookkeeping, AI metering)",
+    migrations: ["0282"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing visible changes: the app only ever calls these from the server, and the functions people use (book, cancel, finish a workout, give back sessions and the rest) call them as the database owner. Afterwards run check-function-acl.sql: every row must say ok = true.",
+    undo: functionAclUndoSql(),
+    undoWhy: "Only if something that used to work for a signed-in person stops working after step 24 (it should not: the app calls these only from the server). It gives the signed-in role access to these functions again, which is the OPEN state step 13 left, so run it only to diagnose and tell Spot straight away.",
+    rows: [
+      ["the internal functions exist", `${has.fnName("apply_session_credit_change")} and ${has.fnName("settle_booking_internal")} and ${has.fnName("audit_record")} and ${has.fnName("reserve_ai_call")} and ${has.fnName("adjust_coach_credits")}`],
+      ["0282 is not already applied (a signed-in user can still run apply_session_credit_change)", "has_function_privilege('authenticated', 'public.apply_session_credit_change(uuid, uuid, integer, text, text, uuid, uuid)', 'execute')"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -664,6 +679,7 @@ for (const s of STEPS) {
     m("0279", has.table("booking_requests")),
     m("0280", has.col("session_credits", "expiry_hold_until")),
     m("0281", has.table("client_inactive")),
+    m("0282", "not has_function_privilege('anon', 'public.book_session(uuid, uuid, uuid, timestamptz, timestamptz)', 'execute') and not has_function_privilege('authenticated', 'public.apply_session_credit_change(uuid, uuid, integer, text, text, uuid, uuid)', 'execute')"),
   ];
   const values = items.map((i) => `    ('2026100600${i.n.slice(1)}', '${i.file.slice(5, -4)}', '${i.file}', ${i.marker})`).join(",\n");
   const sql = [
@@ -726,5 +742,6 @@ for (const s of STEPS) {
   ].join("\n");
   writeFileSync(new URL("check-step13-probe.sql", outDir), sql);
 }
+writeFileSync(new URL("check-function-acl.sql", outDir), functionAclCheckSql());
 writeFileSync(new URL("steps.json", outDir), JSON.stringify(STEPS.map((s) => ({ n: s.n, slug: s.slug, migrations: s.migrations, rows: s.rows.length })), null, 1));
 console.log(`wrote ${STEPS.length} steps to supabase/apply/`);

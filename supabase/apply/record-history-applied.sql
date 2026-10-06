@@ -48,7 +48,8 @@ from (
     ('2026100600278', 'booking_mode', '0278_booking_mode.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_booking_policies' and column_name = 'booking_mode')),
     ('2026100600279', 'booking_requests', '0279_booking_requests.sql', to_regclass('public.booking_requests') is not null),
     ('2026100600280', 'credit_expiry_human_overrides', '0280_credit_expiry_human_overrides.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'session_credits' and column_name = 'expiry_hold_until')),
-    ('2026100600281', 'inactive_clients', '0281_inactive_clients.sql', to_regclass('public.client_inactive') is not null)
+    ('2026100600281', 'inactive_clients', '0281_inactive_clients.sql', to_regclass('public.client_inactive') is not null),
+    ('2026100600282', 'reclose_internal_functions', '0282_reclose_internal_functions.sql', not has_function_privilege('anon', 'public.book_session(uuid, uuid, uuid, timestamptz, timestamptz)', 'execute') and not has_function_privilege('authenticated', 'public.apply_session_credit_change(uuid, uuid, integer, text, text, uuid, uuid)', 'execute'))
 ) as v(version, name, file, applied)
 where v.applied
 on conflict (version) do nothing;
