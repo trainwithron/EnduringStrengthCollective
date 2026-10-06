@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
 
   const body = await request.json();
-  const { checkKind, patternKey, headline, action } = body;
+  const { checkKind, patternKey, headline, action, detail } = body;
 
   if (!checkKind || !patternKey || !headline) {
     return NextResponse.json({ error: "checkKind, patternKey, and headline are required." }, { status: 400 });
@@ -33,6 +33,8 @@ export async function POST(request: Request) {
     dismissal_key: `${checkKind}::${patternKey}`,
     option_summary: headline,
     action,
+    // How long a "Not now" keeps a finding quiet, in days (a plain number); anything else is ignored.
+    edit_detail: typeof detail === "string" && /^\d{1,3}$/.test(detail) ? detail : null,
   });
   if (error) return NextResponse.json({ error: "Couldn't save that feedback — try again." }, { status: 500 });
 

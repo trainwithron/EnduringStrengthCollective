@@ -996,7 +996,7 @@ export default async function CoachCalendarPage(
     })
     .filter((c) => c.tier !== "none");
 
-  const calendarSpotterFindings = await gatherCalendarSpotterFindings(supabase, { groupId: params.groupId });
+  const calendarSpotterFindings = await gatherCalendarSpotterFindings(supabase, { groupId: params.groupId, coachId: user.id });
   const schedulingSpotterFlags = await gatherSchedulingSpotterFlags(supabase, {
     coachId: user.id,
     organizationId: group?.organization_id ?? null,
@@ -1071,7 +1071,7 @@ export default async function CoachCalendarPage(
 
       {calendarSpotterFindings.length > 0 && (
         <div className="mb-6">
-          <CalendarSpotterPanel findings={calendarSpotterFindings} groupId={params.groupId} />
+          <CalendarSpotterPanel findings={calendarSpotterFindings} groupId={params.groupId} timezone={bookingTz} />
         </div>
       )}
 
