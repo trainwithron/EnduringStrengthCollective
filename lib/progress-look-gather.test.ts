@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { gatherProgressLook, minTargetReps } from "./progress-look-gather";
+import { gatherProgressLook, maxTargetReps, minTargetReps } from "./progress-look-gather";
 import { APPLIED_PREFIX, DELIBERATE_PREFIX } from "./progress-look";
 
 const NOW = new Date("2026-10-06T18:00:00Z");
@@ -43,6 +43,7 @@ interface World {
   title?: string;
   skipSet?: boolean;
   lastDaysAgo?: number;
+  reps?: number;
 }
 
 // Sam trains "Tuesday lower" (program p1, day 1) once a week; Back Squat is a tier A main lift.
@@ -59,7 +60,7 @@ function world(w: World = {}, extra: Record<string, any[]> = {}) {
       sets.push({
         set_order: k,
         weight,
-        reps: 5,
+        reps: w.reps ?? 5,
         rpe: w.rpes ? w.rpes[i] : null,
         status: w.skipSet && i === weights.length - 1 && k === 2 ? "skipped" : "completed",
         session_exercises: {
@@ -174,6 +175,27 @@ describe("the progress look gather", () => {
     expect(r.cards).toEqual([]);
   });
 
+  it("suppresses: a client marked as injured", async () => {
+    expect((await run(world({}, { athlete_injury_status: [{ athlete_id: "sam" }] }))).cards).toEqual([]);
+  });
+  it("suppresses: an exercise a progression model is already raising, but not the client's other lifts", async () => {
+    expect((await run(world({}, { exercise_progressions: [{ program_id: "p1", exercise_name: "Back Squat" }] }))).cards).toEqual([]);
+    expect((await run(world({}, { exercise_progressions: [{ program_id: "p1", exercise_name: "Bench Press" }] }))).cards).toHaveLength(1);
+  });
+  it("a deficit phase from months ago no longer silences a client, and a recent one still does", async () => {
+    expect((await run(world({}, { nutrition_checkins: [{ athlete_id: "sam", phase: "fat_loss", created_at: daysAgo(10) }] }))).cards).toEqual([]);
+    // the database is asked only for the last 60 days; a stand-in that returns nothing for an old row behaves the same way
+    expect((await run(world({}, { nutrition_checkins: [] }))).cards).toHaveLength(1);
+  });
+  it("the rough hint uses the top of a rep range: 10 reps on a target of 8-10 is on target, not two over", async () => {
+    const targets = { group_workout_exercise_sets: [0, 1, 2, 3].flatMap((i) => [0, 1, 2].map((k) => ({ id: "t" + i + k, group_workout_exercise_id: "x" + i, set_order: k, target_reps: "8-10" }))) };
+    const r = await run(world({ reps: 10 }, targets));
+    expect(r.cards[0].flagged[0].reps).toBe(10);
+    expect(r.cards[0].flagged[0].overTargetHint).toBe(false);
+    const low = await run(world({ reps: 10 }, { group_workout_exercise_sets: [0, 1, 2, 3].flatMap((i) => [0, 1, 2].map((k) => ({ id: "u" + i + k, group_workout_exercise_group_id: "", group_workout_exercise_id: "x" + i, set_order: k, target_reps: "8" }))) }));
+    expect(low.cards[0].flagged[0].overTargetHint).toBe(true);
+  });
+
   it("returns nothing when the coach has no groups or no clients", async () => {
     expect((await gatherProgressLook(world(), { coachId: "coach", groupIds: [], now: NOW })).cards).toEqual([]);
     expect((await run(world({}, { group_memberships: [] }))).cards).toEqual([]);
@@ -186,5 +208,10 @@ describe("rep targets", () => {
     expect(minTargetReps("8-10")).toBe(8);
     expect(minTargetReps("AMRAP")).toBeNull();
     expect(minTargetReps(null)).toBeNull();
+  });
+  it("reads the top of a range for the hint", () => {
+    expect(maxTargetReps("8-10")).toBe(10);
+    expect(maxTargetReps("8")).toBe(8);
+    expect(maxTargetReps("AMRAP")).toBeNull();
   });
 });

@@ -26,7 +26,8 @@ export const QUIET_DAYS = 21;
 export const PAIN_NOTE_DAYS = 14;
 const PAGE = 1000;
 const MAX_PAGES = 25;
-const IN_CHUNK = 150;
+const IN_CHUNK = 100;
+export const PHASE_DAYS = 60;
 
 export interface NextSlot {
   exerciseId: string;
@@ -57,6 +58,26 @@ const chunk = <T,>(items: T[], n: number): T[][] => {
   for (let i = 0; i < items.length; i += n) out.push(items.slice(i, i + n));
   return out;
 };
+
+// PostgREST returns at most 1000 rows a request, so any read that can come back with more is read a page at a time (ordered by id so the pages never
+// overlap). A failed page is reported, never treated as "no rows".
+type Page = (from: number, to: number) => PromiseLike<{ data: any[] | null; error: unknown }>;
+async function pageAll(make: Page): Promise<{ rows: any[]; failed: boolean }> {
+  const rows: any[] = [];
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const { data, error } = await make(page * PAGE, page * PAGE + PAGE - 1);
+    if (error) return { rows, failed: true };
+    rows.push(...(data ?? []));
+    if ((data ?? []).length < PAGE) break;
+  }
+  return { rows, failed: false };
+}
+
+// The highest number in a target such as "8-10": the top of the range, which is where a double-progression rep target is met.
+export function maxTargetReps(text: string | null | undefined): number | null {
+  const all = text ? text.match(/\d+/g) : null;
+  return all ? Number(all[all.length - 1]) : null;
+}
 
 // The lowest number in a target such as "8", "8-10" or "8 to 10": the reps the client was asked for at the least.
 export function minTargetReps(text: string | null | undefined): number | null {
@@ -135,14 +156,16 @@ export async function gatherProgressLook(
 
   // The program's own targets for the sets that were done (reps, to tell a short set from a full one).
   const slotIds = Array.from(new Set(sets.map((s) => s.session_exercises?.group_workout_exercise_id).filter(Boolean))) as string[];
-  const targetReps = new Map<string, number | null>();
+  const targetReps = new Map<string, { min: number | null; max: number | null }>();
   for (const ids of chunk(slotIds, IN_CHUNK)) {
-    const { data } = await supabase.from("group_workout_exercise_sets").select("group_workout_exercise_id, set_order, target_reps").in("group_workout_exercise_id", ids);
-    for (const t of (data ?? []) as any[]) targetReps.set(`${t.group_workout_exercise_id}:${t.set_order}`, minTargetReps(t.target_reps));
+    const { rows } = await pageAll((a, b) =>
+      supabase.from("group_workout_exercise_sets").select("id, group_workout_exercise_id, set_order, target_reps").in("group_workout_exercise_id", ids).order("id").range(a, b)
+    );
+    for (const t of rows) targetReps.set(`${t.group_workout_exercise_id}:${t.set_order}`, { min: minTargetReps(t.target_reps), max: maxTargetReps(t.target_reps) });
   }
 
   // One point per (client, workout, exercise, session): the heaviest completed set that day, and whether any set was missed.
-  interface Acc { athleteId: string; groupId: string; workoutId: string; sessionId: string; completedAt: string; name: string; best: { weight: number; reps: number; rpe: number | null } | null; missed: boolean; targetRepsOfBest: number | null }
+  interface Acc { athleteId: string; groupId: string; workoutId: string; sessionId: string; completedAt: string; name: string; best: { weight: number; reps: number; rpe: number | null } | null; missed: boolean; targetRepsOfBest: number | null; targetTopOfBest: number | null }
   const accs = new Map<string, Acc>();
   const painAt = new Map<string, number>();
   for (const s of sets) {
@@ -152,11 +175,12 @@ export async function gatherProgressLook(
     const key = `${sess.id}::${se.exercise_name}`;
     let a = accs.get(key);
     if (!a) {
-      a = { athleteId: sess.athlete_id, groupId: sess.group_id, workoutId: sess.workout_id, sessionId: sess.id, completedAt: sess.completed_at, name: se.exercise_name, best: null, missed: false, targetRepsOfBest: null };
+      a = { athleteId: sess.athlete_id, groupId: sess.group_id, workoutId: sess.workout_id, sessionId: sess.id, completedAt: sess.completed_at, name: se.exercise_name, best: null, missed: false, targetRepsOfBest: null, targetTopOfBest: null };
       accs.set(key, a);
     }
     if (mentionsPain(se.athlete_note)) painAt.set(sess.athlete_id, Math.max(painAt.get(sess.athlete_id) ?? 0, new Date(sess.completed_at).getTime()));
-    const target = se.group_workout_exercise_id ? targetReps.get(`${se.group_workout_exercise_id}:${s.set_order}`) ?? null : null;
+    const tr = se.group_workout_exercise_id ? targetReps.get(`${se.group_workout_exercise_id}:${s.set_order}`) ?? null : null;
+    const target = tr ? tr.min : null;
     if (s.status !== "completed") {
       a.missed = true;
       continue;
@@ -166,14 +190,19 @@ export async function gatherProgressLook(
     if (!a.best || s.weight > a.best.weight || (s.weight === a.best.weight && s.reps > a.best.reps)) {
       a.best = { weight: Number(s.weight), reps: Number(s.reps), rpe: s.rpe == null ? null : Number(s.rpe), };
       a.targetRepsOfBest = target;
+      a.targetTopOfBest = tr ? tr.max : null;
     }
   }
 
   // Tiers and the next harder variation, from the coach's own movement patterns.
-  const { data: tierRows } = await supabase
-    .from("movement_pattern_exercises")
-    .select("exercise_name, tier, difficulty_rank, movement_pattern_id, movement_patterns!inner ( created_by )")
-    .eq("movement_patterns.created_by", coachId);
+  const { rows: tierRows } = await pageAll((a, b) =>
+    supabase
+      .from("movement_pattern_exercises")
+      .select("id, exercise_name, tier, difficulty_rank, movement_pattern_id, movement_patterns!inner ( created_by )")
+      .eq("movement_patterns.created_by", coachId)
+      .order("id")
+      .range(a, b)
+  );
   const tierByName = new Map<string, Tier | null>();
   const ladders = new Map<string, { name: string; rank: number }[]>();
   const patternOf = new Map<string, string>();
@@ -193,9 +222,29 @@ export async function gatherProgressLook(
   };
 
   // A client in a deliberate deficit phase is expected to show less.
-  const { data: phaseRows } = await supabase.from("nutrition_checkins").select("athlete_id, phase, created_at").in("group_id", groupIds).order("created_at", { ascending: false });
+  // Only a recent phase counts: a check-in from months ago does not silence a client for ever.
+  const phaseSince = new Date(now.getTime() - PHASE_DAYS * DAY).toISOString();
+  const { rows: phaseRows } = await pageAll((a, b) =>
+    supabase.from("nutrition_checkins").select("id, athlete_id, phase, created_at").in("group_id", groupIds).gte("created_at", phaseSince).order("created_at", { ascending: false }).order("id").range(a, b)
+  );
   const phaseOf = new Map<string, string>();
-  for (const r of (phaseRows ?? []) as any[]) if (!phaseOf.has(r.athlete_id)) phaseOf.set(r.athlete_id, r.phase);
+  for (const r of phaseRows) if (!phaseOf.has(r.athlete_id)) phaseOf.set(r.athlete_id, r.phase);
+
+  // A client the coach or the client has marked as injured never gets a "time to progress?" card: injury is a coach-only decision, so suppress on doubt.
+  // Soft: if that table cannot be read nobody is treated as injured by it (the pain-note rule still applies).
+  const injuredIds = new Set<string>();
+  {
+    const { data: injuryRows, error: injuryError } = await supabase.from("athlete_injury_status").select("athlete_id").in("group_id", groupIds).eq("is_injured", true);
+    if (!injuryError) for (const r of (injuryRows ?? []) as any[]) injuredIds.add(r.athlete_id);
+  }
+
+  // A program that already raises an exercise through a progression model is left alone: the model moves the load as the client logs, so the planned target
+  // can stay flat while it is being raised.
+  const modelled = new Set<string>();
+  for (const ids of chunk(programIds, IN_CHUNK)) {
+    const { data: progRows, error: progError } = await supabase.from("exercise_progressions").select("program_id, exercise_name").in("program_id", ids);
+    if (!progError) for (const r of (progRows ?? []) as any[]) modelled.add(`${r.program_id}::${r.exercise_name}`);
+  }
 
   // Group the points by client and workout (program + day).
   interface WorkoutAcc { athleteId: string; groupId: string; programId: string; dayIndex: number; title: string; weekNumber: number; lastAt: string; lastWorkoutId: string; byExercise: Map<string, { at: string; point: ProgressPoint; targetReps: number | null }[]> }
@@ -220,16 +269,16 @@ export async function gatherProgressLook(
       acc.lastWorkoutId = a.workoutId;
     }
     const list = acc.byExercise.get(a.name) ?? [];
-    list.push({ at: a.completedAt, targetReps: a.targetRepsOfBest, point: { date: a.completedAt, weight: a.best.weight, reps: a.best.reps, rpe: a.best.rpe, missed: a.missed } });
+    list.push({ at: a.completedAt, targetReps: a.targetTopOfBest, point: { date: a.completedAt, weight: a.best.weight, reps: a.best.reps, rpe: a.best.rpe, missed: a.missed } });
     acc.byExercise.set(a.name, list);
   }
 
   // The next not-yet-done workout of each program day, with its exercises, so the program's next target (and where to apply an option) is known.
   const nextWorkoutByKey = new Map<string, string>();
   const laterWorkoutRows: any[] = [];
-  for (const ids of chunk(programIds, IN_CHUNK)) {
-    const { data } = await supabase.from("workouts").select("id, program_id, week_number, day_index").in("program_id", ids);
-    laterWorkoutRows.push(...((data ?? []) as any[]));
+  for (const ids of chunk(programIds, 20)) {
+    const { rows } = await pageAll((a, b) => supabase.from("workouts").select("id, program_id, week_number, day_index").in("program_id", ids).order("id").range(a, b));
+    laterWorkoutRows.push(...rows);
   }
   for (const acc of workouts.values()) {
     const done = doneWorkoutIds.get(acc.athleteId) ?? new Set<string>();
@@ -240,12 +289,16 @@ export async function gatherProgressLook(
   }
   const nextIds = Array.from(new Set(nextWorkoutByKey.values()));
   const nextExercises = new Map<string, any[]>();
-  for (const ids of chunk(nextIds, IN_CHUNK)) {
-    const { data } = await supabase
-      .from("group_workout_exercises")
-      .select("id, workout_id, exercise_name, notes, group_workout_exercise_sets ( id, set_order, target_weight, target_reps )")
-      .in("workout_id", ids);
-    for (const e of (data ?? []) as any[]) nextExercises.set(e.workout_id, [...(nextExercises.get(e.workout_id) ?? []), e]);
+  for (const ids of chunk(nextIds, 40)) {
+    const { rows } = await pageAll((a, b) =>
+      supabase
+        .from("group_workout_exercises")
+        .select("id, workout_id, exercise_name, notes, group_workout_exercise_sets ( id, set_order, target_weight, target_reps )")
+        .in("workout_id", ids)
+        .order("id")
+        .range(a, b)
+    );
+    for (const e of rows) nextExercises.set(e.workout_id, [...(nextExercises.get(e.workout_id) ?? []), e]);
   }
 
   const cards: ProgressCardData[] = [];
@@ -256,6 +309,7 @@ export async function gatherProgressLook(
     if (now.getTime() - new Date(acc.lastAt).getTime() > QUIET_DAYS * DAY) continue;
     const lastTrained = Math.max(...Array.from(workouts.values()).filter((w) => w.athleteId === acc.athleteId).map((w) => new Date(w.lastAt).getTime()));
     if (now.getTime() - lastTrained > QUIET_DAYS * DAY) continue;
+    if (injuredIds.has(acc.athleteId)) continue;
     const phase = phaseOf.get(acc.athleteId);
     if (phase === "fat_loss" || phase === "reverse_diet") continue;
     const pain = painAt.get(acc.athleteId);
@@ -268,6 +322,7 @@ export async function gatherProgressLook(
 
     const histories: ExerciseHistory[] = [];
     for (const [name, list] of acc.byExercise) {
+      if (modelled.has(`${acc.programId}::${name}`)) continue;
       const ordered = [...list].sort((x, y) => new Date(x.at).getTime() - new Date(y.at).getTime());
       const next = nextForName(name);
       const nextWeights = ((next?.group_workout_exercise_sets ?? []) as any[]).map((s) => s.target_weight).filter((w) => w != null).map(Number);

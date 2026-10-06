@@ -239,6 +239,9 @@ describe("a recent pain or injury note", () => {
     expect(mentionsPain("left knee hurt on the way up")).toBe(true);
     expect(mentionsPain("Felt a tweak in my back")).toBe(true);
     expect(mentionsPain("Strained my shoulder last week")).toBe(true);
+    expect(mentionsPain("sharp pinch in my elbow")).toBe(true);
+    expect(mentionsPain("shoulder popped")).toBe(true);
+    expect(mentionsPain("felt dizzy after")).toBe(true);
   });
   it("is not triggered by ordinary training talk", () => {
     expect(mentionsPain("felt strong, easy set")).toBe(false);

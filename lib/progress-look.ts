@@ -55,7 +55,7 @@ export function isMainLift(tier: Tier | null): boolean {
 
 export function mentionsPain(text: string | null | undefined): boolean {
   if (!text) return false;
-  return /\b(pain|painful|hurt|hurts|hurting|injur\w*|strain\w*|sprain\w*|tweak\w*|pulled|torn|tear|numb\w*|tingl\w*|swell\w*|aching|ache)\b/i.test(text);
+  return /\b(pain|painful|hurt|hurts|hurting|injur\w*|strain\w*|sprain\w*|tweak\w*|pulled|torn|tear|numb\w*|tingl\w*|swell\w*|aching|ache|sharp|pinch\w*|popped|locked|dizz\w*)\b/i.test(text);
 }
 
 // The most recent run of sessions (at least `threshold` of them) at exactly the same top load and reps, or null when the exercise is moving, or a set was

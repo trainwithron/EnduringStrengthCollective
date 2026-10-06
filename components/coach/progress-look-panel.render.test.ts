@@ -96,5 +96,7 @@ describe("the row on Home", () => {
     expect(profile).toContain("Turn this into a goal");
     expect(profile).toContain("fromWords={helpAnswer.answer}");
     expect(readFileSync(new URL("../athlete/goal-proposal-form.tsx", import.meta.url), "utf8")).toContain("fromWords");
+    // the client's words stay in the goal's own label; the coach-editable note starts empty
+    expect(readFileSync(new URL("../athlete/goal-proposal-form.tsx", import.meta.url), "utf8")).toContain('const [priorityNote, setPriorityNote] = useState("");');
   });
 });
