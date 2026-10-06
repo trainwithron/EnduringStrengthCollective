@@ -32,7 +32,7 @@ export function SaveToast() {
 
   return (
     <div
-      className={`fixed bottom-5 right-5 z-40 font-body text-xs font-medium px-3 py-2 shadow-lg transition-opacity duration-200 ${
+      className={`fixed bottom-5 right-5 z-40 max-w-[calc(100vw-2.5rem)] break-words font-body text-xs font-medium px-3 py-2 shadow-lg transition-opacity duration-200 ${
         state.error ? "bg-rust text-graphite" : "bg-positive text-graphite"
       } ${state.visible ? "opacity-100" : "opacity-0 pointer-events-none"}`}
     >

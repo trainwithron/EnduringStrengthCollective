@@ -181,7 +181,7 @@ export function SwappableTerm({
         </>
       )}
       {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-surface border border-rust/40 px-4 py-2 max-w-sm text-center">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-surface border border-rust/40 px-4 py-2 w-max max-w-[calc(100vw-2rem)] text-center break-words">
           <p className="font-body text-xs text-chalk">{toast}</p>
         </div>
       )}
