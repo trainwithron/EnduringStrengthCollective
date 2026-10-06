@@ -17,7 +17,7 @@ export const LIVE_EXTRA = ["0239", "0243", "0245", "0246", "0247"];
 // the invite-join smoke test, because they close access the old code still uses.
 export const PLAN_ORDER = [
   "0248", "0249", "0250", "0251", "0254", "0240", "0241", "0237", "0242", "0236", "0244",
-  "0255", "0256", "0257", "0258", "0259", "0260", "0261", "0262", "0263", "0264", "0265", "0266", "0267",
+  "0255", "0256", "0257", "0258", "0259", "0260", "0261", "0262", "0263", "0264", "0265", "0266", "0267", "0268", "0269",
   "0238", "0252", "0253",
 ];
 
@@ -75,6 +75,8 @@ export async function applyLiveEquivalent(db) {
   }
   // The repo's text of this function differs from live; 0236 and 0248 patch it by exact text, so use the live definition.
   await db.exec(readFileSync(new URL("complete_workout_session.live.sql", fixturesDir), "utf8"));
+  // The live database has a second, identical recompute trigger on set_logs that no repo migration creates (found by reading live read-only).
+  await db.exec("create trigger trg_recompute_workout_log after insert or update or delete on public.set_logs for each row execute function public.recompute_workout_log()");
   return notes;
 }
 

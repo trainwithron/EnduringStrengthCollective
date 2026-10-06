@@ -34,7 +34,9 @@ from (
     ('2026100600264', 'session_credits_coach_only_update', '0264_session_credits_coach_only_update.sql', exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'session_credits' and policyname = 'credits_update_coach')),
     ('2026100600265', 'bookings_coach_only_direct_writes', '0265_bookings_coach_only_direct_writes.sql', exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'bookings' and policyname = 'bookings_update_coach')),
     ('2026100600266', 'client_write_column_guards', '0266_client_write_column_guards.sql', exists (select 1 from pg_trigger where tgname = 'profiles_guard_sensitive_columns')),
-    ('2026100600267', 'audit_trail', '0267_audit_trail.sql', to_regclass('public.audit_log') is not null)
+    ('2026100600267', 'audit_trail', '0267_audit_trail.sql', to_regclass('public.audit_log') is not null),
+    ('2026100600268', 'guard_fixes_and_audit_redaction', '0268_guard_fixes_and_audit_redaction.sql', exists (select 1 from pg_proc where proname = 'guard_athlete_session_insert' and pronamespace = 'public'::regnamespace)),
+    ('2026100600269', 'group_session_fixes', '0269_group_session_fixes.sql', exists (select 1 from pg_proc where proname = 'guard_group_session_bookings' and pronamespace = 'public'::regnamespace))
 ) as v(version, name, file, applied)
 where v.applied
 on conflict (version) do nothing;

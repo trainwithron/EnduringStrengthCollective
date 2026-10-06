@@ -42,6 +42,20 @@ Before applying a batch, rehearse it: `node scripts/sql-tests/rehearsal.mjs` bui
 
 Migrations that need care and must be applied in the documented order: those that drop things (`0252`, `0253`) wait until the code that no longer needs them is live.
 
+### Audit trail purge (break glass)
+
+The audit trail (`audit_log`, migration 0267) is append-only: no API role can change it, and triggers refuse update, delete and truncate. If rows must be removed on purpose (a mistaken entry, a legal deletion request), do it in the Supabase SQL editor, which runs as the database owner, and keep the steps visible:
+
+```sql
+begin;
+alter table public.audit_log disable trigger audit_log_no_update;   -- allows delete of single rows
+delete from public.audit_log where id in (/* the ids */);
+alter table public.audit_log enable trigger audit_log_no_update;
+commit;
+```
+
+Never leave a trigger disabled. Check afterwards: `select tgname, tgenabled from pg_trigger where tgrelid = 'public.audit_log'::regclass and not tgisinternal;` must show both triggers enabled ('O'). Since 0268, blocked rewrites of messages are logged without their text, so there should rarely be anything sensitive to remove.
+
 ## 4. A secret has leaked
 
 Assume the worst: someone has it. Rotate first, investigate second.

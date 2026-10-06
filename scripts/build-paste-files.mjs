@@ -156,6 +156,32 @@ const STEPS = [
       ["the loose self-join policy is still there (0238 is not already applied)", has.policy("group_memberships", "memberships_insert_coach_or_self")],
     ],
   },
+  {
+    n: "10",
+    slug: "0268",
+    title: "0268 guard fixes: a client's new session cannot start pre-flagged, workout totals recompute correctly, audit rows stop copying message text",
+    migrations: ["0268"],
+    sees: "Success. No rows returned.",
+    afterwards: "A client's own new workout always starts as self-logged; editing an imported session still updates its totals; blocked rewrites of messages are recorded without the text; the service role can no longer write the audit log; the duplicate set-logs recompute trigger is gone.",
+    rows: [
+      ["0266 and 0267 are applied (the guards and audit_blocked exist)", `${has.fnName("guard_workout_log_columns")} and ${has.fnName("audit_blocked")} and ${has.table("audit_log")}`],
+      ["recompute_workout_log exists", has.fnName("recompute_workout_log")],
+      ["0268 is not already applied", `not ${has.fnName("guard_athlete_session_insert")}`],
+    ],
+  },
+  {
+    n: "11",
+    slug: "0269",
+    title: "0269 group session fixes: owed on promotion, not after start, credits in the right group, held time cannot be cancelled or double-booked",
+    migrations: ["0269"],
+    sees: "Success. No rows returned.",
+    afterwards: "Group classes behave as designed: the waiting list charges (owed if no sessions), nobody is moved into a started class, the class's hidden booking cannot be cancelled through the ordinary booking functions, and new bookings are checked against classes inside the database.",
+    rows: [
+      ["0263 is applied (group_sessions and discovery_bookings exist)", `${has.table("group_sessions")} and ${has.table("discovery_bookings")}`],
+      ["0248 is applied (bookings.credit_state exists)", has.col("bookings", "credit_state")],
+      ["0269 is not already applied", `not ${has.fnName("guard_group_session_bookings")}`],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -263,6 +289,8 @@ for (const s of STEPS) {
     m("0265", has.policy("bookings", "bookings_update_coach")),
     m("0266", "exists (select 1 from pg_trigger where tgname = 'profiles_guard_sensitive_columns')"),
     m("0267", has.table("audit_log")),
+    m("0268", has.fnName("guard_athlete_session_insert")),
+    m("0269", has.fnName("guard_group_session_bookings")),
   ];
   const values = items.map((i) => `    ('2026100600${i.n.slice(1)}', '${i.file.slice(5, -4)}', '${i.file}', ${i.marker})`).join(",\n");
   const sql = [

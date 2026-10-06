@@ -12,6 +12,8 @@ Re-running is refused by a guard at the top of each file (it raises before chang
 
 | Order | Step | Migrations | Notes |
 |---|---|---|---|
+| A | step10 | 0268 | guard fixes and audit redaction (ready now; prechecks checked against live) |
+| B | step11 | 0269 | group session fixes (ready now; prechecks checked against live) |
 | 1 | **kiosk test** | | passed Oct 5 (see `supabase/ron-test-kiosk-checkin.md`) |
 | 2 | step07 | 0252 | drops the plain-text PIN column; the live site must be commit 0019772 or later |
 | 3 | step08 | 0237, 0242 | |
