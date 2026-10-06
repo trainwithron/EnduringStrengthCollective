@@ -45,3 +45,4 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0272 | yes | yes | 17 | 0271 function permissions: signed-in and server only; 0272 public forms server-only |
 | 0273 | yes | yes | 14 | 0273 groups and organizations: protected columns |
 | 0274 | yes | yes | 11 | 0274 completed workout lock |
+| 0275 | yes | yes | 7 | 0275 a cancelled or moved week of an ongoing schedule stays skipped |

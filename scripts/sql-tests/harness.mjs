@@ -23,7 +23,7 @@ export const PLAN_ORDER = [
   "0270",
   // Closes function permissions (0271), then the two public forms once their server routes are live (0272).
   "0271", "0272",
-  "0273", "0274",
+  "0273", "0274", "0275",
 ];
 
 export function migrationFile(prefix) {
