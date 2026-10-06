@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { checkAndNotifyLowSessionBalance } from "@/lib/notify-low-session-balance";
 
@@ -13,13 +14,14 @@ export function SessionCreditsControl({
   groupId: string;
   initialBalance: number;
 }) {
+  const router = useRouter();
   const [balance, setBalance] = useState(initialBalance);
   const [error, setError] = useState<string | null>(null);
 
   function adjust(delta: number) {
     // A balance is money the client paid for. One stray tap on a small
     // button must not add or remove a session without a second look.
-    const verb = delta < 0 ? "Remove 1 session credit from" : "Add 1 session credit to";
+    const verb = delta < 0 ? "Remove 1 session from" : "Add 1 session to";
     if (!window.confirm(`${verb} this client? Their balance goes from ${balance} to ${balance + delta}.`)) {
       return;
     }
@@ -47,6 +49,8 @@ export function SessionCreditsControl({
           return;
         }
         if (typeof newBalance === "number") setBalance(newBalance);
+        // The ledger and the Assign box above read the same balance; bring them up to date.
+        router.refresh();
         // Only a real spend is worth checking — an increase (a manual
         // top-up) never needs the low-balance staircase.
         if (delta < 0) checkAndNotifyLowSessionBalance(athleteId, groupId);
@@ -57,12 +61,12 @@ export function SessionCreditsControl({
     <div>
       <div className="flex items-center gap-3">
         <span className="font-body text-xs text-steel uppercase tracking-wide">
-          Session credits
+          Sessions left
         </span>
         <button
           type="button"
           onClick={() => adjust(-1)}
-          aria-label="Remove one session credit"
+          aria-label="Remove one session"
           className="w-11 h-11 flex items-center justify-center border border-steel/30 text-steel font-body text-lg active:border-rust active:text-rust transition-colors disabled:opacity-40"
         >
           &minus;
@@ -72,7 +76,7 @@ export function SessionCreditsControl({
         <button
           type="button"
           onClick={() => adjust(1)}
-          aria-label="Add one session credit"
+          aria-label="Add one session"
           className="w-11 h-11 flex items-center justify-center border border-steel/30 text-steel font-body text-lg active:border-rust active:text-rust transition-colors disabled:opacity-40"
         >
           +

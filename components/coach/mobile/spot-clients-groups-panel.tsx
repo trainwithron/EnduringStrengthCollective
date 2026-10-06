@@ -186,6 +186,14 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated }: { groupId: stri
     router.push(`/groups/${client.groupId}/athletes/${client.id}/log`);
   }
 
+  // Opens the client's own page (sessions, schedule, notes). Each one-on-one client lives in their own group, so this is the way to
+  // reach them from here.
+  function openProfileFor(client: ClientOption) {
+    if (busy) return;
+    onNavigated();
+    router.push(`/groups/${client.groupId}/athletes/${client.id}`);
+  }
+
   async function confirmActAsClient() {
     if (!pendingClient || busy) return;
     const client = pendingClient;
@@ -421,6 +429,14 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated }: { groupId: stri
                     className="flex-1 h-9 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-50 active:bg-rust/80"
                   >
                     Log session
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => openProfileFor(c)}
+                    className="h-11 px-3 border border-steel/30 text-chalk font-body text-xs disabled:opacity-50 active:border-rust/50"
+                  >
+                    Profile
                   </button>
                   <button
                     type="button"

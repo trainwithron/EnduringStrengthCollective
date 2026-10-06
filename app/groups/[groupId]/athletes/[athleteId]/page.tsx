@@ -889,9 +889,10 @@ export default async function AthleteProfilePage(
     })
   ) {
     profileFlag = "Logged low readiness today.";
-  } else if (quietTier === "strong") {
+  } else if (signInStatus === "active" && quietTier === "strong") {
+    // Not for someone who has not signed in yet: a client added a minute ago has not "gone quiet".
     profileFlag = "Has gone quiet — worth a personal check-in.";
-  } else if (quietTier === "mild") {
+  } else if (signInStatus === "active" && quietTier === "mild") {
     profileFlag = "Hasn't logged in a while.";
   } else if (habitCompliancePct != null && habitCompliancePct < 50) {
     profileFlag = `Missed ${totalHabitsDue - totalHabitsCompleted} habit${totalHabitsDue - totalHabitsCompleted === 1 ? "" : "s"} this week.`;
@@ -969,8 +970,8 @@ export default async function AthleteProfilePage(
           </Link>
           <VideoCheckinRecorder athleteId={params.athleteId} groupId={params.groupId} coachId={user.id} />
           <Link
-            href={`/groups/${params.groupId}/calendar?client=${params.athleteId}`}
-            className="inline-flex items-center h-9 font-body text-xs text-graphite bg-rust px-3 font-medium"
+            href={`/groups/${params.groupId}/calendar?client=${params.athleteId}&scheduleFor=${params.athleteId}`}
+            className="inline-flex items-center h-11 font-body text-xs text-graphite bg-rust px-3 font-medium"
           >
             Schedule session
           </Link>
@@ -1319,6 +1320,7 @@ export default async function AthleteProfilePage(
           <section className="space-y-4">
             <SettingsGroup label="Billing">
               <SessionCreditsControl
+                key={`credits-${creditsRow?.balance ?? 0}`}
                 athleteId={params.athleteId}
                 groupId={params.groupId}
                 initialBalance={creditsRow?.balance ?? 0}
@@ -1327,6 +1329,7 @@ export default async function AthleteProfilePage(
 
             <SettingsGroup label="Assign sessions">
               <AssignSessionsControl
+                key={`assign-${creditsRow?.balance ?? 0}`}
                 athleteId={params.athleteId}
                 groupId={params.groupId}
                 clientName={profile?.full_name ?? "this client"}

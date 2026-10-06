@@ -67,11 +67,15 @@ export function CoachRosterMobile({
     const now = new Date();
     return members.map((m) => ({
       member: m,
-      tier: computeQuietTier({
-        lastLoggedAt: m.lastWorkoutAt ? new Date(m.lastWorkoutAt) : null,
-        now,
-        trainingDays: trainingDaysByAthleteId.get(m.profileId) ?? null,
-      }),
+      // A client who has not signed in yet has not "gone quiet"; they are still getting started.
+      tier:
+        m.signInStatus && m.signInStatus !== "active"
+          ? ("none" as const)
+          : computeQuietTier({
+              lastLoggedAt: m.lastWorkoutAt ? new Date(m.lastWorkoutAt) : null,
+              now,
+              trainingDays: trainingDaysByAthleteId.get(m.profileId) ?? null,
+            }),
     }));
   }, [members, trainingDaysByAthleteId]);
 
@@ -107,7 +111,7 @@ export function CoachRosterMobile({
   if (members.length === 0) {
     return (
       <p className="font-body text-sm text-steel py-6">
-        No athletes yet. Send an invite to get the first one training.
+        No clients yet. Add one to get started.
       </p>
     );
   }
@@ -200,25 +204,32 @@ function RosterRow({
           <p className="font-body text-sm text-steel">
             {tier !== "none" ? QUIET_TIER_LABEL[tier] : status.text}
           </p>
-          <div className="flex items-center gap-4 pt-2">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-2">
+            <Link
+              href={`/groups/${groupId}/athletes/${member.profileId}`}
+              onClick={close}
+              className="font-body text-sm text-rust min-h-11 inline-flex items-center"
+            >
+              Open profile
+            </Link>
             <Link
               href={`/groups/${groupId}/athletes/${member.profileId}/log`}
               onClick={close}
-              className="font-body text-sm text-rust"
+              className="font-body text-sm text-rust min-h-11 inline-flex items-center"
             >
               Log a session
             </Link>
             <Link
               href={`/groups/${groupId}/messages/${member.profileId}`}
               onClick={close}
-              className="font-body text-sm text-rust"
+              className="font-body text-sm text-rust min-h-11 inline-flex items-center"
             >
               Message
             </Link>
             <Link
               href={`/groups/${groupId}/clients?spotBuilder=${member.profileId}&spotBuilderName=${encodeURIComponent(member.fullName)}`}
               onClick={close}
-              className="font-body text-sm text-rust"
+              className="font-body text-sm text-rust min-h-11 inline-flex items-center"
             >
               Build with AI
             </Link>
