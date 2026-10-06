@@ -16,7 +16,8 @@ import { FinalCta } from "@/components/marketing/final-cta";
 // a coach at a desktop goes to /dashboard. Someone signed in with no
 // group membership yet (e.g. mid-signup) falls through to the marketing
 // page, same as a signed-out visitor — nothing else to send them to.
-export default async function HomePage() {
+export default async function HomePage(props: { searchParams: Promise<{ source?: string }> }) {
+  const searchParams = await props.searchParams;
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -31,6 +32,9 @@ export default async function HomePage() {
       redirect(wantsMobileHome ? `/groups/${membership.group_id}` : "/dashboard");
     }
   }
+
+  // Opened from the installed home-screen icon but not signed in: that person wants to sign in, not read the sales page.
+  if (!user && searchParams.source === "pwa") redirect("/login");
 
   return (
     <main className="min-h-screen">

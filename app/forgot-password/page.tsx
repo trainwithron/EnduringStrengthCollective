@@ -16,13 +16,17 @@ export default function ForgotPasswordPage() {
     setError(null);
 
     const supabase = createBrowserClient();
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
       redirectTo: `${window.location.origin}/set-password`,
     });
 
     setSubmitting(false);
     if (resetError) {
-      setError(resetError.message);
+      setError(
+        /rate limit|too many/i.test(resetError.message)
+          ? "Too many requests. Wait a few minutes and try again."
+          : "We couldn't send that. Check the email address and try again."
+      );
       return;
     }
     setSent(true);

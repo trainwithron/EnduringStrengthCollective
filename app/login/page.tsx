@@ -45,7 +45,8 @@ function LoginForm() {
 
     const supabase = createBrowserClient();
     const { data, error: signInError } = await supabase.auth.signInWithPassword({
-      email,
+      // Phones and autofill often add a trailing space or a capital letter; neither should make the password look wrong.
+      email: email.trim().toLowerCase(),
       password,
     });
 
