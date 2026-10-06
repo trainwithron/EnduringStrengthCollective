@@ -546,6 +546,21 @@ drop table if exists public.client_inactive_events;`,
       ["0282 is not already applied (a signed-in user can still run apply_session_credit_change)", "has_function_privilege('authenticated', 'public.apply_session_credit_change(uuid, uuid, integer, text, text, uuid, uuid)', 'execute')"],
     ],
   },
+  {
+    n: "25",
+    slug: "0283",
+    title: "0283 session length separate from the slot step: a window can keep 60-minute slots with 55-minute sessions (a 5-minute gap), or any length up to the step",
+    migrations: ["0283"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for anyone at once: every existing window has no session length, which means the same as its slot step. After the code deploy, on the Availability page: pick a Session length for all your hours (30, 40, 45, 50, 55, 60 or your own), or set it per window. Slots keep starting every slot step; each booking lasts the session length. For 06:00 to 06:55 then 07:00 to 07:55: windows with a slot every 60 minutes, session length 55, and a buffer of 5 or less under Booking rules.",
+    undo: `alter table public.coach_availability_windows drop constraint if exists coach_availability_windows_session_minutes_range;
+alter table public.coach_availability_windows drop column if exists session_minutes;`,
+    undoWhy: "Only if something about booking times misbehaves after step 25. Removes the session length (every window goes back to sessions as long as the slot step; bookings already made keep their own times).",
+    rows: [
+      ["coach_availability_windows exists", has.table("coach_availability_windows")],
+      ["0283 is not already applied (the session length column is not there yet)", has.noCol("coach_availability_windows", "session_minutes")],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -680,6 +695,7 @@ for (const s of STEPS) {
     m("0279", has.table("booking_requests")),
     m("0280", has.col("session_credits", "expiry_hold_until")),
     m("0281", has.table("client_inactive")),
+    m("0283", has.col("coach_availability_windows", "session_minutes")),
     m("0282", "not has_function_privilege('anon', 'public.book_session(uuid, uuid, uuid, timestamptz, timestamptz)', 'execute') and not has_function_privilege('authenticated', 'public.apply_session_credit_change(uuid, uuid, integer, text, text, uuid, uuid)', 'execute')"),
   ];
   const values = items.map((i) => `    ('2026100600${i.n.slice(1)}', '${i.file.slice(5, -4)}', '${i.file}', ${i.marker})`).join(",\n");
