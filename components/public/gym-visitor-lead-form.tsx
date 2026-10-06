@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { createBrowserClient } from "@/lib/supabase/client";
 
 // equipment_qr_decal_scoping_sept19.md — the walk-in/non-member join
 // CTA. Calls submit_gym_visitor_lead (security-definer RPC, migration
@@ -29,17 +28,16 @@ export function GymVisitorLeadForm({
     if (!fullName.trim() || !contactInfo.trim()) return;
     setSubmitting(true);
     setError(null);
-    const supabase = createBrowserClient();
-    const { error: rpcError } = await supabase.rpc("submit_gym_visitor_lead", {
-      p_organization_id: organizationId,
-      p_exercise_library_id: exerciseLibraryId,
-      p_full_name: fullName,
-      p_contact_info: contactInfo,
-      p_note: note || null,
-    });
+    // Through our own server route (which checks and limits the request), not the database from the browser.
+    const res = await fetch("/api/public/gym-lead", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ organizationId, exerciseLibraryId, fullName, contactInfo, note: note || null }),
+    }).catch(() => null);
+    const data = res ? await res.json().catch(() => ({})) : {};
     setSubmitting(false);
-    if (rpcError) {
-      setError("Something went wrong — try again in a moment.");
+    if (!res || !res.ok) {
+      setError(data.error ?? "Something went wrong. Try again in a moment.");
       return;
     }
     setSubmitted(true);

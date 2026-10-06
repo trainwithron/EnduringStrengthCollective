@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createBrowserClient } from "@/lib/supabase/client";
 
 interface Slot {
   start: string;
@@ -75,26 +74,27 @@ export function DiscoveryBookingFlow({ coachId }: { coachId: string }) {
     }
     setSubmitting(true);
     setFormError(null);
-    const supabase = createBrowserClient();
     const endAt = new Date(
       new Date(selectedSlot.start).getTime() + selectedSlot.durationMinutes * 60000
     );
-    const { error } = await supabase.rpc("book_discovery_call", {
-      p_coach_id: coachId,
-      p_start_at: selectedSlot.start,
-      p_end_at: endAt.toISOString(),
-      p_prospect_name: name.trim(),
-      p_prospect_email: email.trim(),
-      p_prospect_phone: phone.trim() || null,
-      p_message: message.trim() || null,
-    });
+    // Through our own server route (which checks and limits the request), not the database from the browser.
+    const res = await fetch("/api/public/discovery-book", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        coachId,
+        startAt: selectedSlot.start,
+        endAt: endAt.toISOString(),
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim() || null,
+        message: message.trim() || null,
+      }),
+    }).catch(() => null);
+    const data = res ? await res.json().catch(() => ({})) : {};
     setSubmitting(false);
-    if (error) {
-      setFormError(
-        error.message.includes("just taken")
-          ? "That time was just taken — pick another slot."
-          : "Couldn't book that call — try again."
-      );
+    if (!res || !res.ok) {
+      setFormError(data.error ?? "Couldn't book that call. Check your connection and try again.");
       return;
     }
     setConfirmed(selectedSlot);

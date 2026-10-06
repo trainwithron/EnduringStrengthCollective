@@ -19,6 +19,10 @@ export const PLAN_ORDER = [
   "0248", "0249", "0250", "0251", "0254", "0240", "0241", "0237", "0242", "0236", "0244",
   "0255", "0256", "0257", "0258", "0259", "0260", "0261", "0262", "0263", "0264", "0265", "0266", "0267", "0268", "0269",
   "0238", "0252", "0253",
+  // After 0238: live already has 0238 applied, and 0238 re-creates the membership insert policy that 0270 tightens.
+  "0270",
+  // Closes function permissions (0271), then the two public forms once their server routes are live (0272).
+  "0271", "0272",
 ];
 
 export function migrationFile(prefix) {

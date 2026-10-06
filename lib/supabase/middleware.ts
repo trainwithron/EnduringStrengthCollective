@@ -80,6 +80,8 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/discovery-availability/") ||
     // A coach's public booking page and a visitor's private manage link: no account, the routes check and rate-limit themselves.
     pathname.startsWith("/api/public-booking/") ||
+    // The discovery-call and gym QR forms post here with no login; each route validates and rate limits itself.
+    pathname.startsWith("/api/public/") ||
     // Stripe calls this directly with no user session at all — its own
     // signature check is the real auth, same gotcha as /pr/ and /share/
     // above. Without this, every webhook delivery 307s to /login instead

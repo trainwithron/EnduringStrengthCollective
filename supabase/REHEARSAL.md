@@ -40,3 +40,6 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0238 | yes | yes | 24 | invite links: join_group_with_invite, revoked links, closing the loose self-join |
 | 0252 | yes | yes | 29 | 0251/0252 kiosk PINs: hashed, lockout and escalation |
 | 0253 | yes | yes | 23 | 0253 anon share policies closed; 0254 client tag write rules |
+| 0270 | yes | yes | 7 | 0270 group membership insert: a coach can only add their own clients |
+| 0271 | yes | yes | 17 | 0271 function permissions: signed-in and server only; 0272 public forms server-only |
+| 0272 | yes | yes | 17 | 0271 function permissions: signed-in and server only; 0272 public forms server-only |
