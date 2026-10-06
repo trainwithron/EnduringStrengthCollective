@@ -182,6 +182,165 @@ const STEPS = [
       ["0269 is not already applied", `not ${has.fnName("guard_group_session_bookings")}`],
     ],
   },
+  {
+    n: "12",
+    slug: "0270",
+    title: "0270 a coach can only add their own clients to a group (closes the hole that lets any coach add any user)",
+    migrations: ["0270"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing visible changes for normal use: coaches still add their own clients to other groups, owners and admins still add themselves as coach, and invite links still work. A coach can no longer put a stranger into their group to read that person's private details.",
+    undo: `drop policy if exists "memberships_insert_coach_or_self" on public.group_memberships;
+create policy "memberships_insert_coach_or_self" on public.group_memberships for insert
+  to authenticated
+  with check (
+    is_group_coach(group_id)
+    or ((profile_id = (select auth.uid())) and role = 'coach' and is_org_admin_of_group(group_id))
+  );`,
+    undoWhy: "Only if adding a client to a group, or an owner adding themselves as coach, stops working after step 12. Restores the previous rule (the one 0238 created).",
+    rows: [
+      ["0238 is applied (the loose self-join is gone)", `${has.policy("group_memberships", "memberships_insert_coach_or_self")} and not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'group_memberships' and policyname = 'memberships_insert_coach_or_self' and with_check like '%has_valid_group_invite%')`],
+      ["is_coach_of_athlete and is_org_admin_of_group exist", `${has.fnName("is_coach_of_athlete")} and ${has.fnName("is_org_admin_of_group")}`],
+      ["0270 is not already applied", `exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'group_memberships' and policyname = 'memberships_insert_coach_or_self' and with_check not like '%is_coach_of_athlete%')`],
+    ],
+  },
+  {
+    n: "13",
+    slug: "0271",
+    title: "0271 database functions are runnable by signed-in users and the server only (not by the public internet), except the three the public pages call",
+    migrations: ["0271"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing visible changes. Signed-in people, row security and the server keep working. A signed-out visitor can still open an invite page and still use the discovery-call and gym QR forms (those two are closed later, by step 17, after a deploy). Open the live site signed in as a coach and as a client and check Home, the calendar and one booking.",
+    undo: `grant execute on all functions in schema public to public, anon, authenticated, service_role;
+alter default privileges in schema public grant execute on functions to public;
+alter default privileges in schema public grant execute on functions to anon;`,
+    undoWhy: "Only if something breaks that worked before step 13 (for example a page that signs the visitor out and shows 'permission denied for function'). Puts function permissions back exactly as they were (everyone can run everything). Tell Spot which page failed.",
+    rows: [
+      ["the helper functions row security uses exist", `${has.fnName("is_group_coach")} and ${has.fnName("is_group_member")} and ${has.fnName("is_org_member")} and ${has.fnName("is_platform_admin")}`],
+      ["the three public pages' functions exist", `${has.fnName("get_invite_info")} and ${has.fnName("book_discovery_call")} and ${has.fnName("submit_gym_visitor_lead")}`],
+      ["0271 is not already applied (the signed-out role can still run most functions today)", `(select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.prokind = 'f' and has_function_privilege('anon', p.oid, 'execute')) > 10`],
+    ],
+  },
+  {
+    n: "14",
+    slug: "0273",
+    title: "0273 guards on groups and organizations: ownership, the platform fee, moving a group, the one-on-one rule",
+    migrations: ["0273"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing visible changes for normal use: renaming, branding, focus tag, team mode, switching a group's kind and transferring ownership all still work. An organization admin can no longer make themselves the owner with a plain update, and a coach can no longer move a group to another organization or turn a group of several clients into a one-on-one space.",
+    undo: `drop trigger if exists organizations_guard_columns on public.organizations;
+drop trigger if exists groups_guard_columns on public.groups;
+drop function if exists public.guard_organization_columns();
+drop function if exists public.guard_group_columns();`,
+    undoWhy: "Only if renaming a group, saving branding or transferring ownership stops working after step 14. Removes the two guards.",
+    rows: [
+      ["organizations.platform_fee_pct exists and is_platform_admin() exists", `${has.col("organizations", "platform_fee_pct")} and ${has.fn("is_platform_admin()")}`],
+      ["groups.group_kind exists", has.col("groups", "group_kind")],
+      ["0273 is not already applied (no guard triggers yet)", `not exists (select 1 from pg_trigger where tgname in ('organizations_guard_columns', 'groups_guard_columns'))`],
+    ],
+  },
+  {
+    n: "15",
+    slug: "0274",
+    title: "0274 a completed workout is locked against added or deleted sets and against being reopened by the client",
+    migrations: ["0274"],
+    sees: "Success. No rows returned.",
+    afterwards: "Finishing a workout works as before. After Finish a client can no longer add or delete sets of that workout or reopen it (the coach still can, history imports are unaffected). A tab left open that tries to save after Finish shows the existing 'already completed' message.",
+    undo: `create or replace function public.block_athlete_edits_to_completed_session()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_status public.session_status;
+  v_group uuid;
+  v_historical boolean;
+begin
+  -- Internal/admin calls (no signed-in user) and the service role are not blocked.
+  if auth.uid() is null or auth.role() = 'service_role' then
+    return new;
+  end if;
+
+  select s.status, s.group_id, s.is_historical
+    into v_status, v_group, v_historical
+  from public.athlete_sessions s
+  join public.session_exercises se on se.session_id = s.id
+  where se.id = new.session_exercise_id;
+
+  if v_status = 'completed' and not coalesce(v_historical, false)
+     and not coalesce(public.is_group_coach(v_group), false) then
+    raise exception 'This workout was already completed.';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_block_edits_to_completed_session on public.set_logs;
+create trigger trg_block_edits_to_completed_session
+  before update on public.set_logs
+  for each row execute function public.block_athlete_edits_to_completed_session();
+
+create or replace function public.guard_athlete_session_columns()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.role() in ('authenticated', 'anon') and not coalesce(public.is_group_coach(old.group_id), false) then
+    new.logged_by_coach := old.logged_by_coach;
+    new.deduct_session_credit := old.deduct_session_credit;
+    new.booking_id := old.booking_id;
+    new.is_historical := old.is_historical;
+    new.session_type_id := old.session_type_id;
+    new.athlete_id := old.athlete_id;
+    new.group_id := old.group_id;
+    new.workout_id := old.workout_id;
+  end if;
+  return new;
+end;
+$$;`,
+    undoWhy: "Only if finishing or logging a workout breaks after step 15. Puts back the previous rule (only edits are blocked after Finish).",
+    rows: [
+      ["0236 is applied (the completed-workout trigger exists)", `exists (select 1 from pg_trigger where tgname = 'trg_block_edits_to_completed_session')`],
+      ["0266 is applied (the athlete session guard exists)", has.fnName("guard_athlete_session_columns")],
+      ["0274 is not already applied (the lock only covers updates today)", `coalesce((select position('tg_op' in pg_get_functiondef(p.oid)) = 0 from pg_proc p where p.proname = 'block_athlete_edits_to_completed_session' and p.pronamespace = 'public'::regnamespace), false)`],
+    ],
+  },
+  {
+    n: "16",
+    slug: "0275",
+    title: "0275 a client's cancel or move of one week of an ongoing weekly schedule stays skipped (so the nightly top-up does not book it back)",
+    migrations: ["0275"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing visible changes. When a client cancels or moves one session of a no-end-date weekly schedule, that week is no longer booked again the next morning.",
+    undo: `drop trigger if exists bookings_note_series_skip on public.bookings;
+drop function if exists public.note_series_session_skipped();`,
+    undoWhy: "Only if cancelling or moving a booking starts failing after step 16. Removes the trigger.",
+    rows: [
+      ["0259 is applied (recurring_booking_series.skipped_starts and mode exist)", `${has.col("recurring_booking_series", "skipped_starts")} and ${has.col("recurring_booking_series", "mode")}`],
+      ["bookings.recurring_series_id exists", has.col("bookings", "recurring_series_id")],
+      ["0275 is not already applied", `not exists (select 1 from pg_trigger where tgname = 'bookings_note_series_skip')`],
+    ],
+  },
+  {
+    n: "17",
+    slug: "0272",
+    title: "0272 the discovery-call and gym QR functions are server-only (ONLY after the release with the two new server routes is deployed)",
+    migrations: ["0272"],
+    warn: "Do NOT run this until the release that contains /api/public/discovery-book and /api/public/gym-lead is deployed AND step 13 (0271) is applied. If you run it first, the public discovery-call page and the gym QR form show an error until the deploy.",
+    sees: "Success. No rows returned.",
+    afterwards: "The two public forms keep working (they now go through our server). Open /book/<a coach id> and the gym QR form once to confirm. A signed-out visitor can no longer call those two database functions directly.",
+    undo: `grant execute on function public.book_discovery_call(uuid, timestamptz, timestamptz, text, text, text, text) to anon, authenticated;
+grant execute on function public.submit_gym_visitor_lead(uuid, uuid, text, text, text) to anon, authenticated;`,
+    undoWhy: "Only if the public discovery-call page or the gym QR form stops working after step 17. Re-opens those two functions to the browser (the old way).",
+    rows: [
+      ["0271 is applied (the signed-out role cannot run book_session)", `not has_function_privilege('anon', 'public.book_session(uuid, uuid, uuid, timestamptz, timestamptz)', 'execute')`],
+      ["the two functions exist", `${has.fnName("book_discovery_call")} and ${has.fnName("submit_gym_visitor_lead")}`],
+      ["0272 is not already applied (the signed-out role can still run book_discovery_call)", `has_function_privilege('anon', 'public.book_discovery_call(uuid, timestamptz, timestamptz, text, text, text, text)', 'execute')`],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -234,6 +393,19 @@ for (const s of STEPS) {
   writeFileSync(new URL(`${base}-precheck.sql`, outDir), pre);
   const body = s.migrations.map((n) => `${bar}\n-- migration ${index[n]}\n${bar}\n\n${migrationSql(n)}\n`).join("\n");
   writeFileSync(new URL(`${base}.sql`, outDir), `${header(s, "apply")}\n\nbegin;\n\n${guardFor(s)}${body}\ncommit;\n`);
+  if (s.undo) {
+    writeFileSync(
+      new URL(`undo-step${s.n}-${s.slug}.sql`, outDir),
+      [
+        `-- UNDO for step ${s.n} (${s.slug}). ${s.undoWhy}`,
+        '-- WHAT YOU SHOULD SEE: "Success. No rows returned."   Then tell Spot, and do not run the step again until Spot says why it failed.',
+        "begin;",
+        s.undo,
+        "commit;",
+        "",
+      ].join("\n")
+    );
+  }
 }
 // ---- apply-0248.sql: already applied; kept so that running it again can never silently undo 0236 ----
 {
@@ -291,6 +463,12 @@ for (const s of STEPS) {
     m("0267", has.table("audit_log")),
     m("0268", has.fnName("guard_athlete_session_insert")),
     m("0269", has.fnName("guard_group_session_bookings")),
+    m("0270", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'group_memberships' and policyname = 'memberships_insert_coach_or_self' and with_check like '%is_coach_of_athlete%')"),
+    m("0271", "not has_function_privilege('anon', 'public.book_session(uuid, uuid, uuid, timestamptz, timestamptz)', 'execute')"),
+    m("0272", "not has_function_privilege('anon', 'public.book_discovery_call(uuid, timestamptz, timestamptz, text, text, text, text)', 'execute')"),
+    m("0273", "exists (select 1 from pg_trigger where tgname = 'groups_guard_columns')"),
+    m("0274", "coalesce((select position('tg_op' in pg_get_functiondef(p.oid)) > 0 from pg_proc p where p.proname = 'block_athlete_edits_to_completed_session' and p.pronamespace = 'public'::regnamespace), false)"),
+    m("0275", "exists (select 1 from pg_trigger where tgname = 'bookings_note_series_skip')"),
   ];
   const values = items.map((i) => `    ('2026100600${i.n.slice(1)}', '${i.file.slice(5, -4)}', '${i.file}', ${i.marker})`).join(",\n");
   const sql = [

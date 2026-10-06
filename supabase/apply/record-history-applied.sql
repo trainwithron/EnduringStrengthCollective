@@ -36,7 +36,13 @@ from (
     ('2026100600266', 'client_write_column_guards', '0266_client_write_column_guards.sql', exists (select 1 from pg_trigger where tgname = 'profiles_guard_sensitive_columns')),
     ('2026100600267', 'audit_trail', '0267_audit_trail.sql', to_regclass('public.audit_log') is not null),
     ('2026100600268', 'guard_fixes_and_audit_redaction', '0268_guard_fixes_and_audit_redaction.sql', exists (select 1 from pg_proc where proname = 'guard_athlete_session_insert' and pronamespace = 'public'::regnamespace)),
-    ('2026100600269', 'group_session_fixes', '0269_group_session_fixes.sql', exists (select 1 from pg_proc where proname = 'guard_group_session_bookings' and pronamespace = 'public'::regnamespace))
+    ('2026100600269', 'group_session_fixes', '0269_group_session_fixes.sql', exists (select 1 from pg_proc where proname = 'guard_group_session_bookings' and pronamespace = 'public'::regnamespace)),
+    ('2026100600270', 'membership_insert_needs_a_real_client', '0270_membership_insert_needs_a_real_client.sql', exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'group_memberships' and policyname = 'memberships_insert_coach_or_self' and with_check like '%is_coach_of_athlete%')),
+    ('2026100600271', 'function_permissions_signed_in_only', '0271_function_permissions_signed_in_only.sql', not has_function_privilege('anon', 'public.book_session(uuid, uuid, uuid, timestamptz, timestamptz)', 'execute')),
+    ('2026100600272', 'public_forms_only_through_the_server', '0272_public_forms_only_through_the_server.sql', not has_function_privilege('anon', 'public.book_discovery_call(uuid, timestamptz, timestamptz, text, text, text, text)', 'execute')),
+    ('2026100600273', 'group_and_organization_column_guards', '0273_group_and_organization_column_guards.sql', exists (select 1 from pg_trigger where tgname = 'groups_guard_columns')),
+    ('2026100600274', 'completed_workout_lock', '0274_completed_workout_lock.sql', coalesce((select position('tg_op' in pg_get_functiondef(p.oid)) > 0 from pg_proc p where p.proname = 'block_athlete_edits_to_completed_session' and p.pronamespace = 'public'::regnamespace), false)),
+    ('2026100600275', 'series_session_removed_stays_removed', '0275_series_session_removed_stays_removed.sql', exists (select 1 from pg_trigger where tgname = 'bookings_note_series_skip'))
 ) as v(version, name, file, applied)
 where v.applied
 on conflict (version) do nothing;

@@ -45,6 +45,15 @@ for (const s of steps) {
   check(`step ${s.n} (${s.slug}) precheck: ${rows.length} rows, all true` + (bad.length ? ` (FALSE: ${bad.join("; ")})` : ""), rows.length === s.rows && bad.length === 0);
   e = await run(`${base}.sql`);
   check(`step ${s.n} (${s.slug}) applies` + (e ? `: ${e}` : ""), !e);
+  if (Number(s.n) >= 12) {
+    // The newer steps: a precheck run again flags it as already applied, the undo file runs, and the step can then be applied again.
+    const again = await pre(`${base}-precheck.sql`);
+    check(`step ${s.n} precheck run again after applying has a false row ("already applied")`, again.some((r) => !r.ok));
+    const eu = await run(`apply/undo-step${s.n}-${s.slug}.sql`);
+    check(`undo-step${s.n}-${s.slug}.sql runs` + (eu ? ": " + eu : ""), !eu);
+    const ea = await run(`${base}.sql`);
+    check(`step ${s.n} applies again after its undo` + (ea ? ": " + ea : ""), !ea);
+  }
   if (s.n === "06") {
     // The migration-history file records only what is in the database so far (not 0252, 0237, 0238, 0242), and can be run twice.
     await db.exec("create schema if not exists supabase_migrations; create table if not exists supabase_migrations.schema_migrations (version text primary key, statements text[], name text, created_by text, idempotency_key text, rollback text[])");
