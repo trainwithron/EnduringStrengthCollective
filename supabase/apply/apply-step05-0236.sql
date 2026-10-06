@@ -1,7 +1,16 @@
--- STEP 2 of 2 for migration 0236. Run apply-0236-precheck.sql first (after 0248): every row must say ok = true.
--- One transaction. Nothing in it searches existing text: complete_workout_session is replaced as a whole.
+-- STEP 05: 0236 workout session integrity: one log per workout however many times Finish is tapped, no edits to a completed workout, atomic resumable start
+--
+-- Run apply-precheck first (every row ok = true). Then paste THIS file and run it once.
+-- WHAT YOU SHOULD SEE: "Success. No rows returned."
+-- AFTERWARDS: Tapping Finish twice no longer creates a second workout log, post or session charge; a client cannot edit a workout after completing it (the coach still can); Start Workout is one safe step that Resume can pick up.
+-- ON ERROR: it is all or nothing, so nothing was applied. Run   rollback;   once, copy the red error text, and send it back. Do not run the file again.
+-- It contains no text searching, so editor re-indenting cannot break it.
 
 begin;
+
+-- ====================================================================================================
+-- migration 0236_workout_session_integrity.sql
+-- ====================================================================================================
 
 -- Workout logging data integrity, before real clients log every set.
 --
