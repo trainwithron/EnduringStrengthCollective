@@ -80,7 +80,7 @@ export function WorkoutOverviewView({
               exercise={ex}
               athleteId={athleteId}
               groupId={groupId}
-              videoUrl={videoUrlByExerciseId.get(ex.id) ?? ex.youtubeUrl ?? undefined}
+              videoUrl={videoUrlByExerciseId.get(ex.id)}
               lastTime={lastTimeByExercise[ex.exerciseName]}
               goal={goalByExerciseId.get(ex.id)}
             />

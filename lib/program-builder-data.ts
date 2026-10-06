@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEFAULT_TRACKED_FIELDS, mapSetRow } from "./exercise-fields";
+import { findDemo, type DemoRow } from "./exercise-demo";
 import { computeScheduledDates, type VisibilityWindow } from "./program-schedule";
 import { getGroupCoachTimezone, nowInZone } from "./timezone";
 import { computeProgramDayProgress } from "./program-day-progress";
@@ -88,11 +89,8 @@ export async function getProgramBuilderData(
     .select("name, video_path, youtube_url")
     .eq("created_by", coachId);
 
-  const mediaByName = new Map<string, { videoPath: string | null; youtubeUrl: string | null }>();
-  for (const row of libraryRows ?? []) {
-    mediaByName.set(row.name, { videoPath: row.video_path, youtubeUrl: row.youtube_url });
-  }
-  const exerciseLibrary = Array.from(mediaByName.keys()).sort();
+  const demoRows: DemoRow[] = (libraryRows ?? []).map((row: any) => ({ name: row.name, videoPath: row.video_path, youtubeUrl: row.youtube_url }));
+  const exerciseLibrary = Array.from(new Set(demoRows.map((r) => r.name))).sort();
 
   const { data: aliasRows } = await supabase
     .from("exercise_aliases")
@@ -136,7 +134,7 @@ export async function getProgramBuilderData(
 
   const days: BuilderDay[] = (workoutRows ?? []).map((w: any) => {
     const exerciseItems: BuilderExercise[] = (w.group_workout_exercises ?? []).map((ex: any) => {
-      const media = mediaByName.get(ex.exercise_name);
+      const media = findDemo(demoRows, ex.exercise_name);
       return {
         kind: "exercise" as const,
         id: ex.id,

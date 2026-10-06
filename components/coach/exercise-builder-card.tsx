@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { ExerciseNameInput } from "./exercise-name-input";
+import { ExerciseDemoButton } from "@/components/logging/exercise-demo-button";
 import type { AliasEntry } from "@/lib/exercise-matching";
 import { ExerciseMediaPicker } from "./exercise-media-picker";
 import type { BuilderExercise, ExerciseSetTarget } from "@/lib/types";
@@ -901,13 +902,16 @@ export function ExerciseBuilderCard({
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={() => setShowDetails((v) => !v)}
-            className="mt-2 font-body text-xs text-steel active:text-rust transition-colors block"
-          >
-            {showDetails ? "Hide details" : "Edit details"}
-          </button>
+          <div className="mt-2 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setShowDetails((v) => !v)}
+              className="font-body text-xs text-steel active:text-rust transition-colors"
+            >
+              {showDetails ? "Hide details" : "Edit details"}
+            </button>
+            <ExerciseDemoButton compact title={exercise.exerciseName || "Exercise"} youtubeUrl={exercise.youtubeUrl} videoPath={exercise.videoPath} />
+          </div>
 
           {showDetails && (
             <div className="mt-2 pt-2 border-t border-steel/15 space-y-2">
