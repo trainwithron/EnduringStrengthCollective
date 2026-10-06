@@ -13,6 +13,8 @@ import {
   AI_BURST_LIMIT_PER_MINUTE,
   MEAL_SLOT_MONTHLY_CEILING_PER_STEP,
   aiMultiplier,
+  aiInputTooLong,
+  AI_INPUT_LIMITS,
 } from "./ai-usage";
 
 describe("burst policy", () => {
@@ -115,5 +117,19 @@ describe("allowance scaling", () => {
   it("an explicit org scale wins over everything", () => {
     expect(allowanceLimit("program_generation", 0, { exempt: true, scale: 0.1 })).toBe(10);
     expect(allowanceLimit("program_generation", 0, { scale: 2 })).toBe(200);
+  });
+});
+
+describe("input length limits", () => {
+  it("accepts text at the limit and rejects one character over", () => {
+    const max = AI_INPUT_LIMITS.food_log_parse as number;
+    expect(aiInputTooLong("food_log_parse", "a".repeat(max))).toBeNull();
+    expect(aiInputTooLong("food_log_parse", "a".repeat(max + 1))).toMatch(/too long/);
+  });
+  it("names the limit in the message", () => {
+    expect(aiInputTooLong("session_nl", "a".repeat(5000))).toContain(String(AI_INPUT_LIMITS.session_nl));
+  });
+  it("does not limit features with no cap set", () => {
+    expect(aiInputTooLong("coach_briefing", "a".repeat(100000))).toBeNull();
   });
 });

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError } from "@/lib/anthropic-client";
-import { AiRateLimitedError } from "@/lib/ai-usage";
+import { AiRateLimitedError, aiInputTooLong } from "@/lib/ai-usage";
 
 // Natural-language quick-log (calorie_tracking_ux_research_and_plan.md,
 // V1) — mirrors app/api/ai/parse-workout/route.ts's shape closely.
@@ -47,6 +47,8 @@ export async function POST(request: Request) {
   if (!text || typeof text !== "string" || !text.trim()) {
     return NextResponse.json({ error: "Missing food description" }, { status: 400 });
   }
+  const tooLong = aiInputTooLong("food_log_parse", text);
+  if (tooLong) return NextResponse.json({ error: tooLong }, { status: 400 });
 
   try {
     const raw = await callClaude({

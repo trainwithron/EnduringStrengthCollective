@@ -71,6 +71,23 @@ export type AiFeature =
   | "spotter_overarching"
   | "trivia_generate";
 
+// The longest text a person may hand each AI feature. The model is paid for by the length of what is sent, and a pasted wall of text is never what
+// these features are for; the limit also stops one request from costing far more than the allowance assumes.
+export const AI_INPUT_LIMITS: Partial<Record<AiFeature, number>> = {
+  food_log_parse: 600,
+  recipe_parse: 3000,
+  session_nl: 2000,
+  program_chat: 2000,
+  ci_chat_router: 1000,
+};
+
+// A plain message to show when the text is too long, or null when it is fine.
+export function aiInputTooLong(feature: AiFeature, text: string): string | null {
+  const max = AI_INPUT_LIMITS[feature];
+  if (max == null || text.length <= max) return null;
+  return `That's too long. Keep it under ${max} characters and try again.`;
+}
+
 interface FeaturePolicy {
   enforce: boolean;
   burstLimit?: number; // overrides AI_BURST_LIMIT_PER_MINUTE and counts this feature alone

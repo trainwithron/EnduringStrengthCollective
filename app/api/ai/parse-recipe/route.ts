@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError } from "@/lib/anthropic-client";
-import { AiRateLimitedError } from "@/lib/ai-usage";
+import { AiRateLimitedError, aiInputTooLong } from "@/lib/ai-usage";
 
 // Replaces the manual "+ New recipe → fill in every ingredient by hand"
 // flow (live_walkthrough_round2_findings.md — Ron's own read, backed by
@@ -63,6 +63,8 @@ export async function POST(request: Request) {
   if (!description || typeof description !== "string" || !description.trim()) {
     return NextResponse.json({ error: "Missing recipe description" }, { status: 400 });
   }
+  const tooLong = aiInputTooLong("recipe_parse", description);
+  if (tooLong) return NextResponse.json({ error: tooLong }, { status: 400 });
 
   try {
     const raw = await callClaude({

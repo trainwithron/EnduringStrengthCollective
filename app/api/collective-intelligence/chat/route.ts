@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured } from "@/lib/anthropic-client";
-import { AiRateLimitedError } from "@/lib/ai-usage";
+import { AiRateLimitedError, aiInputTooLong } from "@/lib/ai-usage";
 import { validateNoHallucinatedNumbers, validateNoNumbers } from "@/lib/coach-briefing-numeral-guard";
 import { validateNoUnresolvedAthleteNames } from "@/lib/coach-chat-name-guard";
 import {
@@ -103,6 +103,8 @@ export async function POST(request: Request) {
   if (!message || typeof message !== "string" || !message.trim()) {
     return NextResponse.json({ error: "A message is required." }, { status: 400 });
   }
+  const tooLong = aiInputTooLong("ci_chat_router", message);
+  if (tooLong) return NextResponse.json({ error: tooLong }, { status: 400 });
 
   let threadId: string = body.threadId;
   if (!threadId) {

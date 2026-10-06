@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError } from "@/lib/anthropic-client";
-import { AiRateLimitedError } from "@/lib/ai-usage";
+import { AiRateLimitedError, aiInputTooLong } from "@/lib/ai-usage";
 
 // Lightweight NL program builder (coach_mobile_app_redesign_plan.md,
 // locked 2026-09-14) — mirrors parse-food-log's shape almost exactly.
@@ -67,6 +67,8 @@ export async function POST(request: Request) {
   if (!text || typeof text !== "string" || !text.trim()) {
     return NextResponse.json({ error: "Missing description" }, { status: 400 });
   }
+  const tooLong = aiInputTooLong("session_nl", text);
+  if (tooLong) return NextResponse.json({ error: tooLong }, { status: 400 });
 
   try {
     const raw = await callClaude({
