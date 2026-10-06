@@ -175,6 +175,41 @@ export default async function CoachCalendarPage(
         athleteName: b.profiles?.full_name ?? "Client",
       }));
 
+      // The general calendar: this month, every client's sessions on their day (on the coach's clock). It is what the Calendar tab
+      // always opens; one client is chosen afterwards, never first.
+      const generalToday = new Date();
+      const generalMonthMatch = /^(\d{4})-(\d{2})$/.exec(searchParams.month ?? "");
+      const gYear = generalMonthMatch ? Number(generalMonthMatch[1]) : generalToday.getFullYear();
+      const gMonthIndex = generalMonthMatch ? Math.min(11, Math.max(0, Number(generalMonthMatch[2]) - 1)) : generalToday.getMonth();
+      const gPrev = new Date(gYear, gMonthIndex - 1, 1);
+      const gNext = new Date(gYear, gMonthIndex + 1, 1);
+      const gKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      const gMonthStart = new Date(gYear, gMonthIndex, 1, 0, 0, 0);
+      const gMonthEnd = new Date(gYear, gMonthIndex + 1, 1, 0, 0, 0);
+      const { data: monthBookingRows } = await supabase
+        .from("bookings")
+        .select("id, start_at, profiles!bookings_athlete_id_fkey ( full_name )")
+        .eq("coach_id", user.id)
+        .eq("status", "confirmed")
+        .gte("start_at", new Date(gMonthStart.getTime() - 86400000).toISOString())
+        .lt("start_at", new Date(gMonthEnd.getTime() + 86400000).toISOString())
+        .order("start_at", { ascending: true });
+      const sessionsByGeneralDay = new Map<string, { time: string; name: string }[]>();
+      for (const b of (monthBookingRows ?? []) as any[]) {
+        const k = dateKeyInZone(coachTz, new Date(b.start_at));
+        const list = sessionsByGeneralDay.get(k) ?? [];
+        list.push({ time: formatInTimezone(new Date(b.start_at), coachTz, "time"), name: String(b.profiles?.full_name ?? "Client").split(" ")[0] });
+        sessionsByGeneralDay.set(k, list);
+      }
+      const gLeading = new Date(gYear, gMonthIndex, 1).getDay();
+      const gDays = new Date(gYear, gMonthIndex + 1, 0).getDate();
+      const gCells: (Date | null)[] = [
+        ...Array.from({ length: gLeading }, () => null),
+        ...Array.from({ length: gDays }, (_, i) => new Date(gYear, gMonthIndex, i + 1)),
+      ];
+      const sameDay = (a: Date, b: Date) =>
+        a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
       return (
         <main className="min-h-screen bg-graphite text-chalk font-body">
           <CoachMobileShell groupId={params.groupId} groupName={coachGroupName} activeOverride="calendar">
@@ -183,7 +218,51 @@ export default async function CoachCalendarPage(
             </header>
             <div className="px-5 pb-24">
               <ScheduleClientPicker groupId={params.groupId} clients={scheduleClients} />
-              <p className="font-body text-sm text-steel mt-4">Pick a client to see and book their sessions.</p>
+              <div className="flex items-center justify-between mt-3">
+                <Link
+                  href={`/groups/${params.groupId}/calendar?month=${gKey(gPrev)}`}
+                  className="h-11 px-3 inline-flex items-center font-body text-sm text-chalk underline underline-offset-2"
+                >
+                  &larr; {gPrev.toLocaleDateString("en-US", { month: "short" })}
+                </Link>
+                <span className="font-display font-bold uppercase text-base">{monthLabel(gYear, gMonthIndex)}</span>
+                <Link
+                  href={`/groups/${params.groupId}/calendar?month=${gKey(gNext)}`}
+                  className="h-11 px-3 inline-flex items-center font-body text-sm text-chalk underline underline-offset-2"
+                >
+                  {gNext.toLocaleDateString("en-US", { month: "short" })} &rarr;
+                </Link>
+              </div>
+              <p className="font-body text-xs text-steel mt-1">All clients. Tap a day to see its sessions and open times.</p>
+              <div className="grid grid-cols-7 gap-px bg-steel/15 mt-3 border border-steel/15">
+                {WEEKDAY_LABELS.map((label) => (
+                  <div key={label} className="bg-graphite text-center font-body text-xs text-steel uppercase tracking-wide py-1.5">
+                    {label}
+                  </div>
+                ))}
+                {gCells.map((date, i) => {
+                  if (!date) return <div key={i} className="bg-graphite min-h-[56px]" />;
+                  const isToday = sameDay(date, generalToday);
+                  const sessions = sessionsByGeneralDay.get(dateKey(date)) ?? [];
+                  return (
+                    <Link
+                      key={i}
+                      href={`/groups/${params.groupId}/calendar/${dateKey(date)}`}
+                      className={`bg-graphite min-h-[56px] p-1.5 flex flex-col ${isToday ? "ring-1 ring-inset ring-rust" : ""}`}
+                    >
+                      <span className={`font-body text-xs ${isToday ? "text-rust font-bold" : "text-steel"}`}>{date.getDate()}</span>
+                      {sessions.slice(0, 2).map((s, idx) => (
+                        <span key={idx} className="font-body text-[10px] leading-tight text-chalk mt-0.5 truncate">
+                          {s.time} {s.name}
+                        </span>
+                      ))}
+                      {sessions.length > 2 && (
+                        <span className="font-body text-[10px] leading-tight text-rust mt-0.5">+{sessions.length - 2}</span>
+                      )}
+                    </Link>
+                  );
+                })}
+              </div>
 
               <h2 className="font-body text-xs text-steel uppercase tracking-wide mt-8 mb-2">
                 Upcoming sessions

@@ -15,6 +15,8 @@ export interface RosterMember {
   // in the sign-in checklist (active = signed in, the normal case).
   signInStatus?: "not_signed_in" | "invite_created" | "finishing_setup" | "active";
   profileId: string;
+  // On the coach-level phone Clients list: the group this client is opened in (their one-on-one group when they have one).
+  groupId?: string;
   fullName: string;
   avatarUrl: string | null;
   role: MemberRole;

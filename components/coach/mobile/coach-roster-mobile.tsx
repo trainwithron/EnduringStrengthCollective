@@ -29,6 +29,8 @@ export function CoachRosterMobile({
   );
 
   const athleteIdsKey = members.map((m) => m.profileId).join(",");
+  // Each client is opened in their own group; the list can span several.
+  const groupIdsKey = Array.from(new Set(members.map((m) => m.groupId ?? groupId))).join(",");
 
   // computeQuietTier needs each athlete's own active program's schedule
   // to normalize against (same input Dashboard/Calendar already fetch
@@ -47,7 +49,7 @@ export function CoachRosterMobile({
       const { data } = await supabase
         .from("programs")
         .select("athlete_id, training_days")
-        .eq("group_id", groupId)
+        .in("group_id", groupIdsKey.split(","))
         .eq("is_active", true)
         .in("athlete_id", ids);
       if (cancelled) return;
@@ -61,7 +63,7 @@ export function CoachRosterMobile({
     return () => {
       cancelled = true;
     };
-  }, [groupId, athleteIdsKey]);
+  }, [groupIdsKey, athleteIdsKey]);
 
   const withTier = useMemo(() => {
     const now = new Date();
@@ -125,7 +127,7 @@ export function CoachRosterMobile({
           </p>
           <div className="divide-y divide-steel/15 border border-steel/20 rounded-token-lg overflow-hidden">
             {needsAttention.map(({ member, tier }) => (
-              <RosterRow key={member.profileId} groupId={groupId} member={member} tier={tier} />
+              <RosterRow key={member.profileId} groupId={member.groupId ?? groupId} member={member} tier={tier} />
             ))}
           </div>
         </div>
@@ -138,7 +140,7 @@ export function CoachRosterMobile({
               {letter}
             </p>
             {groupedByLetter.get(letter)!.map(({ member, tier }) => (
-              <RosterRow key={member.profileId} groupId={groupId} member={member} tier={tier} />
+              <RosterRow key={member.profileId} groupId={member.groupId ?? groupId} member={member} tier={tier} />
             ))}
           </div>
         ))}
