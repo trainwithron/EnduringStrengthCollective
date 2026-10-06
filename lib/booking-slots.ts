@@ -4,7 +4,11 @@ export interface AvailabilityWindow {
   weekday: number;
   startTime: string; // "HH:MM" or "HH:MM:SS"
   endTime: string;
+  // How often a bookable slot starts.
   slotDurationMinutes: number;
+  // How long a booked session lasts, when that differs from the step (a 55-minute session in 60-minute slots leaves a 5-minute gap). Null or missing
+  // means the same as the step, which is how every window behaved before this setting existed.
+  sessionMinutes?: number | null;
 }
 
 export interface CandidateSlot {
@@ -59,12 +63,14 @@ export function generateSlotsForDate(
   for (const w of windows.filter((w) => w.weekday === date.getDay())) {
     const start = zonedTimeToUtc(dateKey, w.startTime, timezone);
     const end = zonedTimeToUtc(dateKey, w.endTime, timezone);
+    // Slots start every slotDurationMinutes; each one lasts sessionMinutes (default: the same). The session has to fit before the window ends.
+    const length = w.sessionMinutes && w.sessionMinutes > 0 ? w.sessionMinutes : w.slotDurationMinutes;
     let cursor = new Date(start);
-    while (cursor.getTime() + w.slotDurationMinutes * 60000 <= end.getTime()) {
-      const slotEnd = new Date(cursor.getTime() + w.slotDurationMinutes * 60000);
+    while (cursor.getTime() + length * 60000 <= end.getTime()) {
+      const slotEnd = new Date(cursor.getTime() + length * 60000);
       const blocked = blockedRanges.some((b) => overlaps(cursor, slotEnd, b.start, b.end));
       if (!blocked) {
-        slots.push({ start: new Date(cursor), durationMinutes: w.slotDurationMinutes });
+        slots.push({ start: new Date(cursor), durationMinutes: length });
       }
       cursor = new Date(cursor.getTime() + w.slotDurationMinutes * 60000);
     }

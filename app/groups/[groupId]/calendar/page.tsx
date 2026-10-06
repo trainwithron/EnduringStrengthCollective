@@ -1,3 +1,4 @@
+import { fetchSessionMinutes, sessionMinutesFor } from "@/lib/availability-windows";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
@@ -1003,12 +1004,14 @@ export default async function CoachCalendarPage(
 
   const timezone = coachProfile?.timezone ?? DEFAULT_COACH_TIMEZONE;
 
+  const sessionIndex = await fetchSessionMinutes(supabase, [user.id]);
   const availabilityWindows = (windowRows ?? []).map((w) => ({
     id: w.id,
     weekday: w.weekday,
     startTime: w.start_time,
     endTime: w.end_time,
     slotDurationMinutes: w.slot_duration_minutes,
+    sessionMinutes: sessionMinutesFor(sessionIndex, user.id, w) ?? null,
   }));
 
   const blockedRanges = (exceptionRows ?? []).map((e) => ({

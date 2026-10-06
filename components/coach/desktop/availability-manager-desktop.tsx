@@ -18,24 +18,33 @@ const toRow = (d: any): AvailabilityWindowRow => ({
   startTime: d.start_time,
   endTime: d.end_time,
   slotDurationMinutes: d.slot_duration_minutes,
+  sessionMinutes: d.session_minutes ?? null,
 });
 
 const inputCls = "h-9 px-2 bg-surface border border-steel/30 text-chalk font-body text-xs";
 
 // The coach's recurring weekly hours: add, change (day, start, end, minutes per session), copy to other days, delete. Changing hours never touches a
 // session that is already booked; it only changes which times can be booked next.
+// The session length is separate from how often slots start (a 55-minute session in 60-minute slots leaves a 5-minute gap). It needs the 0283 database
+// update: until that is applied `sessionLengthEnabled` is false and the page works exactly as before.
 export function AvailabilityManagerDesktop({
   coachId,
   initialWindows,
+  sessionLengthEnabled = false,
 }: {
   coachId: string;
   initialWindows: AvailabilityWindowRow[];
+  sessionLengthEnabled?: boolean;
 }) {
+  const COLS = sessionLengthEnabled
+    ? "id, weekday, start_time, end_time, slot_duration_minutes, session_minutes"
+    : "id, weekday, start_time, end_time, slot_duration_minutes";
   const [windows, setWindows] = useState(initialWindows);
   const [weekday, setWeekday] = useState("1");
   const [startTime, setStartTime] = useState("17:00");
   const [endTime, setEndTime] = useState("20:00");
   const [slotDuration, setSlotDuration] = useState("60");
+  const [sessionInput, setSessionInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,7 +59,7 @@ export function AvailabilityManagerDesktop({
   async function handleAdd() {
     setError(null);
     const problem = validateWindow(
-      { weekday: Number(weekday), startTime, endTime, slotMinutes: Number(slotDuration) },
+      { weekday: Number(weekday), startTime, endTime, slotMinutes: Number(slotDuration), sessionMinutes: sessionLengthEnabled && sessionInput.trim() ? Number(sessionInput) : null },
       windows.map((w) => ({ id: w.id, weekday: w.weekday, startTime: w.startTime, endTime: w.endTime }))
     );
     if (problem) {
@@ -67,8 +76,9 @@ export function AvailabilityManagerDesktop({
         start_time: startTime,
         end_time: endTime,
         slot_duration_minutes: Number(slotDuration),
+        ...(sessionLengthEnabled && sessionInput.trim() ? { session_minutes: Number(sessionInput) } : {}),
       })
-      .select("id, weekday, start_time, end_time, slot_duration_minutes")
+      .select(COLS)
       .single();
 
     if (data) {
@@ -96,7 +106,7 @@ export function AvailabilityManagerDesktop({
     setCopyingId(null);
     setNotice(null);
     setEditingId(w.id);
-    setDraft({ weekday: w.weekday, startTime: w.startTime.slice(0, 5), endTime: w.endTime.slice(0, 5), slotMinutes: w.slotDurationMinutes });
+    setDraft({ weekday: w.weekday, startTime: w.startTime.slice(0, 5), endTime: w.endTime.slice(0, 5), slotMinutes: w.slotDurationMinutes, sessionMinutes: w.sessionMinutes ?? null });
   }
 
   async function saveEdit() {
@@ -115,9 +125,15 @@ export function AvailabilityManagerDesktop({
     const supabase = createBrowserClient();
     const { data, error: updateError } = await supabase
       .from("coach_availability_windows")
-      .update({ weekday: draft.weekday, start_time: draft.startTime, end_time: draft.endTime, slot_duration_minutes: draft.slotMinutes })
+      .update({
+        weekday: draft.weekday,
+        start_time: draft.startTime,
+        end_time: draft.endTime,
+        slot_duration_minutes: draft.slotMinutes,
+        ...(sessionLengthEnabled ? { session_minutes: draft.sessionMinutes ?? null } : {}),
+      })
       .eq("id", editingId)
-      .select("id, weekday, start_time, end_time, slot_duration_minutes")
+      .select(COLS)
       .single();
     setRowBusy(false);
     if (updateError || !data) {
@@ -160,9 +176,10 @@ export function AvailabilityManagerDesktop({
           start_time: w.startTime,
           end_time: w.endTime,
           slot_duration_minutes: w.slotDurationMinutes,
+          ...(sessionLengthEnabled && w.sessionMinutes ? { session_minutes: w.sessionMinutes } : {}),
         }))
       )
-      .select("id, weekday, start_time, end_time, slot_duration_minutes");
+      .select(COLS);
     setRowBusy(false);
     if (insertError || !data) {
       setRowError("That didn't save. Nothing was changed. Try again.");
@@ -182,6 +199,13 @@ export function AvailabilityManagerDesktop({
         <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
           Recurring hours
         </h2>
+        {sessionLengthEnabled && windows.length > 0 && (
+          <SessionLengthForAll
+            coachId={coachId}
+            current={Array.from(new Set(windows.map((w) => w.sessionMinutes ?? null)))}
+            onChanged={(minutes) => setWindows((prev) => prev.map((w) => ({ ...w, sessionMinutes: minutes })))}
+          />
+        )}
         {notice && (
           <p className="font-body text-xs text-chalk border border-steel/30 bg-surface p-2 mb-3" role="status">
             {notice}
@@ -239,7 +263,7 @@ export function AvailabilityManagerDesktop({
                             <input type="time" value={draft.endTime} onChange={(e) => setDraft({ ...draft, endTime: e.target.value })} className={inputCls} />
                           </label>
                           <label className="flex flex-col gap-1">
-                            <span className="font-body text-xs text-steel uppercase tracking-wide">Minutes/session</span>
+                            <span className="font-body text-xs text-steel uppercase tracking-wide">{sessionLengthEnabled ? "Slot every (min)" : "Minutes/session"}</span>
                             <input
                               type="number"
                               min={5}
@@ -248,6 +272,19 @@ export function AvailabilityManagerDesktop({
                               className={`${inputCls} w-24`}
                             />
                           </label>
+                          {sessionLengthEnabled && (
+                            <label className="flex flex-col gap-1">
+                              <span className="font-body text-xs text-steel uppercase tracking-wide">Session (min)</span>
+                              <input
+                                type="number"
+                                min={5}
+                                value={draft.sessionMinutes ?? ""}
+                                placeholder="Same"
+                                onChange={(e) => setDraft({ ...draft, sessionMinutes: e.target.value === "" ? null : Number(e.target.value) })}
+                                className={`${inputCls} w-24`}
+                              />
+                            </label>
+                          )}
                           <button type="button" onClick={saveEdit} disabled={rowBusy} className="h-9 px-4 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40">
                             Save
                           </button>
@@ -275,7 +312,9 @@ export function AvailabilityManagerDesktop({
                           {w.startTime.slice(0, 5)}–{w.endTime.slice(0, 5)}
                         </td>
                         <td className="py-3 font-body text-sm text-steel">
-                          {w.slotDurationMinutes} min
+                          {w.sessionMinutes && w.sessionMinutes !== w.slotDurationMinutes
+                            ? `${w.sessionMinutes} min, a slot every ${w.slotDurationMinutes} min`
+                            : `${w.slotDurationMinutes} min`}
                         </td>
                         <td className="py-3 text-right whitespace-nowrap">
                           <button
@@ -395,7 +434,7 @@ export function AvailabilityManagerDesktop({
         </label>
         <label className="flex flex-col gap-1">
           <span className="font-body text-xs text-steel uppercase tracking-wide">
-            Minutes/session
+            {sessionLengthEnabled ? "Slot every (minutes)" : "Minutes/session"}
           </span>
           <input
             type="number"
@@ -405,6 +444,19 @@ export function AvailabilityManagerDesktop({
             className={inputCls}
           />
         </label>
+        {sessionLengthEnabled && (
+          <label className="flex flex-col gap-1">
+            <span className="font-body text-xs text-steel uppercase tracking-wide">Session length (minutes)</span>
+            <input
+              type="number"
+              min={5}
+              value={sessionInput}
+              placeholder="Same as the slot"
+              onChange={(e) => setSessionInput(e.target.value)}
+              className={inputCls}
+            />
+          </label>
+        )}
         <button
           type="button"
           onClick={handleAdd}
@@ -415,6 +467,77 @@ export function AvailabilityManagerDesktop({
         </button>
         {error && <p className="font-body text-xs text-rust">{error}</p>}
       </div>
+    </div>
+  );
+}
+
+const PRESETS = [30, 40, 45, 50, 55, 60];
+
+// One control for the common case: "my sessions are 55 minutes" for every window at once. A window can still differ (edit it on its row).
+function SessionLengthForAll({ coachId, current, onChanged }: { coachId: string; current: (number | null)[]; onChanged: (minutes: number | null) => void }) {
+  const [custom, setCustom] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const single = current.length === 1 ? current[0] : undefined;
+
+  async function apply(minutes: number | null) {
+    if (minutes != null && (!Number.isInteger(minutes) || minutes < 5 || minutes > 480)) {
+      setErr("Session length must be a whole number from 5 to 480 minutes.");
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    const supabase = createBrowserClient();
+    const { error } = await supabase.from("coach_availability_windows").update({ session_minutes: minutes }).eq("coach_id", coachId);
+    setBusy(false);
+    if (error) {
+      setErr("That didn't save. Nothing was changed. Try again.");
+      return;
+    }
+    onChanged(minutes);
+  }
+
+  return (
+    <div className="border border-steel/20 p-3 mb-3">
+      <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Session length for all your hours</p>
+      <div className="flex flex-wrap items-center gap-2">
+        {PRESETS.map((m) => (
+          <button
+            key={m}
+            type="button"
+            disabled={busy}
+            aria-pressed={single === m}
+            onClick={() => apply(m)}
+            className={`h-9 px-3 border font-body text-xs disabled:opacity-40 ${single === m ? "border-rust bg-rust/10 text-chalk" : "border-steel/30 text-steel"}`}
+          >
+            {m} min
+          </button>
+        ))}
+        <input
+          type="number"
+          min={5}
+          value={custom}
+          onChange={(e) => setCustom(e.target.value)}
+          placeholder="Other"
+          aria-label="Other session length in minutes"
+          className={`${inputCls} w-20`}
+        />
+        <button type="button" disabled={busy || !custom.trim()} onClick={() => apply(Number(custom))} className="h-9 px-3 border border-steel/30 text-chalk font-body text-xs disabled:opacity-40">
+          Set
+        </button>
+        <button type="button" disabled={busy || single === null} onClick={() => apply(null)} className="h-9 px-3 text-steel font-body text-xs underline underline-offset-2 disabled:opacity-40">
+          Same as the slot
+        </button>
+      </div>
+      <p className="font-body text-xs text-steel mt-2">
+        Slots keep starting on your slot step; each booking lasts this long. A 55-minute session in 60-minute slots leaves a 5-minute gap. Set the gap rule (buffer) under Booking rules.
+      </p>
+      {current.length > 1 && <p className="font-body text-xs text-steel mt-1">Your windows currently differ; picking a length sets it on all of them.</p>}
+      {err && (
+        <p className="font-body text-xs text-rust mt-2" role="alert">
+          {err}
+        </p>
+      )}
     </div>
   );
 }

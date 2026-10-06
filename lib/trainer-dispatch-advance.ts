@@ -1,3 +1,4 @@
+import { fetchSessionMinutes, sessionMinutesFor } from "@/lib/availability-windows";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { findAndRankAvailableTrainers } from "./trainer-dispatch-gather";
 import { computeStepExpiry, findMatchingSlotForTrainer, resolveLocalDateForInstant, type GoalType } from "./trainer-dispatch";
@@ -144,11 +145,13 @@ export async function acceptDispatchStep(supabase: SupabaseClient, stepId: strin
     .from("coach_availability_windows")
     .select("weekday, start_time, end_time, slot_duration_minutes")
     .eq("coach_id", step.trainer_id);
+  const sessionIndex = await fetchSessionMinutes(supabase, [step.trainer_id]);
   const windows: AvailabilityWindow[] = (windowRows ?? []).map((w) => ({
     weekday: w.weekday,
     startTime: w.start_time,
     endTime: w.end_time,
     slotDurationMinutes: w.slot_duration_minutes,
+    sessionMinutes: sessionMinutesFor(sessionIndex, step.trainer_id, w),
   }));
   const localDate = resolveLocalDateForInstant(requestedStartAt, timezone);
   const { data: exceptionRows } = await supabase

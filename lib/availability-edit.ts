@@ -5,7 +5,8 @@ export interface WindowDraft {
   weekday: number; // 0 = Sunday .. 6 = Saturday
   startTime: string; // "HH:MM" or "HH:MM:SS"
   endTime: string;
-  slotMinutes: number; // how often a bookable slot starts (and, today, how long a session lasts)
+  slotMinutes: number; // how often a bookable slot starts (and, unless sessionMinutes is set, how long a session lasts)
+  sessionMinutes?: number | null; // how long a booked session lasts when that differs from the step (a 55-minute session in 60-minute slots)
 }
 
 export interface ExistingWindow {
@@ -39,6 +40,12 @@ export function validateWindow(draft: WindowDraft, others: ExistingWindow[], ign
     return `Minutes per session must be a whole number from ${MIN_SLOT_MINUTES} to ${MAX_SLOT_MINUTES}.`;
   }
   if (draft.slotMinutes > end - start) return "That session is longer than the whole window.";
+  if (draft.sessionMinutes != null) {
+    if (!Number.isInteger(draft.sessionMinutes) || draft.sessionMinutes < MIN_SLOT_MINUTES || draft.sessionMinutes > MAX_SLOT_MINUTES) {
+      return `Session length must be a whole number from ${MIN_SLOT_MINUTES} to ${MAX_SLOT_MINUTES} minutes.`;
+    }
+    if (draft.sessionMinutes > draft.slotMinutes) return "A session can't be longer than the time between slots.";
+  }
   const clash = others.find((o) => o.id !== ignoreId && windowsOverlap(draft, o));
   if (clash) return "That overlaps another window on the same day. Change or delete the other one first.";
   return null;

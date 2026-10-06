@@ -40,3 +40,14 @@ describe("copyTargets", () => {
     expect(copyTargets({ weekday: 1, startTime: "06:00", endTime: "17:00" }, [2, 3], [])).toEqual({ create: [2, 3], skipped: [] });
   });
 });
+
+describe("session length", () => {
+  it("is optional, whole minutes, and never longer than the time between slots", () => {
+    const base = { weekday: 3, startTime: "06:00", endTime: "17:00", slotMinutes: 60 };
+    expect(validateWindow({ ...base, sessionMinutes: 55 }, [])).toBeNull();
+    expect(validateWindow({ ...base, sessionMinutes: null }, [])).toBeNull();
+    expect(validateWindow({ ...base, sessionMinutes: 60 }, [])).toBeNull();
+    expect(validateWindow({ ...base, sessionMinutes: 90 }, [])).toMatch(/longer than the time between slots/);
+    expect(validateWindow({ ...base, sessionMinutes: 2 }, [])).toMatch(/whole number/);
+  });
+});
