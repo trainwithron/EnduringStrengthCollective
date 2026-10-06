@@ -4,19 +4,13 @@ Each step has two files: `apply-stepNN-...-precheck.sql` (read-only, every row m
 
 ## Already applied. NEVER re-run these.
 
-0264, 0265, 0266, 0253, 0248, 0267 (the files in `supabase/`), and steps 01 to 09 (0236, 0249, 0250, 0254, 0240, 0241, 0244, 0255 to 0263, 0251, 0252, 0237, 0242, 0238), applied by hand after passing every precheck. Steps 07 to 09 were confirmed live on Oct 5 by a read-only check of the database.
+0264, 0265, 0266, 0253, 0248, 0267 (the files in `supabase/`), and steps 01 to 11 (0236, 0249, 0250, 0254, 0240, 0241, 0244, 0255 to 0263, 0251, 0252, 0237, 0242, 0238, 0268, 0269), applied by hand after passing every precheck, plus `record-history-applied.sql`. Steps 07 to 09 were confirmed live on Oct 5 by a read-only check of the database; 10, 11 and the history file were applied by Ron and verified afterwards.
 
 Re-running is refused by a guard at the top of each file (it raises before changing anything), but do not rely on it. Why it matters most for `apply-0248.sql`: it replaces `complete_workout_session`, so running it again would silently undo 0236's protection against a double Finish; its first statement checks that the live function is still the 0248 version and refuses otherwise. 0258, 0261, 0262 and 0263 are plain create-table/policy files: a second run would only error, but never re-paste them. (0264, 0265, 0266, 0267, 0253 are re-runnable by design; if you re-run 0266 run 0267 again straight after, because 0266 re-creates the guards without the audit logging.)
 
-## Still to run, in this order
+## Still to run
 
-| Order | Step | Migrations | Notes |
-|---|---|---|---|
-| 1 | step10 | 0268 | guard fixes and audit redaction. Not applied yet (checked live Oct 5). Before the deploy. |
-| 2 | step11 | 0269 | group session fixes. Not applied yet (checked live Oct 5). Before the deploy. |
-| 3 | `record-history-applied.sql` | | after 1 and 2; changes no tables |
-
-`undo-step09-0238.sql` stays only as the undo for step 09.
+Nothing. Every migration through 0269 is applied.
 
 ## Migration history (not applied yet)
 
