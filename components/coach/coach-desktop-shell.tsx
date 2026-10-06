@@ -25,6 +25,7 @@ import {
   Home,
   MonitorPlay,
   Activity,
+  MoreHorizontal,
   CalendarClock,
   Mail,
   Trophy,
@@ -46,6 +47,7 @@ import { DownloadAppButton } from "@/components/coach/desktop/download-app-butto
 import { FeedbackButton } from "@/components/feedback/feedback-button";
 import { ClientFinder } from "@/components/coach/desktop/client-finder";
 import { HeaderNotificationBell } from "@/components/notifications/header-bell";
+import { WorkspaceMenu } from "@/components/coach/desktop/workspace-menu";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { TerminologyProvider } from "@/components/coach/terminology-provider";
 import { SwappableTerm } from "@/components/coach/swappable-term";
@@ -149,11 +151,15 @@ export function CoachDesktopShell({
   groupId,
   groupName,
   active,
+  coachLevel = false,
   children,
 }: {
   groupId: string;
   groupName: string;
   active: Active;
+  // Home and other coach-level pages: the page belongs to the coach, not to the group used to anchor the rail's links. The business name is shown
+  // instead of the group's, and no client or group identity is badged.
+  coachLevel?: boolean;
   children: React.ReactNode;
 }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -303,7 +309,9 @@ export function CoachDesktopShell({
   // own sidebar to somewhere real instead of showing no nav at all.
   // Non-httpOnly on purpose — this is UI convenience, not access control,
   // and the server-rendered Home page needs to read it via cookies().
+  // A one-on-one client group is never remembered: Home would anchor on a client. The cookie keeps the last team or social group.
   useEffect(() => {
+    if (coachLevel || groupKind === null || groupKind === "one_on_one") return;
     try {
       document.cookie = `last_group=${encodeURIComponent(
         JSON.stringify({ id: groupId, name: groupName })
@@ -311,7 +319,7 @@ export function CoachDesktopShell({
     } catch {
       // Non-fatal — Home just falls back to its minimal shell.
     }
-  }, [groupId, groupName]);
+  }, [groupId, groupName, groupKind, coachLevel]);
 
   // Organization branding (button shape, colors, fonts, logo) is now
   // applied once at the app root (app/layout.tsx) as CSS custom
@@ -445,30 +453,11 @@ export function CoachDesktopShell({
     // roster-wide insights page every coach can use, not just team-mode
     // groups — gating it behind a group would hide something that's
     // reachable today for anyone who isn't running a team sport.
-    { key: "dashboard", label: "Dashboard", href: `/groups/${groupId}/dashboard`, icon: LayoutDashboard },
-    { key: "team-performance", label: "Team Performance", href: `/groups/${groupId}/team-performance`, icon: Activity },
+    // The rail is short and coach-level: Clients, Calendar, Messages, Programs, Nutrition, Business (Home and Settings sit around it).
+    // Everything else is under "More tools". The old group Dashboard entry is gone from the rail (Home is the dashboard); it is under More tools.
     { key: "clients", label: "Clients", href: `/groups/${groupId}/clients`, icon: Users, badge: clientsUnread, termKey: "client", termForm: "plural" },
-    { key: "messages", label: "Messages", href: `/groups/${groupId}/messages`, icon: Mail, badge: messagesUnread },
-    // Real cleanup from Ron: a Team Feed only makes sense with an actual
-    // team on the other end of it — a 1-on-1 group is one specific
-    // client, so this entry (and its unread badge) is hidden entirely
-    // rather than showing an empty/meaningless feed for a "team" of one.
-    // Gated on a resolved (non-null) groupKind, not just "!== one_on_one"
-    // — groupKind starts null until the effect above resolves, and null
-    // !== "one_on_one" is true, so the old check let Team Feed flash on
-    // every load of a real 1-on-1 group before disappearing a moment
-    // later. Withholding it during that brief unresolved window is a
-    // much smaller, more honest gap than showing-then-yanking a nav item.
-    ...(groupKind !== null && groupKind !== "one_on_one"
-      ? [{ key: "feed" as const, label: "Team Feed", href: `/groups/${groupId}/feed`, icon: MessagesSquare, badge: feedUnread }]
-      : []),
     { key: "calendar", label: "Calendar", href: `/groups/${groupId}/calendar`, icon: CalendarDays },
-
-    // Build — creation/authoring tools, kept as their own adjacent
-    // collapsible groups (not merged into one literal "Build" super-
-    // group) so this reuses the exact same NavGroup shape/behavior
-    // already proven for Business, rather than inventing nested
-    // sub-sections the component doesn't support today.
+    { key: "messages", label: "Messages", href: `/groups/${groupId}/messages`, icon: Mail, badge: messagesUnread },
     {
       label: "Programming",
       icon: LayoutGrid,
@@ -486,48 +475,40 @@ export function CoachDesktopShell({
         { key: "tools", label: "Macro Calculator", href: `/groups/${groupId}/tools/macro-calculator`, icon: Calculator },
       ],
     },
-    ...(teamMode
-      ? [
-          {
-            label: "Team",
-            icon: ClipboardList,
-            items: [
-              { key: "team" as const, label: "Depth Chart", href: `/groups/${groupId}/team`, icon: ClipboardList },
-              { key: "team-calendar" as const, label: "Team Calendar", href: `/groups/${groupId}/team/calendar`, icon: CalendarDays },
-            ],
-          },
-        ]
-      : []),
-
-    // Business — unchanged, plus Availability (real bug fix: this route
-    // existed with no nav entry anywhere, reachable only by typing the
-    // URL directly).
     {
       label: "Business",
       icon: TrendingUp,
       items: [
         { key: "business", label: "Overview", href: `/groups/${groupId}/business`, icon: TrendingUp },
         { key: "packages", label: "Packages", href: `/groups/${groupId}/business/packages`, icon: Layers },
-        { key: "waiver", label: "Waiver", href: `/groups/${groupId}/business/waiver`, icon: ClipboardList },
         { key: "availability", label: "Availability", href: `/groups/${groupId}/availability`, icon: CalendarClock },
+        { key: "session-types", label: "Session Types", href: `/groups/${groupId}/business/session-types`, icon: Tag },
+      ],
+    },
+    {
+      label: "More tools",
+      icon: MoreHorizontal,
+      items: [
+        { key: "dashboard", label: "Group dashboard", href: `/groups/${groupId}/dashboard`, icon: LayoutDashboard },
+        { key: "team-performance", label: "Team Performance", href: `/groups/${groupId}/team-performance`, icon: Activity },
+        ...(groupKind !== null && groupKind !== "one_on_one"
+          ? [{ key: "feed" as const, label: "Team Feed", href: `/groups/${groupId}/feed`, icon: MessagesSquare, badge: feedUnread }]
+          : []),
+        ...(teamMode
+          ? [
+              { key: "team" as const, label: "Depth Chart", href: `/groups/${groupId}/team`, icon: ClipboardList },
+              { key: "team-calendar" as const, label: "Team Calendar", href: `/groups/${groupId}/team/calendar`, icon: CalendarDays },
+            ]
+          : []),
+        { key: "waiver", label: "Waiver", href: `/groups/${groupId}/business/waiver`, icon: ClipboardList },
         { key: "booking-page", label: "Booking Page", href: `/groups/${groupId}/business/booking-page`, icon: Link2 },
         { key: "group-sessions", label: "Group Sessions", href: `/groups/${groupId}/group-sessions`, icon: Users2 },
-        { key: "support", label: "Support", href: `/groups/${groupId}/business/support`, icon: HeartHandshake },
         { key: "leads", label: "Leads", href: `/groups/${groupId}/business/leads`, icon: UserPlus },
         { key: "sms-settings", label: "SMS Notifications", href: `/groups/${groupId}/business/sms-settings`, icon: MessageCircle },
         { key: "zapier", label: "Zapier", href: `/groups/${groupId}/business/zapier`, icon: Zap },
         { key: "session-ledger", label: "Session Ledger", href: `/groups/${groupId}/business/session-ledger`, icon: Wallet },
-        { key: "session-types", label: "Session Types", href: `/groups/${groupId}/business/session-types`, icon: Tag },
         { key: "branding", label: "Organization", href: `/groups/${groupId}/branding`, icon: Palette },
-      ],
-    },
-
-    // Engage — lighter, occasional-use surfaces, no longer sitting
-    // between Team Feed and Calendar the way they used to.
-    {
-      label: "Engage",
-      icon: Flag,
-      items: [
+        { key: "support", label: "Support", href: `/groups/${groupId}/business/support`, icon: HeartHandshake },
         { key: "challenges", label: "Challenges", href: `/groups/${groupId}/challenges`, icon: Flag },
         { key: "records", label: "Hall of Fame", href: `/groups/${groupId}/records`, icon: Trophy },
         { key: "resources", label: "Resources", href: `/groups/${groupId}/resources`, icon: HeartHandshake },
@@ -629,21 +610,22 @@ export function CoachDesktopShell({
               is exactly the confusion that led to the org-scoping bug this
               indicator exists to guard against going forward. Only renders
               once the org name has loaded, so it never flashes empty. */}
-          {orgName && (
+          {orgName && !coachLevel && (
             <>
-              <span
-                className="hidden sm:inline font-body text-xs md:text-sm text-steel truncate max-w-[10rem] md:max-w-[16rem]"
-                title={orgName}
-              >
-                {orgName}
-              </span>
+              <div className="hidden sm:block min-w-0">
+                <WorkspaceMenu groupId={groupId} orgName={orgName} />
+              </div>
               <ChevronRight className="hidden sm:inline w-3.5 h-3.5 text-steel shrink-0" />
             </>
           )}
-          <p className="font-display font-bold text-lg md:text-2xl uppercase tracking-wide truncate">
-            {groupName}
-          </p>
-          {groupKind && (
+          {coachLevel && orgName ? (
+            <WorkspaceMenu groupId={groupId} orgName={orgName} large />
+          ) : (
+            <p className="font-display font-bold text-lg md:text-2xl uppercase tracking-wide truncate">
+              {groupName}
+            </p>
+          )}
+          {groupKind && !coachLevel && (
             <span
               className={`shrink-0 font-body text-xs uppercase tracking-wide px-1.5 py-0.5 border ${
                 groupKind === "one_on_one"

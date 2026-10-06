@@ -153,7 +153,7 @@ export async function getCoachDashboardData(
   ] = await Promise.all([
     supabase
       .from("group_memberships")
-      .select("group_id, profile_id, monthly_rate, joined_at, profiles ( full_name )")
+      .select("group_id, profile_id, monthly_rate, joined_at, profiles ( full_name, claimed_at )")
       .in("group_id", allGroupIds)
       .eq("role", "athlete"),
     supabase
@@ -337,7 +337,7 @@ export async function getCoachDashboardData(
   // them once, not once per membership.
   const athleteByProfileId = new Map<
     string,
-    { profileId: string; groupId: string; groupName: string; fullName: string; monthlyRate: number | null; joinedAt: string | null }
+    { profileId: string; groupId: string; groupName: string; fullName: string; monthlyRate: number | null; joinedAt: string | null; signedIn: boolean }
   >();
   // A client the coach has set aside as inactive (0281) is left out of every count and flag below; their data is untouched.
   const inactiveKeys = await fetchInactiveKeys(supabase, allGroupIds);
@@ -352,6 +352,7 @@ export async function getCoachDashboardData(
       fullName: profile?.full_name ?? "Client",
       monthlyRate: row.monthly_rate,
       joinedAt: row.joined_at,
+      signedIn: !!profile?.claimed_at,
     });
   }
   const athletes = [...athleteByProfileId.values()];
@@ -466,6 +467,8 @@ export async function getCoachDashboardData(
       lastLoggedAt: lastLoggedAtStr ? new Date(lastLoggedAtStr) : null,
       now,
       trainingDays,
+      addedAt: athlete.joinedAt ? new Date(athlete.joinedAt) : null,
+      signedIn: athlete.signedIn,
     });
     quietTierByAthlete.set(athlete.profileId, tier);
     if (tier !== "none") {
