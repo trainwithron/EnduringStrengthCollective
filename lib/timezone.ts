@@ -29,21 +29,33 @@ export const DEFAULT_COACH_TIMEZONE = "America/New_York";
 // UTC instant. Handles DST correctly for the given date, since the offset
 // is derived by asking Intl what that exact instant reads as in both zones,
 // not from a fixed/hardcoded UTC offset.
+// How far ahead of UTC `timeZone` is at the instant `ms`, in milliseconds (negative for the Americas). Read from the zone's own wall clock
+// at that instant, so it is right on both sides of a clock change and does not depend on the machine's own time zone.
+function offsetAtMs(ms: number, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(ms));
+  const get = (type: string) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  const wallAsUtc = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour") % 24, get("minute"), get("second"));
+  return wallAsUtc - Math.floor(ms / 1000) * 1000;
+}
+
 export function zonedTimeToUtc(dateStr: string, timeStr: string, timeZone: string): Date {
   const [year, month, day] = dateStr.split("-").map(Number);
   const [hour, minute] = timeStr.split(":").map(Number);
 
   const asIfUtc = Date.UTC(year, month - 1, day, hour, minute, 0, 0);
-  const probe = new Date(asIfUtc);
-
-  // How that same instant reads as a wall clock in each zone — the
-  // difference between them is the zone's real UTC offset at this
-  // specific date (so DST transitions resolve correctly).
-  const zoned = new Date(probe.toLocaleString("en-US", { timeZone }));
-  const utc = new Date(probe.toLocaleString("en-US", { timeZone: "UTC" }));
-  const offsetMs = utc.getTime() - zoned.getTime();
-
-  return new Date(asIfUtc + offsetMs);
+  // Two passes: the offset is looked up at a first guess, then again at the corrected instant, because on a day the clocks change the
+  // guess can land on the other side of the change (one hour off).
+  const first = asIfUtc - offsetAtMs(asIfUtc, timeZone);
+  return new Date(asIfUtc - offsetAtMs(first, timeZone));
 }
 
 // The reverse direction: "what does a wall clock read right now, in

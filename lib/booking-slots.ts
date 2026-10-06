@@ -162,8 +162,11 @@ export function bookingFitsAvailability(
   bookingStart: Date,
   windows: AvailabilityWindow[],
   blockedRanges: BlockedRange[],
-  timezone: string = DEFAULT_COACH_TIMEZONE
+  timezone: string = DEFAULT_COACH_TIMEZONE,
+  // Noon of the booking's day ON THE COACH'S CLOCK. The slot helpers read a Date's calendar day and weekday in the machine's own
+  // zone (UTC on the server), so an evening session would otherwise be checked against tomorrow's hours.
+  dayDate?: Date
 ): boolean {
-  const slots = generateSlotsForDate(bookingStart, windows, blockedRanges, timezone);
+  const slots = generateSlotsForDate(dayDate ?? bookingStart, windows, blockedRanges, timezone);
   return slots.some((s) => s.start.getTime() === bookingStart.getTime());
 }

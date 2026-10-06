@@ -3,6 +3,9 @@ import { changeFromHere, moveOccurrence, skipOccurrence } from "@/lib/series-eng
 import { authorizeCoachCall, isResponse } from "@/lib/series-route";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
+// A 52-week schedule is booked one session at a time; give it room to finish instead of stopping part way.
+export const maxDuration = 60;
+
 // Edit one session of a recurring schedule (move it, or take it off), or this session and every one after it.
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));

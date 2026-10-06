@@ -3,6 +3,9 @@ import { endSeries, extendSeries, pauseSeries, resumeSeries } from "@/lib/series
 import { authorizeCoachCall, isResponse } from "@/lib/series-route";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
+// A 52-week schedule is booked one session at a time; give it room to finish instead of stopping part way.
+export const maxDuration = 60;
+
 // Pause, resume, end or extend a whole recurring schedule.
 export async function POST(request: Request, props: { params: Promise<{ seriesId: string }> }) {
   const { seriesId } = await props.params;

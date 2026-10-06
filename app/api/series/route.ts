@@ -5,6 +5,9 @@ import { sendPushToProfile } from "@/lib/send-push";
 import { formatInTimezone } from "@/lib/format-in-timezone";
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 
+// A 52-week schedule is booked one session at a time; give it room to finish instead of stopping part way.
+export const maxDuration = 60;
+
 // Creates a recurring schedule for a client: books every week (fixed) or the next 12 weeks (ongoing). Each booking goes
 // through book_session, so overlap and buffer rules are the same as booking one session. The client gets one message, not
 // one per week.

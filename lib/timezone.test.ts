@@ -1,6 +1,26 @@
 import { describe, it, expect } from "vitest";
 import { zonedTimeToUtc, nowInZone, dateKeyInZone, localDayBounds } from "./timezone";
 
+describe("zonedTimeToUtc on the day the clocks change", () => {
+  it("reads 6:00 AM on the spring-forward day as EDT (the clocks moved at 2:00 AM)", () => {
+    expect(zonedTimeToUtc("2026-03-08", "06:00", "America/New_York").toISOString()).toBe("2026-03-08T10:00:00.000Z");
+    expect(zonedTimeToUtc("2026-03-08", "01:00", "America/New_York").toISOString()).toBe("2026-03-08T06:00:00.000Z");
+  });
+  it("reads 6:00 AM on the fall-back day as EST", () => {
+    expect(zonedTimeToUtc("2026-11-01", "06:00", "America/New_York").toISOString()).toBe("2026-11-01T11:00:00.000Z");
+    expect(zonedTimeToUtc("2026-11-01", "00:30", "America/New_York").toISOString()).toBe("2026-11-01T04:30:00.000Z");
+  });
+  it("Pacific, same days", () => {
+    expect(zonedTimeToUtc("2026-03-08", "09:00", "America/Los_Angeles").toISOString()).toBe("2026-03-08T16:00:00.000Z");
+    expect(zonedTimeToUtc("2026-11-01", "09:00", "America/Los_Angeles").toISOString()).toBe("2026-11-01T17:00:00.000Z");
+  });
+  it("Arizona never changes: noon is 7 PM UTC all year", () => {
+    expect(zonedTimeToUtc("2026-03-08", "12:00", "America/Phoenix").toISOString()).toBe("2026-03-08T19:00:00.000Z");
+    expect(zonedTimeToUtc("2026-07-15", "12:00", "America/Phoenix").toISOString()).toBe("2026-07-15T19:00:00.000Z");
+    expect(zonedTimeToUtc("2026-11-01", "12:00", "America/Phoenix").toISOString()).toBe("2026-11-01T19:00:00.000Z");
+  });
+});
+
 describe("zonedTimeToUtc", () => {
   it("converts a US Eastern wall-clock time (winter, EST = UTC-5)", () => {
     const utc = zonedTimeToUtc("2026-01-15", "09:00", "America/New_York");
