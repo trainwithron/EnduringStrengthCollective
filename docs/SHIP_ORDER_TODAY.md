@@ -1,4 +1,29 @@
-# Ship order for today (Oct 6)
+# Ship order (Oct 6)
+
+## RELEASE D: ready, not pushed (the list below it is Release C, which is live)
+
+Branch `release-d` (one merged, green branch: booking at any time, the fixes from the live check, session types on hours, the vocabulary change). Nothing in it is applied or deployed. Do the pastes first, in this order, each only after Assistant has reviewed it against live (each file refuses by itself if it was already applied or is out of order):
+
+1. **Step 32** (`apply-step32-0287-precheck.sql`, then `apply-step32-0287.sql`): a session may be longer than the time between slot starts (a start every 15 minutes with a 55-minute session). You should see 3 rows `true`, then "Success. No rows returned."
+2. **Step 33** (`apply-step33-0288-precheck.sql`, then `apply-step33-0288.sql`): two bookings that overlap at different minutes can no longer both be saved at the same instant. You should see 2 rows `true`, then "Success. No rows returned." Nothing visible changes.
+3. **Step 34** (`apply-step34-0289-precheck.sql`, then `apply-step34-0289.sql`): a window of hours can be tagged with one of your session types, and a booking made inside it is tagged the same. You should see 3 rows `true`, then "Success. No rows returned." Nothing visible changes at once.
+4. Then type **`push and deploy release D`**.
+
+What to try after it is live (phone and desktop):
+
+- **Availability:** each window has **Slot every**, **Session length** and **Gap between sessions** side by side, with a line like "Slot every 60, session 55, gap 5 = 6:00–6:55 AM, 7:00–7:55, 8:00–8:55, …" and a warning (never a block) if they fight each other. 15, 30, 45 and 60 are one-tap choices. The gap is the same setting as "Buffer between sessions". "Slot every 15" with "Session 55" saves once step 32 is applied. Under **Session type** (optional) pick Online, In person and so on for a window.
+- **Business > Session types:** one tap adds Online / In person or Weight room / Practice / Game (private, rename or delete them as you like).
+- **A client's day on the calendar:** each booked session shows its type and lets you change it. **Another time** books any start in 5-minute steps and any length; outside your hours is a warning only.
+- **A client in request mode:** under the open sessions there is **Ask for a different time**; the request on your Home shows start to end, your time zone, and a note if it is outside your hours.
+- **Calendar Spot** rows (for example "Alice hasn't attended a session in 19 days"): **Not now** (2 weeks), **Don't flag Alice** (60 days), the next session with Cancel, and the session type.
+- **Scheduling Spot:** one line, "You have gaps in your schedule. Are you looking to fill them, or happy where you are?" with **Looking to fill them** / **Happy where I am**; fill them asks Online / Hybrid / In person.
+- **What do you call your people?** on Home (asked once) and in Settings: pick Clients, Athletes, Players, Members or your own word. It then reads as plain text everywhere (no underline), in proper case at the start of a label.
+
+Not in Release D: the Ask Spot action layer, the messages synopsis and the "I'm away" flow (designs only), and the server hours check inside `book_session` (queued for mid-November).
+
+---
+
+# Release C list (live since Oct 6; kept for the record)
 
 One list, in order. Do a line, check what you should see, then the next. If anything is not what it says, stop, run `rollback;` once if it was a paste, and send Spot the red text or the table. Nothing in a paste file runs twice by accident: each one refuses by itself if it was already applied.
 
