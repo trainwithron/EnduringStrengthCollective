@@ -6,6 +6,8 @@ export interface ScheduleClientOption {
   id: string;
   fullName: string;
   balance: number;
+  // The client's own group (a one-on-one client lives in their own). Booking and balances are kept per group.
+  groupId?: string;
 }
 
 export function ScheduleClientPicker({
@@ -28,9 +30,10 @@ export function ScheduleClientPicker({
         value={selectedId ?? ""}
         onChange={(e) => {
           const value = e.target.value;
-          router.push(value ? `/groups/${groupId}/calendar?scheduleFor=${value}` : `/groups/${groupId}/calendar`);
+          const target = clients.find((c) => c.id === value);
+          router.push(value ? `/groups/${target?.groupId ?? groupId}/calendar?scheduleFor=${value}` : `/groups/${groupId}/calendar`);
         }}
-        className="w-full h-10 mt-1 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust"
+        className="w-full h-11 mt-1 bg-graphite border border-steel/30 text-chalk px-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
       >
         <option value="">Select a client…</option>
         {clients.map((c) => (

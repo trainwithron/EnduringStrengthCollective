@@ -12,7 +12,10 @@ import { CancelBookingButton } from "@/components/athlete/cancel-booking-button"
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { computeScheduledDates } from "@/lib/program-schedule";
 import { ScheduleClientPicker } from "@/components/coach/schedule-client-picker";
-import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
+import { DEFAULT_COACH_TIMEZONE, dateKeyInZone } from "@/lib/timezone";
+import { formatInTimezone } from "@/lib/format-in-timezone";
+import { getCoachClients } from "@/lib/coach-clients";
+import { coachBalanceLabel } from "@/lib/reup";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { computeQuietTier, QUIET_TIER_LABEL } from "@/lib/quiet-client-tier";
 import { gatherCalendarSpotterFindings } from "@/lib/calendar-spotter-gather";
@@ -117,31 +120,29 @@ export default async function CoachCalendarPage(
   // while acting as a client — that's the coach's own tool, not part of
   // the client's real experience.
   if (showMobileView && isCoach && !isActingAsOther) {
-    const [{ data: clientMemberships }, { data: coachGroup }] = await Promise.all([
-      supabase
-        .from("group_memberships")
-        .select("profile_id, profiles ( full_name )")
-        .eq("group_id", params.groupId)
-        .eq("role", "athlete"),
+    // Every client across the coach's groups (a one-on-one client lives in their own group), each with their own group so the booking
+    // and the balance are the ones kept for that client.
+    const [coachClients, { data: coachGroup }, { data: coachProfileRow }] = await Promise.all([
+      getCoachClients(supabase, user.id, params.groupId),
       supabase.from("groups").select("name").eq("id", params.groupId).maybeSingle(),
+      supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle(),
     ]);
     const coachGroupName = coachGroup?.name ?? "Coaching";
+    const coachTz = coachProfileRow?.timezone ?? DEFAULT_COACH_TIMEZONE;
 
-    const clientIds = (clientMemberships ?? []).map((m: any) => m.profile_id);
+    const clientIds = coachClients.map((c) => c.id);
     const { data: creditRows } = await supabase
       .from("session_credits")
-      .select("athlete_id, balance")
-      .eq("group_id", params.groupId)
+      .select("athlete_id, group_id, balance")
       .in("athlete_id", clientIds.length > 0 ? clientIds : [""]);
-    const balanceByAthlete = new Map((creditRows ?? []).map((r) => [r.athlete_id, r.balance]));
+    const balanceByClientGroup = new Map((creditRows ?? []).map((r) => [`${r.athlete_id}:${r.group_id}`, r.balance as number]));
 
-    const scheduleClients = (clientMemberships ?? [])
-      .map((m: any) => ({
-        id: m.profile_id,
-        fullName: m.profiles?.full_name ?? "Unknown",
-        balance: balanceByAthlete.get(m.profile_id) ?? 0,
-      }))
-      .sort((a, b) => a.fullName.localeCompare(b.fullName));
+    const scheduleClients = coachClients.map((c) => ({
+      id: c.id,
+      fullName: c.fullName,
+      groupId: c.groupId,
+      balance: balanceByClientGroup.get(`${c.id}:${c.groupId}`) ?? 0,
+    }));
 
     if (!searchParams.scheduleFor) {
       // No client picked yet — this is the coach's own real destination
@@ -194,9 +195,7 @@ export default async function CoachCalendarPage(
                     <div key={b.id} className="py-2.5 flex items-center justify-between gap-3">
                       <span className="font-body text-sm">{b.athleteName}</span>
                       <span className="font-body text-xs text-steel shrink-0">
-                        {new Date(b.startAt).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-                        {" · "}
-                        {new Date(b.startAt).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}
+                        {formatInTimezone(new Date(b.startAt), coachTz, "dateTime")}
                       </span>
                     </div>
                   ))}
@@ -209,6 +208,10 @@ export default async function CoachCalendarPage(
     }
 
     const selected = scheduleClients.find((c) => c.id === searchParams.scheduleFor);
+    // The client is booked in THEIR group (sessions and balances are kept per group), so move to it if we are standing in another.
+    if (selected && selected.groupId !== params.groupId) {
+      redirect(`/groups/${selected.groupId}/calendar?scheduleFor=${selected.id}${searchParams.month ? `&month=${searchParams.month}` : ""}`);
+    }
     if (!selected) {
       return (
         <main className="min-h-screen bg-graphite text-chalk font-body">
@@ -223,9 +226,34 @@ export default async function CoachCalendarPage(
     }
 
     const today = new Date();
-    const year = today.getFullYear();
-    const monthIndex = today.getMonth();
+    const monthMatch = /^(\d{4})-(\d{2})$/.exec(searchParams.month ?? "");
+    const year = monthMatch ? Number(monthMatch[1]) : today.getFullYear();
+    const monthIndex = monthMatch ? Math.min(11, Math.max(0, Number(monthMatch[2]) - 1)) : today.getMonth();
+    const prevMonth = new Date(year, monthIndex - 1, 1);
+    const nextMonth = new Date(year, monthIndex + 1, 1);
+    const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const monthHref = (d: Date) => `/groups/${params.groupId}/calendar?scheduleFor=${selected.id}&month=${monthKey(d)}`;
     const firstOfMonth = new Date(year, monthIndex, 1);
+
+    // This client's confirmed sessions in the visible month, shown on their day (on the coach's clock).
+    const monthStart = new Date(year, monthIndex, 1, 0, 0, 0);
+    const monthEnd = new Date(year, monthIndex + 1, 1, 0, 0, 0);
+    const { data: clientMonthBookings } = await supabase
+      .from("bookings")
+      .select("id, start_at")
+      .eq("coach_id", user.id)
+      .eq("athlete_id", selected.id)
+      .eq("group_id", params.groupId)
+      .eq("status", "confirmed")
+      .gte("start_at", new Date(monthStart.getTime() - 86400000).toISOString())
+      .lt("start_at", new Date(monthEnd.getTime() + 86400000).toISOString());
+    const sessionsByDay = new Map<string, string[]>();
+    for (const b of clientMonthBookings ?? []) {
+      const k = dateKeyInZone(coachTz, new Date(b.start_at));
+      const list = sessionsByDay.get(k) ?? [];
+      list.push(formatInTimezone(new Date(b.start_at), coachTz, "time"));
+      sessionsByDay.set(k, list);
+    }
     const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
     const leadingBlanks = firstOfMonth.getDay();
     const cells: (Date | null)[] = [
@@ -245,11 +273,18 @@ export default async function CoachCalendarPage(
             <div className="px-5 pt-4">
               <p className="font-body text-sm text-chalk">
                 {selected.fullName} —{" "}
-                <span className="text-steel">
-                  {selected.balance} {selected.balance === 1 ? "session" : "sessions"} left
-                </span>
+                <span className="text-steel">{coachBalanceLabel(selected.balance)}</span>
               </p>
               <p className="font-body text-xs text-steel mt-1">Tap a date to see and book open sessions.</p>
+              <div className="flex items-center justify-between mt-3">
+                <Link href={monthHref(prevMonth)} className="h-11 px-3 inline-flex items-center font-body text-sm text-chalk underline underline-offset-2">
+                  &larr; {prevMonth.toLocaleDateString("en-US", { month: "short" })}
+                </Link>
+                <span className="font-display font-bold uppercase text-base">{monthLabel(year, monthIndex)}</span>
+                <Link href={monthHref(nextMonth)} className="h-11 px-3 inline-flex items-center font-body text-sm text-chalk underline underline-offset-2">
+                  {nextMonth.toLocaleDateString("en-US", { month: "short" })} &rarr;
+                </Link>
+              </div>
             </div>
             <div className="grid grid-cols-7 gap-px bg-steel/15 mt-4 mx-5 border border-steel/15">
               {WEEKDAY_LABELS.map((label) => (
@@ -274,6 +309,11 @@ export default async function CoachCalendarPage(
                     <span className={`font-body text-xs ${isToday ? "text-rust font-bold" : "text-steel"}`}>
                       {date.getDate()}
                     </span>
+                    {(sessionsByDay.get(dateKey(date)) ?? []).slice(0, 2).map((t, idx) => (
+                      <span key={idx} className="font-body text-[10px] leading-tight text-chalk mt-0.5 truncate">
+                        {t}
+                      </span>
+                    ))}
                   </Link>
                 );
               })}
