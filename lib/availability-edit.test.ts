@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { copyTargets, timeToMinutes, validateWindow, windowsOverlap } from "./availability-edit";
+import { STEP_PRESETS, copyTargets, isSessionRuleError, timeToMinutes, validateWindow, windowsOverlap } from "./availability-edit";
 
 const win = (id: string, weekday: number, startTime: string, endTime: string) => ({ id, weekday, startTime, endTime });
 
@@ -42,12 +42,22 @@ describe("copyTargets", () => {
 });
 
 describe("session length", () => {
-  it("is optional, whole minutes, and never longer than the time between slots", () => {
+  it("is optional, whole minutes, and fits inside the window (it may be longer than the time between starts)", () => {
     const base = { weekday: 3, startTime: "06:00", endTime: "17:00", slotMinutes: 60 };
     expect(validateWindow({ ...base, sessionMinutes: 55 }, [])).toBeNull();
     expect(validateWindow({ ...base, sessionMinutes: null }, [])).toBeNull();
     expect(validateWindow({ ...base, sessionMinutes: 60 }, [])).toBeNull();
-    expect(validateWindow({ ...base, sessionMinutes: 90 }, [])).toMatch(/longer than the time between slots/);
     expect(validateWindow({ ...base, sessionMinutes: 2 }, [])).toMatch(/whole number/);
+    // a start every 15 minutes with a 55-minute session, and a 90-minute session on a 60-minute step
+    expect(validateWindow({ ...base, slotMinutes: 15, sessionMinutes: 55 }, [])).toBeNull();
+    expect(validateWindow({ ...base, sessionMinutes: 90 }, [])).toBeNull();
+    // but never longer than the window itself
+    expect(validateWindow({ weekday: 3, startTime: "06:00", endTime: "07:00", slotMinutes: 30, sessionMinutes: 90 }, [])).toMatch(/longer than the whole window/);
+  });
+  it("offers 15 and 30 as first-class steps, and recognises the database's refusal until step 32 is applied", () => {
+    expect(STEP_PRESETS).toEqual([15, 30, 45, 60]);
+    expect(isSessionRuleError('new row for relation "coach_availability_windows" violates check constraint "coach_availability_windows_session_minutes_range"')).toBe(true);
+    expect(isSessionRuleError("network error")).toBe(false);
+    expect(isSessionRuleError(null)).toBe(false);
   });
 });

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { bookingFitsAvailability, resolveBlockedRangesForDate, type AvailabilityWindow } from "@/lib/booking-slots";
+import { DEFAULT_COACH_TIMEZONE, dateKeyInZone } from "@/lib/timezone";
 
 interface MoveRequest {
   id: string;
@@ -9,6 +11,9 @@ interface MoveRequest {
   clientName: string;
   fromStartAt: string | null;
   newStartAt: string;
+  newEndAt: string | null;
+  // Outside the coach's open hours or on their time off: said plainly on the card (the coach can still confirm).
+  outsideHours: boolean;
 }
 
 interface FlaggedChange {
@@ -26,6 +31,8 @@ export function LateChangesPanel() {
   const [moves, setMoves] = useState<MoveRequest[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Times are shown on the coach's own clock, not the browser's, and the card says which clock.
+  const [timezone, setTimezone] = useState<string>(DEFAULT_COACH_TIMEZONE);
 
   useEffect(() => {
     let cancelled = false;
@@ -45,21 +52,53 @@ export function LateChangesPanel() {
       // Booking requests, new and move (needs the database update that adds them; until then the lookup fails quietly and nothing shows).
       const { data: moveData, error: moveError } = await supabase
         .from("booking_requests")
-        .select("id, kind, from_start_at, new_start_at, profiles!booking_requests_athlete_id_fkey ( full_name )")
+        .select("id, kind, from_start_at, new_start_at, new_end_at, profiles!booking_requests_athlete_id_fkey ( full_name )")
         .eq("coach_id", user.id)
         .eq("status", "pending")
         .gt("new_start_at", new Date().toISOString())
         .order("new_start_at", { ascending: true })
         .limit(20);
       if (!cancelled && !moveError) {
+        // The coach's clock and open hours, to say where a requested time sits (a session can be asked for at any minute).
+        const { data: coachProfile } = await supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle();
+        const tz = (coachProfile?.timezone as string | null) ?? DEFAULT_COACH_TIMEZONE;
+        const { data: windowRows } = await supabase.from("coach_availability_windows").select("weekday, start_time, end_time, slot_duration_minutes").eq("coach_id", user.id);
+        const { data: exceptionRows } = await supabase.from("coach_availability_exceptions").select("kind, start_at, end_at, weekday, start_time, end_time").eq("coach_id", user.id);
+        const windows: AvailabilityWindow[] = ((windowRows ?? []) as any[]).map((w) => ({
+          weekday: w.weekday,
+          startTime: w.start_time,
+          endTime: w.end_time,
+          slotDurationMinutes: w.slot_duration_minutes,
+        }));
+        const rawExceptions = ((exceptionRows ?? []) as any[]).map((e) => ({
+          kind: e.kind as "one_off" | "recurring",
+          startAt: e.start_at as string | null,
+          endAt: e.end_at as string | null,
+          weekday: e.weekday as number | null,
+          startTime: e.start_time as string | null,
+          endTime: e.end_time as string | null,
+        }));
+        if (!cancelled) setTimezone(tz);
         setMoves(
-          ((moveData ?? []) as any[]).map((m) => ({
-            id: m.id as string,
-            kind: (m.kind as "new" | "move") ?? "new",
-            clientName: (m.profiles?.full_name as string | undefined) ?? "A client",
-            fromStartAt: (m.from_start_at as string | null) ?? null,
-            newStartAt: m.new_start_at as string,
-          }))
+          ((moveData ?? []) as any[]).map((m) => {
+            const start = new Date(m.new_start_at as string);
+            const end = m.new_end_at ? new Date(m.new_end_at as string) : null;
+            let outsideHours = false;
+            if (end && windows.length > 0) {
+              const [y, mo, d] = dateKeyInZone(tz, start).split("-").map(Number);
+              const localNoon = new Date(y, mo - 1, d, 12, 0, 0);
+              outsideHours = !bookingFitsAvailability(start, windows, resolveBlockedRangesForDate(localNoon, rawExceptions, tz), tz, localNoon, end);
+            }
+            return {
+              id: m.id as string,
+              kind: (m.kind as "new" | "move") ?? "new",
+              clientName: (m.profiles?.full_name as string | undefined) ?? "A client",
+              fromStartAt: (m.from_start_at as string | null) ?? null,
+              newStartAt: m.new_start_at as string,
+              newEndAt: (m.new_end_at as string | null) ?? null,
+              outsideHours,
+            };
+          })
         );
       }
       if (cancelled || loadError) return;
@@ -107,7 +146,9 @@ export function LateChangesPanel() {
   }
 
   const fmt = (iso: string) =>
-    new Date(iso).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    new Date(iso).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: timezone });
+  const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZone: timezone });
+  const tzName = (iso: string) => new Intl.DateTimeFormat("en-US", { timeZone: timezone, timeZoneName: "short" }).formatToParts(new Date(iso)).find((p) => p.type === "timeZoneName")?.value ?? timezone;
 
   if (items.length === 0 && moves.length === 0) return null;
 
@@ -126,7 +167,9 @@ export function LateChangesPanel() {
                   <p className="font-body text-sm text-chalk truncate">{m.clientName}</p>
                   <p className="font-body text-xs text-steel">
                     {m.kind === "move" && m.fromStartAt ? `Move ${fmt(m.fromStartAt)} to ${fmt(m.newStartAt)}` : `New session ${fmt(m.newStartAt)}`}
+                    {m.newEndAt ? ` to ${fmtTime(m.newEndAt)}` : ""} ({tzName(m.newStartAt)})
                   </p>
+                  {m.outsideHours && <p className="font-body text-xs text-rust">Outside your open hours or on your time off. You can still confirm it.</p>}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <button

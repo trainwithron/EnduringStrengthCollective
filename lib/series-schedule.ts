@@ -1,5 +1,5 @@
 import { dateKeyInZone, nowInZone, zonedTimeToUtc } from "@/lib/timezone";
-import { generateSlotsForDate, resolveBlockedRangesForDate, type AvailabilityWindow } from "@/lib/booking-slots";
+import { bookingFitsAvailability, resolveBlockedRangesForDate, type AvailabilityWindow } from "@/lib/booking-slots";
 
 // The date math behind recurring sessions. Everything here is pure: given a pattern ("Tuesdays at 6:00 AM, 60 minutes, in the
 // coach's time zone"), it says which instants the sessions fall on and which of them clash with something. The wall-clock time
@@ -151,7 +151,8 @@ export function classifyOccurrences(
       const blocked = resolveBlockedRangesForDate(dayDate, ctx.exceptions, ctx.timezone);
       if (blocked.some((r) => occ.start < r.end && occ.end > r.start)) {
         conflict = "time_off";
-      } else if (!ctx.ignoreWindows && ctx.windows.length > 0 && !generateSlotsForDate(dayDate, ctx.windows, blocked, ctx.timezone).some((slot) => slot.start.getTime() === occ.start.getTime())) {
+      // "Outside hours" now means the whole session is not inside one of the open windows, so a session at any minute (6:20, 1:15) inside the hours is not flagged.
+      } else if (!ctx.ignoreWindows && ctx.windows.length > 0 && !bookingFitsAvailability(occ.start, ctx.windows, blocked, ctx.timezone, dayDate, occ.end)) {
         conflict = "outside_hours";
       }
     }

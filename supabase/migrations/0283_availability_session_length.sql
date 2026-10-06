@@ -4,9 +4,9 @@
 --
 --  * coach_availability_windows.session_minutes: null means "the same as the slot step", so every existing window behaves exactly as it did.
 --    Between 5 and 480 minutes and never longer than the step (sessions in neighbouring slots must not overlap).
--- Nothing else changes: the booking functions already take the end time from the caller and check that [start, end] sits inside a window, clear of time
--- off, and that the gap to other bookings is at least the coach's buffer, so a 55-minute session at 06:00 then another at 07:00 works with a buffer of 5
--- or less. The app reads the new column wherever it builds slots (the calendar, booking and request screens, weekly schedules, the public booking page,
+-- Nothing else changes: the booking functions already take the end time from the caller and check the overlap with other bookings and the coach's buffer on
+-- the real end times (book_session and reschedule_booking do NOT check weekly hours or time off: only the request functions, through coach_time_is_open,
+-- check that [start, end] sits inside a window), so a 55-minute session at 06:00 then another at 07:00 works with a buffer of 5 or less. The app reads the new column wherever it builds slots (the calendar, booking and request screens, weekly schedules, the public booking page,
 -- conflict checks), and ignores it until this is applied.
 -- Needs coach_availability_windows (0023). Re-runnable.
 

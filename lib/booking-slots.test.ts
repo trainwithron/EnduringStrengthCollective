@@ -5,6 +5,8 @@ import {
   minimumNoticeBlockedRange,
   isSlotBufferBlocked,
   bookingFitsAvailability,
+  slotConflict,
+  customStartOptions,
 } from "./booking-slots";
 
 // Every test passes "UTC" explicitly and asserts with getUTCHours()/
@@ -287,5 +289,91 @@ describe("a session length that differs from the slot step (Ron: 55-minute sessi
   it("a recurring booking still fits when its start is one of the generated starts", () => {
     expect(bookingFitsAvailability(new Date("2026-09-08T07:00:00Z"), windows, [], "UTC", date)).toBe(true);
     expect(bookingFitsAvailability(new Date("2026-09-08T07:30:00Z"), windows, [], "UTC", date)).toBe(false);
+  });
+});
+
+// Sessions at any minute (Ron, Oct 6: 15-minute or custom times, "be human, not tied to a system").
+describe("sessions at any minute", () => {
+  const day = new Date("2026-09-08T00:00:00");
+  const d = (hm: string) => new Date(`2026-09-08T${hm}:00Z`);
+  const hours = [{ weekday: 2, startTime: "06:00", endTime: "09:00", slotDurationMinutes: 15, sessionMinutes: 55 }];
+  const hm = (x: Date) => `${String(x.getUTCHours()).padStart(2, "0")}:${String(x.getUTCMinutes()).padStart(2, "0")}`;
+
+  it("a 15-minute step with a 55-minute session generates overlapping starts that all fit before the window ends", () => {
+    const slots = generateSlotsForDate(day, hours, [], "UTC");
+    expect(slots.map((s) => hm(s.start)).slice(0, 4)).toEqual(["06:00", "06:15", "06:30", "06:45"]);
+    expect(hm(slots[slots.length - 1].start)).toBe("08:00");
+    expect(slots.every((s) => s.start.getTime() + 55 * 60000 <= d("09:00").getTime())).toBe(true);
+  });
+
+  it("a session at 6:20 blocks the slots it overlaps even with no buffer, and not the ones clear of it", () => {
+    const booked = [{ start: d("06:20"), end: d("07:15") }];
+    expect(isSlotBufferBlocked(d("06:00"), d("06:55"), booked, 0)).toBe(true);
+    expect(isSlotBufferBlocked(d("06:15"), d("07:10"), booked, 0)).toBe(true);
+    expect(isSlotBufferBlocked(d("07:15"), d("08:10"), booked, 0)).toBe(false);
+    expect(isSlotBufferBlocked(d("05:00"), d("06:00"), booked, 0)).toBe(false);
+  });
+
+  it("says why: taken when it overlaps, buffer when it only comes close", () => {
+    const booked = [{ start: d("06:20"), end: d("07:15") }];
+    expect(slotConflict(d("06:00"), d("06:55"), booked, 5)).toBe("taken");
+    expect(slotConflict(d("07:18"), d("08:13"), booked, 5)).toBe("buffer");
+    expect(slotConflict(d("07:25"), d("08:20"), booked, 5)).toBeNull();
+    expect(slotConflict(d("07:15"), d("08:10"), booked, 0)).toBeNull();
+  });
+
+  it("a recurring session at an off-grid start still fits when the whole session is inside the open hours", () => {
+    const old = [{ weekday: 2, startTime: "06:00", endTime: "09:00", slotDurationMinutes: 60 }];
+    expect(bookingFitsAvailability(d("06:20"), old, [], "UTC", day, d("07:15"))).toBe(true);
+    expect(bookingFitsAvailability(d("06:20"), old, [], "UTC", day)).toBe(false); // the old exact-start rule
+    expect(bookingFitsAvailability(d("08:30"), old, [], "UTC", day, d("09:25"))).toBe(false); // runs past the end of the window
+    expect(bookingFitsAvailability(d("05:30"), old, [], "UTC", day, d("06:25"))).toBe(false); // starts before the window opens
+  });
+
+  it("a session that overlaps time off does not fit, and a session on a day with no hours does not fit", () => {
+    const off = [{ start: d("06:30"), end: d("06:45") }];
+    expect(bookingFitsAvailability(d("06:20"), hours, off, "UTC", day, d("07:15"))).toBe(false);
+    expect(bookingFitsAvailability(d("06:20"), [{ ...hours[0], weekday: 3 }], [], "UTC", day, d("07:15"))).toBe(false);
+  });
+
+  it("offers every 5 minutes inside the hours for a client's different time, leaving out the regular slots, time off and other sessions", () => {
+    const opts = customStartOptions({
+      date: day,
+      windows: [{ weekday: 2, startTime: "06:00", endTime: "10:00", slotDurationMinutes: 60 }],
+      blockedRanges: [{ start: d("07:00"), end: d("07:10") }],
+      bookings: [{ start: d("06:30"), end: d("06:50") }],
+      bufferMinutes: 0,
+      timezone: "UTC",
+      excludeStarts: new Set([d("06:00").getTime(), d("07:00").getTime()]),
+    }).map((o) => hm(o.start));
+    // every 60-minute session from 06:05 to 07:05 runs into the 06:30 session or the 07:00 time off, so the first start that works is 07:10
+    expect(opts).not.toContain("06:05");
+    expect(opts).not.toContain("06:00");
+    expect(opts).not.toContain("06:30");
+    expect(opts).not.toContain("07:00");
+    expect(opts).not.toContain("06:50");
+    expect(opts).not.toContain("07:05");
+    expect(opts[0]).toBe("07:10");
+    expect(opts).toContain("09:00");
+    expect(opts).not.toContain("09:05");
+  });
+
+  it("never offers a start whose session would run past the end of the hours, and steps by 5", () => {
+    const opts = customStartOptions({ date: day, windows: [{ weekday: 2, startTime: "06:00", endTime: "07:30", slotDurationMinutes: 60 }], blockedRanges: [], bookings: [], bufferMinutes: 0, timezone: "UTC" });
+    expect(opts.map((o) => hm(o.start))).toEqual(["06:00", "06:05", "06:10", "06:15", "06:20", "06:25", "06:30"]);
+    expect(opts.every((o) => o.durationMinutes === 60)).toBe(true);
+  });
+
+  it("keeps the buffer: a start too close after another session is not offered", () => {
+    const opts = customStartOptions({
+      date: day,
+      windows: [{ weekday: 2, startTime: "06:00", endTime: "10:00", slotDurationMinutes: 60 }],
+      blockedRanges: [],
+      bookings: [{ start: d("06:00"), end: d("07:00") }],
+      bufferMinutes: 10,
+      timezone: "UTC",
+    }).map((o) => hm(o.start));
+    expect(opts).not.toContain("07:05");
+    expect(opts[0]).toBe("07:10");
   });
 });

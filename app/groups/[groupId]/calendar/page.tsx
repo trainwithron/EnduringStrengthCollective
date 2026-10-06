@@ -801,7 +801,7 @@ export default async function CoachCalendarPage(
     // the recurring hours).
     supabase
       .from("bookings")
-      .select("id, start_at, athlete_id, profiles!bookings_athlete_id_fkey ( full_name )")
+      .select("id, start_at, end_at, athlete_id, profiles!bookings_athlete_id_fkey ( full_name )")
       .eq("coach_id", user.id)
       .eq("status", "confirmed")
       .gte("start_at", rangeStart.toISOString())
@@ -858,14 +858,14 @@ export default async function CoachCalendarPage(
   // Dates and times on the COACH's clock. This page renders on the server, which runs in UTC: without the zone an evening session lands on
   // tomorrow's cell and a 6:00 AM one reads 1:00 PM.
   const bookingTz = coachProfile?.timezone ?? DEFAULT_COACH_TIMEZONE;
-  const bookingsByDateKey = new Map<string, { time: string; name: string }[]>();
+  const bookingsByDateKey = new Map<string, { time: string; name: string; startMs?: number; endMs?: number }[]>();
   for (const b of (bookingRows ?? []) as any[]) {
     const d = new Date(b.start_at);
     const key = dateKeyInZone(bookingTz, d);
     const time = formatSlotTime(d, bookingTz);
     const name = b.profiles?.full_name ?? "A client";
     if (!bookingsByDateKey.has(key)) bookingsByDateKey.set(key, []);
-    bookingsByDateKey.get(key)!.push({ time, name });
+    bookingsByDateKey.get(key)!.push({ time, name, startMs: d.getTime(), endMs: b.end_at ? new Date(b.end_at).getTime() : undefined });
   }
 
   const eventsByDateKey = new Map<string, CalendarEventEntry[]>();

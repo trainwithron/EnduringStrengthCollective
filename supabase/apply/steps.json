@@ -252,5 +252,13 @@
   "slug": "delete-two-groups",
   "migrations": [],
   "rows": 5
+ },
+ {
+  "n": "32",
+  "slug": "0287",
+  "migrations": [
+   "0287"
+  ],
+  "rows": 3
  }
 ]

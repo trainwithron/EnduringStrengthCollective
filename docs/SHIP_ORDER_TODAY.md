@@ -35,6 +35,8 @@ Already applied by you: steps 12 to 22 and 24. You do not touch those again.
     - You should see: 2 rows `true`, then "Success. No rows returned."
 12. **`check-function-acl.sql`** (read-only, the permanent permissions check).
     - You should see: 4 rows, every one `true`, and no row that starts `UNREVIEWED`.
+12b. **Step 32** (`apply-step32-0287-precheck.sql`, then `apply-step32-0287.sql`): a session may be longer than the time between slot starts (a start every 15 minutes with a 55-minute session). Run it any time after step 25, and only when the booking-times release is out.
+    - You should see: 3 rows `true`, then "Success. No rows returned." Nothing visible changes at once.
 13. **`record-history-applied.sql`**: puts the hand-applied steps into the migration history.
     - You should see: "Success. No rows returned."
 
@@ -50,6 +52,7 @@ Already applied by you: steps 12 to 22 and 24. You do not touch those again.
       - The post-workout card appears for every client, including ones who keep workouts off the group feed and one-on-one clients.
       - Calendar: a "Send a note" button on a gap instead of any automatic text.
       - Time to progress?: on Home a collapsed row "N need a look" (only when a client's main lift has sat at the same load and reps for 3 or more sessions). Open it: at most 3 cards with Yes, deliberate / Show me options / Not now; "I'll ask after 3 sessions. Change" at the bottom. On a client with their own program, Show me options then Apply changes only their next workout. On a client's profile, "Turn this into a goal" appears once they have replied to the "what do you need most help with?" message.
+      - Booking at any time (needs the booking-times code): Availability has 15, 30, 45 and 60 as one-tap "Slot every" choices (after step 32, "Slot every 15" with "Session 55" saves). In request mode a client sees "Ask for a different time" under the open sessions: pick a start like 6:20 and it arrives on your Home as a request showing the start to end, your time zone and a note if it is outside your hours. On a client's day, "Another time" books any start and length for them. A session at an off-slot minute no longer shows as an open slot, and is not flagged as "no longer fits your hours" by the nightly check.
       - Wording: "coach" everywhere instead of "trainer", and Spotter / Ask Spot instead of "Collective Intelligence".
       - Exercise demos: open a workout and tap **Demo** under an exercise (try Bulgarian Split Squat). A sheet slides up with the video, big, and it does not play until you press play; it should show the Rear Foot Elevated Split Squat video. Close it with Close or by tapping outside. Also try an exercise you add or swap in the middle of a workout. In Settings > Workout Logging, **Hide exercise demos** removes the button (saved on that phone only; following you across phones is a later step).
 

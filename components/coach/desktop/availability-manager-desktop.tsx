@@ -4,7 +4,28 @@ import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { Copy, Pencil, Trash2 } from "lucide-react";
 import type { AvailabilityWindowRow } from "../availability-manager";
-import { copyTargets, validateWindow, type WindowDraft } from "@/lib/availability-edit";
+import { STEP_PRESETS, copyTargets, isSessionRuleError, timeToMinutes, validateWindow, type WindowDraft } from "@/lib/availability-edit";
+
+const RULE_PENDING = "A session longer than the time between starts needs a database update that has not been applied yet. Nothing was changed.";
+
+// 15, 30, 45 and 60 as one-tap choices for how often a slot starts; any whole number can still be typed in the box.
+function StepPresets({ value, onPick }: { value: number | string; onPick: (n: number) => void }) {
+  return (
+    <div className="flex flex-wrap gap-1.5" role="group" aria-label="How often a slot starts">
+      {STEP_PRESETS.map((n) => (
+        <button
+          key={n}
+          type="button"
+          onClick={() => onPick(n)}
+          aria-pressed={Number(value) === n}
+          className={`h-8 px-2.5 border font-body text-xs ${Number(value) === n ? "border-rust text-rust" : "border-steel/30 text-steel"}`}
+        >
+          {n}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -84,7 +105,7 @@ export function AvailabilityManagerDesktop({
     if (data) {
       setWindows((prev) => sortWindows([...prev, toRow(data)]));
     } else if (insertError) {
-      setError("Couldn't save that window.");
+      setError(isSessionRuleError(insertError.message) ? RULE_PENDING : "Couldn't save that window.");
     }
     setSubmitting(false);
   }
@@ -137,7 +158,7 @@ export function AvailabilityManagerDesktop({
       .single();
     setRowBusy(false);
     if (updateError || !data) {
-      setRowError("That didn't save. Nothing was changed. Try again.");
+      setRowError(isSessionRuleError(updateError?.message) ? RULE_PENDING : "That didn't save. Nothing was changed. Try again.");
       return;
     }
     setWindows((prev) => sortWindows(prev.map((w) => (w.id === editingId ? toRow(data) : w))));
@@ -272,6 +293,7 @@ export function AvailabilityManagerDesktop({
                               onChange={(e) => setDraft({ ...draft, slotMinutes: Number(e.target.value) })}
                               className={`${inputCls} w-24`}
                             />
+                            <StepPresets value={draft.slotMinutes} onPick={(n) => setDraft({ ...draft, slotMinutes: n })} />
                           </label>
                           {sessionLengthEnabled && (
                             <label className="flex flex-col gap-1">
@@ -444,6 +466,7 @@ export function AvailabilityManagerDesktop({
             onChange={(e) => setSlotDuration(e.target.value)}
             className={inputCls}
           />
+          <StepPresets value={slotDuration} onPick={(n) => setSlotDuration(String(n))} />
         </label>
         {sessionLengthEnabled && (
           <label className="flex flex-col gap-1">
@@ -496,11 +519,11 @@ function SessionLengthForAll({
       setErr("Session length must be a whole number from 5 to 480 minutes.");
       return;
     }
-    // A session cannot be longer than the time between slots: say which window is the problem instead of failing the whole change.
-    const tooShort = minutes == null ? [] : windows.filter((w) => w.slotDurationMinutes < minutes);
+    // A session may be longer than the time between starts, but it has to fit inside each window: say which window is the problem instead of failing the whole change.
+    const tooShort = minutes == null ? [] : windows.filter((w) => timeToMinutes(w.endTime) - timeToMinutes(w.startTime) < minutes);
     if (tooShort.length > 0) {
       setErr(
-        `${tooShort.map((w) => `${WEEKDAYS[w.weekday]} ${w.startTime.slice(0, 5)}–${w.endTime.slice(0, 5)} has a slot every ${w.slotDurationMinutes} minutes`).join("; ")}. Change that window's "Slot every" to ${minutes} or more (edit its row) first, then set the session length again. Nothing was changed.`
+        `${tooShort.map((w) => `${WEEKDAYS[w.weekday]} ${w.startTime.slice(0, 5)}–${w.endTime.slice(0, 5)} is shorter than ${minutes} minutes`).join("; ")}. Make that window longer (edit its row) first, then set the session length again. Nothing was changed.`
       );
       return;
     }
@@ -510,7 +533,7 @@ function SessionLengthForAll({
     const { error } = await supabase.from("coach_availability_windows").update({ session_minutes: minutes }).eq("coach_id", coachId);
     setBusy(false);
     if (error) {
-      setErr("That didn't save. Nothing was changed. Try again.");
+      setErr(isSessionRuleError(error.message) ? RULE_PENDING : "That didn't save. Nothing was changed. Try again.");
       return;
     }
     onChanged(minutes);

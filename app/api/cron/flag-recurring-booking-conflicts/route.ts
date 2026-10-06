@@ -27,7 +27,7 @@ async function handler(request: Request) {
 
   const { data: bookings } = await supabase
     .from("bookings")
-    .select("id, coach_id, athlete_id, group_id, start_at")
+    .select("id, coach_id, athlete_id, group_id, start_at, end_at")
     .not("recurring_series_id", "is", null)
     .eq("status", "confirmed")
     .eq("needs_coach_resolution", false)
@@ -103,7 +103,7 @@ async function handler(request: Request) {
       timezone
     );
 
-    if (!bookingFitsAvailability(bookingDate, windows, blockedRanges, timezone, localNoon)) {
+    if (!bookingFitsAvailability(bookingDate, windows, blockedRanges, timezone, localNoon, new Date(booking.end_at))) {
       await supabase.from("bookings").update({ needs_coach_resolution: true }).eq("id", booking.id);
       const entry = flaggedByCoach.get(booking.coach_id) ?? { groupId: booking.group_id, names: new Set<string>(), count: 0 };
       entry.names.add(nameByAthlete.get(booking.athlete_id) ?? "a client");

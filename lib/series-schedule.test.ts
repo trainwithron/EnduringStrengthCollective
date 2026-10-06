@@ -165,6 +165,13 @@ describe("conflicts", () => {
     expect(isBlockingConflict(r.conflict)).toBe(false);
   });
 
+  it("a session at any minute inside the weekly hours is not flagged (a start at 6:20 or 1:15 is fine), but one that runs past the end is", () => {
+    const [off] = classifyOccurrences([occurrenceAt("2026-10-20", "06:20", NY, 55, 0)], ctx);
+    expect(off.conflict).toBeNull();
+    const [pastEnd] = classifyOccurrences([occurrenceAt("2026-10-20", "11:30", NY, 60, 0)], ctx);
+    expect(pastEnd.conflict).toBe("outside_hours");
+  });
+
   it("hours are not flagged when the coach has set none", () => {
     const [r] = classifyOccurrences([occurrenceAt("2026-10-20", "15:00", NY, 60, 0)], { ...ctx, windows: [] });
     expect(r.conflict).toBeNull();

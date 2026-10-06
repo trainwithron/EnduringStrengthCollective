@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { generateSlotsForDate, formatSlotTime, resolveBlockedRangesForDate, type AvailabilityWindow } from "@/lib/booking-slots";
-import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
+import { generateSlotsForDate, formatSlotTime, resolveBlockedRangesForDate, bookingFitsAvailability, type AvailabilityWindow } from "@/lib/booking-slots";
+import { DEFAULT_COACH_TIMEZONE, zonedTimeToUtc } from "@/lib/timezone";
 import type { DraggedClient } from "./draggable-client-name";
 import type { CalendarEventEntry } from "./calendar-grid";
 import { notifyBookingConfirmed } from "@/lib/notify-booking-confirmed";
@@ -31,7 +31,7 @@ export function ExpandedDayScheduler({
   date: Date;
   groupId: string;
   client: DraggedClient;
-  bookings: { time: string; name: string }[];
+  bookings: { time: string; name: string; startMs?: number; endMs?: number }[];
   events: CalendarEventEntry[];
   availabilityWindows: AvailabilityWindow[];
   blockedRanges?: {
@@ -53,6 +53,9 @@ export function ExpandedDayScheduler({
   // The slot the coach picked, waiting for a confirm: book it once, or repeat it weekly.
   const [pending, setPending] = useState<{ start: Date; durationMinutes: number } | null>(null);
   const [repeating, setRepeating] = useState(false);
+  // Another time: the coach is human about it, so any start in 5-minute steps and any length, not only the slot starts (Ron, Oct 6).
+  const [otherTime, setOtherTime] = useState("");
+  const [otherMinutes, setOtherMinutes] = useState("");
 
   const daySlots = generateSlotsForDate(
     date,
@@ -60,6 +63,29 @@ export function ExpandedDayScheduler({
     resolveBlockedRangesForDate(date, blockedRanges ?? [], timezone),
     timezone
   );
+
+  const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  const defaultMinutes = daySlots[0]?.durationMinutes ?? 60;
+  const otherMinutesNumber = otherMinutes.trim() === "" ? defaultMinutes : Number(otherMinutes);
+  const otherValid = /^\d{2}:\d{2}$/.test(otherTime) && Number.isInteger(otherMinutesNumber) && otherMinutesNumber >= 5 && otherMinutesNumber <= 480;
+  const otherStart = otherValid ? zonedTimeToUtc(dateKey, otherTime, timezone) : null;
+  const otherEnd = otherStart ? new Date(otherStart.getTime() + otherMinutesNumber * 60000) : null;
+  // A warning, not a block: the coach decides, and the booking works at any time.
+  const otherOutsideHours =
+    otherStart && otherEnd
+      ? !bookingFitsAvailability(
+          otherStart,
+          availabilityWindows.filter((w) => w.weekday === date.getDay()),
+          resolveBlockedRangesForDate(date, blockedRanges ?? [], timezone),
+          timezone,
+          date,
+          otherEnd
+        )
+      : false;
+  const otherClash =
+    otherStart && otherEnd
+      ? bookings.some((b) => b.startMs != null && b.endMs != null && b.startMs < otherEnd.getTime() && b.endMs > otherStart.getTime())
+      : false;
 
   const dateLabel = date.toLocaleDateString("en-US", {
     weekday: "long",
@@ -226,7 +252,11 @@ export function ExpandedDayScheduler({
             <div className="grid grid-cols-3 gap-2">
               {daySlots.map((slot, idx) => {
                 const label = formatSlotTime(slot.start, timezone);
-                const taken = bookings.some((b) => b.time === label);
+                // Taken when another session overlaps it (a session can start at any minute), or starts at exactly this time.
+                const slotEndMs = slot.start.getTime() + slot.durationMinutes * 60000;
+                const taken = bookings.some((b) =>
+                  b.startMs != null && b.endMs != null ? b.startMs < slotEndMs && b.endMs > slot.start.getTime() : b.time === label
+                );
                 return (
                   <button
                     key={idx}
@@ -246,6 +276,52 @@ export function ExpandedDayScheduler({
               })}
             </div>
           )}
+
+          <div className="mt-4 border border-steel/20 p-3">
+            <h4 className="font-body text-xs text-steel uppercase tracking-wide mb-2">Another time</h4>
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="font-body text-xs text-steel">
+                Start
+                <input
+                  type="time"
+                  step={300}
+                  value={otherTime}
+                  onChange={(e) => setOtherTime(e.target.value)}
+                  className="mt-1 block h-10 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
+                />
+              </label>
+              <label className="font-body text-xs text-steel">
+                Minutes
+                <input
+                  type="number"
+                  min={5}
+                  max={480}
+                  step={5}
+                  value={otherMinutes}
+                  placeholder={String(defaultMinutes)}
+                  onChange={(e) => setOtherMinutes(e.target.value)}
+                  className="mt-1 block w-24 h-10 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
+                />
+              </label>
+              <button
+                type="button"
+                disabled={!otherStart || assigning}
+                onClick={() => {
+                  if (!otherStart) return;
+                  setAssignError(null);
+                  setRepeating(false);
+                  setPending({ start: otherStart, durationMinutes: otherMinutesNumber });
+                }}
+                className="h-10 px-4 border border-rust text-rust font-body text-sm disabled:opacity-40"
+              >
+                Choose this time
+              </button>
+            </div>
+            {otherStart && otherOutsideHours && !otherClash && (
+              <p className="font-body text-xs text-steel mt-2">This is outside your open hours or on your time off. You can still book it.</p>
+            )}
+            {otherClash && <p className="font-body text-xs text-rust mt-2">That overlaps another session on this day.</p>}
+          </div>
 
           {pending && (
             <div className="mt-4 border border-rust/40 p-4" role="group" aria-label="Confirm session">

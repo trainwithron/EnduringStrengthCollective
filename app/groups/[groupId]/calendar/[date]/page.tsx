@@ -4,7 +4,7 @@ import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
-import { generateSlotsForDate, formatSlotTime, minimumNoticeBlockedRange, isSlotBufferBlocked } from "@/lib/booking-slots";
+import { generateSlotsForDate, formatSlotTime, minimumNoticeBlockedRange, slotConflict, customStartOptions } from "@/lib/booking-slots";
 import { expiryWindowLine } from "@/lib/expiry-checkin";
 import { creditExpiryDate } from "@/lib/credit-expiration";
 import { getBlockedRangesForDate } from "@/lib/availability-exceptions";
@@ -12,6 +12,7 @@ import { zonedTimeToUtc, DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { addDaysToDateKey } from "@/lib/series-schedule";
 import { coachBalanceLabel } from "@/lib/reup";
 import { AssignSlotButton } from "@/components/coach/desktop/assign-slot-button";
+import { AssignOtherTime } from "@/components/coach/desktop/assign-other-time";
 import { AssignWorkoutToDateButton } from "@/components/coach/desktop/assign-workout-to-date-button";
 import { AddDayEventForm } from "@/components/coach/desktop/add-day-event-form";
 import { getActiveProgramForAthlete, getAllProgramWorkouts, getScheduledWorkouts, dateKeyOf } from "@/lib/athlete-day-schedule";
@@ -20,6 +21,7 @@ import { CancelBookingButton } from "@/components/athlete/cancel-booking-button"
 import { MarkAttendedControl, type CreditState } from "@/components/coach/mark-attended-control";
 import { RescheduleSlotButton } from "@/components/athlete/reschedule-slot-button";
 import { RequestSlotButton } from "@/components/athlete/request-slot-button";
+import { RequestDifferentTime } from "@/components/athlete/request-different-time";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { DayHourGrid } from "@/components/coach/desktop/day-hour-grid";
@@ -126,6 +128,10 @@ export default async function CoachDayDetailPage(
     let availablePackages: PackageOption[] = [];
     let bufferBlockingBookings: { id: string; start: Date; end: Date }[] = [];
     let resolvedBufferMinutes = 0;
+    // Start times a client can ask for beyond the regular slots (request mode): every 5 minutes inside the hours, clear of time off and other sessions.
+    let customStarts: { start: Date; durationMinutes: number }[] = [];
+    let dayStartUtc: Date | null = null;
+    let dayEndUtc: Date | null = null;
     let waitlistStatusByTime = new Map<number, "waiting" | "offered">();
 
     if (coachMembership) {
@@ -205,6 +211,8 @@ export default async function CoachDayDetailPage(
       const zonedDayStart = zonedTimeToUtc(params.date, "00:00", timezone);
       // The next local midnight, not +24 hours: a day with a clock change is 23 or 25 hours long.
       const zonedDayEnd = zonedTimeToUtc(addDaysToDateKey(params.date, 1), "00:00", timezone);
+      dayStartUtc = zonedDayStart;
+      dayEndUtc = zonedDayEnd;
       const bufferMinutes = policyRow?.buffer_minutes ?? 0;
       const minimumNoticeHours = policyRow?.minimum_notice_hours ?? 0;
 
@@ -238,6 +246,15 @@ export default async function CoachDayDetailPage(
         end: new Date(b.end_at as string),
       }));
       resolvedBufferMinutes = bufferMinutes;
+      customStarts = customStartOptions({
+        date,
+        windows,
+        blockedRanges,
+        bookings: bufferBlockingBookings,
+        bufferMinutes,
+        timezone,
+        excludeStarts: new Set(slots.map((s) => s.start.getTime())),
+      });
     }
 
     const bookingByTime = new Map(
@@ -263,13 +280,21 @@ export default async function CoachDayDetailPage(
     }
     // Times this client has already asked for (pending requests), so the slot says "Requested" instead of offering the button again.
     const requestedTimes = new Set<number>();
+    // Requests at a time that is not one of the slots (asked for with "Ask for a different time") are listed on their own, so nothing the client asked for is lost.
+    const offGridRequests: { start: Date; end: Date }[] = [];
     if (bookingMode === "request") {
       const { data: pendingRows } = await supabase
         .from("booking_requests")
-        .select("new_start_at")
+        .select("new_start_at, new_end_at")
         .eq("athlete_id", athleteId)
         .eq("status", "pending");
       for (const r of pendingRows ?? []) requestedTimes.add(new Date(r.new_start_at as string).getTime());
+      const slotStarts = new Set(slots.map((s) => s.start.getTime()));
+      for (const r of pendingRows ?? []) {
+        const s = new Date(r.new_start_at as string);
+        const e = new Date((r.new_end_at as string | null) ?? (r.new_start_at as string));
+        if (!slotStarts.has(s.getTime()) && dayStartUtc && dayEndUtc && s >= dayStartUtc && s < dayEndUtc) offGridRequests.push({ start: s, end: e });
+      }
     }
     const backHref = `/groups/${params.groupId}/calendar`;
 
@@ -348,14 +373,15 @@ export default async function CoachDayDetailPage(
                 // buffer-blocked) slot doesn't invite a click that the
                 // RPC would just reject. Excludes the booking currently
                 // being rescheduled from its own buffer check.
-                const isBufferBlocked =
-                  !booking &&
-                  isSlotBufferBlocked(
-                    start,
-                    endAt,
-                    bufferBlockingBookings.filter((b) => b.id !== reschedulingBooking?.id),
-                    resolvedBufferMinutes
-                  );
+                const conflict = booking
+                  ? null
+                  : slotConflict(
+                      start,
+                      endAt,
+                      bufferBlockingBookings.filter((b) => b.id !== reschedulingBooking?.id),
+                      resolvedBufferMinutes
+                    );
+                const isBufferBlocked = conflict !== null;
 
                 return (
                   <div key={iso} className="py-3 flex items-center justify-between">
@@ -369,7 +395,7 @@ export default async function CoachDayDetailPage(
                       booking ? (
                         <span className="font-body text-xs text-steel">Booked</span>
                       ) : isBufferBlocked ? (
-                        <span className="font-body text-xs text-steel">Too close to another session</span>
+                        <span className="font-body text-xs text-steel">{conflict === "taken" ? "Booked" : "Too close to another session"}</span>
                       ) : (
                         <RescheduleSlotButton
                           requestOnly={bookingMode === "request"}
@@ -399,7 +425,7 @@ export default async function CoachDayDetailPage(
                         />
                       )
                     ) : isBufferBlocked ? (
-                      <span className="font-body text-xs text-steel">Too close to another session</span>
+                      <span className="font-body text-xs text-steel">{conflict === "taken" ? "Booked" : "Too close to another session"}</span>
                     ) : bookingMode === "request" && requestedTimes.has(start.getTime()) ? (
                       <span className="font-body text-xs text-chalk">Requested. Waiting for your coach.</span>
                     ) : bookingMode === "request" ? (
@@ -434,6 +460,30 @@ export default async function CoachDayDetailPage(
                 );
               })}
             </div>
+          )}
+
+          {bookingMode === "request" && offGridRequests.length > 0 && (
+            <div className="mt-4">
+              <h3 className="font-display uppercase text-xs tracking-wide text-steel mb-1">Waiting for your coach</h3>
+              {offGridRequests.map((r) => (
+                <p key={r.start.getTime()} className="font-body text-sm text-chalk">
+                  {formatSlotTime(r.start, timezone)} to {formatSlotTime(r.end, timezone)}
+                </p>
+              ))}
+            </div>
+          )}
+          {bookingMode === "request" && !reschedulingBooking && coachMembership && customStarts.length > 0 && (
+            <RequestDifferentTime
+              coachId={coachMembership.profile_id}
+              athleteId={athleteId}
+              groupId={params.groupId}
+              sessionMinutes={customStarts[0]?.durationMinutes ?? null}
+              options={customStarts.map((o) => ({
+                startAt: o.start.toISOString(),
+                endAt: new Date(o.start.getTime() + o.durationMinutes * 60000).toISOString(),
+                label: formatSlotTime(o.start, timezone),
+              }))}
+            />
           )}
         </section>
 
@@ -736,6 +786,22 @@ export default async function CoachDayDetailPage(
             );
           })}
         </div>
+      )}
+
+      {/* A coach is human about times: book at any start in 5-minute steps and any length, not only the slot starts. */}
+      {selectedClient && clientId && (
+        <AssignOtherTime
+          coachId={user.id}
+          athleteId={clientId}
+          groupId={params.groupId}
+          dateKey={params.date}
+          timezone={timezone}
+          defaultMinutes={slots[0]?.durationMinutes ?? windows.find((w) => w.weekday === date.getDay())?.sessionMinutes ?? windows.find((w) => w.weekday === date.getDay())?.slotDurationMinutes ?? 60}
+          openRanges={windows
+            .filter((w) => w.weekday === date.getDay())
+            .map((w) => ({ startMs: zonedTimeToUtc(params.date, w.startTime, timezone).getTime(), endMs: zonedTimeToUtc(params.date, w.endTime, timezone).getTime() }))}
+          busyRanges={(bookingRows ?? []).map((b: any) => ({ startMs: new Date(b.start_at).getTime(), endMs: new Date(b.end_at).getTime() }))}
+        />
       )}
 
       {/* Sessions at a time that is not one of the open slots (booked outside hours, or hours changed since) still need Mark attended

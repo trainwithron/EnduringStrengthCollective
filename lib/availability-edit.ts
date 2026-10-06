@@ -16,6 +16,15 @@ export interface ExistingWindow {
   endTime: string;
 }
 
+// The quick choices for how often a slot starts (any whole number from 5 to 480 can still be typed). 15 and 30 are first-class: a coach can offer a start
+// every 15 minutes while each session lasts 55 (Ron, Oct 6: "be human, not tied to a system").
+export const STEP_PRESETS = [15, 30, 45, 60];
+
+// The database refuses a session longer than the step until step 32 (0287) is applied; this recognises that refusal so the screen can say so plainly.
+export function isSessionRuleError(message: string | null | undefined): boolean {
+  return !!message && /coach_availability_windows_session_minutes_range/.test(message);
+}
+
 export const MIN_SLOT_MINUTES = 5;
 export const MAX_SLOT_MINUTES = 480;
 
@@ -44,7 +53,8 @@ export function validateWindow(draft: WindowDraft, others: ExistingWindow[], ign
     if (!Number.isInteger(draft.sessionMinutes) || draft.sessionMinutes < MIN_SLOT_MINUTES || draft.sessionMinutes > MAX_SLOT_MINUTES) {
       return `Session length must be a whole number from ${MIN_SLOT_MINUTES} to ${MAX_SLOT_MINUTES} minutes.`;
     }
-    if (draft.sessionMinutes > draft.slotMinutes) return "A session can't be longer than the time between slots.";
+    // A session may be longer than the time between starts (starts then overlap), but it has to fit inside the window.
+    if (draft.sessionMinutes > end - start) return "A session can't be longer than the whole window.";
   }
   const clash = others.find((o) => o.id !== ignoreId && windowsOverlap(draft, o));
   if (clash) return "That overlaps another window on the same day. Change or delete the other one first.";

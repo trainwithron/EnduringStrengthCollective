@@ -649,6 +649,21 @@ alter table public.coach_availability_windows drop column if exists session_minu
     undoWhy: "A deleted group cannot be put back by a button. This lists what was saved in cleanup_backups so it can be restored by hand: every group, program, workout, exercise, set, note, progression, membership, wellness check-in, view-state row and Spotter dismissal of both groups is in the payload. To put it all back in one go run restore-step31-from-backup.sql (it restores the most recent backup and refuses if either group already exists).",
     rows: [["both groups exist","(select count(*) from public.groups where id in ('b292055b-edc6-4171-ad2b-a89d65dcd8db', 'c368ab0b-ccab-442e-a42e-38fb22293182')) = 2"],["the copy of christmas_abs_program is in The Home Team","exists (select 1 from public.programs where group_id = '060017b5-e613-4204-a101-c6a14c3a9630' and name = 'christmas_abs_program')"],["neither group has a client","not exists (select 1 from public.group_memberships where group_id in ('b292055b-edc6-4171-ad2b-a89d65dcd8db', 'c368ab0b-ccab-442e-a42e-38fb22293182') and role = 'athlete')"],["neither group has a logged workout, a booking or a session record","not exists (select 1 from public.workout_logs where group_id in ('b292055b-edc6-4171-ad2b-a89d65dcd8db', 'c368ab0b-ccab-442e-a42e-38fb22293182')) and not exists (select 1 from public.bookings where group_id in ('b292055b-edc6-4171-ad2b-a89d65dcd8db', 'c368ab0b-ccab-442e-a42e-38fb22293182')) and not exists (select 1 from public.athlete_sessions where group_id in ('b292055b-edc6-4171-ad2b-a89d65dcd8db', 'c368ab0b-ccab-442e-a42e-38fb22293182'))"],["step 31 is not already applied (both groups are still there)","(select count(*) from public.groups where id in ('b292055b-edc6-4171-ad2b-a89d65dcd8db', 'c368ab0b-ccab-442e-a42e-38fb22293182')) = 2"]].map(([n, e]) => [n, e]),
   },
+  {
+    n: "32",
+    slug: "0287",
+    title: "0287 a session can be longer than the time between slot starts (a start every 15 minutes with a 55-minute session); the session still has to fit inside its window",
+    migrations: ["0287"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing visible changes at once and no existing hours change. After the code deploy a coach can set Slot every 15 (or 5, 10, 20, 30) minutes together with a session length of 55 or 60: starts overlap, and booking one blocks the others it overlaps. Run this after step 25.",
+    undo: "-- Puts the old rule back (a session no longer than the step). A window set up under the new rule (a session longer than its step) is first made the same as its step, so the old rule can be applied.\nupdate public.coach_availability_windows set session_minutes = slot_duration_minutes where session_minutes is not null and session_minutes > slot_duration_minutes;\nalter table public.coach_availability_windows drop constraint if exists coach_availability_windows_session_minutes_range;\nalter table public.coach_availability_windows add constraint coach_availability_windows_session_minutes_range check (session_minutes is null or (session_minutes between 5 and 480 and session_minutes <= slot_duration_minutes));",
+    undoWhy: "Only if overlapping starts misbehave. Restores the 0283 rule (a session no longer than the step). Any window with a session longer than its step is changed to a session the same as its step first; nothing else is touched.",
+    rows: [
+      ["coach_availability_windows has the session length column (step 25 / 0283 is applied)", has.col("coach_availability_windows", "session_minutes")],
+      ["0287 is not already applied (the old rule, a session no longer than the step, is still the rule)", "exists (select 1 from pg_constraint where conname = 'coach_availability_windows_session_minutes_range' and pg_get_constraintdef(oid) like '%slot_duration_minutes%')"],
+      ["no window already has hours where the end is not after the start", "not exists (select 1 from public.coach_availability_windows where end_time <= start_time)"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);

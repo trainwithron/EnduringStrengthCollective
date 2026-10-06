@@ -144,17 +144,70 @@ export function minimumNoticeBlockedRange(now: Date, minimumNoticeHours: number)
 // flagged, without removing already-booked slots from the rendered list
 // (this app's day-detail pages show every slot with its own booked/open
 // status, not just the open ones).
+// A session can start at any minute (Ron, Oct 6: "be human, not tied to a system"), so a booking made at 6:20 must block the 6:00 and 6:15 slots even with no
+// buffer: this is plain overlap, widened by the buffer when there is one. (It used to say nothing at a buffer of 0, which only worked while every session
+// started exactly on a slot.)
 export function isSlotBufferBlocked(
   slotStart: Date,
   slotEnd: Date,
   otherBookings: { start: Date; end: Date }[],
   bufferMinutes: number
 ): boolean {
-  if (bufferMinutes <= 0) return false;
+  return slotConflict(slotStart, slotEnd, otherBookings, bufferMinutes) !== null;
+}
+
+// Why a slot cannot be booked, so the words can be right: "taken" when another session overlaps it, "buffer" when it only comes within the buffer of one.
+export function slotConflict(
+  slotStart: Date,
+  slotEnd: Date,
+  otherBookings: { start: Date; end: Date }[],
+  bufferMinutes: number
+): "taken" | "buffer" | null {
+  if (otherBookings.some((b) => overlaps(slotStart, slotEnd, b.start, b.end))) return "taken";
+  if (bufferMinutes <= 0) return null;
   const bufferMs = bufferMinutes * 60000;
-  return otherBookings.some((b) =>
+  const near = otherBookings.some((b) =>
     overlaps(slotStart, slotEnd, new Date(b.start.getTime() - bufferMs), new Date(b.end.getTime() + bufferMs))
   );
+  return near ? "buffer" : null;
+}
+
+export interface CustomStartOption {
+  start: Date;
+  durationMinutes: number;
+}
+
+// The start times a client can ask for beyond the regular slots (request mode, "Ask for a different time"): every `stepMinutes` (5) inside the coach's open hours
+// for that day, long enough for the window's session, clear of time off and of other sessions (with the buffer). Regular slot starts are left out because they
+// are already offered. Nothing here books anything: the client's pick becomes an ordinary request the coach confirms.
+export function customStartOptions(input: {
+  date: Date;
+  windows: AvailabilityWindow[];
+  blockedRanges: BlockedRange[];
+  bookings: { start: Date; end: Date }[];
+  bufferMinutes: number;
+  timezone?: string;
+  stepMinutes?: number;
+  excludeStarts?: Set<number>;
+}): CustomStartOption[] {
+  const { date, windows, blockedRanges, bookings, bufferMinutes } = input;
+  const timezone = input.timezone ?? DEFAULT_COACH_TIMEZONE;
+  const step = input.stepMinutes && input.stepMinutes > 0 ? input.stepMinutes : 5;
+  const dateKey = dateKeyOf(date);
+  const out = new Map<number, CustomStartOption>();
+  for (const w of windows.filter((w) => w.weekday === date.getDay())) {
+    const start = zonedTimeToUtc(dateKey, w.startTime, timezone);
+    const end = zonedTimeToUtc(dateKey, w.endTime, timezone);
+    const length = w.sessionMinutes && w.sessionMinutes > 0 ? w.sessionMinutes : w.slotDurationMinutes;
+    for (let cursor = new Date(start); cursor.getTime() + length * 60000 <= end.getTime(); cursor = new Date(cursor.getTime() + step * 60000)) {
+      const slotEnd = new Date(cursor.getTime() + length * 60000);
+      if (input.excludeStarts?.has(cursor.getTime())) continue;
+      if (blockedRanges.some((b) => overlaps(cursor, slotEnd, b.start, b.end))) continue;
+      if (slotConflict(cursor, slotEnd, bookings, bufferMinutes) !== null) continue;
+      if (!out.has(cursor.getTime())) out.set(cursor.getTime(), { start: new Date(cursor), durationMinutes: length });
+    }
+  }
+  return [...out.values()].sort((a, b) => a.start.getTime() - b.start.getTime());
 }
 
 // acuity_replacement_gap_audit_sept16.md — recurring bookings, the
@@ -171,8 +224,19 @@ export function bookingFitsAvailability(
   timezone: string = DEFAULT_COACH_TIMEZONE,
   // Noon of the booking's day ON THE COACH'S CLOCK. The slot helpers read a Date's calendar day and weekday in the machine's own
   // zone (UTC on the server), so an evening session would otherwise be checked against tomorrow's hours.
-  dayDate?: Date
+  dayDate?: Date,
+  // With the session's end, "fits" means the whole session sits inside one of the coach's open windows and clear of time off, so a session at any minute
+  // (6:20, 1:15) still fits. Without it the old rule applies: the start must be exactly one of the generated slots.
+  bookingEnd?: Date
 ): boolean {
-  const slots = generateSlotsForDate(dayDate ?? bookingStart, windows, blockedRanges, timezone);
+  const day = dayDate ?? bookingStart;
+  if (bookingEnd) {
+    const dateKey = dateKeyOf(day);
+    const inside = windows
+      .filter((w) => w.weekday === day.getDay())
+      .some((w) => zonedTimeToUtc(dateKey, w.startTime, timezone) <= bookingStart && bookingEnd <= zonedTimeToUtc(dateKey, w.endTime, timezone));
+    return inside && !blockedRanges.some((b) => overlaps(bookingStart, bookingEnd, b.start, b.end));
+  }
+  const slots = generateSlotsForDate(day, windows, blockedRanges, timezone);
   return slots.some((s) => s.start.getTime() === bookingStart.getTime());
 }
