@@ -34,12 +34,14 @@ export function SmsSettingsForm({
   const [quietEnd, setQuietEnd] = useState(initialQuietHoursEnd ?? "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   async function persist(overrides: Partial<{ phone: string; smsEnabled: boolean; quietStart: string; quietEnd: string }> = {}) {
     setSaving(true);
     setSaved(false);
+    setSaveError(null);
     const supabase = createBrowserClient();
-    await supabase.from("coach_sms_config").upsert(
+    const { error } = await supabase.from("coach_sms_config").upsert(
       {
         coach_id: coachId,
         phone: (overrides.phone ?? phone).trim() || null,
@@ -51,13 +53,19 @@ export function SmsSettingsForm({
       { onConflict: "coach_id" }
     );
     setSaving(false);
+    if (error) {
+      setSaveError("That didn't save. Nothing was changed. Check your connection and try again.");
+      return false;
+    }
     setSaved(true);
+    return true;
   }
 
-  function handleToggle() {
+  async function handleToggle() {
     const next = !smsEnabled;
     setSmsEnabled(next);
-    persist({ smsEnabled: next });
+    // The switch is put back when the save fails, so it never shows "on" for something that is not saved.
+    if (!(await persist({ smsEnabled: next }))) setSmsEnabled(!next);
   }
 
   return (
@@ -143,6 +151,11 @@ export function SmsSettingsForm({
       </p>
 
       <p className="font-body text-xs text-steel">{saving ? "Saving…" : saved ? "Saved." : ""}</p>
+      {saveError && (
+        <p className="font-body text-xs text-rust" role="alert">
+          {saveError}
+        </p>
+      )}
     </div>
   );
 }
