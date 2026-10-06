@@ -14,7 +14,7 @@ Nothing here is pushed, deployed or applied. The Oct 5 evening deploy (head 981e
    - step 12 (0270) a coach can only add their own clients to a group
    - step 14 (0273) guards on groups and organizations
    - step 16 (0275) a client's cancelled or moved week of a weekly schedule stays skipped
-   - step 13 (0271) database functions are signed-in and server only
+   - step 13 (0271) database functions are signed-in and server only. After it, paste `supabase\apply\check-step13-probe.sql` (it rolls itself back): it must show anon_can_run = false. Note for later: after any future CREATE EXTENSION run in the SQL editor, grant execute on its functions to authenticated and service_role.
    - step 15 (0274) a completed workout is locked against added or deleted sets and against being reopened
    - (reviewed read-only against the live database by the Assistant session; steps 13 and 15 were revised after that review and are being re-checked)
    - then deploy the care batch (code)
