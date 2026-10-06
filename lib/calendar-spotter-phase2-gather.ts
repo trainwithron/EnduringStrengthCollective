@@ -9,23 +9,18 @@ import {
   detectBookedVsActualMismatch,
   type AvailabilityWindow,
 } from "./calendar-spotter-phase2";
+import { ASK_HEADLINE, FOLLOWUP_HEADLINE, scheduleGapsStage, type GapAnswerEvent } from "./schedule-gaps-question";
 
 export interface SchedulingSpotterFlag {
-  checkKind: "recurring_gap" | "uneven_load" | "duration_mismatch";
+  checkKind: "schedule_gaps" | "recurring_gap" | "uneven_load" | "duration_mismatch";
   patternKey: string;
   headline: string;
+  // For the gap question: which of its two questions this is (the first asks whether to fill the gaps, the second what kind of clients).
+  stage?: "ask" | "followup";
 }
 
-const WEEKDAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const LOOKBACK_DAYS_FOR_GAPS = 45; // covers the 6-week default lookback with room to spare
 const LOOKBACK_DAYS_FOR_LOAD = 30;
-
-function formatTime(time: string): string {
-  const [h, m] = time.split(":").map(Number);
-  const period = h >= 12 ? "PM" : "AM";
-  const hour12 = h % 12 === 0 ? 12 : h % 12;
-  return `${hour12}:${String(m).padStart(2, "0")} ${period}`;
-}
 
 export async function gatherSchedulingSpotterFlags(
   supabase: SupabaseClient,
@@ -47,7 +42,7 @@ export async function gatherSchedulingSpotterFlags(
       .eq("status", "confirmed")
       .gte("start_at", new Date(now.getTime() - LOOKBACK_DAYS_FOR_GAPS * 86400000).toISOString())
       .lte("start_at", now.toISOString()),
-    supabase.from("spotter_recommendation_feedback").select("dismissal_key, action, created_at").eq("coach_id", coachId).eq("spotter_kind", "calendar").order("created_at", { ascending: false }),
+    supabase.from("spotter_recommendation_feedback").select("dismissal_key, action, created_at, edit_detail").eq("coach_id", coachId).eq("spotter_kind", "calendar").order("created_at", { ascending: false }),
   ]);
 
   const dismissedKeys = new Set<string>();
@@ -75,15 +70,17 @@ export async function gatherSchedulingSpotterFlags(
     endTime: w.end_time,
   }));
   const gapBookings = (recentBookingRows ?? []).map((b) => ({ startAt: new Date(b.start_at) }));
+  // Windows that have sat unbooked for six weeks, only ever from days the coach actually has hours on (a day with no window is never looked at). They are
+  // asked about once, in one friendly line, and the answer is remembered (lib/schedule-gaps-question.ts), instead of one line per window.
   const gaps = detectRecurringScheduleGaps(windows, gapBookings, now, 6);
-  for (const gap of gaps) {
-    const patternKey = `${gap.weekday}-${gap.startTime}-${gap.endTime}`;
-    if (dismissedKeys.has(`recurring_gap::${patternKey}`)) continue;
-    flags.push({
-      checkKind: "recurring_gap",
-      patternKey,
-      headline: `Your ${WEEKDAY_LABELS[gap.weekday]} ${formatTime(gap.startTime)}–${formatTime(gap.endTime)} slot has gone unbooked for ${gap.weeksChecked} straight weeks — real open capacity, or worth closing?`,
-    });
+  if (gaps.length > 0) {
+    const answers: GapAnswerEvent[] = (dismissalRows ?? [])
+      .filter((r: any) => r.dismissal_key === "schedule_gaps::all" || r.dismissal_key === "schedule_gaps::clients")
+      .map((r: any) => ({ key: r.dismissal_key as string, detail: (r.edit_detail as string | null) ?? null, at: r.created_at as string }));
+    const stage = scheduleGapsStage(answers, now);
+    if (stage !== "quiet") {
+      flags.push({ checkKind: "schedule_gaps", patternKey: stage === "ask" ? "all" : "clients", headline: stage === "ask" ? ASK_HEADLINE : FOLLOWUP_HEADLINE, stage });
+    }
   }
 
   // --- Pattern 2: uneven load across a multi-trainer org ---

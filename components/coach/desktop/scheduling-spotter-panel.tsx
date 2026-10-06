@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { SchedulingSpotterFlag } from "@/lib/calendar-spotter-phase2-gather";
+import { ASK_HEADLINE, CLIENT_KINDS, FOLLOWUP_HEADLINE, type ClientKind } from "@/lib/schedule-gaps-question";
 
 // Calendar Spotter Phase 2 — recurring gaps, uneven multi-trainer load,
 // and booked-vs-actual duration mismatch. Same suggestive-only,
@@ -23,6 +24,8 @@ export function SchedulingSpotterPanel({
   const router = useRouter();
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [handled, setHandled] = useState<Set<string>>(new Set());
+  // The gap question has two parts: after "Looking to fill them" it moves straight on to what kind of clients, without a reload.
+  const [gapStage, setGapStage] = useState<"ask" | "followup" | null>(null);
 
   const visible = flags.filter((f) => !handled.has(`${f.checkKind}::${f.patternKey}`));
   if (visible.length === 0) return null;
@@ -37,6 +40,30 @@ export function SchedulingSpotterPanel({
       for (const f of visible) next.add(`${f.checkKind}::${f.patternKey}`);
       return next;
     });
+  }
+
+  // The gap question's answers are kept as the coach's own feedback rows (fill / happy / later, then online / hybrid / in_person / later).
+  async function answerGaps(flag: SchedulingSpotterFlag, stage: "ask" | "followup", answer: "fill" | "happy" | "later" | ClientKind) {
+    const key = `${flag.checkKind}::${flag.patternKey}`;
+    setBusyKey(key);
+    try {
+      const res = await fetch("/api/calendar-spotter/feedback", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          checkKind: "schedule_gaps",
+          patternKey: stage === "ask" ? "all" : "clients",
+          headline: stage === "ask" ? ASK_HEADLINE : FOLLOWUP_HEADLINE,
+          action: answer === "fill" ? "confirmed" : answer === "happy" || answer === "later" ? "denied" : "edited",
+          detail: answer,
+        }),
+      });
+      if (!res.ok) return;
+      if (stage === "ask" && answer === "fill") setGapStage("followup");
+      else setHandled((prev) => new Set(prev).add(key));
+    } finally {
+      setBusyKey(null);
+    }
   }
 
   async function sendFeedback(flag: SchedulingSpotterFlag, action: "confirmed" | "denied" | "edited") {
@@ -75,6 +102,42 @@ export function SchedulingSpotterPanel({
         {visible.map((flag) => {
           const key = `${flag.checkKind}::${flag.patternKey}`;
           const busy = busyKey === key;
+          if (flag.checkKind === "schedule_gaps") {
+            const stage = gapStage ?? flag.stage ?? "ask";
+            const choice = "h-11 px-4 border font-body text-sm disabled:opacity-50";
+            return (
+              <div key={key} className="flex items-start gap-2">
+                <span className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 bg-rust" />
+                <div className="flex-1">
+                  <p className="font-body text-sm text-chalk">{stage === "ask" ? ASK_HEADLINE : FOLLOWUP_HEADLINE}</p>
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
+                    {stage === "ask" ? (
+                      <>
+                        <button type="button" disabled={busy} onClick={() => answerGaps(flag, "ask", "fill")} className={`${choice} border-rust text-rust`}>
+                          Looking to fill them
+                        </button>
+                        <button type="button" disabled={busy} onClick={() => answerGaps(flag, "ask", "happy")} className={`${choice} border-steel/30 text-chalk`}>
+                          Happy where I am
+                        </button>
+                        <a href={availabilityHref} className="font-body text-xs text-steel underline">
+                          Edit my hours
+                        </a>
+                      </>
+                    ) : (
+                      CLIENT_KINDS.map((k) => (
+                        <button key={k.id} type="button" disabled={busy} onClick={() => answerGaps(flag, "followup", k.id)} className={`${choice} border-rust text-rust`}>
+                          {k.label}
+                        </button>
+                      ))
+                    )}
+                    <button type="button" disabled={busy} onClick={() => answerGaps(flag, stage, "later")} className={`${choice} border-steel/30 text-steel`}>
+                      Not now
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          }
           return (
             <div key={key} className="flex items-start gap-2">
               <span className="mt-1 w-1.5 h-1.5 rounded-full shrink-0 bg-rust" />

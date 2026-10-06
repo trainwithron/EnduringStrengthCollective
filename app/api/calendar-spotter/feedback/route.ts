@@ -33,8 +33,8 @@ export async function POST(request: Request) {
     dismissal_key: `${checkKind}::${patternKey}`,
     option_summary: headline,
     action,
-    // How long a "Not now" keeps a finding quiet, in days (a plain number); anything else is ignored.
-    edit_detail: typeof detail === "string" && /^\d{1,3}$/.test(detail) ? detail : null,
+    // How long a "Not now" keeps a finding quiet, in days, or a short word for the gap question's answers (fill, happy, later, online, hybrid, in_person); anything else is ignored.
+    edit_detail: typeof detail === "string" && /^(\d{1,3}|[a-z_]{1,20})$/.test(detail) ? detail : null,
   });
   if (error) return NextResponse.json({ error: "Couldn't save that feedback — try again." }, { status: 500 });
 
