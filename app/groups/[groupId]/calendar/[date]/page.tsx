@@ -1,3 +1,4 @@
+import { fetchSessionMinutes, sessionMinutesFor } from "@/lib/availability-windows";
 import Link from "next/link";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
@@ -180,11 +181,13 @@ export default async function CoachDayDetailPage(
       );
 
       const timezone = coachProfile?.timezone ?? DEFAULT_COACH_TIMEZONE;
+      const sessionIndex = await fetchSessionMinutes(supabase, [coachMembership.profile_id]);
       const windows = (windowRows ?? []).map((w) => ({
         weekday: w.weekday,
         startTime: w.start_time,
         endTime: w.end_time,
         slotDurationMinutes: w.slot_duration_minutes,
+        sessionMinutes: sessionMinutesFor(sessionIndex, coachMembership.profile_id, w),
       }));
       creditBalance = creditsRow?.balance ?? 0;
       creditExpiresAt = creditExpiryDate(creditsRow?.last_granted_at ?? null, policyRow?.credit_expiry_days ?? 0);
@@ -494,11 +497,13 @@ export default async function CoachDayDetailPage(
   ]);
 
   const timezone = viewerProfile?.timezone ?? DEFAULT_COACH_TIMEZONE;
+  const sessionIndex = await fetchSessionMinutes(supabase, [user.id]);
   const windows = (windowRows ?? []).map((w) => ({
     weekday: w.weekday,
     startTime: w.start_time,
     endTime: w.end_time,
     slotDurationMinutes: w.slot_duration_minutes,
+    sessionMinutes: sessionMinutesFor(sessionIndex, user.id, w),
   }));
 
   const zonedDayStart = zonedTimeToUtc(params.date, "00:00", timezone);

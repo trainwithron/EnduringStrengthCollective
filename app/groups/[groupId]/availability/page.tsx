@@ -57,12 +57,18 @@ export default async function AvailabilityPage(
     .order("weekday", { ascending: true })
     .order("start_time", { ascending: true });
 
+  // Session length (migration 0283). Until it is applied the select errors and the setting is simply hidden.
+  const sessionResult = await supabase.from("coach_availability_windows").select("id, session_minutes").eq("coach_id", user.id);
+  const sessionLengthEnabled = !sessionResult.error;
+  const sessionById = new Map(((sessionResult.data ?? []) as { id: string; session_minutes: number | null }[]).map((r) => [r.id, r.session_minutes]));
+
   const windows = (windowRows ?? []).map((w) => ({
     id: w.id,
     weekday: w.weekday,
     startTime: w.start_time,
     endTime: w.end_time,
     slotDurationMinutes: w.slot_duration_minutes,
+    sessionMinutes: sessionById.get(w.id) ?? null,
   }));
 
   const { data: policyRow } = await supabase
@@ -137,7 +143,7 @@ export default async function AvailabilityPage(
 
       <AvailabilityExceptionsManager coachId={user.id} initialExceptions={exceptions} />
 
-      <AvailabilityManagerDesktop coachId={user.id} initialWindows={windows} />
+      <AvailabilityManagerDesktop coachId={user.id} initialWindows={windows} sessionLengthEnabled={sessionLengthEnabled} />
 
     </CoachDesktopShell>
   );

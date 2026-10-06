@@ -1,3 +1,4 @@
+import { fetchSessionMinutes, sessionMinutesFor } from "@/lib/availability-windows";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { generateSlotsForDate, resolveBlockedRangesForDate } from "@/lib/booking-slots";
@@ -59,12 +60,14 @@ export async function GET(request: Request, props: { params: Promise<{ coachId: 
     .select("kind, start_at, end_at, weekday, start_time, end_time")
     .eq("coach_id", params.coachId);
 
+  const sessionIndex = await fetchSessionMinutes(supabase, [params.coachId]);
   const targetDate = new Date(`${date}T00:00:00`);
   const windows = (windowRows ?? []).map((w) => ({
     weekday: w.weekday,
     startTime: w.start_time,
     endTime: w.end_time,
     slotDurationMinutes: w.slot_duration_minutes,
+    sessionMinutes: sessionMinutesFor(sessionIndex, params.coachId, w),
   }));
   const blockedRanges = resolveBlockedRangesForDate(
     targetDate,

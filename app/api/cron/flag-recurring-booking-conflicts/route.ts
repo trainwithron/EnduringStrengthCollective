@@ -1,3 +1,4 @@
+import { fetchSessionMinutes, sessionMinutesFor } from "@/lib/availability-windows";
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendPushToProfile } from "@/lib/send-push";
@@ -53,6 +54,7 @@ async function handler(request: Request) {
         .in("coach_id", coachIds),
     ]);
 
+  const sessionIndex = await fetchSessionMinutes(supabase, coachIds);
   const timezoneByCoach = new Map((coachProfiles ?? []).map((p) => [p.id, p.timezone ?? DEFAULT_COACH_TIMEZONE]));
   const nameByAthlete = new Map((athleteProfiles ?? []).map((p) => [p.id, p.full_name as string]));
 
@@ -64,6 +66,7 @@ async function handler(request: Request) {
       startTime: w.start_time,
       endTime: w.end_time,
       slotDurationMinutes: w.slot_duration_minutes,
+      sessionMinutes: sessionMinutesFor(sessionIndex, w.coach_id, w),
     });
     windowsByCoach.set(w.coach_id, list);
   }

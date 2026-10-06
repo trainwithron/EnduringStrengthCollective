@@ -1,3 +1,4 @@
+import { fetchSessionMinutes, sessionMinutesFor } from "@/lib/availability-windows";
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { mirrorBookingToGoogleCalendar } from "@/lib/google-calendar-mirror-server";
 import type { BookingRow, CoachContext, NewSeries, SeriesRow, SeriesStore } from "@/lib/series-engine";
@@ -62,6 +63,7 @@ export function supabaseSeriesStore(db: any): SeriesStore {
         db.from("coach_availability_windows").select("weekday, start_time, end_time, slot_duration_minutes").eq("coach_id", coachId),
         db.from("coach_availability_exceptions").select("kind, start_at, end_at, weekday, start_time, end_time").eq("coach_id", coachId),
       ]);
+      const sessionIndex = await fetchSessionMinutes(db, [coachId]);
       return {
         timezone: profile?.timezone ?? DEFAULT_COACH_TIMEZONE,
         bufferMinutes: policy?.buffer_minutes ?? 0,
@@ -70,6 +72,7 @@ export function supabaseSeriesStore(db: any): SeriesStore {
           startTime: w.start_time,
           endTime: w.end_time,
           slotDurationMinutes: w.slot_duration_minutes,
+          sessionMinutes: sessionMinutesFor(sessionIndex, coachId, w),
         })),
         exceptions: (exceptions ?? []).map((e: any) => ({
           kind: e.kind,

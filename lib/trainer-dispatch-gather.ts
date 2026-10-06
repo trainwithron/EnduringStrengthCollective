@@ -1,3 +1,4 @@
+import { fetchSessionMinutes, sessionMinutesFor } from "@/lib/availability-windows";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   findMatchingSlotForTrainer,
@@ -44,11 +45,13 @@ export async function findAndRankAvailableTrainers(
       .eq("coach_id", trainerId);
     if (!windowRows || windowRows.length === 0) continue;
 
+    const sessionIndex = await fetchSessionMinutes(supabase, [trainerId]);
     const windows: AvailabilityWindow[] = windowRows.map((w: any) => ({
       weekday: w.weekday,
       startTime: w.start_time,
       endTime: w.end_time,
       slotDurationMinutes: w.slot_duration_minutes,
+      sessionMinutes: sessionMinutesFor(sessionIndex, trainerId, w),
     }));
 
     const localDate = resolveLocalDateForInstant(requestedStartAt, timezone);

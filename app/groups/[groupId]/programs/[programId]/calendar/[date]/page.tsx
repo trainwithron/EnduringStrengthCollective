@@ -1,3 +1,4 @@
+import { fetchSessionMinutes, sessionMinutesFor } from "@/lib/availability-windows";
 import Link from "next/link";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
@@ -235,11 +236,13 @@ export default async function DayDetailPage(
       .select("weekday, start_time, end_time, slot_duration_minutes")
       .eq("coach_id", coachMembership.profile_id);
 
+    const sessionIndex = await fetchSessionMinutes(supabase, [coachMembership.profile_id]);
     const windows = (windowRows ?? []).map((w) => ({
       weekday: w.weekday,
       startTime: w.start_time,
       endTime: w.end_time,
       slotDurationMinutes: w.slot_duration_minutes,
+      sessionMinutes: sessionMinutesFor(sessionIndex, coachMembership.profile_id, w),
     }));
 
     const { data: policyRow } = await supabase

@@ -248,3 +248,44 @@ describe("bookingFitsAvailability", () => {
     ).toBe(false);
   });
 });
+
+describe("a session length that differs from the slot step (Ron: 55-minute sessions in 60-minute slots)", () => {
+  const date = new Date("2026-09-08T00:00:00"); // a Tuesday
+  const windows = [{ weekday: 2, startTime: "06:00", endTime: "09:00", slotDurationMinutes: 60, sessionMinutes: 55 }];
+  const hm = (d: Date) => `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`;
+
+  it("starts a slot every 60 minutes and makes each session 55 minutes long", () => {
+    const slots = generateSlotsForDate(date, windows, [], "UTC");
+    expect(slots.map((s) => hm(s.start))).toEqual(["06:00", "07:00", "08:00"]);
+    expect(slots.every((s) => s.durationMinutes === 55)).toBe(true);
+  });
+  it("is the same as before when no session length is set, or when it equals the step", () => {
+    const plain = generateSlotsForDate(date, [{ weekday: 2, startTime: "06:00", endTime: "09:00", slotDurationMinutes: 60 }], [], "UTC");
+    const same = generateSlotsForDate(date, [{ weekday: 2, startTime: "06:00", endTime: "09:00", slotDurationMinutes: 60, sessionMinutes: 60 }], [], "UTC");
+    const nulled = generateSlotsForDate(date, [{ weekday: 2, startTime: "06:00", endTime: "09:00", slotDurationMinutes: 60, sessionMinutes: null }], [], "UTC");
+    expect(plain.map((s) => hm(s.start))).toEqual(["06:00", "07:00", "08:00"]);
+    expect(same).toEqual(plain);
+    expect(nulled).toEqual(plain);
+  });
+  it("lets the last session of the window be 55 minutes even when a full 60 would not fit", () => {
+    const slots = generateSlotsForDate(date, [{ weekday: 2, startTime: "06:00", endTime: "07:55", slotDurationMinutes: 60, sessionMinutes: 55 }], [], "UTC");
+    expect(slots.map((s) => hm(s.start))).toEqual(["06:00", "07:00"]);
+  });
+  it("blocks a slot when time off overlaps the session itself, not just its step", () => {
+    // Time off 06:56 to 07:30: the 06:00 session (06:00-06:55) is clear, the 07:00 session is not.
+    const blocked = [{ start: new Date("2026-09-08T06:56:00Z"), end: new Date("2026-09-08T07:30:00Z") }];
+    expect(generateSlotsForDate(date, windows, blocked, "UTC").map((s) => hm(s.start))).toEqual(["06:00", "08:00"]);
+  });
+  it("a back-to-back pair 06:00-06:55 and 07:00-07:55 works with a 5-minute buffer, and a 60-minute pair would not", () => {
+    const first = { start: new Date("2026-09-08T06:00:00Z"), end: new Date("2026-09-08T06:55:00Z") };
+    const next = { start: new Date("2026-09-08T07:00:00Z"), end: new Date("2026-09-08T07:55:00Z") };
+    expect(isSlotBufferBlocked(next.start, next.end, [first], 5)).toBe(false);
+    expect(isSlotBufferBlocked(next.start, next.end, [first], 6)).toBe(true);
+    const sixty = { start: new Date("2026-09-08T06:00:00Z"), end: new Date("2026-09-08T07:00:00Z") };
+    expect(isSlotBufferBlocked(new Date("2026-09-08T07:00:00Z"), new Date("2026-09-08T08:00:00Z"), [sixty], 5)).toBe(true);
+  });
+  it("a recurring booking still fits when its start is one of the generated starts", () => {
+    expect(bookingFitsAvailability(new Date("2026-09-08T07:00:00Z"), windows, [], "UTC", date)).toBe(true);
+    expect(bookingFitsAvailability(new Date("2026-09-08T07:30:00Z"), windows, [], "UTC", date)).toBe(false);
+  });
+});

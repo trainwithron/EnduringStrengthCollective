@@ -12,6 +12,8 @@ export interface AvailabilityWindowRow {
   startTime: string;
   endTime: string;
   slotDurationMinutes: number;
+  // Migration 0283. Null or missing: a session lasts as long as the slot step.
+  sessionMinutes?: number | null;
 }
 
 export function AvailabilityManager({
