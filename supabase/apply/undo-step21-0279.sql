@@ -1,4 +1,4 @@
--- UNDO for step 21 (0279). Only if moving a session breaks after step 21. Puts reschedule_booking back to the step 19 version (a client can move directly again), removes the two request functions, the request table (pending requests are lost) and their notices.
+-- UNDO for step 21 (0279). Only if moving or requesting a session breaks after step 21. Puts reschedule_booking back to the step 19 version, removes the request functions, the request table (pending requests are lost) and their notices, and puts the notification type list back to the step 19 list (late_change stays).
 -- WHAT YOU SHOULD SEE: "Success. No rows returned."   Then tell Spot, and do not run the step again until Spot says why it failed.
 begin;
 create or replace function public.reschedule_booking(p_booking_id uuid, p_new_start_at timestamp with time zone, p_new_end_at timestamp with time zone)
@@ -96,10 +96,15 @@ begin
 end;
 $function$;
 
-drop function if exists public.resolve_move_request(uuid, boolean);
+drop function if exists public.expire_stale_booking_requests();
+drop function if exists public.cancel_booking_request(uuid);
+drop function if exists public.resolve_booking_request(uuid, boolean);
 drop function if exists public.request_booking_move(uuid, timestamptz, timestamptz);
-drop table if exists public.booking_move_requests;
-delete from public.notifications where type in ('move_request', 'move_decision');
+drop function if exists public.request_booking(uuid, uuid, uuid, timestamptz, timestamptz);
+drop function if exists public.check_booking_request_slot(uuid, uuid, timestamptz, timestamptz);
+drop function if exists public.coach_time_is_open(uuid, timestamptz, timestamptz);
+drop table if exists public.booking_requests;
+delete from public.notifications where type in ('booking_request', 'request_decision');
 alter table public.notifications drop constraint if exists notifications_type_check;
 alter table public.notifications add constraint notifications_type_check
   check (type in (

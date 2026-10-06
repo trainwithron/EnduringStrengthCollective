@@ -45,8 +45,8 @@ from (
     ('2026100600275', 'series_session_removed_stays_removed', '0275_series_session_removed_stays_removed.sql', exists (select 1 from pg_trigger where tgname = 'bookings_note_series_skip')),
     ('2026100600276', 'notify_on_direct_message', '0276_notify_on_direct_message.sql', exists (select 1 from pg_trigger where tgname = 'direct_messages_notify')),
     ('2026100600277', 'late_change_flagged_for_coach', '0277_late_change_flagged_for_coach.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'bookings' and column_name = 'late_charge_state')),
-    ('2026100600278', 'self_booking_switch', '0278_self_booking_switch.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_booking_policies' and column_name = 'self_booking_enabled')),
-    ('2026100600279', 'client_move_requests', '0279_client_move_requests.sql', to_regclass('public.booking_move_requests') is not null)
+    ('2026100600278', 'booking_mode', '0278_booking_mode.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_booking_policies' and column_name = 'booking_mode')),
+    ('2026100600279', 'booking_requests', '0279_booking_requests.sql', to_regclass('public.booking_requests') is not null)
 ) as v(version, name, file, applied)
 where v.applied
 on conflict (version) do nothing;

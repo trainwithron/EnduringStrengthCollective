@@ -5,8 +5,9 @@ import { createBrowserClient } from "@/lib/supabase/client";
 
 interface MoveRequest {
   id: string;
+  kind: "new" | "move";
   clientName: string;
-  fromStartAt: string;
+  fromStartAt: string | null;
   newStartAt: string;
 }
 
@@ -41,21 +42,22 @@ export function LateChangesPanel() {
         .eq("late_charge_state", "flagged")
         .order("start_at", { ascending: true })
         .limit(20);
-      // Move requests (needs the database update that adds them; until then the lookup fails quietly and nothing shows).
+      // Booking requests, new and move (needs the database update that adds them; until then the lookup fails quietly and nothing shows).
       const { data: moveData, error: moveError } = await supabase
-        .from("booking_move_requests")
-        .select("id, from_start_at, new_start_at, profiles!booking_move_requests_athlete_id_fkey ( full_name )")
+        .from("booking_requests")
+        .select("id, kind, from_start_at, new_start_at, profiles!booking_requests_athlete_id_fkey ( full_name )")
         .eq("coach_id", user.id)
         .eq("status", "pending")
-        .gt("from_start_at", new Date().toISOString())
-        .order("from_start_at", { ascending: true })
+        .gt("new_start_at", new Date().toISOString())
+        .order("new_start_at", { ascending: true })
         .limit(20);
       if (!cancelled && !moveError) {
         setMoves(
           ((moveData ?? []) as any[]).map((m) => ({
             id: m.id as string,
+            kind: (m.kind as "new" | "move") ?? "new",
             clientName: (m.profiles?.full_name as string | undefined) ?? "A client",
-            fromStartAt: m.from_start_at as string,
+            fromStartAt: (m.from_start_at as string | null) ?? null,
             newStartAt: m.new_start_at as string,
           }))
         );
@@ -93,13 +95,14 @@ export function LateChangesPanel() {
     setBusyId(id);
     setError(null);
     const supabase = createBrowserClient();
-    const { data, error: rpcError } = await supabase.rpc("resolve_move_request", { p_request_id: id, p_confirm: confirm });
+    const { data, error: rpcError } = await supabase.rpc("resolve_booking_request", { p_request_id: id, p_confirm: confirm });
     setBusyId(null);
     if (rpcError) {
-      setError(/just taken/.test(rpcError.message ?? "") ? "That time was just taken. Decline it, or ask the client for another." : "That didn't save. Nothing was changed. Try again.");
+      setError("That didn't save. Nothing was changed. Try again.");
       return;
     }
     if (data === "closed") setError("That session is no longer scheduled, so the request was closed.");
+    if (data === "slot_taken") setError("Someone else took that time first, so the request was declined and the client told.");
     setMoves((prev) => prev.filter((m) => m.id !== id));
   }
 
@@ -114,7 +117,7 @@ export function LateChangesPanel() {
       {moves.length > 0 && (
         <>
           <p className="font-body text-xs text-steel mt-1">
-            These clients asked to move a session. It stays where it is until you confirm.
+            These clients asked for a session or a move. Nothing is booked or moved until you confirm.
           </p>
           <ul className="divide-y divide-steel/15 mt-2 mb-3">
             {moves.map((m) => (
@@ -122,7 +125,7 @@ export function LateChangesPanel() {
                 <div className="min-w-0">
                   <p className="font-body text-sm text-chalk truncate">{m.clientName}</p>
                   <p className="font-body text-xs text-steel">
-                    {fmt(m.fromStartAt)} to {fmt(m.newStartAt)}
+                    {m.kind === "move" && m.fromStartAt ? `Move ${fmt(m.fromStartAt)} to ${fmt(m.newStartAt)}` : `New session ${fmt(m.newStartAt)}`}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">

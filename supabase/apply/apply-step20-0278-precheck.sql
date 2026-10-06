@@ -1,4 +1,4 @@
--- STEP 20 (PRECHECK, run first, changes nothing): 0278 clients can book their own sessions (one at a time, weekly, or by joining a waiting list) only when the coach switches self-booking on (off by default)
+-- STEP 20 (PRECHECK, run first, changes nothing): 0278 each coach picks how clients book: on their own, request and the coach confirms, or the coach schedules everyone (existing coaches start as 'coach schedules')
 --
 -- Paste into the Supabase SQL editor and run. Every row must say ok = true.
 -- If any row says false: do NOT run the apply file. Copy the result table and send it back.

@@ -1,25 +1,3 @@
--- STEP 21: 0279 booking requests: in 'request' mode a client asks for a new session or to move one, and the coach confirms (nothing is booked or held until then)
---
--- Run apply-precheck first (every row ok = true). Then paste THIS file and run it once.
--- WHAT YOU SHOULD SEE: "Success. No rows returned."
--- AFTERWARDS: In 'Clients request, I confirm' mode a client picks a time and sends a request (nothing is booked or held); you get a notice and a Confirm / Decline row under Needs your decision; Confirm books it (or moves the session, flagging a late move for Charge or Waive); the client is told either way. Requests whose time passes lapse by themselves. Direct moves are refused unless the mode is 'book on their own'. Test with a throwaway client in request mode.
--- ON ERROR: it is all or nothing, so nothing was applied. Run   rollback;   once, copy the red error text, and send it back. Do not run the file again.
--- It contains no text searching, so editor re-indenting cannot break it.
-
-begin;
-
-do $guard$
-begin
-  if not ((coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = '1df6fdc5b7ed651158e1d39b99312519' from pg_proc p where p.oid = to_regprocedure('public.reschedule_booking(uuid, timestamptz, timestamptz)')), false) and to_regclass('public.booking_requests') is null)) then
-    raise exception 'Step 21 (0279) looks already applied, or the database is not in the state it expects. Nothing was changed. Run the precheck file and send Spot the result.';
-  end if;
-end
-$guard$;
-
--- ====================================================================================================
--- migration 0279_booking_requests.sql
--- ====================================================================================================
-
 -- Booking requests (Ron, Oct 6): in 'request' mode a client asks for a NEW session or asks to MOVE one, and the session is only booked or moved when the
 -- coach confirms. One mechanism and one panel (Needs your decision) for both.
 --
@@ -593,5 +571,3 @@ begin
   perform public.offer_freed_slot_to_waitlist(v_coach_id, v_start_at, v_end_at);
 end;
 $function$;
-
-commit;

@@ -1,18 +1,64 @@
--- Ron's rule (Oct 6): clients cannot book their own sessions unless the coach switches that on. Per coach, OFF by default (every existing coach is
--- off, so Ron's clients cannot book themselves while he schedules them).
+-- Ron's rule (Oct 6): each coach picks how clients book, three ways:
+--   'free'            Clients book on their own (how it worked before).
+--   'request'         Clients request a time and the coach confirms (step 21 adds the requests). Nothing is booked or held until the coach says yes.
+--   'coach_schedules' The coach schedules everyone; a client cannot book, and asks by message.
+-- Existing coaches start as 'coach_schedules' (the safest). A coach changes it on the Availability page; Ron sets his to 'request'.
 --
---  * coach_booking_policies.self_booking_enabled (boolean, default false). A coach's own policy row already is theirs to write.
---  * book_session: when the caller is the client booking for themselves and the coach has not switched self-booking on, it refuses with
---    'your coach schedules your sessions'. The 0248 text as live, with only that check added. A coach booking a client, and the server (service
---    role: the nightly weekly-schedule top-up and the like), are unaffected.
---  * create_recurring_booking_series and join_booking_waitlist carry the same check at the top: they are other ways for a client to book themselves, and
---    the weekly one would otherwise swallow the refusal and report every week as failed.
---  * A coach who is also their own client (a self-coach account) is refused until the switch is on, like any client.
---  * Moving an existing session (reschedule_booking) is NOT covered by this switch.
+--  * coach_booking_policies.booking_mode (default 'coach_schedules').
+--  * coach_booking_mode(coach): the mode, 'coach_schedules' when the coach has no policy row.
+--  * assert_client_may_book_directly(coach, athlete, group): refuses a client booking directly unless the mode is 'free'. A coach acting for
+--    a client, a coach booking themselves (a self-coach account) and the server's own routines are never refused.
+--  * book_session, create_recurring_booking_series and join_booking_waitlist call it first. Each is the live text with only that call added
+--    (the paste step checks the live text first). A weekly schedule or a waiting-list join is also a way to book, so they follow the same rule.
+--  * Moving an existing session is handled in step 21 (reschedule_booking).
 -- Needs 0248, 0218 and 0208 (coach_booking_policies). Re-running replaces the functions again.
 
 alter table public.coach_booking_policies
-  add column if not exists self_booking_enabled boolean not null default false;
+  add column if not exists booking_mode text not null default 'coach_schedules'
+    check (booking_mode in ('free', 'request', 'coach_schedules'));
+
+create or replace function public.coach_booking_mode(p_coach_id uuid)
+returns text
+language sql
+stable
+security definer
+set search_path to 'public'
+as $function$
+  select coalesce((select bp.booking_mode from public.coach_booking_policies bp where bp.coach_id = p_coach_id), 'coach_schedules');
+$function$;
+
+revoke all on function public.coach_booking_mode(uuid) from public, anon;
+grant execute on function public.coach_booking_mode(uuid) to authenticated, service_role;
+
+-- Raises when a client acting for themselves may not book directly under this coach's booking mode. A coach acting for a client, a coach
+-- booking themselves as their own client (a self-coach account), and the server's own routines are never refused.
+create or replace function public.assert_client_may_book_directly(p_coach_id uuid, p_athlete_id uuid, p_group_id uuid)
+returns void
+language plpgsql
+stable
+security definer
+set search_path to 'public'
+as $function$
+declare
+  v_mode text;
+begin
+  if auth.role() = 'service_role' or auth.uid() is distinct from p_athlete_id then
+    return;
+  end if;
+  if coalesce(public.is_group_coach(p_group_id), false) then
+    return;
+  end if;
+  v_mode := public.coach_booking_mode(p_coach_id);
+  if v_mode = 'request' then
+    raise exception 'your coach confirms new sessions: send a request instead';
+  elsif v_mode <> 'free' then
+    raise exception 'your coach schedules your sessions';
+  end if;
+end;
+$function$;
+
+revoke all on function public.assert_client_may_book_directly(uuid, uuid, uuid) from public, anon;
+grant execute on function public.assert_client_may_book_directly(uuid, uuid, uuid) to authenticated, service_role;
 
 -- ---- booking ----
 create or replace function public.book_session(p_coach_id uuid, p_athlete_id uuid, p_group_id uuid, p_start_at timestamp with time zone, p_end_at timestamp with time zone)
@@ -27,7 +73,6 @@ declare
   v_booking_id uuid;
   v_buffer_minutes int;
   v_minimum_notice_hours int;
-  v_self_booking boolean;
 begin
   if auth.role() = 'service_role' then
     null;
@@ -49,15 +94,8 @@ begin
     raise exception 'invalid time range';
   end if;
 
-  -- A client booking for themselves only works when this coach has switched self-booking on (off by default). Checked here, not just in the
-  -- screens, so no old tab or direct call can get around it. A coach scheduling a client, and the server's own jobs, are not affected.
-  if v_is_self and auth.role() is distinct from 'service_role' then
-    select coalesce(bp.self_booking_enabled, false) into v_self_booking
-    from public.coach_booking_policies bp where bp.coach_id = p_coach_id;
-    if not coalesce(v_self_booking, false) then
-      raise exception 'your coach schedules your sessions';
-    end if;
-  end if;
+  -- The coach's booking mode decides whether a client may book directly (see assert_client_may_book_directly).
+  perform public.assert_client_may_book_directly(p_coach_id, p_athlete_id, p_group_id);
 
   select coalesce(bp.buffer_minutes, 0), coalesce(bp.minimum_notice_hours, 0)
     into v_buffer_minutes, v_minimum_notice_hours
@@ -141,13 +179,7 @@ begin
   if auth.uid() <> p_athlete_id and not public.is_group_coach(p_group_id) then
     raise exception 'not authorized to create this booking series';
   end if;
-
-  -- Self-booking is a per-coach switch (off by default); a client acting for themselves needs it on.
-  if auth.uid() = p_athlete_id and auth.role() is distinct from 'service_role'
-     and not coalesce((select bp.self_booking_enabled from public.coach_booking_policies bp where bp.coach_id = p_coach_id), false) then
-    raise exception 'your coach schedules your sessions';
-  end if;
-
+  perform public.assert_client_may_book_directly(p_coach_id, p_athlete_id, p_group_id);
   if p_occurrences_total <= 0 or p_occurrences_total > 52 then
     raise exception 'occurrences_total must be between 1 and 52';
   end if;
@@ -201,12 +233,7 @@ begin
   if not public.is_training_client_of_group(p_group_id, p_athlete_id) then
     raise exception 'not a training client of this group';
   end if;
-
-  -- Self-booking is a per-coach switch (off by default); a client acting for themselves needs it on.
-  if auth.uid() = p_athlete_id and auth.role() is distinct from 'service_role'
-     and not coalesce((select bp.self_booking_enabled from public.coach_booking_policies bp where bp.coach_id = p_coach_id), false) then
-    raise exception 'your coach schedules your sessions';
-  end if;
+  perform public.assert_client_may_book_directly(p_coach_id, p_athlete_id, p_group_id);
 
   if not exists (
     select 1 from public.bookings b

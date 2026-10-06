@@ -420,18 +420,20 @@ alter table public.notifications add constraint notifications_type_check
   {
     n: "20",
     slug: "0278",
-    title: "0278 clients can book their own sessions (one at a time, weekly, or by joining a waiting list) only when the coach switches self-booking on (off by default)",
+    title: "0278 each coach picks how clients book: on their own, request and the coach confirms, or the coach schedules everyone (existing coaches start as 'coach schedules')",
     migrations: ["0278"],
     sees: "Success. No rows returned.",
-    afterwards: "From now on a client cannot book their own session unless you switch on 'Let clients book their own sessions' on the Availability page (it is off for everyone). You can still schedule any client. Test: as a throwaway client try to book a session (it must say your coach schedules your sessions); as the coach schedule one for them (it must work).",
+    afterwards: "Every coach is set to 'I schedule everyone' until they choose: clients cannot book, start a weekly schedule or join a waiting list on their own. Open Availability and pick the mode (Ron: 'Clients request, I confirm' once step 21 is also applied; 'Clients book on their own' restores today's behaviour). You can always schedule any client. Test as a throwaway client: try to book (it must refuse); switch the mode to 'book on their own' and try again.",
     undo: `${fnFrom0248("book_session")}
 
 ${fnFrom0248("create_recurring_booking_series")}
 
 ${fnFrom0218("join_booking_waitlist")}
 
-alter table public.coach_booking_policies drop column if exists self_booking_enabled;`,
-    undoWhy: "Only if booking a session breaks after step 20. Puts book_session, the weekly-schedule function and the waiting-list function back to the previous versions (clients can book themselves again) and removes the switch column.",
+drop function if exists public.assert_client_may_book_directly(uuid, uuid, uuid);
+drop function if exists public.coach_booking_mode(uuid);
+alter table public.coach_booking_policies drop column if exists booking_mode;`,
+    undoWhy: "Only if booking a session breaks after step 20. Puts book_session, the weekly-schedule function and the waiting-list function back to the previous versions (clients can book themselves again) and removes the mode column and its two helper functions.",
     rows: [
       ["0248 is applied (book_session settles credits)", `${has.fnName("book_session")} and ${has.col("bookings", "credit_state")}`],
       ["coach_booking_policies exists", has.table("coach_booking_policies")],
@@ -441,16 +443,21 @@ alter table public.coach_booking_policies drop column if exists self_booking_ena
   {
     n: "21",
     slug: "0279",
-    title: "0279 with self-booking off a client asks to move a session and the coach confirms (the session stays put until then)",
+    title: "0279 booking requests: in 'request' mode a client asks for a new session or to move one, and the coach confirms (nothing is booked or held until then)",
     migrations: ["0279"],
     sees: "Success. No rows returned.",
-    afterwards: "With self-booking switched off, a client who wants a different time picks it and sends a request; the session stays where it is. You get a notice and a Confirm / Decline row under Needs your decision. Confirm moves it (and flags it for Charge or Waive if it was inside your window); Decline leaves it. The client is told either way. With self-booking on, clients move directly as before. Test with a throwaway client.",
+    afterwards: "In 'Clients request, I confirm' mode a client picks a time and sends a request (nothing is booked or held); you get a notice and a Confirm / Decline row under Needs your decision; Confirm books it (or moves the session, flagging a late move for Charge or Waive); the client is told either way. Requests whose time passes lapse by themselves. Direct moves are refused unless the mode is 'book on their own'. Test with a throwaway client in request mode.",
     undo: `${fnFrom0277("reschedule_booking")}
 
-drop function if exists public.resolve_move_request(uuid, boolean);
+drop function if exists public.expire_stale_booking_requests();
+drop function if exists public.cancel_booking_request(uuid);
+drop function if exists public.resolve_booking_request(uuid, boolean);
 drop function if exists public.request_booking_move(uuid, timestamptz, timestamptz);
-drop table if exists public.booking_move_requests;
-delete from public.notifications where type in ('move_request', 'move_decision');
+drop function if exists public.request_booking(uuid, uuid, uuid, timestamptz, timestamptz);
+drop function if exists public.check_booking_request_slot(uuid, uuid, timestamptz, timestamptz);
+drop function if exists public.coach_time_is_open(uuid, timestamptz, timestamptz);
+drop table if exists public.booking_requests;
+delete from public.notifications where type in ('booking_request', 'request_decision');
 alter table public.notifications drop constraint if exists notifications_type_check;
 alter table public.notifications add constraint notifications_type_check
   check (type in (
@@ -460,12 +467,13 @@ alter table public.notifications add constraint notifications_type_check
     'credits_expired', 'waitlist_slot_offered', 'recurring_booking_conflict',
     'email_changed', 'direct_message', 'late_change'
   ));`,
-    undoWhy: "Only if moving a session breaks after step 21. Puts reschedule_booking back to the step 19 version (a client can move directly again), removes the two request functions, the request table (pending requests are lost) and their notices.",
+    undoWhy: "Only if moving or requesting a session breaks after step 21. Puts reschedule_booking back to the step 19 version, removes the request functions, the request table (pending requests are lost) and their notices, and puts the notification type list back to the step 19 list (late_change stays).",
     rows: [
       ["0277 is applied (late-change flags exist)", has.col("bookings", "late_charge_state")],
-      ["0278 is applied (the self-booking switch exists)", has.col("coach_booking_policies", "self_booking_enabled")],
-      ["coach_availability_windows and discovery_bookings exist", `${has.table("coach_availability_windows")} and ${has.table("discovery_bookings")}`],
-      ["0279 is not already applied (the live reschedule_booking is exactly the step 19 version, and there is no request table yet)", `${md5Is("reschedule_booking(uuid, timestamptz, timestamptz)", "1df6fdc5b7ed651158e1d39b99312519")} and ${has.noTable("booking_move_requests")}`],
+      ["0278 is applied (the booking mode exists)", `${has.col("coach_booking_policies", "booking_mode")} and ${has.fnName("coach_booking_mode")}`],
+      ["coach_availability_windows, coach_availability_exceptions and discovery_bookings exist", `${has.table("coach_availability_windows")} and ${has.table("coach_availability_exceptions")} and ${has.table("discovery_bookings")}`],
+      ["is_org_admin_of_group and offer_freed_slot_to_waitlist exist", `${has.fnName("is_org_admin_of_group")} and ${has.fnName("offer_freed_slot_to_waitlist")}`],
+      ["0279 is not already applied (the live reschedule_booking is exactly the step 19 version, and there is no request table yet)", `${md5Is("reschedule_booking(uuid, timestamptz, timestamptz)", "1df6fdc5b7ed651158e1d39b99312519")} and ${has.noTable("booking_requests")}`],
     ],
   },
 ];
@@ -598,8 +606,8 @@ for (const s of STEPS) {
     m("0275", "exists (select 1 from pg_trigger where tgname = 'bookings_note_series_skip')"),
     m("0276", "exists (select 1 from pg_trigger where tgname = 'direct_messages_notify')"),
     m("0277", has.col("bookings", "late_charge_state")),
-    m("0278", has.col("coach_booking_policies", "self_booking_enabled")),
-    m("0279", has.table("booking_move_requests")),
+    m("0278", has.col("coach_booking_policies", "booking_mode")),
+    m("0279", has.table("booking_requests")),
   ];
   const values = items.map((i) => `    ('2026100600${i.n.slice(1)}', '${i.file.slice(5, -4)}', '${i.file}', ${i.marker})`).join(",\n");
   const sql = [

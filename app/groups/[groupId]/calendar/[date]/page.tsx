@@ -17,6 +17,7 @@ import { BookSlotButton } from "@/components/athlete/book-slot-button";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { MarkAttendedControl, type CreditState } from "@/components/coach/mark-attended-control";
 import { RescheduleSlotButton } from "@/components/athlete/reschedule-slot-button";
+import { RequestSlotButton } from "@/components/athlete/request-slot-button";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { DayHourGrid } from "@/components/coach/desktop/day-hour-grid";
@@ -239,17 +240,17 @@ export default async function CoachDayDetailPage(
 
     // Clients book themselves only when the coach has switched self-booking on (off by default; the database enforces it too). When it is
     // off, the open times are not offered; the client still sees their own sessions and can cancel or move them.
-    let selfBookingEnabled = true;
+    let bookingMode = "free" as "free" | "request" | "coach_schedules";
     if (coachMembership) {
       const sb = await supabase
         .from("coach_booking_policies")
-        .select("self_booking_enabled")
+        .select("booking_mode")
         .eq("coach_id", coachMembership.profile_id)
         .maybeSingle();
       // Until the database update that adds the switch is applied, the select errors and booking behaves as before.
-      if (!sb.error) selfBookingEnabled = sb.data?.self_booking_enabled ?? false;
+      if (!sb.error) bookingMode = ((sb.data?.booking_mode as string | null) ?? "coach_schedules") as typeof bookingMode;
     }
-    if (!selfBookingEnabled && !reschedulingBooking) {
+    if (bookingMode === "coach_schedules") {
       slots = slots.filter((s) => bookingByTime.get(s.start.getTime())?.athlete_id === athleteId);
     }
     const backHref = `/groups/${params.groupId}/calendar`;
@@ -295,7 +296,7 @@ export default async function CoachDayDetailPage(
               })}{" "}
               session — moving it less than your coach&apos;s cancellation window
               before that session lets your coach know, and they decide whether it counts as a session.
-              {!selfBookingEnabled && " Your coach confirms every move: your session stays where it is until they do."}
+              {bookingMode === "request" && " Your coach confirms every move: your session stays where it is until they do."}
             </p>
           )}
         </header>
@@ -309,7 +310,7 @@ export default async function CoachDayDetailPage(
             <p className="font-body text-sm text-steel py-2">No coach found for this group.</p>
           ) : slots.length === 0 ? (
             <p className="font-body text-sm text-steel py-2">
-              {!selfBookingEnabled && !reschedulingBooking
+              {bookingMode === "coach_schedules"
                 ? "Your coach schedules your sessions. Message them to set one up."
                 : "No open hours on this day."}
             </p>
@@ -350,7 +351,7 @@ export default async function CoachDayDetailPage(
                         <span className="font-body text-xs text-steel">Too close to another session</span>
                       ) : (
                         <RescheduleSlotButton
-                          requestOnly={!selfBookingEnabled}
+                          requestOnly={bookingMode === "request"}
                           bookingId={reschedulingBooking.id}
                           startAt={iso}
                           endAt={endAt.toISOString()}
@@ -378,6 +379,14 @@ export default async function CoachDayDetailPage(
                       )
                     ) : isBufferBlocked ? (
                       <span className="font-body text-xs text-steel">Too close to another session</span>
+                    ) : bookingMode === "request" ? (
+                      <RequestSlotButton
+                        coachId={coachMembership.profile_id}
+                        athleteId={athleteId}
+                        groupId={params.groupId}
+                        startAt={iso}
+                        endAt={endAt.toISOString()}
+                      />
                     ) : creditBalance > 0 ? (
                       <div className="flex flex-col items-end gap-1">
                         <BookSlotButton
