@@ -16,7 +16,7 @@ A card points at the **workout**, not one lift, and says what looks odd inside i
 > `Yes, deliberate` · `Show me options` · `Not now`
 
 - **Yes, deliberate**: the coach is holding it on purpose. That client and workout stay quiet for 6 weeks, and the Spotter learns this coach holds loads longer.
-- **Show me options**: plain choices, each a *draft* the coach edits and applies: a bit more load, a rep, a set, better control, or the same load at lower effort; or keep it and look again in 2 weeks; or change it only in this client's own program. Nothing is written until the coach taps Apply.
+- **Show me options**: plain choices, each a *draft* the coach edits and applies. Progress is not only more weight, so the list is wide: a bit more load; a rep; an extra set; a slower lowering phase (add a 1 second eccentric, or more); a pause at the bottom; a slower overall tempo; more range of motion; a harder variation (the next step up the exercise's ladder); better control (a cue, same load); or the same load at lower effort. Also: keep it and look again in 2 weeks, or change it only in this client's own program. Every option is just "some form of progress", all editable, and nothing is written until the coach taps Apply.
 - **Not now**: 14 days away.
 
 Neutral words only: never "stalled", "plateau" or "stuck", never blame.
@@ -70,6 +70,20 @@ It plugs into what already exists, nothing new:
 - **"Suggest a time"** (coach side, when the coach feels a meeting is needed): offers the coach's open slots through the same request flow, so the client taps one.
 - **The wording** reuses the quiet-client nudge templates and the weekly check-in's voice, so a coach's tone settings apply.
 
+## An optional question for the client: "what do you need most help with?"
+
+Ron asks his clients this all the time: he sees what he thinks they need, but they know what they feel they need and where they feel they are lacking. The coach can send it with one tap, from a client's profile or from a card's options. It is coach-voiced, optional, and never sent automatically:
+
+> What do you feel you need the most help with right now? Where do you feel you're lacking? There's no wrong answer; I'd like to hear it in your words.
+
+It reuses what exists, with no new system and no new table:
+
+- **Sent through the message thread** (the drafted-message path, so the coach edits and sends it; the client gets the normal message notice and push).
+- **The answer is an ordinary reply in the thread.** The coach already sees it in Needs your decision (unread message) and in the conversation.
+- **On the client's profile** a small line shows "What {name} said they need most help with" with their latest reply to that question. It finds it by the time the question was sent, which is recorded as one Spotter feedback row (kind `ask-help`), so the profile can read the first client message after that moment.
+- **It seeds a goal the two of them agree on:** next to the reply the coach has one tap, "Turn this into a goal", which opens the existing coach-suggested goal form (migration 0284) pre-filled with the client's own words. The client confirms, changes it or says not now, exactly as with any suggested goal, so the coach and client agree before anything changes.
+- It is never a form the client must fill in, and a client who does not answer is not chased.
+
 ## What needs building (after the release and paste queue)
 
 - A pure function `progressLook(points, programTargets, coachThreshold, hasEffort)` and tests, like the matched-load watcher.
@@ -77,6 +91,7 @@ It plugs into what already exists, nothing new:
 - The collapsed "N need a look" row and the card, reusing the quiet card layout.
 - The options panel, writing only through the existing personal-program edits.
 - The optional note draft and its two buttons, wired to the existing message and request flows.
+- The "what do you need most help with?" question: a drafted message, the one feedback row that records when it was sent, the profile line, and the "Turn this into a goal" button into the existing suggested-goal form.
 - No migration. Assistant reviews the TypeScript.
 
 ## Answered by Ron (Oct 6)
