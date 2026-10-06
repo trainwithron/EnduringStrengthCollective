@@ -72,6 +72,7 @@ export function InviteJoinFlow({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [legalAccepted, setLegalAccepted] = useState(false);
+  const [resendNote, setResendNote] = useState<string | null>(null);
 
   useEffect(() => {
     if (phase === "authed") void flushLegalConsent();
@@ -155,6 +156,20 @@ export function InviteJoinFlow({
     window.localStorage.removeItem(`invite_pending_signup_${code}`);
     router.push(`/groups/${groupId}`);
     router.refresh();
+  }
+
+  async function handleResend() {
+    setSubmitting(true);
+    setError(null);
+    setResendNote(null);
+    const { error: resendError } = await createBrowserClient().auth.resend({
+      type: "signup",
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/invite/${code}` },
+    });
+    if (resendError) setError(resendError.message);
+    else setResendNote(`Sent again to ${email}. It can take a minute; check spam too.`);
+    setSubmitting(false);
   }
 
   async function handleAuthSubmit(e: React.FormEvent) {
@@ -262,6 +277,53 @@ export function InviteJoinFlow({
           then come back to this page to finish joining{" "}
           <span className="text-chalk">{groupName}</span>.
         </p>
+        {resendNote && (
+          <p className="font-body text-sm text-chalk mt-3" role="status">
+            {resendNote}
+          </p>
+        )}
+        {error && (
+          <p className="font-body text-sm text-rust mt-3" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="mt-6 flex flex-col gap-3">
+          <button
+            type="button"
+            onClick={handleResend}
+            disabled={submitting}
+            className="h-11 border border-steel/40 text-chalk font-display uppercase text-sm font-bold disabled:opacity-40"
+          >
+            {submitting ? "Sending…" : "Send the email again"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              // Back to the sign-up form with the address cleared and the name kept. The account made with the wrong address stays unconfirmed and unused.
+              setEmail("");
+              setPassword("");
+              setError(null);
+              setResendNote(null);
+              setMode("signup");
+              setPhase("guest");
+            }}
+            className="font-body text-sm text-rust underline"
+          >
+            Wrong address? Use a different email
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setError(null);
+              setResendNote(null);
+              setMode("login");
+              setPhase("guest");
+            }}
+            className="font-body text-sm text-steel underline"
+          >
+            Already confirmed? Sign in
+          </button>
+        </div>
       </div>
     );
   }
@@ -285,6 +347,19 @@ export function InviteJoinFlow({
           className="w-full h-12 mt-5 bg-rust text-graphite font-display uppercase text-lg font-bold disabled:opacity-40 active:bg-rust/80 transition-colors"
         >
           {submitting ? "Joining…" : `Join ${groupName}`}
+        </button>
+        <button
+          type="button"
+          onClick={async () => {
+            await createBrowserClient().auth.signOut();
+            setError(null);
+            setPassword("");
+            setMode("login");
+            setPhase("guest");
+          }}
+          className="mt-4 font-body text-sm text-steel underline"
+        >
+          Not you? Use a different account
         </button>
       </div>
     );

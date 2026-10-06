@@ -36,13 +36,21 @@ export default async function InvitePage(
           >
             Sign in
           </Link>
+          <div className="mt-4">
+            <Link href="/" className="font-body text-sm text-steel underline">
+              Go to Home
+            </Link>
+          </div>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-6">
+    <main className="min-h-screen flex items-center justify-center px-6 relative">
+      <Link href="/" className="absolute top-5 left-5 font-body text-xs text-steel uppercase tracking-wide">
+        &larr; Home
+      </Link>
       <InviteJoinFlow
         code={params.code}
         groupId={data.group_id}
