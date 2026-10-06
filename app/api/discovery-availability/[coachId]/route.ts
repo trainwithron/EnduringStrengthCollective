@@ -4,6 +4,8 @@ import { generateSlotsForDate, resolveBlockedRangesForDate } from "@/lib/booking
 import { zonedTimeToUtc, DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { limitByIp } from "@/lib/public-booking-route";
 
+const CLOSED = true;
+
 // Public, unauthenticated endpoint powering the /book/[coachId] prospect
 // self-booking page — a stranger has no session to read
 // coach_availability_windows/exceptions/bookings through normal RLS (and
@@ -13,6 +15,9 @@ import { limitByIp } from "@/lib/public-booking-route";
 // open slot start times for one date — never another person's contact
 // info, never the raw schedule internals.
 export async function GET(request: Request, props: { params: Promise<{ coachId: string }> }) {
+  // Closed: the old discovery-call page is switched off (Ron, Oct 6) and the function it booked through is closed to the browser. The
+  // code below is kept so it can be switched back on by removing this line.
+  if (CLOSED) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const params = await props.params;
   const { searchParams } = new URL(request.url);
   const date = searchParams.get("date");

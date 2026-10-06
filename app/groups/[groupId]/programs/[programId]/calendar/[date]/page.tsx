@@ -18,6 +18,7 @@ import { isHabitDueOn } from "@/lib/habits";
 import { resolveDayMacros, standingForDate } from "@/lib/macro-resolution";
 import { fetchStandingHistory } from "@/lib/standing-macros";
 import { CalendarPurchasePrompt } from "@/components/athlete/calendar-purchase-prompt";
+import { isStripeConfigured } from "@/lib/stripe";
 import type { PackageOption } from "@/components/athlete/package-picker";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { WaitlistJoinButton } from "@/components/athlete/waitlist-join-button";
@@ -380,7 +381,7 @@ export default async function DayDetailPage(
                 </span>
               )}
             </p>
-            {creditBalance <= 0 && !reschedulingBooking && (
+            {creditBalance <= 0 && !reschedulingBooking && isStripeConfigured() && (
               <div className="mt-2">
                 <CalendarPurchasePrompt activeSubscription={activeSubscription} packages={availablePackages} />
               </div>

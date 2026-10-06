@@ -6,7 +6,6 @@ import { AvailabilityManagerDesktop } from "@/components/coach/desktop/availabil
 import { BookingPolicyControl } from "@/components/coach/desktop/booking-policy-control";
 import { ReupNudgeToggle } from "@/components/coach/desktop/reup-nudge-toggle";
 import { AvailabilityExceptionsManager } from "@/components/coach/desktop/availability-exceptions-manager";
-import { DiscoveryCallsPanel, type DiscoveryCallRow } from "@/components/coach/desktop/discovery-calls-panel";
 import { TimezoneControl } from "@/components/coach/desktop/timezone-control";
 
 export default async function AvailabilityPage(
@@ -80,23 +79,6 @@ export default async function AvailabilityPage(
     .eq("coach_id", user.id)
     .order("created_at", { ascending: false });
 
-  const { data: discoveryCallRows } = await supabase
-    .from("discovery_bookings")
-    .select("id, start_at, prospect_name, prospect_email, prospect_phone, message")
-    .eq("coach_id", user.id)
-    .eq("status", "confirmed")
-    .gte("start_at", new Date().toISOString())
-    .order("start_at", { ascending: true });
-
-  const discoveryCalls: DiscoveryCallRow[] = (discoveryCallRows ?? []).map((c) => ({
-    id: c.id,
-    startAt: c.start_at,
-    prospectName: c.prospect_name,
-    prospectEmail: c.prospect_email,
-    prospectPhone: c.prospect_phone,
-    message: c.message,
-  }));
-
   const exceptions = (exceptionRows ?? []).map((e) => ({
     id: e.id,
     kind: e.kind as "one_off" | "recurring",
@@ -138,7 +120,6 @@ export default async function AvailabilityPage(
 
       <AvailabilityManagerDesktop coachId={user.id} initialWindows={windows} />
 
-      <DiscoveryCallsPanel coachId={user.id} initialCalls={discoveryCalls} />
     </CoachDesktopShell>
   );
 }
