@@ -555,6 +555,8 @@ export default async function CoachDayDetailPage(
           bookingId={booking.id}
           initialAttended={settlementById.get(booking.id)!.attended_at !== null}
           initialState={settlementById.get(booking.id)!.credit_state}
+          athleteId={booking.athlete_id}
+          groupId={params.groupId}
         />
       )}
       {start.getTime() < Date.now() ? (

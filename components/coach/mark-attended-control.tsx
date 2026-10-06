@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { checkAndNotifyLowSessionBalance } from "@/lib/notify-low-session-balance";
 
 export type CreditState = "prepaid" | "unsettled" | "settled" | "waived";
 
@@ -14,10 +15,15 @@ export function MarkAttendedControl({
   bookingId,
   initialAttended,
   initialState,
+  athleteId,
+  groupId,
 }: {
   bookingId: string;
   initialAttended: boolean;
   initialState: CreditState;
+  // When given, a session taken off the balance here also runs the low-balance check, as every other path that spends a session does.
+  athleteId?: string;
+  groupId?: string;
 }) {
   const [attended, setAttended] = useState(initialAttended);
   const [state, setState] = useState<CreditState>(initialState);
@@ -32,12 +38,15 @@ export function MarkAttendedControl({
     const { error: rpcError } = await supabase.rpc(fn, fn === "waive_booking" ? { p_booking_id: bookingId, p_note: null } : { p_booking_id: bookingId });
     setBusy(false);
     if (rpcError) {
-      setError("That didn't save.");
+      setError("That didn't save. Nothing was changed. Try again.");
       return;
     }
     if (fn === "mark_booking_attended") {
       setAttended(true);
-      if (state === "unsettled") setState("settled");
+      if (state === "unsettled") {
+        setState("settled");
+        if (athleteId && groupId) checkAndNotifyLowSessionBalance(athleteId, groupId);
+      }
     } else if (fn === "undo_booking_attended") {
       setAttended(false);
       if (state === "settled") setState("unsettled");
@@ -49,15 +58,15 @@ export function MarkAttendedControl({
 
   if (attended) {
     return (
-      <span className="flex items-center gap-2">
+      <span className="flex flex-wrap items-center gap-2">
         <span className="font-body text-xs text-steel">
-          Attended{state === "settled" ? " (1 session used)" : state === "prepaid" ? " (prepaid)" : ""}
+          Attended{state === "settled" ? " (1 session used)" : state === "prepaid" ? " (already paid)" : ""}
         </span>
         <button
           type="button"
           onClick={() => run("undo_booking_attended")}
           disabled={busy}
-          className="h-8 px-3 border border-steel/30 text-steel font-body text-xs disabled:opacity-40"
+          className="h-11 px-3 border border-steel/30 text-steel font-body text-xs disabled:opacity-40"
         >
           {busy ? "Undoing…" : "Undo"}
         </button>
@@ -71,21 +80,24 @@ export function MarkAttendedControl({
   }
 
   return (
-    <span className="flex items-center gap-2">
+    <span className="flex flex-wrap items-center gap-2">
       <button
         type="button"
         onClick={() => run("mark_booking_attended")}
         disabled={busy}
-        className="h-8 px-3 border border-rust/50 text-rust font-body text-xs disabled:opacity-40"
+        className="h-11 px-3 border border-rust/50 text-rust font-body text-xs disabled:opacity-40"
       >
         {busy ? "Saving…" : "Mark attended"}
       </button>
       {state === "unsettled" && (
         <button
           type="button"
-          onClick={() => run("waive_booking")}
+          onClick={() => {
+            // Not charging cannot be taken back from this screen, and the button sits next to Mark attended.
+            if (window.confirm("Don't charge for this session? It will not come off their sessions.")) run("waive_booking");
+          }}
           disabled={busy}
-          className="h-8 px-3 border border-steel/30 text-steel font-body text-xs disabled:opacity-40"
+          className="h-11 px-3 border border-steel/30 text-steel font-body text-xs disabled:opacity-40"
         >
           Don&apos;t charge
         </button>
