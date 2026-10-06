@@ -74,5 +74,6 @@ export async function POST(request: Request) {
 
   const result = await eraseAccount(db, athleteId, { eraseHistory, deleteEmptyOneOnOneGroups: emptyOneOnOne });
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 502 });
-  return NextResponse.json({ success: true, deletedGroupIds: emptyOneOnOne });
+  // The space is only removed when history was erased too; otherwise it stays (renamed) so the kept records still have a home.
+  return NextResponse.json({ success: true, deletedGroupIds: eraseHistory ? emptyOneOnOne : [], warning: result.leftover ?? null });
 }

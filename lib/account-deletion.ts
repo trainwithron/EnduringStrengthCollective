@@ -71,7 +71,7 @@ export async function loadDeletionFacts(db: any, userId: string): Promise<Deleti
   };
 }
 
-export type EraseResult = { ok: true } | { ok: false; error: string };
+export type EraseResult = { ok: true; leftover?: string } | { ok: false; error: string };
 
 // Does the deletion. Order matters: detach or erase what would block the delete, then the account itself, which removes the
 // rest through the database's own cascades. Stops at the first failure and says so.
@@ -105,9 +105,19 @@ export async function eraseAccount(db: any, userId: string, opts: { eraseHistory
   const { error: deleteError } = await db.auth.admin.deleteUser(userId);
   if (deleteError) return fail("Couldn't delete the account", deleteError.message);
 
-  // A one-on-one space that held only this client has nothing left in it.
+  // A one-on-one space that held only this client. Deleting the space also deletes everything filed under it (logged workouts, notes,
+  // sessions), so it is only removed when the coach chose to erase history. Otherwise it stays, renamed, so the records the coach
+  // kept still have somewhere to live and no name of the person remains.
+  let leftover: string | undefined;
   for (const groupId of opts.deleteEmptyOneOnOneGroups ?? []) {
-    await db.from("groups").delete().eq("id", groupId);
+    if (opts.eraseHistory) {
+      const { error } = await db.from("groups").delete().eq("id", groupId);
+      if (error) leftover = "Their account is gone, but their empty space could not be removed (payment records still point at it). It stays under the name Former client.";
+      if (error) await db.from("groups").update({ name: "Former client" }).eq("id", groupId);
+    } else {
+      const { error } = await db.from("groups").update({ name: "Former client" }).eq("id", groupId);
+      if (error) leftover = "Their account is gone, but their space could not be renamed.";
+    }
   }
-  return { ok: true };
+  return leftover ? { ok: true, leftover } : { ok: true };
 }

@@ -62,12 +62,12 @@ export function DeleteClientControl({
       <div className="font-body text-xs text-chalk space-y-2">
         <p>
           <span className="font-medium">Erased for good:</span> their account and login, profile, group memberships, messages, posts, check-ins,
-          habits, weight, photos, goals, intake and waiver records, session balance, and their personal programs. Their one-on-one space goes too.
+          habits, weight, photos, goals, intake and waiver records, session balance and ledger, bookings and weekly schedules, and their personal programs.
         </p>
         <p>
           <span className="font-medium">Kept, with no name on it:</span> payment records (they are financial records) and the audit log
-          of admin changes. Unless you tick the box below, their logged workouts and your notes about them stay too, so your totals and
-          business numbers do not change.
+          of admin changes. Unless you tick the box below, their logged workouts and your notes about them stay too (their empty space stays
+          under the name Former client), so your totals and business numbers do not change.
         </p>
         <p className="text-rust">This can&apos;t be undone. If they have a live subscription, cancel it first.</p>
       </div>
