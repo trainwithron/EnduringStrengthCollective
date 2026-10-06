@@ -15,6 +15,8 @@ import { getGroupCoachTimezone } from "@/lib/timezone";
 import type { LedgerEntry } from "@/lib/session-ledger";
 import { SwipeDirectionSetting } from "@/components/athlete/swipe-direction-setting";
 import { GoalConfirmationControl } from "@/components/coach/goal-confirmation-control";
+import { GoalWaitingOnClient } from "@/components/coach/goal-waiting-on-client";
+import { GoalProposalForm } from "@/components/athlete/goal-proposal-form";
 import { PackageAssignmentControl } from "@/components/coach/package-assignment-control";
 import { PrivateFromOrgToggle } from "@/components/coach/private-from-org-toggle";
 import { ClientTagAssignmentControl } from "@/components/coach/client-tag-assignment-control";
@@ -194,7 +196,7 @@ export default async function AthleteProfilePage(
     // page, not repeated on this profile.
     supabase
       .from("client_goals")
-      .select("id, goal_type, custom_label, target_date, priority_note, status, main_lift_movement_pattern_id")
+      .select("id, goal_type, custom_label, target_date, priority_note, status, created_by, main_lift_movement_pattern_id")
       .eq("athlete_id", params.athleteId)
       .eq("group_id", params.groupId)
       .order("created_at", { ascending: false })
@@ -1310,7 +1312,33 @@ export default async function AthleteProfilePage(
             </section>
           )}
 
-          {latestGoalRow?.status === "proposed" && (
+          {latestGoalRow?.status === "proposed" && latestGoalRow.created_by !== params.athleteId && (
+            <section>
+              <GoalWaitingOnClient
+                clientName={profile?.full_name ?? "the client"}
+                goal={{
+                  id: latestGoalRow.id,
+                  goalType: latestGoalRow.goal_type,
+                  customLabel: latestGoalRow.custom_label,
+                  targetDate: latestGoalRow.target_date,
+                  priorityNote: latestGoalRow.priority_note,
+                }}
+              />
+            </section>
+          )}
+
+          {latestGoalRow?.status !== "proposed" && (
+            <section>
+              <details className="border border-steel/20 p-3">
+                <summary className="font-body text-xs text-steel uppercase tracking-wide font-bold cursor-pointer">Suggest a goal</summary>
+                <div className="mt-3">
+                  <GoalProposalForm athleteId={params.athleteId} groupId={params.groupId} suggestedBy={user.id} />
+                </div>
+              </details>
+            </section>
+          )}
+
+          {latestGoalRow?.status === "proposed" && latestGoalRow.created_by === params.athleteId && (
             <section>
               <GoalConfirmationControl
                 goal={{

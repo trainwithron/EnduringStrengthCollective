@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { GOAL_TYPE_LABELS, GOAL_TYPE_ORDER, goalTypeHasEventFields } from "@/lib/goal-types";
 import type { GoalType } from "@/lib/goal-reversal";
+import { notifyPush } from "@/lib/push-notify";
 
 // The client always sets/owns the goal — the coach is kept in the loop
 // (sees it, confirms it), never the author. Same preset+Custom pattern
 // already used for the dashboard word-swap presets.
-export function GoalProposalForm({ athleteId, groupId }: { athleteId: string; groupId: string }) {
+// A coach can use the same form to SUGGEST a goal to a client (`suggestedBy` = the coach's id): the client then confirms it, changes it or declines it.
+export function GoalProposalForm({ athleteId, groupId, suggestedBy }: { athleteId: string; groupId: string; suggestedBy?: string }) {
   const [goalType, setGoalType] = useState<GoalType>("weight_loss");
   const [customLabel, setCustomLabel] = useState("");
   const [priorityNote, setPriorityNote] = useState("");
@@ -37,12 +39,15 @@ export function GoalProposalForm({ athleteId, groupId }: { athleteId: string; gr
       event_type: goalTypeHasEventFields(goalType) ? eventType.trim() || null : null,
       event_priority: goalTypeHasEventFields(goalType) && eventPriority ? eventPriority : null,
       weight_class_flag: goalType === "powerbuilding_strongman" ? weightClassFlag : false,
-      created_by: athleteId,
+      created_by: suggestedBy ?? athleteId,
     });
     setSubmitting(false);
     if (insertError) {
-      setError("Couldn't save your goal — try again.");
+      setError(suggestedBy ? "Couldn't send that suggestion. Try again." : "Couldn't save your goal — try again.");
       return;
+    }
+    if (suggestedBy) {
+      notifyPush(athleteId, "Your coach suggested a goal", "Open My Goal to confirm it, change it, or say not now.", `/groups/${groupId}/goal`);
     }
     setSubmitted(true);
     router.refresh();
@@ -51,7 +56,9 @@ export function GoalProposalForm({ athleteId, groupId }: { athleteId: string; gr
   if (submitted) {
     return (
       <p className="font-body text-sm text-moss">
-        Sent to your coach for confirmation — they&apos;ll take it from here.
+        {suggestedBy
+          ? "Suggested. They'll see it on My Goal and can confirm it, change it, or say not now."
+          : "Sent to your coach for confirmation — they'll take it from here."}
       </p>
     );
   }
@@ -134,7 +141,7 @@ export function GoalProposalForm({ athleteId, groupId }: { athleteId: string; gr
 
       <div>
         <label className="font-body text-xs text-steel uppercase tracking-wide">
-          Anything specific your coach should know? (optional)
+          {suggestedBy ? "Anything specific to add? (optional)" : "Anything specific your coach should know? (optional)"}
         </label>
         <textarea
           value={priorityNote}
@@ -150,7 +157,7 @@ export function GoalProposalForm({ athleteId, groupId }: { athleteId: string; gr
         disabled={submitting}
         className="w-full h-10 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
       >
-        Send to my coach
+        {suggestedBy ? "Suggest to client" : "Send to my coach"}
       </button>
     </form>
   );

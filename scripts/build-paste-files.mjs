@@ -561,6 +561,21 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["0283 is not already applied (the session length column is not there yet)", has.noCol("coach_availability_windows", "session_minutes")],
     ],
   },
+  {
+    n: "27",
+    slug: "0284",
+    title: "0284 a coach can propose a goal to a client, and the client confirms it, changes it or declines it (a coach cannot confirm it for them)",
+    migrations: ["0284"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing visible changes at once. After the code deploy: on a client's profile a coach can suggest a goal; the client sees it on My Goal with Looks right, Change it and Not now, and the coach is told how they answered. A goal a client proposes still waits for the coach exactly as before.",
+    undo: "drop trigger if exists client_goals_notify on public.client_goals;\ndrop trigger if exists client_goals_guard_update on public.client_goals;\ndrop function if exists public.notify_on_client_goal();\ndrop function if exists public.guard_client_goal_update();\ndrop policy if exists \"client_goals_update_athlete_answers\" on public.client_goals;\ndrop policy if exists \"client_goals_insert_coach\" on public.client_goals;\ndelete from public.notifications where type in ('goal_proposed', 'goal_answered');\nalter table public.notifications drop constraint if exists notifications_type_check;\nalter table public.notifications add constraint notifications_type_check\n  check (type in (\n    'comment', 'program_assigned', 'macros_assigned', 'partner_request',\n    'partner_request_accepted', 'milestone_celebration', 'gym_visitor_lead',\n    'trainer_dispatch_offer', 'trainer_dispatch_question', 'session_pattern_note',\n    'credits_expired', 'waitlist_slot_offered', 'recurring_booking_conflict',\n    'email_changed', 'direct_message', 'late_change', 'booking_request', 'request_decision'\n  ));",
+    undoWhy: "Only if goals misbehave after step 27. Removes the coach-proposal and client-answer rules and the two notice types (any such notices are deleted). A goal a coach already suggested stays as it is; after the undo only a coach can confirm goals again.",
+    rows: [
+      ["client_goals and the notification type list exist", `${has.table("client_goals")} and exists (select 1 from pg_constraint where conname = 'notifications_type_check')`],
+      ["is_group_coach exists", has.fnName("is_group_coach")],
+      ["0284 is not already applied (the coach proposal rule is not there yet)", has.noPolicy("client_goals", "client_goals_insert_coach")],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -695,6 +710,7 @@ for (const s of STEPS) {
     m("0279", has.table("booking_requests")),
     m("0280", has.col("session_credits", "expiry_hold_until")),
     m("0281", has.table("client_inactive")),
+    m("0284", has.policy("client_goals", "client_goals_insert_coach")),
     m("0283", has.col("coach_availability_windows", "session_minutes")),
     m("0282", "not has_function_privilege('anon', 'public.book_session(uuid, uuid, uuid, timestamptz, timestamptz)', 'execute') and not has_function_privilege('authenticated', 'public.apply_session_credit_change(uuid, uuid, integer, text, text, uuid, uuid)', 'execute')"),
   ];

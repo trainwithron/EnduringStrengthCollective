@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { GoalProposalForm } from "@/components/athlete/goal-proposal-form";
+import { GoalAnswerControl } from "@/components/athlete/goal-answer-control";
 import { GOAL_TYPE_LABELS } from "@/lib/goal-types";
 import type { GoalType } from "@/lib/goal-reversal";
 
@@ -34,12 +35,17 @@ export default async function GoalPage(props: { params: Promise<{ groupId: strin
 
   const { data: goals } = await supabase
     .from("client_goals")
-    .select("id, goal_type, custom_label, target_date, priority_note, status, created_at")
+    .select("id, goal_type, custom_label, target_date, priority_note, status, created_by, created_at")
     .eq("athlete_id", user.id)
     .eq("group_id", params.groupId)
     .order("created_at", { ascending: false });
 
   const current = (goals ?? [])[0] ?? null;
+  // A goal their coach suggested and the client has not answered yet.
+  const suggested = current && current.status === "proposed" && current.created_by !== user.id ? current : null;
+  const { data: coachRows } = suggested
+    ? await supabase.from("group_memberships").select("profile_id").eq("group_id", params.groupId).eq("role", "coach")
+    : { data: [] as { profile_id: string }[] };
   const history = (goals ?? []).slice(1);
 
   function labelFor(goalType: string, customLabel: string | null) {
@@ -63,7 +69,21 @@ export default async function GoalPage(props: { params: Promise<{ groupId: strin
       </header>
 
       <section className="px-5 pt-6">
-      {current && (
+      {suggested && (
+        <GoalAnswerControl
+          goal={{
+            id: suggested.id,
+            goalType: suggested.goal_type,
+            customLabel: suggested.custom_label,
+            targetDate: suggested.target_date,
+            priorityNote: suggested.priority_note,
+          }}
+          groupId={params.groupId}
+          coachIds={(coachRows ?? []).map((c: { profile_id: string }) => c.profile_id)}
+        />
+      )}
+
+      {current && !suggested && (
         <div className="border border-steel/20 p-4 mb-6">
           <p className="font-body text-xs text-steel uppercase tracking-wide font-bold mb-1">
             {current.status === "confirmed" ? "Current goal" : current.status === "proposed" ? "Waiting on your coach" : "Declined"}
