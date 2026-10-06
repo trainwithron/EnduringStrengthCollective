@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { AvailabilityManagerDesktop } from "@/components/coach/desktop/availability-manager-desktop";
@@ -32,11 +33,7 @@ export default async function AvailabilityPage(
 
   if (membership?.role !== "coach") {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">
-          Only coaches can manage availability.
-        </p>
-      </main>
+      <NoAccess>Only coaches can manage availability.</NoAccess>
     );
   }
 

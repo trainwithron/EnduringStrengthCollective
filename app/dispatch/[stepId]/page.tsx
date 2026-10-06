@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 import { DispatchStepActions } from "@/components/coach/dispatch-step-actions";
 
@@ -34,9 +35,7 @@ export default async function DispatchStepPage(props: { params: Promise<{ stepId
 
   if (!step || step.trainer_id !== user.id) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">This request isn&apos;t yours to view.</p>
-      </main>
+      <NoAccess>This request isn&apos;t yours to view.</NoAccess>
     );
   }
 

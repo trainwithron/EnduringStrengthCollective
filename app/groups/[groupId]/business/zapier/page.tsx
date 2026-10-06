@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ZapierSettings } from "@/components/coach/desktop/zapier-settings";
@@ -21,9 +22,7 @@ export default async function ZapierPage(props: { params: Promise<{ groupId: str
 
   if (membership?.role !== "coach") {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">Only coaches can manage the Zapier integration.</p>
-      </main>
+      <NoAccess>Only coaches can manage the Zapier integration.</NoAccess>
     );
   }
 

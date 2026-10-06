@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 
@@ -13,9 +14,7 @@ export default async function AdminFeedbackPage() {
   const { data: me } = await supabase.from("profiles").select("is_platform_admin").eq("id", user.id).maybeSingle();
   if (!me?.is_platform_admin) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">You don&apos;t have access to this page.</p>
-      </main>
+      <NoAccess>You don&apos;t have access to this page.</NoAccess>
     );
   }
 

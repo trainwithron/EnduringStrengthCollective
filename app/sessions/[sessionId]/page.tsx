@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { NoAccess } from "@/components/shared/no-access";
 import Link from "next/link";
 import { createServerClient } from "@/lib/supabase/server";
 import { SessionLogger } from "@/components/logging/session-logger";
@@ -41,11 +42,7 @@ export default async function SessionPage(
 
   if (!session) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">
-          This session isn&apos;t available, or you don&apos;t have access to it.
-        </p>
-      </main>
+      <NoAccess>This session isn&apos;t available, or you don&apos;t have access to it.</NoAccess>
     );
   }
 

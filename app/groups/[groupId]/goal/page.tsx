@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
@@ -27,9 +28,7 @@ export default async function GoalPage(props: { params: Promise<{ groupId: strin
 
   if (membership?.role !== "athlete") {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">This page is for clients to set their own goal.</p>
-      </main>
+      <NoAccess>This page is for clients to set their own goal.</NoAccess>
     );
   }
 

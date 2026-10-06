@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { NoAccess } from "@/components/shared/no-access";
 import { getJourneyRecap } from "@/lib/journey-recap-data";
 import { ShareWorkoutButton } from "@/components/share/share-workout-button";
 
@@ -30,11 +31,7 @@ export default async function ShareJourneyPage(
 
   if (!recap) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">
-          This journey recap isn&apos;t available yet.
-        </p>
-      </main>
+      <NoAccess>This journey recap isn&apos;t available yet.</NoAccess>
     );
   }
 

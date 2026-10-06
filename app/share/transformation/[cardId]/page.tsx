@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { NoAccess } from "@/components/shared/no-access";
 import { getSharedTransformationCard } from "@/lib/shared-transformation-card";
 import { ShareWorkoutButton } from "@/components/share/share-workout-button";
 
@@ -30,9 +31,7 @@ export default async function ShareTransformationCardPage(
 
   if (!shared) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">This card isn&apos;t available.</p>
-      </main>
+      <NoAccess>This card isn&apos;t available.</NoAccess>
     );
   }
 

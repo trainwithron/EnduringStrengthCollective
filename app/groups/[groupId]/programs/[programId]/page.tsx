@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { UnavailableState } from "@/components/ui/unavailable-state";
@@ -53,11 +54,7 @@ export default async function ProgramDetailPage(
 
   if (!membership) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">
-          This program isn&apos;t available, or you don&apos;t have access to it.
-        </p>
-      </main>
+      <NoAccess>This program isn&apos;t available, or you don&apos;t have access to it.</NoAccess>
     );
   }
 
@@ -70,11 +67,7 @@ export default async function ProgramDetailPage(
 
   if (!program) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">
-          This program isn&apos;t available, or you don&apos;t have access to it.
-        </p>
-      </main>
+      <NoAccess>This program isn&apos;t available, or you don&apos;t have access to it.</NoAccess>
     );
   }
 
@@ -268,11 +261,7 @@ async function CoachProgramBuilder({
 
   if (!data) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">
-          This program isn&apos;t available, or you don&apos;t have access to it.
-        </p>
-      </main>
+      <NoAccess>This program isn&apos;t available, or you don&apos;t have access to it.</NoAccess>
     );
   }
 

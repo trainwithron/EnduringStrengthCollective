@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
@@ -34,9 +35,7 @@ export default async function SessionLedgerPage(
 
   if (membership?.role !== "coach") {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">Only coaches can view the session ledger.</p>
-      </main>
+      <NoAccess>Only coaches can view the session ledger.</NoAccess>
     );
   }
 

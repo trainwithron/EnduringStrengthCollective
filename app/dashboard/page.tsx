@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { NoAccess } from "@/components/shared/no-access";
 import { cookies } from "next/headers";
 import { loadStartInputs, parseLastGroupCookie, pickStartGroup } from "@/lib/start-group";
 import { createServerClient } from "@/lib/supabase/server";
@@ -59,9 +60,7 @@ export default async function CoachHomePage() {
 
   if (!coachedGroupRows || coachedGroupRows.length === 0) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">Only coaches have a home dashboard.</p>
-      </main>
+      <NoAccess>Only coaches have a home dashboard.</NoAccess>
     );
   }
 

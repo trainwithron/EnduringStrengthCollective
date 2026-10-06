@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { NoAccess } from "@/components/shared/no-access";
 import { getSharedMilestone, type SharedMilestone } from "@/lib/shared-milestone";
 import { ShareWorkoutButton } from "@/components/share/share-workout-button";
 
@@ -39,11 +40,7 @@ export default async function ShareMilestonePage(
 
   if (!shared) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">
-          This milestone card isn&apos;t available.
-        </p>
-      </main>
+      <NoAccess>This milestone card isn&apos;t available.</NoAccess>
     );
   }
 

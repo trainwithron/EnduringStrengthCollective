@@ -1,4 +1,5 @@
 import { resolveDayMacros, standingForDate } from "@/lib/macro-resolution";
+import { NoAccess } from "@/components/shared/no-access";
 import { fetchStandingHistory } from "@/lib/standing-macros";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -51,11 +52,7 @@ export default async function ClientCalendarPage(
 
   if (membership?.role !== "coach") {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">
-          Only coaches can view a client&apos;s calendar.
-        </p>
-      </main>
+      <NoAccess>Only coaches can view a client&apos;s calendar.</NoAccess>
     );
   }
 
@@ -68,9 +65,7 @@ export default async function ClientCalendarPage(
 
   if (!athleteMembership) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">This client isn&apos;t in this group.</p>
-      </main>
+      <NoAccess>This client isn&apos;t in this group.</NoAccess>
     );
   }
 

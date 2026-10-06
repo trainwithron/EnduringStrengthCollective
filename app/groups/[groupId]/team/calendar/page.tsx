@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
@@ -37,11 +38,7 @@ export default async function TeamCalendarPage(
 
   if (!group?.team_mode) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">
-          Team mode isn&apos;t enabled for this group yet.
-        </p>
-      </main>
+      <NoAccess>Team mode isn&apos;t enabled for this group yet.</NoAccess>
     );
   }
 

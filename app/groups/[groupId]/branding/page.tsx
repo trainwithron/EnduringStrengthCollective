@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
@@ -59,11 +60,7 @@ export default async function BrandingPage(
 
   if (membership?.role !== "coach") {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">
-          Only coaches can customize dashboard branding.
-        </p>
-      </main>
+      <NoAccess>Only coaches can customize dashboard branding.</NoAccess>
     );
   }
 
@@ -89,11 +86,7 @@ export default async function BrandingPage(
 
   if (!orgMembership) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">
-          You&apos;re not part of an organization yet.
-        </p>
-      </main>
+      <NoAccess>You&apos;re not part of an organization yet.</NoAccess>
     );
   }
 

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
@@ -33,11 +34,7 @@ export default async function MyHistoryPage(
 
   if (membership?.role !== "athlete" || !membership.history_import_enabled) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">
-          Ask your coach to enable this before you can enter your own exercise history.
-        </p>
-      </main>
+      <NoAccess>Ask your coach to enable this before you can enter your own exercise history.</NoAccess>
     );
   }
 

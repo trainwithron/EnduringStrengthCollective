@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
@@ -46,9 +47,7 @@ export default async function CoachDayDetailPage(
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(params.date)) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">Invalid date.</p>
-      </main>
+      <NoAccess>Invalid date.</NoAccess>
     );
   }
 
@@ -61,11 +60,7 @@ export default async function CoachDayDetailPage(
 
   if (!membership) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">
-          This group isn&apos;t available, or you don&apos;t have access to it.
-        </p>
-      </main>
+      <NoAccess>This group isn&apos;t available, or you don&apos;t have access to it.</NoAccess>
     );
   }
 
@@ -391,9 +386,7 @@ export default async function CoachDayDetailPage(
 
   if (membership.role !== "coach") {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">Only coaches can view this page.</p>
-      </main>
+      <NoAccess>Only coaches can view this page.</NoAccess>
     );
   }
 

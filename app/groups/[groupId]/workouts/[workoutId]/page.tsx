@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 import { getWorkoutOverviewData } from "@/lib/workout-overview-data";
 import { WorkoutOverviewView } from "@/components/logging/workout-overview-view";
@@ -45,11 +46,7 @@ export default async function WorkoutOverviewPage(
 
   if (!data) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">
-          This workout isn&apos;t available, or you don&apos;t have access to it.
-        </p>
-      </main>
+      <NoAccess>This workout isn&apos;t available, or you don&apos;t have access to it.</NoAccess>
     );
   }
 

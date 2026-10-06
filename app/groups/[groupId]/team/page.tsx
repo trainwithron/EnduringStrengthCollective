@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import {
@@ -26,9 +27,7 @@ export default async function TeamPage(props: { params: Promise<{ groupId: strin
 
   if (membership?.role !== "coach") {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">Only coaches can manage the team.</p>
-      </main>
+      <NoAccess>Only coaches can manage the team.</NoAccess>
     );
   }
 

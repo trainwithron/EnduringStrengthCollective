@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import {
@@ -30,11 +31,7 @@ export default async function NewTransformationCardPage(
   const milestoneId = searchParams.milestone;
   if (!milestoneId) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">
-          No milestone selected — head back to your home tab and log a weight to find one.
-        </p>
-      </main>
+      <NoAccess>No milestone selected — head back to your home tab and log a weight to find one.</NoAccess>
     );
   }
 
@@ -47,9 +44,7 @@ export default async function NewTransformationCardPage(
 
   if (!milestone) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">This milestone isn&apos;t available.</p>
-      </main>
+      <NoAccess>This milestone isn&apos;t available.</NoAccess>
     );
   }
 

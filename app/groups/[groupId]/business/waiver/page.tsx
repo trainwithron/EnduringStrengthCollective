@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { WaiverSettings } from "@/components/coach/desktop/waiver-settings";
@@ -23,9 +24,7 @@ export default async function WaiverPage(
 
   if (membership?.role !== "coach") {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">Only coaches can manage the client waiver.</p>
-      </main>
+      <NoAccess>Only coaches can manage the client waiver.</NoAccess>
     );
   }
 

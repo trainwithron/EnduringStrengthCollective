@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { AcknowledgeSessionPatternNoteButton } from "@/components/coach/acknowledge-session-pattern-note-button";
@@ -26,9 +27,7 @@ export default async function SessionPatternNotePage(props: { params: Promise<{ 
 
   if (!session) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">That session doesn&apos;t exist.</p>
-      </main>
+      <NoAccess>That session doesn&apos;t exist.</NoAccess>
     );
   }
 
@@ -41,9 +40,7 @@ export default async function SessionPatternNotePage(props: { params: Promise<{ 
 
   if (membership?.role !== "coach") {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">Only coaches can view this.</p>
-      </main>
+      <NoAccess>Only coaches can view this.</NoAccess>
     );
   }
 

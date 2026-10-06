@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 import { getSessionRecap } from "@/lib/session-recap-data";
 import { getWorkoutOverviewData, type WorkoutOverviewExercise } from "@/lib/workout-overview-data";
@@ -25,9 +26,7 @@ export default async function SessionRecapPage(props: { params: Promise<{ sessio
 
   if (!session) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">That session doesn&apos;t exist.</p>
-      </main>
+      <NoAccess>That session doesn&apos;t exist.</NoAccess>
     );
   }
 
@@ -40,28 +39,20 @@ export default async function SessionRecapPage(props: { params: Promise<{ sessio
 
   if (membership?.role !== "coach") {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">Only coaches can view this.</p>
-      </main>
+      <NoAccess>Only coaches can view this.</NoAccess>
     );
   }
 
   if (session.status !== "completed") {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">
-          This session isn&apos;t completed yet — recap is only available once it&apos;s finished.
-        </p>
-      </main>
+      <NoAccess>This session isn&apos;t completed yet — recap is only available once it&apos;s finished.</NoAccess>
     );
   }
 
   const recap = await getSessionRecap(supabase, params.sessionId, user.id);
   if (!recap) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">Couldn&apos;t load this session.</p>
-      </main>
+      <NoAccess>Couldn&apos;t load this session.</NoAccess>
     );
   }
 

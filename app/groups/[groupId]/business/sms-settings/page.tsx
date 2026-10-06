@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { SmsSettingsForm } from "@/components/coach/desktop/sms-settings-form";
@@ -24,9 +25,7 @@ export default async function SmsSettingsPage(
 
   if (membership?.role !== "coach") {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">Only coaches can manage SMS settings.</p>
-      </main>
+      <NoAccess>Only coaches can manage SMS settings.</NoAccess>
     );
   }
 

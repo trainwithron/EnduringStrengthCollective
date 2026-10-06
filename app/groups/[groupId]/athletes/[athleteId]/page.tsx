@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NoAccess } from "@/components/shared/no-access";
 import { calorieSeriesWithStanding, latestStanding, standingForDate } from "@/lib/macro-resolution";
 import { fetchStandingHistory } from "@/lib/standing-macros";
 import { StandingMacroTargetCard } from "@/components/coach/desktop/standing-macro-target-card";
@@ -334,21 +335,13 @@ export default async function AthleteProfilePage(
 
   if (membership?.role !== "coach") {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">
-          Only coaches can view client profiles.
-        </p>
-      </main>
+      <NoAccess>Only coaches can view client profiles.</NoAccess>
     );
   }
 
   if (!athleteMembership) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">
-          This client isn&apos;t in this group.
-        </p>
-      </main>
+      <NoAccess>This client isn&apos;t in this group.</NoAccess>
     );
   }
 

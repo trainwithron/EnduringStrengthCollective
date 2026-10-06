@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { GroupSessionsManager, type ClassRow, type ClientOption } from "@/components/coach/desktop/group-sessions-manager";
@@ -23,9 +24,7 @@ export default async function GroupSessionsPage(props: { params: Promise<{ group
     .maybeSingle();
   if (membership?.role !== "coach") {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">Only coaches can manage group sessions.</p>
-      </main>
+      <NoAccess>Only coaches can manage group sessions.</NoAccess>
     );
   }
 

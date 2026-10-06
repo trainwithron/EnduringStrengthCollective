@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 import { computeScheduledDates } from "@/lib/program-schedule";
 import { SET_ROW_SELECT, mapSetRow, DEFAULT_TRACKED_FIELDS, type TrackedField } from "@/lib/exercise-fields";
@@ -35,11 +36,7 @@ export default async function DisplayModePage(
 
   if (membership?.role !== "coach") {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">
-          Only coaches can open Display Mode.
-        </p>
-      </main>
+      <NoAccess>Only coaches can open Display Mode.</NoAccess>
     );
   }
 

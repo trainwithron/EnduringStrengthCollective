@@ -1,4 +1,5 @@
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { NoAccess } from "@/components/shared/no-access";
 import { OrgTrainerRequestForm } from "@/components/public/org-trainer-request-form";
 
 // org_calendar_spotter_trainer_dispatch_scoping_sept19.md — a forward-
@@ -16,9 +17,7 @@ export default async function JoinOrgPage(props: { params: Promise<{ orgSlug: st
 
   if (!org) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk font-body flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">This page isn&apos;t available.</p>
-      </main>
+      <NoAccess>This page isn&apos;t available.</NoAccess>
     );
   }
 

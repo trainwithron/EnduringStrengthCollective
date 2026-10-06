@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { ClientPicker } from "@/components/coach/client-picker";
@@ -31,11 +32,7 @@ export default async function WorkoutClientsPage(
 
   if (membership?.role !== "coach") {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">
-          Only coaches can view client versions of a workout.
-        </p>
-      </main>
+      <NoAccess>Only coaches can view client versions of a workout.</NoAccess>
     );
   }
 
@@ -53,11 +50,7 @@ export default async function WorkoutClientsPage(
 
   if (!workout) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">
-          This workout isn&apos;t available, or you don&apos;t have access to it.
-        </p>
-      </main>
+      <NoAccess>This workout isn&apos;t available, or you don&apos;t have access to it.</NoAccess>
     );
   }
 

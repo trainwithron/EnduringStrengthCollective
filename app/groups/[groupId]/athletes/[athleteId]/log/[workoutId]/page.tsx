@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 import { getWorkoutOverviewData } from "@/lib/workout-overview-data";
 import { WorkoutOverviewView } from "@/components/logging/workout-overview-view";
@@ -27,11 +28,7 @@ export default async function LogWorkoutForClientPage(
 
   if (membership?.role !== "coach") {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">
-          Only coaches can log sessions for a client.
-        </p>
-      </main>
+      <NoAccess>Only coaches can log sessions for a client.</NoAccess>
     );
   }
 
@@ -49,11 +46,7 @@ export default async function LogWorkoutForClientPage(
 
   if (!data) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">
-          This workout isn&apos;t available.
-        </p>
-      </main>
+      <NoAccess>This workout isn&apos;t available.</NoAccess>
     );
   }
 

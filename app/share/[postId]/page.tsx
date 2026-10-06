@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { NoAccess } from "@/components/shared/no-access";
 import Link from "next/link";
 import { createServerClient } from "@/lib/supabase/server";
 import { getVolumeEquivalence } from "@/lib/volume-equivalence";
@@ -61,11 +62,7 @@ export default async function ShareWorkoutPage(
 
   if (!shared) {
     return (
-      <main className="min-h-screen bg-graphite text-chalk flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">
-          This workout card isn&apos;t available.
-        </p>
-      </main>
+      <NoAccess>This workout card isn&apos;t available.</NoAccess>
     );
   }
 

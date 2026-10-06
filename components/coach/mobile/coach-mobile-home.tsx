@@ -236,6 +236,39 @@ export async function CoachMobileHome({
           </section>
         )}
 
+        {/* Always there, so Home is never a dead end: the empty-state buttons above disappear once a coach has clients. */}
+        {(rosterRows ?? []).length > 0 && (
+          <section className="px-5 pb-6">
+            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">Quick actions</h2>
+            <div className="grid grid-cols-2 gap-2">
+              <Link
+                href={`/groups/${groupId}/clients`}
+                className="h-11 flex items-center justify-center bg-rust text-graphite font-display uppercase text-sm font-bold"
+              >
+                Add a client
+              </Link>
+              <Link
+                href={`/groups/${groupId}/clients`}
+                className="h-11 flex items-center justify-center border border-steel/40 text-chalk font-display uppercase text-sm font-bold"
+              >
+                All clients
+              </Link>
+              <Link
+                href={`/groups/${groupId}/programs`}
+                className="h-11 flex items-center justify-center border border-steel/40 text-chalk font-display uppercase text-sm font-bold"
+              >
+                Programs
+              </Link>
+              <Link
+                href={`/groups/${groupId}/calendar`}
+                className="h-11 flex items-center justify-center border border-steel/40 text-chalk font-display uppercase text-sm font-bold"
+              >
+                Calendar
+              </Link>
+            </div>
+          </section>
+        )}
+
         <section className="px-5 pb-8">
           <CoachHomeComplications
             groupId={groupId}
