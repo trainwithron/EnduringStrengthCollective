@@ -149,6 +149,11 @@ describe("open times", () => {
     expect(slots.map((s) => s.startIso)).toEqual(["2026-10-13T13:00:00.000Z", "2026-10-13T14:00:00.000Z", "2026-10-13T15:00:00.000Z"]);
   });
 
+  it("ignores a window's own session length (0283): the session type's length rules the public page", () => {
+    const withSession = [{ weekday: 2, startTime: "09:00", endTime: "12:00", slotDurationMinutes: 30, sessionMinutes: 55 }];
+    expect(computePublicSlots({ ...base, windows: withSession, days: 1 })).toEqual(computePublicSlots({ ...base, days: 1 }));
+  });
+
   it("a 30 minute type gets twice as many starts", () => {
     expect(computePublicSlots({ ...base, durationMinutes: 30, days: 1 })).toHaveLength(6);
   });

@@ -203,6 +203,7 @@ export function AvailabilityManagerDesktop({
           <SessionLengthForAll
             coachId={coachId}
             current={Array.from(new Set(windows.map((w) => w.sessionMinutes ?? null)))}
+            windows={windows}
             onChanged={(minutes) => setWindows((prev) => prev.map((w) => ({ ...w, sessionMinutes: minutes })))}
           />
         )}
@@ -474,7 +475,17 @@ export function AvailabilityManagerDesktop({
 const PRESETS = [30, 40, 45, 50, 55, 60];
 
 // One control for the common case: "my sessions are 55 minutes" for every window at once. A window can still differ (edit it on its row).
-function SessionLengthForAll({ coachId, current, onChanged }: { coachId: string; current: (number | null)[]; onChanged: (minutes: number | null) => void }) {
+function SessionLengthForAll({
+  coachId,
+  current,
+  windows,
+  onChanged,
+}: {
+  coachId: string;
+  current: (number | null)[];
+  windows: AvailabilityWindowRow[];
+  onChanged: (minutes: number | null) => void;
+}) {
   const [custom, setCustom] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -483,6 +494,14 @@ function SessionLengthForAll({ coachId, current, onChanged }: { coachId: string;
   async function apply(minutes: number | null) {
     if (minutes != null && (!Number.isInteger(minutes) || minutes < 5 || minutes > 480)) {
       setErr("Session length must be a whole number from 5 to 480 minutes.");
+      return;
+    }
+    // A session cannot be longer than the time between slots: say which window is the problem instead of failing the whole change.
+    const tooShort = minutes == null ? [] : windows.filter((w) => w.slotDurationMinutes < minutes);
+    if (tooShort.length > 0) {
+      setErr(
+        `${tooShort.map((w) => `${WEEKDAYS[w.weekday]} ${w.startTime.slice(0, 5)}–${w.endTime.slice(0, 5)} has a slot every ${w.slotDurationMinutes} minutes`).join("; ")}. Change that window's "Slot every" to ${minutes} or more (edit its row) first, then set the session length again. Nothing was changed.`
+      );
       return;
     }
     setBusy(true);

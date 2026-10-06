@@ -175,7 +175,8 @@ export function computePublicSlots(opts: {
     // The coach's hours say WHEN they work; the session type says how long a booking is. Step through each window by it.
     const windows = opts.windows
       .filter((w) => w.weekday === dayDate.getDay())
-      .map((w) => ({ ...w, slotDurationMinutes: opts.durationMinutes }));
+      // The session type's own length rules the public page, so a window's separate session length (migration 0283) is ignored here.
+      .map((w) => ({ ...w, slotDurationMinutes: opts.durationMinutes, sessionMinutes: null }));
     for (const slot of generateSlotsForDate(dayDate, windows, blocked, opts.timezone)) {
       if (slot.start.getTime() <= opts.now.getTime()) continue;
       const end = new Date(slot.start.getTime() + opts.durationMinutes * 60000);
