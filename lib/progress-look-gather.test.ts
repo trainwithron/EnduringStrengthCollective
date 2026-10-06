@@ -27,6 +27,7 @@ function fakeDb(tables: Record<string, any[]>) {
         then: (resolve: any) => {
           const rows = tables[table];
           if (rows === undefined && table === "client_inactive") return resolve({ data: null, error: { message: "no table" } });
+          if (table === "athlete_injury_status" && (tables as any).__injuryError) return resolve({ data: null, error: { message: "cannot read" } });
           const all = rows ?? [];
           resolve({ data: range ? all.slice(range[0], range[1] + 1) : all, error: null });
         },
@@ -177,6 +178,9 @@ describe("the progress look gather", () => {
 
   it("suppresses: a client marked as injured", async () => {
     expect((await run(world({}, { athlete_injury_status: [{ athlete_id: "sam" }] }))).cards).toEqual([]);
+  });
+  it("when the injury status cannot be read it stays quiet: no cards at all, never a card for a possibly injured client", async () => {
+    expect((await run(world({}, { __injuryError: [1] }))).cards).toEqual([]);
   });
   it("suppresses: an exercise a progression model is already raising, but not the client's other lifts", async () => {
     expect((await run(world({}, { exercise_progressions: [{ program_id: "p1", exercise_name: "Back Squat" }] }))).cards).toEqual([]);

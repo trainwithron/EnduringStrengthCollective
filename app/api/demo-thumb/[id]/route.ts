@@ -20,7 +20,8 @@ export async function GET(_request: Request, props: { params: Promise<{ id: stri
   try {
     const upstream = await fetch(youtubeThumbSource(id), { cache: "force-cache", next: { revalidate: 60 * 60 * 24 * 7 } });
     const type = upstream.headers.get("content-type") ?? "";
-    if (!upstream.ok || !type.startsWith("image/")) return new NextResponse(null, { status: 404 });
+    // Only a plain picture: never something else (an SVG, say) served from our own address.
+    if (!upstream.ok || !/^image\/(jpeg|webp|png)\b/i.test(type)) return new NextResponse(null, { status: 404 });
     const bytes = await upstream.arrayBuffer();
     if (bytes.byteLength === 0 || bytes.byteLength > 500_000) return new NextResponse(null, { status: 404 });
     return new NextResponse(bytes, {

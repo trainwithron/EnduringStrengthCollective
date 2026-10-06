@@ -151,8 +151,12 @@ export async function gatherProgressLook(
   }
   const workoutById = new Map<string, any>(workoutRows.map((w) => [w.id, w]));
   const programIds = Array.from(new Set(workoutRows.map((w) => w.program_id).filter(Boolean))) as string[];
-  const { data: programRows } = programIds.length > 0 ? await supabase.from("programs").select("id, name, athlete_id").in("id", programIds) : { data: [] as any[] };
-  const programById = new Map<string, any>(((programRows ?? []) as any[]).map((p) => [p.id, p]));
+  const programRows: any[] = [];
+  for (const ids of chunk(programIds, IN_CHUNK)) {
+    const { data } = await supabase.from("programs").select("id, name, athlete_id").in("id", ids);
+    programRows.push(...((data ?? []) as any[]));
+  }
+  const programById = new Map<string, any>(programRows.map((p) => [p.id, p]));
 
   // The program's own targets for the sets that were done (reps, to tell a short set from a full one).
   const slotIds = Array.from(new Set(sets.map((s) => s.session_exercises?.group_workout_exercise_id).filter(Boolean))) as string[];
@@ -231,11 +235,12 @@ export async function gatherProgressLook(
   for (const r of phaseRows) if (!phaseOf.has(r.athlete_id)) phaseOf.set(r.athlete_id, r.phase);
 
   // A client the coach or the client has marked as injured never gets a "time to progress?" card: injury is a coach-only decision, so suppress on doubt.
-  // Soft: if that table cannot be read nobody is treated as injured by it (the pain-note rule still applies).
   const injuredIds = new Set<string>();
   {
     const { data: injuryRows, error: injuryError } = await supabase.from("athlete_injury_status").select("athlete_id").in("group_id", groupIds).eq("is_injured", true);
-    if (!injuryError) for (const r of (injuryRows ?? []) as any[]) injuredIds.add(r.athlete_id);
+    // Injury is a coach-only decision, so on doubt this stays quiet: if the status cannot be read, no card is made at all.
+    if (injuryError) return { ...empty, threshold, hintOn };
+    for (const r of (injuryRows ?? []) as any[]) injuredIds.add(r.athlete_id);
   }
 
   // A program that already raises an exercise through a progression model is left alone: the model moves the load as the client logs, so the planned target

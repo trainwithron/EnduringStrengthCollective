@@ -31,6 +31,9 @@ describe("the nudge text", () => {
   it("names the client's goal when they have one, and stays plain without one", () => {
     expect(goalLabelFor("muscle_gain", null)).toBe("muscle gain");
     expect(goalLabelFor("custom", "run a half marathon")).toBe("run a half marathon");
+    const long = "I honestly feel like my deadlift lockout and my sleep are what is holding everything back right now";
+    expect(goalLabelFor("custom", long)!.length).toBeLessThanOrEqual(60);
+    expect(goalLabelFor("custom", long)!.endsWith("...")).toBe(true);
     expect(goalLabelFor("custom", "  ")).toBeNull();
     expect(goalLabelFor(null, null)).toBeNull();
     expect(restDayNudgeBody("muscle gain")).toBe("Rest day. A quick check-in keeps you on track for your muscle gain goal.");

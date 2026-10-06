@@ -25,7 +25,12 @@ export function restNudgeDecision(input: { nudgeTimes: Date[]; lastActivityAt: D
 
 export function goalLabelFor(goalType: string | null | undefined, customLabel: string | null | undefined): string | null {
   if (!goalType) return null;
-  if (goalType === "custom") return customLabel?.trim() || null;
+  // A custom goal can be a whole sentence in the client's own words (a suggested goal started from "what do you need most help with?"); a lock screen should
+  // not carry it, so it is cut to a short phrase.
+  if (goalType === "custom") {
+    const label = customLabel?.trim() || null;
+    return label && label.length > 60 ? `${label.slice(0, 57).trimEnd()}...` : label;
+  }
   return (GOAL_TYPE_LABELS[goalType as GoalType] ?? null)?.toLowerCase() ?? null;
 }
 
