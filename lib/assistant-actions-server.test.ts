@@ -108,6 +108,14 @@ describe("a settings change by chat", () => {
     expect(db.coach_booking_policies[0].buffer_minutes).toBe(40);
   });
 
+  it("a bigger gap carries a caution about repeating weekly sessions; a smaller one does not", async () => {
+    const sb = fakeSupabase({ coach_booking_policies: [{ coach_id: COACH, buffer_minutes: 5 }] });
+    const up = await proposeAction(sb, COACH, "set my buffer to 100 minutes", null);
+    expect(up && up.ok && up.card.caution).toMatch(/repeating/);
+    const down = await proposeAction(sb, COACH, "set my buffer to 0", null);
+    expect(down && down.ok && down.card.caution).toBeUndefined();
+  });
+
   it("free booking carries a plain caution on the card", async () => {
     const res = await proposeAction(fakeSupabase({ coach_booking_policies: [] }), COACH, "let clients book themselves", null);
     expect(res && res.ok).toBe(true);

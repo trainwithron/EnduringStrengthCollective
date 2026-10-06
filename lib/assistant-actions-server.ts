@@ -18,7 +18,7 @@ import type { TermOverride, TerminologyOverrides } from "./terminology";
 //            make the same write the settings screen would (under the coach's own sign-in, so the database's own rules decide who may), and record it;
 //   undo     only with the token confirm returned, and only while the setting still has the value the change set (so it never overwrites a later edit by hand).
 // There is no free-form SQL and no new back door: every write is the one the matching settings screen already makes, with the same limits.
-// Every setting here is fully put back by setting it back (no stored value is read by a job that acts on clients). Session expiry is NOT here on purpose.
+// Each setting here is read only at booking or cancel time, so setting it back reverses it, except the buffer (the nightly series top-up leaves a clashing week empty; the card warns). Session expiry is NOT here on purpose.
 
 const PROPOSE_TTL = 10 * 60;
 const UNDO_TTL = 60 * 60;
@@ -170,6 +170,11 @@ export async function proposeAction(supabase: SupabaseClient, userId: string, me
   if (req.id === "set_session_length" && new Set((before.windows ?? []).map((w) => w.minutes)).size > 1) beforeText = "different lengths on different days";
   if (req.id === "set_booking_mode" && req.params.mode === "free") {
     caution = "Clients will be able to book any open time themselves, with no check from you first.";
+  }
+  // The nightly top-up of repeating weekly sessions reads the current gap: a week that would clash with a bigger gap is left empty for good (the coach is told),
+  // and setting the gap back does not bring it back.
+  if (req.id === "set_buffer" && (req.params.amount ?? 0) > (before.amount ?? 0)) {
+    caution = "Weekly repeating sessions that would clash with the bigger gap are left empty, and you are told. Setting it back does not bring those weeks back.";
   }
   const payload: TokenPayload = { kind: "confirm", coachId: userId, orgId, action: req, before };
   return {

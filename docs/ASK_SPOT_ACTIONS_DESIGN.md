@@ -37,7 +37,7 @@ Pure and deterministic, over the coach's own roster only (the navigate route fet
 "Pull up Johann's program" resolves to that client's current program (their own copy if they have one, else the group's), shown as a card: **"Johann Gorsik's program: is this what you're looking for? [Yes] [Not that one]"**. Yes, or Enter in the empty box, opens it. Places per client: profile, program, calendar, nutrition, messages, history, goals, balance, in-person log. Two people who fit: both are offered as buttons.
 
 ### 3.3 Settings by chat (`lib/assistant-actions.ts`, `lib/assistant-actions-server.ts`, `/api/assistant/action`)
-First set: the word for the people a coach coaches (per organization), the gap between sessions, the cancellation window, minimum notice, session length, and how clients book. Each is fully put back by setting it back; no job reads any of them to act on clients.
+First set: the word for the people a coach coaches (per organization), the gap between sessions, the cancellation window, minimum notice, session length, and how clients book. Each is read only at booking or cancel time, so setting it back reverses it, with one exception: **the buffer** is read by the nightly series top-up, which leaves a week that would clash with a bigger gap empty for good (the coach is told). A bigger buffer therefore shows a caution on the card.
 
 **Not by chat: session expiry.** The nightly job applies the *current* window to credits clients already hold, zeroes them and tells each client, so a misheard number would wipe balances and Undo could not give them back. Ask Spot answers any expiry command with where to do it in Settings. (Assistant review, Oct 6.)
 
