@@ -47,3 +47,6 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0274 | yes | yes | 13 | 0274 completed workout lock |
 | 0275 | yes | yes | 8 | 0275 a cancelled or moved week of an ongoing schedule stays skipped |
 | 0276 | yes | yes | 7 | 0276 new message notice |
+| 0277 | yes | yes | 18 | 0277 late cancel or move is flagged for the coach, not charged |
+| 0278 | yes | yes | 10 | 0278 self-booking is a per-coach switch, off by default |
+| 0279 | yes | yes | 18 | 0279 a client asks to move a session and the coach confirms |

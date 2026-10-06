@@ -17,6 +17,7 @@ import { BookSlotButton } from "@/components/athlete/book-slot-button";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { MarkAttendedControl, type CreditState } from "@/components/coach/mark-attended-control";
 import { RescheduleSlotButton } from "@/components/athlete/reschedule-slot-button";
+import { RequestSlotButton } from "@/components/athlete/request-slot-button";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { DayHourGrid } from "@/components/coach/desktop/day-hour-grid";
@@ -236,6 +237,34 @@ export default async function CoachDayDetailPage(
     const bookingByTime = new Map(
       bookingsForDay.map((b) => [new Date(b.start_at).getTime(), b])
     );
+
+    // Clients book themselves only when the coach has switched self-booking on (off by default; the database enforces it too). When it is
+    // off, the open times are not offered; the client still sees their own sessions and can cancel or move them.
+    let bookingMode = "free" as "free" | "request" | "coach_schedules";
+    if (coachMembership) {
+      const sb = await supabase
+        .from("coach_booking_policies")
+        .select("booking_mode")
+        .eq("coach_id", coachMembership.profile_id)
+        .maybeSingle();
+      // Until the database update that adds the switch is applied, the select errors and booking behaves as before.
+      if (!sb.error) bookingMode = ((sb.data?.booking_mode as string | null) ?? "coach_schedules") as typeof bookingMode;
+    // A coach (booking for a client they are viewing as, or for themselves) is never refused: they book directly.
+    if (membership.role === "coach") bookingMode = "free";
+    }
+    if (bookingMode === "coach_schedules") {
+      slots = slots.filter((s) => bookingByTime.get(s.start.getTime())?.athlete_id === athleteId);
+    }
+    // Times this client has already asked for (pending requests), so the slot says "Requested" instead of offering the button again.
+    const requestedTimes = new Set<number>();
+    if (bookingMode === "request") {
+      const { data: pendingRows } = await supabase
+        .from("booking_requests")
+        .select("new_start_at")
+        .eq("athlete_id", athleteId)
+        .eq("status", "pending");
+      for (const r of pendingRows ?? []) requestedTimes.add(new Date(r.new_start_at as string).getTime());
+    }
     const backHref = `/groups/${params.groupId}/calendar`;
 
     return (
@@ -277,8 +306,9 @@ export default async function CoachDayDetailPage(
                 month: "short",
                 day: "numeric",
               })}{" "}
-              session — moving less than your coach&apos;s cancellation window
-              before that session still uses 1 session.
+              session — moving it less than your coach&apos;s cancellation window
+              before that session lets your coach know, and they decide whether it counts as a session.
+              {bookingMode === "request" && " Your coach confirms every move: your session stays where it is until they do."}
             </p>
           )}
         </header>
@@ -291,7 +321,11 @@ export default async function CoachDayDetailPage(
           {!coachMembership ? (
             <p className="font-body text-sm text-steel py-2">No coach found for this group.</p>
           ) : slots.length === 0 ? (
-            <p className="font-body text-sm text-steel py-2">No open hours on this day.</p>
+            <p className="font-body text-sm text-steel py-2">
+              {bookingMode === "coach_schedules"
+                ? "Your coach schedules your sessions. Message them to set one up."
+                : "No open hours on this day."}
+            </p>
           ) : (
             <div className="divide-y divide-steel/15">
               {slots.map(({ start, durationMinutes }) => {
@@ -329,6 +363,7 @@ export default async function CoachDayDetailPage(
                         <span className="font-body text-xs text-steel">Too close to another session</span>
                       ) : (
                         <RescheduleSlotButton
+                          requestOnly={bookingMode === "request"}
                           bookingId={reschedulingBooking.id}
                           startAt={iso}
                           endAt={endAt.toISOString()}
@@ -356,6 +391,16 @@ export default async function CoachDayDetailPage(
                       )
                     ) : isBufferBlocked ? (
                       <span className="font-body text-xs text-steel">Too close to another session</span>
+                    ) : bookingMode === "request" && requestedTimes.has(start.getTime()) ? (
+                      <span className="font-body text-xs text-chalk">Requested. Waiting for your coach.</span>
+                    ) : bookingMode === "request" ? (
+                      <RequestSlotButton
+                        coachId={coachMembership.profile_id}
+                        athleteId={athleteId}
+                        groupId={params.groupId}
+                        startAt={iso}
+                        endAt={endAt.toISOString()}
+                      />
                     ) : creditBalance > 0 ? (
                       <div className="flex flex-col items-end gap-1">
                         <BookSlotButton

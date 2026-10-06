@@ -63,7 +63,11 @@ async function handler(request: Request) {
     expired++;
   }
 
-  return NextResponse.json({ ok: true, pushed, expired });
+  // A pending booking request whose time has passed lapses and the client is told (needs the booking requests database update; until then
+  // the call fails quietly).
+  const { data: lapsed } = await supabase.rpc("expire_stale_booking_requests");
+
+  return NextResponse.json({ ok: true, pushed, expired, lapsedRequests: typeof lapsed === "number" ? lapsed : 0 });
 }
 
 export const GET = withCronRun("process-booking-waitlist", handler);

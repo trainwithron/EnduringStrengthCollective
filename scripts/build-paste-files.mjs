@@ -13,6 +13,20 @@ const index = {};
 for (const f of readdirSync(new URL("migrations/", root))) if (/^\d{4}_/.test(f)) index[f.slice(0, 4)] = f;
 const migrationSql = (n) => readFileSync(new URL(`migrations/${index[n]}`, root), "utf8").replace(/\r\n/g, "\n").replace(/\s+$/, "");
 
+// The text of one function as 0248 defines it (the version live today), for the undo files of the steps that replace it.
+const fnFromMigration = (mig, name) => {
+  const text = migrationSql(mig);
+  const start = text.indexOf(`create or replace function public.${name}(`);
+  if (start < 0) throw new Error(`${mig} has no ${name}`);
+  const open = text.indexOf("$function$", start);
+  const end = text.indexOf("$function$;", open + 10) + "$function$;".length;
+  return text.slice(start, end);
+};
+const fnFrom0248 = (name) => fnFromMigration("0248", name);
+const fnFrom0218 = (name) => fnFromMigration("0218", name);
+const fnFrom0277 = (name) => fnFromMigration("0277", name);
+const md5Is = (sig, md5) => `coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = '${md5}' from pg_proc p where p.oid = to_regprocedure('public.${sig}')), false)`;
+
 const has = {
   table: (t) => `to_regclass('public.${t}') is not null`,
   noTable: (t) => `to_regclass('public.${t}') is null`,
@@ -369,6 +383,100 @@ alter table public.notifications add constraint notifications_type_check
       ["0276 is not already applied", `not exists (select 1 from pg_trigger where tgname = 'direct_messages_notify')`],
     ],
   },
+  {
+    n: "19",
+    slug: "0277",
+    title: "0277 a client's late cancel or late move is flagged for the coach to Charge or Waive (nothing is taken automatically)",
+    migrations: ["0277"],
+    sees: "Success. No rows returned.",
+    afterwards: "A client cancelling or moving a session inside your cancellation window no longer loses a session by itself. You get a notice ('<name> cancelled a session inside the 24-hour window. Charge it or waive it.') and the item appears under Needs your decision on your dashboard with Charge and Waive buttons. Test with a throwaway client: schedule a session in a few hours, cancel it as the client, check the balance did not change and the notice arrived.",
+    undo: `${fnFrom0248("cancel_booking_and_refund_credit")}
+
+${fnFrom0248("reschedule_booking")}
+
+drop function if exists public.resolve_late_change(uuid, boolean);
+drop trigger if exists bookings_audit on public.bookings;
+create trigger bookings_audit after insert or update on public.bookings
+  for each row execute function public.audit_watch('credit_state', 'update_only', 'id');
+delete from public.notifications where type = 'late_change';
+alter table public.notifications drop constraint if exists notifications_type_check;
+alter table public.notifications add constraint notifications_type_check
+  check (type in (
+    'comment', 'program_assigned', 'macros_assigned', 'partner_request',
+    'partner_request_accepted', 'milestone_celebration', 'gym_visitor_lead',
+    'trainer_dispatch_offer', 'trainer_dispatch_question', 'session_pattern_note',
+    'credits_expired', 'waitlist_slot_offered', 'recurring_booking_conflict',
+    'email_changed', 'direct_message'
+  ));`,
+    undoWhy: "Only if cancelling or moving a booking breaks after step 19. Puts the two booking functions back to the previous version (late changes take a session by themselves again), removes the Charge/Waive function and the notices. The flag columns stay (harmless).",
+    rows: [
+      ["0248 is applied (the credit functions exist)", `${has.fnName("apply_session_credit_change")} and ${has.fnName("settle_booking_internal")} and ${has.col("bookings", "credit_state")}`],
+      ["bookings, notifications and coach_booking_policies exist", `${has.table("bookings")} and ${has.table("notifications")} and ${has.table("coach_booking_policies")}`],
+      ["0267 is applied (the audit function exists)", has.fnName("audit_watch")],
+      ["0276 is applied (the notification type list includes direct_message)", `exists (select 1 from pg_constraint where conname = 'notifications_type_check' and pg_get_constraintdef(oid) like '%direct_message%')`],
+      ["0277 is not already applied (the live cancel and reschedule functions are exactly the versions this step was built from)", `${md5Is("cancel_booking_and_refund_credit(uuid)", "b0485b9332f337b725669193b19f0887")} and ${md5Is("reschedule_booking(uuid, timestamptz, timestamptz)", "f45d1a198654ec4150e6ec958de3b1d1")}`],
+    ],
+  },
+  {
+    n: "20",
+    slug: "0278",
+    title: "0278 each coach picks how clients book: on their own, request and the coach confirms, or the coach schedules everyone (existing coaches start as 'coach schedules')",
+    migrations: ["0278"],
+    sees: "Success. No rows returned.",
+    afterwards: "Every coach is set to 'I schedule everyone' until they choose: clients cannot book, start a weekly schedule or join a waiting list on their own. Open Availability and pick the mode (Ron: 'Clients request, I confirm' once step 21 is also applied; 'Clients book on their own' restores today's behaviour). You can always schedule any client. Test as a throwaway client: try to book (it must refuse); switch the mode to 'book on their own' and try again.",
+    undo: `${fnFrom0248("book_session")}
+
+${fnFrom0248("create_recurring_booking_series")}
+
+${fnFrom0218("join_booking_waitlist")}
+
+drop function if exists public.assert_client_may_book_directly(uuid, uuid, uuid);
+drop function if exists public.coach_booking_mode(uuid);
+drop function if exists public.coach_time_zone(uuid);
+alter table public.coach_booking_policies drop column if exists booking_mode;`,
+    undoWhy: "Only if booking a session breaks after step 20. Puts book_session, the weekly-schedule function and the waiting-list function back to the previous versions (clients can book themselves again) and removes the mode column and its three helper functions.",
+    rows: [
+      ["0248 is applied (book_session settles credits)", `${has.fnName("book_session")} and ${has.col("bookings", "credit_state")}`],
+      ["coach_booking_policies exists", has.table("coach_booking_policies")],
+      ["0278 is not already applied (the live book_session, weekly-schedule and waiting-list functions are exactly the versions this step was built from)", `${md5Is("book_session(uuid, uuid, uuid, timestamptz, timestamptz)", "da934a4629a0f09580619b7c908ab42a")} and ${md5Is("create_recurring_booking_series(uuid, uuid, uuid, timestamptz, integer, integer)", "a14562f9889b8094e99a5403e5423835")} and ${md5Is("join_booking_waitlist(uuid, uuid, uuid, timestamptz, timestamptz)", "f2d3243ac4fcf1876d894178e8a937f7")}`],
+    ],
+  },
+  {
+    n: "21",
+    slug: "0279",
+    title: "0279 booking requests: in 'request' mode a client asks for a new session or to move one, and the coach confirms (nothing is booked or held until then)",
+    migrations: ["0279"],
+    sees: "Success. No rows returned.",
+    afterwards: "In 'Clients request, I confirm' mode a client picks a time and sends a request (nothing is booked or held); you get a notice and a Confirm / Decline row under Needs your decision; Confirm books it (or moves the session, flagging a late move for Charge or Waive); the client is told either way. Requests whose time passes lapse by themselves. Direct moves are refused unless the mode is 'book on their own'. Test with a throwaway client in request mode.",
+    undo: `${fnFrom0277("reschedule_booking")}
+
+drop function if exists public.expire_stale_booking_requests();
+drop function if exists public.cancel_booking_request(uuid);
+drop function if exists public.resolve_booking_request(uuid, boolean);
+drop function if exists public.request_booking_move(uuid, timestamptz, timestamptz);
+drop function if exists public.request_booking(uuid, uuid, uuid, timestamptz, timestamptz);
+drop function if exists public.check_booking_request_slot(uuid, uuid, timestamptz, timestamptz);
+drop function if exists public.coach_time_is_open(uuid, timestamptz, timestamptz);
+drop table if exists public.booking_requests;
+delete from public.notifications where type in ('booking_request', 'request_decision');
+alter table public.notifications drop constraint if exists notifications_type_check;
+alter table public.notifications add constraint notifications_type_check
+  check (type in (
+    'comment', 'program_assigned', 'macros_assigned', 'partner_request',
+    'partner_request_accepted', 'milestone_celebration', 'gym_visitor_lead',
+    'trainer_dispatch_offer', 'trainer_dispatch_question', 'session_pattern_note',
+    'credits_expired', 'waitlist_slot_offered', 'recurring_booking_conflict',
+    'email_changed', 'direct_message', 'late_change'
+  ));`,
+    undoWhy: "Only if moving or requesting a session breaks after step 21. Puts reschedule_booking back to the step 19 version, removes the request functions, the request table (pending requests are lost) and their notices, and puts the notification type list back to the step 19 list (late_change stays).",
+    rows: [
+      ["0277 is applied (late-change flags exist)", has.col("bookings", "late_charge_state")],
+      ["0278 is applied (the booking mode exists)", `${has.col("coach_booking_policies", "booking_mode")} and ${has.fnName("coach_booking_mode")}`],
+      ["coach_availability_windows, coach_availability_exceptions and discovery_bookings exist", `${has.table("coach_availability_windows")} and ${has.table("coach_availability_exceptions")} and ${has.table("discovery_bookings")}`],
+      ["is_org_admin_of_group and offer_freed_slot_to_waitlist exist", `${has.fnName("is_org_admin_of_group")} and ${has.fnName("offer_freed_slot_to_waitlist")}`],
+      ["0279 is not already applied (the live reschedule_booking is exactly the step 19 version, and there is no request table yet)", `${md5Is("reschedule_booking(uuid, timestamptz, timestamptz)", "1283df1e48a57927374db97199ad00eb")} and ${has.noTable("booking_requests")}`],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -498,6 +606,9 @@ for (const s of STEPS) {
     m("0274", "coalesce((select position('tg_op' in pg_get_functiondef(p.oid)) > 0 from pg_proc p where p.proname = 'block_athlete_edits_to_completed_session' and p.pronamespace = 'public'::regnamespace), false)"),
     m("0275", "exists (select 1 from pg_trigger where tgname = 'bookings_note_series_skip')"),
     m("0276", "exists (select 1 from pg_trigger where tgname = 'direct_messages_notify')"),
+    m("0277", has.col("bookings", "late_charge_state")),
+    m("0278", has.col("coach_booking_policies", "booking_mode")),
+    m("0279", has.table("booking_requests")),
   ];
   const values = items.map((i) => `    ('2026100600${i.n.slice(1)}', '${i.file.slice(5, -4)}', '${i.file}', ${i.marker})`).join(",\n");
   const sql = [
@@ -519,6 +630,26 @@ for (const s of STEPS) {
     "",
   ].join("\n");
   writeFileSync(new URL("record-history-applied.sql", outDir), sql);
+}
+
+// ---- optional-ron-booking-mode-request.sql: OPTIONAL second statement, to set Ron's own mode right after step 20 ----
+{
+  const sql = [
+    "-- OPTIONAL. Run only AFTER step 20 (0278), and ideally after step 21 (0279) so requests work. You can skip it and pick the mode yourself on the Availability page instead.",
+    "-- Sets ONE coach to 'Clients request, I confirm': the coach whose login email is below. CHECK that this is the email you sign in to coaching with.",
+    "-- If no account has that email it changes nothing. Every other coach stays on 'I schedule everyone' until they choose.",
+    "-- WHAT YOU SHOULD SEE: the first result shows the one coach it will change (one row), the second shows 'request' for that coach.",
+    "do $guard$ begin if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_booking_policies' and column_name = 'booking_mode') then raise exception 'Step 20 (0278) is not applied yet, so there is no booking mode to set. Apply step 20 first. Nothing was changed.'; end if; end $guard$;",
+    "select u.id as coach_id, u.email from auth.users u where lower(u.email) = 'trainwithronarnold@gmail.com';",
+    "begin;",
+    "insert into public.coach_booking_policies (coach_id, booking_mode)",
+    "select u.id, 'request' from auth.users u where lower(u.email) = 'trainwithronarnold@gmail.com'",
+    "on conflict (coach_id) do update set booking_mode = 'request';",
+    "commit;",
+    "select bp.coach_id, bp.booking_mode from public.coach_booking_policies bp join auth.users u on u.id = bp.coach_id where lower(u.email) = 'trainwithronarnold@gmail.com';",
+    "",
+  ].join("\n");
+  writeFileSync(new URL("optional-ron-booking-mode-request.sql", outDir), sql);
 }
 
 // ---- check-step13-probe.sql: proves, on the live database, that a NEW function is closed to the signed-out role after step 13 ----
