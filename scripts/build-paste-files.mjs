@@ -678,6 +678,21 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["0288 is not already applied (the overlap guard is not there yet)", "not exists (select 1 from pg_trigger where tgname = 'bookings_guard_overlap')"],
     ],
   },
+  {
+    n: "34",
+    slug: "0289",
+    title: "0289 a window of hours can be tagged with one of your session types (Online, In person, Weight room, Practice, Game...), and a booking made inside it is tagged the same",
+    migrations: ["0289"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing visible changes at once and no existing window changes (no tag means any type). After the code deploy: on Availability each window has an optional 'Session type', sessions booked inside a tagged window carry that type (shown on the calendar day), and Business > Session types offers one-tap Online / In person or Weight room / Practice / Game. The type never changes what a session costs. Run after step 33.",
+    undo: "drop trigger if exists bookings_tag_session_type on public.bookings;\ndrop function if exists public.tag_booking_session_type();\ndrop index if exists public.coach_availability_windows_session_type_id_idx;\nalter table public.coach_availability_windows drop column if exists session_type_id;",
+    undoWhy: "Only if tagging misbehaves after step 34. Removes the window tag column (the tags on windows are lost) and the automatic tagging of new bookings. Types already on bookings stay.",
+    rows: [
+      ["coach_availability_windows and session_types exist", `${has.table("coach_availability_windows")} and ${has.table("session_types")}`],
+      ["bookings has the session type column (0261 is applied)", has.col("bookings", "session_type_id")],
+      ["0289 is not already applied (the window tag column is not there yet)", has.noCol("coach_availability_windows", "session_type_id")],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
