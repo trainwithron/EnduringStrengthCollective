@@ -24,7 +24,7 @@ export function ScheduleClientPicker({
   return (
     <div className="px-5 pt-4 pb-2 border-b border-steel/20">
       <label className="font-body text-xs text-steel uppercase tracking-wide">
-        Schedule a client
+        Calendar for
       </label>
       <select
         value={selectedId ?? ""}
@@ -35,7 +35,7 @@ export function ScheduleClientPicker({
         }}
         className="w-full h-11 mt-1 bg-graphite border border-steel/30 text-chalk px-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
       >
-        <option value="">Select a client…</option>
+        <option value="">All clients</option>
         {clients.map((c) => (
           <option key={c.id} value={c.id}>
             {c.fullName} — {c.balance < 0 ? `owed ${Math.abs(c.balance)}` : `${c.balance} ${c.balance === 1 ? "session" : "sessions"}`}
