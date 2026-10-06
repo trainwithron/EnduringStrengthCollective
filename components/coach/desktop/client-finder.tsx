@@ -1,5 +1,6 @@
 "use client";
 
+import { withArticle } from "@/lib/article";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
@@ -116,7 +117,7 @@ export function ClientFinder({ currentGroupId, align = "right" }: { currentGroup
     }
   }
 
-  const label = `Find a ${clientWord.toLowerCase()}`;
+  const label = `Find ${withArticle(clientWord.toLowerCase())}`;
 
   return (
     <div className="relative" ref={containerRef}>

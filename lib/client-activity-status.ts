@@ -8,8 +8,10 @@ export function daysSinceOf(lastWorkoutAt: string | null): number {
   return Math.floor((Date.now() - new Date(lastWorkoutAt).getTime()) / (1000 * 60 * 60 * 24));
 }
 
-export function clientActivityStatus(lastWorkoutAt: string | null): { text: string; dotClass: string } {
+// `isNew`: the client was added recently (or has not signed in yet) and has not done a first workout, so say so neutrally instead of "No logs yet".
+export function clientActivityStatus(lastWorkoutAt: string | null, opts: { isNew?: boolean } = {}): { text: string; dotClass: string } {
   if (!lastWorkoutAt) {
+    if (opts.isNew) return { text: "New, hasn't started yet", dotClass: "bg-steel" };
     return { text: "No logs yet", dotClass: "bg-steel" };
   }
   const daysSince = daysSinceOf(lastWorkoutAt);

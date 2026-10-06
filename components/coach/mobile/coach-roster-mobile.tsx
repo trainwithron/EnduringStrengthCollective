@@ -174,7 +174,7 @@ function RosterRow({
   member: RosterMember;
   tier: QuietTier;
 }) {
-  const status = clientActivityStatus(member.lastWorkoutAt);
+  const status = clientActivityStatus(member.lastWorkoutAt, { isNew: !!member.signInStatus && member.signInStatus !== "active" });
   return (
     <QuickViewBubble
       title={member.fullName}

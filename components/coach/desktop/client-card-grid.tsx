@@ -677,7 +677,7 @@ export function ClientCardGrid({
       ) : (
         <div className={`grid ${GRID_CLASS[size]}`}>
           {pageRows.map((member) => {
-            const status = clientActivityStatus(member.lastWorkoutAt);
+            const status = clientActivityStatus(member.lastWorkoutAt, { isNew: !!member.signInStatus && member.signInStatus !== "active" });
             const credits = creditsByAthleteId.get(member.profileId) ?? null;
             const owed = owedByAthleteId.get(member.profileId);
             const owesNow = !!owed && needsPayment(owed.balance, owed.hold);

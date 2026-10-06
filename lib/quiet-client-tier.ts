@@ -49,23 +49,39 @@ function countScheduledDaysMissed(since: Date, now: Date, trainingDays: number[]
   return count;
 }
 
+// A client who has not done a first workout yet is getting started, not gone quiet: not flagged within this many days of being added, or (when
+// they have not signed in yet) within this many days.
+export const NEW_CLIENT_GRACE_DAYS = 14;
+export const NOT_SIGNED_IN_GRACE_DAYS = 45;
+
 export function computeQuietTier(params: {
   lastLoggedAt: Date | null;
   now: Date;
+  // When they were added to the group, and whether they have signed in. Optional: callers that do not know simply keep the old behavior.
+  addedAt?: Date | null;
+  signedIn?: boolean;
   // The athlete's own active program's training_days, when one exists
   // with a real schedule. Null/empty falls back to the calendar-day
   // thresholds (freeform logging, or an unscheduled "playlist mode"
   // program).
   trainingDays: number[] | null;
 }): QuietTier {
-  const { lastLoggedAt, now, trainingDays } = params;
+  const { lastLoggedAt, now, trainingDays, addedAt, signedIn } = params;
   const hasSchedule = !!trainingDays && trainingDays.length > 0;
 
   // Never logged at all — same "ranks above any stale date" rule already
   // used by the Clients page's own needs-attention sort. Immediately
   // strong rather than waiting out a grace period; there's no real
   // baseline to be lenient against.
-  if (!lastLoggedAt) return "strong";
+  if (!lastLoggedAt) {
+    // New and not started yet: neutral, not a flag.
+    if (addedAt) {
+      const sinceAdded = daysBetween(addedAt, now);
+      if (sinceAdded < NEW_CLIENT_GRACE_DAYS) return "none";
+      if (signedIn === false && sinceAdded < NOT_SIGNED_IN_GRACE_DAYS) return "none";
+    }
+    return "strong";
+  }
 
   if (!hasSchedule) {
     const days = daysBetween(lastLoggedAt, now);
