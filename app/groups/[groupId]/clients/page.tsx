@@ -322,6 +322,7 @@ export default async function ClientsPage(
       <GroupInvitesPanel
         groupId={params.groupId}
         createdBy={user.id}
+        groupName={group?.name ?? "this group"}
         invites={groupInvites}
         oneOnOneClientName={
           (group as { group_kind?: string } | null)?.group_kind === "one_on_one" && athletes.length > 0

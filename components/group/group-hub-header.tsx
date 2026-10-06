@@ -59,7 +59,7 @@ export function GroupHubHeader({
           Inviting a client is common enough day-to-day to keep here. */}
       {isCoach && coachId && (
         <div className="mt-5">
-          <InviteAthleteButton groupId={groupId} createdBy={coachId} />
+          <InviteAthleteButton groupId={groupId} createdBy={coachId} groupName={name} />
         </div>
       )}
     </header>

@@ -19,9 +19,12 @@ function randomCode(length = 10) {
 export function InviteAthleteButton({
   groupId,
   createdBy,
+  groupName,
 }: {
   groupId: string;
   createdBy: string;
+  // Shown on the button so it is clear this puts the person INTO this group. To bring in a one-on-one client, use Add client.
+  groupName: string;
 }) {
   const [link, setLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -65,7 +68,7 @@ export function InviteAthleteButton({
     return (
       <div className="w-full border border-steel/30 p-3 max-w-md">
         <p className="font-body text-xs text-steel mb-2">
-          Invite link &middot; expires in 7 days
+          Joins {groupName} &middot; expires in 7 days
         </p>
         <div className="flex items-center gap-2">
           <input
@@ -95,7 +98,7 @@ export function InviteAthleteButton({
         className="inline-flex items-center gap-2 h-11 px-4 rounded-none border border-rust text-rust font-body text-sm font-medium active:bg-rust active:text-graphite transition-colors disabled:opacity-40"
       >
         <Plus className="w-4 h-4" strokeWidth={2.5} />
-        {generating ? "Generating…" : "Invite athlete"}
+        {generating ? "Generating…" : `Invite to ${groupName}`}
       </button>
       {error && <p className="font-body text-xs text-rust mt-2">{error}</p>}
     </div>

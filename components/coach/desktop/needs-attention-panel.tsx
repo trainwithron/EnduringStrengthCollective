@@ -30,6 +30,8 @@ export function NeedsAttentionPanel({
   items: NeedsAttentionItem[];
 }) {
   const router = useRouter();
+  // Closed by default once there is more than a couple, so a full list never takes over Home.
+  const [open, setOpen] = useState(items.length <= 2);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [notifyStatus, setNotifyStatus] = useState<Record<string, string>>({});
   // athleteId alone isn't unique — the same athlete can have both a
@@ -110,64 +112,100 @@ export function NeedsAttentionPanel({
 
   if (items.length === 0) return null;
 
+  const dismissable = items.filter((i) => !i.alreadyOnCalendar);
+
+  // One quiet action for the whole list: marks every item not yet on the calendar as dismissed, the same record a single
+  // Dismiss writes, so they stay gone until something genuinely new comes up.
+  async function handleDismissAll() {
+    if (dismissable.length === 0) return;
+    setBusyKey("all");
+    const supabase = createBrowserClient();
+    await supabase.from("calendar_events").upsert(
+      dismissable.map((item) => ({
+        coach_id: coachId,
+        title: item.title,
+        event_date: item.suggestedDateKey,
+        event_type: "suggestion",
+        trigger_key: item.triggerKey,
+        linked_athlete_id: item.athleteId,
+        linked_group_id: item.groupId,
+        status: "dismissed",
+      })),
+      { onConflict: "coach_id,linked_athlete_id,trigger_key", ignoreDuplicates: true }
+    );
+    setBusyKey(null);
+    router.refresh();
+  }
+
+  const busy = busyKey !== null;
+
   return (
-    <div className="border border-yellow-500/40 bg-yellow-500/5 p-4 mb-6 max-w-2xl">
-      <p className="font-body text-xs text-chalk font-medium uppercase tracking-wide mb-2">
-        Needs attention
-      </p>
-      {/* v3_visual_polish_mockup_sept15.md — real layout bug, not a style
-          opinion: this panel renders both in wide contexts (the full
-          Dashboard/Programs page) and, via NeedsAttentionStrip, inside
-          the resizable list-panel sidebar (220-560px wide). The old
-          layout put the title and its 3 action buttons in ONE flex row
-          fighting for the same horizontal space — at the sidebar's real
-          width that left barely any room for the text, so a name like
-          "Sim Athlete 4 — Went Quiet (Strong)" wrapped 5+ lines deep and
-          the buttons overflowed the column. Stacking the message above
-          its own actions row (which wraps via flex-wrap instead of
-          overflowing) fixes every context this component renders in,
-          fixed once here rather than three separate times. */}
-      <div className="divide-y divide-steel/15">
-        {items.map((item) => (
-          <div key={keyOf(item)} className="py-2.5 space-y-1.5">
-            <p className="font-body text-sm leading-snug">{item.title}</p>
-            {item.alreadyOnCalendar ? (
-              <p className="font-body text-xs text-steel">Added to your calendar</p>
-            ) : (
-              <div className="flex items-center flex-wrap gap-2">
-                {notifyStatus[keyOf(item)] && (
-                  <span className="font-body text-xs text-steel">{notifyStatus[keyOf(item)]}</span>
-                )}
-                <button
-                  type="button"
-                  onClick={() => handleNotify(item)}
-                  disabled={busyKey === keyOf(item)}
-                  className="h-7 px-2.5 border border-steel/30 text-steel font-body text-xs disabled:opacity-40"
-                  title="Send a push notification to this client"
-                >
-                  🔔 Notify
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleAdd(item)}
-                  disabled={busyKey === keyOf(item)}
-                  className="h-7 px-2.5 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
-                >
-                  Add to calendar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDismiss(item)}
-                  disabled={busyKey === keyOf(item)}
-                  className="h-7 px-2.5 border border-steel/30 text-steel font-body text-xs disabled:opacity-40"
-                >
-                  Dismiss
-                </button>
-              </div>
-            )}
-          </div>
-        ))}
+    <div className="border border-yellow-500/40 bg-yellow-500/5 mb-6 max-w-2xl">
+      {/* Collapsed to a single line until opened: a list that grows with every new client should not push the page down. */}
+      <div className="flex items-center justify-between gap-3 px-3 py-2">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          className="flex items-center gap-2 min-h-[32px] font-body text-xs text-chalk font-medium uppercase tracking-wide"
+        >
+          <span aria-hidden="true">{open ? "▾" : "▸"}</span>
+          Needs attention
+          <span className="text-steel normal-case tracking-normal">({items.length})</span>
+        </button>
+        {open && dismissable.length > 1 && (
+          <button
+            type="button"
+            onClick={handleDismissAll}
+            disabled={busy}
+            className="font-body text-xs text-steel underline underline-offset-2 disabled:opacity-40"
+          >
+            {busyKey === "all" ? "Clearing…" : "Dismiss all"}
+          </button>
+        )}
       </div>
+      {open && (
+        <div className="divide-y divide-steel/15 border-t border-steel/15 px-3 max-h-72 overflow-y-auto">
+          {items.map((item) => (
+            <div key={keyOf(item)} className="py-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <p className="font-body text-xs leading-snug flex-1 min-w-[10rem]">{item.title}</p>
+              {item.alreadyOnCalendar ? (
+                <p className="font-body text-xs text-steel">On your calendar</p>
+              ) : (
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {notifyStatus[keyOf(item)] && <span className="font-body text-xs text-steel">{notifyStatus[keyOf(item)]}</span>}
+                  <button
+                    type="button"
+                    onClick={() => handleNotify(item)}
+                    disabled={busy}
+                    className="h-7 px-2 border border-steel/30 text-steel font-body text-xs disabled:opacity-40"
+                    title="Send a push notification to this client"
+                    aria-label="Notify this client"
+                  >
+                    🔔
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAdd(item)}
+                    disabled={busy}
+                    className="h-7 px-2 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
+                  >
+                    Add
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDismiss(item)}
+                    disabled={busy}
+                    className="h-7 px-2 border border-steel/30 text-steel font-body text-xs disabled:opacity-40"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

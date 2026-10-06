@@ -9,6 +9,7 @@ import {
   type AthleteMacroInfo,
   type ReminderRule,
 } from "@/lib/coaching-suggestions";
+import { isStillOnboarding } from "@/lib/client-onboarding";
 import type { NeedsAttentionItem } from "@/components/coach/desktop/needs-attention-panel";
 
 function dateKey(d: Date): string {
@@ -51,7 +52,7 @@ export async function getNeedsAttentionItems(
 
   const { data: allAthleteRows } = await supabase
     .from("group_memberships")
-    .select("profile_id, group_id, client_tier, profiles ( full_name )")
+    .select("profile_id, group_id, client_tier, joined_at, profiles ( full_name, intake_required )")
     .in("group_id", groupIds)
     .eq("role", "athlete");
 
@@ -63,7 +64,22 @@ export async function getNeedsAttentionItems(
     clientTier: "one_on_one" | "online" | "group" | null;
   }
 
-  const allAthletes: AthleteRow[] = (allAthleteRows ?? []).map((a: any) => ({
+  // Someone who just joined, or has not finished their intake, is still getting started: nothing is overdue for them yet.
+  const rowIds = Array.from(new Set((allAthleteRows ?? []).map((a: any) => a.profile_id as string)));
+  const { data: intakeRows } =
+    rowIds.length > 0 ? await supabase.from("client_intake").select("athlete_id, completed_at").in("athlete_id", rowIds) : { data: [] };
+  const intakeDone = new Set((intakeRows ?? []).filter((r: any) => r.completed_at).map((r: any) => r.athlete_id as string));
+  const settledRows = (allAthleteRows ?? []).filter(
+    (a: any) =>
+      !isStillOnboarding({
+        joinedAt: a.joined_at ?? null,
+        intakeRequired: a.profiles?.intake_required === true,
+        intakeCompleted: intakeDone.has(a.profile_id),
+        now: new Date(),
+      })
+  );
+
+  const allAthletes: AthleteRow[] = settledRows.map((a: any) => ({
     athleteId: a.profile_id as string,
     athleteName: (a.profiles?.full_name ?? "A client") as string,
     groupId: a.group_id as string,

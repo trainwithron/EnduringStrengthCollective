@@ -39,11 +39,13 @@ function formatDay(iso: string): string {
 export function GroupInvitesPanel({
   groupId,
   createdBy,
+  groupName,
   invites,
   oneOnOneClientName,
 }: {
   groupId: string;
   createdBy: string;
+  groupName: string;
   invites: GroupInviteRow[];
   // Set when this is a one-on-one group that already has its client: more links cannot be used.
   oneOnOneClientName: string | null;
@@ -112,9 +114,12 @@ export function GroupInvitesPanel({
   return (
     <section className="mb-8 border border-steel/20 p-4">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="font-display uppercase text-sm tracking-wide text-steel">Invite links</h2>
+        <h2 className="font-display uppercase text-sm tracking-wide text-steel">Invite links to {groupName}</h2>
         <span className="font-body text-xs text-steel">{liveCount} working</span>
       </div>
+      <p className="font-body text-xs text-steel mt-2">
+        Anyone who joins with one of these links is put in {groupName}. To bring in a new one-on-one client, use Add client instead.
+      </p>
       {oneOnOneClientName && (
         <p className="font-body text-xs text-steel mt-2">
           This is a one-on-one group and {oneOnOneClientName} has already joined, so a new link can&apos;t be used to
@@ -192,7 +197,7 @@ export function GroupInvitesPanel({
         disabled={creating}
         className="h-11 px-4 mt-3 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-50"
       >
-        {creating ? "Creating…" : "New invite link"}
+        {creating ? "Creating…" : `New link to join ${groupName}`}
       </button>
       {error && (
         <p className="font-body text-xs text-rust mt-2" role="alert">
