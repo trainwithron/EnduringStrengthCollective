@@ -50,6 +50,7 @@ Already applied by you: steps 12 to 22 and 24. You do not touch those again.
       - The post-workout card appears for every client, including ones who keep workouts off the group feed and one-on-one clients.
       - Calendar: a "Send a note" button on a gap instead of any automatic text.
       - Wording: "coach" everywhere instead of "trainer", and Spotter / Ask Spot instead of "Collective Intelligence".
+      - Exercise demos: open a workout and tap **Demo** under an exercise (try Bulgarian Split Squat). A sheet slides up with the video, big, and it does not play until you press play; it should show the Rear Foot Elevated Split Squat video. Close it with Close or by tapping outside. Also try an exercise you add or swap in the middle of a workout. In Settings > Workout Logging, **Hide exercise demos** removes the button (saved on that phone only; following you across phones is a later step).
 
 ## What is NOT in today's list
 
