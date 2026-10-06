@@ -45,7 +45,7 @@ declare
   r record;
 begin
   for r in
-    select p.oid::regprocedure as sig, p.proname = any (array[
+    select p.oid::regprocedure as sig, p.proname, p.proname = any (array[
       'apply_session_credit_change', 'settle_booking_internal', 'promote_group_waitlist', 'offer_freed_slot_to_waitlist', 'grant_session_credits',
       'rate_limit_hit', 'reserve_ai_call', 'adjust_coach_credits', 'record_sms_stop', 'record_sms_start', 'record_sms_help',
       'sms_consent_for_dispatch', 'audit_record', 'audit_blocked', 'audit_blocked_redacted'
@@ -62,7 +62,12 @@ begin
       execute format('revoke execute on function %s from anon', r.sig);
       if r.server_only then
         execute format('revoke execute on function %s from authenticated', r.sig);
-        execute format('grant execute on function %s to service_role', r.sig);
+        if r.proname in ('audit_record', 'audit_blocked', 'audit_blocked_redacted') then
+          -- the audit writers are closed to the server too (0267, 0268): only the triggers that own them call them
+          execute format('revoke execute on function %s from service_role', r.sig);
+        else
+          execute format('grant execute on function %s to service_role', r.sig);
+        end if;
       else
         execute format('grant execute on function %s to authenticated, service_role', r.sig);
       end if;

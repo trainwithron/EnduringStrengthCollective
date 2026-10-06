@@ -39,7 +39,7 @@ export const undoSql = () =>
 
 // The body checks that count as "this function looks at who is calling".
 const CALLER_CHECK =
-  "(auth\\.uid\\(\\)|auth\\.role\\(\\)|is_group_coach|is_org_admin_of_group|is_platform_admin|is_group_member|is_org_member|is_coach_of_athlete|request\\.jwt)";
+  "(auth\\.uid\\(\\) *(=|<>|!=)|auth\\.uid\\(\\) is (not )?(null|distinct)|auth\\.role\\(\\) *(=|<>)|auth\\.role\\(\\) is|is_group_coach|is_org_admin_of_group|is_platform_admin|is_group_member|is_org_member|is_coach_of_athlete)";
 
 const offenderWhere = [
   "p.pronamespace = 'public'::regnamespace",
@@ -65,6 +65,7 @@ export const checkSql = () =>
     "  values",
     `    ('no server-only function can be run by a signed-in user or the public', not exists (select 1 from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname = any (array[${quote(SERVER_ONLY)}]) and (has_function_privilege('authenticated', p.oid, 'execute') or has_function_privilege('anon', p.oid, 'execute')))),`,
     `    ('the audit writers can only be run by the triggers that own them, not even by the server', not exists (select 1 from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname = any (array[${quote(AUDIT_WRITERS)}]) and has_function_privilege('service_role', p.oid, 'execute'))),`,
+    `    ('a signed-out visitor can run only get_invite_info (and the database event helper rls_auto_enable)', not exists (select 1 from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f' and p.proname not in ('get_invite_info', 'rls_auto_enable') and has_function_privilege('anon', p.oid, 'execute') and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e'))),`,
     `    ('every other signed-in-callable SECURITY DEFINER function checks who is calling, is an is_* or training_partner* helper, or was reviewed', not exists (select 1 from pg_proc p where ${offenderWhere}))`,
     ") as checks(check_name, ok)",
     "union all",

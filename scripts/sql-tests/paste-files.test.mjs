@@ -74,7 +74,7 @@ for (const s of steps) {
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   const rows = (await db.query(read("apply/check-function-acl.sql"))).rows;
-  check("check-function-acl.sql after step 24: " + rows.length + " rows, all true" + (rows.some((r) => !r.ok) ? " (FALSE: " + rows.filter((r) => !r.ok).map((r) => r.check_name).join("; ") + ")" : ""), rows.length === 3 && rows.every((r) => r.ok));
+  check("check-function-acl.sql after step 24: " + rows.length + " rows, all true" + (rows.some((r) => !r.ok) ? " (FALSE: " + rows.filter((r) => !r.ok).map((r) => r.check_name).join("; ") + ")" : ""), rows.length === 4 && rows.every((r) => r.ok));
   await db.exec("create function public.zz_new_internal(p_id uuid) returns void language plpgsql security definer set search_path = public as $f$ begin delete from public.profiles where id = p_id; end $f$; grant execute on function public.zz_new_internal(uuid) to authenticated");
   const caught = (await db.query(read("apply/check-function-acl.sql"))).rows;
   check("check-function-acl.sql catches a new SECURITY DEFINER function with no caller check that signed-in users can run", caught.some((r) => !r.ok && /zz_new_internal/.test(r.check_name)));
