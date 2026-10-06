@@ -11,9 +11,15 @@ import { ShareWorkoutButton } from "@/components/share/share-workout-button";
 // ever shows a weight CHANGE, never either absolute weight, matching
 // this thread's established privacy restraint.
 
+// CLOSED (Ron, Oct 6): "why would we need to publicly share everything?" The journey page is off for everyone, logged in or not, and no data is
+// read. The image share card after a workout (Story and Post) covers sharing. The code below is kept so the page can be switched back on by
+// setting this to true; if it ever is, it should be opt-in with a random revocable token, never an id in the address.
+const JOURNEY_PAGE_OPEN = false;
+
 export async function generateMetadata(
   props: { params: Promise<{ athleteId: string }> }
 ): Promise<Metadata> {
+  if (!JOURNEY_PAGE_OPEN) return { title: "Not available" };
   const params = await props.params;
   const recap = await getJourneyRecap(params.athleteId);
   if (!recap) return { title: "Journey not available" };
@@ -26,6 +32,9 @@ export async function generateMetadata(
 export default async function ShareJourneyPage(
   props: { params: Promise<{ athleteId: string }> }
 ) {
+  if (!JOURNEY_PAGE_OPEN) {
+    return <NoAccess>This page isn&apos;t available.</NoAccess>;
+  }
   const params = await props.params;
   const recap = await getJourneyRecap(params.athleteId);
 
