@@ -20,4 +20,7 @@ for (const sig of [
   const { rows } = await db.query(`select md5(replace(pg_get_functiondef('${sig}'::regprocedure), chr(13), '')) as m`);
   console.log(`${sig} ${rows[0].m}`);
 }
+await applyOne(db, "0277");
+const after = await db.query("select md5(replace(pg_get_functiondef('public.reschedule_booking(uuid, timestamptz, timestamptz)'::regprocedure), chr(13), '')) as m");
+console.log("public.reschedule_booking(...) AFTER 0277 " + after.rows[0].m);
 process.exit(0);

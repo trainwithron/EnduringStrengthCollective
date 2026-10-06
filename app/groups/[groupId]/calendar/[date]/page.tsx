@@ -295,6 +295,7 @@ export default async function CoachDayDetailPage(
               })}{" "}
               session — moving it less than your coach&apos;s cancellation window
               before that session lets your coach know, and they decide whether it counts as a session.
+              {!selfBookingEnabled && " Your coach confirms every move: your session stays where it is until they do."}
             </p>
           )}
         </header>
@@ -349,6 +350,7 @@ export default async function CoachDayDetailPage(
                         <span className="font-body text-xs text-steel">Too close to another session</span>
                       ) : (
                         <RescheduleSlotButton
+                          requestOnly={!selfBookingEnabled}
                           bookingId={reschedulingBooking.id}
                           startAt={iso}
                           endAt={endAt.toISOString()}

@@ -24,6 +24,7 @@ const fnFromMigration = (mig, name) => {
 };
 const fnFrom0248 = (name) => fnFromMigration("0248", name);
 const fnFrom0218 = (name) => fnFromMigration("0218", name);
+const fnFrom0277 = (name) => fnFromMigration("0277", name);
 const md5Is = (sig, md5) => `coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = '${md5}' from pg_proc p where p.oid = to_regprocedure('public.${sig}')), false)`;
 
 const has = {
@@ -437,6 +438,36 @@ alter table public.coach_booking_policies drop column if exists self_booking_ena
       ["0278 is not already applied (the live book_session, weekly-schedule and waiting-list functions are exactly the versions this step was built from)", `${md5Is("book_session(uuid, uuid, uuid, timestamptz, timestamptz)", "da934a4629a0f09580619b7c908ab42a")} and ${md5Is("create_recurring_booking_series(uuid, uuid, uuid, timestamptz, integer, integer)", "a14562f9889b8094e99a5403e5423835")} and ${md5Is("join_booking_waitlist(uuid, uuid, uuid, timestamptz, timestamptz)", "f2d3243ac4fcf1876d894178e8a937f7")}`],
     ],
   },
+  {
+    n: "21",
+    slug: "0279",
+    title: "0279 with self-booking off a client asks to move a session and the coach confirms (the session stays put until then)",
+    migrations: ["0279"],
+    sees: "Success. No rows returned.",
+    afterwards: "With self-booking switched off, a client who wants a different time picks it and sends a request; the session stays where it is. You get a notice and a Confirm / Decline row under Needs your decision. Confirm moves it (and flags it for Charge or Waive if it was inside your window); Decline leaves it. The client is told either way. With self-booking on, clients move directly as before. Test with a throwaway client.",
+    undo: `${fnFrom0277("reschedule_booking")}
+
+drop function if exists public.resolve_move_request(uuid, boolean);
+drop function if exists public.request_booking_move(uuid, timestamptz, timestamptz);
+drop table if exists public.booking_move_requests;
+delete from public.notifications where type in ('move_request', 'move_decision');
+alter table public.notifications drop constraint if exists notifications_type_check;
+alter table public.notifications add constraint notifications_type_check
+  check (type in (
+    'comment', 'program_assigned', 'macros_assigned', 'partner_request',
+    'partner_request_accepted', 'milestone_celebration', 'gym_visitor_lead',
+    'trainer_dispatch_offer', 'trainer_dispatch_question', 'session_pattern_note',
+    'credits_expired', 'waitlist_slot_offered', 'recurring_booking_conflict',
+    'email_changed', 'direct_message', 'late_change'
+  ));`,
+    undoWhy: "Only if moving a session breaks after step 21. Puts reschedule_booking back to the step 19 version (a client can move directly again), removes the two request functions, the request table (pending requests are lost) and their notices.",
+    rows: [
+      ["0277 is applied (late-change flags exist)", has.col("bookings", "late_charge_state")],
+      ["0278 is applied (the self-booking switch exists)", has.col("coach_booking_policies", "self_booking_enabled")],
+      ["coach_availability_windows and discovery_bookings exist", `${has.table("coach_availability_windows")} and ${has.table("discovery_bookings")}`],
+      ["0279 is not already applied (the live reschedule_booking is exactly the step 19 version, and there is no request table yet)", `${md5Is("reschedule_booking(uuid, timestamptz, timestamptz)", "1df6fdc5b7ed651158e1d39b99312519")} and ${has.noTable("booking_move_requests")}`],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -568,6 +599,7 @@ for (const s of STEPS) {
     m("0276", "exists (select 1 from pg_trigger where tgname = 'direct_messages_notify')"),
     m("0277", has.col("bookings", "late_charge_state")),
     m("0278", has.col("coach_booking_policies", "self_booking_enabled")),
+    m("0279", has.table("booking_move_requests")),
   ];
   const values = items.map((i) => `    ('2026100600${i.n.slice(1)}', '${i.file.slice(5, -4)}', '${i.file}', ${i.marker})`).join(",\n");
   const sql = [

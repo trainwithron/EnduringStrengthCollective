@@ -44,3 +44,20 @@ describe("the coach decides flagged changes", () => {
     expect(read("../components/coach/mobile/coach-mobile-home.tsx")).toContain("<LateChangesPanel />");
   });
 });
+
+describe("a client's move is a request while self-booking is off", () => {
+  it("both booking-day pages pass requestOnly and the button asks through request_booking_move", () => {
+    for (const p of ["../app/groups/[groupId]/calendar/[date]/page.tsx", "../app/groups/[groupId]/programs/[programId]/calendar/[date]/page.tsx"]) {
+      expect(read(p)).toContain("requestOnly={!selfBookingEnabled}");
+    }
+    const button = read("../components/athlete/reschedule-slot-button.tsx");
+    expect(button).toContain("request_booking_move");
+    expect(button).toContain("Your coach will confirm your new time");
+  });
+  it("the coach panel confirms or declines through resolve_move_request", () => {
+    const panel = read("../components/coach/late-changes-panel.tsx");
+    expect(panel).toContain("resolve_move_request");
+    expect(panel).toContain("Confirm");
+    expect(panel).toContain("Decline");
+  });
+});

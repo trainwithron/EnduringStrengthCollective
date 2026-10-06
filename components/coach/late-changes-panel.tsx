@@ -3,6 +3,13 @@
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 
+interface MoveRequest {
+  id: string;
+  clientName: string;
+  fromStartAt: string;
+  newStartAt: string;
+}
+
 interface FlaggedChange {
   id: string;
   startAt: string;
@@ -15,6 +22,7 @@ interface FlaggedChange {
 // flag is applied, the lookup fails quietly and the panel stays empty).
 export function LateChangesPanel() {
   const [items, setItems] = useState<FlaggedChange[]>([]);
+  const [moves, setMoves] = useState<MoveRequest[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,6 +41,25 @@ export function LateChangesPanel() {
         .eq("late_charge_state", "flagged")
         .order("start_at", { ascending: true })
         .limit(20);
+      // Move requests (needs the database update that adds them; until then the lookup fails quietly and nothing shows).
+      const { data: moveData, error: moveError } = await supabase
+        .from("booking_move_requests")
+        .select("id, from_start_at, new_start_at, profiles!booking_move_requests_athlete_id_fkey ( full_name )")
+        .eq("coach_id", user.id)
+        .eq("status", "pending")
+        .gt("from_start_at", new Date().toISOString())
+        .order("from_start_at", { ascending: true })
+        .limit(20);
+      if (!cancelled && !moveError) {
+        setMoves(
+          ((moveData ?? []) as any[]).map((m) => ({
+            id: m.id as string,
+            clientName: (m.profiles?.full_name as string | undefined) ?? "A client",
+            fromStartAt: m.from_start_at as string,
+            newStartAt: m.new_start_at as string,
+          }))
+        );
+      }
       if (cancelled || loadError) return;
       setItems(
         ((data ?? []) as any[]).map((b) => ({
@@ -62,14 +89,70 @@ export function LateChangesPanel() {
     setItems((prev) => prev.filter((i) => i.id !== id));
   }
 
-  if (items.length === 0) return null;
+  async function answerMove(id: string, confirm: boolean) {
+    setBusyId(id);
+    setError(null);
+    const supabase = createBrowserClient();
+    const { data, error: rpcError } = await supabase.rpc("resolve_move_request", { p_request_id: id, p_confirm: confirm });
+    setBusyId(null);
+    if (rpcError) {
+      setError(/just taken/.test(rpcError.message ?? "") ? "That time was just taken. Decline it, or ask the client for another." : "That didn't save. Nothing was changed. Try again.");
+      return;
+    }
+    if (data === "closed") setError("That session is no longer scheduled, so the request was closed.");
+    setMoves((prev) => prev.filter((m) => m.id !== id));
+  }
+
+  const fmt = (iso: string) =>
+    new Date(iso).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+
+  if (items.length === 0 && moves.length === 0) return null;
 
   return (
     <section className="border border-rust/40 bg-rust/5 rounded-token-lg p-4 mb-6" aria-label="Needs your decision">
       <h2 className="font-body text-xs text-rust uppercase tracking-wide font-bold">Needs your decision</h2>
+      {moves.length > 0 && (
+        <>
+          <p className="font-body text-xs text-steel mt-1">
+            These clients asked to move a session. It stays where it is until you confirm.
+          </p>
+          <ul className="divide-y divide-steel/15 mt-2 mb-3">
+            {moves.map((m) => (
+              <li key={m.id} className="py-2.5 flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-body text-sm text-chalk truncate">{m.clientName}</p>
+                  <p className="font-body text-xs text-steel">
+                    {fmt(m.fromStartAt)} to {fmt(m.newStartAt)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    disabled={busyId === m.id}
+                    onClick={() => answerMove(m.id, true)}
+                    className="h-11 px-4 border border-rust text-rust font-body text-sm disabled:opacity-50"
+                  >
+                    Confirm
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busyId === m.id}
+                    onClick={() => answerMove(m.id, false)}
+                    className="h-11 px-4 border border-steel/30 text-chalk font-body text-sm disabled:opacity-50"
+                  >
+                    Decline
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {items.length > 0 && (
       <p className="font-body text-xs text-steel mt-1">
         These clients cancelled or moved a session inside your cancellation window. Nothing was taken. Charge takes one session; Waive takes none.
       </p>
+      )}
       <ul className="divide-y divide-steel/15 mt-2">
         {items.map((i) => (
           <li key={i.id} className="py-2.5 flex flex-wrap items-center justify-between gap-2">
