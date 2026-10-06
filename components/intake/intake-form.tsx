@@ -142,16 +142,18 @@ export function IntakeForm({
 
     // Keep the exact text that was signed, with the version, time, address and device. Best effort: the signature
     // itself is already saved above, and a missing table never blocks the client.
-    void fetch("/api/legal/accept", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        documents: ["waiver"],
-        waiverText: waiverPdfUrl
-          ? `Signed the waiver document at ${waiverPdfUrl} (name typed: ${signedName.trim()})`
-          : `${waiverText || DEFAULT_WAIVER_TEXT}\n\nSigned by typing: ${signedName.trim()}`,
-      }),
-    }).catch(() => {});
+    // Waited for, with one retry, so a dropped request does not leave a signed waiver with no record of its text.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const ok = await fetch("/api/legal/accept", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        // No text is sent: the server builds the record of what was signed from the coach's waiver and this saved intake.
+        body: JSON.stringify({ documents: ["waiver"] }),
+      })
+        .then((r) => r.ok)
+        .catch(() => false);
+      if (ok) break;
+    }
 
     setDone(true);
     router.push(nextUrl);
