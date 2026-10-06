@@ -343,6 +343,32 @@ grant execute on function public.submit_gym_visitor_lead(uuid, uuid, text, text,
       ["0272 is not already applied (the signed-out role can still run book_discovery_call)", `has_function_privilege('anon', 'public.book_discovery_call(uuid, timestamptz, timestamptz, text, text, text, text)', 'execute')`],
     ],
   },
+  {
+    n: "18",
+    slug: "0276",
+    title: "0276 a new direct message gives the recipient an in-app notice (one line per sender while unread, no message text)",
+    migrations: ["0276"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing visible changes at once. From now on a message to a coach or a client shows in their notification bell as '<name> sent you a message', one line per sender while it is unread. Send yourself a test message from a client and check the bell.",
+    undo: `drop trigger if exists direct_messages_notify on public.direct_messages;
+drop function if exists public.notify_on_direct_message();
+delete from public.notifications where type = 'direct_message';
+alter table public.notifications drop constraint if exists notifications_type_check;
+alter table public.notifications add constraint notifications_type_check
+  check (type in (
+    'comment', 'program_assigned', 'macros_assigned', 'partner_request',
+    'partner_request_accepted', 'milestone_celebration', 'gym_visitor_lead',
+    'trainer_dispatch_offer', 'trainer_dispatch_question', 'session_pattern_note',
+    'credits_expired', 'waitlist_slot_offered', 'recurring_booking_conflict',
+    'email_changed'
+  ));`,
+    undoWhy: "Only if sending a message fails after step 18. Removes the notice trigger and the notices it wrote, and puts the notification type list back.",
+    rows: [
+      ["direct_messages and notifications exist", `${has.table("direct_messages")} and ${has.table("notifications")}`],
+      ["0243 is applied (the notification type list includes email_changed)", `exists (select 1 from pg_constraint where conname = 'notifications_type_check' and pg_get_constraintdef(oid) like '%email_changed%')`],
+      ["0276 is not already applied", `not exists (select 1 from pg_trigger where tgname = 'direct_messages_notify')`],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -471,6 +497,7 @@ for (const s of STEPS) {
     m("0273", "exists (select 1 from pg_trigger where tgname = 'groups_guard_columns')"),
     m("0274", "coalesce((select position('tg_op' in pg_get_functiondef(p.oid)) > 0 from pg_proc p where p.proname = 'block_athlete_edits_to_completed_session' and p.pronamespace = 'public'::regnamespace), false)"),
     m("0275", "exists (select 1 from pg_trigger where tgname = 'bookings_note_series_skip')"),
+    m("0276", "exists (select 1 from pg_trigger where tgname = 'direct_messages_notify')"),
   ];
   const values = items.map((i) => `    ('2026100600${i.n.slice(1)}', '${i.file.slice(5, -4)}', '${i.file}', ${i.marker})`).join(",\n");
   const sql = [

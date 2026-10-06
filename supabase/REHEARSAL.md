@@ -46,3 +46,4 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0273 | yes | yes | 14 | 0273 groups and organizations: protected columns |
 | 0274 | yes | yes | 13 | 0274 completed workout lock |
 | 0275 | yes | yes | 8 | 0275 a cancelled or moved week of an ongoing schedule stays skipped |
+| 0276 | yes | yes | 7 | 0276 new message notice |

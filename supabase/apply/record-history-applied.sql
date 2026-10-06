@@ -42,7 +42,8 @@ from (
     ('2026100600272', 'public_forms_only_through_the_server', '0272_public_forms_only_through_the_server.sql', not has_function_privilege('anon', 'public.book_discovery_call(uuid, timestamptz, timestamptz, text, text, text, text)', 'execute')),
     ('2026100600273', 'group_and_organization_column_guards', '0273_group_and_organization_column_guards.sql', exists (select 1 from pg_trigger where tgname = 'groups_guard_columns')),
     ('2026100600274', 'completed_workout_lock', '0274_completed_workout_lock.sql', coalesce((select position('tg_op' in pg_get_functiondef(p.oid)) > 0 from pg_proc p where p.proname = 'block_athlete_edits_to_completed_session' and p.pronamespace = 'public'::regnamespace), false)),
-    ('2026100600275', 'series_session_removed_stays_removed', '0275_series_session_removed_stays_removed.sql', exists (select 1 from pg_trigger where tgname = 'bookings_note_series_skip'))
+    ('2026100600275', 'series_session_removed_stays_removed', '0275_series_session_removed_stays_removed.sql', exists (select 1 from pg_trigger where tgname = 'bookings_note_series_skip')),
+    ('2026100600276', 'notify_on_direct_message', '0276_notify_on_direct_message.sql', exists (select 1 from pg_trigger where tgname = 'direct_messages_notify'))
 ) as v(version, name, file, applied)
 where v.applied
 on conflict (version) do nothing;

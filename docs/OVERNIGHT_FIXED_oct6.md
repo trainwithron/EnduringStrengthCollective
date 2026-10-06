@@ -16,6 +16,7 @@ Nothing here is pushed, deployed or applied. The Oct 5 evening deploy (head 981e
    - step 16 (0275) a client's cancelled or moved week of a weekly schedule stays skipped
    - step 13 (0271) database functions are signed-in and server only. After it, paste `supabase\apply\check-step13-probe.sql` (it rolls itself back): it must show anon_can_run = false. Note for later: after any future CREATE EXTENSION run in the SQL editor, grant execute on its functions to authenticated and service_role.
    - step 15 (0274) a completed workout is locked against added or deleted sets and against being reopened
+   - step 18 (0276) a new message gives the recipient an in-app notice (one line per sender while unread, no message text); undo included
    - (reviewed read-only against the live database by the Assistant session; steps 13 and 15 were revised after that review and are being re-checked)
    - then deploy the care batch (code)
    - **step 17 (0272) only AFTER the care batch is deployed** (it closes the two public forms' database functions to the browser; the care batch moves those forms to server routes)
