@@ -6,6 +6,7 @@ import { MealCheckoffList, type FoodLogEntry } from "./meal-checkoff-list";
 import { QuickLogFoodButton } from "./quick-log-food-button";
 import { BarcodeScanButton } from "./barcode-scan-button";
 import { PhotoLogFoodButton } from "./photo-log-food-button";
+import { FavoriteStar } from "./favorite-star";
 import type { RecentFoodLogOption } from "@/lib/recent-food-logs";
 
 // Wires the checkoff list + quick-log entry point + a running "logged so
@@ -95,6 +96,9 @@ export function FoodLogSection({
               <p className="font-body text-xs text-steel mt-0.5">
                 {e.calories} kcal · {e.proteinG}p / {e.carbsG}c / {e.fatG}f
               </p>
+              <div className="mt-1.5">
+                <FavoriteStar profileId={athleteId} entry={e} />
+              </div>
             </div>
           ))}
         </div>

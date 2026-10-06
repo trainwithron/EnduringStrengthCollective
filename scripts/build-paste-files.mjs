@@ -609,6 +609,20 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["0285 is not already applied (the nudge record is not there yet)", has.noTable("rest_day_nudges")],
     ],
   },
+  {
+    n: "29",
+    slug: "0286",
+    title: "0286 favorite foods: a client can star a food they logged and log it again in one tap (extends recipe_favorites; private to the client; macros frozen as starred)",
+    migrations: ["0286"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing visible changes at once. After the code deploy: in the nutrition log a client can save any logged food (or a planned meal after Ate it) as a favorite, and a Favorites row of one-tap chips shows when they log something else. Favorites are private: a coach never sees them, and starring or logging from one tells nobody anything. The old recipe hearts are untouched and are not shown as favorite foods.",
+    undo: "drop trigger if exists recipe_favorites_limit_food on public.recipe_favorites;\ndrop function if exists public.limit_food_favorites();\ndelete from public.recipe_favorites where kind = 'food';\ndrop index if exists public.recipe_favorites_food_idx;\nalter table public.recipe_favorites drop constraint if exists recipe_favorites_food_snapshot;\nalter table public.recipe_favorites drop constraint if exists recipe_favorites_kind_check;\nalter table public.recipe_favorites drop column if exists fat_g;\nalter table public.recipe_favorites drop column if exists carbs_g;\nalter table public.recipe_favorites drop column if exists protein_g;\nalter table public.recipe_favorites drop column if exists calories;\nalter table public.recipe_favorites drop column if exists label;\nalter table public.recipe_favorites drop column if exists kind;",
+    undoWhy: "Only if favorites misbehave after step 29. Removes the favorite foods (the starred foods are deleted; logged entries are not touched) and the added columns. The old recipe hearts stay.",
+    rows: [
+      ["recipe_favorites exists", has.table("recipe_favorites")],
+      ["0286 is not already applied (the favorite kind column is not there yet)", has.noCol("recipe_favorites", "kind")],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -745,6 +759,7 @@ for (const s of STEPS) {
     m("0279", has.table("booking_requests")),
     m("0280", has.col("session_credits", "expiry_hold_until")),
     m("0281", has.table("client_inactive")),
+    m("0286", has.col("recipe_favorites", "kind")),
     m("0285", has.table("rest_day_nudges")),
     m("0284", has.policy("client_goals", "client_goals_insert_coach")),
     m("0283", has.col("coach_availability_windows", "session_minutes")),

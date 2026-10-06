@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { FreeTextFoodLog, type FoodLogEntry } from "./meal-checkoff-list";
 import { RecentFoodChips } from "./recent-food-chips";
+import { FavoriteFoodChips } from "./favorite-food-chips";
 import type { RecentFoodLogOption } from "@/lib/recent-food-logs";
 
 // Standalone entry point for anything not tied to a planned meal — a
@@ -33,6 +34,15 @@ export function QuickLogFoodButton({
         <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">
           Log something else
         </p>
+        <FavoriteFoodChips
+          athleteId={athleteId}
+          groupId={groupId}
+          logDate={logDate}
+          onLogged={(entry) => {
+            onLogged(entry);
+            setOpen(false);
+          }}
+        />
         <RecentFoodChips
           athleteId={athleteId}
           groupId={groupId}

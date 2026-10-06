@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { RecentFoodLogOption } from "@/lib/recent-food-logs";
 import type { FoodLogEntry } from "./meal-checkoff-list";
+import { insertFoodLogEntry } from "@/lib/food-log-insert";
 
 // One-tap re-log of a real past entry — no retyping, no AI call, no
 // wait. Directly targets the #1 friction cause (calorie_tracking_ux_
@@ -27,36 +28,18 @@ export function RecentFoodChips({
 
   async function handleTap(option: RecentFoodLogOption) {
     setLoggingKey(option.description);
-    const supabase = createBrowserClient();
-    const { data } = await supabase
-      .from("food_log_entries")
-      .insert({
-        athlete_id: athleteId,
-        group_id: groupId,
-        log_date: logDate,
-        meal_slot: null,
-        status: "quick_log",
-        description: option.description,
-        calories: option.calories,
-        protein_g: option.proteinG,
-        carbs_g: option.carbsG,
-        fat_g: option.fatG,
-      })
-      .select("id")
-      .single();
+    const entry = await insertFoodLogEntry(createBrowserClient(), {
+      athleteId,
+      groupId,
+      logDate,
+      description: option.description,
+      calories: option.calories,
+      proteinG: option.proteinG,
+      carbsG: option.carbsG,
+      fatG: option.fatG,
+    });
     setLoggingKey(null);
-    if (data) {
-      onLogged({
-        id: data.id,
-        mealSlot: null,
-        status: "quick_log",
-        description: option.description,
-        calories: option.calories,
-        proteinG: option.proteinG,
-        carbsG: option.carbsG,
-        fatG: option.fatG,
-      });
-    }
+    if (entry) onLogged(entry);
   }
 
   return (

@@ -49,6 +49,7 @@ from (
     ('2026100600279', 'booking_requests', '0279_booking_requests.sql', to_regclass('public.booking_requests') is not null),
     ('2026100600280', 'credit_expiry_human_overrides', '0280_credit_expiry_human_overrides.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'session_credits' and column_name = 'expiry_hold_until')),
     ('2026100600281', 'inactive_clients', '0281_inactive_clients.sql', to_regclass('public.client_inactive') is not null),
+    ('2026100600286', 'food_favorites', '0286_food_favorites.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'recipe_favorites' and column_name = 'kind')),
     ('2026100600285', 'rest_day_nudge_log', '0285_rest_day_nudge_log.sql', to_regclass('public.rest_day_nudges') is not null),
     ('2026100600284', 'coach_proposed_goals', '0284_coach_proposed_goals.sql', exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'client_goals' and policyname = 'client_goals_insert_coach')),
     ('2026100600283', 'availability_session_length', '0283_availability_session_length.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_availability_windows' and column_name = 'session_minutes')),

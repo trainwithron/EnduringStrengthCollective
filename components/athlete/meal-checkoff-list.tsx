@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { GeneratedMeal } from "@/lib/meal-engine";
+import { FavoriteStar } from "./favorite-star";
 
 export interface FoodLogEntry {
   id: string;
@@ -128,6 +129,11 @@ export function MealCheckoffList({
                 {logged.status === "ate_it" && "Logged as eaten"}
                 {logged.status === "modified" && `Logged (modified): ${logged.description ?? ""}`}
                 {logged.status === "skipped" && "Skipped"}
+                {logged.status === "ate_it" && (
+                  <span className="ml-2">
+                    <FavoriteStar profileId={athleteId} entry={logged} fallbackLabel={primaryOption?.recipeName ?? meal.spec.title} />
+                  </span>
+                )}
               </p>
             ) : modifyingSlot === meal.spec.id ? (
               <FreeTextFoodLog
