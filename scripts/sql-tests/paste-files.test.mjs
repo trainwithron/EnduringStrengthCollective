@@ -42,6 +42,23 @@ const steps = JSON.parse(readFileSync(new URL("../../supabase/apply/steps.json",
 for (const s of steps) {
   // Live today: step 13 was applied before it was fixed, so the internal functions are open to signed-in users. Reproduce that before step 24.
   if (s.n === "24") await db.exec(functionAclOpenSql());
+  if (s.n === "26") {
+    // The Home Team move names real ids: build the same shape (a coach who owns both organizations and coaches the group) so every row is exercised.
+    await db.exec(`
+      insert into public.organizations (id, slug, name, owner_id) values
+        ('b7318b19-a17e-4412-88f1-51d68fcf026f', 'ht-old', 'Enduring Strength Co.', '00000000-0000-4000-8000-0000000000a1'),
+        ('e369f4a7-c53a-4532-95d3-f7bd14e40e48', 'ht-new', 'Coast2Coast Fitness', '00000000-0000-4000-8000-0000000000a1')
+      on conflict (id) do nothing;
+      insert into public.organization_memberships (organization_id, profile_id, role) values
+        ('e369f4a7-c53a-4532-95d3-f7bd14e40e48', '00000000-0000-4000-8000-0000000000a1', 'owner')
+      on conflict (organization_id, profile_id) do nothing;
+      insert into public.groups (id, name, created_by, organization_id) values
+        ('060017b5-e613-4204-a101-c6a14c3a9630', 'The Home Team', '00000000-0000-4000-8000-0000000000a1', 'b7318b19-a17e-4412-88f1-51d68fcf026f');
+      insert into public.group_memberships (group_id, profile_id, role) values
+        ('060017b5-e613-4204-a101-c6a14c3a9630', '00000000-0000-4000-8000-0000000000a1', 'coach');
+      insert into public.programs (group_id, name, created_by) values ('060017b5-e613-4204-a101-c6a14c3a9630', 'Home Team program', '00000000-0000-4000-8000-0000000000a1');
+    `);
+  }
   if (s.n === "23") {
     // The probe: applies 0281 inside a transaction, tries the four cases, and ends with an intentional error that carries the answer and rolls everything back.
     // The probe only ever uses the standing Test Sandbox group: build one with a coach and a client.
@@ -85,6 +102,11 @@ for (const s of steps) {
     check("step 06: the existing plain PIN was copied across hashed", hashed === 1);
   }
 }
+// Step 26 left The Home Team in Coast2Coast Fitness (it was applied again after its undo): the group keeps its program and the coach.
+{
+    const moved = (await db.query("select organization_id from public.groups where id = '060017b5-e613-4204-a101-c6a14c3a9630'")).rows[0];
+    check("step 26: The Home Team is in Coast2Coast Fitness and keeps its program and Ron as coach", moved.organization_id === "e369f4a7-c53a-4532-95d3-f7bd14e40e48" && (await db.query("select count(*)::int as n from public.programs where group_id = '060017b5-e613-4204-a101-c6a14c3a9630'")).rows[0].n === 1 && (await db.query("select count(*)::int as n from public.group_memberships where group_id = '060017b5-e613-4204-a101-c6a14c3a9630' and role = 'coach'")).rows[0].n === 1);
+  }
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   const rows = (await db.query(read("apply/check-function-acl.sql"))).rows;

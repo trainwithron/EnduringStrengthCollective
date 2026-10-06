@@ -561,6 +561,25 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["0283 is not already applied (the session length column is not there yet)", has.noCol("coach_availability_windows", "session_minutes")],
     ],
   },
+  {
+    n: "26",
+    slug: "move-home-team",
+    title: "move the group The Home Team from Ron's own organization (Enduring Strength Co.) into Coast2Coast Fitness, keeping its programs, history and Ron's coach access",
+    migrations: [],
+    warn: "Platform-owner change, one group only. Run the precheck first (every row true). Nothing is deleted. The group keeps its two programs and everything attached to it; only which organization it belongs to changes.",
+    sees: "Success. No rows returned.",
+    afterwards: "The Home Team now belongs to Coast2Coast Fitness: it appears under that organization in the business-name menu and no longer under Enduring Strength Co. Ron stays a coach of the group (a normal group membership) and the owner of Coast2Coast Fitness, so he keeps full programming access. The group's programs, workouts and history are unchanged.",
+    bodySql: "-- The Home Team (group 060017b5-e613-4204-a101-c6a14c3a9630) moves from Enduring Strength Co. (b7318b19-a17e-4412-88f1-51d68fcf026f) to Coast2Coast Fitness (e369f4a7-c53a-4532-95d3-f7bd14e40e48).\n-- groups.organization_id is the only organization link the group's own data hangs on: its programs, workouts, sessions, invites and memberships are keyed\n-- to the GROUP, not to the organization, so they come with it. Organization-wide settings (branding, billing, tags) are the new organization's from now on.\ndo $move$\ndeclare\n  n int;\nbegin\n  update public.groups set organization_id = 'e369f4a7-c53a-4532-95d3-f7bd14e40e48' where id = '060017b5-e613-4204-a101-c6a14c3a9630' and organization_id = 'b7318b19-a17e-4412-88f1-51d68fcf026f';\n  get diagnostics n = row_count;\n  if n <> 1 then\n    raise exception 'The Home Team was not found in Enduring Strength Co., so nothing was moved.';\n  end if;\n  -- Every coach of the group is a member of the new organization (Ron already owns it, so this adds nobody today).\n  insert into public.organization_memberships (organization_id, profile_id, role)\n  select 'e369f4a7-c53a-4532-95d3-f7bd14e40e48', gm.profile_id, 'coach' from public.group_memberships gm\n  where gm.group_id = '060017b5-e613-4204-a101-c6a14c3a9630' and gm.role = 'coach'\n  on conflict (organization_id, profile_id) do nothing;\nend\n$move$;",
+    undo: "update public.groups set organization_id = 'b7318b19-a17e-4412-88f1-51d68fcf026f' where id = '060017b5-e613-4204-a101-c6a14c3a9630' and organization_id = 'e369f4a7-c53a-4532-95d3-f7bd14e40e48';",
+    undoWhy: "Only if the move turns out to be wrong. Puts The Home Team back into Enduring Strength Co. (memberships added to Coast2Coast Fitness stay; they change nothing).",
+    rows: [
+      ["the group The Home Team exists", "exists (select 1 from public.groups where id = '060017b5-e613-4204-a101-c6a14c3a9630')"],
+      ["Coast2Coast Fitness exists", "exists (select 1 from public.organizations where id = 'e369f4a7-c53a-4532-95d3-f7bd14e40e48')"],
+      ["step 26 is not already applied (The Home Team is still in Enduring Strength Co.)", "exists (select 1 from public.groups where id = '060017b5-e613-4204-a101-c6a14c3a9630' and organization_id = 'b7318b19-a17e-4412-88f1-51d68fcf026f')"],
+      ["The Home Team has no clients, only coaches (so no client data is tied to the old organization)", "not exists (select 1 from public.group_memberships where group_id = '060017b5-e613-4204-a101-c6a14c3a9630' and role = 'athlete')"],
+      ["every coach of The Home Team already owns or administers Coast2Coast Fitness", "not exists (select 1 from public.group_memberships gm where gm.group_id = '060017b5-e613-4204-a101-c6a14c3a9630' and gm.role = 'coach' and not exists (select 1 from public.organization_memberships om where om.organization_id = 'e369f4a7-c53a-4532-95d3-f7bd14e40e48' and om.profile_id = gm.profile_id and om.role in ('owner', 'admin')))"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -611,7 +630,9 @@ for (const s of STEPS) {
   const values = s.rows.map(([name, expr]) => `    ('${name.replace(/'/g, "''")}',\n      ${expr}`.concat(")")).join(",\n");
   const pre = `${header(s, "precheck")}\nselect check_name, ok\nfrom (\n  values\n${values}\n) as checks(check_name, ok);\n`;
   writeFileSync(new URL(`${base}-precheck.sql`, outDir), pre);
-  const body = s.migrations.map((n) => `${bar}\n-- migration ${index[n]}\n${bar}\n\n${migrationSql(n)}\n`).join("\n");
+  const body = s.bodySql
+    ? `${bar}\n-- ${s.slug}: one-time data change\n${bar}\n\n${s.bodySql}\n`
+    : s.migrations.map((n) => `${bar}\n-- migration ${index[n]}\n${bar}\n\n${migrationSql(n)}\n`).join("\n");
   writeFileSync(new URL(`${base}.sql`, outDir), `${header(s, "apply")}\n\nbegin;\n\n${guardFor(s)}${body}\ncommit;\n`);
   if (s.undo) {
     writeFileSync(
