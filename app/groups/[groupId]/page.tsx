@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { NoAccess } from "@/components/shared/no-access";
 import Link from "next/link";
 import { loadReupState } from "@/lib/reup-server";
+import { isStripeConfigured } from "@/lib/stripe";
 import { ReupCard } from "@/components/athlete/reup-card";
 import { FirstRunGuideCard } from "@/components/athlete/first-run-guide-card";
 import { PushNotificationToggle } from "@/components/athlete/push-notification-toggle";
@@ -578,8 +579,9 @@ export default async function GroupHubPage(
 
   // A client whose sessions have run out gets a one-tap re-up (or "message your coach"), and a prompt on the day a session is
   // booked. Never shown to a coach, or to a coach acting as the client. Any failure just means no card.
+  // While payments are not set up in the app (Ron collects payment outside it), the card is not shown at all.
   let reupState: Awaited<ReturnType<typeof loadReupState>> = null;
-  if (user && !isCoach && !isActingAsOther && showMobileView && athleteId) {
+  if (user && !isCoach && !isActingAsOther && showMobileView && athleteId && isStripeConfigured()) {
     try {
       reupState = await loadReupState(supabase, athleteId, params.groupId);
     } catch {

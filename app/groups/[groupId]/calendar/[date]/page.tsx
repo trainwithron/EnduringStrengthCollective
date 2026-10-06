@@ -21,6 +21,7 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { DayHourGrid } from "@/components/coach/desktop/day-hour-grid";
 import { CalendarPurchasePrompt } from "@/components/athlete/calendar-purchase-prompt";
+import { isStripeConfigured } from "@/lib/stripe";
 import { VideoCallButton } from "@/components/booking/video-call-button";
 import { BookingVideoPanel } from "@/components/coach/desktop/booking-video-panel";
 import type { PackageOption } from "@/components/athlete/package-picker";
@@ -261,7 +262,7 @@ export default async function CoachDayDetailPage(
                   </span>
                 )}
               </p>
-              {creditBalance <= 0 && !reschedulingBooking && (
+              {creditBalance <= 0 && !reschedulingBooking && isStripeConfigured() && (
                 <div className="mt-2">
                   <CalendarPurchasePrompt activeSubscription={activeSubscription} packages={availablePackages} />
                 </div>

@@ -14,6 +14,7 @@ import { FeedbackButton } from "@/components/feedback/feedback-button";
 import { WearablePlaceholder } from "@/components/athlete/wearable-placeholder";
 import { PackagePicker, type PackageOption } from "@/components/athlete/package-picker";
 import { ManageBillingLink } from "@/components/athlete/manage-billing-link";
+import { isStripeConfigured } from "@/lib/stripe";
 import { ProfileDetailsEditor } from "@/components/athlete/profile-details-editor";
 import { SwipeDirectionSetting } from "@/components/athlete/swipe-direction-setting";
 import { SettingsGroup } from "@/components/shared/settings-group";
@@ -270,7 +271,8 @@ export default async function SettingsPage(
           <FeedbackButton />
         </SettingsGroup>
 
-        {!isCoach && (
+        {/* Hidden until payments are set up in the app: today the coach collects payment outside it. */}
+        {!isCoach && isStripeConfigured() && (
           <SettingsGroup label="Billing">
             <PackagePicker packages={packages} />
             <div className="mt-3">
