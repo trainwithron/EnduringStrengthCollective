@@ -135,7 +135,7 @@ export function IntakeForm({
     );
 
     if (upsertError) {
-      setError(upsertError.message);
+      setError("We couldn't save that. Check your connection and try again.");
       setSubmitting(false);
       return;
     }

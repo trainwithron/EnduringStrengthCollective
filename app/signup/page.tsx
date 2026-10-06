@@ -91,7 +91,7 @@ export default function SignupPage() {
     <main className="min-h-screen flex items-center justify-center px-6 py-12">
       <div className="w-full max-w-sm">
         <h1 className="font-display uppercase text-3xl font-bold text-center">
-          Start Coaching
+          Start coaching
         </h1>
         <p className="font-body text-steel text-sm text-center mt-2 mb-8">
           Create your account and your own organization in one step.
