@@ -112,6 +112,8 @@ export async function updateSession(request: NextRequest) {
     // a new route needing an exemption.
     pathname.startsWith("/api/oura/sync") ||
     pathname.startsWith("/api/withings/sync") ||
+    // The Google Health sync is also a daily cron (vercel.json). It checks CRON_SECRET itself; without this line it was redirected to /login and never ran.
+    pathname.startsWith("/api/google-health/sync") ||
     pathname.startsWith("/api/cron/") ||
     // An uptime monitor hits this with no session at all, same gotcha as
     // the webhook/cron routes above.
