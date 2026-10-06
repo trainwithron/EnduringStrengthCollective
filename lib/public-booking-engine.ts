@@ -62,6 +62,8 @@ export interface PublicBookingStore {
   // The visitor already has an upcoming booking with this coach.
   hasUpcomingPublicBooking(coachId: string, email: string, now: Date): Promise<boolean>;
   findGuestClient(coachId: string, email: string): Promise<{ athleteId: string; groupId: string } | null>;
+  // Counts one new visitor against the coach's daily limit; false once the limit is reached.
+  allowNewGuestClient(coachId: string): Promise<boolean>;
   createGuestClient(coachId: string, name: string): Promise<{ ok: true; athleteId: string; groupId: string } | { ok: false; message: string }>;
   discardGuestClient(athleteId: string, groupId: string): Promise<void>;
   book(args: { coachId: string; athleteId: string; groupId: string; start: Date; end: Date; sessionTypeId: string | null }): Promise<
@@ -166,7 +168,7 @@ export type PublicBookingResult =
   | { ok: false; status: number; error: string };
 
 export async function createPublicBooking(store: PublicBookingStore, input: PublicBookingInput, now: Date = new Date()): Promise<PublicBookingResult> {
-  if (isBotSubmission({ honeypot: input.honeypot, renderedAtMs: input.renderedAtMs, now })) {
+  if (isBotSubmission({ honeypot: input.honeypot, renderedAtMs: input.renderedAtMs, now, requireRenderedAt: true })) {
     return { ok: false, status: 400, error: "That didn't go through. Please try again." };
   }
   const page = await store.pageBySlug(input.slug);
@@ -193,6 +195,10 @@ export async function createPublicBooking(store: PublicBookingStore, input: Publ
   let created = false;
   let client = await store.findGuestClient(page.coachId, guest.value.email);
   if (!client) {
+    // Each new visitor becomes a client record, so cap how many a page can add in a day. A returning visitor is not counted.
+    if (!(await store.allowNewGuestClient(page.coachId))) {
+      return { ok: false, status: 429, error: "This page can't take new visitors right now. Please try again tomorrow, or contact your coach directly." };
+    }
     const made = await store.createGuestClient(page.coachId, guest.value.name);
     if (!made.ok) return { ok: false, status: 502, error: "We couldn't complete your booking. Please try again in a moment." };
     client = { athleteId: made.athleteId, groupId: made.groupId };

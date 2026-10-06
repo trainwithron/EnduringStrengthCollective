@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createPublicBooking } from "@/lib/public-booking-engine";
 import { cleanParam, limitByIp, publicStore } from "@/lib/public-booking-route";
 import { normalizeEmail } from "@/lib/public-booking";
+import { canSignProofs, checkEmailProof, checkFormToken } from "@/lib/public-booking-proof";
 import { rateLimitAllows } from "@/lib/rate-limit";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendPushToProfile } from "@/lib/send-push";
@@ -10,11 +11,17 @@ import { formatInTimezone } from "@/lib/format-in-timezone";
 import { appOrigin } from "@/lib/app-url";
 
 // A visitor books a time with a coach, no account needed. Limited per address, per coach and per email so it cannot be used to
-// fill someone's calendar; a hidden field and a minimum fill-in time catch simple bots. The engine does the real checking.
+// fill someone's calendar. Every booking must carry (a) a form token from when the page loaded, checked here for age so a bot cannot
+// skip the timing by leaving a field out, and (b) a proof that the visitor confirmed the email address with a code sent to it.
+// Without an email sender there is no way to confirm an address, so booking is off. The engine does the real checking.
 export async function POST(request: Request, props: { params: Promise<{ slug: string }> }) {
   const { slug: rawSlug } = await props.params;
   const slug = cleanParam(rawSlug, 40);
   if (!slug) return NextResponse.json({ error: "Not found." }, { status: 404 });
+
+  if (!canSignProofs() || !isSendGridConfigured()) {
+    return NextResponse.json({ error: "Online booking isn't available right now." }, { status: 503 });
+  }
 
   const limited = await limitByIp(request, "pb-book-ip", 8, 3600);
   if (limited) return limited;
@@ -26,6 +33,12 @@ export async function POST(request: Request, props: { params: Promise<{ slug: st
 
   // Per email and per coach, before any work is done.
   const email = typeof body?.email === "string" ? normalizeEmail(body.email) : "";
+  const nowMs = Date.now();
+  const form = checkFormToken(body?.formToken, slug, nowMs);
+  if (!form.ok) return NextResponse.json({ error: "That didn't go through. Please reload the page and try again." }, { status: 400 });
+  if (!email || !checkEmailProof(body?.emailProof, slug, email, nowMs)) {
+    return NextResponse.json({ error: "Please confirm your email address first." }, { status: 400 });
+  }
   if (email && !(await rateLimitAllows(`pb-book-email:${slug}:${email}`, 3, 86400))) {
     return NextResponse.json({ error: "Too many requests. Please try again tomorrow." }, { status: 429 });
   }
@@ -42,7 +55,8 @@ export async function POST(request: Request, props: { params: Promise<{ slug: st
     phone: body.phone,
     note: body.note,
     honeypot: body.website,
-    renderedAtMs: typeof body.renderedAtMs === "number" ? body.renderedAtMs : undefined,
+    // When the form was shown comes from the signed token, never from the browser's own claim.
+    renderedAtMs: form.issuedMs,
   });
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
 

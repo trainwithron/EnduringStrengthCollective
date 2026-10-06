@@ -4,6 +4,8 @@ import { PublicBookingFlow } from "@/components/public/public-booking-flow";
 import { getPublicPage } from "@/lib/public-booking-engine";
 import { publicStore, cleanParam } from "@/lib/public-booking-route";
 import { isUuid } from "@/lib/public-booking";
+import { canSignProofs } from "@/lib/public-booking-proof";
+import { isSendGridConfigured } from "@/lib/sendgrid";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +18,8 @@ export const dynamic = "force-dynamic";
 async function pageFor(param: string) {
   const slug = cleanParam(param.toLowerCase(), 40);
   if (!slug) return null;
+  // Booking confirms each visitor's email with a code, so with no email sender set up the page stays closed.
+  if (!canSignProofs() || !isSendGridConfigured()) return { slug, view: null };
   return { slug, view: await getPublicPage(publicStore(), slug) };
 }
 

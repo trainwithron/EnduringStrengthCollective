@@ -4,6 +4,7 @@ import {
   guestChangeAllowed,
   isBotSubmission,
   isUuid,
+  nameLooksLikeMessage,
   normalizeSlug,
   priceLabelFor,
   publicSessionTypes,
@@ -93,6 +94,8 @@ describe("bot checks", () => {
   });
   it("a missing timestamp does not by itself mark a bot", () => {
     expect(isBotSubmission({ honeypot: "", renderedAtMs: undefined, now })).toBe(false);
+    expect(isBotSubmission({ honeypot: "", renderedAtMs: undefined, now, requireRenderedAt: true })).toBe(true);
+    expect(isBotSubmission({ honeypot: "", renderedAtMs: now.getTime() - 15000, now, requireRenderedAt: true })).toBe(false);
   });
 });
 
@@ -205,5 +208,18 @@ describe("changing a booking yourself", () => {
   });
   it("not after it started", () => {
     expect(guestChangeAllowed(new Date("2026-10-10T11:00:00Z"), now, 0).allowed).toBe(false);
+  });
+});
+
+describe("a visitor's name", () => {
+  it("accepts ordinary names, including accents, apostrophes and initials", () => {
+    for (const n of ["Sam Lee", "Zoë O'Brien", "María-José de la Cruz", "J. R. Smith", "李 雷"]) expect(nameLooksLikeMessage(n)).toBe(false);
+  });
+  it("rejects links, addresses, markup and long digit runs", () => {
+    for (const n of ["Click http://evil.example now", "www.prize.com", "win-big.com claim", "sam@x.com", "<b>Sam</b>", "Call 5551234567", "a\b"]) expect(nameLooksLikeMessage(n)).toBe(true);
+  });
+  it("is refused with a clear message when validating the whole form", () => {
+    const r = validateGuestInput({ name: "Free money at www.scam.com", email: "a@b.co" });
+    expect(r.ok).toBe(false);
   });
 });

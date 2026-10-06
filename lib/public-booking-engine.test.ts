@@ -44,6 +44,7 @@ function fakeStore(opts: { page?: Partial<PublicPage>; types?: PublicSessionType
     cancellationWindowHours: 24,
     ...opts.ctx,
   };
+  const allowNew = { value: true };
   const bookings = new Map<string, Booking>();
   const links = new Map<string, ManagedBooking & { tokenHash: string; guestPhone: string | null; note: string | null }>();
   const guests = new Map<string, { athleteId: string; groupId: string }>(); // by email
@@ -75,6 +76,9 @@ function fakeStore(opts: { page?: Partial<PublicPage>; types?: PublicSessionType
     },
     async findGuestClient(_coach, email) {
       return guests.get(email) ?? null;
+    },
+    async allowNewGuestClient() {
+      return allowNew.value;
     },
     async createGuestClient(_coach, name) {
       const athleteId = `a${++n}`;
@@ -133,7 +137,7 @@ function fakeStore(opts: { page?: Partial<PublicPage>; types?: PublicSessionType
       mirrored.push(id);
     },
   };
-  return { store, page, bookings, links, clients, mirrored };
+  return { store, page, bookings, links, clients, mirrored, allowNew };
 }
 
 // Next Tuesday 10:00 AM New York = 14:00Z.
@@ -205,6 +209,31 @@ describe("booking", () => {
     expect((await createPublicBooking(store, request({ honeypot: "http://spam" }), NOW)).ok).toBe(false);
     expect((await createPublicBooking(store, request({ renderedAtMs: NOW.getTime() - 300 }), NOW)).ok).toBe(false);
     expect(bookings.size).toBe(0);
+  });
+
+  it("refuses a submission that leaves out when its form was shown", async () => {
+    const { store, bookings } = fakeStore();
+    expect((await createPublicBooking(store, request({ renderedAtMs: undefined }), NOW)).ok).toBe(false);
+    expect((await createPublicBooking(store, request({ renderedAtMs: "soon" }), NOW)).ok).toBe(false);
+    expect(bookings.size).toBe(0);
+  });
+
+  it("stops adding new visitors once the day's limit is reached, but still lets a returning visitor book", async () => {
+    const { store, bookings, clients, allowNew } = fakeStore();
+    allowNew.value = false;
+    const r = await createPublicBooking(store, request(), NOW);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.status).toBe(429);
+    expect(bookings.size).toBe(0);
+    expect(clients.length).toBe(0);
+    // A visitor already on file is not a new client, so the limit does not apply.
+    allowNew.value = true;
+    expect((await createPublicBooking(store, request(), NOW)).ok).toBe(true);
+    allowNew.value = false;
+    const again = await createPublicBooking(store, request({ startIso: "2026-10-27T14:00:00.000Z" }), NOW);
+    // One upcoming booking per email, so this is refused for that reason, not the limit.
+    expect(again.ok).toBe(false);
+    if (!again.ok) expect(again.status).toBe(409);
   });
 
   it("refuses bad details without booking anything", async () => {

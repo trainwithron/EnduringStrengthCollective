@@ -1,4 +1,5 @@
 import { placeholderEmailFor } from "@/lib/client-claim";
+import { rateLimitAllows } from "@/lib/rate-limit";
 import { mirrorBookingToGoogleCalendar } from "@/lib/google-calendar-mirror-server";
 import { supabaseSeriesStore } from "@/lib/series-store";
 import type { ManagedBooking, PublicBookingStore, PublicCoachContext } from "@/lib/public-booking-engine";
@@ -6,6 +7,9 @@ import type { PublicSessionTypeRow } from "@/lib/public-booking";
 
 // The real PublicBookingStore. Uses the service role: a visitor has no account, so nothing here goes through their login.
 // Every public route checks its own inputs (lib/public-booking.ts) before reaching this.
+
+// New visitors one coach's public page may add in 24 hours. Repeat visitors, found by email, do not count.
+const MAX_NEW_GUESTS_PER_DAY = 15;
 
 const NOT_READY = "Online booking is not switched on yet.";
 
@@ -101,6 +105,10 @@ export function publicBookingStore(db: any): PublicBookingStore {
       const groupId = (data as any)?.bookings?.group_id;
       if (!data || !groupId) return null;
       return { athleteId: data.athlete_id, groupId };
+    },
+
+    async allowNewGuestClient(coachId) {
+      return rateLimitAllows(`pb-new-guest:${coachId}`, MAX_NEW_GUESTS_PER_DAY, 86400);
     },
 
     async createGuestClient(coachId, name) {

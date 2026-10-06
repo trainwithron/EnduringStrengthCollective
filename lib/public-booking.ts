@@ -61,9 +61,16 @@ export interface GuestInput {
   note: string | null;
 }
 
+// A name is shown in the coach's notifications and the visitor's email, so it must be a name: no links, addresses, markup or
+// control characters that could turn a booking into a way to deliver a phishing message.
+export function nameLooksLikeMessage(name: string): boolean {
+  return /[<>@\\\u0000-\u001f\u007f]/.test(name) || /:\/\/|www\.|[a-z0-9-]\.(com|net|org|io|co|app|me|ly|xyz|info|biz|us|uk|ru|cn)\b/i.test(name) || /\d{5,}/.test(name);
+}
+
 export function validateGuestInput(raw: { name?: unknown; email?: unknown; phone?: unknown; note?: unknown }): { ok: true; value: GuestInput } | { ok: false; error: string } {
   const name = typeof raw.name === "string" ? raw.name.trim().replace(/\s+/g, " ") : "";
   if (name.length < 1 || name.length > 80) return { ok: false, error: "Enter your name." };
+  if (nameLooksLikeMessage(name)) return { ok: false, error: "Enter just your name, without links or contact details." };
   const email = typeof raw.email === "string" ? normalizeEmail(raw.email) : "";
   if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return { ok: false, error: "Enter a valid email address." };
   const phoneRaw = typeof raw.phone === "string" ? raw.phone.trim() : "";
@@ -74,8 +81,10 @@ export function validateGuestInput(raw: { name?: unknown; email?: unknown; phone
 }
 
 // A hidden field real people never fill, and a form that is submitted faster than a person could. Either marks a bot.
-export function isBotSubmission(opts: { honeypot: unknown; renderedAtMs: unknown; now: Date; minSeconds?: number }): boolean {
+// With requireRenderedAt, a submission that does not say when its form was shown is refused too: omitting the field is not a way round it.
+export function isBotSubmission(opts: { honeypot: unknown; renderedAtMs: unknown; now: Date; minSeconds?: number; requireRenderedAt?: boolean }): boolean {
   if (typeof opts.honeypot === "string" && opts.honeypot.trim() !== "") return true;
+  if (opts.requireRenderedAt && !(typeof opts.renderedAtMs === "number" && Number.isFinite(opts.renderedAtMs))) return true;
   if (typeof opts.renderedAtMs === "number" && Number.isFinite(opts.renderedAtMs)) {
     const elapsed = opts.now.getTime() - opts.renderedAtMs;
     if (elapsed < (opts.minSeconds ?? 2) * 1000) return true;

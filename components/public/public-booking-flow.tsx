@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { formatInTimezone } from "@/lib/format-in-timezone";
 import type { PublicPageView } from "@/lib/public-booking-engine";
 
@@ -48,9 +48,77 @@ export function PublicBookingFlow({ slug, page }: { slug: string; page: PublicPa
   const [error, setError] = useState<string | null>(null);
   const [booked, setBooked] = useState<Booked | null>(null);
   const [copied, setCopied] = useState(false);
-  const renderedAt = useRef<number>(Date.now());
+  // Signed by the server when the form loads; the booking is refused without it. The time on this page is never trusted.
+  const [formToken, setFormToken] = useState<string | null>(null);
+  const [emailProof, setEmailProof] = useState<{ email: string; proof: string } | null>(null);
+  const [codeSent, setCodeSent] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const [verifyNote, setVerifyNote] = useState<string | null>(null);
+  const [verifyBusy, setVerifyBusy] = useState(false);
 
   const type = types.find((t) => t.id === typeId) ?? null;
+  const cleanEmail = email.trim().toLowerCase();
+  const emailVerified = emailProof !== null && emailProof.email === cleanEmail;
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/public-booking/${slug}/form-token`)
+      .then((r) => r.json())
+      .then((d) => !cancelled && typeof d.formToken === "string" && setFormToken(d.formToken))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
+
+  async function sendCode() {
+    if (!formToken || verifyBusy) return;
+    setVerifyBusy(true);
+    setVerifyNote(null);
+    try {
+      const res = await fetch(`/api/public-booking/${slug}/verify-email/send`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: cleanEmail, formToken }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setVerifyNote(data.error ?? "We couldn't send the code.");
+        return;
+      }
+      setCodeSent(cleanEmail);
+      setCode("");
+      setVerifyNote(`We sent a 6-digit code to ${cleanEmail}. Check spam too.`);
+    } catch {
+      setVerifyNote("We couldn't send the code. Check your connection and try again.");
+    } finally {
+      setVerifyBusy(false);
+    }
+  }
+
+  async function confirmCode() {
+    if (verifyBusy) return;
+    setVerifyBusy(true);
+    setVerifyNote(null);
+    try {
+      const res = await fetch(`/api/public-booking/${slug}/verify-email/confirm`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: cleanEmail, code }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setVerifyNote(data.error ?? "That code isn't right.");
+        return;
+      }
+      setEmailProof({ email: cleanEmail, proof: data.emailProof });
+      setVerifyNote(null);
+    } catch {
+      setVerifyNote("We couldn't check the code. Check your connection and try again.");
+    } finally {
+      setVerifyBusy(false);
+    }
+  }
 
   useEffect(() => {
     if (!typeId) return;
@@ -88,13 +156,17 @@ export function PublicBookingFlow({ slug, page }: { slug: string; page: PublicPa
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!typeId || !startIso || busy) return;
+    if (!emailVerified || !emailProof || !formToken) {
+      setError("Confirm your email address first.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
       const res = await fetch(`/api/public-booking/${slug}/book`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ sessionTypeId: typeId, startIso, name, email, phone, note, website, renderedAtMs: renderedAt.current }),
+        body: JSON.stringify({ sessionTypeId: typeId, startIso, name, email, phone, note, website, formToken, emailProof: emailProof.proof }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -261,6 +333,49 @@ export function PublicBookingFlow({ slug, page }: { slug: string; page: PublicPa
                   <span className="font-body text-xs text-steel block mb-1">Email</span>
                   <input className={field} type="email" value={email} onChange={(e) => setEmail(e.target.value)} required maxLength={254} autoComplete="email" />
                 </label>
+                {/* The address is confirmed with a code sent to it, so a booking only ever reaches an inbox the visitor can read. */}
+                <div className="border border-steel/30 p-3">
+                  {emailVerified ? (
+                    <p className="font-body text-sm text-chalk">Email confirmed: {cleanEmail}</p>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={sendCode}
+                        disabled={verifyBusy || !formToken || !/^[^s@]+@[^s@]+.[^s@]{2,}$/.test(cleanEmail)}
+                        className="border border-steel/40 text-chalk font-body text-sm px-4 py-2 disabled:opacity-40"
+                      >
+                        {verifyBusy && !codeSent ? "Sending…" : codeSent === cleanEmail ? "Send the code again" : "Email me a code to confirm"}
+                      </button>
+                      {codeSent === cleanEmail && (
+                        <div className="flex gap-2 mt-3">
+                          <input
+                            className={field}
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
+                            placeholder="6-digit code"
+                            value={code}
+                            onChange={(e) => setCode(e.target.value.replace(/D/g, "").slice(0, 6))}
+                            aria-label="6-digit code"
+                          />
+                          <button
+                            type="button"
+                            onClick={confirmCode}
+                            disabled={verifyBusy || code.length !== 6}
+                            className="bg-rust text-graphite font-display font-bold uppercase tracking-wide px-4 disabled:opacity-40"
+                          >
+                            Confirm
+                          </button>
+                        </div>
+                      )}
+                      {verifyNote && (
+                        <p className="font-body text-xs text-steel mt-2" role="status">
+                          {verifyNote}
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
                 <label className="block">
                   <span className="font-body text-xs text-steel block mb-1">Phone (optional)</span>
                   <input className={field} type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={30} autoComplete="tel" />
@@ -284,7 +399,7 @@ export function PublicBookingFlow({ slug, page }: { slug: string; page: PublicPa
               )}
               <button
                 type="submit"
-                disabled={busy}
+                disabled={busy || !emailVerified}
                 className="mt-4 w-full bg-rust text-graphite font-display font-bold uppercase tracking-wide px-4 py-3 disabled:opacity-40"
               >
                 {busy ? "Booking…" : "Book this session"}
