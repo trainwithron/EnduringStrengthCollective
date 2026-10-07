@@ -29,9 +29,9 @@ export function ClientProfileTabs({ groupId, athleteId, initial = "overview" }: 
     }
   }
 
-  const base = "h-10 px-3 font-body text-[13px] border-b-2 -mb-px whitespace-nowrap";
+  const base = "h-11 px-3 font-body text-[13px] border-b-2 -mb-px whitespace-nowrap";
   const inPage = (t: { key: ClientProfileTab; label: string }) => (
-    <button key={t.key} type="button" onClick={() => choose(t.key)} aria-current={tab === t.key ? "page" : undefined} className={`${base} ${tab === t.key ? "border-rust text-chalk" : "border-transparent text-steel hover:text-chalk"}`}>
+    <button key={t.key} type="button" onClick={() => choose(t.key)} aria-pressed={tab === t.key} className={`${base} ${tab === t.key ? "border-rust text-chalk" : "border-transparent text-steel hover:text-chalk"}`}>
       {t.label}
     </button>
   );

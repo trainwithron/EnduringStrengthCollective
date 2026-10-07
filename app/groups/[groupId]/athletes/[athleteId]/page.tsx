@@ -1350,7 +1350,7 @@ export default async function AthleteProfilePage(
           )}
           </div>
 
-          <div data-tab="forms">
+          <div data-tab="overview forms">
           {isMinor && (
             <section className="space-y-3">
               <MinorConsentControl
@@ -1388,7 +1388,7 @@ export default async function AthleteProfilePage(
           )}
           </div>
 
-          <div data-tab="forms">
+          <div data-tab="overview forms">
           {helpAnswer && (
             <section className="border border-steel/20 p-3">
               <h2 className="font-body text-xs text-steel uppercase tracking-wide font-bold">
@@ -1471,7 +1471,7 @@ export default async function AthleteProfilePage(
             </SettingsGroup>
             </div>
 
-            <div data-tab="program">
+            <div data-tab="settings">
             <SettingsGroup label="Assign sessions">
               <AssignSessionsControl
                 key={`assign-${creditsRow?.balance ?? 0}`}

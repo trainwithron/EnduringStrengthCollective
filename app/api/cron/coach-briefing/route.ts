@@ -81,6 +81,12 @@ async function handler(request: Request) {
       continue;
     }
 
+    // AI off (no key, or AI_DISABLED): leave no row behind, so switching it back on the same day still generates.
+    if (!isAiConfigured()) {
+      results.push({ coachId, itemCount: 0, skipped: "AI not configured" });
+      continue;
+    }
+
     const candidates = await gatherCandidateSignals(supabase, { coachId, groupIds });
 
     const { data: briefing } = await supabase
@@ -115,7 +121,8 @@ async function handler(request: Request) {
       if (Array.isArray(parsed)) rawItems = parsed.slice(0, MAX_ITEMS_PER_DAY);
     } catch {
       // Take the empty briefing row back so tomorrow's run (or a retry today) tries again instead of reading "already generated today".
-      await supabase.from("coach_briefings").delete().eq("id", briefing.id);
+      const { error: deleteError } = await supabase.from("coach_briefings").delete().eq("id", briefing.id);
+      if (deleteError) console.error("coach-briefing: could not remove the empty briefing row, a retry today will be skipped:", deleteError.message);
       results.push({ coachId, itemCount: 0, skipped: "generation or parse failure" });
       continue;
     }
