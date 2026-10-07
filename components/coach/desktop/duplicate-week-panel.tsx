@@ -429,7 +429,7 @@ export function DuplicateWeekPanel({
               group_workout_exercise_id: exerciseRow.id,
               set_order: i,
               target_time_seconds: result.workSeconds,
-              target_rest_seconds: result.restSeconds,
+              target_rest_seconds: result.restSeconds > 0 ? result.restSeconds : null,
               target_rpe: intervalTrack.otherTargets.rpe,
               target_rir: intervalTrack.otherTargets.rir,
               target_tempo: intervalTrack.otherTargets.tempo,

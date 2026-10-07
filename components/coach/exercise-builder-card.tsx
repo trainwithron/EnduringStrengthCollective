@@ -58,7 +58,7 @@ function TargetCell({
     <input
       type={kind === "number" ? "number" : "text"}
       placeholder={label.startsWith("Rest") ? "m:ss" : undefined}
-      inputMode={kind === "number" ? "decimal" : undefined}
+      inputMode={kind === "number" ? "decimal" : "text"}
       min={kind === "number" ? "0" : undefined}
       aria-label={label}
       value={draft}
@@ -84,7 +84,7 @@ function targetValue(set: ExerciseSetTarget, field: TrackedField): string {
   const v = set[prop];
   if (v === null || v === undefined) return "";
   // Rest is shown as m:ss (5:00), and typed as 5:00, 300 or 90s.
-  if (field === "rest" && typeof v === "number") return formatRest(v);
+  if (field === "rest" && typeof v === "number") return v > 0 ? formatRest(v) : "";
   return String(v);
 }
 
@@ -782,7 +782,7 @@ export function ExerciseBuilderCard({
                 return (
                   <div key={field} className="flex items-center gap-1.5">
                     <span className="w-14 shrink-0 font-body text-xs text-steel uppercase tracking-wide">
-                      {def.label}
+                      {field === "rest" ? "Rest" : def.label}
                     </span>
                     {exercise.sets.map((set, i) => (
                       <TargetCell
@@ -795,9 +795,10 @@ export function ExerciseBuilderCard({
                           if (field === "rest") {
                             const parsed = parseRestInput(typed);
                             if (!parsed.ok) {
-                              flashSaveError("Rest looks like 5:00, 300 or 90s.");
+                              flashSaveError("Rest looks like 5:00, 3m or 90s (up to 30:00).");
                               return;
                             }
+                            if (parsed.bare && !window.confirm(`${parsed.seconds} means ${parsed.seconds} seconds. For minutes type ${parsed.seconds}:00 or ${parsed.seconds}m. Save ${parsed.seconds} seconds?`)) return;
                             raw = parsed.seconds === null ? "" : String(parsed.seconds);
                           }
                           return set.id === firstSetId && exercise.sets.length > 1
