@@ -114,6 +114,8 @@ async function handler(request: Request) {
       const parsed = JSON.parse(extractJson(responseText));
       if (Array.isArray(parsed)) rawItems = parsed.slice(0, MAX_ITEMS_PER_DAY);
     } catch {
+      // Take the empty briefing row back so tomorrow's run (or a retry today) tries again instead of reading "already generated today".
+      await supabase.from("coach_briefings").delete().eq("id", briefing.id);
       results.push({ coachId, itemCount: 0, skipped: "generation or parse failure" });
       continue;
     }
