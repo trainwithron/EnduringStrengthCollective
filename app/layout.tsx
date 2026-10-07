@@ -12,6 +12,13 @@ export const metadata: Metadata = {
   title: "Spotlight Coaching",
   description: "Spotlight Coaching — group training platform",
   manifest: "/manifest.webmanifest",
+  // The picture a link to the app shows when it is shared (the default Spotlight image; see lib/brand.ts).
+  openGraph: {
+    title: "Spotlight Coaching",
+    description: "Spotlight Coaching — group training platform",
+    images: [{ url: "/brand/spotlight-og.png", width: 1200, height: 630, alt: "Spotlight Coaching" }],
+  },
+  twitter: { card: "summary_large_image", images: ["/brand/spotlight-og.png"] },
   // iOS Safari doesn't read the web manifest for "standalone" behavior —
   // it needs these apple-specific tags instead. Without appleWebApp.capable,
   // "Add to Home Screen" just bookmarks the page with browser chrome still
