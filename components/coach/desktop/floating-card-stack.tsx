@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { X, Plus, Minimize2 } from "lucide-react";
 import {
   readCardStackLayout,
@@ -65,11 +66,14 @@ export function FloatingCardStack({
 }) {
   const [layout, setLayout] = useState<CardStackEntry[]>([]);
   const [hydrated, setHydrated] = useState(false);
+  // Where the toolbar goes: a slot in the shell's page flow (see coach-desktop-shell.tsx), so it never draws over the page or the rail.
+  const [barSlot, setBarSlot] = useState<HTMLElement | null>(null);
   const dragRef = useRef<DragState | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setLayout(readCardStackLayout());
+    setBarSlot(document.getElementById("workspace-bar-slot"));
     setHydrated(true);
   }, []);
 
@@ -194,33 +198,37 @@ export function FloatingCardStack({
 
   const closedViews = ALL_VIEWS.filter((v) => !layout.some((e) => e.view === v));
 
-  return (
-    <div ref={containerRef} className="hidden lg:block fixed left-4 top-[72px] z-40">
-      <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+  const bar = (
+    <div className="flex items-center gap-2 h-11 px-4 border-b border-steel/20 bg-graphite overflow-x-auto" role="toolbar" aria-label="Cards">
+      <button
+        type="button"
+        onClick={onExitToTraditional}
+        className="h-9 px-3 shrink-0 flex items-center gap-1.5 font-body text-[13px] text-chalk border border-steel/40 bg-surface rounded-token-lg hover:border-rust"
+      >
+        <Minimize2 className="w-3.5 h-3.5" />
+        Back to panel
+      </button>
+      {closedViews.map((v) => (
         <button
+          key={v}
           type="button"
-          onClick={onExitToTraditional}
-          className="h-7 px-2 flex items-center gap-1 font-body text-xs text-steel border border-steel/30 bg-surface rounded-token-lg active:text-chalk"
+          onClick={() => openCard(v)}
+          className="h-9 px-3 shrink-0 flex items-center gap-1.5 font-body text-[13px] text-chalk border border-steel/40 bg-surface rounded-token-lg hover:border-rust"
         >
-          <Minimize2 className="w-3 h-3" />
-          Collapse all
+          <Plus className="w-3.5 h-3.5" />
+          {CARD_META[v].icon} {CARD_META[v].label}
         </button>
-        {closedViews.map((v) => (
-          <button
-            key={v}
-            type="button"
-            onClick={() => openCard(v)}
-            className="h-7 px-2 flex items-center gap-1 font-body text-xs text-steel border border-steel/30 bg-surface rounded-token-lg active:text-chalk"
-          >
-            <Plus className="w-3 h-3" />
-            {CARD_META[v].icon} {CARD_META[v].label}
-          </button>
-        ))}
-      </div>
+      ))}
+      {layout.length === 0 && <span className="font-body text-[13px] text-steel shrink-0">Cards sit beside your page. Add one to start.</span>}
+    </div>
+  );
 
-      {layout.length === 0 ? (
-        <p className="font-body text-xs text-steel">All cards closed — reopen one above.</p>
-      ) : (
+  // The cards float below the toolbar and to the right of the rail, never over either (a card cannot be dragged above or left of this box).
+  return (
+    <>
+      {barSlot && createPortal(bar, barSlot)}
+      <div ref={containerRef} className="hidden lg:block fixed left-[72px] top-[104px] z-40">
+        {layout.length > 0 && (
         <div className="relative" style={{ width: 1, height: 1 }}>
           {layout.map((entry, index) => {
             const isFront = index === 0;
@@ -246,7 +254,7 @@ export function FloatingCardStack({
                   onPointerDown={(e) => startMove(e, entry)}
                   className="flex items-center justify-between px-3 h-9 border-b border-steel/20 bg-surface/60 shrink-0 cursor-move select-none"
                 >
-                  <p className="font-body text-xs uppercase tracking-wide text-steel pointer-events-none">
+                  <p className="font-body text-[13px] uppercase tracking-wide text-chalk pointer-events-none">
                     {CARD_META[entry.view].icon} {CARD_META[entry.view].label}
                   </p>
                   <button
@@ -281,7 +289,8 @@ export function FloatingCardStack({
             );
           })}
         </div>
-      )}
-    </div>
+        )}
+      </div>
+    </>
   );
 }

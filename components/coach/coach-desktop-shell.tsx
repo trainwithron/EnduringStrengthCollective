@@ -653,6 +653,10 @@ export function CoachDesktopShell({
         </div>
       </header>
 
+      {/* The floating card stack's toolbar lives here, in the page flow, so it takes its own space instead of drawing over the page and the rail
+          (Ron, Oct 6). Empty (zero height) unless the card-stack layout puts its bar into it. */}
+      {layoutMode === "card_stack" && <div id="workspace-bar-slot" className="sticky top-14 z-30 hidden lg:block" />}
+
       <div className="flex">
         {/* Concept 8 "Familiar" shell redesign — Discord/YouTube-inspired
             icon rail (always 64px, never collapses) + a resizable/
