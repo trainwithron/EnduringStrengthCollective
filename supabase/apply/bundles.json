@@ -42,5 +42,13 @@
    "40"
   ],
   "file": "apply-release-j-all.sql"
+ },
+ {
+  "id": "release-k",
+  "name": "Release K (recipe library)",
+  "steps": [
+   "41"
+  ],
+  "file": "apply-release-k-all.sql"
  }
 ]

@@ -851,6 +851,29 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["0295 is not already applied (client_goals has no nutrition_phase yet)", has.noCol("client_goals", "nutrition_phase")],
     ],
   },
+  {
+    n: "41",
+    slug: "0296",
+    title: "0296 recipe library columns: where a recipe came from (the coach or an approved AI option), tags computed when it is saved (allergens, intolerances, diets), its main protein, its reference macros, a fingerprint so the same option saved twice is one recipe, and the line amounts the meal builder scales; a line of an AI recipe must be matched to a real food",
+    migrations: ["0296"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for anyone until the code in the same release is live. After that: the meal builder offers a client's day from the starter library and the coach's own recipes first, and a coach can save an approved AI option to their private library. Existing recipes keep working exactly as they are (every new column is empty or has a safe default, and who can read or write a recipe does not change). No existing function is replaced. Run it together with the release's code deploy.",
+    undo: [
+      "drop trigger if exists recipe_ingredients_guard_ai on public.recipe_ingredients;",
+      "drop function if exists public.guard_ai_recipe_ingredient();",
+      "drop index if exists public.recipes_owner_content_hash_uniq;",
+      "alter table public.recipe_ingredients drop constraint if exists recipe_ingredients_grams_ref_ok;",
+      "alter table public.recipe_ingredients drop column if exists grams_ref;",
+      "alter table public.recipes drop constraint if exists recipes_source_ok, drop constraint if exists recipes_visibility_ok, drop constraint if exists recipes_tags_ok, drop constraint if exists recipes_main_protein_ok, drop constraint if exists recipes_reference_macros_ok, drop constraint if exists recipes_content_hash_ok;",
+      "alter table public.recipes drop column if exists source, drop column if exists visibility, drop column if exists allergens, drop column if exists intolerance_tags, drop column if exists diet_tags, drop column if exists main_protein, drop column if exists reference_macros, drop column if exists verified_at, drop column if exists content_hash;",
+    ].join(String.fromCharCode(10)),
+    undoWhy: "Only if the recipe library misbehaves after step 41. Removes the new recipe columns and their checks (the source, tags, main protein, reference macros and fingerprint of every saved recipe are lost, and the line amounts the builder scales), the unique fingerprint index, and the AI-line guard. The recipes and their lines themselves stay.",
+    rows: [
+      ["recipes and recipe_ingredients exist", `${has.table("recipes")} and ${has.table("recipe_ingredients")}`],
+      ["0296 is not already applied (recipes has no content_hash yet)", has.noCol("recipes", "content_hash")],
+      ["0296 is not already applied (recipe_ingredients has no grams_ref yet)", has.noCol("recipe_ingredients", "grams_ref")],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -930,6 +953,7 @@ const BUNDLES = [
   { id: "release-h", name: "Release H (refund fix)", steps: ["38"] },
   { id: "release-i", name: "Release I (food preferences)", steps: ["39"] },
   { id: "release-j", name: "Release J (about you, baseline, phase of record)", steps: ["40"] },
+  { id: "release-k", name: "Release K (recipe library)", steps: ["41"] },
 ];
 for (const b of BUNDLES) {
   const stepsIn = b.steps.map((n) => STEPS.find((x) => x.n === n));
@@ -1101,6 +1125,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0293", has.fnName("refund_coach_credit_for")),
     m("0294", has.table("client_nutrition_preferences")),
     m("0295", has.table("client_phase_plans")),
+    m("0296", has.col("recipes", "content_hash")),
     m("0285", has.table("rest_day_nudges")),
     m("0284", has.policy("client_goals", "client_goals_insert_coach")),
     m("0283", has.col("coach_availability_windows", "session_minutes")),

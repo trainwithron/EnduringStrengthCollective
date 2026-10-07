@@ -360,6 +360,38 @@ for (const s of steps) {
   const err2 = await run(file);
   check("release-j: the bundle applies again after an undo" + (err2 ? ": " + err2 : ""), !err2);
 }
+// Release K (step 41): recipe library columns. Applies on the live-shaped state, a second run is refused, the undo removes exactly the new columns, checks, index and guard,
+// existing recipes and their lines survive both ways, and it applies again.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-k");
+  const file = `apply/${bundle.file}`;
+  const st = steps.find((x) => x.n === "41");
+  const state = async () => (await db.query(`select
+      exists (select 1 from information_schema.columns where table_name = 'recipes' and column_name = 'content_hash') as hash,
+      exists (select 1 from information_schema.columns where table_name = 'recipes' and column_name = 'source') as source,
+      exists (select 1 from information_schema.columns where table_name = 'recipe_ingredients' and column_name = 'grams_ref') as grams,
+      exists (select 1 from pg_trigger where tgname = 'recipe_ingredients_guard_ai') as guard,
+      to_regclass('public.recipes_owner_content_hash_uniq') is not null as idx,
+      (select count(*)::int from public.recipes) as recipes,
+      (select count(*)::int from public.recipe_ingredients) as lines`)).rows[0];
+  const eu = await run(`apply/undo-step${st.n}-${st.slug}.sql`);
+  check("release-k: undo-step41-0296.sql runs before the step (nothing to undo)" + (eu ? ": " + eu : ""), !eu);
+  const before = await state();
+  check("release-k: before it runs none of the new objects exist", !before.hash && !before.source && !before.grams && !before.guard && !before.idx, JSON.stringify(before));
+  const err = await run(file);
+  check("release-k bundle applies on the live-shaped state" + (err ? ": " + err : ""), !err);
+  const after = await state();
+  check("release-k: the columns, index and guard exist and no recipe or line was lost", after.hash && after.source && after.grams && after.guard && after.idx && after.recipes === before.recipes && after.lines === before.lines, JSON.stringify(after));
+  const again = await run(file);
+  check("release-k: a second run is refused, naming step 41 (" + again + ")", !!again && /step 41 \(0296\) cannot run/.test(again) && /already applied/.test(again));
+  const eu2 = await run(`apply/undo-step${st.n}-${st.slug}.sql`);
+  check("release-k: the undo runs after the step" + (eu2 ? ": " + eu2 : ""), !eu2);
+  const undone = await state();
+  check("release-k: after the undo the new objects are gone and every recipe and line is still there", !undone.hash && !undone.source && !undone.grams && !undone.guard && !undone.idx && undone.recipes === before.recipes && undone.lines === before.lines, JSON.stringify(undone));
+  const err2 = await run(file);
+  check("release-k: the bundle applies again after an undo" + (err2 ? ": " + err2 : ""), !err2);
+}
 // Steps 30 and 31: the copy matches the original, both groups are gone, and everything in them was saved first.
 {
   const gone = (await db.query("select count(*)::int as n from public.groups where id in ('b292055b-edc6-4171-ad2b-a89d65dcd8db', 'c368ab0b-ccab-442e-a42e-38fb22293182')")).rows[0].n;
