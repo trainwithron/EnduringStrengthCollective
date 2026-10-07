@@ -50,6 +50,11 @@ export function ShellRail({ icons, footer }: { icons: RailIcon[]; footer?: React
 // broken, not helpful.
 const HOVER_DWELL_MS = 450;
 
+// Closing is not instant (Ron, Oct 6: the Calendar glance vanished the moment the pointer left the icon, so its "Open calendar" link could never be reached):
+// the popover is 10px away from the icon, and the pointer has to cross that gap. It stays open for this long after the pointer leaves either one, and stays
+// open as long as the pointer is over the popover itself. Keyboard focus opens the same glance.
+const HOVER_CLOSE_GRACE_MS = 300;
+
 // Real bug fix (2026-09-14, overnight audit): the tooltip below used to
 // be a plain absolute-positioned span inside this link, relying on
 // group-hover — but this rail and the adjacent resizable list panel
@@ -69,7 +74,32 @@ function RailIconButton({ item }: { item: RailIcon }) {
   const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
   const [popoverOpen, setPopoverOpen] = useState(false);
   const dwellTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isTouch, setIsTouch] = useState(false);
+
+  function cancelClose() {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  }
+
+  function scheduleClose() {
+    cancelClose();
+    closeTimerRef.current = setTimeout(() => {
+      closeTimerRef.current = null;
+      setPopoverOpen(false);
+    }, HOVER_CLOSE_GRACE_MS);
+  }
+
+  function openNow() {
+    if (!item.popover) return;
+    cancelClose();
+    if (dwellTimerRef.current) clearTimeout(dwellTimerRef.current);
+    const pos = computePos();
+    if (pos) setPopoverPos(pos);
+    setPopoverOpen(true);
+  }
 
   useEffect(() => {
     setIsTouch(typeof window !== "undefined" && "ontouchstart" in window);
@@ -95,6 +125,9 @@ function RailIconButton({ item }: { item: RailIcon }) {
     if (isTouch) return; // Touch uses tap, not hover — see handleClick.
     showTooltip();
     if (!item.popover) return;
+    cancelClose();
+    // Already open (the pointer came back from the popover): nothing to wait for.
+    if (popoverOpen) return;
     if (dwellTimerRef.current) clearTimeout(dwellTimerRef.current);
     dwellTimerRef.current = setTimeout(() => {
       const pos = computePos();
@@ -109,12 +142,14 @@ function RailIconButton({ item }: { item: RailIcon }) {
       clearTimeout(dwellTimerRef.current);
       dwellTimerRef.current = null;
     }
-    setPopoverOpen(false);
+    if (item.popover) scheduleClose();
+    else setPopoverOpen(false);
   }
 
   useEffect(() => {
     return () => {
       if (dwellTimerRef.current) clearTimeout(dwellTimerRef.current);
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
     };
   }, []);
 
@@ -144,6 +179,12 @@ function RailIconButton({ item }: { item: RailIcon }) {
       aria-label={item.label}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onFocus={() => {
+        if (!isTouch) openNow();
+      }}
+      onBlur={() => {
+        if (item.popover) scheduleClose();
+      }}
       onClick={handleClick}
       className={`relative w-11 h-11 flex items-center justify-center transition-colors ${
         item.active ? "bg-rust/15 text-rust" : "text-steel active:text-chalk"
@@ -173,8 +214,11 @@ function RailIconButton({ item }: { item: RailIcon }) {
           <div
             onMouseEnter={() => {
               if (dwellTimerRef.current) clearTimeout(dwellTimerRef.current);
+              cancelClose();
             }}
-            onMouseLeave={() => setPopoverOpen(false)}
+            onMouseLeave={scheduleClose}
+            onFocus={cancelClose}
+            onBlur={scheduleClose}
             // React's synthetic event system bubbles through the
             // component tree, not the portaled DOM location — without
             // this, any click inside the popover (a button, an inner
