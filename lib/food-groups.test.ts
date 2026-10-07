@@ -106,3 +106,20 @@ describe("a day the library built and the coach then edited is no longer the lib
     expect(ticked.replacingHand).toEqual(["2026-10-08"]);
   });
 });
+
+describe("follow-ups: the meat group covers every cut; restriction wording is never filed as a like", () => {
+  it("'no meat' and 'no animal products' block ribeye, sirloin, burger, flank, wings, hot dog, but not fish or meat-free foods", () => {
+    allFlagged("meat", ["Grilled ribeye", "Turkey burger", "Flank steak", "Buffalo wings", "Hot dog", "Ground chuck", "Sirloin"]);
+    noneFlagged("meat", ["Salmon", "Vegan burger", "Veggie burger", "Tofu scramble"]);
+    allFlagged("animal products", ["Grilled ribeye", "Turkey burger"]);
+    noneFlagged("animal products", ["Vegan burger", "Oats"]);
+  });
+  it("'wants no dairy' and 'prefers no eggs' are restrictions, not likes", () => {
+    expect(rulesFromTypedText("wants no dairy").allergies).toEqual(["dairy"]);
+    expect(rulesFromTypedText("wants dairy free").allergies).toEqual(["dairy"]);
+    expect(rulesFromTypedText("prefers no eggs").allergies).toEqual(["egg"]);
+    expect(rulesFromTypedText("wants no dairy").likes).toEqual([]);
+    expect(rulesFromTypedText("loves cheese").allergies).toEqual([]);
+    expect(rulesFromTypedText("prefers vegetarian").dietType).toBeNull();
+  });
+});

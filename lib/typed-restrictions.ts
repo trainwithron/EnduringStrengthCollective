@@ -23,7 +23,7 @@ const DIET_WORDS: [RegExp, string][] = [
 const FILLER = /^(?:none|n\/a|na|nothing|restrictions?|allergies|allergy|preferences?|omnivore|eats everything|normal|no|n|a)$/;
 const LEAD = /^(?:no|without|avoid(?:s|ing)?|allergic to|allergy to|allergies to|allergies|allergy|intolerant to|doesn'?t eat|does not eat|dont eat|don'?t eat|hates?|dislikes?|can'?t have|cannot have|cant have|free of)\s+/;
 // Positive wording: what the client likes, not a restriction.
-const LIKE_LEAD = /^(?:likes?|loves?|enjoys?|prefers?|favou?rites?|favou?rite|fond of|wants?|craves?)\b\s*/;
+const LIKE_LEAD = /^(?:likes?|loves?|enjoys?|prefers?|favou?rites?|favou?rite|fond of|wants?|needs?|craves?)\b\s*/;
 const TRAIL = /\s+(?:allergy|allergies|intolerant|intolerance|free)$/;
 
 export function rulesFromTypedText(text: string | null | undefined): TypedRules {
@@ -38,8 +38,12 @@ export function rulesFromTypedText(text: string | null | undefined): TypedRules 
     // "likes eggs, loves cheese" is wording about what they enjoy: it boosts, it never restricts.
     if (LIKE_LEAD.test(frag)) {
       const liked = frag.replace(LIKE_LEAD, "").trim();
-      if (liked.length >= 3 && liked.length <= 40) likes.add(liked);
-      continue;
+      // "prefers no dairy" is a restriction wearing like-wording: it is read as the restriction, never filed as a like (the unsafe direction).
+      if (/^(?:no|not|without|avoid|free of)\b/.test(liked) || /\bfree$/.test(liked)) frag = liked;
+      else {
+        if (liked.length >= 3 && liked.length <= 40) likes.add(liked);
+        continue;
+      }
     }
     // A diet word (not inside a "likes ..." fragment): the stricter one wins if several are named.
     for (const [re, diet] of DIET_WORDS) {

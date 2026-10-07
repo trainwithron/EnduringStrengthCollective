@@ -172,6 +172,8 @@ const RED_MEAT_SAFE = [
   "turkey meatball", "chicken meatball", "turkey hot dog", "chicken hot dog", "coconut bacon", "tempeh bacon",
 ];
 const FISH_SAFE = [...(SAFE_PHRASES.fish ?? []), ...(SAFE_PHRASES.shellfish ?? [])];
+// Every meat word: the general meat list plus all the cuts of the groups above (so a ribeye or a burger is meat too).
+const ALL_MEAT_TERMS = [...new Set([...MEAT_TERMS, ...BEEF_TERMS, ...PORK_TERMS, ...POULTRY_TERMS, ...LAMB_TERMS, "venison", "bison"])];
 const FOOD_GROUPS: Record<string, { terms: string[]; safe: string[] }> = {
   pork: { terms: PORK_TERMS, safe: RED_MEAT_SAFE },
   beef: { terms: BEEF_TERMS, safe: RED_MEAT_SAFE },
@@ -181,9 +183,9 @@ const FOOD_GROUPS: Record<string, { terms: string[]; safe: string[] }> = {
   lamb: { terms: LAMB_TERMS, safe: [] },
   "red meat": { terms: [...BEEF_TERMS, ...PORK_TERMS, ...LAMB_TERMS, "venison", "bison"], safe: RED_MEAT_SAFE },
   seafood: { terms: SEAFOOD_TERMS, safe: FISH_SAFE },
-  meat: { terms: MEAT_TERMS, safe: [] },
+  meat: { terms: ALL_MEAT_TERMS, safe: [] },
   "animal products": {
-    terms: [...MEAT_TERMS, ...SEAFOOD_TERMS, ...ALLERGEN_TERMS.dairy, ...ALLERGEN_TERMS.egg, "honey"],
+    terms: [...ALL_MEAT_TERMS, ...SEAFOOD_TERMS, ...ALLERGEN_TERMS.dairy, ...ALLERGEN_TERMS.egg, "honey"],
     safe: [...FISH_SAFE, ...(SAFE_PHRASES.dairy ?? []), ...(SAFE_PHRASES.egg ?? [])],
   },
 };
