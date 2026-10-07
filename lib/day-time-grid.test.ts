@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { assignLanes, clockLabel, clockLabel12, gridRange, minuteFromOffset, minutesOfDayInZone, offsetFromMinute, parseClockMinutes, placementProblem, snapMinutes } from "./day-time-grid";
+import { assignLanes, clockLabel, clockLabel12, gridRange, isHardClash, minuteFromOffset, minutesOfDayInZone, offsetFromMinute, parseClockMinutes, placementProblem, PLACEMENT_TEXT, snapMinutes } from "./day-time-grid";
 
 describe("clock helpers", () => {
   it("reads and writes clock times", () => {
@@ -91,5 +91,19 @@ describe("where a session sits against the day", () => {
     expect(placementProblem({ ...base, startMin: 1000, endMin: 1060 })).toBe("outside");
     expect(placementProblem({ ...base, startMin: 700, endMin: 740 })).toBe("outside");
     expect(placementProblem({ ...base, windows: [], startMin: 800, endMin: 860 })).toBe("outside");
+  });
+});
+
+describe("what stops a booking and what only warns", () => {
+  it("an overlap or a too-close session is a stop (the database refuses it); outside hours is only a warning", () => {
+    expect(isHardClash("taken")).toBe(true);
+    expect(isHardClash("buffer")).toBe(true);
+    expect(isHardClash("outside")).toBe(false);
+    expect(isHardClash(null)).toBe(false);
+  });
+  it("the words match: no 'you can still book it' on a stop", () => {
+    expect(PLACEMENT_TEXT.taken).not.toMatch(/still book/);
+    expect(PLACEMENT_TEXT.buffer).not.toMatch(/still book/);
+    expect(PLACEMENT_TEXT.outside).toMatch(/still book/);
   });
 });

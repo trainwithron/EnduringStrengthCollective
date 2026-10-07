@@ -44,7 +44,7 @@ export function CalendarClientList({ clients, selectedClientId }: { clients: Cal
             </DraggableClientName>
             <span className="flex items-center gap-2 shrink-0">
               {picture.owed > 0 && (
-                <span title={`${picture.owed} more than they have`} className="font-body text-[11px] text-rust">
+                <span title="Already delivered beyond what they had" className="font-body text-[11px] text-rust">
                   owed {picture.owed}
                 </span>
               )}

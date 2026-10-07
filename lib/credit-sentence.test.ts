@@ -15,11 +15,12 @@ describe("the click-through sentence for the coach", () => {
     expect(coachCreditSentence(p({ balance: 0, booked: 0, toMark: 0, bought: 1, done: 1 }), "Alice")).toBe("1 session bought, and it has been completed.");
     expect(coachCreditSentence(p({ balance: 12, booked: 0, toMark: 0, bought: 12, done: 0 }), "Alice")).toBe("12 sessions bought, and 12 left to schedule.");
   });
-  it("says when more are booked than are left, by name, without jargon", () => {
-    expect(coachCreditSentence(p({ balance: 0, booked: 8, toMark: 0, bought: 12, done: 4 }), "Alice")).toBe("12 sessions bought, 4 completed, and 8 booked; 8 more are booked than Alice has left.");
-    expect(coachCreditSentence(p({ balance: 6, booked: 8, toMark: 0, bought: 12, done: 4 }), "Alice")).toBe("12 sessions bought, 4 completed, and 8 booked; 2 more are booked than Alice has left.");
-    expect(coachCreditSentence(p({ balance: 1, booked: 2, toMark: 0 }), "Alice")).toBe("Alice has 1 session left: 2 booked. 1 more is booked than Alice has left.");
-    expect(coachCreditSentence(p({ balance: 8, booked: 10, toMark: 0 }), "Alice")).not.toMatch(/owed/i);
+  it("sessions booked beyond what is left are 'booked ahead', never a debt", () => {
+    expect(coachCreditSentence(p({ balance: 0, booked: 8, toMark: 0, bought: 12, done: 4 }), "Alice")).toBe("12 sessions bought, 4 completed, and 8 booked ahead.");
+    expect(coachCreditSentence(p({ balance: 6, booked: 8, toMark: 0, bought: 12, done: 4 }), "Alice")).toBe("12 sessions bought, 4 completed, and 8 booked ahead.");
+    expect(coachCreditSentence(p({ balance: 1, booked: 2, toMark: 0 }), "Alice")).toBe("Alice has 1 session left: 2 booked ahead.");
+    expect(coachCreditSentence(p({ balance: 0, booked: 52, toMark: 0 }), "Alice")).toBe("Alice has 0 sessions left: 52 booked ahead.");
+    expect(coachCreditSentence(p({ balance: 8, booked: 10, toMark: 0 }), "Alice")).not.toMatch(/owe/i);
   });
   it("adds the sessions waiting to be marked", () => {
     expect(coachCreditSentence(p({ balance: 8, booked: 4, toMark: 2, bought: 12, done: 4 }), "Alice")).toBe("12 sessions bought, 4 completed, 4 booked, and 4 left to schedule. 2 are waiting to be marked.");
@@ -30,8 +31,9 @@ describe("the click-through sentence for the coach", () => {
     expect(coachCreditSentence(p({ balance: 1, booked: 0, toMark: 0 }), "Alice")).toBe("Alice has 1 session left.");
     expect(coachCreditSentence(p({ balance: 0, booked: 0, toMark: 0 }), "Alice")).toBe("Alice has no sessions left.");
   });
-  it("says what is already owed", () => {
+  it("says what was delivered beyond the balance, and only that", () => {
     expect(coachCreditSentence(p({ balance: -2, booked: 0, toMark: 0 }), "Alice")).toBe("Alice has 0 sessions left. Alice owes 2 sessions.");
+    expect(coachCreditSentence(p({ balance: -1, booked: 3, toMark: 0 }), "Alice")).toBe("Alice has 0 sessions left: 3 booked ahead. Alice owes 1 session.");
   });
   it("uses the coach's own word for a session", () => {
     const noun = { singular: "workout", plural: "workouts" };

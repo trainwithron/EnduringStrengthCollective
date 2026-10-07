@@ -9,17 +9,16 @@ import { dateKeyInZone } from "@/lib/timezone";
 import { mirrorGoogleCalendarEvent } from "@/lib/mirror-google-calendar-event";
 import { MarkAttendedControl, type CreditState } from "@/components/coach/mark-attended-control";
 import { useTerm } from "@/components/coach/terminology-provider";
-import { buildCreditPicture } from "@/lib/credit-picture";
+import { buildCreditPicture, fetchBookingCounts, type BookingCounts } from "@/lib/credit-picture";
 import { coachCreditSentence } from "@/lib/credit-sentence";
 import { ledgerTotals } from "@/lib/credit-ledger-totals";
+import { pageAll } from "@/lib/page-all";
 import type { DraggedClient } from "./draggable-client-name";
 
 interface BookingRow {
   id: string;
   start_at: string;
-  status: string;
   credit_state: CreditState;
-  attended_at: string | null;
   session_type_id: string | null;
 }
 
@@ -27,11 +26,14 @@ const STATE_TEXT: Record<CreditState, string> = { prepaid: "paid", unsettled: "p
 
 // Everything the coach has with one client, in one place, opened by tapping their name: a plain sentence about their sessions, the credit adjusters, the sessions
 // coming up (time on the coach's own clock, type, pending or not), the past ones still waiting for Attended, with one tap to mark, cancel or open the day. The
-// client's own program days and workouts live on their calendar, one tap away; they are not mixed into the coach's.
+// client's own program days and workouts live on their calendar, one tap away; they are not mixed into the coach's. The numbers are the same server counts the
+// list uses (every session, not a window of recent ones), and they are read again after every change made here.
 export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client: DraggedClient; timezone: string; sessionTypes: { id: string; name: string }[] }) {
   const router = useRouter();
   const t = useTerm();
-  const [rows, setRows] = useState<BookingRow[] | null>(null);
+  const [upcoming, setUpcoming] = useState<BookingRow[] | null>(null);
+  const [awaiting, setAwaiting] = useState<BookingRow[]>([]);
+  const [counts, setCounts] = useState<BookingCounts>({ booked: 0, toMark: 0, prepaidAhead: 0 });
   const [ledger, setLedger] = useState<{ bought: number; done: number } | null>(null);
   const [balance, setBalance] = useState(client.balance);
   const [adjusting, setAdjusting] = useState(false);
@@ -42,47 +44,70 @@ export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client
   const load = useCallback(async () => {
     if (!groupId) return;
     const supabase = createBrowserClient();
-    const since = new Date(Date.now() - 45 * 86400000).toISOString();
-    const { data, error: loadError } = await supabase
-      .from("bookings")
-      .select("id, start_at, status, credit_state, attended_at, session_type_id")
-      .eq("athlete_id", client.athleteId)
-      .eq("group_id", groupId)
-      .eq("status", "confirmed")
-      .gte("start_at", since)
-      .order("start_at", { ascending: true })
-      .limit(60);
-    if (loadError) {
+    const nowIso = new Date().toISOString();
+    const [upRes, awaitRes, balanceRes, countMap, ledgerRes] = await Promise.all([
+      supabase
+        .from("bookings")
+        .select("id, start_at, credit_state, session_type_id")
+        .eq("athlete_id", client.athleteId)
+        .eq("group_id", groupId)
+        .eq("status", "confirmed")
+        .gte("end_at", nowIso)
+        .order("start_at", { ascending: true })
+        .limit(60),
+      supabase
+        .from("bookings")
+        .select("id, start_at, credit_state, session_type_id")
+        .eq("athlete_id", client.athleteId)
+        .eq("group_id", groupId)
+        .eq("status", "confirmed")
+        .eq("credit_state", "unsettled")
+        .is("attended_at", null)
+        .eq("no_show", false)
+        .lt("end_at", nowIso)
+        .order("start_at", { ascending: false })
+        .limit(30),
+      supabase.from("session_credits").select("balance").eq("athlete_id", client.athleteId).eq("group_id", groupId).maybeSingle(),
+      fetchBookingCounts(supabase, { athleteId: client.athleteId, groupId }),
+      // What was bought and used, from the whole credit history, a page at a time. If it cannot be read the sentence leaves that part out.
+      pageAll((from, to) => supabase.from("session_credit_ledger").select("id, kind, amount").eq("athlete_id", client.athleteId).eq("group_id", groupId).order("id", { ascending: true }).range(from, to)),
+    ]);
+    if (upRes.error) {
       setError("Couldn't load their sessions.");
-      setRows([]);
+      setUpcoming([]);
     } else {
       setError(null);
-      setRows((data ?? []) as BookingRow[]);
+      setUpcoming((upRes.data ?? []) as BookingRow[]);
     }
-    // What was bought and what was used, from the credit history. If it cannot be read the sentence simply leaves that part out.
-    const { data: ledgerRows, error: ledgerError } = await supabase.from("session_credit_ledger").select("kind, amount").eq("athlete_id", client.athleteId).eq("group_id", groupId).limit(2000);
-    if (ledgerError) {
-      setLedger(null);
-      return;
-    }
-    setLedger(ledgerTotals((ledgerRows ?? []) as { kind: string; amount: number }[]));
+    setAwaiting(awaitRes.error ? [] : ((awaitRes.data ?? []) as BookingRow[]));
+    if (!balanceRes.error && balanceRes.data) setBalance((balanceRes.data as { balance: number }).balance);
+    const mine = countMap.get(`${client.athleteId}:${groupId}`) ?? { booked: 0, toMark: 0, prepaidAhead: 0 };
+    setCounts(mine);
+    setLedger(ledgerRes.failed ? null : ledgerTotals(ledgerRes.rows as { kind: string; amount: number }[], { prepaidAhead: mine.prepaidAhead }));
   }, [client.athleteId, groupId]);
 
   useEffect(() => {
-    setRows(null);
+    setUpcoming(null);
     setBalance(client.balance);
-    load().catch(() => setRows([]));
+    load().catch(() => setUpcoming([]));
   }, [load, client.balance]);
+
+  const noun = { singular: t("session", "singular"), plural: t("session", "plural") };
 
   async function adjustCredits(delta: number) {
     if (!groupId) return;
+    // Money moves with one tap here, so it is asked once.
+    if (!window.confirm(`${delta > 0 ? "Add" : "Remove"} one ${noun.singular} ${delta > 0 ? "to" : "from"} ${client.fullName}?`)) return;
     setAdjusting(true);
-    const { data: newBalance } = await createBrowserClient().rpc("adjust_session_credits", { p_athlete_id: client.athleteId, p_group_id: groupId, p_delta: delta });
-    if (typeof newBalance === "number") {
-      setBalance(newBalance);
-      router.refresh();
-    }
+    setError(null);
+    const { data: newBalance, error: rpcError } = await createBrowserClient().rpc("adjust_session_credits", { p_athlete_id: client.athleteId, p_group_id: groupId, p_delta: delta });
     setAdjusting(false);
+    if (rpcError) {
+      setError("That didn't save. Nothing was changed.");
+      return;
+    }
+    if (typeof newBalance === "number") setBalance(newBalance);
+    router.refresh();
     load().catch(() => {});
   }
 
@@ -101,26 +126,14 @@ export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client
     router.refresh();
   }
 
-  const now = Date.now();
-  // Only unsettled sessions take a session when they happen; a prepaid one already did.
-  const unsettled = (rows ?? []).filter((b) => b.credit_state === "unsettled");
-  const upcoming = (rows ?? []).filter((b) => new Date(b.start_at).getTime() >= now);
-  const awaiting = (rows ?? []).filter((b) => new Date(b.start_at).getTime() < now && !b.attended_at && (b.credit_state === "unsettled" || b.credit_state === "prepaid"));
-  const picture = buildCreditPicture({
-    balance,
-    booked: unsettled.filter((b) => new Date(b.start_at).getTime() >= now).length,
-    toMark: awaiting.length,
-    bought: ledger?.bought,
-    done: ledger?.done,
-  });
-  const noun = { singular: t("session", "singular"), plural: t("session", "plural") };
+  const picture = buildCreditPicture({ balance, booked: counts.booked, toMark: counts.toMark, bought: ledger?.bought, done: ledger?.done });
   const typeName = (id: string | null) => (id ? sessionTypes.find((x) => x.id === id)?.name ?? null : null);
   const when = (iso: string) => formatInTimezone(new Date(iso), timezone, "dateTime");
 
   return (
     <div className="mt-3 border border-steel/25 bg-surface p-3" aria-label={`${client.fullName}'s sessions`}>
       <p className="font-display uppercase text-xs tracking-wide text-steel mb-1">{client.fullName}</p>
-      {rows === null ? (
+      {upcoming === null ? (
         <p className="font-body text-xs text-steel">Loading…</p>
       ) : (
         <>
@@ -147,7 +160,16 @@ export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client
                       {typeName(b.session_type_id) ? ` · ${typeName(b.session_type_id)}` : ""}
                     </p>
                     <div className="mt-1">
-                      <MarkAttendedControl bookingId={b.id} initialAttended={false} initialState={b.credit_state} athleteId={client.athleteId} groupId={groupId} />
+                      <MarkAttendedControl
+                        bookingId={b.id}
+                        initialAttended={false}
+                        initialState={b.credit_state}
+                        athleteId={client.athleteId}
+                        groupId={groupId}
+                        onDone={() => {
+                          load().catch(() => {});
+                        }}
+                      />
                     </div>
                   </li>
                 ))}

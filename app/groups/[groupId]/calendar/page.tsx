@@ -9,7 +9,9 @@ import { CalendarClientRail } from "@/components/coach/desktop/calendar-client-r
 import { CalendarAttentionChip } from "@/components/coach/desktop/calendar-attention-chip";
 import { CalendarSchedulingProvider } from "@/components/coach/desktop/calendar-scheduling-context";
 import { buildAttentionItems } from "@/lib/calendar-attention";
-import { monthCellKeys, weekKeys } from "@/lib/date-key";
+import { dateFromKey, monthCellKeys, weekKeys } from "@/lib/date-key";
+import { chunk } from "@/lib/chunk";
+import { pageAll } from "@/lib/page-all";
 import { fetchInactiveKeys, inactiveKey } from "@/lib/inactive-ids";
 import { defaultSessionTypeId, lastTypeByClient, type ClientTierLite } from "@/lib/session-type-default";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
@@ -140,10 +142,9 @@ export default async function CoachCalendarPage(
     const coachTz = coachProfileRow?.timezone ?? DEFAULT_COACH_TIMEZONE;
 
     const clientIds = coachClients.map((c) => c.id);
-    const { data: creditRows } = await supabase
-      .from("session_credits")
-      .select("athlete_id, group_id, balance")
-      .in("athlete_id", clientIds.length > 0 ? clientIds : [""]);
+    const creditRows = (
+      await Promise.all(chunk(clientIds, 100).map((ids) => supabase.from("session_credits").select("athlete_id, group_id, balance").in("athlete_id", ids)))
+    ).flatMap((r) => r.data ?? []);
     const balanceByClientGroup = new Map((creditRows ?? []).map((r) => [`${r.athlete_id}:${r.group_id}`, r.balance as number]));
 
     const phoneCounts = await fetchBookingCounts(supabase, { coachId: user.id });
@@ -760,7 +761,9 @@ export default async function CoachCalendarPage(
     .eq("id", params.groupId)
     .single();
 
-  const today = new Date();
+  // "Today" is the coach's today (the server runs in UTC: on a Saturday or Sunday evening in Pacific time it would already be next week).
+  const { data: earlyTzRow } = await supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle();
+  const today = dateFromKey(dateKeyInZone((earlyTzRow?.timezone as string | null) ?? DEFAULT_COACH_TIMEZONE));
   const view = searchParams.view === "week" ? "week" : "month";
   const monthParam = searchParams.month;
   let year = today.getFullYear();
@@ -892,10 +895,9 @@ export default async function CoachCalendarPage(
   // Every client across the coach's groups, each with their own group (a one-on-one client lives in their own group).
   const coachClients = await getCoachClients(supabase, user.id, params.groupId);
   const clientIds = coachClients.map((c) => c.id);
-  const { data: creditRows } = await supabase
-    .from("session_credits")
-    .select("athlete_id, group_id, balance")
-    .in("athlete_id", clientIds.length > 0 ? clientIds : [""]);
+  const creditRows = (
+    await Promise.all(chunk(clientIds, 100).map((ids) => supabase.from("session_credits").select("athlete_id, group_id, balance").in("athlete_id", ids)))
+  ).flatMap((r) => r.data ?? []);
 
   const balanceByClientGroup = new Map((creditRows ?? []).map((r) => [`${r.athlete_id}:${r.group_id}`, r.balance as number]));
 
@@ -916,12 +918,18 @@ export default async function CoachCalendarPage(
   // joined, whether they have signed in, and their tier (for their usual session type).
   const clientGroupIds = Array.from(new Set(clients.map((c) => c.groupId)));
   const setAsideKeySet = await fetchInactiveKeys(supabase, clientGroupIds);
-  const { data: clientMembershipRows } = await supabase
-    .from("group_memberships")
-    .select("profile_id, group_id, joined_at, client_tier, profiles ( claimed_at )")
-    .in("profile_id", clientIds.length > 0 ? clientIds : [""])
-    .in("group_id", clientGroupIds.length > 0 ? clientGroupIds : [""])
-    .eq("role", "athlete");
+  const clientMembershipRows = (
+    await Promise.all(
+      chunk(clientIds, 100).map((ids) =>
+        supabase
+          .from("group_memberships")
+          .select("profile_id, group_id, joined_at, client_tier, profiles ( claimed_at )")
+          .in("profile_id", ids)
+          .in("group_id", clientGroupIds.length > 0 ? clientGroupIds : [""])
+          .eq("role", "athlete")
+      )
+    )
+  ).flatMap((r) => r.data ?? []);
   const membershipByClient = new Map(
     ((clientMembershipRows ?? []) as any[]).map((m) => [
       `${m.group_id}:${m.profile_id}`,
@@ -1004,6 +1012,23 @@ export default async function CoachCalendarPage(
   for (const log of recentLogRows ?? []) {
     if (!lastLogByAthlete.has(log.athlete_id)) lastLogByAthlete.set(log.athlete_id, log.created_at);
   }
+  // A session the coach marked attended counts as activity too: a client trained in person with the coach is not "quiet" just because nothing was logged in the app.
+  const attendedSessions = await pageAll(
+    (from, to) =>
+      supabase
+        .from("bookings")
+        .select("id, athlete_id, start_at")
+        .eq("coach_id", user.id)
+        .not("attended_at", "is", null)
+        .order("start_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to),
+    { maxPages: 3 }
+  );
+  for (const s of attendedSessions.rows as { athlete_id: string; start_at: string }[]) {
+    const seen = lastLogByAthlete.get(s.athlete_id);
+    if (!seen || s.start_at > seen) lastLogByAthlete.set(s.athlete_id, s.start_at);
+  }
   // Same frequency-normalized computeQuietTier used by the Dashboard hero
   // and the Client Profile banner — this box used to flag "quiet" off a
   // flat 7-calendar-day rule of its own, which could disagree with the
@@ -1072,14 +1097,22 @@ export default async function CoachCalendarPage(
   // Session types (Online, In person...) and each client's usual one: the type of their latest typed session, else the one type that fits their tier.
   const { data: typeRows } = await supabase.from("session_types").select("id, name, location_kind").eq("coach_id", user.id).order("name", { ascending: true });
   const sessionTypes = ((typeRows ?? []) as { id: string; name: string; location_kind: "in_person" | "online" | "either" | null }[]).map((t) => ({ id: t.id, name: t.name, locationKind: t.location_kind }));
-  const { data: typedBookingRows } = await supabase
-    .from("bookings")
-    .select("athlete_id, session_type_id, start_at")
-    .eq("coach_id", user.id)
-    .not("session_type_id", "is", null)
-    .order("start_at", { ascending: false })
-    .limit(500);
-  const lastTypes = lastTypeByClient((typedBookingRows ?? []) as { athlete_id: string; session_type_id: string | null; start_at: string }[]);
+  // Past sessions only (future ones would fill the list), newest first, a page at a time past the 1000-row cap.
+  const nowIsoForTypes = new Date().toISOString();
+  const typedBookings = await pageAll(
+    (from, to) =>
+      supabase
+        .from("bookings")
+        .select("id, athlete_id, session_type_id, start_at")
+        .eq("coach_id", user.id)
+        .not("session_type_id", "is", null)
+        .lt("start_at", nowIsoForTypes)
+        .order("start_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to),
+    { maxPages: 4 }
+  );
+  const lastTypes = lastTypeByClient(typedBookings.rows as { athlete_id: string; session_type_id: string | null; start_at: string }[]);
   const defaultTypeByClient: Record<string, string | null> = {};
   for (const c of clients) {
     defaultTypeByClient[c.profileId] = defaultSessionTypeId({ lastTypeId: lastTypes[c.profileId], tier: membershipByClient.get(`${c.groupId}:${c.profileId}`)?.tier, types: sessionTypes });

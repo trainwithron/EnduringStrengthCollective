@@ -17,6 +17,7 @@ export function MarkAttendedControl({
   initialState,
   athleteId,
   groupId,
+  onDone,
 }: {
   bookingId: string;
   initialAttended: boolean;
@@ -24,6 +25,8 @@ export function MarkAttendedControl({
   // When given, a session taken off the balance here also runs the low-balance check, as every other path that spends a session does.
   athleteId?: string;
   groupId?: string;
+  // Called after a change that saved, so a panel showing numbers can read them again.
+  onDone?: () => void;
 }) {
   const [attended, setAttended] = useState(initialAttended);
   const [state, setState] = useState<CreditState>(initialState);
@@ -54,6 +57,7 @@ export function MarkAttendedControl({
       setState("waived");
     }
     router.refresh();
+    onDone?.();
   }
 
   if (attended) {

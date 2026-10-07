@@ -11,6 +11,7 @@ import { SessionCreditsControl } from "@/components/coach/session-credits-contro
 import { buildCreditPicture, fetchBookingCounts } from "@/lib/credit-picture";
 import { coachCreditSentence } from "@/lib/credit-sentence";
 import { ledgerTotals } from "@/lib/credit-ledger-totals";
+import { pageAll } from "@/lib/page-all";
 import { AssignSessionsControl } from "@/components/coach/assign-sessions-control";
 import { SessionLedgerList } from "@/components/coach/session-ledger-list";
 import { ClientSeriesPanel, type SeriesView } from "@/components/coach/client-series-panel";
@@ -804,10 +805,12 @@ export default async function AthleteProfilePage(
     .order("created_at", { ascending: false })
     .limit(40);
   // The plain sentence about where their sessions stand: totals from the whole history (the list above shows only the latest), booked and waiting-to-mark from the calendar.
-  const { data: ledgerAllRows } = await supabase.from("session_credit_ledger").select("kind, amount").eq("athlete_id", params.athleteId).eq("group_id", params.groupId).limit(2000);
-  const ledgerSums = ledgerTotals((ledgerAllRows ?? []) as { kind: string; amount: number }[]);
+  const ledgerAll = await pageAll((from, to) =>
+    supabase.from("session_credit_ledger").select("id, kind, amount").eq("athlete_id", params.athleteId).eq("group_id", params.groupId).order("id", { ascending: true }).range(from, to)
+  );
   const profileBookingCounts = await fetchBookingCounts(supabase, { athleteId: params.athleteId, groupId: params.groupId });
   const profileCounts = profileBookingCounts.get(`${params.athleteId}:${params.groupId}`);
+  const ledgerSums = ledgerTotals(ledgerAll.rows as { kind: string; amount: number }[], { prepaidAhead: profileCounts?.prepaidAhead ?? 0 });
   const ledgerEntries: LedgerEntry[] = (ledgerRows ?? []).map((r) => ({
     id: r.id as string,
     kind: r.kind as LedgerEntry["kind"],
@@ -1411,8 +1414,8 @@ export default async function AthleteProfilePage(
                     balance: creditsRow?.balance ?? 0,
                     booked: profileCounts?.booked ?? 0,
                     toMark: profileCounts?.toMark ?? 0,
-                    bought: ledgerAllRows ? ledgerSums.bought : null,
-                    done: ledgerAllRows ? ledgerSums.done : null,
+                    bought: ledgerAll.failed ? null : ledgerSums.bought,
+                    done: ledgerAll.failed ? null : ledgerSums.done,
                   }),
                   profile?.full_name ?? "This client"
                 )}

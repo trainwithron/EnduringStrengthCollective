@@ -19,5 +19,7 @@ export function notifyPush(profileId: string, title: string, body: string, url: 
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ profileId, title, body, url }),
+    // So it still goes out if the page is closed or refreshed right after.
+    keepalive: true,
   }).catch(() => {});
 }

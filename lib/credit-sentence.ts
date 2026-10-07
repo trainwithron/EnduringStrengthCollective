@@ -1,7 +1,8 @@
 import type { CreditPicture } from "./credit-picture";
 
 // The click-through sentence: plain words, never an equation. Zero parts are dropped, singular and plural are right, the coach's own word for a session is used,
-// and a client reads "you". The coach is told when more are booked than are left (by name, no jargon); a client never hears "owed" or "to mark".
+// and a client reads "you". The coach hears "owes" only for sessions already delivered beyond the balance; sessions booked ahead beyond what is left are neutral
+// ("booked ahead"): a weekly schedule runs far out and the client pays as each one comes up. A client never hears "owed" or "to mark".
 
 export interface Noun {
   singular: string;
@@ -22,11 +23,8 @@ const waiting = (toMark: number) => (toMark === 1 ? " 1 is waiting to be marked.
 // For the coach about one client. `name` is the client's name.
 export function coachCreditSentence(p: CreditPicture, name: string, noun: Noun = SESSION_NOUN): string {
   const marked = p.toMark > 0 ? waiting(p.toMark) : "";
-  const over = p.booked > p.left ? p.booked - p.left : 0;
-  const overClause = over > 0 ? ` ${over} more ${over === 1 ? "is" : "are"} booked than ${name} has left` : "";
-  // Already owed from before (a negative balance), when it is not just the booked ones running over.
-  const owesNow = Math.max(0, p.owed - over);
-  const owesClause = owesNow > 0 ? ` ${name} owes ${count(owesNow, noun)}.` : "";
+  const owesClause = p.owed > 0 ? ` ${name} owes ${count(p.owed, noun)}.` : "";
+  const bookedWord = p.bookedAhead > 0 ? "booked ahead" : "booked";
 
   if (p.bought != null && p.done != null && p.bought > 0) {
     const head = `${count(p.bought, noun)} bought`;
@@ -35,18 +33,18 @@ export function coachCreditSentence(p: CreditPicture, name: string, noun: Noun =
     }
     const parts: string[] = [];
     if (p.done > 0) parts.push(`${p.done} completed`);
-    if (p.booked > 0) parts.push(`${p.booked} booked`);
+    if (p.booked > 0) parts.push(`${p.booked} ${bookedWord}`);
     if (p.toBook > 0) parts.push(`${p.toBook} left to schedule`);
     const sentence = parts.length === 0 ? head : parts.length === 1 ? `${head}, and ${parts[0]}` : `${head}, ${joinParts(parts)}`;
-    return `${sentence}${overClause ? `;${overClause}` : ""}.${owesClause}${marked}`;
+    return `${sentence}.${owesClause}${marked}`;
   }
 
   // Without the history: where things stand now.
   if (p.left === 0 && p.booked === 0 && p.owed === 0) return `${name} has no ${noun.plural} left.${marked}`;
   const lead = `${name} has ${count(p.left, noun)} left`;
   if (p.booked === 0) return `${lead}.${owesClause}${marked}`;
-  const tail = p.toBook > 0 ? `${p.booked} booked, and ${p.toBook} left to schedule` : `${p.booked} booked`;
-  return `${lead}: ${tail}.${overClause ? `${overClause}.` : ""}${owesClause}${marked}`;
+  const tail = p.toBook > 0 ? `${p.booked} booked, and ${p.toBook} left to schedule` : `${p.booked} ${bookedWord}`;
+  return `${lead}: ${tail}.${owesClause}${marked}`;
 }
 
 // For the client about themselves.

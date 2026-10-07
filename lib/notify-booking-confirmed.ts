@@ -34,5 +34,6 @@ export function notifyBookingConfirmed(athleteId: string, groupId: string, start
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ athleteId, groupId, startAt }),
+    keepalive: true,
   }).catch(() => {});
 }

@@ -128,8 +128,13 @@ export function placementProblem(input: {
   return null;
 }
 
+// An overlap or a session closer than the gap is refused by the database (book_session), so it is a stop, not a warning; only "outside" is a warning.
+export function isHardClash(problem: PlacementProblem): boolean {
+  return problem === "taken" || problem === "buffer";
+}
+
 export const PLACEMENT_TEXT: Record<Exclude<PlacementProblem, null>, string> = {
-  taken: "This overlaps another session. You can still book it.",
-  buffer: "This is closer to another session than your gap. You can still book it.",
+  taken: "This overlaps another session, so pick another time.",
+  buffer: "This is closer to another session than your gap, so pick another time.",
   outside: "This is outside your open hours or on your time off. You can still book it.",
 };

@@ -15,6 +15,7 @@ import {
   clockLabel,
   clockLabel12,
   gridRange,
+  isHardClash,
   minuteFromOffset,
   minutesOfDayInZone,
   offsetFromMinute,
@@ -26,6 +27,7 @@ import {
   type SnapMinutes,
 } from "@/lib/day-time-grid";
 import { typeMismatchWarning, type TypeLite } from "@/lib/session-type-default";
+import { addPending, removePending } from "@/lib/pending-booking-notices";
 import { CLIENT_DRAG_MIME, type DraggedClient } from "./draggable-client-name";
 import type { CalendarEventEntry } from "./calendar-grid";
 
@@ -102,6 +104,7 @@ export function DayTimeGrid({
   const [adjusting, setAdjusting] = useState(false);
   const [typedTime, setTypedTime] = useState("");
   const [booked, setBooked] = useState<{ bookingId: string; label: string; secondsLeft: number } | null>(null);
+  const undoing = useRef(false);
   const flush = useRef<{ athleteId: string; groupId: string; startIso: string; bookingId: string; timer: ReturnType<typeof setInterval> } | null>(null);
 
   // A different client picked: their usual type and balance.
@@ -186,15 +189,25 @@ export function DayTimeGrid({
   }
 
   // The client is told (and the calendar mirrored) once the undo time has passed, so an undone booking never sends anything.
+  // It is also written down when the booking is made (lib/pending-booking-notices.ts), so a closed tab, a crash or a lost connection inside the undo time cannot
+  // leave a booking the client never hears about: the next calendar page that opens sends it. A page being closed or refreshed sends it straight away.
   function sendNotifications() {
     const f = flush.current;
     if (!f) return;
     clearInterval(f.timer);
     flush.current = null;
+    removePending(f.bookingId);
     notifyBookingConfirmed(f.athleteId, f.groupId, f.startIso);
     mirrorGoogleCalendarEvent(f.bookingId);
   }
-  useEffect(() => () => sendNotifications(), []);
+  useEffect(() => {
+    const onHide = () => sendNotifications();
+    window.addEventListener("pagehide", onHide);
+    return () => {
+      window.removeEventListener("pagehide", onHide);
+      sendNotifications();
+    };
+  }, []);
 
   async function book() {
     if (!client || pendingMin == null) return;
@@ -235,6 +248,7 @@ export function DayTimeGrid({
       }
     }, 1000);
     flush.current = { athleteId: client.athleteId, groupId: clientGroup, startIso: start.toISOString(), bookingId: bookingId as string, timer };
+    addPending({ bookingId: bookingId as string, athleteId: client.athleteId, groupId: clientGroup, startIso: start.toISOString(), madeAt: Date.now() });
     setTimeout(() => {
       if (flush.current?.bookingId === (bookingId as string)) sendNotifications();
     }, UNDO_SECONDS * 1000);
@@ -243,15 +257,24 @@ export function DayTimeGrid({
 
   async function undo() {
     const b = booked;
-    if (!b) return;
-    const f = flush.current;
-    if (f) {
-      clearInterval(f.timer);
-      flush.current = null;
-    }
-    setBooked(null);
+    // A second tap while the first is working would fail on a booking that is already gone and look like the undo failed.
+    if (!b || undoing.current) return;
+    undoing.current = true;
+    // Pause the countdown but keep the announcement: it is only dropped once the cancel has actually worked.
+    if (flush.current) clearInterval(flush.current.timer);
     const { error: cancelError } = await createBrowserClient().rpc("cancel_booking_and_refund_credit", { p_booking_id: b.bookingId });
-    if (cancelError) setError("That didn't undo. Cancel it from the day page.");
+    undoing.current = false;
+    if (cancelError) {
+      // The booking stays, so the client is told after all, and the coach is told plainly.
+      setBooked(null);
+      setError("That didn't undo, so the booking stays and your client has been told. Cancel it from their panel or the day page if you still want it gone.");
+      sendNotifications();
+      onChanged();
+      return;
+    }
+    if (flush.current) flush.current = null;
+    removePending(b.bookingId);
+    setBooked(null);
     onChanged();
   }
 
@@ -468,7 +491,7 @@ export function DayTimeGrid({
             </div>
           ) : (
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <button type="button" disabled={assigning || !lengthOk} onClick={book} className="bg-rust text-graphite font-display font-bold uppercase tracking-wide px-4 py-2 disabled:opacity-40">
+              <button type="button" disabled={assigning || !lengthOk || isHardClash(problem)} onClick={book} className="bg-rust text-graphite font-display font-bold uppercase tracking-wide px-4 py-2 disabled:opacity-40">
                 {assigning ? "Booking…" : "Book this session"}
               </button>
               <button type="button" disabled={assigning} onClick={() => setRepeating(true)} className="border border-steel/40 text-chalk font-body text-sm px-4 py-2 disabled:opacity-40">

@@ -265,7 +265,7 @@ export function ClientCardGrid({
           .eq("log_date", todayIso())
           .in("athlete_id", pageIds),
         getIntegrityRollupForGroup(supabase, groupId, pageIds),
-        fetchBookingCounts(supabase, { groupId }),
+        fetchBookingCounts(supabase, { groupId, athleteIds: pageIds }),
       ]);
       if (cancelled) return;
 

@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { X } from "lucide-react";
 import type { AvailabilityWindow } from "@/lib/booking-slots";
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { dateFromKey } from "@/lib/date-key";
+import { flushDueNotices } from "@/lib/flush-pending-notices";
 import type { TypeLite } from "@/lib/session-type-default";
 import { CLIENT_DRAG_MIME, type DraggedClient } from "./draggable-client-name";
 import { DayTimeGrid } from "./day-time-grid";
@@ -105,6 +106,10 @@ export function CalendarGrid({
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   // The open day: a click, a tap or a drop opens it in place as a time grid, below the calendar. A day opened with no client shows what is on it and asks who.
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  // Announce any booking whose tab was closed before its undo time ran out (see lib/pending-booking-notices.ts).
+  useEffect(() => {
+    flushDueNotices(createBrowserClient()).catch(() => {});
+  }, []);
 
   function dayHref(key: string): string {
     const base = `/groups/${groupId}/calendar/${key}`;
