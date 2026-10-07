@@ -13,6 +13,7 @@ import { SwappableTerm } from "@/components/coach/swappable-term";
 import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { CoachRosterMobile } from "@/components/coach/mobile/coach-roster-mobile";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
+import { groupClientsDestination } from "@/lib/coach-clients-nav";
 import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
 import { mergeRosterAcrossGroups, type RosterRowAcrossGroups } from "@/lib/coach-roster";
 import type { RosterMember } from "@/lib/types";
@@ -25,11 +26,12 @@ import {
 export default async function ClientsPage(
   props: {
     params: Promise<{ groupId: string }>;
-    searchParams: Promise<{ add?: string }>;
+    searchParams: Promise<{ add?: string; view?: string }>;
   }
 ) {
   const params = await props.params;
-  const openAdd = (await props.searchParams).add === "1";
+  const search = await props.searchParams;
+  const openAdd = search.add === "1";
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -59,6 +61,13 @@ export default async function ClientsPage(
     .select("name, team_mode, group_kind")
     .eq("id", params.groupId)
     .single();
+
+  // "Clients" is the coach's FULL list, never one group's members (Ron, Oct 6). On a computer this URL goes to the coach-level list, unless it is explicitly the
+  // Members view of a team or social group. A phone keeps its own roster below (already coach-level).
+  const showMembersView = groupClientsDestination(group?.group_kind as "one_on_one" | "social" | "team" | null | undefined, search.view) === "members";
+  if (!showMembersView && !(await prefersAthleteStyleView())) {
+    redirect(search.add === "1" ? "/clients?add=1" : "/clients");
+  }
 
   // team_sports_expansion_scoping.md — the position picker/filter is
   // real, buildable roster-scale infrastructure only for a team-mode
@@ -334,14 +343,12 @@ export default async function ClientsPage(
   }
 
   return (
-    <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="clients">
+    <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="members">
       <div className="pb-6 border-b border-steel/20 mb-6 flex items-center justify-between">
         <div>
-          <h1 className="font-display font-bold text-3xl uppercase leading-none">
-            <SwappableTerm termKey="client" form="plural" className="capitalize" />
-          </h1>
+          <h1 className="font-display font-bold text-3xl uppercase leading-none">Members</h1>
           <p className="font-body text-sm text-steel mt-2">
-            {athletes.length} <SwappableTerm termKey="client" form={athletes.length === 1 ? "singular" : "plural"} />
+            {athletes.length} in {group?.name ?? "this group"}
           </p>
         </div>
         <div className="flex items-center gap-3">

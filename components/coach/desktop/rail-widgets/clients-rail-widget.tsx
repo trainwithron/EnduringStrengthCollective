@@ -52,7 +52,7 @@ export function ClientsRailWidget({ groupId }: { groupId: string }) {
           )}
         </div>
       )}
-      <RailWidgetDeeperLink href={`/groups/${groupId}/clients`} label="Open Clients" />
+      <RailWidgetDeeperLink href="/clients" label="Open Clients" />
     </div>
   );
 }

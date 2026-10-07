@@ -72,6 +72,7 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CoachMoreSheet } from "@/components/coach/mobile/coach-more-sheet";
 import { CoachSpotHub } from "@/components/coach/mobile/coach-spot-hub";
 import { PendingNoticeFlusher } from "@/components/coach/pending-notice-flusher";
+import { CLIENTS_HREF, membersHref, showsMembers } from "@/lib/coach-clients-nav";
 
 function NavBadge({ count, collapsed }: { count: number; collapsed?: boolean }) {
   if (count <= 0) return null;
@@ -100,6 +101,7 @@ type Active =
   | "calendar"
   | "feed"
   | "clients"
+  | "members"
   | "branding"
   | "business"
   | "packages"
@@ -456,7 +458,9 @@ export function CoachDesktopShell({
     // reachable today for anyone who isn't running a team sport.
     // The rail is short and coach-level: Clients, Calendar, Messages, Programs, Nutrition, Business (Home and Settings sit around it).
     // Everything else is under "More tools". The old group Dashboard entry is gone from the rail (Home is the dashboard); it is under More tools.
-    { key: "clients", label: "Clients", href: `/groups/${groupId}/clients`, icon: Users, badge: clientsUnread, termKey: "client", termForm: "plural" },
+    // Clients is always the coach's full list, wherever they are. A team or social group's own roster is a separate "Members" entry, shown only inside such a group.
+    { key: "clients", label: "Clients", href: CLIENTS_HREF, icon: Users, badge: clientsUnread, termKey: "client", termForm: "plural" },
+    ...(showsMembers(groupKind, coachLevel) ? [{ key: "members" as const, label: "Members", href: membersHref(groupId), icon: Users2 }] : []),
     { key: "calendar", label: "Calendar", href: `/groups/${groupId}/calendar`, icon: CalendarDays },
     { key: "messages", label: "Messages", href: `/groups/${groupId}/messages`, icon: Mail, badge: messagesUnread },
     {

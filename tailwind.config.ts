@@ -30,7 +30,11 @@ export default {
         // Third accent for a 3-way category split (Upper/Lower/
         // Conditioning) where rust and moss are already spoken for —
         // colorblind-safety checked, see program-card-visuals.
-        blue: "#4A7A9E",
+        // A scale (not a flat value) so bg-blue-400, bg-blue-500/35 and border-blue-400 exist; DEFAULT keeps bg-blue / text-blue as before.
+        blue: { DEFAULT: "#4A7A9E", 400: "#5E94BA", 500: "#4A7A9E" },
+        // The "good / done / open" green (lighter than moss so text on it clears 4.5:1), used by the calendar's open hours, the booked banner and many badges. It was used in dozens of
+        // places and never defined, so those rendered with no colour.
+        positive: "#7DB586",
         // Warm caution/neutral-emphasis tone for non-primary highlights (unsaved,
         // low readiness) so rust stays reserved for the primary action.
         // Merges into the default amber scale, so amber-400 etc. still work.

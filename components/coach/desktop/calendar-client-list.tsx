@@ -28,7 +28,7 @@ export function CalendarClientList({ clients, selectedClientId }: { clients: Cal
   return (
     <div className="divide-y divide-steel/15">
       {clients.map((c) => {
-        const isSelected = (picked ? picked.athleteId : selectedClientId) === c.profileId;
+        const isSelected = picked?.athleteId === c.profileId;
         const picture = buildCreditPicture({ balance: c.balance, booked: c.booked ?? 0, toMark: c.toMark ?? 0 });
         return (
           <div key={c.profileId} className="flex items-center justify-between py-1.5 gap-2">

@@ -105,18 +105,25 @@ export function DayTimeGrid({
   const [typedTime, setTypedTime] = useState("");
   const [booked, setBooked] = useState<{ bookingId: string; label: string; secondsLeft: number } | null>(null);
   const undoing = useRef(false);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const confirmRef = useRef<HTMLDivElement>(null);
   // The timer that announces the booking once the undo time has run out; Undo cancels it.
   const flushTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flush = useRef<{ athleteId: string; groupId: string; startIso: string; bookingId: string; timer: ReturnType<typeof setInterval> } | null>(null);
 
-  // A different client picked: their usual type and balance.
+  // A different client picked: their usual type. The time just chosen is only forgotten when one client is swapped for ANOTHER: a client dropped on a time
+  // while none was picked becomes the picked client, and that time must stay.
+  const previousClientId = useRef<string | null>(client?.athleteId ?? null);
   useEffect(() => {
     setTypeId(defaultTypeId ?? "");
-    setBalance(client?.balance ?? 0);
-    setPendingMin(null);
-    setRepeating(false);
+    const now = client?.athleteId ?? null;
+    if (previousClientId.current && previousClientId.current !== now) {
+      setPendingMin(null);
+      setRepeating(false);
+    }
+    previousClientId.current = now;
     setError(null);
-  }, [client?.athleteId, defaultTypeId, client?.balance]);
+  }, [client?.athleteId, defaultTypeId]);
 
   const lengthNumber = Number(length);
   const lengthOk = Number.isInteger(lengthNumber) && lengthNumber >= 5 && lengthNumber <= 480;
@@ -146,6 +153,15 @@ export function DayTimeGrid({
   const hours: number[] = [];
   for (let m = range.startMin; m < range.endMin; m += 60) hours.push(m);
   const lanes = assignLanes(sessionSpans);
+  const firstBusyMin = Math.min(...[...windowSpans, ...sessionSpans].map((s) => s.startMin), Number.POSITIVE_INFINITY);
+  const dayKeyForScroll = dateKey;
+  useEffect(() => {
+    // Opens on the day's first open hour or session instead of always at the top of the axis.
+    const el = scrollerRef.current;
+    if (!el || !Number.isFinite(firstBusyMin)) return;
+    el.scrollTop = Math.max(0, offsetFromMinute(firstBusyMin, range) - 24);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dayKeyForScroll]);
 
   const dateLabel = date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
@@ -166,6 +182,8 @@ export function DayTimeGrid({
     setError(null);
     setRepeating(false);
     setPendingMin(minute);
+    // On a short window the confirm box is below the time grid: bring it into view.
+    setTimeout(() => confirmRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 0);
   }
 
   function readDrag(e: React.DragEvent): DraggedClient | null {
@@ -178,17 +196,6 @@ export function DayTimeGrid({
     }
   }
 
-  async function adjustCredits(delta: number) {
-    if (!client) return;
-    setAdjusting(true);
-    const { data: newBalance } = await createBrowserClient().rpc("adjust_session_credits", {
-      p_athlete_id: client.athleteId,
-      p_group_id: client.groupId ?? groupId,
-      p_delta: delta,
-    });
-    if (typeof newBalance === "number") setBalance(newBalance);
-    setAdjusting(false);
-  }
 
   // The client is told (and the calendar mirrored) once the undo time has passed, so an undone booking never sends anything.
   // It is also written down when the booking is made (lib/pending-booking-notices.ts), so a closed tab, a crash or a lost connection inside the undo time cannot
@@ -368,32 +375,11 @@ export function DayTimeGrid({
             </select>
           </label>
         )}
-        {client && (
-          <span className="flex items-center gap-1.5 font-body text-xs text-steel">
-            Credits
-            <button type="button" onClick={() => adjustCredits(-1)} disabled={adjusting} aria-label="Remove a session credit" className="w-6 h-6 border border-steel/30 text-steel disabled:opacity-40">
-              &minus;
-            </button>
-            <span className="text-chalk w-5 text-center">{balance}</span>
-            <button type="button" onClick={() => adjustCredits(1)} disabled={adjusting} aria-label="Add a session credit" className="w-6 h-6 border border-steel/30 text-steel disabled:opacity-40">
-              +
-            </button>
-          </span>
-        )}
       </div>
 
-      {booked && (
-        <div className="px-3 py-2 border-b border-steel/20 bg-positive/10 flex flex-wrap items-center gap-3" role="status">
-          <span className="font-body text-sm text-chalk">Booked {booked.label}.</span>
-          <button type="button" onClick={undo} className="font-body text-sm text-rust underline underline-offset-2">
-            Undo ({booked.secondsLeft}s)
-          </button>
-          <span className="font-body text-xs text-steel">They are told when this runs out.</span>
-        </div>
-      )}
       {error && <p className="px-3 py-2 font-body text-xs text-rust border-b border-steel/20">{error}</p>}
 
-      <div className="max-h-[560px] overflow-y-auto">
+      <div ref={scrollerRef} className="max-h-[min(560px,50vh)] overflow-y-auto">
         <div className="flex">
           <div className="relative w-14 shrink-0" style={{ height: trackHeight }} aria-hidden="true">
             {hours.map((m) => (
@@ -495,7 +481,7 @@ export function DayTimeGrid({
       )}
 
       {pendingMin != null && client && (
-        <div className="m-3 border border-rust/40 p-3" role="group" aria-label="Confirm session">
+        <div ref={confirmRef} className="m-3 border border-rust/40 p-3" role="group" aria-label="Confirm session">
           <p className="font-body text-sm text-chalk">
             {client.fullName}: {pendingLabel}
             {typeId ? ` · ${sessionTypes.find((t) => t.id === typeId)?.name ?? ""}` : ""}
@@ -529,6 +515,16 @@ export function DayTimeGrid({
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {booked && (
+        <div className="px-3 py-2 m-3 border border-positive/40 bg-positive/10 flex flex-wrap items-center gap-3" role="status">
+          <span className="font-body text-sm text-chalk">Booked {booked.label}.</span>
+          <button type="button" onClick={undo} className="font-body text-sm text-rust underline underline-offset-2">
+            Undo ({booked.secondsLeft}s)
+          </button>
+          <span className="font-body text-xs text-steel">They are told when this runs out.</span>
         </div>
       )}
 

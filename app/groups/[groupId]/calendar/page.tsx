@@ -816,8 +816,10 @@ export default async function CoachCalendarPage(
       .select("id, start_at, end_at, athlete_id, profiles!bookings_athlete_id_fkey ( full_name )")
       .eq("coach_id", user.id)
       .eq("status", "confirmed")
-      .gte("start_at", rangeStart.toISOString())
-      .lt("start_at", rangeEnd.toISOString())
+      // Padded by a day and a half each side: the grid's cells are the coach's days, the server's midnights are UTC, and a Pacific evening session on the
+      // last day of a month would otherwise fall past the end of the range and appear on no month at all. The cell keys decide where each one shows.
+      .gte("start_at", new Date(rangeStart.getTime() - 36 * 3600000).toISOString())
+      .lt("start_at", new Date(rangeEnd.getTime() + 36 * 3600000).toISOString())
       .order("start_at", { ascending: true }),
     // Custom events + acted-on suggestions this coach has on the
     // calendar in the visible range — same coach-wide-not-group-scoped
@@ -1199,7 +1201,7 @@ export default async function CoachCalendarPage(
           return c ? { athleteId: c.profileId, fullName: c.fullName, balance: c.balance, groupId: c.groupId } : null;
         })()}
       >
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-8 items-start">
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-8 items-start">
         <div className="min-w-0">
           <div className="flex items-center gap-1 mb-4">
             <Link
