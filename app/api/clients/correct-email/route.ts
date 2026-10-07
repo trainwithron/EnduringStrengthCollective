@@ -17,6 +17,11 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
+  // Off until the email sender is set up: the safeguard is a notice to the old address, and without mail nobody would be told.
+  if (!isSendGridConfigured()) {
+    return NextResponse.json({ error: "A signed-in client changes their own email in their Settings. This tool is off until email sending is set up." }, { status: 403 });
+  }
+
   const limited = await rateLimitResponse("correct-email", user.id, 10, 3600);
   if (limited) return limited;
 
