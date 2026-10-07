@@ -5,6 +5,8 @@ import { Trash2 } from "lucide-react";
 
 export interface CoachPackageRow {
   id: string;
+  // The group the package was made in (it can differ from the page's group); editing it names this one.
+  groupId?: string;
   name: string;
   sessionsPerWeek: number;
   billingType: "subscription" | "one_time";
@@ -108,7 +110,7 @@ export function PackageManager({
       const res = await fetch("/api/coach/packages", {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ packageId: pkg.id, groupId, isPublic: !pkg.isPublic }),
+        body: JSON.stringify({ packageId: pkg.id, groupId: pkg.groupId ?? groupId, isPublic: !pkg.isPublic }),
       });
       if (res.ok) {
         setPackages((prev) => prev.map((p) => (p.id === pkg.id ? { ...p, isPublic: !pkg.isPublic } : p)));
@@ -124,7 +126,7 @@ export function PackageManager({
       await fetch("/api/coach/packages", {
         method: "DELETE",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ packageId: id, groupId }),
+        body: JSON.stringify({ packageId: id, groupId: packages.find((p) => p.id === id)?.groupId ?? groupId }),
       });
       setPackages((prev) => prev.map((p) => (p.id === id ? { ...p, isActive: false } : p)));
     } finally {

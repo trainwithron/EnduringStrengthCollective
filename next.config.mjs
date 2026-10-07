@@ -21,6 +21,9 @@ const nextConfig = {
           supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
         }),
       },
+      // The email-link landing pages: a ?code or token_hash in the address must never be sent on in a Referer header.
+      { source: "/set-password", headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
+      { source: "/confirm-email", headers: [{ key: "Referrer-Policy", value: "no-referrer" }] },
     ];
   },
 };

@@ -41,16 +41,28 @@ export async function POST(request: Request) {
   if (!email || isPlaceholderEmail(email)) {
     return NextResponse.json({ error: "This client has no email address on file yet. Use the sign-in link on their profile instead." }, { status: 400 });
   }
+  // Supabase sends nothing to an address it has not confirmed (and says nothing about it), so this must not claim a send.
+  if (!target?.user?.email_confirmed_at) {
+    return NextResponse.json({ error: "Their email address has not been confirmed yet, so no link can be sent. Use the sign-in link on their profile instead." }, { status: 400 });
+  }
+  // A sign-in link goes to whatever address is on the account. For a day after a coach changed that address it is not offered, so a changed email can never be
+  // followed straight away by a link to the new inbox (the client is told in the app, and the old address when mail is on).
+  const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  const { data: recentChange } = await serviceRole.from("notifications").select("id").eq("profile_id", athleteId).eq("type", "email_changed").gte("created_at", since).limit(1);
+  if ((recentChange ?? []).length > 0) {
+    return NextResponse.json({ error: "Their sign-in email was changed in the last 24 hours, so a link can't be sent yet. Ask them to sign in with the new address or reset the password themselves." }, { status: 403 });
+  }
 
   const anon = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
   const { error } = await anon.auth.resetPasswordForEmail(email, { redirectTo: `${appOrigin(request)}/set-password` });
   if (error) {
-    const rate = /rate limit|too many|seconds/i.test(error.message);
+    // The mail service's own cooldown ("wait 60 seconds") means a link was just sent.
+    const cooldown = /rate limit|too many|seconds/i.test(error.message);
     return NextResponse.json(
-      { error: rate ? "The email service is limiting how many go out right now. Try again in a few minutes." : "The email couldn't be sent. Try again in a few minutes." },
-      { status: rate ? 429 : 502 }
+      { error: cooldown ? "A link was just sent. Wait a minute before sending another." : "The email couldn't be sent. Try again in a few minutes." },
+      { status: cooldown ? 429 : 502 }
     );
   }
   return NextResponse.json({ ok: true, sentTo: maskEmail(email) });

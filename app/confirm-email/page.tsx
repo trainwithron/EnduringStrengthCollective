@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { establishSessionFromLink } from "@/lib/auth-link-client";
+import { LinkConflictNotice } from "@/components/auth/link-conflict-notice";
 import { loadStartInputs, pickStartGroup } from "@/lib/start-group";
 import { isStandaloneDisplay, isMobileUserAgent } from "@/lib/pwa";
 
@@ -20,6 +21,7 @@ function ConfirmEmailStatus() {
   const router = useRouter();
   const [checking, setChecking] = useState(true);
   const [hasSession, setHasSession] = useState(false);
+  const [conflictWith, setConflictWith] = useState<string | null>(null);
 
   useEffect(() => {
     // The confirmation email's link establishes a real session client-side
@@ -30,8 +32,18 @@ function ConfirmEmailStatus() {
     // The browser library only reads the link shape it was built for, so the link is read here first (lib/auth-link.ts).
     const supabase = createBrowserClient();
     establishSessionFromLink(supabase)
-      .then(() => supabase.auth.getUser())
-      .then(async ({ data: { user } }) => {
+      .then(async (result) => {
+        if (result === "conflict") {
+          const { data } = await supabase.auth.getUser();
+          setConflictWith(data.user?.email ?? "another account");
+          setChecking(false);
+          return null;
+        }
+        return supabase.auth.getUser();
+      })
+      .then(async (got) => {
+      if (!got) return;
+      const user = got.data.user;
       if (!user) {
         setHasSession(false);
         setChecking(false);
@@ -50,6 +62,7 @@ function ConfirmEmailStatus() {
     });
   }, [router]);
 
+  if (conflictWith) return <LinkConflictNotice currentEmail={conflictWith} />;
   if (checking || hasSession) return null;
 
   return (

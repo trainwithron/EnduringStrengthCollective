@@ -24,12 +24,10 @@ export async function POST(request: Request) {
   });
   const { error } = await anon.auth.resetPasswordForEmail(email, { redirectTo: `${appOrigin(request)}/set-password` });
   if (error) {
-    if (/rate limit|too many|seconds/i.test(error.message)) {
-      return NextResponse.json({ error: "We couldn't send the email right now because too many were sent recently. Try again in a few minutes." }, { status: 429 });
-    }
-    // Anything else (no such account, not confirmed) is answered like success.
-    if (!/fetch|network|timeout/i.test(error.message)) return NextResponse.json({ ok: true });
-    return NextResponse.json({ error: "We couldn't send the email. Try again in a few minutes." }, { status: 502 });
+    // Supabase's own "wait 60 seconds" and "too many emails" answers only appear for an address that exists, so they are NOT shown (that would tell a real account
+    // from a fake one). Our own limits above (per address and per email) are the only 429s. Only a failure to reach the mail service at all is reported.
+    if (/fetch|network|timeout/i.test(error.message)) return NextResponse.json({ error: "We couldn't send the email. Try again in a few minutes." }, { status: 502 });
+    return NextResponse.json({ ok: true });
   }
   return NextResponse.json({ ok: true });
 }

@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { establishSessionFromLink } from "@/lib/auth-link-client";
+import { LinkConflictNotice } from "@/components/auth/link-conflict-notice";
 import { isPlaceholderEmail, validateClaimEmail, validateNewPassword } from "@/lib/client-claim";
 import { loadStartInputs, pickStartGroup } from "@/lib/start-group";
 import { LegalAcceptance } from "@/components/legal/legal-acceptance";
@@ -34,6 +35,9 @@ function SetPasswordForm() {
   // Shown once: only when this person has not already accepted the current beta notice.
   const [needsLegal, setNeedsLegal] = useState(false);
   const [legalAccepted, setLegalAccepted] = useState(false);
+  // The address this link is for, shown so a person can see which account they are setting a password for; and a link for a DIFFERENT account than the one signed in here.
+  const [linkEmail, setLinkEmail] = useState<string | null>(null);
+  const [conflictWith, setConflictWith] = useState<string | null>(null);
 
   useEffect(() => {
     // The invite email's link establishes a real session client-side
@@ -42,9 +46,20 @@ function SetPasswordForm() {
     // The browser library only reads the link shape it was built for, so the link is read here first (lib/auth-link.ts).
     const supabase = createBrowserClient();
     establishSessionFromLink(supabase)
-      .then(() => supabase.auth.getUser())
-      .then(({ data: { user } }) => {
+      .then(async (result) => {
+        if (result === "conflict") {
+          const { data } = await supabase.auth.getUser();
+          setConflictWith(data.user?.email ?? "another account");
+          setChecking(false);
+          return null;
+        }
+        return supabase.auth.getUser();
+      })
+      .then((got) => {
+      if (!got) return;
+      const user = got.data.user;
       setHasSession(!!user);
+      setLinkEmail(user?.email && !isPlaceholderEmail(user.email) ? user.email : null);
       setNeedsEmail(isPlaceholderEmail(user?.email));
       if (user) {
         // If the table is not there yet this errors and the box is simply shown, which is the safe default.
@@ -142,6 +157,7 @@ function SetPasswordForm() {
   }
 
   if (checking) return null;
+  if (conflictWith) return <LinkConflictNotice currentEmail={conflictWith} />;
 
   if (!hasSession) {
     return (
@@ -172,6 +188,7 @@ function SetPasswordForm() {
         <p className="font-body text-steel text-sm text-center mt-2 mb-6">
           Choose a password. If your coach asks for a short health form, it comes next.
         </p>
+        {linkEmail && <p className="font-body text-xs text-steel text-center -mt-4 mb-6">Setting a password for {linkEmail}</p>}
 
         {needsEmail && (
           <div className="mb-4">

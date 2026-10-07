@@ -15,8 +15,10 @@ export function configuredAppUrl(): string | null {
   }
 }
 
+// Never the Origin header (the caller controls it): a link in an email or a payment return must not be steerable to another host. The request's own address
+// comes from the host the platform routed to this app.
 export function appOrigin(request: Request): string {
-  return configuredAppUrl() ?? request.headers.get("origin") ?? new URL(request.url).origin;
+  return configuredAppUrl() ?? new URL(request.url).origin;
 }
 
 // Browser side: the configured address when there is one (so a link a coach copies or a QR code they print points at
