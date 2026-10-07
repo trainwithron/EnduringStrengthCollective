@@ -26,5 +26,13 @@
    "38"
   ],
   "file": "apply-release-h-all.sql"
+ },
+ {
+  "id": "release-i",
+  "name": "Release I (food preferences)",
+  "steps": [
+   "39"
+  ],
+  "file": "apply-release-i-all.sql"
  }
 ]

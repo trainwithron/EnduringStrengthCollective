@@ -777,6 +777,37 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["0293 is not already applied (the server-only refund function is not there yet)", `not ${has.fnName("refund_coach_credit_for")}`],
     ],
   },
+  {
+    n: "39",
+    slug: "0294",
+    title: "0294 food preferences and allergy safety: one preferences row per client (allergies, dislikes, diet type, protein target and floor) that the client edits for their tastes and a coach edits for the rules, a fixed-wording notice to the coaches when allergies or dislikes change, the client's answer to 'are you happy with your meal plan', and two new notification types added to the list the database already has",
+    migrations: ["0294"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for anyone until the code in the same release is live. After that: a client sees 'My food preferences' on their Nutrition tab and a coach sees Preferences in the client's Nutrition area; a meal option that names an allergen or a food the client does not eat is never offered and is hidden from the client if it was assigned before; a change to allergies or dislikes sends the client's coaches one short notice. No existing data changes and no existing function is replaced. Run it together with the release's code deploy.",
+    undo: [
+      "do $undo$ declare v_def text; v_have text[]; begin select pg_get_constraintdef(c.oid) into v_def from pg_constraint c where c.conname = 'notifications_type_check' and c.conrelid = 'public.notifications'::regclass; delete from public.notifications where type in ('nutrition_preferences_changed', 'nutrition_prompt_answered'); select coalesce(array_agg(m[1] order by m[1]), '{}') into v_have from regexp_matches(v_def, '''([a-z_]+)''::text', 'g') as m; v_have := array(select t from unnest(v_have) as t where t not in ('nutrition_preferences_changed', 'nutrition_prompt_answered')); alter table public.notifications drop constraint notifications_type_check; execute format('alter table public.notifications add constraint notifications_type_check check (type = any (array[%s]))', (select string_agg(quote_literal(t) || '::text', ', ') from unnest(v_have) as t)); end $undo$;",
+      "drop trigger if exists client_nutrition_feedback_notify on public.client_nutrition_feedback;",
+      "drop trigger if exists client_nutrition_feedback_guard on public.client_nutrition_feedback;",
+      "drop trigger if exists client_nutrition_preferences_notify on public.client_nutrition_preferences;",
+      "drop trigger if exists client_nutrition_preferences_guard on public.client_nutrition_preferences;",
+      "drop table if exists public.client_nutrition_feedback;",
+      "drop table if exists public.client_nutrition_preferences;",
+      "drop function if exists public.notify_on_nutrition_feedback();",
+      "drop function if exists public.guard_client_nutrition_feedback();",
+      "drop function if exists public.notify_on_nutrition_preferences();",
+      "drop function if exists public.guard_client_nutrition_preferences();",
+      "drop function if exists public.nutrition_allergies_ok(text[]);",
+      "drop function if exists public.nutrition_list_ok(text[], int, int);",
+    ].join(String.fromCharCode(10)),
+    undoWhy: "Only if food preferences misbehave after step 39. Removes the two tables (every saved preference and answer is lost), their triggers and helper functions, deletes the two new kinds of notification, and puts the notification types back to the list the database had without them (read from the live list, so another release's types are kept). Nothing else is touched.",
+    rows: [
+      ["profiles, groups, group_memberships and notifications exist", `${has.table("profiles")} and ${has.table("groups")} and ${has.table("group_memberships")} and ${has.table("notifications")}`],
+      ["is_coach_of_athlete and is_group_coach exist (the new row security uses them)", `${has.fn("is_coach_of_athlete(uuid)")} and ${has.fnName("is_group_coach")}`],
+      ["the notification types list exists and can be read (notifications_type_check)", "exists (select 1 from pg_constraint where conname = 'notifications_type_check' and conrelid = 'public.notifications'::regclass)"],
+      ["0294 is not already applied (client_nutrition_preferences is not there yet)", has.noTable("client_nutrition_preferences")],
+      ["0294 is not already applied (client_nutrition_feedback is not there yet)", has.noTable("client_nutrition_feedback")],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -854,6 +885,7 @@ const BUNDLES = [
   { id: "release-d", name: "Release D", steps: ["32", "33", "34"] },
   { id: "release-f", name: "Release F", steps: ["35", "36", "37"] },
   { id: "release-h", name: "Release H (refund fix)", steps: ["38"] },
+  { id: "release-i", name: "Release I (food preferences)", steps: ["39"] },
 ];
 for (const b of BUNDLES) {
   const stepsIn = b.steps.map((n) => STEPS.find((x) => x.n === n));
@@ -1023,6 +1055,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0291", has.fnName("expire_session_credit_balance")),
     m("0292", has.col("ai_usage_log", "error_class")),
     m("0293", has.fnName("refund_coach_credit_for")),
+    m("0294", has.table("client_nutrition_preferences")),
     m("0285", has.table("rest_day_nudges")),
     m("0284", has.policy("client_goals", "client_goals_insert_coach")),
     m("0283", has.col("coach_availability_windows", "session_minutes")),

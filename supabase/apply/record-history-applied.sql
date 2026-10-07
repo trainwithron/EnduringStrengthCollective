@@ -57,6 +57,7 @@ from (
     ('2026100600291', 'release_f_booking_guards', '0291_release_f_booking_guards.sql', exists (select 1 from pg_proc where proname = 'expire_session_credit_balance' and pronamespace = 'public'::regnamespace)),
     ('2026100600292', 'ai_usage_error_class', '0292_ai_usage_error_class.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'ai_usage_log' and column_name = 'error_class')),
     ('2026100600293', 'refund_validator_failure_server_only', '0293_refund_validator_failure_server_only.sql', exists (select 1 from pg_proc where proname = 'refund_coach_credit_for' and pronamespace = 'public'::regnamespace)),
+    ('2026100600294', 'client_nutrition_preferences', '0294_client_nutrition_preferences.sql', to_regclass('public.client_nutrition_preferences') is not null),
     ('2026100600285', 'rest_day_nudge_log', '0285_rest_day_nudge_log.sql', to_regclass('public.rest_day_nudges') is not null),
     ('2026100600284', 'coach_proposed_goals', '0284_coach_proposed_goals.sql', exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'client_goals' and policyname = 'client_goals_insert_coach')),
     ('2026100600283', 'availability_session_length', '0283_availability_session_length.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_availability_windows' and column_name = 'session_minutes')),
