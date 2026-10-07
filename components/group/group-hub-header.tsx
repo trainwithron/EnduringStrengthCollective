@@ -1,4 +1,4 @@
-import { InviteAthleteButton } from "./invite-athlete-button";
+import { AddClientButton } from "@/components/coach/desktop/add-client-button";
 import { NotificationBell, type NotificationEntry } from "@/components/athlete/notification-bell";
 
 interface GroupHubHeaderProps {
@@ -59,7 +59,7 @@ export function GroupHubHeader({
           Inviting a client is common enough day-to-day to keep here. */}
       {isCoach && coachId && (
         <div className="mt-5">
-          <InviteAthleteButton groupId={groupId} createdBy={coachId} groupName={name} />
+          <AddClientButton groupId={groupId} groupName={name} createdBy={coachId} />
         </div>
       )}
     </header>

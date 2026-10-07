@@ -5,517 +5,316 @@ import { useRouter } from "next/navigation";
 import { UserPlus } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { useTerm } from "@/components/coach/terminology-provider";
-import { checkOneOnOneGroupHasRoom } from "@/lib/group-kind-guard";
 import { appOriginBrowser } from "@/lib/app-url";
+import { SINGLE_LINK_NOTE } from "@/lib/invite-link-plan";
 
-function randomCode(length = 10) {
-  // Excludes visually ambiguous characters (0/O, 1/l/I) since this gets
-  // read aloud or retyped as often as it gets clicked.
-  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
-  const bytes = new Uint8Array(length);
-  crypto.getRandomValues(bytes);
-  let out = "";
-  for (let i = 0; i < length; i++) out += chars[bytes[i] % chars.length];
-  return out;
-}
+type Step = "choose" | "one_on_one" | "group";
+type GroupMode = "name" | "link";
 
-type Mode = "link" | "direct";
-type Destination = "current" | "existing" | "new";
-
-interface OrgGroupOption {
+interface GroupOption {
   id: string;
   name: string;
 }
 
-// One "Add client" entry point covering both ways to bring a client in —
-// a shareable invite link (they sign themselves up whenever they get to
-// it) or adding them directly by name/email (a real account exists
-// immediately, so a coach can start building their program before they've
-// ever logged in). Previously two separate buttons; merged since they're
-// really one decision ("how do you want to add this client?"), not two
-// different features.
-//
-// A destination picker sits above both modes: the current group (default,
-// today's behavior), any other group in the org (for a 1-on-1 client who
-// should share a sub-group's feed/community with other clients), or a
-// brand-new group created on the spot and flagged group_kind: "one_on_one" — the
-// "don't make me create a group first" path. All three ultimately resolve
-// to a single groupId used by whichever mode's existing logic runs next.
+const inputClass = "w-full h-11 mt-1 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-base sm:text-sm focus:outline-none focus:border-rust";
+
+// ONE way to bring someone in (Ron, Oct 6: "an Add client button, and inside it: add a one-on-one client, and add to a group"). A plain Add client is always a
+// one-on-one client with their own space; only the explicit "Add to a group" puts someone in a group. In a group you can add a person by name, or use the group's
+// ONE current invite link (a new link replaces the old one, 7 days).
 export function AddClientButton({
   groupId,
   groupName,
   createdBy,
   defaultOpen = false,
 }: {
+  // The group the coach is standing in (only a starting point for "Add to a group").
   groupId: string;
   groupName: string;
   createdBy: string;
-  // Opens the panel straight away (the Add a client shortcut on the phone Home).
   defaultOpen?: boolean;
 }) {
+  void createdBy;
   const t = useTerm();
   const router = useRouter();
   const [open, setOpen] = useState(defaultOpen);
-  const [mode, setMode] = useState<Mode>("direct");
-
-  // Destination-picker state
-  const [destination, setDestination] = useState<Destination>("new");
-  const [orgGroups, setOrgGroups] = useState<OrgGroupOption[] | null>(null);
-  const [loadingOrgGroups, setLoadingOrgGroups] = useState(false);
-  const [selectedExistingGroupId, setSelectedExistingGroupId] = useState<string>("");
-  const [newGroupName, setNewGroupName] = useState("");
-  const [destinationError, setDestinationError] = useState<string | null>(null);
-
-  // Invite-link mode state
-  const [link, setLink] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [generating, setGenerating] = useState(false);
-  const [linkError, setLinkError] = useState<string | null>(null);
-
-  // Add-directly mode state
+  const [step, setStep] = useState<Step>("choose");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [directError, setDirectError] = useState<string | null>(null);
-  const [directSuccess, setDirectSuccess] = useState(false);
-  // Where the silently-created client's profile lives (to open it next).
-  const [createdClient, setCreatedClient] = useState<{ groupId: string; profileId: string } | null>(null);
-
-  // Caches the group created for the "new 1-on-1 group" destination so a
-  // failed first attempt (e.g. the invite email hitting a rate limit) and a
-  // retry via the other mode reuse the same group instead of each silently
-  // creating its own — which previously left an orphaned, member-less group
-  // behind on every retry.
+  const [error, setError] = useState<string | null>(null);
+  const [added, setAdded] = useState<{ groupId: string; profileId: string; name: string; inGroup: string | null } | null>(null);
+  const [groups, setGroups] = useState<GroupOption[] | null>(null);
+  const [selectedGroupId, setSelectedGroupId] = useState("");
+  const [groupMode, setGroupMode] = useState<GroupMode>("name");
+  const [link, setLink] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  // A group made for a new one-on-one client: kept so a retry after a failure reuses it instead of leaving an empty space behind each time.
   const createdGroupIdRef = useRef<string | null>(null);
 
-  // Lazily fetches every group this coach coaches (plus every group in
-  // the org, if owner/admin) — same fetch shape GroupSwitcher already
-  // uses, since that's exactly what "groups I could add a client to"
-  // means under RLS.
-  async function loadOrgGroups() {
-    if (orgGroups || loadingOrgGroups) return;
-    setLoadingOrgGroups(true);
+  // Team and social groups this coach coaches (a one-on-one space is not a group you add people to).
+  async function loadGroups() {
+    if (groups) return;
     const supabase = createBrowserClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) {
-      setLoadingOrgGroups(false);
-      return;
-    }
-
-    // Scoped to THIS group's own organization — a coach who owns/admins
-    // more than one organization has more than one row in
-    // organization_memberships, and a blind profile_id-only lookup would
-    // resolve to an arbitrary other org instead of this one.
-    const { data: currentGroup } = await supabase
-      .from("groups")
-      .select("organization_id")
-      .eq("id", groupId)
-      .maybeSingle();
-    const currentOrgId = currentGroup?.organization_id ?? null;
-
-    const [{ data: membership }, { data: coachedRows }] = await Promise.all([
-      currentOrgId
-        ? supabase
-            .from("organization_memberships")
-            .select("organization_id, role")
-            .eq("organization_id", currentOrgId)
-            .eq("profile_id", user.id)
-            .maybeSingle()
-        : Promise.resolve({ data: null }),
-      supabase.from("group_memberships").select("groups ( id, name )").eq("profile_id", user.id).eq("role", "coach"),
-    ]);
-
-    const byId = new Map<string, OrgGroupOption>();
-    for (const row of coachedRows ?? []) {
-      const g = (row as any).groups;
-      if (g) byId.set(g.id, { id: g.id, name: g.name });
-    }
-    if (membership && (membership.role === "owner" || membership.role === "admin")) {
-      const { data: allGroups } = await supabase
-        .from("groups")
-        .select("id, name")
-        .eq("organization_id", membership.organization_id)
-        .order("name");
-      for (const g of allGroups ?? []) byId.set(g.id, { id: g.id, name: g.name });
-    }
-
-    const sorted = [...byId.values()].sort((a, b) => a.name.localeCompare(b.name));
-    setOrgGroups(sorted);
-    setSelectedExistingGroupId((prev) => prev || sorted.find((g) => g.id !== groupId)?.id || "");
-    setLoadingOrgGroups(false);
+    if (!user) return;
+    const { data: current } = await supabase.from("groups").select("organization_id").eq("id", groupId).maybeSingle();
+    const { data: rows } = await supabase.from("group_memberships").select("groups ( id, name, group_kind, organization_id )").eq("profile_id", user.id).eq("role", "coach");
+    const list = ((rows ?? []) as any[])
+      .map((r) => r.groups)
+      .filter((g) => g && g.group_kind !== "one_on_one" && (!current?.organization_id || g.organization_id === current.organization_id))
+      .map((g) => ({ id: g.id as string, name: g.name as string }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    setGroups(list);
+    setSelectedGroupId((prev) => prev || list.find((g) => g.id === groupId)?.id || list[0]?.id || "");
   }
 
-  // Resolves the destination picker down to one groupId, creating a new
-  // group on the spot when needed. Returns null (with destinationError
-  // set) if the picker isn't in a submittable state.
-  async function resolveGroupId(fallbackName: string): Promise<string | null> {
-    setDestinationError(null);
+  function reset() {
+    setOpen(false);
+    setStep("choose");
+    setFullName("");
+    setEmail("");
+    setError(null);
+    setAdded(null);
+    setLink(null);
+    setGroupMode("name");
+    createdGroupIdRef.current = null;
+  }
 
-    if (destination === "current") {
-      const guardError = await checkOneOnOneGroupHasRoom(createBrowserClient(), groupId);
-      if (guardError) {
-        setDestinationError(guardError);
-        return null;
-      }
-      return groupId;
-    }
-
-    if (destination === "existing") {
-      if (!selectedExistingGroupId) {
-        setDestinationError("Pick a group.");
-        return null;
-      }
-      const guardError = await checkOneOnOneGroupHasRoom(createBrowserClient(), selectedExistingGroupId);
-      if (guardError) {
-        setDestinationError(guardError);
-        return null;
-      }
-      return selectedExistingGroupId;
-    }
-
-    // destination === "new"
+  async function createOneOnOneSpace(name: string): Promise<string | null> {
     if (createdGroupIdRef.current) return createdGroupIdRef.current;
-
     const supabase = createBrowserClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) {
-      setDestinationError("Couldn't create the group — try again.");
+      setError("Couldn't set up their space. Try again.");
       return null;
     }
-    const { data: currentGroupForCreate } = await supabase
-      .from("groups")
-      .select("organization_id")
-      .eq("id", groupId)
-      .maybeSingle();
-    const { data: membership } = currentGroupForCreate?.organization_id
-      ? await supabase
-          .from("organization_memberships")
-          .select("organization_id")
-          .eq("organization_id", currentGroupForCreate.organization_id)
-          .eq("profile_id", user.id)
-          .maybeSingle()
+    const { data: current } = await supabase.from("groups").select("organization_id").eq("id", groupId).maybeSingle();
+    const { data: membership } = current?.organization_id
+      ? await supabase.from("organization_memberships").select("organization_id").eq("organization_id", current.organization_id).eq("profile_id", user.id).maybeSingle()
       : { data: null };
     if (!membership) {
-      setDestinationError("Couldn't find your organization — try again.");
+      setError("Couldn't find your business. Try again.");
       return null;
     }
-
-    const trimmedName = newGroupName.trim() || fallbackName.trim() || "New 1-on-1 client";
     const newGroupId = crypto.randomUUID();
-    const { error: groupError } = await supabase.from("groups").insert({
-      id: newGroupId,
-      name: trimmedName,
-      created_by: user.id,
-      organization_id: membership.organization_id,
-      group_kind: "one_on_one",
-    });
+    const { error: groupError } = await supabase.from("groups").insert({ id: newGroupId, name: name.trim() || "New client", created_by: user.id, organization_id: membership.organization_id, group_kind: "one_on_one" });
     if (groupError) {
-      setDestinationError("Couldn't create the group — try again.");
+      setError("Couldn't set up their space. Try again.");
       return null;
     }
-    const { error: coachMembershipError } = await supabase
-      .from("group_memberships")
-      .insert({ group_id: newGroupId, profile_id: user.id, role: "coach" });
-    if (coachMembershipError) {
-      // Without this the next step would fail with a confusing permission error and leave an empty space behind.
+    const { error: coachError } = await supabase.from("group_memberships").insert({ group_id: newGroupId, profile_id: user.id, role: "coach" });
+    if (coachError) {
       await supabase.from("groups").delete().eq("id", newGroupId);
-      setDestinationError("Couldn't set up their space — try again.");
+      setError("Couldn't set up their space. Try again.");
       return null;
     }
     createdGroupIdRef.current = newGroupId;
     return newGroupId;
   }
 
-  async function handleGenerateLink() {
-    // A link for a new one-on-one client needs the client's name, so their space is not called the same thing as everyone else's.
-    if (destination === "new" && !newGroupName.trim()) {
-      setDestinationError(`Type the ${t("client")}'s name first.`);
-      return;
-    }
-    setGenerating(true);
-    setLinkError(null);
-
-    const targetGroupId = await resolveGroupId("New client");
-    if (!targetGroupId) {
-      setGenerating(false);
-      return;
-    }
-
-    const supabase = createBrowserClient();
-    const code = randomCode();
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
-    const { error: insertError } = await supabase.from("group_invites").insert({
-      group_id: targetGroupId,
-      code,
-      role: "athlete",
-      created_by: createdBy,
-      expires_at: expiresAt,
-    });
-
-    if (insertError) {
-      setLinkError("Couldn't create an invite link.");
-      setGenerating(false);
-      return;
-    }
-
-    setLink(`${appOriginBrowser()}/invite/${code}`);
-    if (targetGroupId !== groupId) router.refresh();
-    setGenerating(false);
-  }
-
-  async function handleCopy() {
-    if (!link) return;
-    await navigator.clipboard.writeText(link);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
-
-  async function handleDirectSubmit(e: React.FormEvent) {
+  async function addByName(e: React.FormEvent) {
     e.preventDefault();
     if (submitting) return;
     setSubmitting(true);
-    setDirectError(null);
-
+    setError(null);
     try {
-      const targetGroupId = await resolveGroupId(fullName);
-      if (!targetGroupId) {
-        setSubmitting(false);
+      const target = step === "one_on_one" ? await createOneOnOneSpace(fullName) : selectedGroupId;
+      if (!target) {
+        if (step === "group") setError("Pick a group.");
         return;
       }
-
-      const res = await fetch("/api/clients/invite", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ groupId: targetGroupId, fullName, email }),
-      });
+      const res = await fetch("/api/clients/invite", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ groupId: target, fullName, email }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Couldn't add this ${t("client")}.`);
-
-      setDirectSuccess(true);
-      setCreatedClient({ groupId: targetGroupId, profileId: data.profileId });
+      setAdded({ groupId: target, profileId: data.profileId, name: fullName, inGroup: step === "group" ? groups?.find((g) => g.id === target)?.name ?? null : null });
       setFullName("");
       setEmail("");
       router.refresh();
     } catch (err) {
-      setDirectError(err instanceof Error ? err.message : `Couldn't add this ${t("client")}.`);
+      setError(err instanceof Error ? err.message : `Couldn't add this ${t("client")}.`);
     } finally {
       setSubmitting(false);
     }
   }
 
-  function handleClose() {
-    setOpen(false);
-    setLink(null);
-    setDirectSuccess(false);
-    setCreatedClient(null);
-    setMode("link");
-    setDestination("new");
-    setSelectedExistingGroupId("");
-    setNewGroupName("");
-    setDestinationError(null);
-    createdGroupIdRef.current = null;
+  async function makeLink() {
+    if (!selectedGroupId) {
+      setError("Pick a group.");
+      return;
+    }
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/invites/group", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "create", groupId: selectedGroupId }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Couldn't make the link. Try again.");
+      setLink(`${appOriginBrowser()}/invite/${data.code}`);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't make the link. Try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function copy() {
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError("Couldn't copy. Select the link and copy it by hand.");
+    }
   }
 
   if (!open) {
     return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-2 h-11 px-4 border border-rust text-rust font-body text-sm font-medium active:bg-rust active:text-graphite transition-colors"
-      >
+      <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-2 h-11 px-4 border border-rust text-rust font-body text-sm font-medium active:bg-rust active:text-graphite transition-colors">
         <UserPlus className="w-4 h-4" strokeWidth={2.5} />
         Add {t("client")}
       </button>
     );
   }
 
+  const nameForm = (
+    <form onSubmit={addByName} className="space-y-3">
+      <div>
+        <label htmlFor="client-name" className="font-body text-xs text-steel">
+          Full name
+        </label>
+        <input id="client-name" type="text" required value={fullName} onChange={(e) => setFullName(e.target.value)} className={inputClass} />
+      </div>
+      <div>
+        <label htmlFor="client-email" className="font-body text-xs text-steel">
+          Email (optional)
+        </label>
+        <input id="client-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass} />
+      </div>
+      {error && (
+        <p className="font-body text-xs text-rust" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="flex items-center gap-3">
+        <button type="submit" disabled={submitting} className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40">
+          {submitting ? "Adding…" : `Add ${t("client")}`}
+        </button>
+        <button type="button" onClick={reset} disabled={submitting} className="font-body text-xs text-steel disabled:opacity-40">
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+
   return (
     <div className="border border-steel/30 p-4 w-full max-w-sm bg-surface">
-      <div className="mb-3">
-        <label htmlFor="client-destination" className="font-body text-xs text-steel">
-          Add to
-        </label>
-        <select
-          id="client-destination"
-          value={destination}
-          onChange={(e) => {
-            const next = e.target.value as Destination;
-            setDestination(next);
-            setDestinationError(null);
-            if (next === "existing") loadOrgGroups();
-          }}
-          className="w-full h-11 mt-1 bg-graphite border border-steel/30 text-chalk px-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
-        >
-          <option value="new">A one-on-one client (their own space)</option>
-          <option value="current">Add to the group: {groupName}</option>
-          <option value="existing">Add to another group…</option>
-        </select>
-        <p className="font-body text-xs text-steel mt-1.5 leading-snug">
-          Most coaching clients are one-on-one: each gets their own private space with you. Pick a group instead if this
-          person should train with others.
-        </p>
-        {destination === "existing" && (
-          <select
-            value={selectedExistingGroupId}
-            onChange={(e) => setSelectedExistingGroupId(e.target.value)}
-            disabled={loadingOrgGroups}
-            className="w-full h-11 mt-1.5 bg-graphite border border-steel/30 text-chalk px-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust disabled:opacity-60"
+      {added ? (
+        <div>
+          <p className="font-body text-sm text-positive">
+            {added.name} added{added.inGroup ? ` to ${added.inGroup}` : ""}. Nothing was sent to them.
+          </p>
+          <p className="font-body text-xs text-steel mt-1.5">Build their program and schedule now. When you&apos;re ready, send their sign-in link from their profile.</p>
+          <div className="flex items-center gap-4 mt-3">
+            <button type="button" onClick={() => router.push(`/groups/${added.groupId}/athletes/${added.profileId}`)} className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium">
+              Open their profile
+            </button>
+            <button type="button" onClick={reset} className="font-body text-xs text-steel">
+              Done
+            </button>
+          </div>
+        </div>
+      ) : step === "choose" ? (
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => setStep("one_on_one")}
+            className="w-full text-left border border-steel/40 hover:border-rust px-3 py-3"
           >
-            {loadingOrgGroups && <option>Loading…</option>}
-            {(orgGroups ?? []).map((g) => (
+            <span className="block font-body text-sm text-chalk">Add a one-on-one {t("client")}</span>
+            <span className="block font-body text-xs text-steel mt-0.5">Their own private space with you.</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setStep("group");
+              loadGroups();
+            }}
+            className="w-full text-left border border-steel/40 hover:border-rust px-3 py-3"
+          >
+            <span className="block font-body text-sm text-chalk">Add to a group</span>
+            <span className="block font-body text-xs text-steel mt-0.5">Pick one of your groups, then add someone or share its link.</span>
+          </button>
+          <button type="button" onClick={reset} className="font-body text-xs text-steel pt-1">
+            Cancel
+          </button>
+        </div>
+      ) : step === "one_on_one" ? (
+        <div>
+          <p className="font-body text-xs text-steel mb-3">
+            Add a one-on-one {t("client")}. A real account is made right away, with no email sent, so you can build their program before they ever sign in.
+          </p>
+          {nameForm}
+        </div>
+      ) : (
+        <div>
+          <label htmlFor="group-pick" className="font-body text-xs text-steel">
+            Which group
+          </label>
+          <select id="group-pick" value={selectedGroupId} onChange={(e) => { setSelectedGroupId(e.target.value); setLink(null); }} disabled={!groups} className={inputClass}>
+            {!groups && <option>Loading…</option>}
+            {groups && groups.length === 0 && <option value="">You have no groups yet</option>}
+            {(groups ?? []).map((g) => (
               <option key={g.id} value={g.id}>
                 {g.name}
               </option>
             ))}
           </select>
-        )}
-        {destination === "new" && (
-          <input
-            type="text"
-            value={newGroupName}
-            onChange={(e) => setNewGroupName(e.target.value)}
-            placeholder={fullName || `${t("client", "possessive", { cap: true })} name`}
-            className="w-full h-11 mt-1.5 bg-graphite border border-steel/30 text-chalk px-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
-          />
-        )}
-        {destinationError && <p className="font-body text-xs text-rust mt-1">{destinationError}</p>}
-      </div>
-
-      <div className="flex items-center gap-1 mb-3">
-        {(["link", "direct"] as Mode[]).map((m) => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => setMode(m)}
-            className={`h-11 px-3 font-body text-xs border ${
-              mode === m ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
-            }`}
-          >
-            {m === "link" ? "Invite link" : "Add directly"}
-          </button>
-        ))}
-      </div>
-
-      {mode === "link" ? (
-        link ? (
-          <div>
-            <p className="font-body text-xs text-steel mb-2">Invite link &middot; expires in 7 days</p>
-            <div className="flex items-center gap-2">
-              <input
-                readOnly
-                value={link}
-                onFocus={(e) => e.target.select()}
-                className="flex-1 h-11 min-w-0 bg-graphite border border-steel/30 text-chalk px-2 font-body text-base sm:text-sm focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={handleCopy}
-                className="h-11 px-3 border border-rust text-rust font-body text-xs shrink-0"
-              >
-                {copied ? "Copied" : "Copy"}
+          <div className="flex items-center gap-1 my-3">
+            {(["name", "link"] as GroupMode[]).map((m) => (
+              <button key={m} type="button" onClick={() => setGroupMode(m)} className={`h-10 px-3 font-body text-xs border ${groupMode === m ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"}`}>
+                {m === "name" ? "Add by name" : "Invite link"}
+              </button>
+            ))}
+          </div>
+          {groupMode === "name" ? (
+            nameForm
+          ) : link ? (
+            <div>
+              <p className="font-body text-xs text-steel mb-2">Works for 7 days.</p>
+              <div className="flex items-center gap-2">
+                <input readOnly value={link} onFocus={(e) => e.target.select()} className="flex-1 h-11 min-w-0 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none" />
+                <button type="button" onClick={copy} className="h-11 px-3 border border-rust text-rust font-body text-xs shrink-0">
+                  {copied ? "Copied" : "Copy"}
+                </button>
+              </div>
+              <button type="button" onClick={reset} className="font-body text-xs text-steel mt-3">
+                Done
               </button>
             </div>
-            <button type="button" onClick={handleClose} className="font-body text-xs text-steel mt-3">
-              Done
-            </button>
-          </div>
-        ) : (
-          <div>
-            <p className="font-body text-xs text-steel mb-3">
-              They sign up themselves whenever they get to it.
-            </p>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={handleGenerateLink}
-                disabled={generating}
-                className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
-              >
-                {generating ? "Generating…" : "Generate link"}
-              </button>
-              <button type="button" onClick={handleClose} className="font-body text-xs text-steel">
-                Cancel
-              </button>
+          ) : (
+            <div>
+              <p className="font-body text-xs text-steel mb-3">{SINGLE_LINK_NOTE} They join {groups?.find((g) => g.id === selectedGroupId)?.name ?? groupName} when they sign up.</p>
+              <div className="flex items-center gap-3">
+                <button type="button" onClick={makeLink} disabled={submitting || !selectedGroupId} className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40">
+                  {submitting ? "Making…" : "Make the link"}
+                </button>
+                <button type="button" onClick={reset} className="font-body text-xs text-steel">
+                  Cancel
+                </button>
+              </div>
+              {error && (
+                <p className="font-body text-xs text-rust mt-2" role="alert">
+                  {error}
+                </p>
+              )}
             </div>
-            {linkError && <p className="font-body text-xs text-rust mt-2">{linkError}</p>}
-          </div>
-        )
-      ) : directSuccess ? (
-        <div>
-          <p className="font-body text-sm text-positive">{t("client", "singular", { cap: true })} added. Nothing was sent to them.</p>
-          <p className="font-body text-xs text-steel mt-1.5">
-            Build their programs, schedule and meal plans now. When you&apos;re ready, create their invite link from
-            their profile and send it yourself.
-          </p>
-          <div className="flex items-center gap-4 mt-3">
-            {createdClient && (
-              <button
-                type="button"
-                onClick={() => router.push(`/groups/${createdClient.groupId}/athletes/${createdClient.profileId}`)}
-                className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium"
-              >
-                Open their profile
-              </button>
-            )}
-            <button type="button" onClick={handleClose} className="font-body text-xs text-steel">
-              Done
-            </button>
-          </div>
-        </div>
-      ) : (
-        <form onSubmit={handleDirectSubmit} className="space-y-3">
-          <p className="font-body text-xs text-steel">
-            A real account is created right away, with no email sent. Build their program and schedule before they
-            ever sign in, then give them a link when you&apos;re ready.
-          </p>
-          <div>
-            <label htmlFor="client-name" className="font-body text-xs text-steel">
-              Full name
-            </label>
-            <input
-              id="client-name"
-              type="text"
-              required
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="w-full h-11 mt-1 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
-            />
-          </div>
-          <div>
-            <label htmlFor="client-email" className="font-body text-xs text-steel">
-              Email (optional)
-            </label>
-            <input
-              id="client-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full h-11 mt-1 bg-graphite border border-steel/30 text-chalk px-2.5 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
-            />
-          </div>
-          {directError && (
-            <p className="font-body text-xs text-rust" role="alert">
-              {directError}
-            </p>
           )}
-          <div className="flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={submitting}
-              className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
-            >
-              {submitting ? "Adding…" : `Add ${t("client")}`}
-            </button>
-            <button type="button" onClick={handleClose} disabled={submitting} className="font-body text-xs text-steel disabled:opacity-40">
-              Cancel
-            </button>
-          </div>
-        </form>
+        </div>
       )}
     </div>
   );

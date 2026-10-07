@@ -397,17 +397,10 @@ export default async function ClientsPage(
         </div>
       )}
 
-      <GroupInvitesPanel
-        groupId={params.groupId}
-        createdBy={user.id}
-        groupName={group?.name ?? "this group"}
-        invites={groupInvites}
-        oneOnOneClientName={
-          (group as { group_kind?: string } | null)?.group_kind === "one_on_one" && athletes.length > 0
-            ? athletes[0].fullName
-            : null
-        }
-      />
+      {/* A group's invite link: one current link, tucked into a single collapsed line. Never shown for a one-on-one client's space. */}
+      {(group as { group_kind?: string } | null)?.group_kind !== "one_on_one" && (
+        <GroupInvitesPanel groupId={params.groupId} groupName={group?.name ?? "this group"} invites={groupInvites} />
+      )}
 
       {rosterError ? (
         <UnavailableState what="your clients" />

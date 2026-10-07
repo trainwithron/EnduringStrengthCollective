@@ -6,6 +6,16 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 // link belongs to; that is checked here, not left to the browser.
 //   { action: "revoke", inviteId }  stop the link working (kept, greyed, for a week)
 //   { action: "extend", inviteId }  give a live link another 7 days
+//   { action: "create", groupId }   make the group's ONE current link (7 days) and cancel every other working link of that group
+function newInviteCode(length = 10) {
+  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  const bytes = new Uint8Array(length);
+  crypto.getRandomValues(bytes);
+  let out = "";
+  for (let i = 0; i < length; i++) out += chars[bytes[i] % chars.length];
+  return out;
+}
+
 export async function POST(request: Request) {
   const supabase = await createServerClient();
   const {
@@ -13,7 +23,29 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  const { action, inviteId } = await request.json();
+  const body = await request.json();
+  const { action, inviteId } = body;
+
+  if (action === "create") {
+    const groupId = typeof body.groupId === "string" ? body.groupId : "";
+    if (!groupId) return NextResponse.json({ error: "Missing group." }, { status: 400 });
+    const { data: callerRow } = await supabase.from("group_memberships").select("role").eq("group_id", groupId).eq("profile_id", user.id).maybeSingle();
+    if (callerRow?.role !== "coach") return NextResponse.json({ error: "Only a coach of this group can make its invite link." }, { status: 403 });
+    const admin = createServiceRoleClient();
+    // Cancel every working link of this group (a new link replaces the old one). Falls back to deleting when the cancelled-at columns are not there yet.
+    const { data: working } = await admin.from("group_invites").select("id").eq("group_id", groupId).is("revoked_at", null);
+    const ids = ((working ?? []) as { id: string }[]).map((r) => r.id);
+    if (ids.length > 0) {
+      const { error: revokeError } = await admin.from("group_invites").update({ revoked_at: new Date().toISOString(), revoked_by: user.id }).in("id", ids);
+      if (revokeError) await admin.from("group_invites").delete().in("id", ids);
+    }
+    const code = newInviteCode();
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { error: insertError } = await admin.from("group_invites").insert({ group_id: groupId, code, role: "athlete", created_by: user.id, expires_at: expiresAt });
+    if (insertError) return NextResponse.json({ error: "Couldn't make the link. Try again." }, { status: 500 });
+    return NextResponse.json({ ok: true, code, expiresAt });
+  }
+
   if (!inviteId || (action !== "revoke" && action !== "extend")) {
     return NextResponse.json({ error: "Missing inviteId or action." }, { status: 400 });
   }
