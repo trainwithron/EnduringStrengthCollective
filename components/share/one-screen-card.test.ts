@@ -16,16 +16,21 @@ describe("one-screen card rules", () => {
   it("drops the least important lines on a short screen instead of overflowing", () => {
     expect(source).toContain("max-height:620px");
     expect(source).toContain("max-height:700px");
+    expect(source).toContain("nth-child(2)]:[@media(max-height:600px)]:hidden");
+    expect(source).toContain("max-height:580px");
   });
   it("never uses a fixed pixel height for the card", () => {
     expect(source).not.toMatch(/\bh-\[\d+px\]/);
   });
   it("shows the fun line without a fixed height, drops it on a very short screen, and offers Another one only when given a handler", () => {
     expect(source).toContain("model.funLine");
-    expect(source).toContain("line-clamp-2");
-    expect(source).toContain("max-height:600px");
+    expect(source).toContain("line-clamp-3"); // the longest line (a 99-character joke) must keep its punch line
+    expect(source).toContain("max-height:520px"); // the fun line holds on until a very short screen
+    expect(source).toContain("[@media(max-height:620px)]:block"); // the coach line gives way first, replaced by the short name line
     expect(source).toContain("onShuffle &&");
     expect(source).toContain("min-h-[2.75rem]");
+    expect(source).toContain("share-fun-shuffle-icon"); // no extra row on a short screen: a 44 px round icon at the edge of the line
+    expect(source).toContain("w-11 h-11");
   });
   it("the fun line is fresh per card and remembered on the client's device, and the picture follows the same line", () => {
     const screen = readFileSync(new URL("./share-screen.tsx", import.meta.url), "utf8");

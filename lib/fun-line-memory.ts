@@ -19,6 +19,21 @@ const MAX_STORED_POSTS = 30;
 
 export const memoryKey = (viewerId: string) => `spotlight.funLines.v1:${viewerId}`;
 
+// Removes every viewer's remembered lines from this device (sign-out): they hold the viewer's own workout wording, so they should not outlive the session.
+export function clearAllFunLineMemory(storage: (StorageLike & { length: number; key(i: number): string | null; removeItem(k: string): void }) | null): void {
+  if (!storage) return;
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < storage.length; i++) {
+      const k = storage.key(i);
+      if (k && k.startsWith("spotlight.funLines.v1:")) keys.push(k);
+    }
+    for (const k of keys) storage.removeItem(k);
+  } catch {
+    // Storage blocked: nothing to clear.
+  }
+}
+
 const EMPTY = (): FunMemory => ({ recent: [], byPost: {} });
 
 const KINDS = new Set(["stat", "equiv", "absurd", "encourage"]);

@@ -158,6 +158,13 @@ describe("wrapLines", () => {
     expect(lines.length).toBeLessThanOrEqual(2);
     expect(lines[0].startsWith("supercal")).toBe(true);
   });
+  it("never cuts an emoji in half when it trims the last line", () => {
+    const lines = wrapLines(ctx, "one two three four five six seven eight nine ten 💸💸💸💸💸💸💸💸", 100, 2);
+    const last = lines[lines.length - 1];
+    expect(last.endsWith("…")).toBe(true);
+    // no lone surrogate anywhere
+    for (const l of lines) expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(l)).toBe(false);
+  });
   it("is empty for empty text", () => {
     expect(wrapLines(ctx, "   ", 100, 2)).toEqual([]);
   });

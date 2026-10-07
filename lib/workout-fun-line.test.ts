@@ -27,6 +27,10 @@ const EDGES: Record<string, WorkoutFacts> = {
   "all missing": { totalVolume: null, durationSeconds: null, totalSets: null, weekStreak: 0, prCount: 0, totalWorkoutCount: null },
   "tiny volume": { totalVolume: 12, durationSeconds: 5 * 60, totalSets: 1, weekStreak: 0, prCount: 0, totalWorkoutCount: 2 },
   "huge time": { totalVolume: 20000, durationSeconds: 5 * 3600 + 59 * 60, totalSets: 40, weekStreak: 0, prCount: 0, totalWorkoutCount: null },
+  "bodyweight circuit": { totalVolume: 0, durationSeconds: 45 * 60, totalSets: 20, weekStreak: 0, prCount: 0, totalWorkoutCount: 6 },
+  "60-minute run": { totalVolume: null, durationSeconds: 60 * 60, totalSets: 1, weekStreak: 3, prCount: 0, totalWorkoutCount: 20 },
+  "typo volume": { totalVolume: 1_800_000, durationSeconds: 40 * 60, totalSets: 30, weekStreak: 0, prCount: 0, totalWorkoutCount: 8 },
+  "timer left running": { totalVolume: 2000, durationSeconds: 4 * 3600, totalSets: 10, weekStreak: 0, prCount: 0, totalWorkoutCount: 5 },
   "PR only": { totalVolume: null, durationSeconds: null, totalSets: null, weekStreak: 0, prCount: 2, totalWorkoutCount: null },
 };
 
@@ -47,6 +51,37 @@ describe("every line renders cleanly at edge values", () => {
       for (let i = 0; i < 25; i++) expect(pickSeededFunLine(f, `seed-${i}`).text).not.toMatch(BAD);
     });
   }
+
+  it("leaves out volume lines for an impossible (typo) volume, and every other line still reads cleanly", () => {
+    const pool = funLinePool(EDGES["typo volume"]);
+    expect(pool.some((l) => l.kind === "equiv")).toBe(false);
+    for (const l of pool) expect(l.text).not.toMatch(/1,800,000|pounds/i);
+    expect(pool.length).toBeGreaterThan(5);
+    // The cap is exact: 500,000 is still believable, one more is not.
+    expect(funLinePool({ ...typical, totalVolume: 500_000, durationSeconds: null }).some((l) => l.kind === "equiv")).toBe(true);
+    expect(funLinePool({ ...typical, totalVolume: 500_001, durationSeconds: null }).some((l) => l.kind === "equiv")).toBe(false);
+  });
+
+  it("never turns a timer left running into a rate or a time boast, and drops 'only' above 90 minutes", () => {
+    const ids = funLinePool(EDGES["timer left running"]).map((l) => l.id);
+    expect(ids).not.toContain("stat:money-rate");
+    expect(ids).not.toContain("stat:per-minute");
+    expect(ids).not.toContain("stat:time-and-pounds");
+    const money = STAT_QUIPS.find((t) => t.key === "money-rate")!;
+    const long = { ...typical, totalVolume: 9000, durationSeconds: 100 * 60 };
+    expect(money.needs(long)).toBe(true);
+    expect(money.text(long)).not.toContain(" only ");
+    expect(money.text(typical)).toContain(" only ");
+    // exactly 2 hours is the longest believable session
+    expect(money.needs({ ...long, durationSeconds: 120 * 60 })).toBe(true);
+    expect(money.needs({ ...long, durationSeconds: 120 * 60 + 60 })).toBe(false);
+  });
+
+  it("a slow rate is not worth saying (under 25 pounds a minute), a normal one is", () => {
+    const perMinute = STAT_QUIPS.find((t) => t.key === "per-minute")!;
+    expect(perMinute.needs({ ...typical, totalVolume: 2000, durationSeconds: 100 * 60 })).toBe(false); // 20 lb/min
+    expect(perMinute.needs({ ...typical, totalVolume: 3000, durationSeconds: 100 * 60 })).toBe(true); // 30 lb/min
+  });
 
   it("renders every stat template (with numbers that satisfy it) without a bad value", () => {
     const rich: WorkoutFacts = { totalVolume: 25000, durationSeconds: 75 * 60, totalSets: 24, weekStreak: 6, prCount: 2, totalWorkoutCount: 50 };
@@ -87,7 +122,12 @@ describe("kindness: a small, short or empty session is never joked about", () =>
     expect(isSmallSession(EDGES["0 sets"])).toBe(true);
     expect(isSmallSession(EDGES["tiny volume"])).toBe(true);
     expect(isSmallSession({ ...typical, durationSeconds: 5 * 60 })).toBe(true);
-    expect(isSmallSession({ ...typical, totalSets: 2 })).toBe(true);
+    expect(isSmallSession({ ...typical, totalSets: 2, durationSeconds: 15 * 60 })).toBe(true);
+    expect(isSmallSession({ ...typical, totalSets: 2, durationSeconds: null })).toBe(true);
+    // A long session is not small whatever its pounds or set count: a 45-minute bodyweight circuit, a 60-minute run logged as one set.
+    expect(isSmallSession({ ...typical, totalSets: 2 })).toBe(false);
+    expect(isSmallSession(EDGES["bodyweight circuit"])).toBe(false);
+    expect(isSmallSession(EDGES["60-minute run"])).toBe(false);
     expect(isSmallSession(typical)).toBe(false);
     expect(isSmallSession(EDGES["all missing"])).toBe(false);
   });
@@ -102,6 +142,21 @@ describe("kindness: a small, short or empty session is never joked about", () =>
     for (let i = 0; i < 40; i++) {
       const l = pickSeededFunLine(EDGES["0 sets"], `s${i}`);
       expect(["encourage", "stat"]).toContain(l.kind);
+    }
+  });
+  it("a bodyweight circuit or a long run gets a proper line, never 'a short session' or 'small sessions'", () => {
+    for (const name of ["bodyweight circuit", "60-minute run"]) {
+      const texts = funLinePool(EDGES[name]).map((l) => l.text);
+      expect(texts.length).toBeGreaterThan(5);
+      for (const t of texts) expect(t, name).not.toMatch(/short session|small sessions|checked in/i);
+      expect(funLinePool(EDGES[name]).some((l) => l.kind === "encourage")).toBe(false);
+      for (const l of funLinePool(EDGES[name])) expect(l.text).not.toMatch(/pounds/i);
+    }
+  });
+  it("no line is written in the client's own voice or about a body, food, skipping, age, a coach or guilt", () => {
+    for (const text of ABSURD_LINES) {
+      expect(text, text).not.toMatch(/\b(I|I'm|I'd|I'll|I've|my|me|mine|myself)\b/);
+      expect(text.toLowerCase(), text).not.toMatch(/skip|burrito|abs\b|mirror|coach|diet|shorts|excuse|bank account|sit down|assistance|calorie|belly|waist/);
     }
   });
   it("no line mentions the body, weight loss, fat, shame or failure", () => {

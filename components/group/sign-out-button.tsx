@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { clearWorkspaceStorage } from "@/lib/workspace-layout";
 import { clearAllNoteDrafts } from "@/lib/note-draft";
+import { clearAllFunLineMemory } from "@/lib/fun-line-memory";
 
 export function SignOutButton() {
   const [signingOut, setSigningOut] = useState(false);
@@ -17,6 +18,8 @@ export function SignOutButton() {
     clearWorkspaceStorage(window.localStorage);
     // A shared phone must not keep someone's unsaved exercise notes (they can be about pain or injury).
     clearAllNoteDrafts();
+    // Nor the lines their share cards showed (they hold their workout numbers).
+    clearAllFunLineMemory(window.localStorage);
     router.push("/login");
     router.refresh();
   }

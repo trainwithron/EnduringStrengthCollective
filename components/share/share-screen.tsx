@@ -47,6 +47,9 @@ export function ShareScreen({
 }) {
   const [line, setLine] = useState<FunLine>(defaultLine);
   const canShuffle = isOwner && !!viewerId;
+  // A viewer who is not the owner shows the default at once. The owner's line is chosen on their device, so the line stays invisible (and the picture waits)
+  // until then; otherwise the text would flip after load and the picture would be drawn twice.
+  const [ready, setReady] = useState(!canShuffle);
 
   // First render on the client's own device: use the line already chosen for this card, else choose a fresh one and remember it.
   useEffect(() => {
@@ -56,11 +59,13 @@ export function ShareScreen({
     const chosen = memory.byPost[postId];
     if (chosen) {
       setLine(chosen);
+      setReady(true);
       return;
     }
     const fresh = pickFreshFunLine(facts, memory.recent);
     writeFunMemory(storage, viewerId, rememberLine(memory, postId, fresh));
     setLine(fresh);
+    setReady(true);
     // The facts are fixed for this card.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postId, viewerId, canShuffle]);
@@ -82,8 +87,9 @@ export function ShareScreen({
         coachLine={coachLine}
         hasPr={hasPr}
         onShuffle={canShuffle ? another : undefined}
+        funLineHidden={!ready}
       />
-      <ShareActions input={{ ...imageInput, funLine: line.text }} title={title} homeHref={homeHref} />
+      <ShareActions input={{ ...imageInput, funLine: line.text }} title={title} homeHref={homeHref} hold={!ready} />
     </>
   );
 }

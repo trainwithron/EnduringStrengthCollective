@@ -17,10 +17,13 @@ export function ShareActions({
   input,
   title,
   homeHref,
+  hold = false,
 }: {
   input: Omit<ShareImageInput, "showName">;
   title: string;
   homeHref: string | null;
+  // True while the fun line is still being chosen: the picture is not drawn yet (it would be drawn twice).
+  hold?: boolean;
 }) {
   const [format, setFormat] = useState<ShareImageFormat>("story");
   const [showName, setShowName] = useState(true);
@@ -32,6 +35,7 @@ export function ShareActions({
   // The picture is made ahead of time (and again whenever a choice changes) so that tapping Share can open the
   // phone's share sheet at once; waiting to draw after the tap can lose the permission to open it.
   useEffect(() => {
+    if (hold) return;
     let cancelled = false;
     setBlob(null);
     setFailed(false);
@@ -47,7 +51,7 @@ export function ShareActions({
     };
     // The input is fixed for this page; the two choices and the fun line are what change the picture.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [format, showName, input.funLine]);
+  }, [format, showName, input.funLine, hold]);
 
   const file = useMemo(
     () => (blob ? new File([blob], `workout-${format}.png`, { type: "image/png" }) : null),

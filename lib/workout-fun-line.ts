@@ -54,19 +54,36 @@ export function durationInWords(seconds: number): string {
   return m === 0 ? hours : `${hours} and ${m} ${m === 1 ? "minute" : "minutes"}`;
 }
 
-// Pounds moved per minute, only when both numbers are real and the session is long and big enough for the figure to mean something.
-function poundsPerMinute(f: WorkoutFacts): number | null {
-  if (!good(f.totalVolume) || !good(f.durationSeconds) || f.totalVolume < 2000 || f.durationSeconds < 20 * 60) return null;
-  const ppm = f.totalVolume / (f.durationSeconds / 60);
-  return Number.isFinite(ppm) && ppm >= 1 ? ppm : null;
+// A volume worth saying out loud: real, at least 1,000 lbs, and not so large that it is almost certainly a typo set (a card that says "1,800,000 pounds moved"
+// or "thirty thousand blue whales" would be posted publicly). Above the cap the volume-based lines are left out and the line falls back to ones that do not use it.
+export const MAX_BELIEVABLE_VOLUME = 500_000;
+function volumeOk(f: WorkoutFacts, min = 1000): f is WorkoutFacts & { totalVolume: number } {
+  return good(f.totalVolume) && f.totalVolume >= min && f.totalVolume <= MAX_BELIEVABLE_VOLUME;
 }
 
-// A session too small, too short or empty for a joke: it gets an encouraging line (or a streak or PR line, which are always kind).
+// A session length worth saying: 20 minutes to 2 hours. A timer left running (4 hours for a 40-minute session) must not turn into "only 3 hours and 40 minutes".
+const MIN_TALK_SECONDS = 20 * 60;
+const MAX_TALK_SECONDS = 120 * 60;
+function durationOk(f: WorkoutFacts): f is WorkoutFacts & { durationSeconds: number } {
+  return good(f.durationSeconds) && f.durationSeconds >= MIN_TALK_SECONDS && f.durationSeconds <= MAX_TALK_SECONDS;
+}
+
+// Pounds moved per minute, only when the volume and the time are both believable and the rate is high enough to be worth saying (not 8 pounds a minute).
+const MIN_RATE_LB_PER_MIN = 25;
+function poundsPerMinute(f: WorkoutFacts): number | null {
+  if (!volumeOk(f, 2000) || !durationOk(f)) return null;
+  const ppm = f.totalVolume / (f.durationSeconds / 60);
+  return Number.isFinite(ppm) && ppm >= MIN_RATE_LB_PER_MIN ? ppm : null;
+}
+
+// A session too short or too empty for a joke: it gets an encouraging line (or a streak or PR line, which are always kind). Judged by sets and time ONLY. Volume
+// says nothing about size: a 45-minute bodyweight circuit or a 60-minute run has no pounds at all and is a proper session. A lack of volume just means the
+// volume-based lines are left out (see volumeOk).
 export function isSmallSession(f: WorkoutFacts): boolean {
-  if (f.totalSets != null && f.totalSets < 3) return true;
-  if (good(f.totalVolume) && f.totalVolume < 1000) return true;
-  if (f.totalVolume != null && f.totalVolume <= 0) return true;
   if (good(f.durationSeconds) && f.durationSeconds < 10 * 60) return true;
+  if (f.totalSets === 0) return true; // nothing completed: a check-in
+  // One or two sets is small unless the session itself ran long (a 60-minute run is logged as one set).
+  if (f.totalSets != null && f.totalSets < 3 && !(good(f.durationSeconds) && f.durationSeconds >= MIN_TALK_SECONDS)) return true;
   return false;
 }
 
@@ -81,7 +98,7 @@ export const STAT_QUIPS: Template[] = [
   {
     key: "money-rate",
     needs: (f) => poundsPerMinute(f) != null && good(f.totalVolume),
-    text: (f) => `You lifted ${num(f.totalVolume as number)} pounds in only ${durationInWords(f.durationSeconds as number)}. Too bad we can't make money at that rate. 💸`,
+    text: (f) => `You lifted ${num(f.totalVolume as number)} pounds in ${(f.durationSeconds as number) <= 90 * 60 ? "only " : ""}${durationInWords(f.durationSeconds as number)}. Too bad we can't make money at that rate. 💸`,
   },
   {
     key: "per-minute",
@@ -100,12 +117,12 @@ export const STAT_QUIPS: Template[] = [
   },
   {
     key: "volume-floor",
-    needs: (f) => good(f.totalVolume) && f.totalVolume >= 2000,
+    needs: (f) => volumeOk(f, 2000),
     text: (f) => `${num(f.totalVolume as number)} pounds moved today. The floor felt every one. 🏋️`,
   },
   {
     key: "time-and-pounds",
-    needs: (f) => good(f.totalVolume) && f.totalVolume >= 2000 && good(f.durationSeconds) && f.durationSeconds >= 20 * 60,
+    needs: (f) => volumeOk(f, 2000) && durationOk(f),
     text: (f) => `${durationInWords(f.durationSeconds as number)}, ${num(f.totalVolume as number)} pounds. Time well spent. ⏱️`,
   },
   // Always-kind lines tied to a milestone this workout actually reached.
@@ -164,7 +181,7 @@ export function funLinePool(f: WorkoutFacts): FunLine[] {
     return out;
   }
 
-  if (good(f.totalVolume) && f.totalVolume >= 1000) {
+  if (volumeOk(f)) {
     const seen = new Set<string>();
     for (let i = 0; i < EQUIV_VARIANTS; i++) {
       const eq = getVolumeEquivalence(f.totalVolume, `variant-${i}`);
@@ -178,6 +195,8 @@ export function funLinePool(f: WorkoutFacts): FunLine[] {
   for (const text of ABSURD_LINES) if (FITS(text)) out.push({ id: lineId("absurd", text), kind: "absurd", text });
   return out;
 }
+
+const NICE_WORK: FunLine = { id: "encourage:nice-work", kind: "encourage", text: "Nice work today. 💪" };
 
 export interface RecentLine {
   id: string;
@@ -193,6 +212,7 @@ function randomOf<T>(items: T[], rand: () => number): T {
 // "Another one"). The kind with the fewest recent lines is the most likely, so the kinds spread out. Always returns a line.
 export function pickFreshFunLine(f: WorkoutFacts, recent: RecentLine[], rand: () => number = Math.random, avoid: string[] = []): FunLine {
   const pool = funLinePool(f);
+  if (pool.length === 0) return NICE_WORK; // never empty today (the absurd bank is always there), but a pick must not crash if it ever is
   const window = recent.slice(-RECENT_WINDOW);
   const recentIds = new Set(window.map((r) => r.id));
   const blocked = new Set([...recentIds, ...avoid]);

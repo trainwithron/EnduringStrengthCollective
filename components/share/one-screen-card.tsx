@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { RefreshCw } from "lucide-react";
 import type { ShareImageModel } from "@/lib/share-image";
 
 // The post-workout card, sized to the visible screen: nothing inside it scrolls. Sizes follow the screen's height
@@ -11,6 +12,7 @@ export function OneScreenCard({
   coachLine,
   hasPr,
   onShuffle,
+  funLineHidden,
 }: {
   model: ShareImageModel;
   // The scene behind the card (a scenic background or the group's own image), already positioned to fill it.
@@ -19,6 +21,8 @@ export function OneScreenCard({
   hasPr: boolean;
   // Present only for the client who owns the card: rolls a different fun line.
   onShuffle?: () => void;
+  // The line's space is kept but it is not shown while the owner's device is still choosing theirs, so the text never visibly flips after load.
+  funLineHidden?: boolean;
 }) {
   return (
     <div
@@ -40,10 +44,15 @@ export function OneScreenCard({
             {hasPr ? " 🎉" : ""}
           </h1>
           {coachLine ? (
-            <p className="font-body text-chalk mt-[clamp(6px,1.2dvh,10px)] text-[clamp(12px,1.9dvh,15px)] leading-snug line-clamp-3">
-              <span className="text-steel">{coachLine.coachFirstName}: </span>
-              {coachLine.text}
-            </p>
+            <>
+              <p className="font-body text-chalk mt-[clamp(6px,1.2dvh,10px)] text-[clamp(12px,1.9dvh,15px)] leading-snug line-clamp-3 [@media(max-height:620px)]:hidden">
+                <span className="text-steel">{coachLine.coachFirstName}: </span>
+                {coachLine.text}
+              </p>
+              {model.name && (
+                <p className="hidden [@media(max-height:620px)]:block font-body text-[clamp(14px,2.4dvh,20px)] mt-[clamp(4px,1dvh,8px)]">{model.name}</p>
+              )}
+            </>
           ) : (
             model.name && (
               <p className="font-body text-[clamp(14px,2.4dvh,20px)] mt-[clamp(4px,1dvh,8px)]">{model.name}</p>
@@ -74,36 +83,38 @@ export function OneScreenCard({
         )}
 
         {model.funLine && (
-          <div className="py-[clamp(4px,1.2dvh,10px)] [@media(max-height:600px)]:hidden">
+          <div className={`relative py-[clamp(4px,1.2dvh,10px)] [@media(max-height:520px)]:hidden ${funLineHidden ? "invisible" : ""}`}>
             <p
               data-testid="share-fun-line"
-              className="font-body text-chalk/90 text-[clamp(11px,1.75dvh,14px)] leading-snug line-clamp-2 drop-shadow-[0_1px_3px_rgba(0,0,0,.7)]"
+              className={`font-body text-chalk/90 text-[clamp(11px,1.65dvh,13.5px)] leading-snug line-clamp-3 drop-shadow-[0_1px_3px_rgba(0,0,0,.7)]`}
             >
               {model.funLine}
             </p>
             {onShuffle && (
-              <button
-                type="button"
-                onClick={onShuffle}
-                data-testid="share-fun-shuffle"
-                className="mx-auto flex items-center justify-center min-h-[2.75rem] -my-2 px-4 font-body text-[11px] uppercase tracking-wide text-steel underline underline-offset-2 active:text-chalk"
-              >
-                Another one
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={onShuffle}
+                  data-testid="share-fun-shuffle"
+                  className="hidden [@media(min-height:700px)]:flex mx-auto items-center justify-center min-h-[2.75rem] -my-2 px-4 font-body text-[11px] uppercase tracking-wide text-steel underline underline-offset-2 active:text-chalk"
+                >
+                  Another one
+                </button>
+              </>
             )}
           </div>
         )}
 
         {model.lifts.length > 0 && (
           <div className="text-left">
-            <p className="font-body text-[10px] text-steel uppercase tracking-wide mb-[clamp(3px,0.8dvh,6px)]">
+            <p className="font-body text-[10px] text-steel uppercase tracking-wide mb-[clamp(3px,0.8dvh,6px)] [@media(max-height:580px)]:hidden">
               Top lifts today
             </p>
             <div className="space-y-[clamp(3px,0.7dvh,6px)]">
               {model.lifts.map((lift) => (
                 <div
                   key={lift.name}
-                  className="flex items-center justify-between gap-2 px-3 py-[clamp(4px,1dvh,9px)] rounded-lg bg-chalk/[0.06] last:[@media(max-height:700px)]:hidden"
+                  className="flex items-center justify-between gap-2 px-3 py-[clamp(4px,1dvh,9px)] rounded-lg bg-chalk/[0.06] last:[@media(max-height:700px)]:hidden [&:nth-child(2)]:[@media(max-height:600px)]:hidden"
                 >
                   <span className="font-display uppercase text-[clamp(13px,2.1dvh,17px)] truncate">{lift.name}</span>
                   <span className="font-body text-[clamp(11px,1.8dvh,14px)] text-chalk/80 shrink-0 [font-variant-numeric:tabular-nums]">
@@ -120,6 +131,20 @@ export function OneScreenCard({
           <p className="font-body text-[10px] text-steel tracking-wider mt-0.5">{model.dateLabel}</p>
         </div>
       </div>
+
+      {/* A short screen has no room for another row, so the button is a round icon in the bottom corner (beside the date); a taller screen gets the labelled one under the line. */}
+      {onShuffle && model.funLine && (
+        <button
+          type="button"
+          onClick={onShuffle}
+          data-testid="share-fun-shuffle-icon"
+          aria-label="Another one"
+          title="Another one"
+          className={`[@media(min-height:700px)]:hidden [@media(max-height:520px)]:hidden absolute right-2 bottom-2 w-11 h-11 flex items-center justify-center rounded-full border border-steel/30 bg-graphite/60 text-steel active:text-chalk ${funLineHidden ? "invisible" : ""}`}
+        >
+          <RefreshCw size={16} aria-hidden="true" />
+        </button>
+      )}
     </div>
   );
 }

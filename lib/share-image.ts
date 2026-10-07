@@ -227,9 +227,10 @@ export function wrapLines(ctx: DrawContext, text: string, maxWidth: number, maxL
   if (lines.length > maxLines) lines.length = maxLines;
   const last = lines.length - 1;
   if (last >= 0 && ctx.measureText(lines[last]).width > maxWidth) {
-    let t = lines[last];
-    while (t.length > 1 && ctx.measureText(`${t}…`).width > maxWidth) t = t.slice(0, -1);
-    lines[last] = `${t.trimEnd()}…`;
+    // By code point (Array.from), so an emoji is never cut in half and left as a broken character before the ellipsis.
+    let chars = Array.from(lines[last]);
+    while (chars.length > 1 && ctx.measureText(`${chars.join("")}…`).width > maxWidth) chars = chars.slice(0, -1);
+    lines[last] = `${chars.join("").trimEnd()}…`;
   }
   return lines;
 }
