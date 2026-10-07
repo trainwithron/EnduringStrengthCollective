@@ -9,7 +9,9 @@
 //     from anywhere, and uploaded photos and videos come from Supabase storage.
 //   * Network calls from the browser: this site, Supabase (data, storage and realtime websockets) and Daily (video calls).
 //     Everything else (Stripe, Twilio, SendGrid, Anthropic, Google, Oura...) is called from the server, not the browser.
-//   * Frames: YouTube (exercise videos) and Daily (video calls) only. Nobody may frame this site (frame-ancestors 'none').
+//   * Frames: YouTube (exercise videos) and Daily (video calls) only. Nobody may frame this site (frame-ancestors 'none'), EXCEPT the coach's own pages
+//     (/groups/..., /clients, /dashboard), which the site itself may frame so the workspace can show one coach page inside another (frame-ancestors 'self',
+//     X-Frame-Options SAMEORIGIN, and 'self' added to frame-src). Another site can still never frame any page.
 //   * Forms may only post to this site; no plugins; no <base> tricks.
 // The camera and microphone are deliberately NOT mentioned in Permissions-Policy: listing them as (self) would also stop the
 // Daily call frame from using them. Sensors, payment, USB and the rest are turned off.
@@ -22,7 +24,7 @@ function origin(url) {
   }
 }
 
-export function buildSecurityHeaders({ isProd, supabaseUrl }) {
+export function buildSecurityHeaders({ isProd, supabaseUrl, embeddable = false }) {
   const supabaseOrigin = origin(supabaseUrl || "") || "https://*.supabase.co";
   const supabaseWs = supabaseOrigin.replace(/^https:/, "wss:");
 
@@ -34,13 +36,13 @@ export function buildSecurityHeaders({ isProd, supabaseUrl }) {
     "img-src": ["'self'", "data:", "blob:", "https:"],
     "media-src": ["'self'", "blob:", "https:"],
     "connect-src": ["'self'", supabaseOrigin, supabaseWs, "https://*.daily.co", "wss://*.daily.co", ...(isProd ? [] : ["ws:", "http://localhost:*"])],
-    "frame-src": ["https://www.youtube.com", "https://www.youtube-nocookie.com", "https://*.daily.co"],
+    "frame-src": [...(embeddable ? ["'self'"] : []), "https://www.youtube.com", "https://www.youtube-nocookie.com", "https://*.daily.co"],
     "worker-src": ["'self'", "blob:"],
     "manifest-src": ["'self'"],
     "object-src": ["'none'"],
     "base-uri": ["'self'"],
     "form-action": ["'self'"],
-    "frame-ancestors": ["'none'"],
+    "frame-ancestors": [embeddable ? "'self'" : "'none'"],
   };
   const csp = Object.entries(directives)
     .map(([name, values]) => `${name} ${values.join(" ")}`)
@@ -49,7 +51,7 @@ export function buildSecurityHeaders({ isProd, supabaseUrl }) {
 
   const headers = [
     { key: "Content-Security-Policy", value: csp },
-    { key: "X-Frame-Options", value: "DENY" },
+    { key: "X-Frame-Options", value: embeddable ? "SAMEORIGIN" : "DENY" },
     { key: "X-Content-Type-Options", value: "nosniff" },
     { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
     {

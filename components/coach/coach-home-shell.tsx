@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { isEmbeddedRequest } from "@/lib/embedded-request";
 import { Home } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
@@ -14,7 +15,7 @@ import { CollectiveIntelligenceChat } from "@/components/coach/desktop/collectiv
 // page has no use for. No GroupSwitcher here either: this page's own
 // three sections already are the full group directory, so a dropdown
 // would be redundant.
-export function CoachHomeShell({ orgName, children }: { orgName: string; children: React.ReactNode }) {
+function CoachHomeShellFull({ orgName, children }: { orgName: string; children: React.ReactNode }) {
   return (
     <TerminologyProvider>
     <div className="min-h-screen bg-graphite text-chalk flex">
@@ -56,4 +57,21 @@ export function CoachHomeShell({ orgName, children }: { orgName: string; childre
     </div>
     </TerminologyProvider>
   );
+}
+
+// Shown inside a workspace pane: just the content (see components/shared/embedded-context.tsx).
+export async function CoachHomeShell(props: { orgName: string; children: React.ReactNode }) {
+  const embedded = await isEmbeddedRequest();
+  if (embedded) {
+    return (
+      <TerminologyProvider>
+        <div data-embedded="1" className="min-h-screen bg-graphite text-chalk font-body">
+          <main id="main-content" className="px-4 pt-4 pb-8">
+            {props.children}
+          </main>
+        </div>
+      </TerminologyProvider>
+    );
+  }
+  return <CoachHomeShellFull {...props} />;
 }

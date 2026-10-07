@@ -55,6 +55,21 @@ describe("security headers", () => {
     expect(frames).not.toContain("'self'");
   });
 
+  it("the coach's own pages may be framed by this site only (the workspace), nothing else changes", () => {
+    const emb: Header[] = buildSecurityHeaders({ isProd: true, supabaseUrl: SUPABASE, embeddable: true });
+    const csp = get(emb, "Content-Security-Policy");
+    expect(csp).toContain("frame-ancestors 'self'");
+    expect(csp).not.toContain("frame-ancestors 'none'");
+    expect(get(emb, "X-Frame-Options")).toBe("SAMEORIGIN");
+    expect(csp.split("; ").find((d) => d.startsWith("frame-src"))).toContain("'self'");
+    // every other directive is exactly what the rest of the site has
+    const strip = (c: string) => c.split("; ").filter((d) => !d.startsWith("frame-ancestors") && !d.startsWith("frame-src")).join("; ");
+    expect(strip(csp)).toBe(strip(get(prod, "Content-Security-Policy")));
+    // an ordinary page still cannot be framed by anyone
+    expect(get(prod, "X-Frame-Options")).toBe("DENY");
+    expect(get(prod, "Content-Security-Policy")).toContain("frame-ancestors 'none'");
+  });
+
   it("Google Fonts still load", () => {
     const csp = get(prod, "Content-Security-Policy");
     expect(csp).toContain("https://fonts.googleapis.com");

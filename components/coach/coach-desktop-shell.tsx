@@ -73,6 +73,7 @@ import { CoachMoreSheet } from "@/components/coach/mobile/coach-more-sheet";
 import { CoachSpotHub } from "@/components/coach/mobile/coach-spot-hub";
 import { PendingNoticeFlusher } from "@/components/coach/pending-notice-flusher";
 import { CLIENTS_HREF, membersHref, showsMembers } from "@/lib/coach-clients-nav";
+import { useEmbedded } from "@/components/shared/embedded-context";
 
 function NavBadge({ count, collapsed }: { count: number; collapsed?: boolean }) {
   if (count <= 0) return null;
@@ -150,7 +151,7 @@ function isGroup(entry: NavEntry): entry is NavGroup {
   return "items" in entry;
 }
 
-export function CoachDesktopShell({
+function CoachDesktopShellFull({
   groupId,
   groupName,
   active,
@@ -820,4 +821,22 @@ export function CoachDesktopShell({
     </div>
     </TerminologyProvider>
   );
+}
+
+// A page shown inside a workspace pane (see components/shared/embedded-context.tsx) is just its content: no rail, panels, top bar or floating chat, so a pane never
+// holds a second copy of the whole app. Everything else about the page (its own data, its own controls, its links) is unchanged.
+export function CoachDesktopShell(props: React.ComponentProps<typeof CoachDesktopShellFull>) {
+  const embedded = useEmbedded();
+  if (embedded) {
+    return (
+      <TerminologyProvider groupId={props.groupId}>
+        <div data-embedded="1" className="min-h-screen bg-graphite text-chalk font-body">
+          <main id="main-content" className="px-4 pt-4 pb-8">
+            {props.children}
+          </main>
+        </div>
+      </TerminologyProvider>
+    );
+  }
+  return <CoachDesktopShellFull {...props} />;
 }
