@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirectOneOnOneToAnchor } from "@/lib/coach-wide-redirect";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
@@ -11,6 +12,7 @@ import { normalizeSlug, slugProblem } from "@/lib/public-booking";
 // per coach, not per group), like availability and session types. Needs migration 0261; until it is applied the page says so.
 export default async function BookingPageSettingsPage(props: { params: Promise<{ groupId: string }> }) {
   const params = await props.params;
+  await redirectOneOnOneToAnchor(params.groupId, "business/booking-page");
   const supabase = await createServerClient();
   const {
     data: { user },

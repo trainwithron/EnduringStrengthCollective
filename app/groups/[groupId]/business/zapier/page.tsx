@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { redirectOneOnOneToAnchor } from "@/lib/coach-wide-redirect";
 import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
@@ -6,6 +7,7 @@ import { ZapierSettings } from "@/components/coach/desktop/zapier-settings";
 
 export default async function ZapierPage(props: { params: Promise<{ groupId: string }> }) {
   const params = await props.params;
+  await redirectOneOnOneToAnchor(params.groupId, "business/zapier");
   const supabase = await createServerClient();
   const {
     data: { user },

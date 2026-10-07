@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirectOneOnOneToAnchor } from "@/lib/coach-wide-redirect";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
@@ -19,6 +20,7 @@ export default async function SessionLedgerPage(
   }
 ) {
   const params = await props.params;
+  await redirectOneOnOneToAnchor(params.groupId, "business/session-ledger");
   const supabase = await createServerClient();
   const {
     data: { user },

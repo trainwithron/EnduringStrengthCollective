@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { redirectOneOnOneToAnchor } from "@/lib/coach-wide-redirect";
 import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
@@ -10,6 +11,7 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 // already used by Business/Waiver/Support on this shell.
 export default async function LeadsPage(props: { params: Promise<{ groupId: string }> }) {
   const params = await props.params;
+  await redirectOneOnOneToAnchor(params.groupId, "business/leads");
   const supabase = await createServerClient();
   const {
     data: { user },

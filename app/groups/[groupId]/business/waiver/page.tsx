@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { redirectOneOnOneToAnchor } from "@/lib/coach-wide-redirect";
 import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
@@ -8,6 +9,7 @@ export default async function WaiverPage(
   props: { params: Promise<{ groupId: string }> }
 ) {
   const params = await props.params;
+  await redirectOneOnOneToAnchor(params.groupId, "business/waiver");
   const supabase = await createServerClient();
   const {
     data: { user },
