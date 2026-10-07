@@ -37,7 +37,7 @@ describe("the coach side", () => {
     expect(clientNutrition).toContain("below their protein floor");
     expect(clientNutrition).not.toMatch(/baseline for their current body weight/);
     expect(clientNutrition).toContain("proteinGPerLb={prefs.proteinGPerLb}");
-    expect(panel).toContain("computeArchetypeMacros(engineResult.newCalories, Number(currWeight), archetype, proteinGPerLb)");
+    expect(panel).toContain("computeArchetypeMacros(guarded.result.newCalories, toLbs(currWeight), archetype, proteinGPerLb)");
     expect(generator).toMatch(/detectMacroArchetype\(dietaryRestrictions\),\s*proteinGPerLb/);
     expect(cron).toContain('.from("client_nutrition_preferences").select("protein_g_per_lb")');
     expect(cron).toContain("clientProteinGPerLb");

@@ -1,20 +1,21 @@
 import type { FoodWeekSummary } from "@/lib/food-week";
 import type { WeeklyWeightTrend } from "@/lib/weight-trend";
+import { formatWeight, type WeightUnit } from "@/lib/units";
 
 const num = (n: number) => n.toLocaleString("en-US");
 
-function weightLine(trend: WeeklyWeightTrend): string {
+function weightLine(trend: WeeklyWeightTrend, unit: WeightUnit): string {
   if (trend.currentAvg == null) return "No weight logged in the last 7 days.";
-  const base = `Weight: ${trend.currentAvg} lbs average this week`;
+  const base = `Weight: ${formatWeight(trend.currentAvg, unit)} average this week`;
   if (trend.deltaLbs == null) return `${base}.`;
   if (trend.deltaLbs === 0) return `${base}, the same as last week.`;
-  return `${base}, ${trend.deltaLbs > 0 ? "up" : "down"} ${Math.abs(trend.deltaLbs)} from last week.`;
+  return `${base}, ${trend.deltaLbs > 0 ? "up" : "down"} ${formatWeight(Math.abs(trend.deltaLbs), unit)} from last week.`;
 }
 
 // A read-only look at what the client logged over the last 7 days against their target: which days they logged anything, how close each day was to the calorie
 // target, and the weight trend beside it. It reports; it never changes a target. "Logged anything" means any meal that was not skipped, so one coffee counts: it is a
 // sign the client is engaging, not that the day was accurate.
-export function WhatTheyAte({ week, weightTrend, clientName }: { week: FoodWeekSummary; weightTrend: WeeklyWeightTrend; clientName: string }) {
+export function WhatTheyAte({ week, weightTrend, clientName, weightUnit = "lb" }: { week: FoodWeekSummary; weightTrend: WeeklyWeightTrend; clientName: string; weightUnit?: WeightUnit }) {
   const targetDay = week.days.find((d) => d.target?.calories);
   return (
     <div>
@@ -28,7 +29,7 @@ export function WhatTheyAte({ week, weightTrend, clientName }: { week: FoodWeekS
         ) : null}
         .
       </p>
-      <p className="font-body text-xs text-steel mt-1">{weightLine(weightTrend)}</p>
+      <p className="font-body text-xs text-steel mt-1">{weightLine(weightTrend, weightUnit)}</p>
       {targetDay == null && <p className="font-body text-xs text-steel mt-1">No calorie target was set for these days, so there is nothing to compare against yet.</p>}
 
       <div className="mt-4 grid grid-cols-1 sm:grid-cols-7 gap-2">

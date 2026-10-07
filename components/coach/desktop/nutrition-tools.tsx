@@ -6,6 +6,8 @@ import { MealPlanGenerator, type ImportedMacros } from "@/components/coach/deskt
 import type { WeeklyWeightTrend } from "@/lib/weight-trend";
 import type { NutritionPhase } from "@/lib/nutrition-checkin";
 import type { FoodRules } from "@/lib/allergen-check";
+import type { WeightUnit } from "@/lib/units";
+import type { ActivityLevel } from "@/lib/macros";
 
 interface SavedPlanShape {
   archetype: string;
@@ -41,6 +43,8 @@ export function NutritionTools({
   defaultPhase,
   proteinGPerLb,
   foodRules,
+  weightUnit = "lb",
+  initialActivity = null,
 }: {
   athleteId: string;
   groupId: string;
@@ -63,6 +67,9 @@ export function NutritionTools({
   proteinGPerLb?: number;
   // This client's food rules; the generator never offers an option that breaks them.
   foodRules?: FoodRules;
+  // How the client sees weight, and the activity level they gave: the calculator starts from them.
+  weightUnit?: WeightUnit;
+  initialActivity?: ActivityLevel | null;
 }) {
   const [importedMacros, setImportedMacros] = useState<ImportedMacros | null>(null);
   const [calculatorExpanded, setCalculatorExpanded] = useState(true);
@@ -97,7 +104,7 @@ export function NutritionTools({
         </button>
         {calculatorExpanded && (
           <div className="px-4 pb-4 border-t border-steel/15 pt-4">
-            <MacroCalculator onUseMacros={handleUseMacros} initialWeight={latestBodyWeight} initialGoal={defaultPhase} />
+            <MacroCalculator onUseMacros={handleUseMacros} initialWeight={latestBodyWeight} initialGoal={defaultPhase} weightUnit={weightUnit} initialActivity={initialActivity} />
           </div>
         )}
       </div>

@@ -1,4 +1,4 @@
-import { computeBmr, computeTdee, type BiologicalSex } from "@/lib/bmr-tdee";
+import { computeBmr, computeTdee, type ActivityCategory, type BiologicalSex } from "@/lib/bmr-tdee";
 
 export interface BodyProfileInput {
   weightLbs: number | null;
@@ -7,6 +7,8 @@ export interface BodyProfileInput {
   dateOfBirth: string | null; // "YYYY-MM-DD"
   bodyFatPct: number | null;
   todayKey: string;
+  // The client's own activity level (About you). Without one, maintenance falls back to moderate, the app's long-standing assumption.
+  activity?: ActivityCategory | null;
 }
 
 const KG_PER_LB = 0.453592;
@@ -35,8 +37,8 @@ export function estimateBmr(p: BodyProfileInput): number | null {
   return Number.isFinite(bmr) ? bmr : null;
 }
 
-// Maintenance as the page worked it out before ("moderate" activity, the app's own fallback), now from the same one BMR.
+// Maintenance from the same one BMR, at the client's own activity level when they have given one, else moderate.
 export function estimateMaintenance(p: BodyProfileInput): number | null {
   const bmr = estimateBmr(p);
-  return bmr == null ? null : computeTdee(bmr, "moderate");
+  return bmr == null ? null : computeTdee(bmr, p.activity ?? "moderate");
 }

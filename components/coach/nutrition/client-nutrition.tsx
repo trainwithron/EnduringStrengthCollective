@@ -5,7 +5,6 @@ import { WeeklyCheckinPanel } from "@/components/coach/desktop/weekly-checkin-pa
 import { NutritionCheckinSuggestionsList } from "@/components/coach/desktop/nutrition-checkin-suggestions-list";
 import { NutritionSpotterPanel, type NutritionSpotterFinding } from "@/components/coach/desktop/nutrition-spotter-panel";
 import { StandingMacroTargetCard } from "@/components/coach/desktop/standing-macro-target-card";
-import { NutritionPhaseControl } from "@/components/coach/nutrition-phase-control";
 import { CalorieFloorWarning } from "@/components/coach/nutrition/calorie-floor-warning";
 import { WhatTheyAte } from "@/components/coach/nutrition/what-they-ate";
 import { PreferencesSection } from "@/components/coach/nutrition/preferences-section";
@@ -23,7 +22,7 @@ import { fetchStandingHistory } from "@/lib/standing-macros";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { addDaysToKey, daysBetweenKeys } from "@/lib/date-key";
 import { buildFoodWeek, type FoodEntryRow } from "@/lib/food-week";
-import { asBiologicalSex, estimateBmr, estimateMaintenance } from "@/lib/nutrition-profile";
+import { ageOnDate, asBiologicalSex, estimateBmr, estimateMaintenance } from "@/lib/nutrition-profile";
 import { calorieFloor, floorBasisNote } from "@/lib/calorie-floor";
 import {
   detectStaleMealPlan,
@@ -35,6 +34,12 @@ import {
 import { hasFoodRules, proteinGramsForWeight, restrictionsTextFromPreferences, rowToPreferences } from "@/lib/nutrition-preferences";
 import { checkPlanAgainstPreferences, describeFlagged, flaggedDays } from "@/lib/plan-preference-check";
 import { shortDateLabel } from "@/lib/apply-from";
+import { BodyProfileEditor } from "@/components/coach/nutrition/body-profile-editor";
+import { BaselinePrompt } from "@/components/coach/nutrition/baseline-prompt";
+import { PhaseOfRecordCard } from "@/components/coach/nutrition/phase-of-record-card";
+import { readDateOfBirth, rowToBodyProfile } from "@/lib/client-body-profile";
+import { rowToPhasePlan, resolvePhaseOfRecord } from "@/lib/phase-plan";
+import { chooseBaselinePhase, computeBaseline } from "@/lib/nutrition-baseline";
 
 const PHASE_TAG_LABEL: Record<MilestonePhaseTag, string> = { reverse_diet: "Reverse diet", cut: "Cut", bulk: "Bulk" };
 
@@ -91,6 +96,8 @@ export async function ClientNutrition({
     { data: bodyDetails },
     { data: intakeDob },
     { data: phaseRow },
+    { data: phasePlanRow },
+    { data: goalRows },
   ] = await Promise.all([
     supabase
       .from("body_weight_logs")
@@ -129,7 +136,7 @@ export async function ClientNutrition({
     supabase
       .from("nutrition_checkin_suggestions")
       .select(
-        "id, phase, prev_weight_lbs, curr_weight_lbs, current_calories, adherence_days, recovery_rating, consecutive_surplus_spikes, new_calories, rationale, protein_g, carbs_g, fat_g, adjustment_pct, generated_at"
+        "id, kind, below_floor, phase, prev_weight_lbs, curr_weight_lbs, current_calories, adherence_days, recovery_rating, consecutive_surplus_spikes, new_calories, rationale, protein_g, carbs_g, fat_g, adjustment_pct, generated_at"
       )
       .eq("athlete_id", athleteId)
       .eq("group_id", groupId)
@@ -149,10 +156,15 @@ export async function ClientNutrition({
     supabase.from("meal_plans").select("log_date, meals").eq("athlete_id", athleteId).gte("log_date", todayKey).lte("log_date", addDaysToKey(todayKey, 13)).order("log_date", { ascending: true }),
     // A real client-safety input: the check-in engine floors an injured client's calories at maintenance whatever the phase.
     supabase.from("athlete_injury_status").select("is_injured, surplus_pct").eq("athlete_id", athleteId).maybeSingle(),
-    supabase.from("athlete_profile_details").select("height_cm, biological_sex, body_fat_pct, birthday").eq("athlete_id", athleteId).maybeSingle(),
+    supabase.from("athlete_profile_details").select("*").eq("athlete_id", athleteId).maybeSingle(),
     supabase.from("client_intake").select("date_of_birth").eq("athlete_id", athleteId).maybeSingle(),
     supabase.from("nutrition_phases").select("phase, started_at").eq("athlete_id", athleteId).eq("group_id", groupId).maybeSingle(),
+    // The phase of record (coach-only) and the goals the client and coach have agreed or proposed.
+    supabase.from("client_phase_plans").select("*").eq("athlete_id", athleteId).eq("group_id", groupId).maybeSingle(),
+    supabase.from("client_goals").select("goal_type, status, nutrition_phase, created_at").eq("athlete_id", athleteId).eq("group_id", groupId),
   ]);
+  const bodyProfile = rowToBodyProfile(bodyDetails as Record<string, unknown> | null, intakeDob as Record<string, unknown> | null);
+  const phasePlan = rowToPhasePlan(phasePlanRow as Record<string, unknown> | null);
 
   const prefs = rowToPreferences(prefsRow as Record<string, unknown> | null);
   const foodRules = { allergies: prefs.allergies, intolerances: prefs.intolerances, dislikes: prefs.dislikes, dietType: prefs.dietType };
@@ -175,11 +187,13 @@ export async function ClientNutrition({
 
   const profileInput = {
     weightLbs: weightLogs?.[0]?.weight ?? null,
-    heightCm: bodyDetails?.height_cm ?? null,
-    sex: bodyDetails?.biological_sex ?? null,
-    dateOfBirth: (intakeDob?.date_of_birth as string | null) ?? (bodyDetails?.birthday as string | null) ?? null,
-    bodyFatPct: bodyDetails?.body_fat_pct ?? null,
+    heightCm: bodyProfile.heightCm,
+    sex: bodyProfile.sex,
+    // One reader for the date of birth: the intake's, else the profile's own.
+    dateOfBirth: readDateOfBirth(bodyProfile),
+    bodyFatPct: bodyProfile.bodyFatPct,
     todayKey,
+    activity: bodyProfile.activity,
   };
   const bmr = estimateBmr(profileInput);
   const maintenanceCalories = estimateMaintenance(profileInput);
@@ -315,6 +329,8 @@ export async function ClientNutrition({
 
   const pendingSuggestions = (pendingSuggestionRows ?? []).map((s) => ({
     id: s.id,
+    kind: (s.kind === "baseline" ? "baseline" : "weekly") as "weekly" | "baseline",
+    belowFloor: !!s.below_floor,
     phase: s.phase,
     prevWeightLbs: s.prev_weight_lbs,
     currWeightLbs: s.curr_weight_lbs,
@@ -332,6 +348,28 @@ export async function ClientNutrition({
   }));
 
   const currentCalories = standingTarget?.calories ?? latestExplicit?.calories ?? null;
+
+  // The phase of record (the saved plan, else the latest check-in's phase, else the milestone tag), and the starting target the calculator would suggest for a client with
+  // no target yet. The baseline's phase comes from the saved plan, else the goal they and their coach agreed (or proposed), else maintenance.
+  const derivedPhase = phasePlan ? null : resolvePhaseOfRecord({ plan: null, latestCheckinPhase: lastCheckinRow?.phase ?? null, milestoneTag: phaseTag });
+  const chosenBaseline = chooseBaselinePhase(phasePlan, (goalRows ?? []) as { goal_type: string; status: string; nutrition_phase?: string | null; created_at?: string | null }[]);
+  const baselinePhase = chosenBaseline.phase;
+  const baselinePhaseNote = chosenBaseline.note;
+  const baselineOutcome = computeBaseline({
+    weightLbs: weightLogs?.[0]?.weight != null ? Number(weightLogs[0].weight) : null,
+    heightCm: bodyProfile.heightCm,
+    sex: bodyProfile.sex,
+    dateOfBirth: readDateOfBirth(bodyProfile),
+    bodyFatPct: bodyProfile.bodyFatPct,
+    activity: bodyProfile.activity,
+    phase: baselinePhase,
+    todayKey,
+    proteinGPerLb: prefs.proteinGPerLb,
+    carbSplit: prefs.carbSplit,
+    dietType: prefs.dietType,
+  });
+  const baselineArchetype = prefs.dietType === "keto" ? "keto" : prefs.dietType === "carnivore" ? "carnivore" : "standard";
+  const dobLabel = readDateOfBirth(bodyProfile) ? shortDateLabel(readDateOfBirth(bodyProfile) as string) : null;
 
   return (
     <div className="space-y-10">
@@ -378,6 +416,25 @@ export async function ClientNutrition({
         <SectionHeading id="targets" title="Targets" note="What they should eat each day, what the weekly check-in suggests, and where it came from." />
         <div className="space-y-6">
           <NutritionSpotterPanel findings={findings} />
+          <BodyProfileEditor
+            athleteId={athleteId}
+            groupId={groupId}
+            clientName={firstName}
+            initial={{ heightCm: bodyProfile.heightCm, sex: bodyProfile.sex, bodyFatPct: bodyProfile.bodyFatPct, activity: bodyProfile.activity, weightUnit: bodyProfile.weightUnit }}
+            dateOfBirthLabel={dobLabel}
+            latestWeightLbs={weightLogs?.[0]?.weight != null ? Number(weightLogs[0].weight) : null}
+            latestWeightDate={latestWeightDate}
+          />
+          <BaselinePrompt
+            athleteId={athleteId}
+            groupId={groupId}
+            clientName={firstName}
+            outcome={baselineOutcome}
+            phaseNote={baselinePhaseNote}
+            archetype={baselineArchetype}
+            hasStanding={standingTarget?.calories != null}
+            hasPendingBaseline={pendingSuggestions.some((p) => p.kind === "baseline")}
+          />
           <NutritionCheckinSuggestionsList
             athleteId={athleteId}
             groupId={groupId}
@@ -405,12 +462,14 @@ export async function ClientNutrition({
             scheduled={scheduledTargets}
           />
           <div>
-            <NutritionPhaseControl
+            <PhaseOfRecordCard
               athleteId={athleteId}
               groupId={groupId}
               coachId={coachId}
-              initialPhase={phaseTag}
-              initialStartedAt={phaseRow?.started_at ?? null}
+              clientName={firstName}
+              plan={phasePlan}
+              derived={derivedPhase && derivedPhase.source !== "plan" ? { phase: derivedPhase.phase, source: derivedPhase.source } : null}
+              todayKey={todayKey}
             />
             {trendAlignment && (
               <p className={`font-body text-xs mt-2 ${trendAlignment.aligned ? "text-positive" : "text-rust"}`}>
@@ -440,13 +499,15 @@ export async function ClientNutrition({
                 isInjured={isInjured}
                 maintenanceCalories={maintenanceCalories}
                 injurySurplusPct={injurySurplusPct}
-                defaultPhase={milestoneTagToNutritionPhase(phaseTag)}
+                defaultPhase={phasePlan?.phase ?? derivedPhase?.phase ?? milestoneTagToNutritionPhase(phaseTag)}
                 todayKey={todayKey}
                 floorCalories={floorCalories}
                 floorNote={floorNote}
                 clientName={firstName}
                 proteinGPerLb={prefs.proteinGPerLb}
                 defaultDietaryRestrictions={rulesText}
+                weightUnit={bodyProfile.weightUnit}
+                ageYears={readDateOfBirth(bodyProfile) ? ageOnDate(readDateOfBirth(bodyProfile) as string, todayKey) : null}
               />
             </div>
           </details>
@@ -499,12 +560,14 @@ export async function ClientNutrition({
           defaultPhase={milestoneTagToNutritionPhase(phaseTag)}
           proteinGPerLb={prefs.proteinGPerLb}
           foodRules={foodRules}
+          weightUnit={bodyProfile.weightUnit}
+          initialActivity={bodyProfile.activity}
         />
       </section>
 
       <section>
         <SectionHeading id="what-they-ate" title="What they ate" note="The last 7 days of their food log against their target." />
-        <WhatTheyAte week={week} weightTrend={weightTrend} clientName={firstName} />
+        <WhatTheyAte week={week} weightTrend={weightTrend} clientName={firstName} weightUnit={bodyProfile.weightUnit} />
       </section>
     </div>
   );

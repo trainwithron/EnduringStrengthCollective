@@ -6,6 +6,7 @@ import { WeightLogWidget, type WeightLogEntry } from "./weight-log-widget";
 import type { DayWorkoutInfo } from "@/lib/athlete-day-schedule";
 import type { DaySession } from "@/lib/program-day-contexts";
 import { computeReadinessAverage, type WellnessCheckinValues } from "@/lib/wellness";
+import type { WeightUnit } from "@/lib/units";
 
 // One date's worth of Home content. `isToday` is the one flag that
 // decides whether this renders live, write-capable controls (Start
@@ -24,6 +25,7 @@ export function DayCard({
   macros,
   habits,
   weightLogs,
+  weightUnit = "lb",
   canBook,
   wellnessCheckin,
   nextLabel = null,
@@ -42,6 +44,7 @@ export function DayCard({
   macros: TodayMacros | null;
   habits: TodayHabit[];
   weightLogs: WeightLogEntry[];
+  weightUnit?: WeightUnit;
   canBook: boolean;
   wellnessCheckin?: WellnessCheckinValues | null;
   // "Tomorrow" or a weekday: the next workout, shown on the condensed done card.
@@ -69,7 +72,7 @@ export function DayCard({
       {isToday ? (
         <>
           <TodayWidget todayDate={dateKey} macros={macros} habits={habits} mealLine={mealLine ?? null} mealHref={`/groups/${groupId}/nutrition`} />
-          <WeightLogWidget athleteId={athleteId} groupId={groupId} initialLogs={weightLogs} />
+          <WeightLogWidget athleteId={athleteId} groupId={groupId} initialLogs={weightLogs} weightUnit={weightUnit} />
         </>
       ) : (
         <ReadOnlyDaySummary macros={macros} habits={habits} />

@@ -22,7 +22,7 @@ describe("one ClientNutrition, used by the hub and by the profile", () => {
       expect(page).not.toContain("<NutritionTools");
       expect(page).not.toContain("<WeeklyCheckinPanel");
       expect(page).not.toContain("<StandingMacroTargetCard");
-      expect(page).not.toContain("<NutritionPhaseControl");
+      expect(page).not.toContain("<PhaseOfRecordCard");
     }
   });
   it("the component holds Targets, Preferences, Meal plan and What they ate, with the calculator inside Meal plan", () => {
@@ -33,7 +33,7 @@ describe("one ClientNutrition, used by the hub and by the profile", () => {
     expect(clientNutrition).toContain("<StandingMacroTargetCard");
     expect(clientNutrition).toContain("<NutritionCheckinSuggestionsList");
     expect(clientNutrition).toContain("<WeeklyCheckinPanel");
-    expect(clientNutrition).toContain("<NutritionPhaseControl");
+    expect(clientNutrition).toContain("<PhaseOfRecordCard");
     expect(clientNutrition).toContain("<WhatTheyAte");
     expect(clientNutrition).toContain("#macro-calculator");
   });
@@ -69,7 +69,7 @@ describe("the old pages send a coach to the new tabs, and leave the client's pag
   it("the Macro Calculator goes to the Calculator tab for a coach not acting as a client; a client's own calculator page is kept", () => {
     expect(calcPage).toContain('membership.role === "coach" && !effective.isActingAsOther');
     expect(calcPage).toContain("redirect(`/groups/${params.groupId}/nutrition?tab=calculator`)");
-    expect(calcPage).toContain("<MacroCalculator initialWeight=");
+    expect(calcPage).toContain("initialWeight={latestWeightRow?.weight ?? null}");
     expect(calcPage).toContain("<BottomTabBar");
     expect(calcPage).not.toContain("<CoachDesktopShell");
   });

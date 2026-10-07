@@ -6,6 +6,8 @@ import { clampApplyFrom } from "@/lib/apply-from";
 import { applyStandingTarget, insertCheckinOnce, pushMessageForApply, type ApplyPlan } from "@/lib/apply-standing";
 import { notifyPush } from "@/lib/push-notify";
 import { isBelowFloor } from "@/lib/calorie-floor";
+import { ensurePhasePlan } from "@/lib/phase-plan-write";
+import type { NutritionPhase } from "@/lib/nutrition-checkin";
 import { ApplyFromField } from "@/components/coach/nutrition/apply-from-field";
 import { CalorieFloorWarning } from "@/components/coach/nutrition/calorie-floor-warning";
 import { ApplyOutcomeNotice } from "@/components/coach/nutrition/apply-outcome-notice";
@@ -13,18 +15,21 @@ import { ApplyOutcomeNotice } from "@/components/coach/nutrition/apply-outcome-n
 export interface CheckinSuggestion {
   id: string;
   phase: string;
-  prevWeightLbs: number;
-  currWeightLbs: number;
-  currentCalories: number;
-  adherenceDays: number;
-  recoveryRating: number;
+  // A starting target for a new client has no previous week, so a baseline has none of these five.
+  kind: "weekly" | "baseline";
+  prevWeightLbs: number | null;
+  currWeightLbs: number | null;
+  currentCalories: number | null;
+  adherenceDays: number | null;
+  recoveryRating: number | null;
   consecutiveSurplusSpikes: number;
   newCalories: number;
   rationale: string;
   proteinG: number;
   carbsG: number;
   fatG: number;
-  adjustmentPct: number;
+  adjustmentPct: number | null;
+  belowFloor?: boolean;
   generatedAt: string;
 }
 
@@ -64,6 +69,9 @@ export function NutritionCheckinSuggestionCard({
   const [applyFrom, setApplyFrom] = useState(todayKey);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // A starting target also sets the client's phase when they have none; if that part fails the coach is told here.
+  const [phaseNote, setPhaseNote] = useState<string | null>(null);
+  const isBaseline = suggestion.kind === "baseline";
   // Set once the target is applied: the card then shows what the apply really did until the coach says Done.
   const [outcome, setOutcome] = useState<{ plan: ApplyPlan; startKey: string } | null>(null);
 
@@ -85,30 +93,50 @@ export function NutritionCheckinSuggestionCard({
       return;
     }
 
-    const recorded = await insertCheckinOnce(supabase, {
-      athlete_id: athleteId,
-      group_id: groupId,
-      phase: suggestion.phase,
-      prev_weight_lbs: suggestion.prevWeightLbs,
-      curr_weight_lbs: suggestion.currWeightLbs,
-      current_calories: suggestion.currentCalories,
-      adherence_days: suggestion.adherenceDays,
-      recovery_rating: suggestion.recoveryRating,
-      consecutive_surplus_spikes: suggestion.consecutiveSurplusSpikes,
-      new_calories: suggestion.newCalories,
-      rationale: suggestion.rationale,
-      protein_g: suggestion.proteinG,
-      carbs_g: suggestion.carbsG,
-      fat_g: suggestion.fatG,
-      adjustment_pct: suggestion.adjustmentPct,
-      created_by: user?.id,
-    });
+    const checkinRow = isBaseline
+        ? {
+            athlete_id: athleteId,
+            group_id: groupId,
+            kind: "baseline",
+            phase: suggestion.phase,
+            consecutive_surplus_spikes: 0,
+            new_calories: suggestion.newCalories,
+            rationale: suggestion.rationale,
+            protein_g: suggestion.proteinG,
+            carbs_g: suggestion.carbsG,
+            fat_g: suggestion.fatG,
+            created_by: user?.id,
+          }
+        : {
+            athlete_id: athleteId,
+            group_id: groupId,
+            phase: suggestion.phase,
+            prev_weight_lbs: suggestion.prevWeightLbs,
+            curr_weight_lbs: suggestion.currWeightLbs,
+            current_calories: suggestion.currentCalories,
+            adherence_days: suggestion.adherenceDays,
+            recovery_rating: suggestion.recoveryRating,
+            consecutive_surplus_spikes: suggestion.consecutiveSurplusSpikes,
+            new_calories: suggestion.newCalories,
+            rationale: suggestion.rationale,
+            protein_g: suggestion.proteinG,
+            carbs_g: suggestion.carbsG,
+            fat_g: suggestion.fatG,
+            adjustment_pct: suggestion.adjustmentPct,
+            created_by: user?.id,
+          };
+    const recorded = await insertCheckinOnce(supabase, checkinRow);
     if (!recorded.ok) {
       setError("The new target is applied, but the check-in could not be recorded. Press Apply again to finish; it will not apply twice.");
       setBusy(false);
       return;
     }
 
+    if (isBaseline && user?.id) {
+      // A client with no phase of record gets the one this target was worked out for; one who has a phase keeps it.
+      const ensured = await ensurePhasePlan(supabase, { athleteId, groupId, coachId: user.id, phase: suggestion.phase as NutritionPhase, todayKey });
+      if (!ensured.ok) setPhaseNote("The target is applied, but the phase could not be saved. Set it under Phase.");
+    }
     await supabase.from("nutrition_checkin_suggestions").update({ status: "applied" }).eq("id", suggestion.id);
     notifyPush(
       athleteId,
@@ -132,7 +160,7 @@ export function NutritionCheckinSuggestionCard({
     <div className="border border-rust/40 bg-surface/60 p-4 space-y-3">
       <div className="flex items-center justify-between">
         <p className="font-body text-xs text-rust uppercase tracking-wide font-bold">
-          Weekly check-in suggestion — {PHASE_LABELS[suggestion.phase] ?? suggestion.phase}
+          {isBaseline ? `Starting target for ${clientName}` : "Weekly check-in suggestion"} — {PHASE_LABELS[suggestion.phase] ?? suggestion.phase}
         </p>
         <p className="font-body text-xs text-steel">
           {new Date(suggestion.generatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
@@ -168,6 +196,7 @@ export function NutritionCheckinSuggestionCard({
             startKey={outcome.startKey}
             todayKey={todayKey}
           />
+          {phaseNote && <p className="font-body text-xs text-rust">{phaseNote}</p>}
           <button type="button" onClick={onResolved} className="h-9 px-3 bg-rust text-graphite font-body text-xs font-medium">
             Done
           </button>

@@ -19,6 +19,7 @@ import { DayMealsView } from "@/components/athlete/day-meals-view";
 import { NutritionPreferencesCard } from "@/components/athlete/nutrition-preferences-card";
 import { rowToPreferences } from "@/lib/nutrition-preferences";
 import { filterGeneratedMealsForClient, filterPlanForClient, hidePlanRecipes } from "@/lib/plan-preference-check";
+import { asWeightUnit, displayWeightValue } from "@/lib/units";
 import type { FoodLogEntry } from "@/components/athlete/meal-checkoff-list";
 import { computeTodaysMicronutrients } from "@/lib/todays-micronutrients";
 import { Key12NutrientGrid } from "@/components/athlete/key12-nutrient-grid";
@@ -330,7 +331,10 @@ export default async function NutritionPage(
     ? await computeTodaysMicronutrients(supabase, todayMeals)
     : { totals: {}, coveredIngredientCount: 0, totalIngredientCount: 0, hasAnyData: false };
 
-  const weightTrendPoints = (weightLogs ?? []).map((w) => ({ date: w.logged_date, value: w.weight }));
+  // The client's own unit: stored pounds are only converted for display.
+  const { data: unitRow } = await supabase.from("athlete_profile_details").select("weight_unit").eq("athlete_id", athleteId).maybeSingle();
+  const weightUnit = asWeightUnit(unitRow?.weight_unit);
+  const weightTrendPoints = (weightLogs ?? []).map((w) => ({ date: w.logged_date, value: displayWeightValue(w.weight, weightUnit) }));
   const calorieTrendPoints = (macroHistory ?? [])
     .filter((m: any) => m.calories != null)
     .map((m: any) => ({ date: m.log_date, value: m.calories }));
@@ -487,7 +491,7 @@ export default async function NutritionPage(
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
               Body weight
             </h2>
-            <TrendChart points={weightTrendPoints} unit=" lbs" />
+            <TrendChart points={weightTrendPoints} unit={` ${weightUnit}`} />
           </section>
 
           <section>

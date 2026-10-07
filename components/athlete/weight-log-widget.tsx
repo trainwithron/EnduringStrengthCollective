@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { localDateKey } from "@/lib/timezone";
 import { computeNewlyCrossedThresholds } from "@/lib/transformation-milestones";
+import { displayWeightValue, formatWeight, parseWeightInput, type WeightUnit } from "@/lib/units";
 
 export interface WeightLogEntry {
   id: string;
@@ -20,10 +21,13 @@ export function WeightLogWidget({
   athleteId,
   groupId,
   initialLogs,
+  weightUnit = "lb",
 }: {
   athleteId: string;
   groupId: string;
   initialLogs: WeightLogEntry[];
+  // How the client likes to see weight. Weights are always stored in pounds; this only changes what is shown and typed.
+  weightUnit?: WeightUnit;
 }) {
   const [logs, setLogs] = useState(initialLogs);
   const [weight, setWeight] = useState("");
@@ -93,7 +97,7 @@ export function WeightLogWidget({
   const milestoneBanner = newMilestone && (
     <div className="border border-rust/40 bg-rust/5 p-3 mb-3">
       <p className="font-body text-sm text-chalk">
-        🎉 You&apos;ve hit a real milestone — down {newMilestone.thresholdLbs}+ lbs since you started!
+        🎉 You&apos;ve hit a real milestone — down {displayWeightValue(newMilestone.thresholdLbs, weightUnit)}+ {weightUnit === "kg" ? "kg" : "lbs"} since you started!
       </p>
       <div className="flex items-center gap-3 mt-2">
         <Link
@@ -123,7 +127,7 @@ export function WeightLogWidget({
           className="w-full border border-steel/20 p-4 flex items-center justify-between text-left"
         >
           <span className="font-body text-sm text-chalk">
-            {todayLog ? `Today's weight: ${todayLog.weight} lbs` : "Log today's weight"}
+            {todayLog ? `Today's weight: ${formatWeight(todayLog.weight, weightUnit)}` : "Log today's weight"}
           </span>
           <span className="font-body text-xs text-rust">{todayLog ? "Update" : "Log"}</span>
         </button>
@@ -133,8 +137,12 @@ export function WeightLogWidget({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const value = Number(weight);
-    if (!value || value <= 0) return;
+    // What they typed, in their unit, read once as pounds (what is stored). A converted number is never saved twice.
+    const value = parseWeightInput(weight, weightUnit);
+    if (value == null) {
+      setError("That doesn't look like a body weight. Check the number.");
+      return;
+    }
 
     setSubmitting(true);
     setError(null);
@@ -187,7 +195,7 @@ export function WeightLogWidget({
           step="0.1"
           value={weight}
           onChange={(e) => setWeight(e.target.value)}
-          placeholder={todayLog ? `Today: ${todayLog.weight} lbs` : "Weight (lbs)"}
+          placeholder={todayLog ? `Today: ${formatWeight(todayLog.weight, weightUnit)}` : `Weight (${weightUnit})`}
           className="flex-1 h-11 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
         />
         <button
@@ -209,7 +217,7 @@ export function WeightLogWidget({
         <div className="mt-3 flex gap-3 overflow-x-auto">
           {logs.slice(0, 7).map((l) => (
             <div key={l.id} className="shrink-0 text-center">
-              <p className="font-body text-sm">{l.weight}</p>
+              <p className="font-body text-sm">{displayWeightValue(l.weight, weightUnit)}</p>
               <p className="font-body text-xs text-steel">
                 {new Date(l.loggedDate + "T00:00:00").toLocaleDateString(undefined, {
                   month: "numeric",

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { holdDeficitForMinor } from "@/lib/minor-safety";
+import { displayWeightValue, parseWeightInput, type WeightUnit } from "@/lib/units";
 import {
   runCheckInEngine,
   clampAdjustmentPct,
@@ -61,6 +63,8 @@ export function WeeklyCheckinPanel({
   clientName = "this client",
   proteinGPerLb,
   defaultDietaryRestrictions = "",
+  ageYears = null,
+  weightUnit = "lb",
 }: {
   athleteId: string;
   groupId: string;
@@ -97,13 +101,18 @@ export function WeeklyCheckinPanel({
   proteinGPerLb?: number;
   // The client's own food rules as one line (from their preferences). It wins over the text of an older check-in, which may be out of date.
   defaultDietaryRestrictions?: string;
+  // The client's age in whole years, when their date of birth is on file. Under 18, a suggestion that would lower their calories is held at the current number.
+  ageYears?: number | null;
+  // How this client sees weight. The two weights are typed and shown in it; the engine and the saved check-in always use pounds.
+  weightUnit?: WeightUnit;
 }) {
-  const [phase, setPhase] = useState<NutritionPhase>(lastCheckin?.phase ?? defaultPhase ?? "fat_loss");
+  const toLbs = (text: string): number => parseWeightInput(text, weightUnit) ?? Number(text);
+  const [phase, setPhase] = useState<NutritionPhase>(defaultPhase ?? lastCheckin?.phase ?? "fat_loss");
   const [adjustmentPct, setAdjustmentPct] = useState(lastCheckin?.adjustmentPct ?? DEFAULT_ADJUSTMENT_PCT);
   const [prevWeight, setPrevWeight] = useState(
-    lastWeekAvgWeight != null ? String(lastWeekAvgWeight) : ""
+    lastWeekAvgWeight != null ? String(displayWeightValue(lastWeekAvgWeight, weightUnit)) : ""
   );
-  const [currWeight, setCurrWeight] = useState(weekAvgWeight != null ? String(weekAvgWeight) : "");
+  const [currWeight, setCurrWeight] = useState(weekAvgWeight != null ? String(displayWeightValue(weekAvgWeight, weightUnit)) : "");
   const [currentCalories, setCurrentCalories] = useState(
     defaultCurrentCalories != null ? String(defaultCurrentCalories) : ""
   );
@@ -140,8 +149,8 @@ export function WeeklyCheckinPanel({
     setError(null);
     const engineResult = runCheckInEngine({
       phase,
-      prevWeightLbs: Number(prevWeight),
-      currWeightLbs: Number(currWeight),
+      prevWeightLbs: toLbs(prevWeight),
+      currWeightLbs: toLbs(currWeight),
       currentCalories: Number(currentCalories),
       adherenceDays: Number(adherenceDays),
       recoveryRating: Number(recoveryRating),
@@ -151,9 +160,11 @@ export function WeeklyCheckinPanel({
       maintenanceCalories,
       injurySurplusPct,
     });
-    setResult(engineResult);
+    // No calorie deficit is suggested for anyone under 18: the number is held at their current calories and the reason is added.
+    const guarded = holdDeficitForMinor({ ageYears, currentCalories: Number(currentCalories), result: engineResult });
+    setResult(guarded.result);
     const archetype = detectDietArchetype(dietaryRestrictions);
-    const split = computeArchetypeMacros(engineResult.newCalories, Number(currWeight), archetype, proteinGPerLb);
+    const split = computeArchetypeMacros(guarded.result.newCalories, toLbs(currWeight), archetype, proteinGPerLb);
     setMacros({ proteinG: split.proteinG, carbsG: split.carbsG, fatG: split.fatG });
   }
 
@@ -204,8 +215,8 @@ export function WeeklyCheckinPanel({
       athlete_id: athleteId,
       group_id: groupId,
       phase,
-      prev_weight_lbs: Number(prevWeight),
-      curr_weight_lbs: Number(currWeight),
+      prev_weight_lbs: toLbs(prevWeight),
+      curr_weight_lbs: toLbs(currWeight),
       current_calories: Number(currentCalories),
       adherence_days: Number(adherenceDays),
       recovery_rating: Number(recoveryRating),
@@ -318,7 +329,7 @@ export function WeeklyCheckinPanel({
 
         <label className="flex flex-col gap-1">
           <span className="font-body text-xs text-steel uppercase tracking-wide">
-            Last week&apos;s avg weight (lbs)
+            Last week&apos;s avg weight ({weightUnit})
           </span>
           <input
             type="number"
@@ -331,7 +342,7 @@ export function WeeklyCheckinPanel({
 
         <label className="flex flex-col gap-1">
           <span className="font-body text-xs text-steel uppercase tracking-wide">
-            This week&apos;s avg weight (lbs)
+            This week&apos;s avg weight ({weightUnit})
           </span>
           <input
             type="number"

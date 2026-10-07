@@ -61,6 +61,9 @@ export default async function MacroCalculatorPage(
     .limit(1)
     .maybeSingle();
 
+  // Their own unit and activity level (About you), so the calculator speaks their language from the first screen.
+  const { data: aboutRow } = await supabase.from("athlete_profile_details").select("weight_unit, activity_level").eq("athlete_id", effective.athleteId).maybeSingle();
+
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
       {effective.isActingAsOther && (
@@ -83,7 +86,11 @@ export default async function MacroCalculatorPage(
       </header>
 
       <section className="px-5 pt-6">
-        <MacroCalculator initialWeight={latestWeightRow?.weight ?? null} />
+        <MacroCalculator
+          initialWeight={latestWeightRow?.weight ?? null}
+          weightUnit={aboutRow?.weight_unit === "kg" ? "kg" : "lb"}
+          initialActivity={(["sedentary", "light", "moderate", "very_active"] as const).find((a) => a === aboutRow?.activity_level) ?? null}
+        />
         <Link
           href={`/groups/${params.groupId}/nutrition`}
           className="inline-block mt-6 font-body text-sm text-rust"
