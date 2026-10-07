@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { saveStandingTarget } from "@/lib/standing-macros";
-import { localDateKey } from "@/lib/timezone";
+import { applyStandingTarget, type ApplyPlan } from "@/lib/apply-standing";
 import { CalorieFloorWarning } from "@/components/coach/nutrition/calorie-floor-warning";
+import { ApplyOutcomeNotice } from "@/components/coach/nutrition/apply-outcome-notice";
 
 interface Target {
   calories: number | null;
@@ -46,7 +47,9 @@ export function StandingMacroTargetCard({
   upcomingOverrides,
   calendarHref,
   floorCalories = null,
+  floorNote = null,
   clientName = "this client",
+  todayKey,
 }: {
   athleteId: string;
   groupId: string;
@@ -58,7 +61,10 @@ export function StandingMacroTargetCard({
   calendarHref: string;
   // The soft calorie floor for this client, when it can be worked out: only ever a warning under the number, never a block.
   floorCalories?: number | null;
+  floorNote?: string | null;
   clientName?: string;
+  // The coach's calendar day, worked out on the server in the coach's own time zone.
+  todayKey: string;
 }) {
   const router = useRouter();
   const [saved, setSaved] = useState<Target | null>(initial);
@@ -66,6 +72,8 @@ export function StandingMacroTargetCard({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // What the last save really did (days that still use their own target or a meal plan, and whether today changed).
+  const [outcome, setOutcome] = useState<{ plan: ApplyPlan; target: Target } | null>(null);
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(toDraft(saved));
 
@@ -99,13 +107,7 @@ export function StandingMacroTargetCard({
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    const result = await saveStandingTarget(supabase, {
-      athleteId,
-      groupId,
-      userId: user?.id ?? null,
-      target: parsed,
-      today: localDateKey(),
-    });
+    const result = await applyStandingTarget(supabase, { athleteId, groupId, userId: user?.id ?? null, target: parsed, startKey: todayKey, todayKey });
     setBusy(false);
     if (!result.ok) {
       setError("Couldn't save the standing target. Check your connection and try again.");
@@ -113,7 +115,7 @@ export function StandingMacroTargetCard({
     }
     setSaved(parsed);
     setDraft(toDraft(parsed));
-    setMessage("Saved. It applies from today on. Earlier days keep the target they had.");
+    setOutcome({ plan: result, target: parsed });
     router.refresh();
   }
 
@@ -131,7 +133,7 @@ export function StandingMacroTargetCard({
       groupId,
       userId: user?.id ?? null,
       target: null,
-      today: localDateKey(),
+      today: todayKey,
     });
     setBusy(false);
     if (!result.ok) {
@@ -140,6 +142,7 @@ export function StandingMacroTargetCard({
     }
     setSaved(null);
     setDraft(toDraft(null));
+    setOutcome(null);
     setMessage("Standing target removed.");
     router.refresh();
   }
@@ -179,7 +182,7 @@ export function StandingMacroTargetCard({
       </div>
 
       <div className="mt-3">
-        <CalorieFloorWarning calories={draft.calories.trim() === "" ? null : Number(draft.calories)} floor={floorCalories} who={clientName} />
+        <CalorieFloorWarning calories={draft.calories.trim() === "" ? null : Number(draft.calories)} floor={floorCalories} who={clientName} note={floorNote} />
       </div>
 
       <div className="flex flex-wrap items-center gap-3 mt-3">
@@ -207,6 +210,12 @@ export function StandingMacroTargetCard({
         <p className="font-body text-xs text-rust mt-2" role="alert">
           {error}
         </p>
+      )}
+
+      {outcome && (
+        <div className="mt-3">
+          <ApplyOutcomeNotice athleteId={athleteId} groupId={groupId} target={outcome.target} plan={outcome.plan} startKey={todayKey} todayKey={todayKey} />
+        </div>
       )}
 
       {!saved && latestExplicit && (

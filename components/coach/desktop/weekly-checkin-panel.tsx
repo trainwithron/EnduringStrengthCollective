@@ -12,12 +12,13 @@ import {
   type CheckInResult,
 } from "@/lib/nutrition-checkin";
 import { computeArchetypeMacros, detectDietArchetype } from "@/lib/macros";
-import { saveStandingTarget } from "@/lib/standing-macros";
-import { clampApplyFrom, targetChangeMessage } from "@/lib/apply-from";
+import { clampApplyFrom, shortDateLabel } from "@/lib/apply-from";
+import { applyStandingTarget, insertCheckinOnce, pushMessageForApply, type ApplyPlan } from "@/lib/apply-standing";
 import { notifyPush } from "@/lib/push-notify";
 import { isBelowFloor } from "@/lib/calorie-floor";
 import { ApplyFromField } from "@/components/coach/nutrition/apply-from-field";
 import { CalorieFloorWarning } from "@/components/coach/nutrition/calorie-floor-warning";
+import { ApplyOutcomeNotice } from "@/components/coach/nutrition/apply-outcome-notice";
 
 // Purely a display band for the slider below — the real min/max/step/
 // default (1-15%, default 5%) are untouched; this just marks where most
@@ -31,11 +32,6 @@ const PHASE_LABELS: Record<NutritionPhase, string> = {
   maintenance: "Maintenance",
   reverse_diet: "Reverse diet",
 };
-
-// The check-in code below reads "{ error }" off whichever save ran; adapt the standing-target result to that shape.
-function standingSaveAsSupabaseResult(r: { ok: boolean }) {
-  return { error: r.ok ? null : { message: "standing target save failed" } };
-}
 
 // Coach-facing action that runs Ron's own weekly calorie-periodization
 // rules (lib/nutrition-checkin.ts, ported from his standalone check-in
@@ -61,6 +57,7 @@ export function WeeklyCheckinPanel({
   defaultPhase,
   todayKey,
   floorCalories = null,
+  floorNote = null,
   clientName = "this client",
 }: {
   athleteId: string;
@@ -92,6 +89,7 @@ export function WeeklyCheckinPanel({
   // The coach's calendar day (from the server, in the coach's zone) and the soft calorie floor for this client when it can be worked out.
   todayKey: string;
   floorCalories?: number | null;
+  floorNote?: string | null;
   clientName?: string;
 }) {
   const [phase, setPhase] = useState<NutritionPhase>(lastCheckin?.phase ?? defaultPhase ?? "fat_loss");
@@ -123,6 +121,8 @@ export function WeeklyCheckinPanel({
   );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  // What the standing-target apply really did (days that will not follow yet, whether today changed), shown after Save.
+  const [outcome, setOutcome] = useState<{ plan: ApplyPlan; startKey: string; target: { calories: number; proteinG: number; carbsG: number; fatG: number } } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const canRun =
@@ -130,6 +130,7 @@ export function WeeklyCheckinPanel({
 
   function handleRun() {
     setSaved(false);
+    setOutcome(null);
     setError(null);
     const engineResult = runCheckInEngine({
       phase,
@@ -160,7 +161,40 @@ export function WeeklyCheckinPanel({
     } = await supabase.auth.getUser();
     const archetype = detectDietArchetype(dietaryRestrictions);
 
-    const { error: checkinError } = await supabase.from("nutrition_checkins").insert({
+    const target = { calories: result.newCalories, proteinG: macros.proteinG, carbsG: macros.carbsG, fatG: macros.fatG };
+    const standingStart = clampApplyFrom(applyFrom, todayKey);
+
+    // The target first, then the check-in record, so a retry after a half-failure re-applies the same target (harmless) and records the check-in only once.
+    let applied: Awaited<ReturnType<typeof applyStandingTarget>> | null = null;
+    if (applyMode === "standing") {
+      applied = await applyStandingTarget(supabase, { athleteId, groupId, userId: user?.id ?? null, target, startKey: standingStart, todayKey });
+      if (!applied.ok) {
+        setError("Couldn't apply the new target. Check your connection and try again.");
+        setSaving(false);
+        return;
+      }
+    } else {
+      const { error: macroError } = await supabase.from("daily_macros").upsert(
+        {
+          athlete_id: athleteId,
+          group_id: groupId,
+          log_date: applyDate,
+          calories: result.newCalories,
+          protein_g: macros.proteinG,
+          carbs_g: macros.carbsG,
+          fat_g: macros.fatG,
+          created_by: user?.id,
+        },
+        { onConflict: "athlete_id,log_date" }
+      );
+      if (macroError) {
+        setError("Couldn't apply the new target to that date. Check your connection and try again.");
+        setSaving(false);
+        return;
+      }
+    }
+
+    const recorded = await insertCheckinOnce(supabase, {
       athlete_id: athleteId,
       group_id: groupId,
       phase,
@@ -180,53 +214,20 @@ export function WeeklyCheckinPanel({
       fat_g: macros.fatG,
       created_by: user?.id,
     });
-
-    if (checkinError) {
-      setError("Couldn't save the check-in — check your connection and try again.");
-      setSaving(false);
-      return;
-    }
-
-    const { error: macroError } =
-      applyMode === "standing"
-        ? await standingSaveAsSupabaseResult(
-            await saveStandingTarget(supabase, {
-              athleteId,
-              groupId,
-              userId: user?.id ?? null,
-              target: {
-                calories: result.newCalories,
-                proteinG: macros.proteinG,
-                carbsG: macros.carbsG,
-                fatG: macros.fatG,
-              },
-              today: clampApplyFrom(applyFrom, todayKey),
-            })
-          )
-        : await supabase.from("daily_macros").upsert(
-            {
-              athlete_id: athleteId,
-              group_id: groupId,
-              log_date: applyDate,
-              calories: result.newCalories,
-              protein_g: macros.proteinG,
-              carbs_g: macros.carbsG,
-              fat_g: macros.fatG,
-              created_by: user?.id,
-            },
-            { onConflict: "athlete_id,log_date" }
-          );
-
-    if (macroError) {
-      setError("Check-in saved, but couldn't apply the new targets to that date.");
+    if (!recorded.ok) {
+      setError("The new target is applied, but the check-in could not be recorded. Press Save again to finish; it will not apply twice.");
       setSaving(false);
       return;
     }
 
     if (athleteId !== user?.id) {
-      const startKey = applyMode === "standing" ? clampApplyFrom(applyFrom, todayKey) : applyDate;
-      notifyPush(athleteId, "New macro targets", targetChangeMessage(result.newCalories, startKey, todayKey), `/groups/${groupId}/nutrition`);
+      const message =
+        applied && applied.ok
+          ? pushMessageForApply({ newCalories: result.newCalories, startKey: standingStart, todayKey, todayChanged: applied.todayChanged })
+          : `Your coach set a calorie target of ${result.newCalories.toLocaleString("en-US")} for ${shortDateLabel(applyDate)}`;
+      notifyPush(athleteId, "New macro targets", message, `/groups/${groupId}/nutrition`);
     }
+    if (applied && applied.ok) setOutcome({ plan: applied, startKey: standingStart, target });
     setSaving(false);
     setSaved(true);
   }
@@ -406,7 +407,7 @@ export function WeeklyCheckinPanel({
             </div>
           </div>
 
-          <CalorieFloorWarning calories={result.newCalories} floor={floorCalories} who={clientName} />
+          <CalorieFloorWarning calories={result.newCalories} floor={floorCalories} who={clientName} note={floorNote} />
           <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-steel/15">
             <label className="flex items-center gap-2 font-body text-xs text-steel">
               Apply to
@@ -437,8 +438,11 @@ export function WeeklyCheckinPanel({
             >
               {saving ? "Saving…" : isBelowFloor(result.newCalories, floorCalories ?? 0) ? "Save anyway" : "Save"}
             </button>
-            {saved && <span className="font-body text-xs text-positive">Saved</span>}
+            {saved && !outcome && <span className="font-body text-xs text-positive">Saved</span>}
           </div>
+          {outcome && (
+            <ApplyOutcomeNotice athleteId={athleteId} groupId={groupId} target={outcome.target} plan={outcome.plan} startKey={outcome.startKey} todayKey={todayKey} />
+          )}
           <p className="font-body text-xs text-steel">
             {applyMode === "standing"
               ? "Days that already have their own target keep it."

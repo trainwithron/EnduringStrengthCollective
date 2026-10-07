@@ -50,3 +50,12 @@ export function addDaysToKey(key: string, days: number): string {
   const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) + days * 86400000);
   return dateKeyOfParts(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
 }
+
+// Whole days from `fromKey` to `toKey` (negative when toKey is earlier), by plain calendar arithmetic. NaN-safe: a bad key gives null.
+export function daysBetweenKeys(fromKey: string, toKey: string): number | null {
+  const a = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fromKey);
+  const b = /^(\d{4})-(\d{2})-(\d{2})$/.exec(toKey);
+  if (!a || !b) return null;
+  const ms = Date.UTC(Number(b[1]), Number(b[2]) - 1, Number(b[3])) - Date.UTC(Number(a[1]), Number(a[2]) - 1, Number(a[3]));
+  return Math.round(ms / 86400000);
+}

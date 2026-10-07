@@ -22,9 +22,3 @@ export function shortDateLabel(key: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
   return m ? `${MONTHS[Number(m[2]) - 1]} ${Number(m[3])}` : key;
 }
-
-// What the client is told: "Your daily target is now 2,180 calories" today, "... from Oct 14" when it starts later.
-export function targetChangeMessage(calories: number | null, applyFrom: string, todayKey: string): string {
-  const base = calories != null ? `Your daily target is now ${calories.toLocaleString("en-US")} calories` : "Your daily target has changed";
-  return applyFrom > todayKey ? `${base}, from ${shortDateLabel(applyFrom)}` : base;
-}

@@ -19,3 +19,14 @@ export function isBelowFloor(calories: number | null | undefined, floor: number)
 export function belowFloorMessage(calories: number, floor: number, who: string): string {
   return `${calories.toLocaleString("en-US")} is under ${who === "this client" ? "this client's" : `${who}'s`} estimated floor of ${floor.toLocaleString("en-US")}. Calories this low are rarely a good idea. You can still apply it.`;
 }
+
+// What the floor rests on, in one plain line (shown with the warning): an old weight, or the missing inputs that make it fall back to the base floor. Null when it rests on
+// a recent weight and a full profile. A male client with no sex on file gets the 1,200 base, so that gap is named.
+export function floorBasisNote(args: { bmr: number | null; weightAgeDays: number | null; missing: string[]; floor: number }): string | null {
+  if (args.bmr == null) {
+    const what = args.missing.length > 0 ? args.missing.join(", ") : "height, sex and date of birth";
+    return `This is the base floor of ${args.floor.toLocaleString("en-US")}: add ${what} for a precise one.`;
+  }
+  if (args.weightAgeDays != null && args.weightAgeDays > 30) return `Based on a weight from ${args.weightAgeDays} days ago.`;
+  return null;
+}

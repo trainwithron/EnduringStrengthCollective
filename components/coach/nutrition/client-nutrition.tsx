@@ -17,13 +17,13 @@ import {
   milestoneTagToNutritionPhase,
   type MilestonePhaseTag,
 } from "@/lib/nutrition-trend-classifier";
-import { calorieSeriesWithStanding, latestStanding, standingForDate } from "@/lib/macro-resolution";
+import { calorieSeriesWithStanding, latestStanding, resolveDayMacros, standingForDate } from "@/lib/macro-resolution";
 import { fetchStandingHistory } from "@/lib/standing-macros";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
-import { addDaysToKey } from "@/lib/date-key";
+import { addDaysToKey, daysBetweenKeys } from "@/lib/date-key";
 import { buildFoodWeek, type FoodEntryRow } from "@/lib/food-week";
 import { asBiologicalSex, estimateBmr, estimateMaintenance } from "@/lib/nutrition-profile";
-import { calorieFloor } from "@/lib/calorie-floor";
+import { calorieFloor, floorBasisNote } from "@/lib/calorie-floor";
 import {
   detectStaleMealPlan,
   detectMacroSumMismatch,
@@ -79,6 +79,7 @@ export async function ClientNutrition({
     { data: lastCheckinRow },
     { data: pendingSuggestionRows },
     { data: foodRows },
+    { data: weekPlanRows },
     { data: injuryStatusRow },
     { data: bodyDetails },
     { data: intakeDob },
@@ -133,6 +134,8 @@ export async function ClientNutrition({
       .eq("athlete_id", athleteId)
       .gte("log_date", weekStartKey)
       .lte("log_date", todayKey),
+    // Meal plans assigned in the last 7 days: a day's target is the client's own target, else the plan assigned to it, else the standing target (the order the client sees).
+    supabase.from("meal_plans").select("log_date, macros, meals").eq("athlete_id", athleteId).gte("log_date", weekStartKey).lte("log_date", todayKey),
     // A real client-safety input: the check-in engine floors an injured client's calories at maintenance whatever the phase.
     supabase.from("athlete_injury_status").select("is_injured, surplus_pct").eq("athlete_id", athleteId).maybeSingle(),
     supabase.from("athlete_profile_details").select("height_cm, biological_sex, body_fat_pct, birthday").eq("athlete_id", athleteId).maybeSingle(),
@@ -163,6 +166,14 @@ export async function ClientNutrition({
   const floor = calorieFloor({ sex: asBiologicalSex(profileInput.sex), bmr });
   // The floor is shown only as a warning; with no sex or no BMR on file it still falls back to the base floor, never silently to nothing.
   const floorCalories = floor;
+  const latestWeightDate = (weightLogs?.[0]?.logged_date as string | undefined) ?? null;
+  const missingForFloor = [
+    ...(profileInput.heightCm == null ? ["height"] : []),
+    ...(asBiologicalSex(profileInput.sex) ? [] : ["sex"]),
+    ...(profileInput.dateOfBirth ? [] : ["date of birth"]),
+    ...(profileInput.weightLbs == null ? ["a weight"] : []),
+  ];
+  const floorNote = floorBasisNote({ bmr, weightAgeDays: latestWeightDate ? daysBetweenKeys(latestWeightDate, todayKey) : null, missing: missingForFloor, floor });
 
   // ---- The 7-day food view, against each day's own target ----
   const week = buildFoodWeek({
@@ -170,9 +181,14 @@ export async function ClientNutrition({
     todayKey,
     targetFor: (dateKey) => {
       const explicit = explicitRows.find((r) => r.log_date === dateKey);
-      if (explicit) return { calories: explicit.calories, proteinG: explicit.protein_g };
-      const standing = standingForDate(standingHistory, dateKey);
-      return standing?.calories != null ? { calories: standing.calories, proteinG: standing.protein_g ?? null } : null;
+      const plan = (weekPlanRows ?? []).find((p) => p.log_date === dateKey);
+      const resolved = resolveDayMacros(
+        explicit ? { calories: explicit.calories, protein_g: explicit.protein_g, carbs_g: null, fat_g: null } : null,
+        (plan?.macros ?? null) as Parameters<typeof resolveDayMacros>[1],
+        (plan?.meals ?? null) as Parameters<typeof resolveDayMacros>[2],
+        standingForDate(standingHistory, dateKey)
+      );
+      return resolved.target?.calories != null ? { calories: resolved.target.calories, proteinG: resolved.target.proteinG } : null;
     },
   });
 
@@ -323,7 +339,7 @@ export async function ClientNutrition({
           )}
         </div>
         <div className="mt-1.5">
-          <CalorieFloorWarning calories={currentCalories} floor={floorCalories} who={firstName} />
+          <CalorieFloorWarning calories={currentCalories} floor={floorCalories} who={firstName} note={floorNote} />
         </div>
         <nav aria-label="Nutrition sections" className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-body text-xs text-steel">
           <a href="#targets" className="hover:text-chalk">Targets</a>
@@ -344,6 +360,7 @@ export async function ClientNutrition({
             initialSuggestions={pendingSuggestions}
             todayKey={todayKey}
             floorCalories={floorCalories}
+            floorNote={floorNote}
             clientName={firstName}
           />
           <StandingMacroTargetCard
@@ -358,7 +375,9 @@ export async function ClientNutrition({
             upcomingOverrides={upcomingOverrides}
             calendarHref={`/groups/${groupId}/athletes/${athleteId}/calendar`}
             floorCalories={floorCalories}
+            floorNote={floorNote}
             clientName={firstName}
+            todayKey={todayKey}
           />
           <div>
             <NutritionPhaseControl
@@ -399,6 +418,7 @@ export async function ClientNutrition({
                 defaultPhase={milestoneTagToNutritionPhase(phaseTag)}
                 todayKey={todayKey}
                 floorCalories={floorCalories}
+                floorNote={floorNote}
                 clientName={firstName}
               />
             </div>

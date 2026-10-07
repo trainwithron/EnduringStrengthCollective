@@ -1672,8 +1672,8 @@ export default async function AthleteProfilePage(
         </div>
       </div>
 
-      {macrosEnabled && (
-        <div data-tab="nutrition" className="border-t border-steel/20 pt-6 mt-8">
+      <div data-tab="nutrition" className="border-t border-steel/20 pt-6 mt-8">
+        {macrosEnabled ? (
           <ClientNutrition
             athleteId={params.athleteId}
             groupId={params.groupId}
@@ -1681,8 +1681,10 @@ export default async function AthleteProfilePage(
             clientName={profile?.full_name ?? "Client"}
             variant="profile"
           />
-        </div>
-      )}
+        ) : (
+          <p className="font-body text-sm text-steel">Macro/meal planning isn&apos;t enabled for group-tier clients.</p>
+        )}
+      </div>
       </div>
     </CoachDesktopShell>
   );

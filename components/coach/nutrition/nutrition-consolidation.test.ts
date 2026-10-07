@@ -99,22 +99,56 @@ describe("the standing target editor warns under the floor while the coach types
   });
 });
 
-describe("Apply writes the STANDING target from an apply-from date, and the soft floor only warns", () => {
-  it("the suggestion card applies a standing target (not a one-day row) from the chosen date, tells the client the date, and still never blocks", () => {
-    expect(card).toContain("saveStandingTarget(supabase");
-    expect(card).toContain("today: startKey");
+describe("Apply writes the STANDING target from an apply-from date, never lies about what the client sees, and the soft floor only warns", () => {
+  it("the suggestion card applies from the chosen date through applyStandingTarget, records the check-in once, and words the push by what really changed today", () => {
+    expect(card).toContain("applyStandingTarget(supabase");
+    expect(card).toContain("startKey, todayKey");
+    expect(card).toContain("insertCheckinOnce(supabase");
+    expect(card).toContain("todayChanged: applied.todayChanged");
     expect(card).not.toContain('from("daily_macros")');
+    expect(card).not.toContain("targetChangeMessage");
     expect(card).toContain("clampApplyFrom(applyFrom, todayKey)");
-    expect(card).toContain("targetChangeMessage(suggestion.newCalories, startKey, todayKey)");
     expect(card).toContain("<ApplyFromField");
     expect(card).toContain("<CalorieFloorWarning");
+    expect(card).toContain("<ApplyOutcomeNotice");
     expect(card).toContain("Apply anyway");
   });
-  it("the manual check-in defaults to the standing target from a date; a one-day target is the explicit exception", () => {
+  it("the target is applied BEFORE the check-in is recorded, so a retry cannot duplicate the check-in", () => {
+    for (const source of [card, panel]) {
+      expect(source.indexOf("applyStandingTarget(supabase") !== -1 || source.indexOf('from("daily_macros").upsert') !== -1).toBe(true);
+      const apply = Math.min(...["applyStandingTarget(supabase", 'from("daily_macros").upsert'].map((m) => source.indexOf(m)).filter((i) => i >= 0));
+      expect(apply).toBeLessThan(source.indexOf("insertCheckinOnce(supabase"));
+    }
+    expect(card.indexOf("insertCheckinOnce(supabase")).toBeLessThan(card.indexOf('update({ status: "applied" })'));
+  });
+  it("the manual check-in defaults to the standing target from a date; a one-day target is the explicit exception; the outcome is shown", () => {
     expect(panel).toContain('useState<"standing" | "date">("standing")');
-    expect(panel).toContain("today: clampApplyFrom(applyFrom, todayKey)");
+    expect(panel).toContain("startKey: standingStart, todayKey");
     expect(panel).toContain("<ApplyFromField");
     expect(panel).toContain("<CalorieFloorWarning");
+    expect(panel).toContain("<ApplyOutcomeNotice");
     expect(panel).toContain("Save anyway");
+  });
+  it("the standing editor saves through applyStandingTarget too, from the server's day for the coach", () => {
+    const standing = src("../desktop/standing-macro-target-card.tsx");
+    expect(standing).toContain("applyStandingTarget(supabase");
+    expect(standing).toContain("startKey: todayKey, todayKey");
+    expect(standing).toContain("<ApplyOutcomeNotice");
+    expect(standing).not.toContain("localDateKey");
+  });
+});
+
+describe("the other review fixes", () => {
+  it("a group-tier client's Nutrition tab on the profile says so instead of being blank", () => {
+    expect(profile).toContain("Macro/meal planning isn&apos;t enabled for group-tier clients.");
+    expect(profile.indexOf('data-tab="nutrition"')).toBeLessThan(profile.indexOf("macrosEnabled ? ("));
+  });
+  it("the 7-day view resolves a day the way the client sees it: own target, else assigned plan, else standing", () => {
+    expect(clientNutrition).toContain("resolveDayMacros(");
+    expect(clientNutrition).toContain('.from("meal_plans").select("log_date, macros, meals")');
+  });
+  it("the floor says what it rests on", () => {
+    expect(clientNutrition).toContain("floorBasisNote(");
+    expect(clientNutrition).toContain("note={floorNote}");
   });
 });

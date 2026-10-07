@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { saveStandingTarget } from "@/lib/standing-macros";
-import { clampApplyFrom, targetChangeMessage } from "@/lib/apply-from";
+import { clampApplyFrom } from "@/lib/apply-from";
+import { applyStandingTarget, insertCheckinOnce, pushMessageForApply, type ApplyPlan } from "@/lib/apply-standing";
 import { notifyPush } from "@/lib/push-notify";
 import { isBelowFloor } from "@/lib/calorie-floor";
 import { ApplyFromField } from "@/components/coach/nutrition/apply-from-field";
 import { CalorieFloorWarning } from "@/components/coach/nutrition/calorie-floor-warning";
+import { ApplyOutcomeNotice } from "@/components/coach/nutrition/apply-outcome-notice";
 
 export interface CheckinSuggestion {
   id: string;
@@ -47,6 +48,7 @@ export function NutritionCheckinSuggestionCard({
   onResolved,
   todayKey,
   floorCalories = null,
+  floorNote = null,
   clientName = "this client",
 }: {
   athleteId: string;
@@ -56,11 +58,14 @@ export function NutritionCheckinSuggestionCard({
   // The coach's calendar day (computed on the server in the coach's zone) and the soft floor for this client, if it can be worked out.
   todayKey: string;
   floorCalories?: number | null;
+  floorNote?: string | null;
   clientName?: string;
 }) {
   const [applyFrom, setApplyFrom] = useState(todayKey);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Set once the target is applied: the card then shows what the apply really did until the coach says Done.
+  const [outcome, setOutcome] = useState<{ plan: ApplyPlan; startKey: string } | null>(null);
 
   async function handleApply() {
     setBusy(true);
@@ -71,7 +76,16 @@ export function NutritionCheckinSuggestionCard({
     } = await supabase.auth.getUser();
     const startKey = clampApplyFrom(applyFrom, todayKey);
 
-    const { error: checkinError } = await supabase.from("nutrition_checkins").insert({
+    // The target first, then the check-in record, so a retry after a half-failure re-applies the same target (harmless) and records the check-in only once.
+    const target = { calories: suggestion.newCalories, proteinG: suggestion.proteinG, carbsG: suggestion.carbsG, fatG: suggestion.fatG };
+    const applied = await applyStandingTarget(supabase, { athleteId, groupId, userId: user?.id ?? null, target, startKey, todayKey });
+    if (!applied.ok) {
+      setError("Couldn't apply the new target. Check your connection and try again.");
+      setBusy(false);
+      return;
+    }
+
+    const recorded = await insertCheckinOnce(supabase, {
       athlete_id: athleteId,
       group_id: groupId,
       phase: suggestion.phase,
@@ -89,32 +103,21 @@ export function NutritionCheckinSuggestionCard({
       adjustment_pct: suggestion.adjustmentPct,
       created_by: user?.id,
     });
-    if (checkinError) {
-      setError("Couldn't apply — check your connection and try again.");
+    if (!recorded.ok) {
+      setError("The new target is applied, but the check-in could not be recorded. Press Apply again to finish; it will not apply twice.");
       setBusy(false);
       return;
     }
 
-    const saved = await saveStandingTarget(supabase, {
+    await supabase.from("nutrition_checkin_suggestions").update({ status: "applied" }).eq("id", suggestion.id);
+    notifyPush(
       athleteId,
-      groupId,
-      userId: user?.id ?? null,
-      target: { calories: suggestion.newCalories, proteinG: suggestion.proteinG, carbsG: suggestion.carbsG, fatG: suggestion.fatG },
-      today: startKey,
-    });
-    if (!saved.ok) {
-      setError("Saved the check-in, but couldn't apply the new target.");
-      setBusy(false);
-      return;
-    }
-
-    await supabase
-      .from("nutrition_checkin_suggestions")
-      .update({ status: "applied" })
-      .eq("id", suggestion.id);
-    notifyPush(athleteId, "New macro targets", targetChangeMessage(suggestion.newCalories, startKey, todayKey), `/groups/${groupId}/nutrition`);
+      "New macro targets",
+      pushMessageForApply({ newCalories: suggestion.newCalories, startKey, todayKey, todayChanged: applied.todayChanged }),
+      `/groups/${groupId}/nutrition`
+    );
     setBusy(false);
-    onResolved();
+    setOutcome({ plan: applied, startKey });
   }
 
   async function handleDismiss() {
@@ -154,7 +157,23 @@ export function NutritionCheckinSuggestionCard({
           <p className="font-body text-xs text-steel uppercase mt-1">Fat</p>
         </div>
       </div>
-      <CalorieFloorWarning calories={suggestion.newCalories} floor={floorCalories} who={clientName} />
+      <CalorieFloorWarning calories={suggestion.newCalories} floor={floorCalories} who={clientName} note={floorNote} />
+      {outcome ? (
+        <div className="pt-2 border-t border-steel/15 space-y-2">
+          <ApplyOutcomeNotice
+            athleteId={athleteId}
+            groupId={groupId}
+            target={{ calories: suggestion.newCalories, proteinG: suggestion.proteinG, carbsG: suggestion.carbsG, fatG: suggestion.fatG }}
+            plan={outcome.plan}
+            startKey={outcome.startKey}
+            todayKey={todayKey}
+          />
+          <button type="button" onClick={onResolved} className="h-9 px-3 bg-rust text-graphite font-body text-xs font-medium">
+            Done
+          </button>
+        </div>
+      ) : (
+        <>
       {error && (
         <p className="font-body text-xs text-rust" role="alert">
           {error}
@@ -179,6 +198,8 @@ export function NutritionCheckinSuggestionCard({
           Dismiss
         </button>
       </div>
+        </>
+      )}
     </div>
   );
 }

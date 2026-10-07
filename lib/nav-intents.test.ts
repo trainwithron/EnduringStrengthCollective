@@ -245,7 +245,6 @@ const ATHLETE_PHONE: [string, string][] = [
   ["my macros", "/groups/g1/nutrition"],
   ["meal plan", "/groups/g1/nutrition"],
   ["what should i eat", "/groups/g1/nutrition"],
-  ["recipes", "/groups/g1/recipes"],
   ["records", "/groups/g1/records"],
   ["my prs", "/groups/g1/records"],
   ["personal bests", "/groups/g1/records"],

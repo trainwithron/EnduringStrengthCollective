@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clampApplyFrom, maxApplyFromKey, shortDateLabel, targetChangeMessage } from "@/lib/apply-from";
+import { clampApplyFrom, maxApplyFromKey, shortDateLabel } from "@/lib/apply-from";
 
 describe("apply from", () => {
   it("defaults to today and never goes into the past", () => {
@@ -23,10 +23,5 @@ describe("apply from", () => {
     expect(shortDateLabel("2026-10-14")).toBe("Oct 14");
     expect(shortDateLabel("2026-01-05")).toBe("Jan 5");
     expect(shortDateLabel("nope")).toBe("nope");
-  });
-  it("tells the client the date only when the change starts later", () => {
-    expect(targetChangeMessage(2180, "2026-10-07", "2026-10-07")).toBe("Your daily target is now 2,180 calories");
-    expect(targetChangeMessage(2180, "2026-10-14", "2026-10-07")).toBe("Your daily target is now 2,180 calories, from Oct 14");
-    expect(targetChangeMessage(null, "2026-10-14", "2026-10-07")).toBe("Your daily target has changed, from Oct 14");
   });
 });

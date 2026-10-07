@@ -90,7 +90,6 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   D({ id: "nutrition", label: "Nutrition", path: "/groups/{groupId}/nutrition", roles: ["coach", "athlete"], synonyms: ["nutrition", "macros", "meal plan", "meal plans", "food", "diet", "calories", "what should i eat", "what do i eat", "my macros", "nutrition plan", "standing macro", "macro targets", "eating"] }),
   // A coach's recipes and calculator are tabs of Nutrition; a client keeps their own pages.
   D({ id: "recipes", label: "Favorite meals", path: "/groups/{groupId}/nutrition?tab=favorites", roles: ["coach"], synonyms: ["recipes", "recipe", "meal ideas", "cook", "favorite meals", "favourite meals", "favorites", "recipe hub"] }),
-  D({ id: "athlete-recipes", label: "Recipes", path: "/groups/{groupId}/recipes", roles: ["athlete"], synonyms: ["recipes", "recipe", "meal ideas", "cook"] }),
   D({ id: "macro-calculator", label: "Macro calculator", path: "/groups/{groupId}/nutrition?tab=calculator", roles: ["coach"], synonyms: ["macro calculator", "calculate macros", "calorie calculator", "tdee", "macro tool"] }),
   D({ id: "athlete-macro-calculator", label: "Macro calculator", path: "/groups/{groupId}/tools/macro-calculator", roles: ["athlete"], synonyms: ["macro calculator", "calculate macros", "calorie calculator", "tdee", "macro tool"] }),
   D({ id: "one-rep-max", label: "1RM calculator", path: "/groups/{groupId}/tools/one-rep-max", roles: ["coach", "athlete"], synonyms: ["one rep max", "1rm", "1 rep max", "max calculator", "1rm calculator", "estimate my max", "rep max"] }),
