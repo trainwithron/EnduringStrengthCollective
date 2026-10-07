@@ -163,16 +163,29 @@ export function WorkspaceProvider({ coachId, groupId, isShared, children }: { co
       });
     };
     let lastSource: Window | null = null;
+    // A reload or refresh makes pages load, and a page may save something while loading (a "last seen" mark). Saves in the few seconds after a refresh the workspace
+    // itself caused are ignored, so a refresh can never set off another one in a loop.
+    let quietUntil = 0;
+    const quiet = () => Date.now() < quietUntil;
+    const settle = () => {
+      quietUntil = Date.now() + 6000;
+    };
     const fromPane = debounce(() => {
+      settle();
       reloadAll(lastSource);
       router.refresh();
     }, 1500);
-    const fromPage = debounce(() => reloadAll(null), 1500);
-    const undo = installMutationReporter(fromPage);
+    const fromPage = debounce(() => {
+      settle();
+      reloadAll(null);
+    }, 1500);
+    const undo = installMutationReporter(() => {
+      if (!quiet()) fromPage();
+    });
     function onMessage(e: MessageEvent) {
       if (e.origin !== window.location.origin || e.data?.type !== MUTATION_MESSAGE) return;
       const known = Array.from(frames.current.values()).some((f) => f.contentWindow === e.source);
-      if (!known) return;
+      if (!known || quiet()) return;
       lastSource = e.source as Window;
       fromPane();
     }
