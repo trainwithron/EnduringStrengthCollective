@@ -34,6 +34,7 @@ import {
 } from "@/lib/nutrition-spotter";
 import { NutritionSpotterPanel, type NutritionSpotterFinding } from "@/components/coach/desktop/nutrition-spotter-panel";
 import { estimateProteinFromBodyWeight } from "@/lib/macros";
+import { getCoachClients } from "@/lib/coach-clients";
 
 export default async function NutritionPage(
   props: {
@@ -72,20 +73,25 @@ export default async function NutritionPage(
       .eq("id", params.groupId)
       .single();
 
-    const { data: athleteRows } = await supabase
-      .from("group_memberships")
-      .select("profile_id, client_tier, profiles ( full_name )")
-      .eq("group_id", params.groupId)
-      .eq("role", "athlete")
-      .order("profiles(full_name)", { ascending: true });
-
-    const athletes = (athleteRows ?? []).map((a: any) => ({
-      profileId: a.profile_id,
-      fullName: a.profiles?.full_name ?? "Unknown",
-      clientTier: a.client_tier as string | null,
+    // Every client the coach has, across all their groups in this organization (the same list as Clients), not just the group in the address: a one-on-one
+    // client lives in their own group, so a per-group list would show one person. Picking a client uses THAT client's own group for all their data.
+    const athletes = (await getCoachClients(supabase, user.id, params.groupId)).map((c) => ({
+      profileId: c.id,
+      fullName: c.fullName,
+      groupId: c.groupId,
     }));
 
     const selected = athletes.find((a) => a.profileId === searchParams.athleteId) ?? null;
+    let selectedTier: string | null = null;
+    if (selected) {
+      const { data: tierRow } = await supabase
+        .from("group_memberships")
+        .select("client_tier")
+        .eq("group_id", selected.groupId)
+        .eq("profile_id", selected.profileId)
+        .maybeSingle();
+      selectedTier = (tierRow?.client_tier as string | null) ?? null;
+    }
 
     return (
       <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="nutrition">
@@ -99,7 +105,7 @@ export default async function NutritionPage(
           <NutritionYouthModeToggle groupId={params.groupId} initialEnabled={group?.nutrition_youth_mode ?? false} />
         </div>
 
-        <div className="grid grid-cols-[220px_1fr] gap-8 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-8 items-start">
           <div className="border border-steel/20 divide-y divide-steel/15">
             {athletes.length === 0 ? (
               <p className="font-body text-sm text-steel p-3">No clients yet.</p>
@@ -121,12 +127,12 @@ export default async function NutritionPage(
           <div>
             {!selected ? (
               <p className="font-body text-sm text-steel">Pick a client to build their meal plan.</p>
-            ) : selected.clientTier === "group" ? (
+            ) : selectedTier === "group" ? (
               <p className="font-body text-sm text-steel">
                 Macro/meal planning isn&apos;t enabled for group-tier clients.
               </p>
             ) : (
-              <NutritionSection groupId={params.groupId} athleteId={selected.profileId} />
+              <NutritionSection groupId={selected.groupId} athleteId={selected.profileId} />
             )}
           </div>
         </div>
