@@ -1,3 +1,4 @@
+import { describeScheduleRequests, matchScheduleRequestQuestion } from "@/lib/schedule-requests-chat";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -68,6 +69,30 @@ export async function POST(request: Request) {
       }
     } catch {
       return NextResponse.json({ kind: "unsure", text: "I couldn't set that up right now, so nothing was changed. You can change it by hand in your settings.", chips: [], steps: [], intentIds: [] });
+    }
+  }
+
+  // "Any schedule requests?" / "who asked to pause?": a read-only answer for coaches, from the requests their own sign-in can see (never the clients' private notes). It
+  // changes nothing; the card on the dashboard is where a request is handled.
+  if (role === "coach" && matchScheduleRequestQuestion(message)) {
+    try {
+      const { data: requestRows, error: requestError } = await supabase
+        .from("schedule_requests")
+        .select("athlete_id, kind, effective_on, resume_on")
+        .in("status", ["pending", "applying"])
+        .order("effective_on", { ascending: true })
+        .limit(40);
+      if (!requestError) {
+        const nameById = new Map(roster.map((r) => [r.id, r.fullName]));
+        const asked = message.toLowerCase();
+        const named = roster.filter((r) => r.fullName.length > 2 && asked.includes(r.fullName.toLowerCase().split(" ")[0]));
+        const lines = ((requestRows ?? []) as { athlete_id: string; kind: "pause" | "freeze" | "cancel"; effective_on: string; resume_on: string | null }[])
+          .filter((r) => named.length === 0 || named.some((n) => n.id === r.athlete_id))
+          .map((r) => ({ clientName: nameById.get(r.athlete_id) ?? "A client", kind: r.kind, effectiveOn: r.effective_on, resumeOn: r.resume_on }));
+        return NextResponse.json({ kind: "navigate", text: describeScheduleRequests(lines), chips: [{ label: "Open my dashboard", href: "/dashboard" }], confirm: null, preview: null });
+      }
+    } catch {
+      // Not set up yet, or it failed: fall through to the usual answers.
     }
   }
 
