@@ -15,6 +15,10 @@ export const BRAND = {
     markOnLight: "/brand/spotlight-mark-light.svg",
     appIcon: "/brand/spotlight-app-icon.svg",
     favicon: "/brand/spotlight-favicon.svg",
+    // The same tab icon as an ICO (browsers ask for /favicon.ico on their own) and the iOS home-screen icon. Both live in public/ (not in app/) so the layout can leave
+    // them out when an organisation has its own icon: see app/layout.tsx.
+    faviconIco: "/favicon.ico",
+    appleTouchIcon: "/apple-icon.png",
     // Monochrome (white on transparent) for the small status-bar icon of a push notification.
     pushBadge: "/brand/spotlight-badge-72.png",
     // 1200 x 630, for links shared on social media.
@@ -50,3 +54,6 @@ export function brandMarkSrc(customLogoUrl: string | null | undefined, backgroun
 export function brandAppIconSrc(customAppIconUrl: string | null | undefined): string {
   return clean(customAppIconUrl) ?? BRAND.homeScreenIcons.any512;
 }
+
+// The picture a shared link shows (Open Graph and Twitter), for the app's own pages and the public share pages.
+export const BRAND_OG_IMAGES = [{ url: BRAND.assets.socialImage, width: 1200, height: 630, alt: BRAND.name }];

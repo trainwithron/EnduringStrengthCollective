@@ -49,13 +49,27 @@ describe("the web app manifest keeps the custom icon rule", () => {
     expect(fallback.name).toBe("Spotlight Coaching");
     vi.doUnmock("@/lib/org-theme-server");
   });
-  it("the layout puts a custom icon in the page head, and leaves the default to the app's own icon files", () => {
+  it("the layout emits an organisation's icon as the only icon links, and the Spotlight default only when there is none", () => {
     const layout = readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8");
-    expect(layout).toContain('{theme.appIconUrl && <link rel="icon" href={theme.appIconUrl} />}');
-    expect(layout).toContain('{theme.appIconUrl && <link rel="apple-touch-icon" href={theme.appIconUrl} />}');
-    expect(existsSync(new URL("../app/icon.svg", import.meta.url))).toBe(true);
-    expect(existsSync(new URL("../app/favicon.ico", import.meta.url))).toBe(true);
-    expect(existsSync(new URL("../app/apple-icon.png", import.meta.url))).toBe(true);
+    const custom = layout.slice(layout.indexOf("{theme.appIconUrl ? ("), layout.indexOf(") : ("));
+    const fallback = layout.slice(layout.indexOf(") : ("), layout.indexOf("</head>"));
+    expect(custom).toContain('<link rel="apple-touch-icon" href={theme.appIconUrl} />');
+    expect(custom).toContain('<link rel="icon" href={theme.appIconUrl} />');
+    expect(custom).not.toContain("BRAND.assets");
+    expect(fallback).toContain("BRAND.assets.favicon");
+    expect(fallback).toContain("BRAND.assets.faviconIco");
+    expect(fallback).toContain("BRAND.assets.appleTouchIcon");
+    // No icon files in app/: Next would emit them for every viewer, next to the organisation's own links, and the browser could pick the default.
+    for (const f of ["icon.svg", "icon.png", "favicon.ico", "apple-icon.png"]) expect(existsSync(new URL(`../app/${f}`, import.meta.url)), f).toBe(false);
+    for (const f of ["favicon.ico", "apple-icon.png"]) expect(existsSync(new URL(`../public/${f}`, import.meta.url)), f).toBe(true);
+  });
+  it("a shared link shows the Spotlight picture, with an absolute address, on the app's pages and the public share pages", () => {
+    const layout = readFileSync(new URL("../app/layout.tsx", import.meta.url), "utf8");
+    expect(layout).toContain("metadataBase: new URL(configuredAppUrl()");
+    expect(layout).toContain("images: BRAND_OG_IMAGES");
+    for (const page of ["../app/share/[postId]/page.tsx", "../app/share/journey/[athleteId]/page.tsx", "../app/share/milestone/[milestoneId]/page.tsx", "../app/share/transformation/[cardId]/page.tsx"]) {
+      expect(readFileSync(new URL(page, import.meta.url), "utf8"), page).toContain("images: BRAND_OG_IMAGES");
+    }
   });
 });
 

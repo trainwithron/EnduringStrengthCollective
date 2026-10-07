@@ -1,3 +1,4 @@
+import { BRAND_OG_IMAGES } from "@/lib/brand";
 import type { Metadata } from "next";
 import { NoAccess } from "@/components/shared/no-access";
 import { getJourneyRecap } from "@/lib/journey-recap-data";
@@ -26,7 +27,7 @@ export async function generateMetadata(
 
   const title = `${recap.athleteName}'s journey so far`;
   const description = `${recap.journeyDuration} of training with ${recap.groupName}.`;
-  return { title, description, openGraph: { title, description } };
+  return { title, description, openGraph: { title, description, images: BRAND_OG_IMAGES } };
 }
 
 export default async function ShareJourneyPage(

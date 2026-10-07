@@ -35,7 +35,7 @@ export function SpotlightLockup({
       <SpotlightMark background={background} className={compact ? "h-6 w-6 shrink-0" : "h-10 w-10 shrink-0"} />
       <div className="leading-none">
         <p className={`font-display font-bold ${text} ${compact ? "text-[11px] tracking-[0.4em]" : "text-base tracking-[0.4em]"}`}>{BRAND.wordmark}</p>
-        <p className={`font-display font-bold text-steel ${compact ? "text-[8px] tracking-[0.5em] mt-1" : "text-[10px] tracking-[0.5em] mt-1.5"}`}>{BRAND.wordmarkSub}</p>
+        <p className={`font-display font-bold text-steel [@media(max-height:520px)]:hidden ${compact ? "text-[8px] tracking-[0.5em] mt-1" : "text-[10px] tracking-[0.5em] mt-1.5"}`}>{BRAND.wordmarkSub}</p>
       </div>
     </div>
   );
