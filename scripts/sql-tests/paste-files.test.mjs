@@ -209,6 +209,47 @@ for (const s of steps) {
     check(`bundle fallback: step ${st.n} precheck all true, and its own file applies after the undo` + (ea ? ": " + ea : ""), rows.every((r) => r.ok) && !ea);
   }
 }
+// ---- Release F bundle (steps 35 to 37): the same all-or-nothing checks ----
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-f");
+  const file = `apply/${bundle.file}`;
+  const stepFiles = bundle.steps.map((n) => steps.find((x) => x.n === n));
+  const state = async () => (await db.query(`select
+      exists (select 1 from pg_trigger where tgname = 'group_memberships_guard_identity') as has_guard,
+      coalesce((select position('that coach does not coach this group' in pg_get_functiondef(p.oid)) > 0 from pg_proc p where p.proname = 'book_session' and p.pronamespace = 'public'::regnamespace), false) as has_booking,
+      exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'ai_usage_log' and column_name = 'error_class') as has_col,
+      has_function_privilege('authenticated', 'public.spend_ai_action(uuid, text, integer, integer)', 'execute') as ai_open`)).rows[0];
+  for (const st of [...stepFiles].reverse()) {
+    const eu = await run(`apply/undo-step${st.n}-${st.slug}.sql`);
+    check(`bundle release-f: undo-step${st.n}-${st.slug}.sql runs` + (eu ? ": " + eu : ""), !eu);
+  }
+  const before = await state();
+  check("release-f: before it runs none of its changes is in place and the AI spend function is open to signed-in users", !before.has_guard && !before.has_booking && !before.has_col && before.ai_open, JSON.stringify(before));
+
+  await db.exec("alter table public.ai_usage_log add column error_class text");
+  const refusedLate = await run(file);
+  const afterLate = await state();
+  check("release-f: a wrong state in the LAST step refuses with the step named (" + refusedLate + ")", !!refusedLate && /step 37 \(0292\) cannot run/.test(refusedLate) && /already applied/.test(refusedLate));
+  check("release-f: that refusal kept NOTHING of the earlier steps (all or nothing)", !afterLate.has_guard && !afterLate.has_booking && afterLate.ai_open, JSON.stringify(afterLate));
+  await db.exec("alter table public.ai_usage_log drop column error_class");
+
+  let result;
+  let errBundle = null;
+  try {
+    result = await db.exec(read(file));
+  } catch (err) {
+    errBundle = err.message.split("\n")[0];
+    await db.exec("rollback").catch(() => {});
+  }
+  const rowsOut = Array.isArray(result) ? result[result.length - 1].rows : result?.rows ?? [];
+  check("release-f bundle applies on the live-shaped state" + (errBundle ? ": " + errBundle : ""), !errBundle);
+  check("release-f: ends with a read-only result, one row per step, every in_place = true " + JSON.stringify(rowsOut.map((r) => [r.step, r.in_place])), rowsOut.length === 3 && rowsOut.every((r) => r.in_place === true));
+  const after = await state();
+  check("release-f: all three changes are in place and the AI spend function is closed to signed-in users", after.has_guard && after.has_booking && after.has_col && !after.ai_open, JSON.stringify(after));
+  const again = await run(file);
+  check("release-f: a second run is refused, naming step 35 (" + again + ")", !!again && /step 35 \(0290\) cannot run/.test(again) && /already applied/.test(again));
+}
 // Steps 30 and 31: the copy matches the original, both groups are gone, and everything in them was saved first.
 {
   const gone = (await db.query("select count(*)::int as n from public.groups where id in ('b292055b-edc6-4171-ad2b-a89d65dcd8db', 'c368ab0b-ccab-442e-a42e-38fb22293182')")).rows[0].n;

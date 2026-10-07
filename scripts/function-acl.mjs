@@ -20,7 +20,14 @@ export const SERVER_ONLY_SIGNATURES = [
   ["audit_blocked", "text, text, jsonb, jsonb, text[]", true],
   ["audit_blocked_redacted", "text, text, jsonb, jsonb, text[], text[]", true],
 ];
-export const SERVER_ONLY = SERVER_ONLY_SIGNATURES.map((s) => s[0]);
+// Closed by 0290 (Release F): spend_coach_credits trusted a negative cost and spend_ai_action trusted the allowance and cost sent by the browser, so only the
+// server (which passes its own numbers after checking who is signed in) may run them. Kept apart from the 0282 list because 0282 predates this.
+export const RELEASE_F_SERVER_ONLY_SIGNATURES = [
+  ["spend_coach_credits", "uuid, integer", false],
+  ["spend_ai_action", "uuid, text, integer, integer", false],
+  ["expire_session_credit_balance", "uuid, uuid, integer, integer", false],
+];
+export const SERVER_ONLY = [...SERVER_ONLY_SIGNATURES, ...RELEASE_F_SERVER_ONLY_SIGNATURES].map((s) => s[0]);
 export const AUDIT_WRITERS = SERVER_ONLY_SIGNATURES.filter((s) => s[2]).map((s) => s[0]);
 
 // Signed-in-callable SECURITY DEFINER functions with no caller check in their body that were reviewed and are meant to be (they answer about the
@@ -28,7 +35,7 @@ export const AUDIT_WRITERS = SERVER_ONLY_SIGNATURES.filter((s) => s[2]).map((s) 
 // check-function-acl.sql. (is_* and training_partner* helpers are matched by prefix.)
 export const ACL_REVIEWED = [
   "coach_ai_multiplier", "coach_client_steps", "get_invite_info", "has_valid_group_invite", "athlete_in_org", "can_view_org_branding",
-  "join_group_with_invite", "set_sms_consent", "attach_refund_reason", "refund_coach_credit", "spend_ai_action", "group_session_counts",
+  "join_group_with_invite", "set_sms_consent", "attach_refund_reason", "refund_coach_credit", "group_session_counts",
 ];
 
 const quote = (names) => names.map((n) => `'${n}'`).join(", ");

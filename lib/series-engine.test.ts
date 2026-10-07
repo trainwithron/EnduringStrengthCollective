@@ -459,6 +459,30 @@ describe("edit this and the rest", () => {
     expect(confirmed(bookings)).toHaveLength(4);
   });
 
+  it("refuses, and changes nothing, when none of the new times can be booked", async () => {
+    // Every new Thursday is already taken by someone else's session.
+    const { store, series, bookings } = fakeStore();
+    const r = await createSeries(store, base, NOW);
+    const before = confirmed(bookings).map((b) => b.startAt);
+    for (const day of ["2026-11-05", "2026-11-12"]) {
+      await store.book({ coachId: "c1", athleteId: "x", groupId: "g9", start: new Date(`${day}T15:00:00Z`), end: new Date(`${day}T16:00:00Z`), seriesId: "other" });
+    }
+    const third = confirmed(bookings).filter((b) => b.seriesId === r.seriesId)[2];
+    const c = await changeFromHere(store, third.id, "2026-11-05T15:00:00.000Z", 45, NOW);
+    expect(c.ok).toBe(false);
+    expect(c.message).toMatch(/nothing was changed/i);
+    expect(confirmed(bookings).filter((b) => b.seriesId === r.seriesId).map((b) => b.startAt)).toEqual(before);
+    expect(series.get(r.seriesId!)!.status).toBe("active");
+  });
+
+  it("a new time that overlaps one of the schedule's OWN sessions is fine (that time is about to be free)", async () => {
+    const { store, bookings } = fakeStore();
+    const r = await createSeries(store, base, NOW);
+    const third = confirmed(bookings).filter((b) => b.seriesId === r.seriesId)[2]; // Nov 3, 10:00Z
+    const c = await changeFromHere(store, third.id, "2026-11-03T10:30:00.000Z", 60, NOW);
+    expect(c.ok).toBe(true);
+  });
+
   it("an ongoing schedule stays ongoing", async () => {
     const { store, series, bookings } = fakeStore();
     await createSeries(store, { ...base, mode: "ongoing", count: undefined }, NOW);

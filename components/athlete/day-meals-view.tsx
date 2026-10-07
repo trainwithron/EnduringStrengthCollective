@@ -1,3 +1,4 @@
+import { IngredientLine } from "@/components/shared/ingredient-line";
 import { mealRecipeChoices, type MealEntryPayload, type MealPlanBucket } from "@/lib/meal-plan-assignment";
 
 const BUCKET_LABELS: Record<MealPlanBucket, string> = {
@@ -42,25 +43,14 @@ export function DayMealsView({
                           <p className="font-body text-sm font-medium">{choice.recipeName ?? m.title}</p>
                           {choice.ingredients.length > 0 && (
                             <ul className="mt-1 space-y-0.5 pl-3">
-                              {choice.isAi
-                                ? // AI-generated text, not the fixed recipe database —
-                                  // rendered as plain text, never dangerouslySetInnerHTML.
-                                  choice.ingredients.map((ing, j) => (
-                                    <li key={j} className="font-body text-xs text-steel">
-                                      • {ing}
-                                    </li>
-                                  ))
-                                : // Ingredient lines carry <strong> tags from the fixed,
-                                  // coach-owned recipe database, not user input — same
-                                  // trust boundary as the coach-facing builder's own
-                                  // rendering of this exact data.
-                                  choice.ingredients.map((ing, j) => (
-                                    <li
-                                      key={j}
-                                      className="font-body text-xs text-steel"
-                                      dangerouslySetInnerHTML={{ __html: `• ${ing}` }}
-                                    />
-                                  ))}
+                              {
+                                // Always text (only an exact <strong> shows bold): a coach can write any text into a plan a client opens, so a line is never HTML.
+                                choice.ingredients.map((ing, j) => (
+                                  <li key={j} className="font-body text-xs text-steel">
+                                    <IngredientLine text={ing} />
+                                  </li>
+                                ))
+                              }
                             </ul>
                           )}
                         </div>

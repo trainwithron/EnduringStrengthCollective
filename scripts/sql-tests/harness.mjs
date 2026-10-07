@@ -23,7 +23,7 @@ export const PLAN_ORDER = [
   "0270",
   // Closes function permissions (0271), then the two public forms once their server routes are live (0272).
   "0271", "0272",
-  "0273", "0274", "0275", "0276", "0277", "0278", "0279", "0280", "0281", "0282", "0283", "0284", "0285", "0286", "0287", "0288", "0289",
+  "0273", "0274", "0275", "0276", "0277", "0278", "0279", "0280", "0281", "0282", "0283", "0284", "0285", "0286", "0287", "0288", "0289", "0290", "0291", "0292",
 ];
 
 export function migrationFile(prefix) {
@@ -41,7 +41,7 @@ export async function createDb() {
     create role anon nologin; create role authenticated nologin; create role service_role nologin bypassrls; create role supabase_admin nologin;
     create schema auth; create schema storage; create schema extensions; create schema realtime;
     create extension pgcrypto with schema extensions;
-    create table auth.users (id uuid primary key default gen_random_uuid(), email text, raw_user_meta_data jsonb, created_at timestamptz default now());
+    create table auth.users (id uuid primary key default gen_random_uuid(), email text, raw_user_meta_data jsonb, created_at timestamptz default now(), last_sign_in_at timestamptz);
     create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
     create function auth.role() returns text language sql stable as $$ select nullif(current_setting('request.jwt.claim.role', true), '') $$;
     create function auth.jwt() returns jsonb language sql stable as $$ select '{}'::jsonb $$;

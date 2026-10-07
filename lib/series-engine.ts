@@ -135,11 +135,12 @@ function validate(input: SeriesInput): string | null {
   return null;
 }
 
-async function classify(store: SeriesStore, coachId: string, occurrences: Occurrence[], now: Date, ctx: CoachContext): Promise<ClassifiedOccurrence[]> {
+// `ignoreStarts`: busy times to leave out (sessions about to be cancelled, whose time is about to be free).
+async function classify(store: SeriesStore, coachId: string, occurrences: Occurrence[], now: Date, ctx: CoachContext, ignoreStarts?: Set<number>): Promise<ClassifiedOccurrence[]> {
   if (occurrences.length === 0) return [];
   const from = new Date(Math.min(...occurrences.map((o) => o.start.getTime())) - 86400000);
   const to = new Date(Math.max(...occurrences.map((o) => o.end.getTime())) + 86400000);
-  const busy = await store.busy(coachId, from, to);
+  const busy = (await store.busy(coachId, from, to)).filter((b) => !ignoreStarts?.has(b.start.getTime()));
   return classifyOccurrences(occurrences, {
     now,
     busy,
@@ -550,6 +551,36 @@ export async function changeFromHere(
   const laterCount = all.filter((b) => new Date(b.startAt).getTime() >= fromMs).length;
   const hasEarlier = all.some((b) => new Date(b.startAt).getTime() < fromMs);
 
+  const input: SeriesInput = {
+    coachId: series.coachId,
+    athleteId: series.athleteId,
+    groupId: series.groupId,
+    firstStartIso: newFirst.toISOString(),
+    durationMinutes: duration,
+    mode: series.mode,
+    count: series.mode === "fixed" ? Math.min(Math.max(laterCount, 1), MAX_FIXED_WEEKS) : undefined,
+    windowWeeks: series.windowWeeks,
+    endsOn: series.endsOn,
+  };
+
+  // Check the new times BEFORE anything is cancelled (Release F, Oct 7): if none of them can be booked (the new day is a day off, the new time clashes), the schedule
+  // is left exactly as it was. The sessions about to be cancelled do not count as busy: their times are about to be free.
+  const problem = validate(input);
+  if (problem) return { ok: false, message: problem };
+  const ctx = await store.coachContext(series.coachId);
+  const wouldCancel = new Set(
+    all.filter((b) => new Date(b.startAt).getTime() >= fromMs && !b.attendedAt && new Date(b.startAt).getTime() > now.getTime()).map((b) => new Date(b.startAt).getTime())
+  );
+  const dry = await classify(store, series.coachId, plannedOccurrences(input, ctx, now).list, now, ctx, wouldCancel);
+  const bookableDry = dry.filter((o) => !isBlockingConflict(o.conflict));
+  if (bookableDry.length === 0) {
+    return {
+      ok: false,
+      message: "None of the new times can be booked, so nothing was changed.",
+      notBooked: dry.map((o) => ({ startIso: o.start.toISOString(), reason: conflictLabel(o.conflict as ConflictKind) })),
+    };
+  }
+
   const { cancelled, failed } = await cancelFuture(store, series.id, now, booking.startAt);
   if (failed > 0) return { ok: false, message: `${failed} sessions could not be removed, so the schedule was not changed.`, cancelled: cancelled.length };
 
@@ -559,23 +590,24 @@ export async function changeFromHere(
     endsOn: addDaysToDateKey(wallClockOf(new Date(booking.startAt), tz).dateKey, -1),
   });
 
-  const created = await createSeries(
-    store,
-    {
-      coachId: series.coachId,
-      athleteId: series.athleteId,
-      groupId: series.groupId,
-      firstStartIso: newFirst.toISOString(),
-      durationMinutes: duration,
-      mode: series.mode,
-      count: series.mode === "fixed" ? Math.min(Math.max(laterCount, 1), MAX_FIXED_WEEKS) : undefined,
-      windowWeeks: series.windowWeeks,
-      endsOn: series.endsOn,
-    },
-    now
-  );
+  const created = await createSeries(store, input, now);
   if (!created.ok) {
-    return { ok: false, message: created.error ?? "The new times could not be booked.", cancelled: cancelled.length, notBooked: created.notBooked };
+    // The new schedule could not be made after all: put the old sessions back so the client is not left with nothing.
+    let restored = 0;
+    for (const b of cancelled) {
+      const r = await store.book({ coachId: series.coachId, athleteId: series.athleteId, groupId: series.groupId, start: new Date(b.startAt), end: new Date(b.endAt), seriesId: series.id });
+      if (r.ok) {
+        restored += 1;
+        await store.mirror(r.bookingId);
+      }
+    }
+    await store.updateSeries(series.id, { status: series.status, endsOn: series.endsOn });
+    return {
+      ok: false,
+      message: `${created.error ?? "The new times could not be booked."} The old schedule was put back (${restored} of ${cancelled.length} sessions).`,
+      cancelled: 0,
+      notBooked: created.notBooked,
+    };
   }
   return {
     ok: true,

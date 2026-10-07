@@ -1,5 +1,6 @@
 "use client";
 
+import { IngredientLine } from "@/components/shared/ingredient-line";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -999,25 +1000,14 @@ export function MealPlanGenerator({
                           </p>
                         )}
                         <ul className="space-y-0.5 pl-6">
-                          {opt.isAi
-                            ? opt.ingredients.map((ing, i) => (
-                                // AI-generated text, not the fixed recipe database —
-                                // rendered as plain text, never dangerouslySetInnerHTML.
-                                <li key={i} className="font-body text-xs text-steel">
-                                  • {ing}
-                                </li>
-                              ))
-                            : opt.ingredients.map((ing, i) => (
-                                // Ingredient lines carry <strong> tags from the
-                                // recipe database itself (fixed, coach-owned
-                                // content, not user input) — same as the source
-                                // tool's rendering.
-                                <li
-                                  key={i}
-                                  className="font-body text-xs text-steel"
-                                  dangerouslySetInnerHTML={{ __html: `• ${ing}` }}
-                                />
-                              ))}
+                          {
+                            // Always text (only an exact <strong> shows bold), never HTML.
+                            opt.ingredients.map((ing, i) => (
+                              <li key={i} className="font-body text-xs text-steel">
+                                <IngredientLine text={ing} />
+                              </li>
+                            ))
+                          }
                         </ul>
                       </label>
                       );

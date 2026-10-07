@@ -8,5 +8,15 @@
    "34"
   ],
   "file": "apply-release-d-all.sql"
+ },
+ {
+  "id": "release-f",
+  "name": "Release F",
+  "steps": [
+   "35",
+   "36",
+   "37"
+  ],
+  "file": "apply-release-f-all.sql"
  }
 ]

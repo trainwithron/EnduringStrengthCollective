@@ -41,3 +41,20 @@ describe("creditExpiryDate", () => {
     expect(date?.toISOString()).toBe("2026-01-31T00:00:00.000Z");
   });
 });
+
+import { creditToExpire } from "./credit-expiration";
+
+describe("creditToExpire", () => {
+  it("expires only what is above booked-ahead and unmarked sessions", () => {
+    expect(creditToExpire(5, 2, 1)).toBe(2);
+    expect(creditToExpire(5, 0, 0)).toBe(5);
+  });
+  it("expires nothing when everything left is already spoken for", () => {
+    expect(creditToExpire(3, 3, 0)).toBe(0);
+    expect(creditToExpire(3, 2, 4)).toBe(0);
+  });
+  it("is never negative or above the balance, whatever it is given", () => {
+    expect(creditToExpire(0, 0, 0)).toBe(0);
+    expect(creditToExpire(4, -2, -1)).toBe(4);
+  });
+});

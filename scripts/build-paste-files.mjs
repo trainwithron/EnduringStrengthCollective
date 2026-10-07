@@ -20,8 +20,11 @@ const fnFromMigration = (mig, name) => {
   const text = migrationSql(mig);
   const start = text.indexOf(`create or replace function public.${name}(`);
   if (start < 0) throw new Error(`${mig} has no ${name}`);
-  const open = text.indexOf("$function$", start);
-  const end = text.indexOf("$function$;", open + 10) + "$function$;".length;
+  const m = /\bas\s+(\$[A-Za-z_]*\$)/i.exec(text.slice(start));
+  if (!m) throw new Error(`${mig} ${name} has no body delimiter`);
+  const tag = m[1];
+  const open = start + m.index + m[0].length;
+  const end = text.indexOf(tag + ";", open) + tag.length + 1;
   return text.slice(start, end);
 };
 const fnFrom0248 = (name) => fnFromMigration("0248", name);
@@ -693,6 +696,72 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["0289 is not already applied (the window tag column is not there yet)", has.noCol("coach_availability_windows", "session_type_id")],
     ],
   },
+  {
+    n: "35",
+    slug: "0290",
+    title: "0290 four database closures: a membership can no longer be handed to another person, the two AI-credit spending functions are server-only and refuse negative amounts, two private video buckets are readable only by the person they belong to and the coaches, and a client who joined by invite link is marked as signed in",
+    migrations: ["0290"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for normal use. A coach can no longer swap the person on an existing membership; the AI routes (deployed in the same release) charge credits from the server with the server's own numbers; an athlete's form-check video and a coach's video check-in can be opened only by that person and the group's coaches; clients who joined by invite link and have signed in stop showing 'Not signed in yet' and can no longer be given a coach-made login link. Deploy the release right after this paste: until the new code is live, charging AI credits fails with 'Couldn't process credits' (the AI is down today anyway).",
+    undo: [
+      "drop trigger if exists group_memberships_guard_identity on public.group_memberships;",
+      "drop function if exists public.guard_membership_identity();",
+      fnFromMigration("0220", "spend_coach_credits"),
+      "grant execute on function public.spend_coach_credits(uuid, integer) to authenticated, service_role;",
+      fnFromMigration("0250", "spend_ai_action"),
+      "grant execute on function public.spend_ai_action(uuid, text, integer, integer) to authenticated, service_role;",
+      'drop policy if exists "athlete_exercise_videos_select_own_or_coach" on storage.objects;',
+      'drop policy if exists "athlete_exercise_videos_select_members" on storage.objects;',
+      "create policy \"athlete_exercise_videos_select_members\" on storage.objects for select to authenticated using (bucket_id = 'athlete-exercise-videos' and public.is_group_member(((storage.foldername(name))[1])::uuid));",
+      'drop policy if exists "coach_video_checkins_select_recipient_or_coach" on storage.objects;',
+      'drop policy if exists "coach_video_checkins_select_members" on storage.objects;',
+      "create policy \"coach_video_checkins_select_members\" on storage.objects for select to authenticated using (bucket_id = 'coach-video-checkins' and public.is_group_member(((storage.foldername(name))[1])::uuid));",
+      fnFromMigration("0267", "guard_profile_sensitive_columns"),
+    ].join("\n"),
+    undoWhy: "Only if something misbehaves after step 35. Puts back the old functions, grants and the two wider video policies. It does NOT un-stamp the people who were marked as signed in (that was a correction of wrong data).",
+    rows: [
+      ["group_memberships, coach_credits and session_exercise_videos exist", `${has.table("group_memberships")} and ${has.table("coach_credits")} and ${has.table("session_exercise_videos")}`],
+      ["spend_ai_action, spend_coach_credits, audit_blocked exist", `${has.fnName("spend_ai_action")} and ${has.fnName("spend_coach_credits")} and ${has.fnName("audit_blocked")}`],
+      ["0290 is not already applied (the membership identity guard is not there yet)", "not exists (select 1 from pg_trigger where tgname = 'group_memberships_guard_identity')"],
+    ],
+  },
+  {
+    n: "36",
+    slug: "0291",
+    title: "0291 booking and credit closures: a booking, a waiting-list place or a weekly schedule must name a coach who coaches that group, a client cannot cancel or move a session that has already started or been marked attended, and the nightly credit expiry becomes one locked step that takes only an amount",
+    migrations: ["0291"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for normal use. A coach can no longer put a booking on another coach's calendar, and a client can no longer spend one group's credit on another coach's calendar. A client who tries to cancel or move a session that has started (or that the coach marked attended) is told to ask their coach; cancelling or moving a future session works as before and a coach is never refused. The nightly expiry (code in the same release) now takes off only what is truly unused (sessions booked ahead or not yet marked are kept) and does it in one locked step; until the new code is live the old job still runs as before. Run after step 35.",
+    undo: [
+      fnFromMigration("0278", "book_session"),
+      fnFromMigration("0278", "join_booking_waitlist"),
+      fnFromMigration("0278", "create_recurring_booking_series"),
+      fnFromMigration("0277", "cancel_booking_and_refund_credit"),
+      fnFromMigration("0279", "reschedule_booking"),
+      "drop function if exists public.expire_session_credit_balance(uuid, uuid, integer, integer);",
+    ].join("\n"),
+    undoWhy: "Only if booking misbehaves after step 36. Puts the five booking functions back as they were (without the coach-belongs-to-group check and the started-session guard) and removes the atomic credit-expiry function (the nightly job then expires nothing until it is back).",
+    rows: [
+      ["assert_client_may_book_directly exists (0278 is applied)", has.fnName("assert_client_may_book_directly")],
+      ["bookings, recurring_booking_series and booking_waitlist_entries exist", `${has.table("bookings")} and ${has.table("recurring_booking_series")} and ${has.table("booking_waitlist_entries")}`],
+      ["the credit functions and expiry record exist (0248 and the expiry table are applied)", `${has.fnName("apply_session_credit_change")} and ${has.table("session_credit_expirations")}`],
+      ["0291 is not already applied (book_session does not check the coach yet)", `coalesce((select position('that coach does not coach this group' in pg_get_functiondef(p.oid)) = 0 from pg_proc p where p.proname = 'book_session' and p.pronamespace = 'public'::regnamespace), false)`],
+    ],
+  },
+  {
+    n: "37",
+    slug: "0292",
+    title: "0292 the AI call log records why a call failed (a short error class), so an AI outage can be diagnosed",
+    migrations: ["0292"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing visible changes. After the code deploy every failed AI call records a short class (key rejected, credit or spend limit, rate limit, overloaded, timeout, bad request, unknown) and the nightly AI jobs show as failed when every item failed. Run after step 36.",
+    undo: "alter table public.ai_usage_log drop constraint if exists ai_usage_log_error_class_len;\nalter table public.ai_usage_log drop column if exists error_class;",
+    undoWhy: "Only if the new column causes trouble. Removes the column (the recorded classes are lost).",
+    rows: [
+      ["ai_usage_log exists", has.table("ai_usage_log")],
+      ["0292 is not already applied (the error_class column is not there yet)", has.noCol("ai_usage_log", "error_class")],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -768,6 +837,7 @@ for (const s of STEPS) {
 // The individual step files stay as the fallback (and for a release that was partly applied by hand: the bundle refuses at the first applied step).
 const BUNDLES = [
   { id: "release-d", name: "Release D", steps: ["32", "33", "34"] },
+  { id: "release-f", name: "Release F", steps: ["35", "36", "37"] },
 ];
 for (const b of BUNDLES) {
   const stepsIn = b.steps.map((n) => STEPS.find((x) => x.n === n));

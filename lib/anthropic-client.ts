@@ -7,12 +7,17 @@
 
 import type { AiCallMeta } from "@/lib/ai-usage";
 import { reserveAiCall } from "@/lib/ai-usage-server";
+import { classifyAiHttpError, classifyAiThrown } from "@/lib/ai-error-class";
+import { noteAiAttempt } from "@/lib/ai-run-stats";
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
 const DEFAULT_MODEL = "claude-sonnet-5";
 
+// AI_DISABLED=true is the kill switch: set it in the host's environment and redeploy and every AI feature reports "not configured" and makes no call (and spends
+// nothing), without removing the key.
 export function isAiConfigured(): boolean {
+  if (process.env.AI_DISABLED === "true") return false;
   return !!process.env.ANTHROPIC_API_KEY;
 }
 
@@ -69,7 +74,7 @@ export async function callClaude({
   meta,
 }: ClaudeCallOptions): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new AiNotConfiguredError();
+  if (!apiKey || !isAiConfigured()) throw new AiNotConfiguredError();
 
   // One ceiling on a single call, whichever route made it: a route that forgets its own input check cannot send an
   // enormous prompt, ask for an enormous answer, or attach an enormous image on the platform's bill.
@@ -111,16 +116,21 @@ export async function callClaude({
       }),
     });
   } catch (err) {
-    await usage.complete({ status: "error" });
+    const errorClass = classifyAiThrown(err);
+    noteAiAttempt({ ok: false, errorClass });
+    await usage.complete({ status: "error", errorClass });
     throw err;
   }
 
   if (!response.ok) {
-    await usage.complete({ status: "error" });
     const detail = await response.text();
+    const errorClass = classifyAiHttpError(response.status, detail);
+    noteAiAttempt({ ok: false, errorClass });
+    await usage.complete({ status: "error", errorClass });
     throw new Error(`Claude API error (${response.status}): ${detail.slice(0, 300)}`);
   }
 
+  noteAiAttempt({ ok: true });
   const data = await response.json();
   // Tokens are billed whether or not the output is usable, so they're
   // recorded for truncated calls too.

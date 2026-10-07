@@ -25,7 +25,6 @@ import { findHelpAnswer } from "@/lib/help-answer";
 import { PackageAssignmentControl } from "@/components/coach/package-assignment-control";
 import { PrivateFromOrgToggle } from "@/components/coach/private-from-org-toggle";
 import { ClientTagAssignmentControl } from "@/components/coach/client-tag-assignment-control";
-import { ChangeClientGroupControl } from "@/components/coach/change-client-group-control";
 import { DeleteClientControl } from "@/components/coach/delete-client-control";
 import { SetAsideControl } from "@/components/coach/set-aside-control";
 import { AddSocialOnlyMembershipControl } from "@/components/coach/add-social-only-membership-control";
@@ -1519,14 +1518,8 @@ export default async function AthleteProfilePage(
             )}
           </section>
 
-          <section>
-            <ChangeClientGroupControl
-              athleteId={params.athleteId}
-              athleteName={profile?.full_name ?? "This client"}
-              currentGroupId={params.groupId}
-              currentGroupName={group?.name ?? "this group"}
-            />
-          </section>
+          {/* "Move client" is hidden for now (Release F, Oct 7): move_client_to_group moves the balance but leaves the ledger, series, requests and waiting list behind
+              (r2_03a M5), so the books stop adding up. components/coach/change-client-group-control.tsx is kept; put it back once the function is completed. */}
 
           <section>
             <AddSocialOnlyMembershipControl

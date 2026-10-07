@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendPushToProfile } from "@/lib/send-push";
-import { isCreditBalanceExpired } from "@/lib/credit-expiration";
+import { isCreditBalanceExpired, creditToExpire } from "@/lib/credit-expiration";
+import { fetchBookingCountsOrNull } from "@/lib/credit-picture";
 import { withCronRun } from "@/lib/cron-monitor";
 
 // acuity_replacement_gap_audit_sept16.md — credit-expiration window.
@@ -65,6 +66,7 @@ async function handler(request: Request) {
 
   const now = new Date();
   let expiredCount = 0;
+  let skippedUnreadable = 0;
 
   for (const row of creditRows) {
     const coachId = coachIdByGroup.get(row.group_id);
@@ -72,31 +74,27 @@ async function handler(request: Request) {
     if (row.expiry_hold_until && new Date(row.expiry_hold_until).getTime() > now.getTime()) continue;
     if (!isCreditBalanceExpired(row.last_granted_at, creditExpiryDays, now)) continue;
 
-    const { error: updateError } = await supabase
-      .from("session_credits")
-      .update({ balance: 0, updated_at: now.toISOString() })
-      .eq("athlete_id", row.athlete_id)
-      .eq("group_id", row.group_id)
-      .eq("balance", row.balance); // real optimistic guard against a concurrent grant/spend since this row was read
-    if (updateError) continue;
+    // Only what is truly unused expires: sessions already booked ahead, and sessions that happened but are not marked yet, will still take one each. If the
+    // bookings cannot be read, nothing is expired for this client tonight (the job never guesses).
+    const counts = await fetchBookingCountsOrNull(supabase, { athleteId: row.athlete_id, groupId: row.group_id }, now);
+    if (!counts) {
+      skippedUnreadable++;
+      continue;
+    }
+    const mine = counts.get(`${row.athlete_id}:${row.group_id}`);
+    const amount = creditToExpire(row.balance, mine?.booked ?? 0, mine?.toMark ?? 0);
+    if (amount <= 0) continue;
 
-    // Best-effort: the ledger table exists once migration 0246 is applied.
-    await supabase.from("session_credit_ledger").insert({
-      athlete_id: row.athlete_id,
-      group_id: row.group_id,
-      kind: "expired",
-      amount: -row.balance,
-      balance_after: 0,
-      note: "Unused sessions expired",
+    // One locked step on the database: the balance, the ledger row and the expiry record together, and only if the balance is still what was read above.
+    const { data: expired, error: expireError } = await supabase.rpc("expire_session_credit_balance", {
+      p_athlete_id: row.athlete_id,
+      p_group_id: row.group_id,
+      p_amount: amount,
+      p_expected_balance: row.balance,
     });
+    if (expireError || expired !== true) continue;
 
-    await supabase.from("session_credit_expirations").insert({
-      athlete_id: row.athlete_id,
-      group_id: row.group_id,
-      credits_expired: row.balance,
-    });
-
-    const body = `${row.balance} unused session${row.balance === 1 ? "" : "s"} expired.`;
+    const body = `${amount} unused session${amount === 1 ? "" : "s"} expired.`;
     await supabase.from("notifications").insert({
       profile_id: row.athlete_id,
       group_id: row.group_id,
@@ -109,7 +107,7 @@ async function handler(request: Request) {
     expiredCount++;
   }
 
-  return NextResponse.json({ ok: true, expiredCount });
+  return NextResponse.json({ ok: true, expiredCount, skippedUnreadable });
 }
 
 export const GET = withCronRun("expire-session-credits", handler);

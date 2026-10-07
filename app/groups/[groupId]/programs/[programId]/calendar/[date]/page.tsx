@@ -549,11 +549,16 @@ export default async function DayDetailPage(
                     )
                   ) : booking ? (
                     isMine ? (
-                      <CancelBookingButton
-                        bookingId={booking.id}
-                        rescheduleHref={`${backHref}?reschedule=${booking.id}`}
-                        recurringSeriesId={booking.recurring_series_id}
-                      />
+                      // A session that has started can no longer be cancelled or moved by the client (the database refuses it too); the coach decides.
+                      start.getTime() > Date.now() ? (
+                        <CancelBookingButton
+                          bookingId={booking.id}
+                          rescheduleHref={`${backHref}?reschedule=${booking.id}`}
+                          recurringSeriesId={booking.recurring_series_id}
+                        />
+                      ) : (
+                        <span className="font-body text-xs text-steel">Your session</span>
+                      )
                     ) : (
                       <WaitlistJoinButton
                         coachId={coachMembership.profile_id}

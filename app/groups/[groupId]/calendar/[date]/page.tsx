@@ -412,11 +412,16 @@ export default async function CoachDayDetailPage(
                       isMine ? (
                         <div className="flex items-center gap-2">
                           {booking.session_type === "video" && <VideoCallButton bookingId={booking.id} />}
-                          <CancelBookingButton
-                            bookingId={booking.id}
-                            rescheduleHref={`${backHref}/${params.date}?reschedule=${booking.id}`}
-                            recurringSeriesId={booking.recurring_series_id}
-                          />
+                          {/* A session that has started can no longer be cancelled or moved by the client (the database refuses it too); the coach decides. */}
+                          {start.getTime() > Date.now() ? (
+                            <CancelBookingButton
+                              bookingId={booking.id}
+                              rescheduleHref={`${backHref}/${params.date}?reschedule=${booking.id}`}
+                              recurringSeriesId={booking.recurring_series_id}
+                            />
+                          ) : (
+                            <span className="font-body text-xs text-steel">Your session</span>
+                          )}
                         </div>
                       ) : (
                         <WaitlistJoinButton

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { checkAndSpendCoachCredits } from "@/lib/coach-credits";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 // credit_topup_low_tier_monetization_idea.md — nutrition plan
 // generation is priced as ONE 3-credit charge for a whole plan, not per
@@ -17,7 +18,7 @@ export async function POST() {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  const spend = await checkAndSpendCoachCredits(supabase, user.id, "nutrition_plan");
+  const spend = await checkAndSpendCoachCredits(createServiceRoleClient(), user.id, "nutrition_plan");
   if (!spend.ok) {
     return NextResponse.json({ error: spend.error }, { status: 402 });
   }

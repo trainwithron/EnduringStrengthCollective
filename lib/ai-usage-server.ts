@@ -13,7 +13,7 @@ import {
 // constants never pull the service-role client into their bundle.
 
 export interface UsageHandle {
-  complete: (result: { model?: string; inputTokens?: number; outputTokens?: number; status: "ok" | "truncated" | "error" }) => Promise<void>;
+  complete: (result: { model?: string; inputTokens?: number; outputTokens?: number; status: "ok" | "truncated" | "error"; errorClass?: string }) => Promise<void>;
 }
 
 const NOOP_HANDLE: UsageHandle = { complete: async () => {} };
@@ -69,6 +69,14 @@ export async function reserveAiCall(meta: AiCallMeta): Promise<UsageHandle> {
             .eq("id", logId);
         } catch {
           // logging is best-effort
+        }
+        // Why it failed (ai_usage_log.error_class, 0292): a separate write, so a database that does not have the column yet still records status and time above.
+        if (result.errorClass) {
+          try {
+            await supabase.from("ai_usage_log").update({ error_class: result.errorClass }).eq("id", logId);
+          } catch {
+            // best-effort
+          }
         }
       },
     };

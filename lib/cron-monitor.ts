@@ -3,6 +3,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendPushToProfile } from "@/lib/send-push";
 import { isSendGridConfigured, sendEmail } from "@/lib/sendgrid";
 import { shouldAlertForFailures } from "@/lib/cron-jobs";
+import { trackAiRun, everyAiCallFailed } from "@/lib/ai-run-stats";
 
 // Wraps a scheduled job so every run is recorded (cron_runs) and a failure tells the platform admin. A job that throws is turned
 // into a clean 500 and an alert; one that returns an error status counts as failed too. A request without the cron secret
@@ -53,8 +54,14 @@ async function recordRun(job: string, ok: boolean, error: string | null): Promis
 export function withCronRun(job: string, handler: (request: Request) => Promise<Response>) {
   return async function GET(request: Request): Promise<Response> {
     let response: Response;
+    // Every AI call the job makes is counted, so a run where each one failed is recorded as a failure even though the job swallowed the errors.
+    const ai = { problem: null as string | null };
     try {
-      response = await handler(request);
+      response = await trackAiRun(async (stats) => {
+        const r = await handler(request);
+        if (everyAiCallFailed(stats)) ai.problem = `every AI call in this run failed (${stats.failures} of ${stats.attempts}): ${stats.lastClass ?? "unknown"}`;
+        return r;
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       console.error(`cron ${job} threw:`, message);
@@ -66,10 +73,11 @@ export function withCronRun(job: string, handler: (request: Request) => Promise<
     }
 
     if (response.status === 401) return response;
-    const ok = response.status < 400;
-    const failures = await recordRun(job, ok, ok ? null : `returned status ${response.status}`);
+    const ok = response.status < 400 && !ai.problem;
+    const reason = ai.problem ?? `returned status ${response.status}`;
+    const failures = await recordRun(job, ok, ok ? null : reason);
     if (!ok && shouldAlertForFailures(failures)) {
-      await alertPlatformAdmins(`Scheduled job failed: ${job}`, `${job} returned status ${response.status} (${failures} in a row).`);
+      await alertPlatformAdmins(`Scheduled job failed: ${job}`, `${job}: ${reason} (${failures} in a row).`);
     }
     return response;
   };

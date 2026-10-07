@@ -165,7 +165,10 @@ function outOfAllowanceMessage(action: AiActionKey, balance: number): string {
 }
 
 // The real gate: call this from an authenticated AI-action route (the
-// coach spending their OWN allowance/credits). coach_credits_race_
+// coach spending their OWN allowance/credits). The `supabase` argument MUST be
+// the service-role client: since 0290 spend_ai_action is server-only (it used to
+// take the allowance and cost from the browser's own client), and the caller
+// passes the coach id it has already verified from the session. coach_credits_race_
 // condition_sept30.md — this used to do a plain SELECT read then a
 // SEPARATE adjust_coach_credits RPC call, a real TOCTOU race. Now one
 // atomic spend_ai_action() RPC (migration 0226/0227) uses this month's

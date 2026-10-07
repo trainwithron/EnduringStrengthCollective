@@ -99,6 +99,11 @@ export function countBookings(rows: BookingCountRow[], now: Date): Map<string, B
 // Fails soft: no counts. If the pages run out (25,000 rows) the counts are reported as of what was read.
 // `athleteIds` narrows it to one screenful of clients (at most 100 at a time, so the request stays short).
 export async function fetchBookingCounts(supabase: SupabaseClient, filter: { coachId?: string; athleteId?: string; athleteIds?: string[]; groupId?: string }, now: Date = new Date()): Promise<Map<string, BookingCounts>> {
+  return (await fetchBookingCountsOrNull(supabase, filter, now)) ?? new Map();
+}
+
+// The same read, but null when it could not be completed (so a caller that must not guess, like the credit-expiry job, can tell "none booked" from "could not read").
+export async function fetchBookingCountsOrNull(supabase: SupabaseClient, filter: { coachId?: string; athleteId?: string; athleteIds?: string[]; groupId?: string }, now: Date = new Date()): Promise<Map<string, BookingCounts> | null> {
   const { rows, failed, truncated } = await pageAll((from, to) => {
     let q = supabase
       .from("bookings")
@@ -114,6 +119,6 @@ export async function fetchBookingCounts(supabase: SupabaseClient, filter: { coa
     return q.order("id", { ascending: true }).range(from, to);
   });
   // Partial counts would quietly read as complete ones, so running out of pages counts as a failure.
-  if (failed || truncated) return new Map();
+  if (failed || truncated) return null;
   return countBookings(rows as BookingCountRow[], now);
 }

@@ -5,6 +5,7 @@ import { AiRateLimitedError } from "@/lib/ai-usage";
 import type { ParsedImportRow } from "@/lib/workout-import-parser";
 import { hasFlaggedMusculoskeletalConcern } from "@/lib/athlete-injury-flag";
 import { checkAndSpendCoachCredits, canRunAiAction } from "@/lib/coach-credits";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { matchExercise, matchTopN, type LibraryExercise } from "@/lib/exercise-matching";
 
 // Generates a full draft program from a coach's plain-English description
@@ -435,7 +436,7 @@ export async function POST(request: Request) {
     // empty-rows generation above never reaches here and never costs a
     // credit (coach_output_foolproofing's own "a bad output inside a
     // directly-priced purchase is a real, specific loss" principle).
-    const spend = await checkAndSpendCoachCredits(supabase, user.id, "program_generation");
+    const spend = await checkAndSpendCoachCredits(createServiceRoleClient(), user.id, "program_generation");
     if (!spend.ok) {
       return NextResponse.json({ error: spend.error }, { status: 402 });
     }
