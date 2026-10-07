@@ -119,6 +119,23 @@ describe("floating card geometry", () => {
   });
 });
 
+describe("a floating card shown as a tab on a narrow window", () => {
+  it("picking its tab docks it", () => {
+    let s = reduce(EMPTY_LAYOUT, { type: "open", id: "f", dest: dest("a"), where: "floating", bounds });
+    s = reduce(s, { type: "activate", id: "f" });
+    expect(s.floating).toHaveLength(0);
+    expect(s.dock.activeId).toBe("f");
+  });
+});
+
+describe("replacing the whole layout (another tab, or loading)", () => {
+  it("takes a good layout and repairs a bad one", () => {
+    const good = reduce(EMPTY_LAYOUT, { type: "open", id: "a", dest: dest("calendar"), where: "dock" });
+    expect(reduce(EMPTY_LAYOUT, { type: "replace", layout: good })).toEqual(good);
+    expect(reduce(good, { type: "replace", layout: { version: 7 } as unknown as WorkspaceLayout })).toEqual(EMPTY_LAYOUT);
+  });
+});
+
 describe("dock width and a narrow window", () => {
   it("the dock width stays within its limits", () => {
     expect(reduce(EMPTY_LAYOUT, { type: "setDockWidth", width: 10 }).dock.width).toBe(DOCK_MIN_WIDTH);

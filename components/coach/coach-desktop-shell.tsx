@@ -34,8 +34,6 @@ import {
   MessageCircle,
   Zap,
   UserPlus,
-  SquareStack,
-  PanelLeft,
   SlidersHorizontal,
   Lightbulb,
   Calculator,
@@ -60,14 +58,13 @@ import { TeamRailWidget } from "@/components/coach/desktop/rail-widgets/team-rai
 import { BusinessRailWidget } from "@/components/coach/desktop/rail-widgets/business-rail-widget";
 import { ShellListPanel, type SectionSubLink } from "@/components/coach/desktop/shell-list-panel";
 import { CollectiveIntelligenceChat } from "@/components/coach/desktop/collective-intelligence-chat";
-import { FloatingCardStack } from "@/components/coach/desktop/floating-card-stack";
-import {
-  readLayoutMode,
-  writeLayoutMode,
-  readHasSeenLayoutModeToggle,
-  markLayoutModeToggleSeen,
-  type LayoutMode,
-} from "@/lib/coach-shell-panel-storage";
+import { WorkspaceProvider } from "@/components/coach/workspace/workspace-context";
+import { WorkspaceDock } from "@/components/coach/workspace/workspace-dock";
+import { WorkspaceFloating } from "@/components/coach/workspace/workspace-floating";
+import { WorkspaceToolbar } from "@/components/coach/workspace/workspace-toolbar";
+import { PanePicker } from "@/components/coach/workspace/pane-picker";
+import { WorkspaceRailButton } from "@/components/coach/workspace/workspace-rail-button";
+import { EmbeddedActivityReporter } from "@/components/coach/workspace/embedded-activity-reporter";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CoachMoreSheet } from "@/components/coach/mobile/coach-more-sheet";
 import { CoachSpotHub } from "@/components/coach/mobile/coach-spot-hub";
@@ -167,22 +164,6 @@ function CoachDesktopShellFull({
   children: React.ReactNode;
 }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  // cascading_card_stack_widget_layering_idea.md — a per-coach display
-  // preference between today's traditional ShellListPanel (one-at-a-time
-  // tab switcher) and the new floating cascaded card stack (2-4 of the
-  // same four mini-views shown at once). Read once on mount, same
-  // guarded-localStorage convention as the panel's own width/collapsed/
-  // view state — no server round trip for a pure display preference.
-  const [layoutMode, setLayoutMode] = useState<LayoutMode>("traditional");
-  // overnight_comprehensive_polish_pass_sept19_20.md, finding #4 — a
-  // real, working toggle that was nearly invisible (bare icon, native
-  // tooltip only). A small "NEW" dot points at it until a coach has
-  // actually used it once; a styled hover tooltip (same portal-to-body
-  // pattern shell-rail.tsx already established for this exact rail's
-  // sticky-stacking-context issue) replaces the native title attribute.
-  const [hasSeenLayoutToggle, setHasSeenLayoutToggle] = useState(true);
-  const [layoutToggleTooltipPos, setLayoutToggleTooltipPos] = useState<{ top: number; left: number } | null>(null);
-  const layoutToggleRef = useRef<HTMLButtonElement>(null);
   const [feedUnread, setFeedUnread] = useState(0);
   const [clientsUnread, setClientsUnread] = useState(0);
   const [messagesUnread, setMessagesUnread] = useState(0);
@@ -195,41 +176,6 @@ function CoachDesktopShellFull({
   // redesign.md) — the rail + list panel need the viewer's own id for
   // the pinned Needs Attention strip's fetch.
   const [coachId, setCoachId] = useState<string | null>(null);
-
-  useEffect(() => {
-    setLayoutMode(readLayoutMode());
-    setHasSeenLayoutToggle(readHasSeenLayoutModeToggle());
-  }, []);
-
-  function toggleLayoutMode() {
-    setLayoutMode((prev) => {
-      const next: LayoutMode = prev === "traditional" ? "card_stack" : "traditional";
-      writeLayoutMode(next);
-      return next;
-    });
-    if (!hasSeenLayoutToggle) {
-      markLayoutModeToggleSeen();
-      setHasSeenLayoutToggle(true);
-    }
-  }
-
-  // Real feedback from Ron: the only way out of card-stack mode was
-  // closing all 4 cards one at a time. A direct "collapse all" control
-  // on the widget itself (not just the small rail icon) sets the mode
-  // straight to traditional, no toggling logic needed.
-  function switchToTraditionalLayout() {
-    setLayoutMode("traditional");
-    writeLayoutMode("traditional");
-  }
-
-  function showLayoutToggleTooltip() {
-    const rect = layoutToggleRef.current?.getBoundingClientRect();
-    if (rect) setLayoutToggleTooltipPos({ top: rect.top + rect.height / 2, left: rect.right + 10 });
-  }
-
-  function hideLayoutToggleTooltip() {
-    setLayoutToggleTooltipPos(null);
-  }
 
   // Team (position groups/depth chart) is an opt-in feature for coaches
   // running an actual team sport — most individual-training coaches never
@@ -589,6 +535,7 @@ function CoachDesktopShellFull({
 
   return (
     <TerminologyProvider groupId={groupId}>
+    <WorkspaceProvider coachId={coachId} groupId={groupId} isShared={coachLevel || groupKind === "team" || groupKind === "social"}>
     <div className="min-h-screen bg-graphite text-chalk font-body">
       {/* operational_resilience_oversight_check.md — WCAG 2.4.1 Bypass
           Blocks (AA): this shell's sidebar is a real keyboard-tab-through
@@ -660,7 +607,7 @@ function CoachDesktopShellFull({
 
       {/* The floating card stack's toolbar lives here, in the page flow, so it takes its own space instead of drawing over the page and the rail
           (Ron, Oct 6). Empty (zero height) unless the card-stack layout puts its bar into it. */}
-      {layoutMode === "card_stack" && <div id="workspace-bar-slot" className="sticky top-14 z-30 hidden lg:block" />}
+      <div id="workspace-bar-slot" className="sticky top-14 z-30 hidden lg:block" />
 
       <div className="flex">
         {/* Concept 8 "Familiar" shell redesign — Discord/YouTube-inspired
@@ -701,43 +648,7 @@ function CoachDesktopShellFull({
               >
                 <UserCheck className="w-4 h-4" strokeWidth={2.25} />
               </a>
-              <button
-                ref={layoutToggleRef}
-                type="button"
-                onClick={toggleLayoutMode}
-                onMouseEnter={showLayoutToggleTooltip}
-                onMouseLeave={hideLayoutToggleTooltip}
-                aria-label={
-                  layoutMode === "traditional"
-                    ? "Switch to floating card-stack layout"
-                    : "Switch to traditional layout"
-                }
-                className="relative w-11 h-11 flex items-center justify-center text-steel active:text-chalk"
-              >
-                {layoutMode === "traditional" ? (
-                  <SquareStack className="w-4 h-4" strokeWidth={2.25} />
-                ) : (
-                  <PanelLeft className="w-4 h-4" strokeWidth={2.25} />
-                )}
-                {!hasSeenLayoutToggle && <span className="absolute top-1 right-1.5 w-2 h-2 rounded-full bg-rust" />}
-                {layoutToggleTooltipPos &&
-                  typeof document !== "undefined" &&
-                  createPortal(
-                    <span
-                      style={{
-                        top: layoutToggleTooltipPos.top,
-                        left: layoutToggleTooltipPos.left,
-                        transform: "translateY(-50%)",
-                      }}
-                      className="fixed pointer-events-none whitespace-nowrap bg-surface border border-steel/30 text-chalk font-body text-xs px-2 py-1 z-[100]"
-                    >
-                      {layoutMode === "traditional"
-                        ? "Try the floating card-stack layout"
-                        : "Switch back to the traditional layout"}
-                    </span>,
-                    document.body
-                  )}
-              </button>
+              <WorkspaceRailButton />
               {isPlatformAdmin && (
                 <>
                   <Link
@@ -772,16 +683,13 @@ function CoachDesktopShellFull({
             </>
           }
         />
-        {coachId && layoutMode === "traditional" && (
+        {coachId && (
           <ShellListPanel
             coachId={coachId}
             groupId={groupId}
             sectionLabel={sectionLabel}
             sectionSubLinks={sectionSubLinks}
           />
-        )}
-        {coachId && layoutMode === "card_stack" && (
-          <FloatingCardStack groupId={groupId} onExitToTraditional={switchToTraditionalLayout} />
         )}
 
         {/* Coach mobile tab bar (coach_mobile_app_redesign_plan.md) —
@@ -807,7 +715,12 @@ function CoachDesktopShellFull({
           <PendingNoticeFlusher />
           {children}
         </main>
+        {/* The workspace panel: beside the page, on the right (components/coach/workspace). */}
+        <WorkspaceDock />
       </div>
+      <WorkspaceFloating />
+      <WorkspaceToolbar />
+      <PanePicker />
       {/* Mounted once here so it's reachable from every one of this
           shell's ~50 routes, not just /dashboard (collective_intelligence
           audit gap — the component's own design intent was always
@@ -819,6 +732,7 @@ function CoachDesktopShellFull({
         <CollectiveIntelligenceChat />
       </div>
     </div>
+    </WorkspaceProvider>
     </TerminologyProvider>
   );
 }
@@ -831,6 +745,7 @@ export function CoachDesktopShell(props: React.ComponentProps<typeof CoachDeskto
     return (
       <TerminologyProvider groupId={props.groupId}>
         <div data-embedded="1" className="min-h-screen bg-graphite text-chalk font-body">
+          <EmbeddedActivityReporter />
           <main id="main-content" className="px-4 pt-4 pb-8">
             {props.children}
           </main>

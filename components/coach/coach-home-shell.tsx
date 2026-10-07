@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { EmbeddedActivityReporter } from "@/components/coach/workspace/embedded-activity-reporter";
 import { isEmbeddedRequest } from "@/lib/embedded-request";
 import { Home } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
@@ -66,6 +67,7 @@ export async function CoachHomeShell(props: { orgName: string; children: React.R
     return (
       <TerminologyProvider>
         <div data-embedded="1" className="min-h-screen bg-graphite text-chalk font-body">
+          <EmbeddedActivityReporter />
           <main id="main-content" className="px-4 pt-4 pb-8">
             {props.children}
           </main>

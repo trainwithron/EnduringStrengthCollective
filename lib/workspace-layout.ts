@@ -63,7 +63,8 @@ export type WorkspaceAction =
   | { type: "toDock"; id: string }
   | { type: "toFloating"; id: string; bounds: Bounds }
   | { type: "reorderDock"; id: string; toIndex: number }
-  | { type: "clearRecents" };
+  | { type: "clearRecents" }
+  | { type: "replace"; layout: WorkspaceLayout };
 
 const sameDest = (a: WorkspaceDestination, b: WorkspaceDestination) => a.id === b.id;
 
@@ -102,8 +103,11 @@ export function reduce(state: WorkspaceLayout, action: WorkspaceAction): Workspa
       const activeId = state.dock.activeId === action.id ? panes[panes.length - 1]?.id ?? null : state.dock.activeId;
       return { ...state, dock: { ...state.dock, panes, activeId, open: panes.length === 0 ? false : state.dock.open }, floating: state.floating.filter((p) => p.id !== action.id) };
     }
-    case "activate":
-      return state.dock.panes.some((p) => p.id === action.id) ? { ...state, dock: { ...state.dock, activeId: action.id, open: true } } : state;
+    case "activate": {
+      if (state.dock.panes.some((p) => p.id === action.id)) return { ...state, dock: { ...state.dock, activeId: action.id, open: true } };
+      // On a narrow window a floating card is shown as a dock tab; picking that tab docks it for real.
+      return state.floating.some((p) => p.id === action.id) ? reduce(state, { type: "toDock", id: action.id }) : state;
+    }
     case "setDockOpen":
       return { ...state, dock: { ...state.dock, open: action.open && state.dock.panes.length > 0 } };
     case "setDockWidth":
@@ -167,6 +171,8 @@ export function reduce(state: WorkspaceLayout, action: WorkspaceAction): Workspa
     }
     case "clearRecents":
       return { ...state, recents: [] };
+    case "replace":
+      return sanitizeLayout(action.layout);
   }
 }
 
