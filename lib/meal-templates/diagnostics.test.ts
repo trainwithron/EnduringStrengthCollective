@@ -33,11 +33,11 @@ function bestPasses(r: TemplateRecipe): number {
 }
 
 describe("the library is what the old app had", () => {
-  it("has 66 recipes: 20 breakfast, 19 lunch, 19 dinner, 8 snack, unique ids", () => {
-    expect(RECIPES).toHaveLength(66);
+  it("has 69 recipes (Ron's 66 plus 3 added): 21 breakfast, 19 lunch, 19 dinner, 10 snack, unique ids", () => {
+    expect(RECIPES).toHaveLength(69);
     const count = (slot: string) => RECIPES.filter((r) => r.slot === slot).length;
-    expect([count("breakfast"), count("lunch"), count("dinner"), count("snack")]).toEqual([20, 19, 19, 8]);
-    expect(new Set(RECIPES.map((r) => r.id)).size).toBe(66);
+    expect([count("breakfast"), count("lunch"), count("dinner"), count("snack")]).toEqual([21, 19, 19, 10]);
+    expect(new Set(RECIPES.map((r) => r.id)).size).toBe(69);
   });
   it("every recipe has a name, at least one real diet, keywords and a slot", () => {
     for (const r of RECIPES) {
@@ -53,13 +53,13 @@ describe("the library is what the old app had", () => {
   });
   it("covers every diet the old app declared, pescatarian included", () => {
     for (const d of DIET_TYPES) expect(RECIPES.some((r) => r.archetypes.includes(d)), d).toBe(true);
-    expect(RECIPES.filter((r) => r.archetypes.includes("pescatarian"))).toHaveLength(8);
+    expect(RECIPES.filter((r) => r.archetypes.includes("pescatarian"))).toHaveLength(9);
   });
 });
 
 describe("the food tables are consistent", () => {
-  it("150 foods, each with sane per-gram macros (or per-unit for an egg, a slice, a wrap, a cake, a bagel)", () => {
-    expect(Object.keys(FOOD_DENSITY)).toHaveLength(150);
+  it("151 foods (Ron's 150 plus the trimmed chuck roast), each with sane per-gram macros (or per-unit for an egg, a slice, a wrap, a cake, a bagel)", () => {
+    expect(Object.keys(FOOD_DENSITY)).toHaveLength(151);
     for (const [key, d] of Object.entries(FOOD_DENSITY)) {
       for (const n of [d.protein, d.carbs, d.fat]) expect(n, key).toBeGreaterThanOrEqual(0);
       if (!PER_UNIT_KEYS.has(key)) expect(d.protein + d.carbs + d.fat, `${key} cannot weigh more than itself`).toBeLessThanOrEqual(1.001);
@@ -123,7 +123,7 @@ describe("the food tables are consistent", () => {
   it("every row carries its USDA record, except the exact list that has none (supplements, branded cereals, edamame, mixed berries, seitan, the plant blend)", () => {
     const source = readFileSync(new URL("./food-table.ts", import.meta.url), "utf8");
     const rows = [...source.matchAll(/^\s+([a-z0-9_]+):\s*\{[^}]*\},?(.*)$/gm)].filter((m) => m[1] in FOOD_DENSITY);
-    expect(rows).toHaveLength(150);
+    expect(rows).toHaveLength(151);
     const without = rows.filter((m) => !/\/\/ USDA fdc \d+ \(was /.test(m[2])).map((m) => m[1]);
     expect(without.sort()).toEqual(
       ["berries_mixed", "brown_rice_pasta", "casein_protein", "corn_flakes", "cottage_cheese_2pct", "edamame", "milk_2_pct", "milk_skim", "pea_protein", "plant_protein", "rice_krispies", "seitan", "shredded_wheat", "tvp_dry", "whey_isolate"].sort()
@@ -201,8 +201,6 @@ const KNOWN_NARROW = [
   "d_ribeye_potatoes|omnivore|0",
   "d_ribeye_potatoes|paleo|0",
   "d_flank_steak_butter_carnivore|keto|2",
-  "d_chuck_roast_mash|omnivore|0",
-  "d_chuck_roast_mash|paleo|0",
   "d_ribeye_sweet_potato_steakhouse|omnivore|0",
   "d_ribeye_sweet_potato_steakhouse|paleo|0",
 ];
@@ -302,53 +300,6 @@ const KNOWN_GAPS = [
   "vegan|breakfast|high_protein|1.6",
   "vegan|breakfast|high_protein|2",
   "vegan|snack|high_protein|0.6",
-  "keto|snack|keto|0.6",
-  "keto|snack|keto|0.8",
-  "keto|snack|keto|1",
-  "keto|snack|keto|1.25",
-  "keto|snack|keto|1.6",
-  "keto|snack|keto|2",
-  "paleo|snack|standard|1",
-  "paleo|snack|standard|1.25",
-  "paleo|snack|standard|1.6",
-  "paleo|snack|standard|2",
-  "paleo|snack|high_carb|0.6",
-  "paleo|snack|high_carb|0.8",
-  "paleo|snack|high_carb|1",
-  "paleo|snack|high_carb|1.25",
-  "paleo|snack|high_carb|1.6",
-  "paleo|snack|high_carb|2",
-  "paleo|snack|high_protein|0.6",
-  "paleo|snack|high_protein|0.8",
-  "paleo|snack|high_protein|2",
-  "paleo|snack|light|0.6",
-  "paleo|snack|light|0.8",
-  "paleo|snack|light|1.6",
-  "paleo|snack|light|2",
-  "pescatarian|breakfast|standard|0.6",
-  "pescatarian|breakfast|standard|0.8",
-  "pescatarian|breakfast|standard|1",
-  "pescatarian|breakfast|standard|1.25",
-  "pescatarian|breakfast|standard|1.6",
-  "pescatarian|breakfast|standard|2",
-  "pescatarian|breakfast|high_carb|0.6",
-  "pescatarian|breakfast|high_carb|0.8",
-  "pescatarian|breakfast|high_carb|1",
-  "pescatarian|breakfast|high_carb|1.25",
-  "pescatarian|breakfast|high_carb|1.6",
-  "pescatarian|breakfast|high_carb|2",
-  "pescatarian|breakfast|high_protein|0.6",
-  "pescatarian|breakfast|high_protein|0.8",
-  "pescatarian|breakfast|high_protein|1",
-  "pescatarian|breakfast|high_protein|1.25",
-  "pescatarian|breakfast|high_protein|1.6",
-  "pescatarian|breakfast|high_protein|2",
-  "pescatarian|breakfast|light|0.6",
-  "pescatarian|breakfast|light|0.8",
-  "pescatarian|breakfast|light|1",
-  "pescatarian|breakfast|light|1.25",
-  "pescatarian|breakfast|light|1.6",
-  "pescatarian|breakfast|light|2",
   "pescatarian|snack|standard|1.6",
   "pescatarian|snack|standard|2",
   "pescatarian|snack|low_carb|0.6",
@@ -360,27 +311,11 @@ const KNOWN_GAPS = [
   "pescatarian|snack|high_carb|2",
   "pescatarian|snack|high_protein|0.8",
   "pescatarian|snack|light|0.8",
-  "carnivore|snack|carnivore|0.6",
-  "carnivore|snack|carnivore|0.8",
-  "carnivore|snack|carnivore|1",
-  "carnivore|snack|carnivore|1.25",
-  "carnivore|snack|carnivore|1.6",
-  "carnivore|snack|carnivore|2",
 ];
 
 // (slot | shape | size | meals) where an everyday omnivore has fewer than three meals (two on the high-protein and light shapes). All are snacks: the jerky snacks no longer land
 // with USDA-accurate jerky.
-const KNOWN_OMNIVORE_THIN = [
-  "snack|standard|1.6|2",
-  "snack|standard|2|2",
-  "snack|low_carb|1|2",
-  "snack|low_carb|1.6|2",
-  "snack|high_carb|1|2",
-  "snack|high_carb|1.25|2",
-  "snack|high_carb|1.6|1",
-  "snack|high_carb|2|1",
-  "snack|high_protein|0.8|1",
-];
+const KNOWN_OMNIVORE_THIN: string[] = [];
 
 describe("coverage: which diets and slots the starter library can fill", () => {
   it("the gaps are exactly the known ones", () => {
@@ -519,8 +454,9 @@ describe("the scaler", () => {
     expect(meal!.passes).toBeGreaterThan(1);
   });
   it("returns null, never a bad meal, when a recipe cannot land", () => {
-    const r = RECIPES.find((x) => x.id === "s_jerky_eggs_carnivore")!;
-    expect(scaleTemplate(r, { proteinG: 25, carbsG: 0, fatG: 25 })).toBeNull();
+    const r = RECIPES.find((x) => x.id === "l_chicken_rice_broccoli")!;
+    expect(scaleTemplate(r, { proteinG: 150, carbsG: 0, fatG: 80 })).toBeNull();
+    expect(scaleTemplate(r, { proteinG: 0, carbsG: 0, fatG: 0 })).toBeNull();
   });
   it("a formula that throws is skipped, not shown", () => {
     const bad: TemplateRecipe = { id: "bad", name: "Bad", slot: "lunch", archetypes: ["omnivore"], keywords: ["bad"], build: () => { throw new Error("boom"); } };
