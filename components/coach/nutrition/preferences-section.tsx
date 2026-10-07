@@ -82,6 +82,9 @@ export function PreferencesSection({
           </button>
         </div>
       )}
+      <p className="font-body text-xs text-steel max-w-[70ch]">
+        For celiac disease, also add &ldquo;oats&rdquo; as an &ldquo;other:&rdquo; allergy: oats are the usual cross-contact food and are not counted as gluten here.
+      </p>
       <FoodPreferencesEditor prefs={prefs} onChange={setPrefs} rules="edit" weightLbs={weightLbs} />
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" onClick={save} disabled={busy || !dirty} className="h-11 px-5 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40">
