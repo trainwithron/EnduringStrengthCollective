@@ -10,10 +10,16 @@ export function NutritionCheckinSuggestionsList({
   athleteId,
   groupId,
   initialSuggestions,
+  todayKey,
+  floorCalories = null,
+  clientName = "this client",
 }: {
   athleteId: string;
   groupId: string;
   initialSuggestions: CheckinSuggestion[];
+  todayKey: string;
+  floorCalories?: number | null;
+  clientName?: string;
 }) {
   const [suggestions, setSuggestions] = useState(initialSuggestions);
   if (suggestions.length === 0) return null;
@@ -26,6 +32,9 @@ export function NutritionCheckinSuggestionsList({
           athleteId={athleteId}
           groupId={groupId}
           suggestion={s}
+          todayKey={todayKey}
+          floorCalories={floorCalories}
+          clientName={clientName}
           onResolved={() => setSuggestions((prev) => prev.filter((p) => p.id !== s.id))}
         />
       ))}

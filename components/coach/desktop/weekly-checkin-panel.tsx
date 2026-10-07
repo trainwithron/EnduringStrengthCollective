@@ -13,6 +13,11 @@ import {
 } from "@/lib/nutrition-checkin";
 import { computeArchetypeMacros, detectDietArchetype } from "@/lib/macros";
 import { saveStandingTarget } from "@/lib/standing-macros";
+import { clampApplyFrom, targetChangeMessage } from "@/lib/apply-from";
+import { notifyPush } from "@/lib/push-notify";
+import { isBelowFloor } from "@/lib/calorie-floor";
+import { ApplyFromField } from "@/components/coach/nutrition/apply-from-field";
+import { CalorieFloorWarning } from "@/components/coach/nutrition/calorie-floor-warning";
 import { localDateKey } from "@/lib/timezone";
 
 // Purely a display band for the slider below — the real min/max/step/
@@ -60,6 +65,9 @@ export function WeeklyCheckinPanel({
   injurySurplusPct,
   defaultPhase,
   hasStandingTarget = false,
+  todayKey,
+  floorCalories = null,
+  clientName = "this client",
 }: {
   athleteId: string;
   groupId: string;
@@ -90,6 +98,10 @@ export function WeeklyCheckinPanel({
   // When the client has a standing target, a check-in updates THAT by default, so the new
   // numbers keep applying after one date. Without it the old one-date apply is the default.
   hasStandingTarget?: boolean;
+  // The coach's calendar day (from the server, in the coach's zone) and the soft calorie floor for this client when it can be worked out.
+  todayKey: string;
+  floorCalories?: number | null;
+  clientName?: string;
 }) {
   const [phase, setPhase] = useState<NutritionPhase>(lastCheckin?.phase ?? defaultPhase ?? "fat_loss");
   const [adjustmentPct, setAdjustmentPct] = useState(lastCheckin?.adjustmentPct ?? DEFAULT_ADJUSTMENT_PCT);
@@ -109,8 +121,10 @@ export function WeeklyCheckinPanel({
   const [dietaryRestrictions, setDietaryRestrictions] = useState(
     lastCheckin?.dietaryRestrictions ?? ""
   );
-  const [applyDate, setApplyDate] = useState(todayIso());
-  const [applyMode, setApplyMode] = useState<"standing" | "date">(hasStandingTarget ? "standing" : "date");
+  const [applyDate, setApplyDate] = useState(todayKey);
+  // The standing target is always the default: a one-day target is the explicit exception.
+  const [applyFrom, setApplyFrom] = useState(todayKey);
+  const [applyMode, setApplyMode] = useState<"standing" | "date">("standing");
 
   const [result, setResult] = useState<CheckInResult | null>(null);
   const [macros, setMacros] = useState<{ proteinG: number; carbsG: number; fatG: number } | null>(
@@ -195,7 +209,7 @@ export function WeeklyCheckinPanel({
                 carbsG: macros.carbsG,
                 fatG: macros.fatG,
               },
-              today: localDateKey(),
+              today: clampApplyFrom(applyFrom, todayKey),
             })
           )
         : await supabase.from("daily_macros").upsert(
@@ -218,6 +232,10 @@ export function WeeklyCheckinPanel({
       return;
     }
 
+    if (athleteId !== user?.id) {
+      const startKey = applyMode === "standing" ? clampApplyFrom(applyFrom, todayKey) : applyDate;
+      notifyPush(athleteId, "New macro targets", targetChangeMessage(result.newCalories, startKey, todayKey), `/groups/${groupId}/nutrition`);
+    }
     setSaving(false);
     setSaved(true);
   }
@@ -397,7 +415,8 @@ export function WeeklyCheckinPanel({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 pt-2 border-t border-steel/15">
+          <CalorieFloorWarning calories={result.newCalories} floor={floorCalories} who={clientName} />
+          <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-steel/15">
             <label className="flex items-center gap-2 font-body text-xs text-steel">
               Apply to
               <select
@@ -405,10 +424,11 @@ export function WeeklyCheckinPanel({
                 onChange={(e) => setApplyMode(e.target.value as "standing" | "date")}
                 className="h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs"
               >
-                <option value="standing">Standing target (every day)</option>
+                <option value="standing">Standing target (from a date)</option>
                 <option value="date">One date only</option>
               </select>
             </label>
+            {applyMode === "standing" && <ApplyFromField value={applyFrom} onChange={setApplyFrom} todayKey={todayKey} disabled={saving} />}
             {applyMode === "date" && (
               <input
                 type="date"
@@ -424,7 +444,7 @@ export function WeeklyCheckinPanel({
               disabled={saving}
               className="h-8 px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
             >
-              {saving ? "Saving…" : "Save"}
+              {saving ? "Saving…" : isBelowFloor(result.newCalories, floorCalories ?? 0) ? "Save anyway" : "Save"}
             </button>
             {saved && <span className="font-body text-xs text-positive">Saved</span>}
           </div>

@@ -2,6 +2,12 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { saveStandingTarget } from "@/lib/standing-macros";
+import { clampApplyFrom, targetChangeMessage } from "@/lib/apply-from";
+import { notifyPush } from "@/lib/push-notify";
+import { isBelowFloor } from "@/lib/calorie-floor";
+import { ApplyFromField } from "@/components/coach/nutrition/apply-from-field";
+import { CalorieFloorWarning } from "@/components/coach/nutrition/calorie-floor-warning";
 
 export interface CheckinSuggestion {
   id: string;
@@ -29,21 +35,30 @@ const PHASE_LABELS: Record<string, string> = {
 };
 
 // The proactive weekly cron's own output — a real recommendation, not
-// yet applied to anything. "Apply" writes nutrition_checkins +
-// daily_macros exactly like the manual panel's own Save button already
-// does; "Dismiss" just marks it reviewed-and-skipped. Nothing here ever
-// touches daily_macros until a coach explicitly clicks Apply.
+// yet applied to anything. "Apply" records the check-in and writes the
+// client's STANDING target from the chosen date (today by default, up to 14
+// days ahead), the same as the manual check-in; a day that has its own
+// one-day target keeps it. "Dismiss" just marks it reviewed-and-skipped.
+// Nothing here changes a target until a coach explicitly clicks Apply.
 export function NutritionCheckinSuggestionCard({
   athleteId,
   groupId,
   suggestion,
   onResolved,
+  todayKey,
+  floorCalories = null,
+  clientName = "this client",
 }: {
   athleteId: string;
   groupId: string;
   suggestion: CheckinSuggestion;
   onResolved: () => void;
+  // The coach's calendar day (computed on the server in the coach's zone) and the soft floor for this client, if it can be worked out.
+  todayKey: string;
+  floorCalories?: number | null;
+  clientName?: string;
 }) {
+  const [applyFrom, setApplyFrom] = useState(todayKey);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,7 +69,7 @@ export function NutritionCheckinSuggestionCard({
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    const todayKey = new Date().toISOString().slice(0, 10);
+    const startKey = clampApplyFrom(applyFrom, todayKey);
 
     const { error: checkinError } = await supabase.from("nutrition_checkins").insert({
       athlete_id: athleteId,
@@ -80,21 +95,15 @@ export function NutritionCheckinSuggestionCard({
       return;
     }
 
-    const { error: macroError } = await supabase.from("daily_macros").upsert(
-      {
-        athlete_id: athleteId,
-        group_id: groupId,
-        log_date: todayKey,
-        calories: suggestion.newCalories,
-        protein_g: suggestion.proteinG,
-        carbs_g: suggestion.carbsG,
-        fat_g: suggestion.fatG,
-        created_by: user?.id,
-      },
-      { onConflict: "athlete_id,log_date" }
-    );
-    if (macroError) {
-      setError("Saved the check-in, but couldn't apply today's targets.");
+    const saved = await saveStandingTarget(supabase, {
+      athleteId,
+      groupId,
+      userId: user?.id ?? null,
+      target: { calories: suggestion.newCalories, proteinG: suggestion.proteinG, carbsG: suggestion.carbsG, fatG: suggestion.fatG },
+      today: startKey,
+    });
+    if (!saved.ok) {
+      setError("Saved the check-in, but couldn't apply the new target.");
       setBusy(false);
       return;
     }
@@ -103,6 +112,7 @@ export function NutritionCheckinSuggestionCard({
       .from("nutrition_checkin_suggestions")
       .update({ status: "applied" })
       .eq("id", suggestion.id);
+    notifyPush(athleteId, "New macro targets", targetChangeMessage(suggestion.newCalories, startKey, todayKey), `/groups/${groupId}/nutrition`);
     setBusy(false);
     onResolved();
   }
@@ -144,19 +154,21 @@ export function NutritionCheckinSuggestionCard({
           <p className="font-body text-xs text-steel uppercase mt-1">Fat</p>
         </div>
       </div>
+      <CalorieFloorWarning calories={suggestion.newCalories} floor={floorCalories} who={clientName} />
       {error && (
         <p className="font-body text-xs text-rust" role="alert">
           {error}
         </p>
       )}
-      <div className="flex items-center gap-3 pt-2 border-t border-steel/15">
+      <div className="flex items-center gap-3 flex-wrap pt-2 border-t border-steel/15">
+        <ApplyFromField value={applyFrom} onChange={setApplyFrom} todayKey={todayKey} disabled={busy} />
         <button
           type="button"
           onClick={handleApply}
           disabled={busy}
           className="h-9 px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
         >
-          {busy ? "…" : "Apply today"}
+          {busy ? "…" : isBelowFloor(suggestion.newCalories, floorCalories ?? 0) ? "Apply anyway" : "Apply"}
         </button>
         <button
           type="button"
