@@ -11,4 +11,6 @@ export const DISABLED_TEMPLATES: Record<string, string> = {
     "With the USDA values for beef jerky (about 33 g protein, 11 g carbs and 26 g fat per 100 g) the jerky alone brings more fat than a snack target allows once the snack's protein is met, so it misses the fat target by more than the tolerance at every size.",
   s_cantaloupe_jerky:
     "With the USDA values for beef jerky (about 33 g protein, 11 g carbs and 26 g fat per 100 g) the jerky brings more fat than a snack target allows once the snack's protein is met, so it misses the fat target by more than the tolerance at every size.",
+  b_salmon_eggs_avocado:
+    "Salmon, whole eggs and avocado together carry more fat than any breakfast target allows once the protein is met (with USDA values the salmon alone is 20 g protein and 13 g fat per 100 g, an egg adds about 5 g of fat, and the avocado 15 g per 100 g), so it misses the fat target by more than the tolerance at every size. Before the correction it landed on a single keto size.",
 };

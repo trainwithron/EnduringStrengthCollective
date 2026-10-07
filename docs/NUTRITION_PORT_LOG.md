@@ -51,7 +51,7 @@ All seven diets the old app declared are kept, including pescatarian (8 recipes)
 
 ### 2.7 Recipes that are switched off
 
-**Five in all.** The first (below) was off from the start; the other four were switched off by the USDA corrections (section 5), each with its reason in `disabled.ts`: the two chuck roast meals and the two jerky snacks.
+**Six in all.** The first (below) was off from the start; the other five were switched off by the USDA corrections (section 5), each with its reason in `disabled.ts`: the two chuck roast meals, the two jerky snacks and the salmon, eggs and avocado breakfast.
 
 `s_jerky_eggs_carnivore` (Beef Jerky & Hard-Boiled Eggs): the formula caps the eggs at three and jerky has almost no fat, so the snack holds about 16 g of fat at most, while a keto or carnivore snack aims for 18 to 50 g. It misses at every size. It stays in the file (so it is easy to bring back) and is on the disabled list with this reason (`disabled.ts`).
 
@@ -90,7 +90,7 @@ The scaler records how far it had to move the aim from the slot's own target (`d
 
 ## 4. What the starter library can and cannot fill
 
-72 of the diet / slot / target combinations have **no** recipe that lands (the exact list is in the test). It was 51 before the USDA corrections (section 5): the 21 new gaps are all **paleo and pescatarian snacks**, which the two jerky snacks used to cover. In plain words:
+71 of the diet / slot / target combinations have **no** recipe that lands (the exact list is in the test). It was 51 before the USDA corrections (section 5): the 20 new gaps are all **paleo and pescatarian snacks**, which the two jerky snacks used to cover. In plain words:
 
 - **Pescatarian breakfast**: nothing on a standard, high-carb, high-protein or light plan at any size (both pescatarian breakfasts are fatty fish, and their fat is too high for those targets); some on a low-carb plan.
 - **Pescatarian snack**: gaps at several sizes on every shape (the one pescatarian snack, tuna on rice cakes, now has the corrected rice cake).
@@ -98,11 +98,11 @@ The scaler records how far it had to move the aim from the slot's own target (`d
 - **Carnivore snack** and **keto snack**: none at any size.
 - **Vegan breakfast on a high-protein plan**, the four smaller sizes.
 
-**Narrow spots** (an enabled recipe landing on fewer than three of the six sizes for a diet it declares, 12 pairs, exact list in the test): the Salmon, Eggs & Avocado breakfast, the keto Ground Beef & Cabbage bowl as an omnivore meal, the Flank Steak with Butter dinner as keto, and now the **ribeye dinners (two), the Chuck Roast & Mash dinner** as omnivore and paleo meals (their fat now matches their protein, so they only fit the high-fat shapes).
+**Narrow spots** (an enabled recipe landing on fewer than three of the six sizes for a diet it declares, 8 pairs, exact list in the test): the Salmon, Eggs & Avocado breakfast, the keto Ground Beef & Cabbage bowl as an omnivore meal, the Flank Steak with Butter dinner as keto, and now the **ribeye dinners (two), the Chuck Roast & Mash dinner** as omnivore and paleo meals (their fat now matches their protein, so they only fit the high-fat shapes).
 
-An everyday omnivore has at least three meals at every size of every slot **except snacks**: 10 snack sizes have one or two (exact list in the test).
+An everyday omnivore has at least three meals at every size of every slot **except snacks**: 9 snack sizes have one or two (exact list in the test).
 
-Counts of enabled recipes per diet and slot: omnivore 17 / 14 / 14 / 4, vegetarian 13 / 3 / 3 / 4, vegan 2 / 3 / 3 / 1, keto 2 / 3 / 5 / 0, paleo 4 / 6 / 7 / 1, pescatarian 2 / 3 / 2 / 1, carnivore 1 / 1 / 1 / 0 (breakfast / lunch / dinner / snack). This is what the Generate button (AI top-up) and the coach's own saved meals are for.
+Counts of enabled recipes per diet and slot: omnivore 16 / 14 / 14 / 4, vegetarian 13 / 3 / 3 / 4, vegan 2 / 3 / 3 / 1, keto 1 / 3 / 5 / 0, paleo 3 / 6 / 7 / 1, pescatarian 1 / 3 / 2 / 1, carnivore 1 / 1 / 1 / 0 (breakfast / lunch / dinner / snack). This is what the Generate button (AI top-up) and the coach's own saved meals are for.
 
 ## 5. The food table against real food data (USDA)
 
@@ -140,6 +140,131 @@ Notes on judgment calls: the **pork chop** uses the lean-only record (22.0 / 0 /
 - **Four recipes now cannot land on any target and are switched off** (2.7 and `disabled.ts`, each with its reason): Chuck Roast & Sweet Potato Bowl, Chuck Roast & Root Veggie Dinner, String Cheese, Beef Jerky & Apple, Cantaloupe & Beef Jerky. With USDA-accurate chuck (19 g protein, 19 g fat per 100 g) and jerky (33 / 11 / 26), the fat arrives with the protein and overshoots the fat target. They stay in the file, so they come back if Ron edits the formulas or adds a lean jerky row.
 - **Coverage shifted** (section 4): 72 gaps instead of 51, and more narrow spots for the beef dinners.
 - The corrected foods **make every meal that uses them more honest**: for example a ribeye dinner now has 18.7 g protein per 100 g instead of 24 g, so it needs about a quarter more meat for the same protein.
+
+**Second pass: every remaining row (Ron, 2026-10-07: "the most accurate data for every row").** 116 more rows were set to the USDA record by `scripts/apply-usda-rest.cjs` from `scripts/usda-rest-data.json` (the protein / carbs / fat of each record, read from the usda_foods and usda_food_nutrients tables stored in this project, per 100 g; run once). Three rows from the first pass were refined to the exact record value (rice cake, whole-wheat bread and wrap: the rounding was off by a hundredth). Per gram means the table value times 100 is shown; foods counted in whole units show the per-unit value and the unit weight. Meats and fish with under 0.5 g carbs per 100 g are left at 0. The ground beef grades mix the newer Foundation records (80/20 and 90/10) with the older SR Legacy ones (85/15, 93/7, 95/5), so protein is not strictly ordered by leanness across grades (fat is, and a test enforces that).
+
+| Food | Before (P / C / F) | After (P / C / F) | USDA record |
+|---|---|---|---|
+| `almonds_raw` | 21 / 20 / 50 | 21.5 / 20 / 51.1 | 2346393: Nuts, almonds, whole, raw |
+| `apple_raw` | 1 / 14 / 0 | 0.3 / 13.8 / 0.2 | 171688: Apples, raw, with skin |
+| `arugula_raw` | 3 / 3 / 0 | 2.6 / 3.7 / 0.7 | 169387: Arugula, raw |
+| `asparagus_raw` | 2 / 4 / 0 | 2.2 / 3.9 / 0.1 | 168389: Asparagus, raw |
+| `avocado_hass` | 2 / 8 / 15 | 2 / 8.6 / 15.4 | 171706: Avocados, raw, California |
+| `bagel_plain` | 9 / 50 / 1.5 (per 100 g unit) | 10.6 / 52.4 / 1.3 (per 100 g unit) | 174899: Bagels, plain, enriched, with calcium propionate (a 100 g bagel) |
+| `banana_raw` | 1 / 23 / 0 | 1.1 / 22.8 / 0.3 | 173944: Bananas, raw |
+| `beets_raw` | 2 / 10 / 0 | 1.7 / 8.8 / 0.3 | 2685576: Beets, raw |
+| `bell_pepper_raw` | 1 / 6 / 0 | 0.9 / 4.6 / 0.2 | 170427: Peppers, sweet, green, raw |
+| `black_beans_cooked` | 9 / 23 / 1 | 8.9 / 23.7 / 0.5 | 173735: Beans, black, mature seeds, cooked, boiled, without salt |
+| `blackberries_raw` | 1 / 10 / 0 | 1.4 / 9.6 / 0.5 | 173946: Blackberries, raw |
+| `blueberries_raw` | 1 / 14 / 0 | 0.7 / 14.6 / 0.3 | 2263889: Blueberries, raw |
+| `bok_choy_raw` | 1 / 2 / 0 | 1.5 / 2.2 / 0.2 | 170390: Cabbage, chinese (pak-choi), raw |
+| `brisket` | 19 / 0 / 22 | 17.9 / 0 / 22.2 | 168666: Beef, brisket, flat half, separable lean and fat, trimmed to 1/8 in fat, all grades, raw |
+| `broccoli_raw` | 3 / 7 / 0 | 2.6 / 6.3 / 0.3 | 321900: Broccoli, raw |
+| `brown_rice_dry` | 7 / 75 / 2 | 7.5 / 76.3 / 3.2 | 169703: Rice, brown, long-grain, raw |
+| `brussels_sprouts` | 3 / 9 / 0 | 4 / 9.6 / 0.6 | 2685575: Brussels sprouts, raw |
+| `butter_grassfed` | 0 / 0 / 82 | 0.9 / 0.1 / 81.1 | 173410: Butter, salted |
+| `butternut_squash` | 1 / 12 / 0 | 1.1 / 10.5 / 0.2 | 2685570: Squash, winter, butternut, raw |
+| `cabbage_green` | 1 / 6 / 0 | 1.3 / 5.8 / 0.1 | 169975: Cabbage, raw |
+| `cantaloupe_raw` | 1 / 8 / 0 | 0.8 / 8.2 / 0.2 | 327198: Melons, cantaloupe, raw |
+| `carrots_raw` | 1 / 10 / 0 | 0.9 / 9.6 / 0.2 | 170393: Carrots, raw |
+| `cauliflower_raw` | 2 / 5 / 0 | 1.6 / 4.7 / 0.2 | 2685573: Cauliflower, raw |
+| `celery_raw` | 1 / 3 / 0 | 0.5 / 3.3 / 0.2 | 2346405: Celery, raw |
+| `cherries_raw` | 1 / 16 / 0 | 1.1 / 16 / 0.2 | 171719: Cherries, sweet, raw |
+| `chia_seeds` | 17 / 42 / 31 | 16.5 / 42.1 / 30.7 | 170554: Seeds, chia seeds, dried |
+| `chicken_breast` | 23 / 0 / 2.5 | 22.5 / 0 / 2.6 | 171077: Chicken, broiler or fryers, breast, skinless, boneless, meat only, raw |
+| `chicken_drumstick` | 19 / 0 / 9 | 19.4 / 0 / 3.7 | 173614: Chicken, broilers or fryers, dark meat, drumstick, meat only, raw |
+| `chicken_tenderloin` | 23 / 0 / 2 | 22.5 / 0 / 2.6 | 171077: Chicken, broiler or fryers, breast, skinless, boneless, meat only, raw (the breast record) |
+| `chicken_thigh` | 20 / 0 / 8 | 19.7 / 0 / 4.1 | 173627: Chicken, broilers or fryers, dark meat, thigh, meat only, raw |
+| `chickpeas_cooked` | 9 / 27 / 3 | 8.9 / 27.4 / 2.6 | 173757: Chickpeas, mature seeds, cooked, boiled, without salt |
+| `coconut_water` | 0.2 / 4 / 0 | 0.7 / 3.7 / 0.2 | 170174: Nuts, coconut water (liquid from coconuts) |
+| `collard_greens_raw` | 3 / 5 / 0 | 3 / 7 / 0.8 | 2685574: Collards, raw |
+| `cream_of_rice_dry` | 7 / 80 / 1 | 6.3 / 82.4 / 0.5 | 173900: Cereals, CREAM OF RICE, dry |
+| `cream_of_wheat_dry` | 10 / 75 / 1 | 10.6 / 78 / 0.5 | 173916: Cereals, farina, unenriched, dry |
+| `egg_whites_liquid` | 11 / 1 / 0 | 10.9 / 0.7 / 0.2 | 172183: Egg, white, raw, fresh |
+| `egg_whole_large` | 6.3 / 0.4 / 5 (per 50 g unit) | 6.3 / 0.35 / 4.75 (per 50 g unit) | 171287: Egg, whole, raw, fresh (a 50 g egg) |
+| `eggplant_raw` | 1 / 6 / 0 | 0.9 / 5.4 / 0.1 | 2685577: Eggplant, raw |
+| `filet_mignon` | 22 / 0 / 5 | 21.7 / 0 / 6.7 | 173988: Beef, loin, tenderloin steak, boneless, separable lean and fat, trimmed to 0 in fat, all grades, raw |
+| `flank_steak` | 21 / 0 / 8 | 20.1 / 0 / 9.4 | 2646175: Beef, flank, steak, boneless, choice, raw |
+| `flat_iron` | 22 / 0 / 9 | 20.2 / 0 / 7.3 | 168693: Beef, shoulder top blade steak, boneless, separable lean and fat, trimmed to 0 in fat, all grades, raw |
+| `fruit_juice_100` | 0.5 / 11 / 0 | 0.1 / 11.3 / 0.1 | 167771: Apple juice, canned or bottled, unsweetened, with added ascorbic acid |
+| `grapes_raw` | 1 / 18 / 0 | 0.7 / 18.1 / 0.2 | 174683: Grapes, red or green (European type), raw |
+| `greek_yogurt_0pct` | 10 / 4 / 0.5 | 10.3 / 3.6 / 0.4 | 330137: Yogurt, Greek, plain, nonfat |
+| `green_beans_raw` | 2 / 7 / 0 | 2 / 7.4 / 0.3 | 2346400: Beans, snap, green, raw |
+| `ground_beef_80_20` | 19 / 0 / 20 | 17.5 / 0 / 19.4 | 2514744: Beef, ground, 80% lean meat / 20% fat, raw |
+| `ground_beef_85_15` | 20 / 0 / 15 | 18.6 / 0 / 15 | 171796: Beef, ground, 85% lean meat / 15% fat, raw |
+| `ground_beef_93_7` | 21 / 0 / 7.5 | 20.9 / 0 / 7 | 173110: Beef, ground, 93% lean meat / 7% fat, raw |
+| `ground_beef_96_4` | 22 / 0 / 4 | 21.4 / 0 / 5 | 171790: Beef, ground, 95% lean meat / 5% fat, raw (the nearest USDA grade to 96/4) |
+| `ground_turkey_99_1` | 24 / 0 / 1 | 23.6 / 0 / 2 | 172847: Turkey, ground, fat free, raw |
+| `hemp_seeds` | 32 / 9 / 49 | 31.6 / 8.7 / 48.8 | 170148: Seeds, hemp seed, hulled |
+| `honey_raw` | 0.3 / 82 / 0 | 0.3 / 82.4 / 0 | 169640: Honey |
+| `honeydew_raw` | 1 / 9 / 0 | 0.5 / 8.1 / 0.2 | 2710816: Melons, honeydew, raw |
+| `jasmine_rice_dry` | 7 / 80 / 1 | 7.1 / 80 / 0.7 | 168877: Rice, white, long-grain, regular, raw, enriched |
+| `juice_apple` | 0.1 / 11 / 0 | 0.1 / 11.3 / 0.1 | 167771: Apple juice, canned or bottled, unsweetened, with added ascorbic acid |
+| `juice_cranberry` | 0.4 / 12 / 0 | 0.4 / 12.2 / 0.1 | 168117: Cranberry juice, unsweetened |
+| `juice_orange` | 0.7 / 10 / 0 | 0.7 / 10.4 / 0.2 | 169098: Orange juice, raw |
+| `juice_tart_cherry` | 1 / 14 / 0 | 0.3 / 13.7 / 0.5 | 167807: Cherry juice, tart |
+| `kiwi_raw` | 1 / 15 / 1 | 1.1 / 14 / 0.4 | 327046: Kiwifruit, green, raw |
+| `leeks_raw` | 2 / 14 / 0 | 1.5 / 14.2 / 0.3 | 169246: Leeks, (bulb and lower leaf-portion), raw |
+| `lemon_raw` | 1 / 9 / 0 | 1.1 / 9.3 / 0.3 | 167746: Lemons, raw, without peel |
+| `lentils_cooked` | 9 / 20 / 1 | 9 / 20.1 / 0.4 | 172421: Lentils, mature seeds, cooked, boiled, without salt |
+| `lime_raw` | 1 / 11 / 0 | 0.7 / 10.5 / 0.2 | 168155: Limes, raw |
+| `macadamia_raw` | 8 / 14 / 76 | 7.9 / 13.8 / 75.8 | 170178: Nuts, macadamia nuts, raw (SR Legacy; the newer Foundation record reads 24.1 g carbs and 64.9 g fat, which disagrees with every other source) |
+| `mahi_mahi` | 19 / 0 / 1 | 18.5 / 0 / 0.7 | 171959: Fish, mahimahi, raw |
+| `mango_raw` | 1 / 15 / 0 | 0.8 / 15 / 0.4 | 169910: Mangos, raw |
+| `milk_almond_unsweet` | 0.4 / 1 / 1.2 | 0.6 / 0.3 / 1.2 | 1750338: Almond milk, unsweetened, plain, shelf stable |
+| `milk_oat` | 1 / 7 / 1.5 | 0.8 / 5.1 / 2.7 | 2257046: Oat milk, unsweetened, plain, refrigerated |
+| `milk_soy_unsweet` | 2.8 / 2 / 1.6 | 2.9 / 1.7 / 1.7 | 175223: SILK Unsweetened, soymilk |
+| `milk_whole` | 3.2 / 5 / 3.3 | 3.3 / 4.7 / 3.2 | 322892: Milk, whole, 3.25% milkfat, with added vitamin D |
+| `ny_strip` | 22 / 0 / 10 | 20.6 / 0 / 15.5 | 169538: Beef, short loin, top loin, steak, separable lean and fat, trimmed to 1/8 in fat, all grades, raw |
+| `olive_oil_g` | 0 / 0 / 100 | 0 / 0 / 100 | 171413: Oil, olive, salad or cooking |
+| `onions_raw` | 1 / 9 / 0 | 1.1 / 9.3 / 0.1 | 170000: Onions, raw |
+| `orange_raw` | 1 / 12 / 0 | 0.9 / 11.8 / 0.1 | 169097: Oranges, raw, all commercial varieties |
+| `parsnips_raw` | 1 / 18 / 0 | 1.3 / 19.3 / 0.5 | 2747659: Parsnips, raw |
+| `peach_raw` | 1 / 10 / 0 | 0.9 / 10.1 / 0.3 | 325430: Peaches, yellow, raw |
+| `peanut_butter_nat` | 25 / 20 / 50 | 22.2 / 22.3 / 51.4 | 172470: Peanut butter, smooth style, without salt |
+| `pear_raw` | 1 / 15 / 0 | 0.4 / 15.1 / 0.2 | 746773: Pears, raw, bartlett |
+| `pineapple_raw` | 1 / 13 / 0 | 0.5 / 13.1 / 0.1 | 169124: Pineapple, raw, all varieties |
+| `plum_raw` | 1 / 11 / 0 | 0.7 / 11.4 / 0.3 | 169949: Plums, raw |
+| `pork_roast` | 21 / 0 / 8 | 17.4 / 0 / 12.4 | 167849: Pork, fresh, shoulder, (Boston butt), blade (steaks), separable lean and fat, raw |
+| `pork_tenderloin` | 22 / 0 / 4 | 20.7 / 0 / 3.5 | 168312: Pork, fresh, loin, tenderloin, separable lean and fat, raw |
+| `potato_russet_raw` | 2 / 17 / 0 | 2.1 / 18.1 / 0.1 | 170027: Potatoes, russet, flesh and skin, raw |
+| `quinoa_dry` | 14 / 64 / 6 | 14.1 / 64.2 / 6.1 | 168874: Quinoa, uncooked |
+| `radicchio_raw` | 1 / 4 / 0 | 1.3 / 5 / 0.1 | 2747664: Radicchio, raw |
+| `radishes_raw` | 1 / 3 / 0 | 0.7 / 3.4 / 0.1 | 169276: Radishes, raw |
+| `raspberries_raw` | 1 / 12 / 0 | 1 / 12.9 / 0.2 | 2263888: Raspberries, raw |
+| `ricotta_part_skim` | 11 / 5 / 8 | 11.4 / 5.1 / 7.9 | 171248: Cheese, ricotta, part skim milk |
+| `rolled_oats_dry` | 13 / 68 / 6 | 13.2 / 67.7 / 6.5 | 173904: Cereals, oats, regular and quick, not fortified, dry |
+| `romaine_lettuce` | 1 / 3 / 0 | 1.2 / 3.2 / 0.3 | 327923: Lettuce, cos or romaine, raw |
+| `salmon_raw` | 20 / 0 / 13 | 20.3 / 0 / 13.1 | 2684441: Fish, salmon, Atlantic, farm raised, raw |
+| `scallions_raw` | 2 / 7 / 0 | 1.8 / 7.3 / 0.2 | 170005: Onions, spring or scallions (includes tops and bulb), raw |
+| `sesame_oil_g` | 0 / 0 / 100 | 0 / 0 / 100 | 171016: Oil, sesame, salad or cooking |
+| `shallots_raw` | 3 / 17 / 0 | 2.5 / 16.8 / 0.1 | 170499: Shallots, raw |
+| `sirloin_steak` | 22 / 0 / 6 | 22 / 0 / 5.7 | 2727574: Beef, top sirloin steak, raw |
+| `skirt_steak` | 21 / 0 / 12 | 20.4 / 0 / 11.7 | 172158: Beef, plate steak, boneless, inside skirt, separable lean and fat, trimmed to 0 in fat, all grades, raw |
+| `sourdough_slice` | 3.5 / 18 / 0.8 (per 40 g unit) | 4.32 / 20.76 / 0.96 (per 40 g unit) | 172675: Bread, french or vienna (includes sourdough) (a 40 g slice) |
+| `spinach_raw` | 3 / 4 / 0 | 2.9 / 3.6 / 0.4 | 168462: Spinach, raw |
+| `strawberries_raw` | 1 / 8 / 0 | 0.6 / 7.6 / 0.2 | 327699: Strawberries, raw |
+| `string_cheese` | 24 / 3 / 18 | 23.7 / 4.4 / 20.4 | 329370: Cheese, mozzarella, low moisture, part-skim |
+| `sugar_snap_peas` | 3 / 8 / 0 | 2.8 / 7.6 / 0.2 | 170010: Peas, edible-podded, raw |
+| `sweet_potato_raw` | 2 / 20 / 0 | 1.6 / 20.1 / 0.1 | 168482: Sweet potato, raw, unprepared |
+| `swiss_chard_raw` | 2 / 4 / 0 | 1.8 / 3.7 / 0.2 | 169991: Chard, swiss, raw |
+| `tempeh_organic` | 19 / 9 / 11 | 20.3 / 7.6 / 10.8 | 174272: Tempeh |
+| `tofu_extra_firm` | 10 / 2 / 5 | 17.3 / 2.8 / 8.7 | 172475: Tofu, raw, firm, prepared with calcium sulfate (the firmest USDA record) |
+| `tuna_canned` | 25 / 0 / 1 | 25.5 / 0 / 0.8 | 171986: Fish, tuna, light, canned in water, without salt, drained solids |
+| `turkey_breast` | 24 / 0 / 2 | 23.3 / 0 / 2.3 | 174515: Turkey, retail parts, breast, meat only, raw |
+| `turkey_tenderloin` | 24 / 0 / 2 | 23.3 / 0 / 2.3 | 174515: Turkey, retail parts, breast, meat only, raw (the breast record) |
+| `turnips_raw` | 1 / 6 / 0 | 1 / 7.3 / 0.1 | 2747674: Turnips, raw |
+| `watermelon_raw` | 1 / 8 / 0 | 0.6 / 7.6 / 0.2 | 167765: Watermelon, raw |
+| `white_bread_slice` | 2.5 / 13 / 0.8 (per 25 g unit) | 2.35 / 12.3 / 0.9 (per 25 g unit) | 325871: Bread, white, commercially prepared (a 25 g slice) |
+| `white_fish` | 19 / 0 / 1.5 | 17.8 / 0 / 0.7 | 171955: Fish, cod, Atlantic, raw |
+| `zucchini_raw` | 1 / 3 / 0 | 1.2 / 3.1 / 0.3 | 169291: Squash, summer, zucchini, includes skin, raw |
+| `whole_wheat_bread` | 3.44 / 12.07 / 1.01 (per 28 g unit) | 3.44 / 12.07 / 0.99 (per 28 g unit) | 335240: Bread, whole-wheat, commercially prepared (a 28 g slice; fat rounding refined) |
+| `whole_wheat_wrap` | 4.9 / 22.95 / 4.9 (per 50 g unit) | 4.88 / 22.95 / 4.88 (per 50 g unit) | 174081: Tortillas, ready-to-bake or -fry, whole wheat (a 50 g wrap; rounding refined) |
+| `rice_cake` | 0.74 / 7.34 / 0.25 (per 9 g unit) | 0.74 / 7.33 / 0.25 (per 9 g unit) | 170250: Snacks, rice cakes, brown rice, plain, unsalted (a 9 g cake) |
+
+**Rows with no change to make** appear above only because USDA agrees with the old value to the displayed rounding. **Rows that stay as written, and why** (15, each also listed in the diagnostics test): whey isolate, casein, pea protein, TVP, brown-rice pasta, 2 percent cottage cheese, skim and 2 percent milk (no usable USDA record is stored for them, or only a different product); rice crispies, shredded wheat and corn flakes (the only stored records are branded cereals of other flavours or brands); edamame (the stored record has no values); mixed berries (a blend, not one fruit); seitan (the table is prepared seitan; USDA only has dry vital wheat gluten); the plant protein blend (USDA's soy isolate is a different product).
+
+**What this pass changed in the library:** one more recipe is switched off, **Salmon, Eggs & Avocado** (2.7), because with USDA values its fat is above every breakfast target once the protein is met (it already landed on a single keto size). Coverage gaps are **71** (one fewer than after the first pass), narrow spots are 8 pairs, and an everyday omnivore has fewer than three snacks at 9 sizes (all listed exactly in the test). New permanent checks: no food gives more than 9.1 kcal per gram, a leaner ground-beef grade never has more fat than a fattier one (and the same for milks, turkey, chicken cuts, fish), and every row either carries its USDA fdc id or is on the exact list above.
 
 **Still unchecked: no USDA record in the stored data** (about 12 foods, mostly supplements, powders and cuts the stored set lacks; their numbers are Ron's own and have not been compared with anything): chicken breast, chicken tenderloin, whey isolate, casein, pea protein, TVP, brown-rice pasta, canned tuna, 2% cottage cheese, skim and 2% milk. (Chicken thigh and drumstick exist in USDA but are leaner there, 19.7 / 4.1 and 19.4 / 3.7, than in the table, 20 / 8 and 19 / 9; they were not changed because they were not on Ron's list.)
 

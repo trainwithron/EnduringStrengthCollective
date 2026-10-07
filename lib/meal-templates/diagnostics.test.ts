@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { ALLERGEN_KEYS, allergenWordsIn } from "@/lib/allergen-check";
 import { DIET_TYPES as PREFERENCE_DIET_TYPES } from "@/lib/nutrition-preferences";
@@ -84,6 +85,39 @@ describe("the food tables are consistent", () => {
     }
     expect(impossible).toEqual([]);
   });
+  it("the numbers are physically sane: no food gives more than 9.1 kcal a gram, a leaner grade never has more fat than a fattier one, and related foods keep their order", () => {
+    const d = FOOD_DENSITY as unknown as Record<string, { protein: number; carbs: number; fat: number }>;
+    const unitG: Record<string, number> = { egg_whole_large: 50, sourdough_slice: 40, whole_wheat_bread: 28, white_bread_slice: 25, bagel_plain: 100, whole_wheat_wrap: 50, rice_cake: 9 };
+    for (const [k, v] of Object.entries(d)) {
+      const kcal = 4 * v.protein + 4 * v.carbs + 9 * v.fat;
+      expect(kcal, `${k} kcal`).toBeGreaterThanOrEqual(0);
+      expect(kcal / (PER_UNIT_KEYS.has(k) ? unitG[k] : 1), `${k} kcal per gram`).toBeLessThanOrEqual(9.1);
+    }
+    // Ground beef: the leaner the grade, the less fat.
+    const fatOf = (k: string) => d[k].fat;
+    const beef = ["ground_beef_80_20", "ground_beef_85_15", "ground_beef_90_10", "ground_beef_93_7", "ground_beef_96_4"];
+    for (let i = 1; i < beef.length; i++) expect(fatOf(beef[i]), `${beef[i]} must not have more fat than ${beef[i - 1]}`).toBeLessThanOrEqual(fatOf(beef[i - 1]));
+    // Milk: skim, then 2 percent, then whole. Ground turkey: fat free, then 93/7.
+    expect(fatOf("milk_skim")).toBeLessThanOrEqual(fatOf("milk_2_pct"));
+    expect(fatOf("milk_2_pct")).toBeLessThanOrEqual(fatOf("milk_whole"));
+    expect(fatOf("ground_turkey_99_1")).toBeLessThanOrEqual(fatOf("ground_turkey_93_7"));
+    // Cuts of chicken: breast, then thigh, then the wing with its skin. Fish: white fish is leaner than salmon.
+    expect(fatOf("chicken_breast")).toBeLessThanOrEqual(fatOf("chicken_thigh"));
+    expect(fatOf("chicken_thigh")).toBeLessThanOrEqual(fatOf("chicken_wing"));
+    expect(fatOf("white_fish")).toBeLessThan(fatOf("salmon_raw"));
+    // Oils are pure fat; a protein powder is mostly protein.
+    for (const k of ["olive_oil_g", "sesame_oil_g"]) expect(fatOf(k)).toBe(1);
+    expect(d.whey_isolate.protein).toBeGreaterThan(0.8);
+  });
+  it("every row carries its USDA record, except the exact list that has none (supplements, branded cereals, edamame, mixed berries, seitan, the plant blend)", () => {
+    const source = readFileSync(new URL("./food-table.ts", import.meta.url), "utf8");
+    const rows = [...source.matchAll(/^\s+([a-z0-9_]+):\s*\{[^}]*\},?(.*)$/gm)].filter((m) => m[1] in FOOD_DENSITY);
+    expect(rows).toHaveLength(150);
+    const without = rows.filter((m) => !/\/\/ USDA fdc \d+ \(was /.test(m[2])).map((m) => m[1]);
+    expect(without.sort()).toEqual(
+      ["berries_mixed", "brown_rice_pasta", "casein_protein", "corn_flakes", "cottage_cheese_2pct", "edamame", "milk_2_pct", "milk_skim", "pea_protein", "plant_protein", "rice_krispies", "seitan", "shredded_wheat", "tvp_dry", "whey_isolate"].sort()
+    );
+  });
   it("every diet-table and name-table key is a real food", () => {
     for (const k of Object.keys(FOOD_ARCHETYPES)) expect(FOOD_DENSITY, k).toHaveProperty(k);
     for (const [name, k] of [...Object.entries(NAME_TO_KEY), ...Object.entries(EXTRA_NAME_TO_KEY)]) expect(FOOD_DENSITY, `${name} -> ${k}`).toHaveProperty(k);
@@ -148,13 +182,10 @@ function bestPassesForDiet(r: TemplateRecipe, diet: (typeof DIET_TYPES)[number])
 
 // (recipe | declared diet | best number of sizes) where an enabled recipe lands on FEWER than three of the six sizes for a diet it declares. These are real narrow spots,
 // listed so they are known and reviewed. The list must match exactly: a fix that widens one, or a change that narrows another, fails until the list is updated on purpose.
-const NY_TARGET = gridFor("standard", "breakfast")[3];
+// The NY strip breakfast lands on the low-carb shape (its fat now matches its protein, so it no longer fits the standard shape).
+const NY_TARGET = gridFor("low_carb", "breakfast")[2];
 
 const KNOWN_NARROW = [
-  "b_salmon_eggs_avocado|omnivore|0",
-  "b_salmon_eggs_avocado|pescatarian|0",
-  "b_salmon_eggs_avocado|keto|1",
-  "b_salmon_eggs_avocado|paleo|0",
   "l_ground_beef_cabbage_bowl_keto|omnivore|0",
   "d_ribeye_potatoes|omnivore|0",
   "d_ribeye_potatoes|paleo|0",
@@ -257,13 +288,15 @@ const KNOWN_GAPS = [
   "vegan|breakfast|high_protein|0.8",
   "vegan|breakfast|high_protein|1",
   "vegan|breakfast|high_protein|1.25",
+  "vegan|breakfast|high_protein|1.6",
+  "vegan|breakfast|high_protein|2",
+  "vegan|snack|high_protein|0.6",
   "keto|snack|keto|0.6",
   "keto|snack|keto|0.8",
   "keto|snack|keto|1",
   "keto|snack|keto|1.25",
   "keto|snack|keto|1.6",
   "keto|snack|keto|2",
-  "paleo|snack|standard|0.6",
   "paleo|snack|standard|1",
   "paleo|snack|standard|1.25",
   "paleo|snack|standard|1.6",
@@ -276,11 +309,9 @@ const KNOWN_GAPS = [
   "paleo|snack|high_carb|2",
   "paleo|snack|high_protein|0.6",
   "paleo|snack|high_protein|0.8",
-  "paleo|snack|high_protein|1.6",
   "paleo|snack|high_protein|2",
   "paleo|snack|light|0.6",
   "paleo|snack|light|0.8",
-  "paleo|snack|light|1",
   "paleo|snack|light|1.6",
   "paleo|snack|light|2",
   "pescatarian|breakfast|standard|0.6",
@@ -317,7 +348,6 @@ const KNOWN_GAPS = [
   "pescatarian|snack|high_carb|1.6",
   "pescatarian|snack|high_carb|2",
   "pescatarian|snack|high_protein|0.8",
-  "pescatarian|snack|high_protein|2",
   "pescatarian|snack|light|0.8",
   "carnivore|snack|carnivore|0.6",
   "carnivore|snack|carnivore|0.8",
@@ -338,7 +368,6 @@ const KNOWN_OMNIVORE_THIN = [
   "snack|high_carb|1.25|2",
   "snack|high_carb|1.6|1",
   "snack|high_carb|2|1",
-  "snack|high_protein|0.6|1",
   "snack|high_protein|0.8|1",
 ];
 
@@ -463,8 +492,8 @@ describe("rendering", () => {
       ],
     };
     const { macros } = mealMacros(fake.build(0, 0, 0));
-    expect(macros.proteinG).toBeCloseTo(23, 6);
-    expect(macros.fatG).toBeCloseTo(2.5, 6);
+    expect(macros.proteinG).toBeCloseTo(100 * FOOD_DENSITY.chicken_breast.protein, 6);
+    expect(macros.fatG).toBeCloseTo(100 * FOOD_DENSITY.chicken_breast.fat, 6);
     expect(mealIngredients(fake.build(0, 0, 0))).toHaveLength(1);
   });
 });
