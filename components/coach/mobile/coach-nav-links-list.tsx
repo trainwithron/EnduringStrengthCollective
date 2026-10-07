@@ -107,8 +107,8 @@ export function CoachNavLinksList({ groupId }: { groupId: string; groupName?: st
       <div className="pt-3">
         <Item href={`/groups/${groupId}/programs`} label="Programs" icon={LayoutGrid} />
         <Item href={`/groups/${groupId}/exercise-library`} label="Exercise library" icon={Dumbbell} />
-        <Item href={`/groups/${groupId}/recipes`} label="Recipe hub" icon={ChefHat} />
         <Item href={`/groups/${groupId}/nutrition`} label="Meal plans" icon={Salad} />
+        <Item href={`/groups/${groupId}/recipes`} label="Recipe hub" icon={ChefHat} />
         <Item href={`/groups/${groupId}/tools/macro-calculator`} label="Macro calculator" icon={Calculator} />
         <Item href={`/groups/${groupId}/availability`} label="Availability" icon={CalendarClock} />
         <Item href={`/groups/${groupId}/business`} label="Business overview" icon={TrendingUp} />

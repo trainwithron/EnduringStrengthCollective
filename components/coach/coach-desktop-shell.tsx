@@ -418,10 +418,12 @@ function CoachDesktopShellFull({
     {
       label: "Nutrition",
       icon: ChefHat,
+      // The Nutrition icon opens the first item, so Meal Plans (enter a macro target and preferences, get plans that fit the client) is the front door. The
+      // Recipe Hub is for building your own recipes, so it sits last as a secondary tool.
       items: [
-        { key: "recipes", label: "Recipe Hub", href: `/groups/${groupId}/recipes`, icon: ChefHat },
         { key: "nutrition", label: "Meal Plans", href: `/groups/${groupId}/nutrition`, icon: Salad },
         { key: "tools", label: "Macro Calculator", href: `/groups/${groupId}/tools/macro-calculator`, icon: Calculator },
+        { key: "recipes", label: "Recipe Hub", href: `/groups/${groupId}/recipes`, icon: ChefHat },
       ],
     },
     {
