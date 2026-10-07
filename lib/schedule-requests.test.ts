@@ -123,6 +123,19 @@ describe("applying a claimed schedule request", () => {
     expect(finishCall(calls)?.args).toMatchObject({ p_ok: true });
   });
 
+  it("the freeze check uses the database's own today, not the app's clock: a schedule with no zone of its own and a coach far from New York", async () => {
+    // 04:00 UTC on Oct 14 is still Oct 13 in New York but already Oct 14 for a coach in Auckland: the database says today is Oct 14.
+    const late = new Date("2026-10-13T20:00:00Z");
+    const { store, series } = fakeStore(seriesRow({ timezone: null }));
+    const a = fakeRpc();
+    await applyClaimedRequest(a.db, store, claim({ kind: "freeze", resume_on: "2026-10-14", today: "2026-10-14" }), { bySystem: true }, late);
+    expect(series.get("s1")?.status).toBe("active"); // the database's today is the restart day: nothing to freeze
+    const b = fakeStore(seriesRow({ timezone: null }));
+    const c = fakeRpc();
+    await applyClaimedRequest(c.db, b.store, claim({ kind: "freeze", resume_on: "2026-10-14", today: "2026-10-13" }), { bySystem: true }, late);
+    expect(b.series.get("s1")?.status).toBe("paused"); // the database's today is a day earlier: the freeze is still ahead
+  });
+
   it("what is stored on the request row (the client can read it) is a fixed sentence, never an engine message", async () => {
     const missing = fakeStore(null);
     const a = fakeRpc();

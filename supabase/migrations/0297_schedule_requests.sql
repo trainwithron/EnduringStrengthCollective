@@ -314,8 +314,13 @@ as $function$
 begin
   if old.frozen_from is not null and new.status is distinct from old.status and new.frozen_from is not distinct from old.frozen_from then
     if old.status = 'paused' and new.status <> 'paused' then
-      perform public.settle_schedule_freeze(old.athlete_id, old.group_id, old.coach_id, old.frozen_from,
-        public.schedule_local_today(old.timezone, old.coach_id), old.frozen_hold_days);
+      -- A problem settling the expiry hold must never stop a schedule from restarting or ending: it is reported and the freeze dates are cleared anyway.
+      begin
+        perform public.settle_schedule_freeze(old.athlete_id, old.group_id, old.coach_id, old.frozen_from,
+          public.schedule_local_today(old.timezone, old.coach_id), old.frozen_hold_days);
+      exception when others then
+        raise warning 'schedule freeze %: the expiry hold could not be settled (%)', old.id, sqlerrm;
+      end;
     end if;
     new.frozen_from := null;
     new.frozen_until := null;
@@ -327,6 +332,7 @@ begin
   return new;
 end;
 $function$;
+revoke all on function public.recurring_series_freeze_guard() from public, anon, authenticated;
 drop trigger if exists recurring_series_freeze_guard on public.recurring_booking_series;
 create trigger recurring_series_freeze_guard before update on public.recurring_booking_series
   for each row execute function public.recurring_series_freeze_guard();
@@ -501,7 +507,7 @@ begin
   update public.schedule_requests set status = 'applying', claimed_at = now(), attempts = attempts + 1 where id = r.id;
   return jsonb_build_object(
     'request_id', r.id, 'series_id', r.series_id, 'kind', r.kind, 'effective_on', r.effective_on, 'resume_on', r.resume_on,
-    'athlete_id', r.athlete_id, 'group_id', r.group_id, 'early', v_today <= r.effective_on
+    'athlete_id', r.athlete_id, 'group_id', r.group_id, 'early', v_today <= r.effective_on, 'today', v_today::text
   );
 end;
 $function$;
@@ -520,7 +526,7 @@ begin
     raise exception 'not authorized';
   end if;
   for r in
-    select sr.* from public.schedule_requests sr
+    select sr.*, public.schedule_local_today(s.timezone, s.coach_id) as local_today from public.schedule_requests sr
     join public.recurring_booking_series s on s.id = sr.series_id
     where (sr.status = 'pending' or (sr.status = 'applying' and sr.claimed_at < now() - interval '10 minutes'))
       and sr.attempts < 3
@@ -532,7 +538,7 @@ begin
     update public.schedule_requests set status = 'applying', claimed_at = now(), attempts = attempts + 1 where id = r.id;
     return next jsonb_build_object(
       'request_id', r.id, 'series_id', r.series_id, 'kind', r.kind, 'effective_on', r.effective_on, 'resume_on', r.resume_on,
-      'athlete_id', r.athlete_id, 'group_id', r.group_id, 'early', false
+      'athlete_id', r.athlete_id, 'group_id', r.group_id, 'early', false, 'today', r.local_today::text
     );
   end loop;
 end;

@@ -22,6 +22,9 @@ export interface ClaimedRequest {
   athlete_id: string;
   group_id: string;
   early: boolean;
+  // The schedule's own "today" as the database worked it out (schedule zone, then the coach's, then New York). The app compares dates against THIS, never its own clock
+  // and zone, so the two cannot disagree about whether a day has passed.
+  today?: string;
 }
 
 export interface ApplyResult {
@@ -70,7 +73,7 @@ export async function applyClaimedRequest(db: Rpc, store: SeriesStore, claim: Cl
 
   // A freeze whose restart day has already come has nothing to freeze: the schedule is left running and the database tells the client so.
   if (claim.kind === "freeze" && claim.resume_on) {
-    const todayKey = wallClockOf(now, series.timezone ?? "America/New_York").dateKey;
+    const todayKey = claim.today ?? wallClockOf(now, series.timezone ?? "America/New_York").dateKey;
     if (claim.resume_on <= todayKey) return finish(true, null);
   }
 

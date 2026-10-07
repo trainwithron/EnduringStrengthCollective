@@ -491,6 +491,36 @@ export default {
       const onceNotes = await h.rows(`select 1 from public.notifications where profile_id = $1 and type = 'schedule_applied'`, [once.coach]);
       h.check("a coach pressing Done again and again after three failures is not sent the notice again", onceNotes.length === 1, String(onceNotes.length));
 
+      // ---- S1: the claim carries the database's own today ----
+      const todayClaim = await scene(h, db, "S1");
+      await h.as(todayClaim.ann);
+      const tcReq = (await tryQ(db, `select public.request_schedule_change($1, 'pause', $2, null, null) as id`, [todayClaim.annSeries, sPlus(0)])).rows[0].id;
+      await h.asService();
+      const tcClaim = await tryQ(db, `select public.claim_schedule_request($1, true) as c`, [tcReq]);
+      const dbToday = await h.one(`select public.schedule_local_today('America/New_York', $1)::text as d`, [todayClaim.coach]);
+      h.check("the claim carries the schedule's own today as the database worked it out", tcClaim.rows?.[0]?.c?.today === dbToday.d, JSON.stringify({ tcClaim, dbToday }));
+      await h.asSuper();
+      await db.query(`update public.schedule_requests set effective_on = effective_on - 2 where id = $1`, [tcReq]);
+      await h.asService();
+      await tryQ(db, `select public.finish_schedule_request($1, false, false, true, 'x')`, [tcReq]);
+      const dueClaim = await tryQ(db, `select * from public.claim_due_schedule_requests(50)`);
+      const dueRow = (dueClaim.rows ?? []).map((r) => r.claim_due_schedule_requests).find((c) => c.request_id === tcReq);
+      h.check("so does the daily claim", dueRow?.today === dbToday.d, JSON.stringify(dueClaim));
+
+      // ---- S2: a problem in the credit clock never stops a schedule from restarting ----
+      const brk = await scene(h, db, "S2");
+      await withWindow(brk);
+      await freezeNow(brk, brk.annSeries, 14);
+      await h.asSuper();
+      await db.query(`alter function public.settle_schedule_freeze(uuid, uuid, uuid, date, date, integer) rename to settle_schedule_freeze_real`);
+      await db.query(`create function public.settle_schedule_freeze(uuid, uuid, uuid, date, date, integer) returns integer language plpgsql as $f$ begin raise exception 'simulated credit clock failure'; end $f$`);
+      const restart = await tryQ(db, `update public.recurring_booking_series set status = 'active' where id = $1 returning status, frozen_from`, [brk.annSeries]);
+      await db.query(`drop function public.settle_schedule_freeze(uuid, uuid, uuid, date, date, integer)`);
+      await db.query(`alter function public.settle_schedule_freeze_real(uuid, uuid, uuid, date, date, integer) rename to settle_schedule_freeze`);
+      h.check("a failure while settling the expiry hold does not stop the schedule from restarting, and the freeze dates are cleared anyway", !restart.error && restart.rows?.[0]?.status === "active" && restart.rows[0].frozen_from === null, JSON.stringify(restart));
+      const trig = await h.one(`select has_function_privilege('authenticated', 'public.recurring_series_freeze_guard()', 'execute') as a, has_function_privilege('anon', 'public.recurring_series_freeze_guard()', 'execute') as b`);
+      h.check("the trigger function is closed to signed-in people and the public like every other function here", trig.a === false && trig.b === false, JSON.stringify(trig));
+
       // ---- a freeze whose restart day has already passed freezes nothing ----
       const pastFreeze = await scene(h, db, "F8");
       await withWindow(pastFreeze);
