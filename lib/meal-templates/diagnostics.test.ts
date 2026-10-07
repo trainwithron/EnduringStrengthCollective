@@ -109,6 +109,17 @@ describe("the food tables are consistent", () => {
     for (const k of ["olive_oil_g", "sesame_oil_g"]) expect(fatOf(k)).toBe(1);
     expect(d.whey_isolate.protein).toBeGreaterThan(0.8);
   });
+  it("a chicken thigh line always says skinless (the USDA record is meat only), and the 95/5 beef row is the only ground beef row nothing prints", () => {
+    const thighRecipes = RECIPES.filter((r) => r.build(40, 40, 15).some((i) => isIngredient(i) && i.name === "Chicken Thigh"));
+    expect(thighRecipes.length).toBeGreaterThan(0);
+    for (const r of thighRecipes) {
+      const line = r.build(40, 40, 15).filter(isIngredient).find((i) => i.name === "Chicken Thigh")!;
+      expect(line.text, r.id).toContain("Skinless");
+    }
+    const source = readFileSync(new URL("./recipes.ts", import.meta.url), "utf8");
+    expect(source).not.toContain("ground_beef_96_4");
+    expect(source).not.toContain("Chicken Thigh (Raw)");
+  });
   it("every row carries its USDA record, except the exact list that has none (supplements, branded cereals, edamame, mixed berries, seitan, the plant blend)", () => {
     const source = readFileSync(new URL("./food-table.ts", import.meta.url), "utf8");
     const rows = [...source.matchAll(/^\s+([a-z0-9_]+):\s*\{[^}]*\},?(.*)$/gm)].filter((m) => m[1] in FOOD_DENSITY);

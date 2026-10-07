@@ -68,6 +68,12 @@ Some recipes name foods in the preparation text only: sugar-free teriyaki sauce,
 - **`b_cereal_bowl_eggs`** said "a bowl of Corn Flakes with skim milk" in the method but had no milk line, so the milk (and its dairy) was uncounted. A `Skim Milk` 200 g line was added after the Corn Flakes line (recorded in `gen-fixes.cjs`), so the milk is counted, shown and tagged dairy.
 - **`s_string_cheese_jerky_apple`** no longer declares keto: it landed on no keto target (it has an apple in it), so the tag only ever offered it to keto clients to be skipped. It stays omnivore and paleo.
 
+### 2.9b Two labels made exact (after the USDA passes)
+
+- **Chicken thigh** (and drumstick): the USDA records are *skinless, meat only* (thigh 19.7 / 0 / 4.1, drumstick 19.4 / 0 / 3.7); skin-on has about 3 to 4 g more fat per 100 g. The three thigh recipes now print "Chicken Thigh, Skinless (Raw)" and their method says "skinless". The drumstick is in no recipe. The food's lookup name ("Chicken Thigh") is unchanged, so saved plans, favorites and ids are untouched; plans saved earlier keep the text they were saved with.
+- **Ground beef "96/4"**: the USDA grade the row uses is **95/5** (fdc 171790). No recipe or screen prints this row (it has no printed name), so there is nothing to relabel for a coach or client; the row's comment says 95/5 and the table above names the record. The key (`ground_beef_96_4`) is kept so nothing that refers to it breaks.
+- Reminder: the ground beef grades mix the newer USDA Foundation records (80/20, 90/10) with older SR Legacy ones (85/15, 93/7, 95/5), so **protein is not ordered by leanness across grades** (80/20 17.5, 85/15 18.6, 90/10 18.2, 93/7 20.9, 95/5 21.4 g per 100 g). Fat is ordered, and a test enforces it.
+
 ### 2.10 A cap on how far a meal may be re-aimed
 
 The scaler records how far it had to move the aim from the slot's own target (`drift`, as a share of the target). A meal that only lands after an aim more than **75 percent** away is skipped, because a plate built for a very different target can look odd to a client. Across the whole test grid the largest drift is 0.75 (counts per 0.25 band: 1,769 / 520 / 129 / 2 / 0).

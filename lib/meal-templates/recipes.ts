@@ -299,8 +299,8 @@ export const RECIPES: TemplateRecipe[] = [
       const remFat = Math.max(0, f - Math.round(chickenG * FOOD_DENSITY.chicken_thigh.fat) - Math.round(riceG * FOOD_DENSITY.jasmine_rice_dry.fat));
       const avoG = Math.round(remFat / FOOD_DENSITY.avocado_hass.fat);
       return [
-        { text: `<strong>Preparation:</strong> Cook jasmine rice. Pan-sear seasoned chicken thigh and slice. Serve over rice topped with sliced avocado.` },
-        { name: "Chicken Thigh", category: "proteins", qty: chickenG, unit: "g", text: `<strong>Chicken Thigh (Raw):</strong> ${chickenG}g ${toOz(chickenG)}` },
+        { text: `<strong>Preparation:</strong> Cook jasmine rice. Pan-sear seasoned skinless chicken thigh and slice. Serve over rice topped with sliced avocado.` },
+        { name: "Chicken Thigh", category: "proteins", qty: chickenG, unit: "g", text: `<strong>Chicken Thigh, Skinless (Raw):</strong> ${chickenG}g ${toOz(chickenG)}` },
         { name: "Jasmine White Rice", category: "starches", qty: riceG, unit: "g", text: `<strong>Jasmine Rice (Dry):</strong> ${riceG}g` },
         { name: "Hass Avocado", category: "fats", qty: avoG, unit: "g", text: avoG > 5 ? `<strong>Avocado:</strong> ${avoG}g` : `` }
       ];
@@ -653,8 +653,8 @@ export const RECIPES: TemplateRecipe[] = [
       const chickenG = Math.max(60, Math.round((p - Math.round(riceG * FOOD_DENSITY.jasmine_rice_dry.protein)) / FOOD_DENSITY.chicken_thigh.protein));
       const remFat = Math.max(0, f - Math.round(chickenG * FOOD_DENSITY.chicken_thigh.fat) - Math.round(riceG * FOOD_DENSITY.jasmine_rice_dry.fat));
       return [
-        { text: `<strong>Preparation:</strong> Cook jasmine rice. Pan-sear seasoned chicken thigh and slice. Steam broccoli florets. Combine in a bowl and drizzle with olive oil.` },
-        { name: "Chicken Thigh", category: "proteins", qty: chickenG, unit: "g", text: `<strong>Chicken Thigh (Raw):</strong> ${chickenG}g ${toOz(chickenG)}` },
+        { text: `<strong>Preparation:</strong> Cook jasmine rice. Pan-sear seasoned skinless chicken thigh and slice. Steam broccoli florets. Combine in a bowl and drizzle with olive oil.` },
+        { name: "Chicken Thigh", category: "proteins", qty: chickenG, unit: "g", text: `<strong>Chicken Thigh, Skinless (Raw):</strong> ${chickenG}g ${toOz(chickenG)}` },
         { name: "Jasmine White Rice", category: "starches", qty: riceG, unit: "g", text: `<strong>Jasmine Rice (Dry):</strong> ${riceG}g` },
         { name: "Broccoli Florets", category: "produce", qty: 150, unit: "g", text: `<strong>Broccoli Florets:</strong> 150g` },
         { name: "Olive Oil", category: "fats", qty: remFat, unit: "g", text: remFat > 2 ? `<strong>Olive Oil:</strong> ${(remFat/4.5).toFixed(1)} tsp` : `` }
@@ -813,8 +813,8 @@ export const RECIPES: TemplateRecipe[] = [
       const thighG = Math.round(Math.max(0, p - Math.round(carrotG * FOOD_DENSITY.carrots_raw.protein) - Math.round(beetG * FOOD_DENSITY.beets_raw.protein)) / FOOD_DENSITY.chicken_thigh.protein);
       const remFat = Math.max(0, f - Math.round(thighG * FOOD_DENSITY.chicken_thigh.fat));
       return [
-        { text: `<strong>Preparation:</strong> Chop carrots and beets, toss in olive oil, and roast at 400°F. Bake chicken thighs alongside until golden brown.` },
-        { name: "Chicken Thigh", category: "proteins", qty: thighG, unit: "g", text: `<strong>Chicken Thigh (Raw):</strong> ${thighG}g ${toOz(thighG)}` },
+        { text: `<strong>Preparation:</strong> Chop carrots and beets, toss in olive oil, and roast at 400°F. Bake skinless chicken thighs alongside until golden brown.` },
+        { name: "Chicken Thigh", category: "proteins", qty: thighG, unit: "g", text: `<strong>Chicken Thigh, Skinless (Raw):</strong> ${thighG}g ${toOz(thighG)}` },
         { name: "Carrots", category: "produce", qty: carrotG, unit: "g", text: `<strong>Carrots:</strong> ${carrotG}g` },
         { name: "Beets", category: "produce", qty: beetG, unit: "g", text: beetG > 10 ? `<strong>Beets (Raw):</strong> ${beetG}g` : `` },
         { name: "Olive Oil", category: "fats", qty: remFat, unit: "g", text: remFat > 2 ? `<strong>Olive Oil:</strong> ${(remFat/4.5).toFixed(1)} tsp` : `` }

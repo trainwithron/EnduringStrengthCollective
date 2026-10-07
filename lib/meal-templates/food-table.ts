@@ -18,7 +18,7 @@ export const FOOD_DENSITY = {
   ground_beef_85_15:   { protein: 0.186, carbs: 0, fat: 0.15, category: "proteins" }, // USDA fdc 171796 (was 0.2 / 0 / 0.15)
   ground_beef_90_10:   { protein: 0.182, carbs: 0, fat: 0.129, category: "proteins" }, // USDA fdc 2514743 (was 0.2 / 0 / 0.1)
   ground_beef_93_7:    { protein: 0.209, carbs: 0, fat: 0.07, category: "proteins" }, // USDA fdc 173110 (was 0.21 / 0 / 0.075)
-  ground_beef_96_4:    { protein: 0.214, carbs: 0, fat: 0.05, category: "proteins" }, // USDA fdc 171790 (was 0.22 / 0 / 0.04)
+  ground_beef_96_4:    { protein: 0.214, carbs: 0, fat: 0.05, category: "proteins" }, // USDA fdc 171790 (was 0.22 / 0 / 0.04) the 95/5 grade, USDA's nearest to the old 96/4; no recipe prints this row
   sirloin_steak:       { protein: 0.22, carbs: 0, fat: 0.057, category: "proteins" }, // USDA fdc 2727574 (was 0.22 / 0 / 0.06)
   flank_steak:         { protein: 0.201, carbs: 0, fat: 0.094, category: "proteins" }, // USDA fdc 2646175 (was 0.21 / 0 / 0.08)
   ribeye_steak:        { protein: 0.187, carbs: 0, fat: 0.184, category: "proteins" }, // USDA fdc 173403 (was 0.24 / 0 / 0.18)
@@ -32,8 +32,8 @@ export const FOOD_DENSITY = {
   beef_jerky:          { protein: 0.332, carbs: 0.11, fat: 0.256, category: "proteins" }, // USDA fdc 167536 (was 0.5 / 0.05 / 0.05)
 
   chicken_breast:      { protein: 0.225, carbs: 0, fat: 0.026, category: "proteins" }, // USDA fdc 171077 (was 0.23 / 0 / 0.025)
-  chicken_thigh:       { protein: 0.197, carbs: 0, fat: 0.041, category: "proteins" }, // USDA fdc 173627 (was 0.2 / 0 / 0.08)
-  chicken_drumstick:   { protein: 0.194, carbs: 0, fat: 0.037, category: "proteins" }, // USDA fdc 173614 (was 0.19 / 0 / 0.09)
+  chicken_thigh:       { protein: 0.197, carbs: 0, fat: 0.041, category: "proteins" }, // USDA fdc 173627 (was 0.2 / 0 / 0.08) skinless meat only: always printed as skinless
+  chicken_drumstick:   { protein: 0.194, carbs: 0, fat: 0.037, category: "proteins" }, // USDA fdc 173614 (was 0.19 / 0 / 0.09) skinless meat only: always printed as skinless
   chicken_wing:        { protein: 0.175, carbs: 0, fat: 0.129, category: "proteins" }, // USDA fdc 172390 (was 0.18 / 0 / 0.16)
   chicken_tenderloin:  { protein: 0.225, carbs: 0, fat: 0.026, category: "proteins" }, // USDA fdc 171077 (was 0.23 / 0 / 0.02)
   ground_turkey_93_7:  { protein: 0.173, carbs: 0, fat: 0.096, category: "proteins" }, // USDA fdc 2514747 (was 0.2 / 0 / 0.07)
