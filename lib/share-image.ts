@@ -1,3 +1,5 @@
+import { BRAND } from "@/lib/brand";
+import { drawSpotlightMark } from "@/lib/brand-canvas";
 import { SCENIC_SKY_STOPS, type ScenicBackgroundKey } from "@/lib/scenic-backgrounds";
 
 // The post-workout card as a PICTURE people can post. Everything here draws on a plain canvas so the image is
@@ -45,7 +47,7 @@ export interface ShareImageModel {
   funLine: string | null;
 }
 
-const WORDMARK = "SPOTLIGHT";
+const WORDMARK = BRAND.wordmark;
 
 // A session length worth printing: at least a minute (the app can record a few seconds for a mis-tap) and under six
 // hours (almost always a Finish button forgotten overnight). Anything else is dropped rather than shown as a guess.
@@ -440,16 +442,27 @@ export function drawShareImage(ctx: DrawContext, format: ShareImageFormat, model
     });
   }
 
-  // Footer: small wordmark, no link
-  ctx.textAlign = "center";
+  // Footer: the Spotlight mark with the wordmark (SPOTLIGHT, and a smaller COACHING under it), then the date. No link.
   ctx.font = display(40);
   setLetterSpacing(ctx, 10);
+  const wordWidth = ctx.measureText(WORDMARK).width;
+  const markSize = 52;
+  const gap = 18;
+  const startX = w / 2 - (markSize + gap + wordWidth) / 2;
+  // The mark's visible top (the halo) sits at the wordmark's cap height.
+  drawSpotlightMark(ctx, startX, p.footerY - 30 - (21 * markSize) / 200, markSize, "dark");
+  ctx.textAlign = "left";
   ctx.fillStyle = theme.chalk;
-  ctx.fillText(WORDMARK, w / 2, p.footerY);
+  ctx.fillText(WORDMARK, startX + markSize + gap, p.footerY);
+  ctx.font = display(20);
+  setLetterSpacing(ctx, 9);
+  ctx.fillStyle = theme.steel;
+  ctx.fillText(BRAND.wordmarkSub, startX + markSize + gap, p.footerY + 26);
+  ctx.textAlign = "center";
   setLetterSpacing(ctx, 3);
   ctx.font = body(26);
   ctx.fillStyle = theme.steel;
-  ctx.fillText(model.dateLabel, w / 2, p.footerY + 46);
+  ctx.fillText(model.dateLabel, w / 2, p.footerY + 66);
   setLetterSpacing(ctx, 0);
 }
 

@@ -1,3 +1,4 @@
+import { BRAND_OG_IMAGES } from "@/lib/brand";
 import type { Metadata } from "next";
 import { NoAccess } from "@/components/shared/no-access";
 import { getSharedTransformationCard } from "@/lib/shared-transformation-card";
@@ -20,7 +21,7 @@ export async function generateMetadata(
 
   const title = `${shared.athleteName} is down ${shared.totalLossLbs} lbs 🎉`;
   const description = `Training with ${shared.groupName}.`;
-  return { title, description, openGraph: { title, description } };
+  return { title, description, openGraph: { title, description, images: BRAND_OG_IMAGES } };
 }
 
 export default async function ShareTransformationCardPage(

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Spotlight Coaching favicon">
+  <title>Spotlight Coaching</title>
+  <rect width="64" height="64" rx="14" fill="#0D0C0A"/>
+  <polygon points="23,14 41,14 56,46 8,46" fill="#F4C95D" opacity="0.5"/>
+  <ellipse cx="32" cy="12" rx="11" ry="4" fill="none" stroke="#FFF4D6" stroke-width="5"/>
+  <rect x="9" y="46" width="46" height="6" rx="3" fill="#FFF4D6"/>
+</svg>
