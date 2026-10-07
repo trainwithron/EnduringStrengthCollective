@@ -16,9 +16,11 @@ export const FOOD_ARCHETYPES: Record<string, DietType[]> = {
   ny_strip:            ["keto", "omnivore", "paleo", "carnivore"],
   flank_steak:         ["carnivore", "keto", "omnivore", "paleo"],
   chuck_roast:         ["keto", "omnivore", "paleo", "carnivore"],
+  chuck_roast_trimmed: ["keto", "omnivore", "paleo", "carnivore"],
   pork_tenderloin:     ["omnivore", "paleo", "keto"],
   salmon_raw:          ["keto", "omnivore", "paleo", "pescatarian"],
   shrimp_raw:          ["omnivore", "paleo", "pescatarian", "keto"],
+  white_fish:          ["omnivore", "paleo", "pescatarian", "keto"],
   tuna_canned:         ["omnivore", "pescatarian", "keto", "paleo"],
   tofu_extra_firm:     ["vegan", "vegetarian"],
   tempeh_organic:      ["vegan", "vegetarian"],
@@ -125,6 +127,10 @@ export const EXTRA_NAME_TO_KEY: Record<string, FoodKey> = {
   "Liquid Egg Whites": "egg_whites_liquid",
   "0% Greek Yogurt": "greek_yogurt_0pct",
   "String Cheese": "string_cheese",
+  // Added with the recipe rework: the lean (trimmed) chuck roast row, USDA fdc 174051.
+  "Chuck Roast, Trimmed": "chuck_roast_trimmed",
+  "Raw Macadamia Nuts": "macadamia_raw",
+  "White Fish (Cod)": "white_fish",
 };
 
 // Quick, sugar-heavy carbs offered as a swap only on a training day.
