@@ -1,3 +1,4 @@
+import { SendSignInLinkButton } from "@/components/coach/send-signin-link-button";
 import { ClientProfileTabs } from "@/components/coach/desktop/client-profile-tabs";
 import { ClientProgramsSection } from "@/components/coach/desktop/client-programs-section";
 import { isClientProfileTab } from "@/lib/client-profile-tabs";
@@ -1040,11 +1041,14 @@ export default async function AthleteProfilePage(
           </div>
           <div data-tab="overview">
           {signInStatus === "active" && (
-            <CorrectClientEmail
-              groupId={params.groupId}
-              athleteId={params.athleteId}
-              clientName={profile?.full_name ?? "Client"}
-            />
+            <>
+              <CorrectClientEmail
+                groupId={params.groupId}
+                athleteId={params.athleteId}
+                clientName={profile?.full_name ?? "Client"}
+              />
+              <SendSignInLinkButton groupId={params.groupId} athleteId={params.athleteId} clientName={profile?.full_name ?? "this client"} />
+            </>
           )}
           </div>
           <div data-tab="overview forms">

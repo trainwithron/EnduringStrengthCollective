@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { createBrowserClient } from "@/lib/supabase/client";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -15,18 +14,21 @@ export default function ForgotPasswordPage() {
     setSubmitting(true);
     setError(null);
 
-    const supabase = createBrowserClient();
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-      redirectTo: `${window.location.origin}/set-password`,
-    });
+    // Sent from the server so the link works on any device (a link made in this browser only works in this browser).
+    let message: string | null = null;
+    try {
+      const res = await fetch("/api/auth/forgot-password", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: email.trim().toLowerCase() }) });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        message = data.error || "We couldn't send that. Check the email address and try again.";
+      }
+    } catch {
+      message = "We couldn't send that. Check your connection and try again.";
+    }
 
     setSubmitting(false);
-    if (resetError) {
-      setError(
-        /rate limit|too many/i.test(resetError.message)
-          ? "Too many requests. Wait a few minutes and try again."
-          : "We couldn't send that. Check the email address and try again."
-      );
+    if (message) {
+      setError(message);
       return;
     }
     setSent(true);

@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { establishSessionFromLink } from "@/lib/auth-link-client";
 import { isPlaceholderEmail, validateClaimEmail, validateNewPassword } from "@/lib/client-claim";
 import { loadStartInputs, pickStartGroup } from "@/lib/start-group";
 import { LegalAcceptance } from "@/components/legal/legal-acceptance";
@@ -38,8 +39,11 @@ function SetPasswordForm() {
     // The invite email's link establishes a real session client-side
     // (Supabase's own library reads it from the URL fragment on load) —
     // this just confirms one actually landed before showing the form.
+    // The browser library only reads the link shape it was built for, so the link is read here first (lib/auth-link.ts).
     const supabase = createBrowserClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    establishSessionFromLink(supabase)
+      .then(() => supabase.auth.getUser())
+      .then(({ data: { user } }) => {
       setHasSession(!!user);
       setNeedsEmail(isPlaceholderEmail(user?.email));
       if (user) {

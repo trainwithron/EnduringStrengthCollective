@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { establishSessionFromLink } from "@/lib/auth-link-client";
 import { loadStartInputs, pickStartGroup } from "@/lib/start-group";
 import { isStandaloneDisplay, isMobileUserAgent } from "@/lib/pwa";
 
@@ -26,8 +27,11 @@ function ConfirmEmailStatus() {
     // same pattern as /set-password. The account and its organization were
     // already created back at signup, so once a session is here, there's
     // just the same "find their first group, route in" lookup to do.
+    // The browser library only reads the link shape it was built for, so the link is read here first (lib/auth-link.ts).
     const supabase = createBrowserClient();
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
+    establishSessionFromLink(supabase)
+      .then(() => supabase.auth.getUser())
+      .then(async ({ data: { user } }) => {
       if (!user) {
         setHasSession(false);
         setChecking(false);
