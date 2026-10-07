@@ -105,6 +105,8 @@ export function DayTimeGrid({
   const [typedTime, setTypedTime] = useState("");
   const [booked, setBooked] = useState<{ bookingId: string; label: string; secondsLeft: number } | null>(null);
   const undoing = useRef(false);
+  // The timer that announces the booking once the undo time has run out; Undo cancels it.
+  const flushTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flush = useRef<{ athleteId: string; groupId: string; startIso: string; bookingId: string; timer: ReturnType<typeof setInterval> } | null>(null);
 
   // A different client picked: their usual type and balance.
@@ -194,6 +196,10 @@ export function DayTimeGrid({
   function sendNotifications() {
     const f = flush.current;
     if (!f) return;
+    if (flushTimeout.current) {
+      clearTimeout(flushTimeout.current);
+      flushTimeout.current = null;
+    }
     clearInterval(f.timer);
     flush.current = null;
     removePending(f.bookingId);
@@ -248,9 +254,20 @@ export function DayTimeGrid({
       }
     }, 1000);
     flush.current = { athleteId: client.athleteId, groupId: clientGroup, startIso: start.toISOString(), bookingId: bookingId as string, timer };
-    addPending({ bookingId: bookingId as string, athleteId: client.athleteId, groupId: clientGroup, startIso: start.toISOString(), madeAt: Date.now() });
-    setTimeout(() => {
-      if (flush.current?.bookingId === (bookingId as string)) sendNotifications();
+    addPending({ bookingId: bookingId as string, coachId: userData.user.id, athleteId: client.athleteId, groupId: clientGroup, startIso: start.toISOString(), madeAt: Date.now() });
+    flushTimeout.current = setTimeout(async () => {
+      flushTimeout.current = null;
+      if (undoing.current || flush.current?.bookingId !== (bookingId as string)) return;
+      // Right before telling the client, make sure the booking is still there (it could have been cancelled from another screen in these seconds).
+      const { data: still } = await createBrowserClient().from("bookings").select("status").eq("id", bookingId as string).maybeSingle();
+      if (undoing.current || flush.current?.bookingId !== (bookingId as string)) return;
+      if (still && (still as { status: string }).status !== "confirmed") {
+        clearInterval(flush.current.timer);
+        flush.current = null;
+        removePending(bookingId as string);
+        return;
+      }
+      sendNotifications();
     }, UNDO_SECONDS * 1000);
     onChanged();
   }
@@ -260,10 +277,20 @@ export function DayTimeGrid({
     // A second tap while the first is working would fail on a booking that is already gone and look like the undo failed.
     if (!b || undoing.current) return;
     undoing.current = true;
-    // Pause the countdown but keep the announcement: it is only dropped once the cancel has actually worked.
+    // Pause the countdown and the announcement timer but keep the announcement: it is only dropped once the cancel has actually worked.
     if (flush.current) clearInterval(flush.current.timer);
-    const { error: cancelError } = await createBrowserClient().rpc("cancel_booking_and_refund_credit", { p_booking_id: b.bookingId });
-    undoing.current = false;
+    if (flushTimeout.current) {
+      clearTimeout(flushTimeout.current);
+      flushTimeout.current = null;
+    }
+    let cancelError: unknown = null;
+    try {
+      ({ error: cancelError } = await createBrowserClient().rpc("cancel_booking_and_refund_credit", { p_booking_id: b.bookingId }));
+    } catch (e) {
+      cancelError = e ?? new Error("cancel failed");
+    } finally {
+      undoing.current = false;
+    }
     if (cancelError) {
       // The booking stays, so the client is told after all, and the coach is told plainly.
       setBooked(null);

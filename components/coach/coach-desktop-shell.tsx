@@ -71,6 +71,7 @@ import {
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { CoachMoreSheet } from "@/components/coach/mobile/coach-more-sheet";
 import { CoachSpotHub } from "@/components/coach/mobile/coach-spot-hub";
+import { PendingNoticeFlusher } from "@/components/coach/pending-notice-flusher";
 
 function NavBadge({ count, collapsed }: { count: number; collapsed?: boolean }) {
   if (count <= 0) return null;
@@ -793,7 +794,10 @@ export function CoachDesktopShell({
           )}
         </div>
 
-        <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 px-4 pt-6 pb-24 md:px-10 md:pt-8 lg:pb-8 max-w-[1400px] focus:outline-none">{children}</main>
+        <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 px-4 pt-6 pb-24 md:px-10 md:pt-8 lg:pb-8 max-w-[1400px] focus:outline-none">
+          <PendingNoticeFlusher />
+          {children}
+        </main>
       </div>
       {/* Mounted once here so it's reachable from every one of this
           shell's ~50 routes, not just /dashboard (collective_intelligence

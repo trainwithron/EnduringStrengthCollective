@@ -99,18 +99,21 @@ export function countBookings(rows: BookingCountRow[], now: Date): Map<string, B
 // Fails soft: no counts. If the pages run out (25,000 rows) the counts are reported as of what was read.
 // `athleteIds` narrows it to one screenful of clients (at most 100 at a time, so the request stays short).
 export async function fetchBookingCounts(supabase: SupabaseClient, filter: { coachId?: string; athleteId?: string; athleteIds?: string[]; groupId?: string }, now: Date = new Date()): Promise<Map<string, BookingCounts>> {
-  const { rows, failed } = await pageAll((from, to) => {
+  const { rows, failed, truncated } = await pageAll((from, to) => {
     let q = supabase
       .from("bookings")
       .select("id, athlete_id, group_id, start_at, end_at, attended_at, no_show, credit_state")
       .eq("status", "confirmed")
-      .in("credit_state", ["unsettled", "prepaid"]);
+      .in("credit_state", ["unsettled", "prepaid"])
+      // Only what can still be counted: sessions that have not ended, and ended ones still waiting to be marked (so old prepaid and no-show rows are never pulled).
+      .or(`end_at.gte.${now.toISOString()},and(credit_state.eq.unsettled,attended_at.is.null,no_show.eq.false)`);
     if (filter.coachId) q = q.eq("coach_id", filter.coachId);
     if (filter.athleteId) q = q.eq("athlete_id", filter.athleteId);
     if (filter.athleteIds) q = q.in("athlete_id", filter.athleteIds.slice(0, 100));
     if (filter.groupId) q = q.eq("group_id", filter.groupId);
     return q.order("id", { ascending: true }).range(from, to);
   });
-  if (failed) return new Map();
+  // Partial counts would quietly read as complete ones, so running out of pages counts as a failure.
+  if (failed || truncated) return new Map();
   return countBookings(rows as BookingCountRow[], now);
 }

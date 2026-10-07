@@ -112,6 +112,7 @@ describe("reading all the rows, past the 1000-row cap", () => {
       select: () => chain,
       eq: () => chain,
       in: () => chain,
+      or: () => chain,
       order: () => chain,
       range: (from: number, to: number) => {
         calls += 1;
@@ -127,7 +128,16 @@ describe("reading all the rows, past the 1000-row cap", () => {
     expect(calls).toBe(3);
   });
   it("fails soft, with no counts, when a page fails", async () => {
-    const chain: any = { select: () => chain, eq: () => chain, in: () => chain, order: () => chain, range: () => Promise.resolve({ data: null, error: { message: "x" } }) };
+    const chain: any = { select: () => chain, eq: () => chain, in: () => chain, or: () => chain, order: () => chain, range: () => Promise.resolve({ data: null, error: { message: "x" } }) };
+    const m = await fetchBookingCounts({ from: () => chain } as any, { coachId: "c" });
+    expect(m.size).toBe(0);
+  });
+});
+
+describe("running out of pages", () => {
+  it("counts as a failure: partial counts would read as complete", async () => {
+    const full = Array.from({ length: 1000 }, (_, i) => ({ id: String(i), athlete_id: "a", group_id: "g", start_at: "2099-01-01T00:00:00Z", end_at: "2099-01-01T01:00:00Z", credit_state: "unsettled" }));
+    const chain: any = { select: () => chain, eq: () => chain, in: () => chain, or: () => chain, order: () => chain, range: () => Promise.resolve({ data: full, error: null }) };
     const m = await fetchBookingCounts({ from: () => chain } as any, { coachId: "c" });
     expect(m.size).toBe(0);
   });

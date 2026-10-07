@@ -12,6 +12,8 @@ What is in Release E (all code, nothing to paste):
 - **Your calendar shows only your sessions** (time off, events). A client's program days and own workouts are on their own calendar, one tap away.
 - **Clients see** "8 left · 4 booked" (never "owed").
 
+**Queued before the December gym pilot (not needed for Release E):** replace the session-count reads (they page through every open session, fine to about 100 to 150 clients) with one database function that returns the counts per client (booked, to mark, prepaid ahead), riding the existing booking row security, plus a partial index. That is a migration with its own paste file, undo and review. Past about 300 clients the page reads get slow, and past about 400 they would stop being complete (a read that runs out of pages now shows no counts instead of wrong ones).
+
 Known gaps, written down on purpose: group-session attendees are charged through their own table and are not yet counted in "booked"; credit cost and session length are not applied at booking from the session type; weekly schedules and client requests are not typed automatically; Home cards show no balance so there was nothing to change there; the Add client button and one-invite-link-per-group work is not built (waiting on read permission).
 
 ---

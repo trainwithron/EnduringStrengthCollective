@@ -138,7 +138,7 @@ export function LateChangesPanel() {
           const ids = Array.from(new Set(Array.from(pairs.values()).map((p) => p.athleteId)));
           const [{ data: creditRows }, counts] = await Promise.all([
             supabase.from("session_credits").select("athlete_id, group_id, balance").in("athlete_id", ids),
-            fetchBookingCounts(supabase, { coachId: user.id }),
+            fetchBookingCounts(supabase, { coachId: user.id, athleteIds: ids }),
           ]);
           const balanceByKey = new Map(((creditRows ?? []) as any[]).map((r) => [`${r.athlete_id}:${r.group_id}`, r.balance as number]));
           const lines: Record<string, string> = {};

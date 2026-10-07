@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { addPending, dueNotices, expiredNotices, listPending, removePending, NOTICE_MAX_AGE_MS, type KeyValueStore } from "./pending-booking-notices";
+import { addPending, AUTO_SEND_MAX_AGE_MS, dueNotices, isStale, listPending, removePending, type KeyValueStore } from "./pending-booking-notices";
 
-function memoryStore(initial?: string): KeyValueStore & { raw: () => string | null } {
+function memoryStore(initial?: string): KeyValueStore {
   let value: string | null = initial ?? null;
-  return { getItem: () => value, setItem: (_k, v) => (value = v), raw: () => value };
+  return { getItem: () => value, setItem: (_k, v) => (value = v) };
 }
-const n = (id: string, madeAt: number) => ({ bookingId: id, athleteId: "a", groupId: "g", startIso: "2026-10-15T15:00:00.000Z", madeAt });
+const n = (id: string, madeAt: number, coachId = "c1") => ({ bookingId: id, coachId, athleteId: "a", groupId: "g", startIso: "2026-10-15T15:00:00.000Z", madeAt });
 
 describe("announcements waiting out their undo time", () => {
   it("are written down, found again, and removed", () => {
@@ -25,12 +25,18 @@ describe("announcements waiting out their undo time", () => {
   });
   it("only the ones past their undo window are due", () => {
     const list = [n("old", 0), n("fresh", 9000)];
-    expect(dueNotices(list, 10000, 8000).map((x) => x.bookingId)).toEqual(["old"]);
-    expect(dueNotices(list, 10000, 0)).toHaveLength(2);
+    expect(dueNotices(list, "c1", 10000, 8000).map((x) => x.bookingId)).toEqual(["old"]);
+    expect(dueNotices(list, "c1", 10000, 0)).toHaveLength(2);
   });
-  it("very old ones are dropped instead of announced late", () => {
-    const now = NOTICE_MAX_AGE_MS + 1000;
-    expect(expiredNotices([n("a", 0), n("b", now - 1000)], now).map((x) => x.bookingId)).toEqual(["a"]);
+  it("a coach only ever sends their own, on a shared browser", () => {
+    const list = [n("mine", 0, "c1"), n("theirs", 0, "c2")];
+    expect(dueNotices(list, "c1", 100000, 8000).map((x) => x.bookingId)).toEqual(["mine"]);
+    expect(dueNotices(list, "c2", 100000, 8000).map((x) => x.bookingId)).toEqual(["theirs"]);
+    expect(dueNotices(list, "c3", 100000, 8000)).toEqual([]);
+  });
+  it("one that has waited a long time is left for the coach to decide", () => {
+    expect(isStale(n("a", 0), AUTO_SEND_MAX_AGE_MS)).toBe(false);
+    expect(isStale(n("a", 0), AUTO_SEND_MAX_AGE_MS + 1)).toBe(true);
   });
   it("a missing, broken or foreign store never throws", () => {
     expect(listPending(null)).toEqual([]);

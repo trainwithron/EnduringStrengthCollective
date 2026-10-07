@@ -1,36 +1,42 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { notifyBookingConfirmed } from "./notify-booking-confirmed";
 import { mirrorGoogleCalendarEvent } from "./mirror-google-calendar-event";
-import { dueNotices, expiredNotices, listPending, removePending } from "./pending-booking-notices";
+import { dueNotices, isStale, listPending, removePending, type PendingNotice } from "./pending-booking-notices";
 
-// Sends the announcements a closed or refreshed tab never got to (see pending-booking-notices.ts), when any calendar page opens. Only a booking that is still
-// confirmed is announced; one that was undone or cancelled since is dropped silently. Runs once per page load and never throws.
+// Sends the announcements a closed or refreshed tab never got to (see pending-booking-notices.ts), when a coach page opens. Only the coach's own, only a booking
+// that is still confirmed and still ahead (one that was undone, cancelled or has passed is dropped silently); one that waited more than a few hours is returned
+// for the coach to decide instead of being sent on its own. Never throws.
 export const FLUSH_AFTER_MS = 15000;
 
-export async function flushDueNotices(supabase: SupabaseClient, now: number = Date.now()): Promise<number> {
+export function announce(n: PendingNotice) {
+  removePending(n.bookingId);
+  notifyBookingConfirmed(n.athleteId, n.groupId, n.startIso);
+  mirrorGoogleCalendarEvent(n.bookingId);
+}
+
+export async function flushDueNotices(supabase: SupabaseClient, coachId: string, now: number = Date.now()): Promise<{ sent: number; stale: PendingNotice[] }> {
+  const result = { sent: 0, stale: [] as PendingNotice[] };
   try {
-    const all = listPending();
-    for (const old of expiredNotices(all, now)) removePending(old.bookingId);
-    const due = dueNotices(
-      all.filter((n) => !expiredNotices(all, now).includes(n)),
-      now,
-      FLUSH_AFTER_MS
-    );
-    if (due.length === 0) return 0;
-    const { data, error } = await supabase.from("bookings").select("id, status").in("id", due.map((n) => n.bookingId));
-    if (error) return 0;
-    const confirmed = new Set(((data ?? []) as { id: string; status: string }[]).filter((b) => b.status === "confirmed").map((b) => b.id));
-    let sent = 0;
+    const due = dueNotices(listPending(), coachId, now, FLUSH_AFTER_MS);
+    if (due.length === 0) return result;
+    const { data, error } = await supabase.from("bookings").select("id, status, start_at").in("id", due.map((n) => n.bookingId));
+    if (error) return result;
+    const live = new Map(((data ?? []) as { id: string; status: string; start_at: string }[]).filter((b) => b.status === "confirmed" && new Date(b.start_at).getTime() > now).map((b) => [b.id, b]));
     for (const n of due) {
+      if (!live.has(n.bookingId)) {
+        removePending(n.bookingId);
+        continue;
+      }
+      if (isStale(n, now)) {
+        result.stale.push(n);
+        continue;
+      }
       // Taken off the list first: if another tab is flushing too, whoever removes it first is the one that sends.
-      removePending(n.bookingId);
-      if (!confirmed.has(n.bookingId)) continue;
-      notifyBookingConfirmed(n.athleteId, n.groupId, n.startIso);
-      mirrorGoogleCalendarEvent(n.bookingId);
-      sent += 1;
+      announce(n);
+      result.sent += 1;
     }
-    return sent;
+    return result;
   } catch {
-    return 0;
+    return result;
   }
 }

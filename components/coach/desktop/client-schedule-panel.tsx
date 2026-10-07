@@ -39,6 +39,9 @@ export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client
   const [adjusting, setAdjusting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // A session just marked attended stays in the list until the panel is opened again, so its Undo is still there.
+  const [kept, setKept] = useState<Record<string, BookingRow>>({});
+  const [showAllUpcoming, setShowAllUpcoming] = useState(false);
   const groupId = client.groupId;
 
   const load = useCallback(async () => {
@@ -88,6 +91,8 @@ export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client
 
   useEffect(() => {
     setUpcoming(null);
+    setKept({});
+    setShowAllUpcoming(false);
     setBalance(client.balance);
     load().catch(() => setUpcoming([]));
   }, [load, client.balance]);
@@ -126,6 +131,8 @@ export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client
     router.refresh();
   }
 
+  // The rows waiting to be marked, plus any just marked here (kept so the Undo stays), newest first.
+  const waitingRows = [...awaiting, ...Object.values(kept).filter((k) => !awaiting.some((a) => a.id === k.id))].sort((a, b) => b.start_at.localeCompare(a.start_at));
   const picture = buildCreditPicture({ balance, booked: counts.booked, toMark: counts.toMark, bought: ledger?.bought, done: ledger?.done });
   const typeName = (id: string | null) => (id ? sessionTypes.find((x) => x.id === id)?.name ?? null : null);
   const when = (iso: string) => formatInTimezone(new Date(iso), timezone, "dateTime");
@@ -149,11 +156,11 @@ export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client
             </button>
           </div>
 
-          {awaiting.length > 0 && (
+          {waitingRows.length > 0 && (
             <div className="mt-3">
               <p className="font-body text-[11px] text-steel uppercase tracking-wide mb-1">Waiting to be marked</p>
               <ul className="divide-y divide-steel/15">
-                {awaiting.map((b) => (
+                {waitingRows.map((b) => (
                   <li key={b.id} className="py-2">
                     <p className="font-body text-xs text-chalk">
                       {when(b.start_at)}
@@ -167,6 +174,7 @@ export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client
                         athleteId={client.athleteId}
                         groupId={groupId}
                         onDone={() => {
+                          setKept((k) => ({ ...k, [b.id]: b }));
                           load().catch(() => {});
                         }}
                       />
@@ -181,7 +189,7 @@ export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client
             <p className="font-body text-xs text-steel">Nothing scheduled with you.</p>
           ) : (
             <ul className="divide-y divide-steel/15">
-              {upcoming.map((b) => (
+              {upcoming.slice(0, showAllUpcoming ? upcoming.length : 8).map((b) => (
                 <li key={b.id} className="py-2 flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span className="font-body text-xs text-chalk flex-1 min-w-[9rem]">
                     {when(b.start_at)}
@@ -196,6 +204,13 @@ export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client
                   </button>
                 </li>
               ))}
+              {upcoming.length > 8 && !showAllUpcoming && (
+                <li className="py-2">
+                  <button type="button" onClick={() => setShowAllUpcoming(true)} className="font-body text-xs text-rust underline underline-offset-2">
+                    and {upcoming.length - 8} more
+                  </button>
+                </li>
+              )}
             </ul>
           )}
         </>
