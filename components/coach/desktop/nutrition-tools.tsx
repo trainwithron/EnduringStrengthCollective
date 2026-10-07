@@ -5,6 +5,9 @@ import { MacroCalculator, type CalculatedMacros } from "@/components/tools/macro
 import { MealPlanGenerator, type ImportedMacros } from "@/components/coach/desktop/meal-plan-generator";
 import type { WeeklyWeightTrend } from "@/lib/weight-trend";
 import type { NutritionPhase } from "@/lib/nutrition-checkin";
+import type { FoodRules } from "@/lib/allergen-check";
+import type { WeightUnit } from "@/lib/units";
+import type { ActivityLevel } from "@/lib/macros";
 
 interface SavedPlanShape {
   archetype: string;
@@ -38,6 +41,11 @@ export function NutritionTools({
   injurySurplusPct,
   initialConsecutiveSurplusSpikes,
   defaultPhase,
+  proteinGPerLb,
+  foodRules,
+  rulesReadable = true,
+  weightUnit = "lb",
+  initialActivity = null,
 }: {
   athleteId: string;
   groupId: string;
@@ -56,6 +64,15 @@ export function NutritionTools({
   // — seeds both Step 1 and Step 2's own default, rather than each
   // opening on a hardcoded guess regardless of what's actually tagged.
   defaultPhase?: NutritionPhase | null;
+  // This client's own protein target in g per pound (their preferences).
+  proteinGPerLb?: number;
+  // This client's food rules; the generator never offers an option that breaks them.
+  foodRules?: FoodRules;
+  // False when the client's saved food rules could not be read: the planner builds nothing then.
+  rulesReadable?: boolean;
+  // How the client sees weight, and the activity level they gave: the calculator starts from them.
+  weightUnit?: WeightUnit;
+  initialActivity?: ActivityLevel | null;
 }) {
   const [importedMacros, setImportedMacros] = useState<ImportedMacros | null>(null);
   const [calculatorExpanded, setCalculatorExpanded] = useState(true);
@@ -90,7 +107,7 @@ export function NutritionTools({
         </button>
         {calculatorExpanded && (
           <div className="px-4 pb-4 border-t border-steel/15 pt-4">
-            <MacroCalculator onUseMacros={handleUseMacros} initialWeight={latestBodyWeight} initialGoal={defaultPhase} />
+            <MacroCalculator onUseMacros={handleUseMacros} initialWeight={latestBodyWeight} initialGoal={defaultPhase} weightUnit={weightUnit} initialActivity={initialActivity} />
           </div>
         )}
       </div>
@@ -115,6 +132,9 @@ export function NutritionTools({
           injurySurplusPct={injurySurplusPct}
           initialConsecutiveSurplusSpikes={initialConsecutiveSurplusSpikes}
           initialPhase={defaultPhase}
+          proteinGPerLb={proteinGPerLb}
+          foodRules={foodRules}
+          rulesReadable={rulesReadable}
         />
       </div>
     </div>

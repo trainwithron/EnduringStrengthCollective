@@ -1032,6 +1032,15 @@ export interface MealOption {
   // this way. Must be surfaced in the UI per the revamp's own
   // requirement: never silently degrade without explanation.
   isFallback?: boolean;
+  // Set by the library-first builder (lib/library-meal-plan.ts): where the option came from, the real macros of what is printed, the structured lines (each food's name and
+  // printed label, which the food-rule checks read), and the protein family. A key the same meal keeps across days.
+  source?: "library" | "coach" | "ai";
+  macros?: { proteinG: number; carbsG: number; fatG: number; calories: number };
+  lines?: { name: string; label: string; grams: number | null; matched?: string }[];
+  mainProtein?: string | null;
+  key?: string;
+  // Only on an AI option the coach may save to their library: the verified lines with the real food each was matched to.
+  aiLines?: { rawLine: string; name: string | null; grams: number | null; fdcId: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null }[];
 }
 
 export interface GeneratedMeal {
@@ -1043,6 +1052,11 @@ export interface GeneratedMeal {
   // options above may violate a stated restriction when this is true;
   // the caller must surface that, not silently show them as clean.
   restrictionDropped: boolean;
+  // Library-first builds only: how many of the three options are missing (the screen offers to generate that many), how many meals the client's food rules removed, and
+  // which option the client's card shows first.
+  shortfall?: number;
+  leftOutForRules?: number;
+  featuredIndex?: number;
 }
 
 export interface MealPlanContext {

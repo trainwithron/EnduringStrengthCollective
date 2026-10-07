@@ -8,6 +8,7 @@ import {
   type ActivityLevel,
   type MacroGoal,
 } from "@/lib/macros";
+import { displayWeightValue, kgToLb, type WeightUnit } from "@/lib/units";
 
 const ACTIVITY_OPTIONS: { value: ActivityLevel; label: string }[] = [
   { value: "sedentary", label: "Sedentary (desk job, little exercise)" },
@@ -43,6 +44,8 @@ export function MacroCalculator({
   onUseMacros,
   initialWeight,
   initialGoal,
+  weightUnit = "lb",
+  initialActivity,
 }: {
   onUseMacros?: (macros: CalculatedMacros) => void;
   // Real logged weight (body_weight_logs), when a specific client is in
@@ -53,9 +56,12 @@ export function MacroCalculator({
   // when one is in view — falls back to "maintenance" otherwise, same as
   // before this existed.
   initialGoal?: MacroGoal | null;
+  // How this person sees weight (typed and shown in it; the estimate is worked out in pounds) and the activity level they gave in About you.
+  weightUnit?: WeightUnit;
+  initialActivity?: ActivityLevel | null;
 } = {}) {
-  const [weight, setWeight] = useState(initialWeight != null ? String(initialWeight) : "180");
-  const [activity, setActivity] = useState<ActivityLevel>("moderate");
+  const [weight, setWeight] = useState(initialWeight != null ? String(displayWeightValue(initialWeight, weightUnit)) : weightUnit === "kg" ? "82" : "180");
+  const [activity, setActivity] = useState<ActivityLevel>(initialActivity ?? "moderate");
   const [goal, setGoal] = useState<MacroGoal>(initialGoal ?? "maintenance");
   const [proteinPerLb, setProteinPerLb] = useState("1");
   const [split, setSplit] = useState<"high" | "balanced" | "low">("balanced");
@@ -64,7 +70,8 @@ export function MacroCalculator({
   // default sub-section nested under the current-calories result below.
   const [showMaintenanceExplainer, setShowMaintenanceExplainer] = useState(false);
 
-  const weightNum = parseFloat(weight) || 0;
+  const typedWeight = parseFloat(weight) || 0;
+  const weightNum = weightUnit === "kg" ? kgToLb(typedWeight) : typedWeight;
   const valid = weightNum > 0;
 
   const maintenance = valid ? estimateMaintenanceCalories(weightNum, activity) : 0;
@@ -79,7 +86,7 @@ export function MacroCalculator({
       <div className="grid grid-cols-2 gap-3">
         <label className="flex flex-col gap-1">
           <span className="font-body text-xs text-steel uppercase tracking-wide">
-            Body weight (lbs)
+            Body weight ({weightUnit})
           </span>
           <input
             type="number"

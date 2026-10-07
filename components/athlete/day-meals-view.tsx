@@ -1,5 +1,5 @@
 import { IngredientLine } from "@/components/shared/ingredient-line";
-import { mealRecipeChoices, type MealEntryPayload, type MealPlanBucket } from "@/lib/meal-plan-assignment";
+import { choicesFeaturedFirst, type MealEntryPayload, type MealPlanBucket } from "@/lib/meal-plan-assignment";
 
 const BUCKET_LABELS: Record<MealPlanBucket, string> = {
   daily: "Meals",
@@ -9,8 +9,13 @@ const BUCKET_LABELS: Record<MealPlanBucket, string> = {
 
 export function DayMealsView({
   meals,
+  hiddenCount = 0,
+  emptiedMeals = [],
 }: {
   meals: Record<string, MealEntryPayload[]> | null;
+  // Options left out because they break this client's food preferences (an allergy added after the plan was made), and the meals that now have nothing to show.
+  hiddenCount?: number;
+  emptiedMeals?: { bucket: string; mealId: string }[];
 }) {
   if (!meals) return null;
   const buckets = (Object.keys(meals) as MealPlanBucket[]).filter(
@@ -23,6 +28,11 @@ export function DayMealsView({
       <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
         Selected meals
       </h2>
+      {hiddenCount > 0 && (
+        <p role="status" className="font-body text-xs text-chalk border border-steel/30 bg-surface/40 p-2.5 mb-3">
+          Your coach is updating {emptiedMeals.length > 0 ? (emptiedMeals.length === 1 ? "one meal" : `${emptiedMeals.length} meals`) : "some of your meals"} to match your food preferences. Anything that doesn&apos;t fit is hidden until then.
+        </p>
+      )}
       <div className="space-y-4">
         {buckets.map((bucket) => (
           <div key={bucket}>
@@ -33,7 +43,7 @@ export function DayMealsView({
             )}
             <div className="divide-y divide-steel/15">
               {meals[bucket].map((m) => {
-                const choices = mealRecipeChoices(m);
+                const choices = choicesFeaturedFirst(m);
                 return (
                   <div key={m.mealId} className="py-2">
                     <p className="font-body text-xs text-steel uppercase tracking-wide">{m.title}</p>
@@ -41,6 +51,11 @@ export function DayMealsView({
                       choices.map((choice, i) => (
                         <div key={i} className="mt-0.5">
                           <p className="font-body text-sm font-medium">{choice.recipeName ?? m.title}</p>
+                          {choice.macros && (
+                            <p className="font-body text-xs text-steel">
+                              {choice.macros.calories} kcal · {choice.macros.proteinG}p / {choice.macros.carbsG}c / {choice.macros.fatG}f
+                            </p>
+                          )}
                           {choice.ingredients.length > 0 && (
                             <ul className="mt-1 space-y-0.5 pl-3">
                               {
@@ -55,6 +70,8 @@ export function DayMealsView({
                           )}
                         </div>
                       ))
+                    ) : emptiedMeals.some((e) => e.bucket === bucket && e.mealId === m.mealId) ? (
+                      <p className="font-body text-sm text-steel mt-0.5">Your coach is updating this meal.</p>
                     ) : (
                       <p className="font-body text-sm font-medium mt-0.5">{m.title}</p>
                     )}

@@ -104,9 +104,9 @@ export interface StandingTargetInput {
   fatG: number | null;
 }
 
-// Saves a new standing target from today (the coach's own calendar day) onward, or, with `null`, removes
-// it from today onward. Past days keep what they showed: each save is a new dated row, and saving twice on
-// the same day just replaces that day's row. Falls back to the single-row table where the history table
+// Saves a new standing target from `today` (the day it starts, the coach's own calendar day, or a later one the coach chose) onward, or, with `null`, removes
+// it from then on. Past days keep what they showed: each save is a new dated row, saving twice on the same day just replaces that day's row, and any row dated
+// AFTER `today` is removed (the newer decision wins). Falls back to the single-row table where the history table
 // hasn't been created yet, so saving still works either way.
 export async function saveStandingTarget(
   supabase: SupabaseClient,
@@ -124,7 +124,17 @@ export async function saveStandingTarget(
     { athlete_id: athleteId, group_id: groupId, effective_from: today, ...values, created_by: userId },
     { onConflict: "athlete_id,group_id,effective_from" }
   );
-  if (!error) return { ok: true };
+  if (!error) {
+    // A row scheduled for a LATER date would take over again on that date and silently undo this newer decision, so it is removed in the same step. If that
+    // cleanup fails the save is reported as failed (the coach retries), never as done with an old row still waiting.
+    const { error: clearError } = await supabase
+      .from("client_macro_target_history")
+      .delete()
+      .eq("athlete_id", athleteId)
+      .eq("group_id", groupId)
+      .gt("effective_from", today);
+    return clearError ? { ok: false } : { ok: true };
+  }
 
   // Only a missing history table falls back to the old single row; any other failure (a denied write,
   // a dropped connection) is a real failure and must not quietly write somewhere else.

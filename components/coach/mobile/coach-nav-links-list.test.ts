@@ -12,9 +12,7 @@ describe("phone More list", () => {
     for (const label of [
       "Programs",
       "Exercise library",
-      "Recipe hub",
-      "Meal plans",
-      "Macro calculator",
+      "Nutrition",
       "Availability",
       "Business overview",
       "Settings",
@@ -22,6 +20,9 @@ describe("phone More list", () => {
     ]) {
       expect(open, label).toContain(label);
     }
+  });
+  it("has one Nutrition item, not separate meal plan, recipe and calculator entries", () => {
+    for (const old of ["Recipe hub", "Meal plans", "Macro calculator"]) expect(source, old).not.toContain(old);
   });
   it("puts the rarely used tools behind a closed More tools section", () => {
     expect(source).toContain("More tools");

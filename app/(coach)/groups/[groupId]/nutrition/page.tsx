@@ -2,46 +2,34 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
-import { NutritionTools } from "@/components/coach/desktop/nutrition-tools";
-import { WeeklyCheckinPanel } from "@/components/coach/desktop/weekly-checkin-panel";
-import { NutritionCheckinSuggestionsList } from "@/components/coach/desktop/nutrition-checkin-suggestions-list";
-import { computeWeeklyWeightTrend } from "@/lib/weight-trend";
-import { computeBmr, computeTdee } from "@/lib/bmr-tdee";
-import { computeReadinessAverage } from "@/lib/wellness";
-import type { NutritionPhase } from "@/lib/nutrition-checkin";
-import { milestoneTagToNutritionPhase, type MilestonePhaseTag } from "@/lib/nutrition-trend-classifier";
+import { ClientNutrition } from "@/components/coach/nutrition/client-nutrition";
+import { FavoriteMealsTab } from "@/components/coach/nutrition/favorite-meals-tab";
+import { MacroCalculator } from "@/components/tools/macro-calculator";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { TrendChart } from "@/components/coach/desktop/trend-chart";
-import { resolveDayMacros, latestStanding, standingForDate } from "@/lib/macro-resolution";
+import { resolveDayMacros, standingForDate } from "@/lib/macro-resolution";
 import { fetchStandingHistory } from "@/lib/standing-macros";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { FoodLogSection } from "@/components/athlete/food-log-section";
-import { computeAdherenceDays } from "@/lib/food-log-adherence";
 import type { GeneratedMeal } from "@/lib/meal-engine";
 import type { MealEntryPayload } from "@/lib/meal-plan-assignment";
-import { DayMealsView } from "@/components/athlete/day-meals-view";
+import { NutritionPreferencesCard } from "@/components/athlete/nutrition-preferences-card";
+import { rowToPreferences } from "@/lib/nutrition-preferences";
+import { filterGeneratedMealsForClient, filterPlanForClient, hidePlanRecipes } from "@/lib/plan-preference-check";
+import { asWeightUnit, displayWeightValue } from "@/lib/units";
 import type { FoodLogEntry } from "@/components/athlete/meal-checkoff-list";
 import { computeTodaysMicronutrients } from "@/lib/todays-micronutrients";
 import { Key12NutrientGrid } from "@/components/athlete/key12-nutrient-grid";
 import { NutritionYouthModeToggle } from "@/components/coach/desktop/nutrition-youth-mode-toggle";
 import { dedupeRecentFoodLogs } from "@/lib/recent-food-logs";
-import {
-  detectStaleMealPlan,
-  detectMacroSumMismatch,
-  detectRestrictedIngredientSlips,
-  detectProteinTooLow,
-  detectInjuredActiveDeficit,
-} from "@/lib/nutrition-spotter";
-import { NutritionSpotterPanel, type NutritionSpotterFinding } from "@/components/coach/desktop/nutrition-spotter-panel";
-import { estimateProteinFromBodyWeight } from "@/lib/macros";
 import { getCoachClients } from "@/lib/coach-clients";
 
 export default async function NutritionPage(
   props: {
     params: Promise<{ groupId: string }>;
-    searchParams: Promise<{ athleteId?: string }>;
+    searchParams: Promise<{ athleteId?: string; tab?: string }>;
   }
 ) {
   const params = await props.params;
@@ -95,49 +83,93 @@ export default async function NutritionPage(
       selectedTier = (tierRow?.client_tier as string | null) ?? null;
     }
 
+    // Three tabs: Clients (a client's whole nutrition, the default), Favorite meals (the coach's own recipes) and a blank Calculator (for a prospect). The tab and
+    // the redirects from the old Recipe Hub and Macro Calculator pages apply to the coach only; the client's own page below never reads `tab`.
+    const tab = searchParams.tab === "favorites" || searchParams.tab === "calculator" ? searchParams.tab : "clients";
+    const tabHref = (t: string) => `/groups/${params.groupId}/nutrition${t === "clients" ? "" : `?tab=${t}`}`;
+    const TABS: { key: "clients" | "favorites" | "calculator"; label: string }[] = [
+      { key: "clients", label: "Clients" },
+      { key: "favorites", label: "Favorite meals" },
+      { key: "calculator", label: "Calculator" },
+    ];
+
     return (
       <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="nutrition">
-        <div className="pb-6 border-b border-steel/20 mb-6 flex items-end justify-between gap-4">
-          <div>
-            <h1 className="font-display font-bold text-3xl uppercase leading-none">Meal Plans</h1>
-            <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
-              Build a check-in-based macro & meal plan for a specific client.
-            </p>
-          </div>
-          <NutritionYouthModeToggle groupId={params.groupId} initialEnabled={group?.nutrition_youth_mode ?? false} />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-8 items-start">
-          <div className="border border-steel/20 divide-y divide-steel/15">
-            {athletes.length === 0 ? (
-              <p className="font-body text-sm text-steel p-3">No clients yet.</p>
-            ) : (
-              athletes.map((a) => (
-                <Link
-                  key={a.profileId}
-                  href={`/groups/${params.groupId}/nutrition?athleteId=${a.profileId}`}
-                  className={`block p-3 font-body text-sm ${
-                    selected?.profileId === a.profileId ? "bg-rust/10 text-rust" : "text-chalk"
-                  }`}
-                >
-                  {a.fullName}
-                </Link>
-              ))
-            )}
-          </div>
-
-          <div>
-            {!selected ? (
-              <p className="font-body text-sm text-steel">Pick a client to build their meal plan.</p>
-            ) : selectedTier === "group" ? (
-              <p className="font-body text-sm text-steel">
-                Macro/meal planning isn&apos;t enabled for group-tier clients.
+        <div className="pb-4 border-b border-steel/20 mb-6">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <h1 className="font-display font-bold text-3xl uppercase leading-none">Nutrition</h1>
+              <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
+                Targets, meal plans and what each client actually ate, in one place.
               </p>
-            ) : (
-              <NutritionSection groupId={selected.groupId} athleteId={selected.profileId} />
-            )}
+            </div>
+            <NutritionYouthModeToggle groupId={params.groupId} initialEnabled={group?.nutrition_youth_mode ?? false} />
           </div>
+          <nav aria-label="Nutrition" className="mt-4 flex gap-1">
+            {TABS.map((t) => (
+              <Link
+                key={t.key}
+                href={tabHref(t.key)}
+                aria-current={tab === t.key ? "page" : undefined}
+                className={`h-9 px-4 flex items-center font-body text-sm border ${
+                  tab === t.key ? "bg-rust/10 text-rust border-rust/40" : "text-steel border-steel/20 hover:text-chalk"
+                }`}
+              >
+                {t.label}
+              </Link>
+            ))}
+          </nav>
         </div>
+
+        {tab === "favorites" ? (
+          <FavoriteMealsTab userId={user.id} />
+        ) : tab === "calculator" ? (
+          <div>
+            <p className="font-body text-sm text-steel mb-4 max-w-[70ch]">
+              A blank calculator, for a prospect or a quick estimate. To work out a number for one of your clients, open the client and use the calculator in their Meal plan,
+              which opens with their own weight and phase.
+            </p>
+            <MacroCalculator />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-8 items-start">
+            <div className="border border-steel/20 divide-y divide-steel/15">
+              {athletes.length === 0 ? (
+                <p className="font-body text-sm text-steel p-3">No clients yet.</p>
+              ) : (
+                athletes.map((a) => (
+                  <Link
+                    key={a.profileId}
+                    href={`/groups/${params.groupId}/nutrition?athleteId=${a.profileId}`}
+                    className={`block p-3 font-body text-sm ${
+                      selected?.profileId === a.profileId ? "bg-rust/10 text-rust" : "text-chalk"
+                    }`}
+                  >
+                    {a.fullName}
+                  </Link>
+                ))
+              )}
+            </div>
+
+            <div>
+              {!selected ? (
+                <p className="font-body text-sm text-steel">Pick a client to see their nutrition.</p>
+              ) : selectedTier === "group" ? (
+                <p className="font-body text-sm text-steel">
+                  Macro/meal planning isn&apos;t enabled for group-tier clients.
+                </p>
+              ) : (
+                <ClientNutrition
+                  groupId={selected.groupId}
+                  athleteId={selected.profileId}
+                  coachId={user.id}
+                  clientName={selected.fullName}
+                  variant="hub"
+                />
+              )}
+            </div>
+          </div>
+        )}
       </CoachDesktopShell>
     );
   }
@@ -253,12 +285,23 @@ export default async function NutritionPage(
     fatG: r.fat_g,
   }));
   // A saved plan's meals are an OBJECT keyed by day type ({ daily | train | rest: [...] }), not a list; the checklist below wants a list, and handing it the
-  // object throws on the client's page the day a coach saves a plan. So the checklist only gets a real list, and the saved plan is shown by DayMealsView.
-  const todayMeals: GeneratedMeal[] = Array.isArray(todayMealPlan?.meals) ? (todayMealPlan?.meals as unknown as GeneratedMeal[]) : [];
+  // object throws on the client's page the day a coach saves a plan. So the checklist only gets a real list, and the saved plan is shown by TodaysMealCards (inside FoodLogSection).
+  const todayMealsRaw: GeneratedMeal[] = Array.isArray(todayMealPlan?.meals) ? (todayMealPlan?.meals as unknown as GeneratedMeal[]) : [];
   const savedPlanMeals =
     todayMealPlan?.meals && typeof todayMealPlan.meals === "object" && !Array.isArray(todayMealPlan.meals)
       ? (todayMealPlan.meals as unknown as Record<string, MealEntryPayload[]>)
       : null;
+
+  // The client's own food preferences, and the saved plan with anything that breaks them left out (a missing row, or a database without the table yet, is no rules).
+  // A client with NO row simply has no rules. A row that could not be READ is different: nothing can be checked, so no recipe is shown (the meals say the coach is updating them).
+  const { data: prefsRow, error: prefsError } = await supabase.from("client_nutrition_preferences").select("*").eq("athlete_id", athleteId).maybeSingle();
+  if (prefsError) console.error("[nutrition] could not read food rules:", prefsError.message);
+  const clientPrefs = rowToPreferences(prefsRow as Record<string, unknown> | null);
+  const clientRules = prefsError
+    ? ("unreadable" as const)
+    : { allergies: clientPrefs.allergies, intolerances: clientPrefs.intolerances, dislikes: clientPrefs.dislikes, dietType: clientPrefs.dietType };
+  const todayMeals = filterGeneratedMealsForClient(todayMealsRaw, clientRules);
+  const clientPlan = clientRules === "unreadable" ? hidePlanRecipes(savedPlanMeals) : filterPlanForClient(savedPlanMeals, clientRules);
 
   const recentFoodOptions = dedupeRecentFoodLogs(
     (recentFoodLogRows ?? []).map((r) => ({
@@ -287,7 +330,10 @@ export default async function NutritionPage(
     ? await computeTodaysMicronutrients(supabase, todayMeals)
     : { totals: {}, coveredIngredientCount: 0, totalIngredientCount: 0, hasAnyData: false };
 
-  const weightTrendPoints = (weightLogs ?? []).map((w) => ({ date: w.logged_date, value: w.weight }));
+  // The client's own unit: stored pounds are only converted for display.
+  const { data: unitRow } = await supabase.from("athlete_profile_details").select("weight_unit").eq("athlete_id", athleteId).maybeSingle();
+  const weightUnit = asWeightUnit(unitRow?.weight_unit);
+  const weightTrendPoints = (weightLogs ?? []).map((w) => ({ date: w.logged_date, value: displayWeightValue(w.weight, weightUnit) }));
   const calorieTrendPoints = (macroHistory ?? [])
     .filter((m: any) => m.calories != null)
     .map((m: any) => ({ date: m.log_date, value: m.calories }));
@@ -382,6 +428,8 @@ export default async function NutritionPage(
             )}
           </section>
 
+          <NutritionPreferencesCard athleteId={athleteId} initial={clientPrefs} />
+
           {micronutrients.hasAnyData && (
             <Key12NutrientGrid
               totals={micronutrients.totals}
@@ -394,12 +442,8 @@ export default async function NutritionPage(
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
               Today&apos;s meals
             </h2>
-            {savedPlanMeals && (
-              <div className="mb-3">
-                <DayMealsView meals={savedPlanMeals} />
-              </div>
-            )}
             <FoodLogSection
+              plan={savedPlanMeals ? { meals: clientPlan.meals, hiddenCount: clientPlan.hiddenCount, emptiedMeals: clientPlan.emptiedMeals } : null}
               athleteId={athleteId}
               groupId={params.groupId}
               logDate={todayKey}
@@ -442,7 +486,7 @@ export default async function NutritionPage(
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
               Body weight
             </h2>
-            <TrendChart points={weightTrendPoints} unit=" lbs" />
+            <TrendChart points={weightTrendPoints} unit={` ${weightUnit}`} />
           </section>
 
           <section>
@@ -456,338 +500,5 @@ export default async function NutritionPage(
 
       <BottomTabBar groupId={params.groupId} activeOverride="nutrition" />
     </main>
-  );
-}
-
-async function NutritionSection({ groupId, athleteId }: { groupId: string; athleteId: string }) {
-  const supabase = await createServerClient();
-  const standingHistoryForCheckin = await fetchStandingHistory(supabase, athleteId, groupId);
-  const standingTargetForCheckin = latestStanding(standingHistoryForCheckin);
-  const todayKey = new Date().toISOString().slice(0, 10);
-  const sevenDaysAgoKey = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-
-  const [
-    { data: weightLogs },
-    { data: existingPlan },
-    { data: recentMacroRow },
-    { data: wellnessRows },
-    { data: lastCheckinRow },
-    { data: pendingSuggestionRows },
-    { data: foodLogDateRows },
-    { data: injuryStatusRow },
-    { data: bmrProfileDetails },
-    { data: intakeDob },
-    { data: taggedPhaseRow },
-  ] = await Promise.all([
-    supabase
-      .from("body_weight_logs")
-      .select("id, logged_date, weight")
-      .eq("athlete_id", athleteId)
-      .eq("group_id", groupId)
-      .order("logged_date", { ascending: false })
-      .limit(20),
-    supabase
-      .from("meal_plans")
-      .select("archetype, meal_count, include_snack, carb_cycling, rationale, macros, meals")
-      .eq("athlete_id", athleteId)
-      .eq("log_date", todayKey)
-      .maybeSingle(),
-    supabase
-      .from("daily_macros")
-      .select("log_date, calories")
-      .eq("athlete_id", athleteId)
-      .order("log_date", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from("wellness_checkins")
-      .select("sleep_quality, soreness, energy")
-      .eq("athlete_id", athleteId)
-      .eq("group_id", groupId)
-      .gte("log_date", sevenDaysAgoKey),
-    supabase
-      .from("nutrition_checkins")
-      .select("phase, consecutive_surplus_spikes, dietary_restrictions, adjustment_pct, new_calories")
-      .eq("athlete_id", athleteId)
-      .eq("group_id", groupId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from("nutrition_checkin_suggestions")
-      .select(
-        "id, phase, prev_weight_lbs, curr_weight_lbs, current_calories, adherence_days, recovery_rating, consecutive_surplus_spikes, new_calories, rationale, protein_g, carbs_g, fat_g, adjustment_pct, generated_at"
-      )
-      .eq("athlete_id", athleteId)
-      .eq("group_id", groupId)
-      .eq("status", "pending")
-      .order("generated_at", { ascending: false }),
-    supabase
-      .from("food_log_entries")
-      .select("log_date, protein_g")
-      .eq("athlete_id", athleteId)
-      .neq("status", "skipped")
-      .gte("log_date", sevenDaysAgoKey),
-    // coach_em_up_finley_funston_transcript.md — real client-safety gap:
-    // the check-in engine needs to know if this client is currently
-    // injured, to floor their calorie target at maintenance regardless
-    // of phase.
-    supabase
-      .from("athlete_injury_status")
-      .select("is_injured, surplus_pct")
-      .eq("athlete_id", athleteId)
-      .maybeSingle(),
-    supabase
-      .from("athlete_profile_details")
-      .select("height_cm, biological_sex, body_fat_pct")
-      .eq("athlete_id", athleteId)
-      .maybeSingle(),
-    supabase.from("client_intake").select("date_of_birth").eq("athlete_id", athleteId).maybeSingle(),
-    // progression_systems_and_phase_vocab_deep_dive_sept30.md — the real
-    // client-profile phase tag, so the Macro Calculator/Meal Plan
-    // Generator open seeded from what's actually tagged instead of a
-    // hardcoded guess.
-    supabase
-      .from("nutrition_phases")
-      .select("phase")
-      .eq("athlete_id", athleteId)
-      .eq("group_id", groupId)
-      .maybeSingle(),
-  ]);
-
-  const weightTrend = computeWeeklyWeightTrend(
-    (weightLogs ?? []).map((w) => ({ loggedDate: w.logged_date, weight: w.weight })),
-    todayKey
-  );
-
-  // A default recovery rating from the week's actual wellness check-ins
-  // (same readiness math already used for the low-readiness roster
-  // flag) so the coach isn't guessing a number from memory — still
-  // fully editable before running the check-in.
-  let defaultRecoveryRating: number | null = null;
-  if (wellnessRows && wellnessRows.length > 0) {
-    const avgReadiness =
-      wellnessRows.reduce(
-        (sum, w) =>
-          sum +
-          computeReadinessAverage({
-            sleepQuality: w.sleep_quality,
-            soreness: w.soreness,
-            energy: w.energy,
-          }),
-        0
-      ) / wellnessRows.length;
-    defaultRecoveryRating = Math.min(5, Math.max(1, Math.round(avgReadiness)));
-  }
-
-  // Real adherence, derived from actual food_log_entries instead of the
-  // old plain manual 1-7 entry — same "compute a real default, stay
-  // fully editable" pattern as defaultRecoveryRating above.
-  const defaultAdherenceDays = computeAdherenceDays(
-    (foodLogDateRows ?? []).map((r) => r.log_date),
-    todayKey
-  );
-
-  // Same real computeBmr/computeTdee estimate used elsewhere in this app
-  // (daily-macros-form.tsx) — never a guessed number. Only computed when
-  // every real input actually exists.
-  let maintenanceCalories: number | null = null;
-  const latestWeightLbsForBmr = weightLogs?.[0]?.weight ?? null;
-  if (
-    latestWeightLbsForBmr != null &&
-    bmrProfileDetails?.height_cm != null &&
-    bmrProfileDetails?.biological_sex &&
-    intakeDob?.date_of_birth
-  ) {
-    const ageYears = Math.floor(
-      (Date.now() - new Date(intakeDob.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000)
-    );
-    const bmr = computeBmr({
-      weightKg: latestWeightLbsForBmr * 0.453592,
-      heightCm: bmrProfileDetails.height_cm,
-      age: ageYears,
-      sex: bmrProfileDetails.biological_sex as "male" | "female",
-      bodyFatPct: bmrProfileDetails.body_fat_pct ?? null,
-    });
-    maintenanceCalories = computeTdee(bmr, "moderate");
-  }
-  const isInjured = injuryStatusRow?.is_injured ?? false;
-  const injurySurplusPct = injuryStatusRow?.surplus_pct ?? 0;
-
-  const lastCheckin = lastCheckinRow
-    ? {
-        phase: lastCheckinRow.phase as NutritionPhase,
-        consecutiveSurplusSpikes: lastCheckinRow.consecutive_surplus_spikes,
-        dietaryRestrictions: lastCheckinRow.dietary_restrictions ?? "",
-        adjustmentPct: lastCheckinRow.adjustment_pct,
-      }
-    : null;
-
-  // nutrition_spotter_scoping_sept15.md — real, currently-invisible gap:
-  // nothing compares an already-saved plan's own calories against the
-  // most recent CONFIRMED check-in's real target. Only checkable when
-  // both a plan and a check-in exist; a plan with no check-in yet, or a
-  // check-in with no saved plan yet, has nothing to flag as "mismatched."
-  const staleMealPlan =
-    existingPlan && lastCheckinRow
-      ? detectStaleMealPlan(existingPlan.macros as any, lastCheckinRow.new_calories)
-      : null;
-
-  // nutrition_spotter_scoping_sept15.md's three remaining checks — same
-  // deterministic, no-LLM approach as the stale-plan check above.
-  const nutritionSpotterFindings: NutritionSpotterFinding[] = [];
-
-  if (staleMealPlan?.isStale && staleMealPlan.planCalories !== null) {
-    const direction = staleMealPlan.targetCalories > staleMealPlan.planCalories ? "higher" : "lower";
-    nutritionSpotterFindings.push({
-      id: "stale-plan",
-      message: `Today's saved meal plan targets ${staleMealPlan.planCalories} kcal, but the most recent check-in set ${staleMealPlan.targetCalories} kcal — ${staleMealPlan.diffKcal} kcal ${direction} than the plan. Worth regenerating the plan to match, or confirming this gap is intentional.`,
-    });
-  }
-
-  interface PlanMealEntry {
-    mealId: string;
-    title: string;
-    proteinTarget: number;
-    carbsTarget: number;
-    fatTarget: number;
-    recipes?: { recipeName: string | null; ingredients: string[] }[];
-  }
-  const planMacros = existingPlan?.macros as
-    | {
-        daily?: { protein: number; carbs: number; fats: number };
-        train?: { protein: number; carbs: number; fats: number };
-        rest?: { protein: number; carbs: number; fats: number };
-      }
-    | undefined;
-  const planMeals = existingPlan?.meals as
-    | { daily?: PlanMealEntry[]; train?: PlanMealEntry[]; rest?: PlanMealEntry[] }
-    | undefined;
-
-  if (planMacros && planMeals) {
-    const buckets: { key: "daily" | "train" | "rest"; label: string }[] = planMacros.daily
-      ? [{ key: "daily", label: "day" }]
-      : [
-          { key: "train", label: "training day" },
-          { key: "rest", label: "rest day" },
-        ];
-    for (const b of buckets) {
-      const bucketMacros = (planMacros as any)[b.key];
-      const bucketMeals = (planMeals as any)[b.key];
-      if (!bucketMacros || !Array.isArray(bucketMeals) || bucketMeals.length === 0) continue;
-      const result = detectMacroSumMismatch(bucketMeals, bucketMacros);
-      if (result.isMismatched) {
-        nutritionSpotterFindings.push({
-          id: `macro-sum-${b.key}`,
-          message: `Today's ${b.label} meals sum to ${result.summedProtein}g protein / ${result.summedCarbs}g carbs / ${result.summedFat}g fat, but the plan's own target is ${result.targetProtein}g / ${result.targetCarbs}g / ${result.targetFat}g — worth checking what changed.`,
-        });
-      }
-    }
-
-    if (lastCheckinRow?.dietary_restrictions) {
-      const allMealEntries = [
-        ...((planMeals as any).daily ?? []),
-        ...((planMeals as any).train ?? []),
-        ...((planMeals as any).rest ?? []),
-      ];
-      const slips = detectRestrictedIngredientSlips(allMealEntries, lastCheckinRow.dietary_restrictions);
-      for (const slip of slips) {
-        nutritionSpotterFindings.push({
-          id: `restricted-${slip.mealId}-${slip.matchedRestriction}`,
-          message: `${slip.recipeName ?? slip.mealTitle} may contain "${slip.matchedRestriction}" — flagged as a dietary restriction for this client.`,
-        });
-      }
-    }
-  }
-
-  const proteinByDay = new Map<string, number>();
-  for (const row of foodLogDateRows ?? []) {
-    proteinByDay.set(row.log_date, (proteinByDay.get(row.log_date) ?? 0) + ((row as any).protein_g ?? 0));
-  }
-  const targetProtein = weightLogs?.[0]?.weight ? estimateProteinFromBodyWeight(weightLogs[0].weight) : 0;
-  const proteinTooLow = detectProteinTooLow([...proteinByDay.values()], targetProtein);
-  if (proteinTooLow.isLow) {
-    nutritionSpotterFindings.push({
-      id: "protein-too-low",
-      message: `Logged protein has averaged ${proteinTooLow.avgLoggedProtein}g/day over the last ${proteinTooLow.daysWithData} logged days — meaningfully under the ~${proteinTooLow.targetProtein}g/day baseline for their current body weight (${proteinTooLow.daysBelowTarget} of ${proteinTooLow.daysWithData} days under).`,
-    });
-  }
-
-  const injuredActiveDeficit = detectInjuredActiveDeficit(isInjured, lastCheckinRow?.phase ?? null);
-  if (injuredActiveDeficit.isFlagged) {
-    nutritionSpotterFindings.push({
-      id: "injured-active-deficit",
-      message: `Marked as currently injured, but their most recent check-in still has them in a fat-loss phase. Run a new check-in to apply the maintenance floor, or confirm this is intentional.`,
-    });
-  }
-
-  const pendingSuggestions = (pendingSuggestionRows ?? []).map((s) => ({
-    id: s.id,
-    phase: s.phase,
-    prevWeightLbs: s.prev_weight_lbs,
-    currWeightLbs: s.curr_weight_lbs,
-    currentCalories: s.current_calories,
-    adherenceDays: s.adherence_days,
-    recoveryRating: s.recovery_rating,
-    consecutiveSurplusSpikes: s.consecutive_surplus_spikes,
-    newCalories: s.new_calories,
-    rationale: s.rationale,
-    proteinG: s.protein_g,
-    carbsG: s.carbs_g,
-    fatG: s.fat_g,
-    adjustmentPct: s.adjustment_pct,
-    generatedAt: s.generated_at,
-  }));
-
-  return (
-    <div className="space-y-8">
-      <NutritionSpotterPanel findings={nutritionSpotterFindings} />
-      <NutritionCheckinSuggestionsList
-        athleteId={athleteId}
-        groupId={groupId}
-        initialSuggestions={pendingSuggestions}
-      />
-      <WeeklyCheckinPanel
-        athleteId={athleteId}
-        groupId={groupId}
-        weekAvgWeight={weightTrend.currentAvg}
-        lastWeekAvgWeight={weightTrend.previousAvg}
-        // The most recently set number: the standing target if it was saved after the
-        // last per-day row, otherwise that row.
-        defaultCurrentCalories={
-          standingTargetForCheckin?.calories != null &&
-          (!recentMacroRow ||
-            standingTargetForCheckin.effective_from > ((recentMacroRow.log_date as string) ?? ""))
-            ? standingTargetForCheckin.calories
-            : recentMacroRow?.calories ?? standingTargetForCheckin?.calories ?? null
-        }
-        hasStandingTarget={standingTargetForCheckin != null}
-        defaultRecoveryRating={defaultRecoveryRating}
-        defaultAdherenceDays={defaultAdherenceDays}
-        lastCheckin={lastCheckin}
-        isInjured={isInjured}
-        maintenanceCalories={maintenanceCalories}
-        injurySurplusPct={injurySurplusPct}
-        defaultPhase={milestoneTagToNutritionPhase(taggedPhaseRow?.phase as MilestonePhaseTag | undefined)}
-      />
-      <div className="pt-6 border-t border-steel/20">
-        <NutritionTools
-          athleteId={athleteId}
-          groupId={groupId}
-          date={todayKey}
-          latestBodyWeight={weightLogs?.[0]?.weight ?? null}
-          weightTrend={weightTrend}
-          existingPlan={existingPlan ?? null}
-          defaultAdherenceDays={defaultAdherenceDays}
-          defaultRecoveryRating={defaultRecoveryRating}
-          defaultDietaryRestrictions={lastCheckin?.dietaryRestrictions ?? null}
-          isInjured={isInjured}
-          maintenanceCalories={maintenanceCalories}
-          injurySurplusPct={injurySurplusPct}
-          initialConsecutiveSurplusSpikes={lastCheckin?.consecutiveSurplusSpikes ?? 0}
-          defaultPhase={milestoneTagToNutritionPhase(taggedPhaseRow?.phase as MilestonePhaseTag | undefined)}
-        />
-      </div>
-    </div>
   );
 }

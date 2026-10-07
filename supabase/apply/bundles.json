@@ -26,5 +26,29 @@
    "38"
   ],
   "file": "apply-release-h-all.sql"
+ },
+ {
+  "id": "release-i",
+  "name": "Release I (food preferences)",
+  "steps": [
+   "39"
+  ],
+  "file": "apply-release-i-all.sql"
+ },
+ {
+  "id": "release-j",
+  "name": "Release J (about you, baseline, phase of record)",
+  "steps": [
+   "40"
+  ],
+  "file": "apply-release-j-all.sql"
+ },
+ {
+  "id": "release-k",
+  "name": "Release K (recipe library)",
+  "steps": [
+   "41"
+  ],
+  "file": "apply-release-k-all.sql"
  }
 ]

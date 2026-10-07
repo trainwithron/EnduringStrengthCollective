@@ -14,6 +14,9 @@ import { WellnessCheckinPopup } from "@/components/athlete/wellness-checkin-popu
 import { shouldShowLifeImpactPrompt, pickLifeImpactPrompt } from "@/lib/life-impact-prompt";
 import type { WellnessCheckinValues } from "@/components/athlete/wellness-checkin-widget";
 import { DayCard } from "@/components/athlete/day-card";
+import { AboutYouCard } from "@/components/athlete/about-you-card";
+import { aboutYouComplete, rowToBodyProfile } from "@/lib/client-body-profile";
+import type { WeightUnit } from "@/lib/units";
 import { HomeWeekView, type HomeDaySummary } from "@/components/athlete/home-week-view";
 import { HomeMonthView } from "@/components/athlete/home-month-view";
 import {
@@ -277,6 +280,9 @@ export default async function GroupHubPage(
   let dayMacros: TodayMacros | null = null;
   let dayHabits: TodayHabit[] = [];
   let weightLogs: WeightLogEntry[] = [];
+  // How this client likes to see weight, and whether they still owe the calculator's inputs (a one-time card).
+  let weightUnit: WeightUnit = "lb";
+  let aboutYouNeeded = false;
   let wellnessCheckin: WellnessCheckinValues | null = null;
   let lifeImpactPrompt: string | null = null;
   let canBook = false;
@@ -469,7 +475,7 @@ export default async function GroupHubPage(
       }));
 
       if (isToday) {
-        const [{ data: weightRows }, { data: wellnessRow }, { data: lastLifeImpactRow }] = await Promise.all([
+        const [{ data: weightRows }, { data: wellnessRow }, { data: lastLifeImpactRow }, { data: detailsRow }, { data: intakeRow }] = await Promise.all([
           supabase
             .from("body_weight_logs")
             .select("id, logged_date, weight")
@@ -496,7 +502,12 @@ export default async function GroupHubPage(
             .order("log_date", { ascending: false })
             .limit(1)
             .maybeSingle(),
+          supabase.from("athlete_profile_details").select("*").eq("athlete_id", athleteId).maybeSingle(),
+          supabase.from("client_intake").select("date_of_birth").eq("athlete_id", athleteId).maybeSingle(),
         ]);
+        const bodyProfile = rowToBodyProfile(detailsRow as Record<string, unknown> | null, intakeRow as Record<string, unknown> | null);
+        weightUnit = bodyProfile.weightUnit;
+        aboutYouNeeded = !aboutYouComplete(bodyProfile, weightRows?.[0]?.weight != null ? Number(weightRows[0].weight) : null);
         weightLogs = (weightRows ?? []).map((w) => ({ id: w.id, loggedDate: w.logged_date, weight: w.weight }));
         wellnessCheckin = wellnessRow
           ? { sleepQuality: wellnessRow.sleep_quality, soreness: wellnessRow.soreness, energy: wellnessRow.energy }
@@ -719,6 +730,7 @@ export default async function GroupHubPage(
           {view === "day" && (
             <div className="space-y-4">
               {isToday && <HomeThread lines={homeThreadLines} />}
+              {isToday && aboutYouNeeded && !isCoach && !isActingAsOther && <AboutYouCard groupId={params.groupId} athleteId={athleteId} />}
               {reupState && <ReupCard state={reupState} />}
               {isToday && !isCoach && !isActingAsOther && (
                 // The one place a client reaches their coach: it was three taps deep (Settings, More, Messages).
@@ -756,6 +768,7 @@ export default async function GroupHubPage(
                 macros={dayMacros}
                 habits={dayHabits}
                 weightLogs={weightLogs}
+                weightUnit={weightUnit}
                 canBook={canBook}
                 wellnessCheckin={wellnessCheckin}
                 mealLine={mealLine}

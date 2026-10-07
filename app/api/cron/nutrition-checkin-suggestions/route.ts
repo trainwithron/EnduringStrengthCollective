@@ -4,8 +4,18 @@ import { runCheckInEngine, DEFAULT_ADJUSTMENT_PCT, type NutritionPhase } from "@
 import { computeWeeklyWeightTrend } from "@/lib/weight-trend";
 import { computeReadinessAverage } from "@/lib/wellness";
 import { computeArchetypeMacros, detectDietArchetype } from "@/lib/macros";
-import { computeBmr, computeTdee } from "@/lib/bmr-tdee";
+import { estimateMaintenance } from "@/lib/nutrition-profile";
 import { withCronRun } from "@/lib/cron-monitor";
+import { pageAll } from "@/lib/page-all";
+import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
+import { addDaysToKey } from "@/lib/date-key";
+import { summarizeAdherence } from "@/lib/food-log-adherence";
+import { readDateOfBirth, rowToBodyProfile } from "@/lib/client-body-profile";
+import { rowToPhasePlan } from "@/lib/phase-plan";
+import { chooseBaselinePhase, computeBaseline } from "@/lib/nutrition-baseline";
+import { rowToPreferences } from "@/lib/nutrition-preferences";
+import { ageOnDate } from "@/lib/nutrition-profile";
+import { holdDeficitForMinor, AGE_UNKNOWN_NOTE } from "@/lib/minor-safety";
 
 // Weekly Check-In engine, made proactive (nutrition_checkin_engine_scoping
 // memory) — a coach shouldn't have to remember to open the panel and
@@ -16,13 +26,13 @@ import { withCronRun } from "@/lib/cron-monitor";
 // pending row a coach reviews and applies, never writing daily_macros
 // directly. Nothing here is a new business rule.
 //
-// "Adherence" stays the one deliberately-manual input in the manual
-// panel, but there's no coach present in a headless cron to ask — so
-// this defaults to full compliance (7/7) rather than guessing at a
-// missing signal. The coach still sees the full inputs (including
-// weight trend) before applying, and can always run a fresh manual
-// check-in with a real adherence number instead of applying this one.
-const AUTOMATED_ADHERENCE_DAYS = 7;
+// ADHERENCE is the number of the last 7 days (the client's own calendar days, as date keys in the group's coach time zone) on which the client logged at least
+// one non-skipped meal. Under 5 of 7 the engine holds calories steady, which writes no suggestion (the coach screen shows "logged 2 of 7, held" from the logs).
+//
+// The PHASE a suggestion carries is the client's phase of record (client_phase_plans), else the latest check-in's phase. A review date never changes it: this job
+// never proposes a phase change.
+//
+// A client with no check-in AND no standing target (the job used to skip them) gets a STARTING target suggestion once their About-you numbers are complete.
 
 async function handler(request: Request) {
   if (!process.env.CRON_SECRET) {
@@ -40,12 +50,18 @@ async function handler(request: Request) {
   // of phase/continuation state (consecutive_surplus_spikes) is
   // persisted per athlete today. Take each athlete's single most recent
   // row as the continuation baseline.
-  const { data: recentCheckins } = await supabase
-    .from("nutrition_checkins")
-    .select(
-      "athlete_id, group_id, phase, new_calories, consecutive_surplus_spikes, dietary_restrictions, adjustment_pct, created_at"
-    )
-    .order("created_at", { ascending: false });
+  // The database returns at most 1,000 rows a call, so every list below is read a page at a time. A check-in list that could not be read in full would silently
+  // drop clients from the weekly run, so a failed read stops the run with an error rather than carrying on with part of the list.
+  const checkinPage = await pageAll((from, to) =>
+    supabase
+      .from("nutrition_checkins")
+      .select("athlete_id, group_id, phase, new_calories, consecutive_surplus_spikes, dietary_restrictions, adjustment_pct, created_at")
+      .order("created_at", { ascending: false })
+      .order("id")
+      .range(from, to)
+  );
+  if (checkinPage.failed) return NextResponse.json({ error: "Could not read the check-ins, so nothing was suggested." }, { status: 502 });
+  const recentCheckins = checkinPage.rows;
 
   interface RecentCheckinRow {
     athlete_id: string;
@@ -63,16 +79,41 @@ async function handler(request: Request) {
     if (!latestByAthlete.has(row.athlete_id)) latestByAthlete.set(row.athlete_id, row);
   }
 
-  const todayKey = new Date().toISOString().slice(0, 10);
-  const results: { athleteId: string; suggested: boolean }[] = [];
+  // Each group's own calendar day (the coach's zone), worked out once per group.
+  const todayKeyByGroup = new Map<string, string>();
+  const todayKeyFor = async (groupId: string): Promise<string> => {
+    const cached = todayKeyByGroup.get(groupId);
+    if (cached) return cached;
+    const key = dateKeyInZone(await getGroupCoachTimezone(supabase, groupId));
+    todayKeyByGroup.set(groupId, key);
+    return key;
+  };
+
+  const planPage = await pageAll((from, to) =>
+    supabase
+      .from("client_phase_plans")
+      .select("athlete_id, group_id, phase, started_on, review_on, planned_next_phase, last_reviewed_at")
+      .order("athlete_id")
+      .order("group_id")
+      .range(from, to)
+  );
+  if (planPage.failed) return NextResponse.json({ error: "Could not read the phase plans, so nothing was suggested." }, { status: 502 });
+  const planByKey = new Map<string, ReturnType<typeof rowToPhasePlan>>();
+  for (const p of planPage.rows) planByKey.set(`${p.athlete_id}|${p.group_id}`, rowToPhasePlan(p as Record<string, unknown>));
+
+  // heldForAge: the engine wanted to lower a minor's calories and the cut was held (it writes no suggestion; the coach screen explains why on read).
+  const results: { athleteId: string; suggested: boolean; loggedDays?: number; held?: boolean; heldForAge?: boolean }[] = [];
 
   for (const [athleteId, last] of latestByAthlete) {
+    const todayKey = await todayKeyFor(last.group_id);
     const [
       { data: weightLogs },
       { data: wellnessRows },
       { data: injuryStatusRow },
       { data: profileDetails },
       { data: intake },
+      { data: prefsRow },
+      { data: foodRows },
     ] = await Promise.all([
       supabase
         .from("body_weight_logs")
@@ -86,7 +127,7 @@ async function handler(request: Request) {
         .select("sleep_quality, soreness, energy")
         .eq("athlete_id", athleteId)
         .eq("group_id", last.group_id)
-        .gte("log_date", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)),
+        .gte("log_date", addDaysToKey(todayKey, -7)),
       // coach_em_up_finley_funston_transcript.md — same real
       // client-safety gap as the two other runCheckInEngine call sites
       // (WeeklyCheckinPanel, MealPlanGenerator): the automated digest was
@@ -97,12 +138,17 @@ async function handler(request: Request) {
         .select("is_injured, surplus_pct")
         .eq("athlete_id", athleteId)
         .maybeSingle(),
-      supabase
-        .from("athlete_profile_details")
-        .select("height_cm, biological_sex, body_fat_pct")
-        .eq("athlete_id", athleteId)
-        .maybeSingle(),
+      supabase.from("athlete_profile_details").select("*").eq("athlete_id", athleteId).maybeSingle(),
       supabase.from("client_intake").select("date_of_birth").eq("athlete_id", athleteId).maybeSingle(),
+      // The client's own protein target (a missing row, or a database without the table yet, just means the platform default).
+      supabase.from("client_nutrition_preferences").select("protein_g_per_lb").eq("athlete_id", athleteId).maybeSingle(),
+      // The meals they logged in the last 7 days: the real adherence.
+      supabase
+        .from("food_log_entries")
+        .select("log_date, status")
+        .eq("athlete_id", athleteId)
+        .gte("log_date", addDaysToKey(todayKey, -6))
+        .lte("log_date", todayKey),
     ]);
 
     const trend = computeWeeklyWeightTrend(
@@ -125,35 +171,29 @@ async function handler(request: Request) {
       recoveryRating = Math.min(5, Math.max(1, Math.round(avg)));
     }
 
-    // Same computeBmr/computeTdee estimate used at every other
-    // runCheckInEngine call site — only computed when every real input
-    // actually exists, never a guessed number backing a safety floor.
-    let maintenanceCalories: number | null = null;
-    if (
-      trend.currentAvg != null &&
-      profileDetails?.height_cm != null &&
-      profileDetails?.biological_sex &&
-      intake?.date_of_birth
-    ) {
-      const ageYears = Math.floor(
-        (Date.now() - new Date(intake.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000)
-      );
-      const bmr = computeBmr({
-        weightKg: trend.currentAvg * 0.453592,
-        heightCm: profileDetails.height_cm,
-        age: ageYears,
-        sex: profileDetails.biological_sex as "male" | "female",
-        bodyFatPct: profileDetails.body_fat_pct ?? null,
-      });
-      maintenanceCalories = computeTdee(bmr, "moderate");
-    }
+    // Same BMR/maintenance estimate used at every other runCheckInEngine call site — only computed when every real input actually exists, never a guessed number
+    // backing a safety floor. The date of birth comes from the one reader (the intake's, else the profile's), and activity is the client's own when given.
+    const body = rowToBodyProfile(profileDetails as Record<string, unknown> | null, intake as Record<string, unknown> | null);
+    const maintenanceCalories = estimateMaintenance({
+      weightLbs: trend.currentAvg,
+      heightCm: body.heightCm,
+      sex: body.sex,
+      dateOfBirth: readDateOfBirth(body),
+      bodyFatPct: body.bodyFatPct,
+      todayKey,
+      activity: body.activity,
+    });
 
-    const engineResult = runCheckInEngine({
-      phase: last.phase as NutritionPhase,
+    const adherence = summarizeAdherence((foodRows ?? []) as { log_date: string; status: string | null }[], todayKey);
+    // The phase of record, else the latest check-in's: a review date never changes it.
+    const phase = (planByKey.get(`${athleteId}|${last.group_id}`)?.phase ?? last.phase) as NutritionPhase;
+
+    const rawResult = runCheckInEngine({
+      phase,
       prevWeightLbs: trend.previousAvg,
       currWeightLbs: trend.currentAvg,
       currentCalories: last.new_calories,
-      adherenceDays: AUTOMATED_ADHERENCE_DAYS,
+      adherenceDays: adherence.daysLogged,
       recoveryRating,
       consecutiveSurplusSpikes: last.consecutive_surplus_spikes,
       adjustmentPct: last.adjustment_pct ?? DEFAULT_ADJUSTMENT_PCT,
@@ -161,30 +201,35 @@ async function handler(request: Request) {
       maintenanceCalories,
       injurySurplusPct: injuryStatusRow?.surplus_pct ?? 0,
     });
+    // No calorie deficit is suggested for anyone under 18: a cut is held at their current calories, which writes no suggestion.
+    const dob = readDateOfBirth(body);
+    const { result: engineResult, held: heldForAge } = holdDeficitForMinor({ ageYears: dob ? ageOnDate(dob, todayKey) : null, currentCalories: last.new_calories, result: rawResult });
 
     // Only a real, actionable recommendation is worth a coach's
-    // attention — an "on track, hold steady" week would just be
+    // attention — an "on track, hold steady" week (or a week held for low logging) would just be
     // per-athlete-per-week noise in a review inbox otherwise.
     if (engineResult.newCalories === last.new_calories) {
-      results.push({ athleteId, suggested: false });
+      results.push({ athleteId, suggested: false, loggedDays: adherence.daysLogged, held: adherence.heldForLowLogging, heldForAge });
       continue;
     }
 
     const archetype = detectDietArchetype(last.dietary_restrictions);
-    const macros = computeArchetypeMacros(engineResult.newCalories, trend.currentAvg, archetype);
+    const clientProteinGPerLb = prefsRow?.protein_g_per_lb != null ? Number(prefsRow.protein_g_per_lb) : undefined;
+    const macros = computeArchetypeMacros(engineResult.newCalories, trend.currentAvg, archetype, clientProteinGPerLb);
 
     await supabase.from("nutrition_checkin_suggestions").insert({
       athlete_id: athleteId,
       group_id: last.group_id,
-      phase: last.phase,
+      phase,
       prev_weight_lbs: trend.previousAvg,
       curr_weight_lbs: trend.currentAvg,
       current_calories: last.new_calories,
-      adherence_days: AUTOMATED_ADHERENCE_DAYS,
+      adherence_days: adherence.daysLogged,
       recovery_rating: recoveryRating,
       consecutive_surplus_spikes: engineResult.consecutiveSurplusSpikes,
       new_calories: engineResult.newCalories,
-      rationale: engineResult.rationale,
+      // With no date of birth on file nothing can protect a minor, and the suggestion says so rather than staying silent.
+      rationale: dob ? engineResult.rationale : `${engineResult.rationale} ${AGE_UNKNOWN_NOTE}`,
       protein_g: macros.proteinG,
       carbs_g: macros.carbsG,
       fat_g: macros.fatG,
@@ -192,10 +237,95 @@ async function handler(request: Request) {
       diet_archetype: archetype,
       dietary_restrictions: last.dietary_restrictions ?? "",
     });
-    results.push({ athleteId, suggested: true });
+    results.push({ athleteId, suggested: true, loggedDays: adherence.daysLogged, held: adherence.heldForLowLogging, heldForAge });
   }
 
-  return NextResponse.json({ athletes: results.length, results });
+  const baselines = await seedBaselines(supabase, latestByAthlete, planByKey, todayKeyFor);
+  return NextResponse.json({ athletes: results.length, results, baselinesSuggested: baselines.made, baselinesSkipped: baselines.skipped });
+}
+
+// A starting target for clients who have no check-in and no standing target yet, once their numbers are complete. At most one per client and group, ever: a
+// baseline the coach dismissed is not made again. Groups where the client is group-tier (no macros) are skipped. A cap keeps one run bounded.
+//
+// The lists that decide who already has a target are read in FULL (a page at a time). If any of them could not be read completely, NOTHING is seeded this run: a
+// partial list would hand a starting target to a client who already has one.
+const MAX_BASELINES_PER_RUN = 200;
+const BATCH = 10;
+
+async function seedBaselines(
+  supabase: ReturnType<typeof createServiceRoleClient>,
+  checkedAthletes: Map<string, unknown>,
+  planByKey: Map<string, ReturnType<typeof rowToPhasePlan>>,
+  todayKeyFor: (groupId: string) => Promise<string>
+): Promise<{ made: number; skipped: string | null }> {
+  const [members, standing, baselines] = await Promise.all([
+    pageAll((from, to) => supabase.from("group_memberships").select("profile_id, group_id, client_tier").eq("role", "athlete").order("profile_id").order("group_id").range(from, to)),
+    pageAll((from, to) => supabase.from("client_macro_target_history").select("athlete_id, group_id").order("athlete_id").order("group_id").order("effective_from").range(from, to)),
+    pageAll((from, to) => supabase.from("nutrition_checkin_suggestions").select("athlete_id, group_id").eq("kind", "baseline").order("athlete_id").order("group_id").order("generated_at").range(from, to)),
+  ]);
+  if (members.failed || standing.failed || baselines.failed || members.truncated || standing.truncated || baselines.truncated) {
+    return { made: 0, skipped: "a list could not be read in full" };
+  }
+  const hasStanding = new Set(standing.rows.map((r) => `${r.athlete_id}|${r.group_id}`));
+  const hadBaseline = new Set(baselines.rows.map((r) => `${r.athlete_id}|${r.group_id}`));
+  const candidates = members.rows.filter((m) => {
+    const key = `${m.profile_id}|${m.group_id}`;
+    return m.client_tier !== "group" && !checkedAthletes.has(m.profile_id) && !hasStanding.has(key) && !hadBaseline.has(key);
+  });
+
+  const seedOne = async (m: { profile_id: string; group_id: string }): Promise<boolean> => {
+    const key = `${m.profile_id}|${m.group_id}`;
+    const todayKey = await todayKeyFor(m.group_id);
+    const [{ data: details }, { data: intake }, { data: weightRow }, { data: prefsRow }, { data: goalRows }] = await Promise.all([
+      supabase.from("athlete_profile_details").select("*").eq("athlete_id", m.profile_id).maybeSingle(),
+      supabase.from("client_intake").select("date_of_birth").eq("athlete_id", m.profile_id).maybeSingle(),
+      supabase.from("body_weight_logs").select("weight").eq("athlete_id", m.profile_id).order("logged_date", { ascending: false }).limit(1).maybeSingle(),
+      supabase.from("client_nutrition_preferences").select("*").eq("athlete_id", m.profile_id).maybeSingle(),
+      supabase.from("client_goals").select("goal_type, status, nutrition_phase, created_at").eq("athlete_id", m.profile_id).eq("group_id", m.group_id),
+    ]);
+    const body = rowToBodyProfile(details as Record<string, unknown> | null, intake as Record<string, unknown> | null);
+    const prefs = rowToPreferences(prefsRow as Record<string, unknown> | null);
+    const chosen = chooseBaselinePhase(planByKey.get(key) ?? null, (goalRows ?? []) as { goal_type: string; status: string; nutrition_phase?: string | null; created_at?: string | null }[]);
+    const outcome = computeBaseline({
+      weightLbs: weightRow?.weight != null ? Number(weightRow.weight) : null,
+      heightCm: body.heightCm,
+      sex: body.sex,
+      dateOfBirth: readDateOfBirth(body),
+      bodyFatPct: body.bodyFatPct,
+      activity: body.activity,
+      phase: chosen.phase,
+      todayKey,
+      proteinGPerLb: prefs.proteinGPerLb,
+      carbSplit: prefs.carbSplit,
+      dietType: prefs.dietType,
+    });
+    // Incomplete numbers: nothing is made (and nothing is guessed); the coach screen says what is missing.
+    if (!outcome.ok) return false;
+    const { error } = await supabase.from("nutrition_checkin_suggestions").insert({
+      athlete_id: m.profile_id,
+      group_id: m.group_id,
+      phase: outcome.phase,
+      new_calories: outcome.calories,
+      rationale: outcome.rationale,
+      protein_g: outcome.proteinG,
+      carbs_g: outcome.carbsG,
+      fat_g: outcome.fatG,
+      diet_archetype: prefs.dietType === "keto" ? "keto" : prefs.dietType === "carnivore" ? "carnivore" : "standard",
+      dietary_restrictions: "",
+      status: "pending",
+      kind: "baseline",
+      below_floor: outcome.belowFloor,
+      consecutive_surplus_spikes: 0,
+    });
+    return !error;
+  };
+
+  let made = 0;
+  for (let i = 0; i < candidates.length && made < MAX_BASELINES_PER_RUN; i += BATCH) {
+    const done = await Promise.all(candidates.slice(i, i + BATCH).map(seedOne));
+    made += done.filter(Boolean).length;
+  }
+  return { made, skipped: null };
 }
 
 export const GET = withCronRun("nutrition-checkin-suggestions", handler);

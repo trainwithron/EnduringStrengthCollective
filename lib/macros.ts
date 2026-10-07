@@ -10,8 +10,9 @@ const CARB_SPLIT = {
   low: { carb: 0.3, fat: 0.7 },
 } as const;
 
-export function estimateProteinFromBodyWeight(bodyWeightLbs: number): number {
-  return Math.round(bodyWeightLbs * PROTEIN_G_PER_LB);
+// `gPerLb` is the client's own protein TARGET when they have one (client_nutrition_preferences); without it the platform's 1 g per pound.
+export function estimateProteinFromBodyWeight(bodyWeightLbs: number, gPerLb: number = PROTEIN_G_PER_LB): number {
+  return Math.round(bodyWeightLbs * gPerLb);
 }
 
 // Splits whatever calories remain after protein into carbs/fat at a
@@ -111,9 +112,10 @@ export interface ArchetypeMacroSplit {
 export function computeArchetypeMacros(
   calories: number,
   bodyWeightLbs: number,
-  archetype: DietArchetype
+  archetype: DietArchetype,
+  proteinGPerLb: number = PROTEIN_G_PER_LB
 ): ArchetypeMacroSplit {
-  const proteinG = estimateProteinFromBodyWeight(bodyWeightLbs);
+  const proteinG = estimateProteinFromBodyWeight(bodyWeightLbs, proteinGPerLb);
   let carbsG: number;
   let fatG: number;
 

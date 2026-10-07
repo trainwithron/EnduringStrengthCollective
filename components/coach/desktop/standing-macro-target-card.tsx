@@ -5,7 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { saveStandingTarget } from "@/lib/standing-macros";
-import { localDateKey } from "@/lib/timezone";
+import { applyStandingTarget, scheduledConfirmMessage, type ApplyPlan } from "@/lib/apply-standing";
+import { shortDateLabel } from "@/lib/apply-from";
+import { CalorieFloorWarning } from "@/components/coach/nutrition/calorie-floor-warning";
+import { ApplyOutcomeNotice } from "@/components/coach/nutrition/apply-outcome-notice";
 
 interface Target {
   calories: number | null;
@@ -44,6 +47,11 @@ export function StandingMacroTargetCard({
   latestExplicit,
   upcomingOverrides,
   calendarHref,
+  floorCalories = null,
+  floorNote = null,
+  clientName = "this client",
+  todayKey,
+  scheduled = [],
 }: {
   athleteId: string;
   groupId: string;
@@ -53,6 +61,14 @@ export function StandingMacroTargetCard({
   latestExplicit: { date: string; calories: number } | null;
   upcomingOverrides: { date: string; calories: number }[];
   calendarHref: string;
+  // The soft calorie floor for this client, when it can be worked out: only ever a warning under the number, never a block.
+  floorCalories?: number | null;
+  floorNote?: string | null;
+  clientName?: string;
+  // The coach's calendar day, worked out on the server in the coach's own time zone.
+  todayKey: string;
+  // Targets scheduled for a LATER date (from an Apply with a later start). Saving here from today removes them, so they are listed and a save asks first.
+  scheduled?: { date: string; calories: number | null }[];
 }) {
   const router = useRouter();
   const [saved, setSaved] = useState<Target | null>(initial);
@@ -60,6 +76,8 @@ export function StandingMacroTargetCard({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // What the last save really did (days that still use their own target or a meal plan, and whether today changed).
+  const [outcome, setOutcome] = useState<{ plan: ApplyPlan; target: Target } | null>(null);
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(toDraft(saved));
 
@@ -88,18 +106,13 @@ export function StandingMacroTargetCard({
       setError(parsed);
       return;
     }
+    if (scheduled.length > 0 && !window.confirm(scheduledConfirmMessage(scheduled))) return;
     setBusy(true);
     const supabase = createBrowserClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    const result = await saveStandingTarget(supabase, {
-      athleteId,
-      groupId,
-      userId: user?.id ?? null,
-      target: parsed,
-      today: localDateKey(),
-    });
+    const result = await applyStandingTarget(supabase, { athleteId, groupId, userId: user?.id ?? null, target: parsed, startKey: todayKey, todayKey });
     setBusy(false);
     if (!result.ok) {
       setError("Couldn't save the standing target. Check your connection and try again.");
@@ -107,12 +120,28 @@ export function StandingMacroTargetCard({
     }
     setSaved(parsed);
     setDraft(toDraft(parsed));
-    setMessage("Saved. It applies from today on. Earlier days keep the target they had.");
+    setOutcome({ plan: result, target: parsed });
+    router.refresh();
+  }
+
+  async function removeScheduled(date: string) {
+    if (!window.confirm(`Remove the target scheduled from ${shortDateLabel(date)}?`)) return;
+    setError(null);
+    setBusy(true);
+    const supabase = createBrowserClient();
+    const { error: deleteError } = await supabase.from("client_macro_target_history").delete().eq("athlete_id", athleteId).eq("group_id", groupId).eq("effective_from", date);
+    setBusy(false);
+    if (deleteError) {
+      setError("Couldn't remove it. Try again.");
+      return;
+    }
+    setMessage("Scheduled target removed.");
     router.refresh();
   }
 
   async function handleRemove() {
-    if (!window.confirm("Remove the standing target? Days with their own target keep it. Other days will have none.")) return;
+    const scheduledNote = scheduled.length > 0 ? ` ${scheduledConfirmMessage(scheduled).replace("Saving this also removes", "This also removes").replace(" Continue?", "")}` : "";
+    if (!window.confirm(`Remove the standing target? Days with their own target keep it. Other days will have none.${scheduledNote}`)) return;
     setError(null);
     setMessage(null);
     setBusy(true);
@@ -125,7 +154,7 @@ export function StandingMacroTargetCard({
       groupId,
       userId: user?.id ?? null,
       target: null,
-      today: localDateKey(),
+      today: todayKey,
     });
     setBusy(false);
     if (!result.ok) {
@@ -134,6 +163,7 @@ export function StandingMacroTargetCard({
     }
     setSaved(null);
     setDraft(toDraft(null));
+    setOutcome(null);
     setMessage("Standing target removed.");
     router.refresh();
   }
@@ -172,6 +202,10 @@ export function StandingMacroTargetCard({
         ))}
       </div>
 
+      <div className="mt-3">
+        <CalorieFloorWarning calories={draft.calories.trim() === "" ? null : Number(draft.calories)} floor={floorCalories} who={clientName} note={floorNote} />
+      </div>
+
       <div className="flex flex-wrap items-center gap-3 mt-3">
         <button
           type="button"
@@ -197,6 +231,29 @@ export function StandingMacroTargetCard({
         <p className="font-body text-xs text-rust mt-2" role="alert">
           {error}
         </p>
+      )}
+
+      {scheduled.length > 0 && (
+        <div className="mt-3 border border-steel/20 p-2.5 space-y-1.5">
+          <p className="font-body text-xs text-steel uppercase tracking-wide">Scheduled</p>
+          {scheduled.map((r) => (
+            <div key={r.date} className="flex items-center justify-between gap-3">
+              <p className="font-body text-xs text-chalk">
+                {r.calories == null ? "Standing target removed" : `${r.calories.toLocaleString("en-US")} kcal`} from {shortDateLabel(r.date)}
+              </p>
+              <button type="button" onClick={() => removeScheduled(r.date)} disabled={busy} className="h-8 px-2 font-body text-xs text-steel border border-steel/30 disabled:opacity-40">
+                Remove
+              </button>
+            </div>
+          ))}
+          <p className="font-body text-xs text-steel">Saving a standing target here (from today) also removes these, and asks first.</p>
+        </div>
+      )}
+
+      {outcome && (
+        <div className="mt-3">
+          <ApplyOutcomeNotice athleteId={athleteId} groupId={groupId} target={outcome.target} plan={outcome.plan} startKey={todayKey} todayKey={todayKey} />
+        </div>
       )}
 
       {!saved && latestExplicit && (

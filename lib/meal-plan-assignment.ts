@@ -4,6 +4,8 @@
 // time. Pure date math + JSON-merge logic, kept independent of Supabase
 // so it's directly testable.
 
+import { EDITED_BY_HAND_RATIONALE, LIBRARY_WEEK_RATIONALE } from "@/lib/week-replace";
+
 export interface MealRecipeChoice {
   recipeId: string | null;
   recipeName: string | null;
@@ -13,6 +15,22 @@ export interface MealRecipeChoice {
   // makes. Preserved through the save so a later renderer (the athlete's
   // day view) knows which rendering rule applies without guessing.
   isAi?: boolean;
+  // What the library-first builder adds (all optional: a plan saved before it reads exactly as it did). The structured lines are what the checks read (the food's name AND the
+  // label that is printed), the macros are what this option really contains at the printed amounts, and source says where it came from.
+  source?: "library" | "coach" | "ai";
+  lines?: { name: string; label: string; grams: number | null; matched?: string }[];
+  macros?: { proteinG: number; carbsG: number; fatG: number; calories: number };
+  mainProtein?: string | null;
+  // The meal's stable key ("t:<template id>" or "r:<recipe id>"), so a later build knows what was offered before.
+  key?: string;
+}
+
+// The key of a saved option. Plans saved before keys existed are read from the recipe id: a starter-library id starts with a slot letter and an underscore ("l_chicken..."),
+// anything else is a coach recipe's database id.
+export function choiceKey(choice: MealRecipeChoice): string | null {
+  if (choice.key) return choice.key;
+  if (!choice.recipeId) return null;
+  return /^[bdls]_/.test(choice.recipeId) ? `t:${choice.recipeId}` : `r:${choice.recipeId}`;
 }
 
 export interface MealEntryPayload {
@@ -32,6 +50,16 @@ export interface MealEntryPayload {
   recipeId?: string | null;
   recipeName?: string | null;
   ingredients?: string[];
+  // Index into the choices of the option the client's card shows first. Absent = the first.
+  featuredIndex?: number;
+}
+
+// The choices in the order a client sees them: the featured option first, the rest in their saved order.
+export function choicesFeaturedFirst(entry: MealEntryPayload): MealRecipeChoice[] {
+  const choices = mealRecipeChoices(entry);
+  const i = entry.featuredIndex;
+  if (i === undefined || !Number.isInteger(i) || i <= 0 || i >= choices.length) return choices;
+  return [choices[i], ...choices.slice(0, i), ...choices.slice(i + 1)];
 }
 
 // Normalizes either shape (new `recipes` array, or the old singular
@@ -157,5 +185,8 @@ export function mergeMealIntoPlan(
   const idx = bucketMeals.findIndex((m) => m.mealId === entry.mealId);
   if (idx >= 0) bucketMeals[idx] = entry;
   else bucketMeals.push(entry);
-  return { ...base, meals: { ...base.meals, [bucket]: bucketMeals } };
+  // A day the library built (its rationale says so) that a coach then changes by hand is no longer the library's: it is relabelled, so the next "Build the week" asks before it
+  // replaces it instead of overwriting the coach's edit.
+  const rationale = base.rationale === LIBRARY_WEEK_RATIONALE ? EDITED_BY_HAND_RATIONALE : base.rationale;
+  return { ...base, rationale, meals: { ...base.meals, [bucket]: bucketMeals } };
 }

@@ -5,9 +5,9 @@ import { ClientProgramsSection } from "@/components/coach/desktop/client-program
 import { isClientProfileTab } from "@/lib/client-profile-tabs";
 import Link from "next/link";
 import { NoAccess } from "@/components/shared/no-access";
-import { calorieSeriesWithStanding, latestStanding, standingForDate } from "@/lib/macro-resolution";
+import { calorieSeriesWithStanding, standingForDate } from "@/lib/macro-resolution";
 import { fetchStandingHistory } from "@/lib/standing-macros";
-import { StandingMacroTargetCard } from "@/components/coach/desktop/standing-macro-target-card";
+import { ClientNutrition } from "@/components/coach/nutrition/client-nutrition";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
@@ -40,33 +40,23 @@ import { CorrectClientEmail } from "@/components/coach/correct-client-email";
 import { claimStatus } from "@/lib/client-claim";
 import { claimLinkDetail } from "@/lib/invite-state";
 import { GuardianShareButton } from "@/components/coach/guardian-share-button";
-import { NutritionPhaseControl } from "@/components/coach/nutrition-phase-control";
 import { SettingsGroup } from "@/components/shared/settings-group";
 import { InjuryStatusToggle } from "@/components/coach/injury-status-toggle";
-import { computeBmr, computeTdee } from "@/lib/bmr-tdee";
 import { VideoCheckinRecorder } from "@/components/coach/video-checkin-recorder";
 import { ParQAnswersPanel } from "@/components/coach/par-q-answers-panel";
 import { WaiverStatusLine } from "@/components/coach/waiver-status-line";
 import { RosterSection } from "@/components/coach/desktop/roster-section";
 import { isUnder13 } from "@/lib/coppa";
 import { CoachLoggedBadge } from "@/components/coach-logged-badge";
-import { NutritionTools } from "@/components/coach/desktop/nutrition-tools";
 import { TrendChart } from "@/components/coach/desktop/trend-chart";
 import { ExerciseProgressionChart } from "@/components/coach/desktop/exercise-progression-chart";
 import { isHabitDueOn, computeCompliancePct } from "@/lib/habits";
 import { computeQuietTier } from "@/lib/quiet-client-tier";
 import { isLowReadiness } from "@/lib/wellness";
-import { computeWeeklyWeightTrend } from "@/lib/weight-trend";
 import { deriveEventWindow, weeksUntilEvent, isWithinTaperWindow, daysUntilEvent } from "@/lib/event-window";
 import { currentTaperMultiplier } from "@/lib/endurance-taper";
 import { computeStrengthTaperWeek, computeHeavySingleWeight } from "@/lib/strength-meet-taper";
 import { MainLiftPicker } from "@/components/coach/main-lift-picker";
-import {
-  classifyNutritionTrend,
-  isTrendAligned,
-  milestoneTagToNutritionPhase,
-  type MilestonePhaseTag,
-} from "@/lib/nutrition-trend-classifier";
 
 // Every date key from `startKey` through `endKey`, inclusive.
 function last7DatesForTargets(startKey: string, endKey: string): string[] {
@@ -116,7 +106,6 @@ export default async function AthleteProfilePage(
     { data: allLogs },
     { data: noteRow },
     { data: creditsRow },
-    { data: nutritionPhaseRow },
     { data: latestGoalRow },
     { data: sharedPhotoRows },
     { data: intake },
@@ -193,12 +182,6 @@ export default async function AthleteProfilePage(
     supabase
       .from("session_credits")
       .select("balance")
-      .eq("athlete_id", params.athleteId)
-      .eq("group_id", params.groupId)
-      .maybeSingle(),
-    supabase
-      .from("nutrition_phases")
-      .select("phase, started_at")
       .eq("athlete_id", params.athleteId)
       .eq("group_id", params.groupId)
       .maybeSingle(),
@@ -417,36 +400,6 @@ export default async function AthleteProfilePage(
   const isMinor = !!intake?.date_of_birth && isUnder13(intake.date_of_birth, new Date());
   const todayKeyForWave2 = new Date().toISOString().slice(0, 10);
 
-  // Real maintenance-calorie estimate for the injury-safety floor
-  // (lib/nutrition-checkin.ts) — same computeBmr/computeTdee this app
-  // already uses for Smart Macro Fill (daily-macros-form.tsx), never a
-  // guessed number. Only computed when every real input actually
-  // exists — no fallback/assumed values for height, sex, or DOB, since
-  // a wrong maintenance number defeats the point of a safety floor.
-  let maintenanceCalories: number | null = null;
-  const latestWeightLbs = weightLogs?.[0]?.weight ?? null;
-  if (
-    latestWeightLbs != null &&
-    profileDetails?.height_cm != null &&
-    profileDetails?.biological_sex &&
-    intake?.date_of_birth
-  ) {
-    const ageYears = Math.floor(
-      (Date.now() - new Date(intake.date_of_birth).getTime()) / (365.25 * 24 * 60 * 60 * 1000)
-    );
-    const bmr = computeBmr({
-      weightKg: latestWeightLbs * 0.453592,
-      heightCm: profileDetails.height_cm,
-      age: ageYears,
-      sex: profileDetails.biological_sex as "male" | "female",
-      bodyFatPct: profileDetails.body_fat_pct ?? null,
-    });
-    // No step data plumbed into this page — "moderate" matches this
-    // app's own existing fallback for the same gap (daily-macros-
-    // form.tsx), not a new assumption invented here.
-    maintenanceCalories = computeTdee(bmr, "moderate");
-  }
-
   // Wave 2 — each of these depends on a wave-1 result (or a pure JS
   // value derived from one), but not on each other, so they run as one
   // more batch instead of ~8 more sequential round trips.
@@ -457,10 +410,8 @@ export default async function AthleteProfilePage(
     { data: assignmentRows },
     { data: habitLogRows },
     signedPhotoResults,
-    nutritionTrendInputs,
     { data: wearableMetrics },
     { data: withingsMetrics },
-    { data: existingPlan },
     { data: orgClientTagRows },
     { data: clientTagAssignmentRows },
   ] = await Promise.all([
@@ -511,31 +462,6 @@ export default async function AthleteProfilePage(
         return { id: p.id, takenDate: p.taken_date, signedUrl: signed?.signedUrl ?? null };
       })
     ),
-    // Category 2 (Milestone Celebrations) — a live "does the trend
-    // actually match the tagged goal" read, computed fresh on every
-    // page load. Only queried when a phase is actually tagged.
-    nutritionPhaseRow?.phase
-      ? (async () => {
-          const sixWeeksAgo = new Date();
-          sixWeeksAgo.setDate(sixWeeksAgo.getDate() - 42);
-          const sixWeeksAgoKey = sixWeeksAgo.toISOString().slice(0, 10);
-          const [{ data: macroRows }, { data: weightRowsForTrend }] = await Promise.all([
-            supabase
-              .from("daily_macros")
-              .select("log_date, calories")
-              .eq("athlete_id", params.athleteId)
-              .eq("group_id", params.groupId)
-              .gte("log_date", sixWeeksAgoKey),
-            supabase
-              .from("body_weight_logs")
-              .select("logged_date, weight")
-              .eq("athlete_id", params.athleteId)
-              .eq("group_id", params.groupId)
-              .gte("logged_date", sixWeeksAgoKey),
-          ]);
-          return { macroRows, weightRowsForTrend };
-        })()
-      : Promise.resolve({ macroRows: null, weightRowsForTrend: null }),
     ouraConnection
       ? supabase
           .from("wearable_daily_metrics")
@@ -565,14 +491,6 @@ export default async function AthleteProfilePage(
             })()
           )
       : Promise.resolve({ data: null }),
-    macrosEnabled
-      ? supabase
-          .from("meal_plans")
-          .select("archetype, meal_count, include_snack, carb_cycling, rationale, macros, meals")
-          .eq("athlete_id", params.athleteId)
-          .eq("log_date", todayKeyForWave2)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
     // organizational_only_group_kind_idea_sept16.md — every tag defined
     // for this group's own organization, for the assignment control
     // below. No org at all (a group not part of any organization) just
@@ -584,36 +502,6 @@ export default async function AthleteProfilePage(
   ]);
 
   const sharedPhotos = signedPhotoResults;
-  let nutritionTrendAlignment: {
-    trend: string;
-    aligned: boolean;
-    calorieChangePct: number;
-    weightChangePct: number;
-  } | null = null;
-  if (nutritionPhaseRow?.phase) {
-    const calorieSeries = calorieSeriesWithStanding(
-      (nutritionTrendInputs.macroRows ?? [])
-        .filter((r) => r.calories != null)
-        .map((r) => ({ date: r.log_date as string, value: r.calories as number })),
-      macrosEnabled ? await fetchStandingHistory(supabase, params.athleteId, params.groupId) : [],
-      "0000-01-01",
-      new Date().toISOString().slice(0, 10)
-    );
-    const weightSeries = (nutritionTrendInputs.weightRowsForTrend ?? []).map((r) => ({
-      date: r.logged_date as string,
-      value: r.weight as number,
-    }));
-    const classification = classifyNutritionTrend(calorieSeries, weightSeries, new Date());
-    if (classification) {
-      nutritionTrendAlignment = {
-        trend: classification.trend,
-        aligned: isTrendAligned(classification, nutritionPhaseRow.phase as MilestonePhaseTag),
-        calorieChangePct: classification.calorieChangePct,
-        weightChangePct: classification.weightChangePct,
-      };
-    }
-  }
-
   const parQAnswers = (intake?.par_q_answers as { question: string; answer: boolean }[]) ?? [];
   const parQFlaggedCount = parQAnswers.filter((a) => a.answer).length;
   const hasAboutInfo = !!(
@@ -668,11 +556,6 @@ export default async function AthleteProfilePage(
   const totalHabitsDue = habitCompliance.reduce((sum, h) => sum + h.due, 0);
   const totalHabitsCompleted = habitCompliance.reduce((sum, h) => sum + h.completed, 0);
 
-  const weightTrend = computeWeeklyWeightTrend(
-    (weightLogs ?? []).map((w) => ({ loggedDate: w.logged_date, weight: w.weight })),
-    todayKey
-  );
-
   // Every real logged set for this client, grouped into a per-exercise
   // trend — this is what "see a graph of your progress" is actually built
   // from: no separate schema, every set already carries its own
@@ -708,19 +591,12 @@ export default async function AthleteProfilePage(
   // this day" control removes it here too, so a coach testing numbers
   // doesn't leave a fake point behind.
   const standingHistory = macrosEnabled ? await fetchStandingHistory(supabase, params.athleteId, params.groupId) : [];
-  const standingTarget = latestStanding(standingHistory);
   const calorieTrend = calorieSeriesWithStanding(
     (calorieRows ?? []).map((r) => ({ date: r.log_date as string, value: r.calories as number })),
     standingHistory,
     "0000-01-01",
     todayKey
   );
-  // Explicit day rows from today onward: the "overrides ahead" the coach sees next to the standing target.
-  const upcomingOverrides = (calorieRows ?? [])
-    .filter((r) => (r.log_date as string) >= todayKey)
-    .slice(0, 14)
-    .map((r) => ({ date: r.log_date as string, calories: r.calories as number }));
-  const latestExplicitRow = (calorieRows ?? []).length > 0 ? (calorieRows ?? [])[(calorieRows ?? []).length - 1] : null;
   // Same rows as above, just the last-7-days slice — one query serves
   // both instead of a second round trip against the same table/filter.
   // A day counts as having a target if it has its own row, or the standing
@@ -1525,29 +1401,6 @@ export default async function AthleteProfilePage(
             </SettingsGroup>
             </div>
 
-            <div data-tab="nutrition">
-            <SettingsGroup label="Nutrition">
-              <NutritionPhaseControl
-                athleteId={params.athleteId}
-                groupId={params.groupId}
-                coachId={user.id}
-                initialPhase={(nutritionPhaseRow?.phase as MilestonePhaseTag | undefined) ?? null}
-                initialStartedAt={nutritionPhaseRow?.started_at ?? null}
-              />
-              {nutritionTrendAlignment && (
-                <p
-                  className={`font-body text-xs mt-2 ${
-                    nutritionTrendAlignment.aligned ? "text-positive" : "text-rust"
-                  }`}
-                >
-                  {nutritionTrendAlignment.aligned
-                    ? "✓ Trending as expected for this phase"
-                    : `⚠ Trend reads as "${nutritionTrendAlignment.trend.replace("_", " ")}" — doesn't match the tagged goal yet, worth a look`}
-                </p>
-              )}
-            </SettingsGroup>
-            </div>
-
             <div data-tab="settings">
             <SettingsGroup label="Packages">
               <PackageAssignmentControl
@@ -1756,8 +1609,8 @@ export default async function AthleteProfilePage(
           the very bottom of the page, after everything else — now sits
           alongside them instead, turning that wasted scroll into real
           horizontal use of the page. */}
-      <div data-tab="progress nutrition" className={`profile-grid border-t border-steel/20 pt-6 mt-8 grid gap-10 ${macrosEnabled ? "lg:grid-cols-2" : ""}`}>
-        <div data-tab="progress" className="space-y-8">
+      <div data-tab="progress" className="profile-grid border-t border-steel/20 pt-6 mt-8">
+        <div className="space-y-8">
           {(wellnessRows ?? []).length > 0 && (
             <RosterSection title="Wellness" summary="Sleep, soreness & energy trends" defaultExpanded>
               <div className="space-y-4 pb-2">
@@ -1817,46 +1670,19 @@ export default async function AthleteProfilePage(
             )}
           </section>
         </div>
+      </div>
 
-        {macrosEnabled && (
-          <section data-tab="nutrition">
-            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
-              Nutrition
-            </h2>
-            <StandingMacroTargetCard
-              athleteId={params.athleteId}
-              groupId={params.groupId}
-              initial={
-                standingTarget
-                  ? {
-                      calories: standingTarget.calories,
-                      proteinG: standingTarget.protein_g,
-                      carbsG: standingTarget.carbs_g,
-                      fatG: standingTarget.fat_g,
-                    }
-                  : null
-              }
-              latestExplicit={
-                latestExplicitRow
-                  ? { date: latestExplicitRow.log_date as string, calories: latestExplicitRow.calories as number }
-                  : null
-              }
-              upcomingOverrides={upcomingOverrides}
-              calendarHref={`/groups/${params.groupId}/athletes/${params.athleteId}/calendar`}
-            />
-            <NutritionTools
-              athleteId={params.athleteId}
-              groupId={params.groupId}
-              date={todayKey}
-              latestBodyWeight={weightLogs?.[0]?.weight ?? null}
-              weightTrend={weightTrend}
-              existingPlan={existingPlan ?? null}
-              isInjured={injuryStatusRow?.is_injured ?? false}
-              maintenanceCalories={maintenanceCalories}
-              injurySurplusPct={injuryStatusRow?.surplus_pct ?? 0}
-              defaultPhase={milestoneTagToNutritionPhase(nutritionPhaseRow?.phase as MilestonePhaseTag | undefined)}
-            />
-          </section>
+      <div data-tab="nutrition" className="border-t border-steel/20 pt-6 mt-8">
+        {macrosEnabled ? (
+          <ClientNutrition
+            athleteId={params.athleteId}
+            groupId={params.groupId}
+            coachId={user.id}
+            clientName={profile?.full_name ?? "Client"}
+            variant="profile"
+          />
+        ) : (
+          <p className="font-body text-sm text-steel">Macro/meal planning isn&apos;t enabled for group-tier clients.</p>
         )}
       </div>
       </div>
