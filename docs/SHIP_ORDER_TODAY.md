@@ -1,5 +1,21 @@
 # Ship order (Oct 6)
 
+## RELEASE E: built locally (branch `safe-add-client`), not pushed. No database paste is needed.
+
+**First, separately, the calendar date fix** (branch `hotfix-calendar-days`, commit `3ff8f30`): on the live calendar every day sat one column to the right for a coach in Pacific time (the 15th showed under Friday), because the page sent server-made dates to the browser. It ships on its own, on your word (`push and deploy the calendar fix`). Release E contains the same fix, so after the hotfix it merges cleanly.
+
+What is in Release E (all code, nothing to paste):
+
+- **Calendar:** your client list is first in the right rail (search, collapse, scrolls on its own, set-aside clients behind "Show set-aside"). Each row is just a name and one quiet number: the sessions still available to schedule (a small "owed N" appears only if more are booked than they have). **Needs attention** is one collapsed chip, three rows at a time, with Snooze on each and "Clear all for 7 days" (quiet-client snoozes are shared with Home). A client who has never trained reads "hasn't done a first workout yet", and the 14/45-day new-client rule now applies here.
+- **Drop a name on a day:** the day opens in place as a time grid (5 or 15 minute snap, your open hours, existing sessions with your gap, time off). Drop the name on a time, or on a touch screen tap a client, tap a day, tap a time. Confirm Book once or Repeat weekly; a clear note and **Undo** for 8 seconds (the client is told only after that). A clash, a time outside your hours or an hour tagged for another session type is a warning, never a block. The booking's session type chip is filled from the client's usual type.
+- **Tap a client's name:** a panel with a plain sentence ("12 sessions bought, 4 completed, 4 booked, and 4 left to schedule."), the session +/-, sessions waiting to be marked, sessions coming up (Cancel, Open day) and links to their calendar and profile. The same sentence is on the profile under Billing and on the Needs-your-decision rows.
+- **Your calendar shows only your sessions** (time off, events). A client's program days and own workouts are on their own calendar, one tap away.
+- **Clients see** "8 left · 4 booked" (never "owed").
+
+Known gaps, written down on purpose: group-session attendees are charged through their own table and are not yet counted in "booked"; credit cost and session length are not applied at booking from the session type; weekly schedules and client requests are not typed automatically; Home cards show no balance so there was nothing to change there; the Add client button and one-invite-link-per-group work is not built (waiting on read permission).
+
+---
+
 ## HOW EVERY RELEASE IS PASTED FROM NOW ON: ONE file
 
 Each release gets **one bundled paste file**, `supabase\apply\apply-release-<x>-all.sql`. It runs all of that release's steps, in the right order, inside one all-or-nothing transaction. Each step's checks (everything its separate precheck says, including "not already applied") are built in as a guard in front of it, so there is **no separate precheck paste**. If a check is false the run stops with a red message that names the release, the step and the failed check, and nothing is kept, so it is safe to try again after fixing what it names. After the commit it shows a read-only result table, one row per step, and every row must say `in_place = true`. The separate `apply-stepNN-...` and `undo-stepNN-...` files stay as the fallback and for undoing one step at a time. If a step was already applied by hand, the bundle refuses at that step (by name); use the single-step files for the rest. The paste test applies each bundle on the live-shaped schema, proves a bad state in the last step keeps nothing of the earlier ones, proves a second run is refused, and proves each step's undo file still works afterwards.

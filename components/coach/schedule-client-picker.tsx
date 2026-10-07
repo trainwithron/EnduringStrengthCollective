@@ -1,13 +1,22 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { buildCreditPicture } from "@/lib/credit-picture";
 
 export interface ScheduleClientOption {
   id: string;
   fullName: string;
   balance: number;
+  // Sessions scheduled with the coach that have not happened yet: the number shown is what is still available to schedule.
+  booked?: number;
   // The client's own group (a one-on-one client lives in their own). Booking and balances are kept per group.
   groupId?: string;
+}
+
+// ONE quiet number: how many are still available to schedule, or "owed N" when more are booked than they have.
+function pickerNumber(balance: number, booked: number): string {
+  const picture = buildCreditPicture({ balance, booked, toMark: 0 });
+  return picture.owed > 0 ? `owed ${picture.owed}` : String(picture.toBook);
 }
 
 export function ScheduleClientPicker({
@@ -38,7 +47,7 @@ export function ScheduleClientPicker({
         <option value="">All clients</option>
         {clients.map((c) => (
           <option key={c.id} value={c.id}>
-            {c.fullName} — {c.balance < 0 ? `owed ${Math.abs(c.balance)}` : `${c.balance} ${c.balance === 1 ? "session" : "sessions"}`}
+            {c.fullName} — {pickerNumber(c.balance, c.booked ?? 0)}
           </option>
         ))}
       </select>

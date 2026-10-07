@@ -22,7 +22,7 @@ import { ScheduleClientPicker } from "@/components/coach/schedule-client-picker"
 import { DEFAULT_COACH_TIMEZONE, dateKeyInZone } from "@/lib/timezone";
 import { formatInTimezone } from "@/lib/format-in-timezone";
 import { getCoachClients } from "@/lib/coach-clients";
-import { coachBalanceLabel } from "@/lib/reup";
+import { coachCreditSentence } from "@/lib/credit-sentence";
 import { formatSlotTime } from "@/lib/booking-slots";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { computeQuietTier } from "@/lib/quiet-client-tier";
@@ -146,11 +146,13 @@ export default async function CoachCalendarPage(
       .in("athlete_id", clientIds.length > 0 ? clientIds : [""]);
     const balanceByClientGroup = new Map((creditRows ?? []).map((r) => [`${r.athlete_id}:${r.group_id}`, r.balance as number]));
 
+    const phoneCounts = await fetchBookingCounts(supabase, { coachId: user.id });
     const scheduleClients = coachClients.map((c) => ({
       id: c.id,
       fullName: c.fullName,
       groupId: c.groupId,
       balance: balanceByClientGroup.get(`${c.id}:${c.groupId}`) ?? 0,
+      booked: phoneCounts.get(`${c.id}:${c.groupId}`)?.booked ?? 0,
     }));
 
     if (!searchParams.scheduleFor) {
@@ -360,8 +362,7 @@ export default async function CoachCalendarPage(
             <ScheduleClientPicker groupId={params.groupId} clients={scheduleClients} selectedId={selected.id} />
             <div className="px-5 pt-4">
               <p className="font-body text-sm text-chalk">
-                {selected.fullName} —{" "}
-                <span className="text-steel">{coachBalanceLabel(selected.balance)}</span>
+                <span className="text-steel">{coachCreditSentence(buildCreditPicture({ balance: selected.balance, booked: selected.booked ?? 0, toMark: 0 }), selected.fullName)}</span>
               </p>
               <p className="font-body text-xs text-steel mt-1">Tap a date to see and book open sessions.</p>
               <div className="flex items-center justify-between mt-3">

@@ -10,6 +10,7 @@ import { CardSizeToggle } from "@/components/coach/desktop/card-size-toggle";
 import { readCardSize, writeCardSize, type CardSize } from "@/lib/card-size";
 import { isLowReadiness } from "@/lib/wellness";
 import { coachBalanceLabel, needsPayment } from "@/lib/reup";
+import { fetchBookingCounts } from "@/lib/credit-picture";
 import { daysSinceOf, clientActivityStatus } from "@/lib/client-activity-status";
 import { initialsOf } from "@/lib/initials";
 import { getIntegrityRollupForGroup, type AthleteIntegrityResult } from "@/lib/session-integrity-data";
@@ -102,6 +103,8 @@ export function ClientCardGrid({
   // the currently-visible PAGE — the actual fix for the stress-test
   // finding, not just a rendering optimization.
   const [creditsByAthleteId, setCreditsByAthleteId] = useState<Map<string, number>>(new Map());
+  // Sessions scheduled with the coach that have not happened yet, shown beside the balance (the balance only drops when a session happens).
+  const [bookedByAthleteId, setBookedByAthleteId] = useState<Map<string, number>>(new Map());
   const [lowReadinessAthleteIds, setLowReadinessAthleteIds] = useState<Set<string>>(new Set());
   // Clients at zero sessions or below (the hold flag arrives with migration 0260). One small query for the whole group, so the
   // count and the filter cover every page, not only the one on screen.
@@ -249,7 +252,7 @@ export function ClientCardGrid({
         return;
       }
       const supabase = createBrowserClient();
-      const [creditsResult, wellnessResult, integrityResult] = await Promise.all([
+      const [creditsResult, wellnessResult, integrityResult, bookingCounts] = await Promise.all([
         supabase
           .from("session_credits")
           .select("athlete_id, balance")
@@ -262,8 +265,15 @@ export function ClientCardGrid({
           .eq("log_date", todayIso())
           .in("athlete_id", pageIds),
         getIntegrityRollupForGroup(supabase, groupId, pageIds),
+        fetchBookingCounts(supabase, { groupId }),
       ]);
       if (cancelled) return;
+
+      const booked = new Map<string, number>();
+      bookingCounts.forEach((v, k) => {
+        if (v.booked > 0) booked.set(k.split(":")[0], v.booked);
+      });
+      setBookedByAthleteId(booked);
 
       const credits = new Map<string, number>();
       for (const row of creditsResult.data ?? []) {
@@ -787,6 +797,7 @@ export function ClientCardGrid({
                   </select>
                   <span className={`font-body text-xs whitespace-nowrap ${credits !== null && credits <= 0 && !owed?.hold ? "text-rust" : "text-steel"}`}>
                     {coachBalanceLabel(credits)}
+                    {(bookedByAthleteId.get(member.profileId) ?? 0) > 0 ? ` \u00B7 ${bookedByAthleteId.get(member.profileId)} booked` : ""}
                   </span>
                 </div>
 

@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { bookingFitsAvailability, resolveBlockedRangesForDate, type AvailabilityWindow } from "@/lib/booking-slots";
 import { DEFAULT_COACH_TIMEZONE, dateKeyInZone } from "@/lib/timezone";
+import { buildCreditPicture, fetchBookingCounts } from "@/lib/credit-picture";
+import { coachCreditSentence } from "@/lib/credit-sentence";
 
 interface MoveRequest {
   id: string;
@@ -14,6 +16,8 @@ interface MoveRequest {
   newEndAt: string | null;
   // Outside the coach's open hours or on their time off: said plainly on the card (the coach can still confirm).
   outsideHours: boolean;
+  athleteId: string;
+  groupId: string;
 }
 
 interface FlaggedChange {
@@ -21,6 +25,8 @@ interface FlaggedChange {
   startAt: string;
   kind: "cancel" | "reschedule";
   clientName: string;
+  athleteId: string;
+  groupId: string;
 }
 
 // A client who cancels or moves a session inside your cancellation window is flagged here for YOU to decide: Charge takes one session, Waive
@@ -31,6 +37,8 @@ export function LateChangesPanel() {
   const [moves, setMoves] = useState<MoveRequest[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Where each client's sessions stand, in a plain sentence, so the coach can decide with the numbers in view.
+  const [creditLines, setCreditLines] = useState<Record<string, string>>({});
   // Times are shown on the coach's own clock, not the browser's, and the card says which clock.
   const [timezone, setTimezone] = useState<string>(DEFAULT_COACH_TIMEZONE);
 
@@ -44,7 +52,7 @@ export function LateChangesPanel() {
       if (!user) return;
       const { data, error: loadError } = await supabase
         .from("bookings")
-        .select("id, start_at, late_change_kind, profiles!bookings_athlete_id_fkey ( full_name )")
+        .select("id, start_at, late_change_kind, athlete_id, group_id, profiles!bookings_athlete_id_fkey ( full_name )")
         .eq("coach_id", user.id)
         .eq("late_charge_state", "flagged")
         .order("start_at", { ascending: true })
@@ -52,7 +60,7 @@ export function LateChangesPanel() {
       // Booking requests, new and move (needs the database update that adds them; until then the lookup fails quietly and nothing shows).
       const { data: moveData, error: moveError } = await supabase
         .from("booking_requests")
-        .select("id, kind, from_start_at, new_start_at, new_end_at, profiles!booking_requests_athlete_id_fkey ( full_name )")
+        .select("id, kind, from_start_at, new_start_at, new_end_at, athlete_id, group_id, profiles!booking_requests_athlete_id_fkey ( full_name )")
         .eq("coach_id", user.id)
         .eq("status", "pending")
         .gt("new_start_at", new Date().toISOString())
@@ -97,6 +105,8 @@ export function LateChangesPanel() {
               newStartAt: m.new_start_at as string,
               newEndAt: (m.new_end_at as string | null) ?? null,
               outsideHours,
+              athleteId: m.athlete_id as string,
+              groupId: m.group_id as string,
             };
           })
         );
@@ -108,8 +118,39 @@ export function LateChangesPanel() {
           startAt: b.start_at as string,
           kind: (b.late_change_kind as "cancel" | "reschedule") ?? "cancel",
           clientName: (b.profiles?.full_name as string | undefined) ?? "A client",
+          athleteId: b.athlete_id as string,
+          groupId: b.group_id as string,
         }))
       );
+      // The sentence about each client's sessions. If it cannot load, the rows simply show without it.
+      try {
+        const names = new Map<string, string>();
+        const pairs = new Map<string, { athleteId: string; groupId: string }>();
+        for (const b of (data ?? []) as any[]) {
+          pairs.set(`${b.athlete_id}:${b.group_id}`, { athleteId: b.athlete_id, groupId: b.group_id });
+          names.set(`${b.athlete_id}:${b.group_id}`, (b.profiles?.full_name as string | undefined) ?? "This client");
+        }
+        for (const m of (moveData ?? []) as any[]) {
+          pairs.set(`${m.athlete_id}:${m.group_id}`, { athleteId: m.athlete_id, groupId: m.group_id });
+          names.set(`${m.athlete_id}:${m.group_id}`, (m.profiles?.full_name as string | undefined) ?? "This client");
+        }
+        if (pairs.size > 0) {
+          const ids = Array.from(new Set(Array.from(pairs.values()).map((p) => p.athleteId)));
+          const [{ data: creditRows }, counts] = await Promise.all([
+            supabase.from("session_credits").select("athlete_id, group_id, balance").in("athlete_id", ids),
+            fetchBookingCounts(supabase, { coachId: user.id }),
+          ]);
+          const balanceByKey = new Map(((creditRows ?? []) as any[]).map((r) => [`${r.athlete_id}:${r.group_id}`, r.balance as number]));
+          const lines: Record<string, string> = {};
+          pairs.forEach((_p, key) => {
+            const c = counts.get(key);
+            lines[key] = coachCreditSentence(buildCreditPicture({ balance: balanceByKey.get(key) ?? 0, booked: c?.booked ?? 0, toMark: c?.toMark ?? 0 }), names.get(key) ?? "This client");
+          });
+          if (!cancelled) setCreditLines(lines);
+        }
+      } catch {
+        // No sentence; the decision rows work without it.
+      }
     }
     load();
     return () => {
@@ -170,6 +211,7 @@ export function LateChangesPanel() {
                     {m.newEndAt ? ` to ${fmtTime(m.newEndAt)}` : ""} ({tzName(m.newStartAt)})
                   </p>
                   {m.outsideHours && <p className="font-body text-xs text-rust">Outside your open hours or on your time off. You can still confirm it.</p>}
+                  {creditLines[`${m.athleteId}:${m.groupId}`] && <p className="font-body text-xs text-steel">{creditLines[`${m.athleteId}:${m.groupId}`]}</p>}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <button
@@ -208,6 +250,7 @@ export function LateChangesPanel() {
                 {i.kind === "reschedule" ? "Moved" : "Cancelled"} a session for{" "}
                 {new Date(i.startAt).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
               </p>
+              {creditLines[`${i.athleteId}:${i.groupId}`] && <p className="font-body text-xs text-steel">{creditLines[`${i.athleteId}:${i.groupId}`]}</p>}
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <button

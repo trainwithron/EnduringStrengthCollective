@@ -10,7 +10,8 @@ import { creditExpiryDate } from "@/lib/credit-expiration";
 import { getBlockedRangesForDate } from "@/lib/availability-exceptions";
 import { zonedTimeToUtc, DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { addDaysToDateKey } from "@/lib/series-schedule";
-import { coachBalanceLabel } from "@/lib/reup";
+import { coachCreditSentence } from "@/lib/credit-sentence";
+import { buildCreditPicture, clientCreditPictureLine, fetchBookingCounts } from "@/lib/credit-picture";
 import { AssignSlotButton } from "@/components/coach/desktop/assign-slot-button";
 import { AssignOtherTime } from "@/components/coach/desktop/assign-other-time";
 import { BookingTypeSelect } from "@/components/coach/desktop/booking-type-select";
@@ -37,7 +38,7 @@ import { MarkNoShowToggle } from "@/components/coach/mark-no-show-toggle";
 import { WaitlistJoinButton } from "@/components/athlete/waitlist-join-button";
 import { RecurringBookingButton } from "@/components/athlete/recurring-booking-button";
 import { RecurringConflictBadge } from "@/components/coach/desktop/recurring-conflict-badge";
-import { sessionBalanceLine, NO_SESSIONS_SLOT_LABEL } from "@/lib/session-credit-copy";
+import { NO_SESSIONS_SLOT_LABEL, NO_SESSIONS_LINE } from "@/lib/session-credit-copy";
 
 export default async function CoachDayDetailPage(
   props: {
@@ -123,6 +124,7 @@ export default async function CoachDayDetailPage(
     let slots: { start: Date; durationMinutes: number }[] = [];
     let bookingsForDay: any[] = [];
     let creditBalance = 0;
+    let creditBooked = 0;
     let creditExpiresAt: Date | null = null;
     let creditExpiryDaysForNote = 0;
     let activeSubscription: { currentPeriodEnd: string | null } | null = null;
@@ -197,6 +199,7 @@ export default async function CoachDayDetailPage(
         sessionMinutes: sessionMinutesFor(sessionIndex, coachMembership.profile_id, w),
       }));
       creditBalance = creditsRow?.balance ?? 0;
+      creditBooked = (await fetchBookingCounts(supabase, { athleteId, groupId: params.groupId })).get(`${athleteId}:${params.groupId}`)?.booked ?? 0;
       creditExpiresAt = creditExpiryDate(creditsRow?.last_granted_at ?? null, policyRow?.credit_expiry_days ?? 0);
       creditExpiryDaysForNote = policyRow?.credit_expiry_days ?? 0;
       activeSubscription = subscriptionRow ? { currentPeriodEnd: subscriptionRow.current_period_end } : null;
@@ -314,7 +317,7 @@ export default async function CoachDayDetailPage(
           {coachMembership && (
             <div className="mt-3">
               <p className="font-body text-xs text-steel">
-                {sessionBalanceLine(creditBalance)}
+                {clientCreditPictureLine(buildCreditPicture({ balance: creditBalance, booked: creditBooked, toMark: 0 }), NO_SESSIONS_LINE)}
                 {creditBalance > 0 && creditExpiresAt && (
                   <span className="text-steel">
                     {" "}
@@ -630,7 +633,7 @@ export default async function CoachDayDetailPage(
     }
   }
 
-  let selectedClient: { fullName: string; balance: number } | null = null;
+  let selectedClient: { fullName: string; balance: number; booked: number } | null = null;
   // Day-click-to-assign (calendar_workout_scheduling_and_adjustable_
   // workspace_idea.md item 1) — the selected client's program workouts,
   // offered for pinning to this exact date. Empty when they have no
@@ -641,6 +644,7 @@ export default async function CoachDayDetailPage(
     selectedClient = {
       fullName: (clientMembership.profiles as any)?.full_name ?? "Client",
       balance: creditsForClient?.balance ?? 0,
+      booked: clientId ? (await fetchBookingCounts(supabase, { athleteId: clientId, groupId: params.groupId })).get(`${clientId}:${params.groupId}`)?.booked ?? 0 : 0,
     };
 
     if (activeProgram) {
@@ -706,7 +710,7 @@ export default async function CoachDayDetailPage(
           <p className="font-body text-sm text-steel mt-3">
             Assigning for <span className="text-chalk font-medium">{selectedClient.fullName}</span>
             {" — "}
-            {coachBalanceLabel(selectedClient.balance)}
+            {coachCreditSentence(buildCreditPicture({ balance: selectedClient.balance, booked: selectedClient.booked, toMark: 0 }), selectedClient.fullName)}
           </p>
         ) : (
           <p className="font-body text-xs text-steel mt-3">
