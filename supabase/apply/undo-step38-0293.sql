@@ -103,5 +103,5 @@ begin
   return true;
 end;
 $$;
-drop function if exists public.refund_coach_credit_for(uuid, text, text, text, text);
+drop function if exists public.refund_coach_credit_for(uuid, text, text, text, text, uuid);
 commit;

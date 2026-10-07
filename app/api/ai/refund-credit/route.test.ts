@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   userRpcCalls: [] as { fn: string; args: Record<string, unknown> }[],
   serviceRpcCalls: [] as { fn: string; args: Record<string, unknown> }[],
   chargeQuery: [] as string[],
+  rpcError: null as { code: string; message: string } | null,
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -16,7 +17,7 @@ vi.mock("@/lib/supabase/server", () => ({
     auth: { getUser: async () => ({ data: { user: state.user } }) },
     rpc: async (fn: string, args: Record<string, unknown>) => {
       state.userRpcCalls.push({ fn, args });
-      return { data: true, error: null };
+      return state.rpcError ? { data: null, error: state.rpcError } : { data: true, error: null };
     },
   }),
 }));
@@ -56,6 +57,7 @@ beforeEach(() => {
   state.userRpcCalls = [];
   state.serviceRpcCalls = [];
   state.chargeQuery = [];
+  state.rpcError = null;
 });
 
 describe("the AI refund route", () => {
@@ -92,7 +94,7 @@ describe("the AI refund route", () => {
     const res = await post({ action: "nutrition_plan", trigger: "auto_validator_failure", referenceId: "r3" });
     expect(res.status).toBe(200);
     expect(state.serviceRpcCalls).toEqual([
-      { fn: "refund_coach_credit_for", args: { p_coach_id: "coach-1", p_action: "nutrition_plan", p_trigger: "auto_validator_failure", p_reference_id: "r3" } },
+      { fn: "refund_coach_credit_for", args: { p_coach_id: "coach-1", p_action: "nutrition_plan", p_trigger: "auto_validator_failure", p_reference_id: "r3", p_charge_id: "c1" } },
     ]);
     expect(state.userRpcCalls).toEqual([]);
   });
@@ -102,7 +104,8 @@ describe("the AI refund route", () => {
     const q = state.chargeQuery.join(" | ");
     expect(q).toContain("ai_usage_log.eq(user_id,coach-1)");
     expect(q).toContain("ai_usage_log.eq(feature,meal_plan_slot_delivered)");
-    expect(q).toContain("ai_usage_log.gte(created_at,2026-10-07T12:00:00Z)");
+    // deliveries count from 30 minutes BEFORE the charge as well as after it (generate first, charge afterwards)
+    expect(q).toContain("ai_usage_log.gte(created_at,2026-10-07T11:30:00.000Z)");
   });
 
   it("with no charge to refund the answer is simply 'not refunded' and nothing is called", async () => {
@@ -117,6 +120,18 @@ describe("the AI refund route", () => {
     const res = await post({ action: "program_generation", trigger: "auto_validator_failure", referenceId: "r6" });
     expect(res.status).toBe(400);
     expect(state.serviceRpcCalls).toEqual([]);
+  });
+
+  it("an unknown action is a clean 400, not a database error", async () => {
+    expect((await post({ action: "ci_overview", trigger: "coach_flagged", referenceId: "r7" })).status).toBe(400);
+    expect(state.userRpcCalls).toEqual([]);
+  });
+
+  it("a second refund with the same reference (the database refuses it) is just 'not refunded'", async () => {
+    state.rpcError = { code: "23505", message: "duplicate key value violates unique constraint" };
+    const res = await post({ action: "nutrition_plan", trigger: "coach_flagged", referenceId: "r8" });
+    expect(res.status).toBe(200);
+    expect((await res.json()).refunded).toBe(false);
   });
 
   it("missing fields are refused", async () => {

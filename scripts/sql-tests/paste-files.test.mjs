@@ -257,11 +257,11 @@ for (const s of steps) {
   const file = `apply/${bundle.file}`;
   const st = steps.find((x) => x.n === "38");
   const state = async () => (await db.query(`select
-      to_regprocedure('public.refund_coach_credit_for(uuid, text, text, text, text)') is not null as has_for,
+      to_regprocedure('public.refund_coach_credit_for(uuid, text, text, text, text, uuid)') is not null as has_for,
       position('refund_coach_credit_for' in pg_get_functiondef('public.refund_coach_credit(text, text, text, text)'::regprocedure)) > 0 as only_flag,
       has_function_privilege('authenticated', 'public.refund_coach_credit(text, text, text, text)', 'execute') as flag_auth,
       has_function_privilege('anon', 'public.refund_coach_credit(text, text, text, text)', 'execute') as flag_anon,
-      coalesce(has_function_privilege('authenticated', to_regprocedure('public.refund_coach_credit_for(uuid, text, text, text, text)'), 'execute'), false) as for_auth`)).rows[0];
+      coalesce(has_function_privilege('authenticated', to_regprocedure('public.refund_coach_credit_for(uuid, text, text, text, text, uuid)'), 'execute'), false) as for_auth`)).rows[0];
   const eu = await run(`apply/undo-step${st.n}-${st.slug}.sql`);
   check("release-h: undo-step38-0293.sql runs" + (eu ? ": " + eu : ""), !eu);
   const before = await state();

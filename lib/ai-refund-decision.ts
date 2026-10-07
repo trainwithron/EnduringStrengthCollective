@@ -6,6 +6,16 @@
 
 export const MEAL_SLOT_DELIVERED_FEATURE = "meal_plan_slot_delivered";
 
+// A coach can generate the slots first and press the charging button afterwards, so delivered rows count from this long BEFORE the charge as well as after it.
+export const DELIVERY_LOOKBACK_MS = 30 * 60 * 1000;
+
+export function deliveredSince(chargeCreatedAtIso: string): string {
+  return new Date(Date.parse(chargeCreatedAtIso) - DELIVERY_LOOKBACK_MS).toISOString();
+}
+
+// The two charged actions a refund can name; anything else is a clean 400 instead of a database error.
+export const REFUNDABLE_ACTIONS = ["program_generation", "nutrition_plan"] as const;
+
 // Only the meal-plan charge has an automatic refund (it is the only one the app ever triggered automatically); a program generation has no server-side evidence
 // of delivery, so its automatic refund is not available (the coach's own "This was wrong" button still is).
 export const AUTO_REFUND_ACTIONS = ["nutrition_plan"] as const;

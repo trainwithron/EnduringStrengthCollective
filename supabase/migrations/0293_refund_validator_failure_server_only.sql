@@ -11,6 +11,9 @@
 --   * refund_coach_credit(action, trigger, reference, reason) keeps its signature and its grants (CREATE OR REPLACE; not dropped, so its permissions are untouched) and
 --     is now only the coach's own "This was wrong" button: it accepts the 'coach_flagged' trigger only and runs the same logic for the signed-in coach.
 -- The 'coach_flagged' button stays honest-user feedback by design (a person tapping "this output was wrong"); the one-refund-per-charge rules are unchanged.
+-- Honest scope: this REDUCES the self-refund, it does not close it. Paths that remain: generating slots long before pressing the charging button, and the coach's own
+-- honor-system "This was wrong" flag. The real fix is the single server step in the Nutrition design (one request that generates, verifies, charges and refunds on its own
+-- evidence).
 -- Re-runnable.
 
 create or replace function public.refund_coach_credit_for(
@@ -18,7 +21,8 @@ create or replace function public.refund_coach_credit_for(
   p_action text,
   p_trigger text,
   p_reference_id text,
-  p_reason text default null
+  p_reason text default null,
+  p_charge_id uuid default null
 )
 returns boolean
 language plpgsql
@@ -53,6 +57,11 @@ begin
     raise exception 'Invalid action';
   end if;
 
+  -- Only a meal-plan charge has an automatic refund.
+  if p_trigger = 'auto_validator_failure' and p_action <> 'nutrition_plan' then
+    raise exception 'No automatic refund exists for this action';
+  end if;
+
   if exists (
     select 1 from public.ai_output_refunds
     where coach_id = v_coach_id and reference_id = p_reference_id
@@ -68,12 +77,27 @@ begin
     and action = p_action
     and refunded_at is null
     and created_at > now() - interval '24 hours'
+    and (p_charge_id is null or id = p_charge_id)
   order by created_at desc
   limit 1
   for update;
 
   if not found then
     return false;
+  end if;
+
+  -- The AUTOMATIC refund ("the generation delivered nothing") is checked here, under the lock on the very charge being refunded, so two concurrent requests cannot
+  -- refund each other's charges: if the AI returned any usable suggestion from 30 minutes before this charge until now, the plan was delivered and the charge stands.
+  -- (A coach may press the charging button after generating, so the look-back starts before the charge.)
+  if p_trigger = 'auto_validator_failure' then
+    if exists (
+      select 1 from public.ai_usage_log
+      where user_id = v_coach_id
+        and feature = 'meal_plan_slot_delivered'
+        and created_at >= v_charge.created_at - interval '30 minutes'
+    ) then
+      return false;
+    end if;
   end if;
 
   update public.ai_charges set refunded_at = now() where id = v_charge.id;
@@ -113,8 +137,8 @@ begin
 end;
 $$;
 
-revoke all on function public.refund_coach_credit_for(uuid, text, text, text, text) from public, anon, authenticated;
-grant execute on function public.refund_coach_credit_for(uuid, text, text, text, text) to service_role;
+revoke all on function public.refund_coach_credit_for(uuid, text, text, text, text, uuid) from public, anon, authenticated;
+grant execute on function public.refund_coach_credit_for(uuid, text, text, text, text, uuid) to service_role;
 
 -- Same signature and grants as 0245 (CREATE OR REPLACE keeps them): now only the coach's own flag.
 create or replace function public.refund_coach_credit(

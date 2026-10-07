@@ -769,7 +769,7 @@ alter table public.coach_availability_windows drop column if exists session_minu
     migrations: ["0293"],
     sees: "Success. No rows returned.",
     afterwards: "Nothing changes for normal use. The coach's 'This was wrong' button still refunds the latest charge once. The automatic refund when an AI meal-plan generation delivered nothing is now decided by the server (code in the same release): until that code is live the old browser call is refused, so a failed generation is not auto-refunded. Run it together with the release's code deploy.",
-    undo: [fnFromMigration("0245", "refund_coach_credit"), "drop function if exists public.refund_coach_credit_for(uuid, text, text, text, text);"].join(String.fromCharCode(10)),
+    undo: [fnFromMigration("0245", "refund_coach_credit"), "drop function if exists public.refund_coach_credit_for(uuid, text, text, text, text, uuid);"].join(String.fromCharCode(10)),
     undoWhy: "Only if refunds misbehave after step 38. Puts refund_coach_credit back as it was (the browser can name either trigger again, which re-opens the self-refund) and removes the server-only refund function.",
     rows: [
       ["ai_charges, ai_output_refunds and coach_credits exist (0245 is applied)", `${has.table("ai_charges")} and ${has.table("ai_output_refunds")} and ${has.table("coach_credits")}`],

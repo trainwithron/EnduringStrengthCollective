@@ -142,11 +142,13 @@ Favorite foods / requests: ${favoriteFoods || "none given"}`;
     // believing the browser (lib/ai-refund-decision.ts). Best effort: a failed write only means an automatic refund stays possible, never blocks the coach.
     if (verifiedOptions.some((o) => o.confident)) {
       try {
-        await createServiceRoleClient()
+        const { error: deliveredError } = await createServiceRoleClient()
           .from("ai_usage_log")
           .insert({ user_id: user.id, coach_id: user.id, feature: MEAL_SLOT_DELIVERED_FEATURE, status: "ok", completed_at: new Date().toISOString() });
-      } catch {
-        // see above
+        // supabase-js reports a failed insert in the result, it does not throw: log it, so a run of failures is visible.
+        if (deliveredError) console.error("[generate-meal-plan] could not record delivery:", deliveredError.message);
+      } catch (e) {
+        console.error("[generate-meal-plan] could not record delivery:", e instanceof Error ? e.message : e);
       }
     }
 
