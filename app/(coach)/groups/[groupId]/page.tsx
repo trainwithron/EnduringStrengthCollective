@@ -4,6 +4,9 @@ import Link from "next/link";
 import { loadReupState } from "@/lib/reup-server";
 import { isStripeConfigured } from "@/lib/stripe";
 import { ReupCard } from "@/components/athlete/reup-card";
+import { MyScheduleCard, type MyScheduleCardState } from "@/components/athlete/my-schedule-card";
+import { loadMySchedule } from "@/lib/my-schedule-data";
+import { openRequest, scheduleStateLine, scheduleSummary } from "@/lib/schedule-request-ui";
 import { FirstRunGuideCard } from "@/components/athlete/first-run-guide-card";
 import { PushNotificationToggle } from "@/components/athlete/push-notification-toggle";
 import { UnavailableState } from "@/components/ui/unavailable-state";
@@ -600,6 +603,25 @@ export default async function GroupHubPage(
     }
   }
 
+  // A client with a weekly schedule gets a "My schedule" card (ask to pause, freeze or cancel). Never shown to a coach, or to a coach acting as the client. Any failure
+  // (or the feature not being switched on yet) just means no card.
+  let scheduleCard: MyScheduleCardState | null = null;
+  if (user && !isCoach && !isActingAsOther && showMobileView && athleteId) {
+    try {
+      const mine = await loadMySchedule(supabase, params.groupId, athleteId);
+      const first = mine.items.find((i) => i.series.status !== "ended");
+      if (first) {
+        scheduleCard = {
+          summary: scheduleSummary(first.series),
+          state: scheduleStateLine(first.series),
+          waiting: !!openRequest(first.requests, first.series.id),
+        };
+      }
+    } catch {
+      scheduleCard = null;
+    }
+  }
+
   // Upcoming small-group sessions with this client's coach, as a link to the Classes page. Any failure (or the feature not being
   // switched on yet) just means no link.
   let upcomingClasses = 0;
@@ -732,6 +754,7 @@ export default async function GroupHubPage(
               {isToday && <HomeThread lines={homeThreadLines} />}
               {isToday && aboutYouNeeded && !isCoach && !isActingAsOther && <AboutYouCard groupId={params.groupId} athleteId={athleteId} />}
               {reupState && <ReupCard state={reupState} />}
+              {scheduleCard && <MyScheduleCard groupId={params.groupId} state={scheduleCard} />}
               {isToday && !isCoach && !isActingAsOther && (
                 // The one place a client reaches their coach: it was three taps deep (Settings, More, Messages).
                 <Link href={`/groups/${params.groupId}/messages`} className="block font-body text-sm text-chalk underline underline-offset-2">
