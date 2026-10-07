@@ -11,29 +11,46 @@ export type AllergenKey = "peanut" | "tree nut" | "dairy" | "egg" | "soy" | "whe
 export const ALLERGEN_KEYS: AllergenKey[] = ["peanut", "tree nut", "dairy", "egg", "soy", "wheat or gluten", "fish", "shellfish", "sesame"];
 
 export const ALLERGEN_TERMS: Record<AllergenKey, string[]> = {
-  peanut: ["peanut", "arachis", "satay", "groundnut"],
+  peanut: ["peanut", "arachis", "satay", "groundnut", "nut", "mixed nut", "trail mix", "nut butter"],
   "tree nut": [
     "almond", "walnut", "cashew", "pecan", "pistachio", "hazelnut", "macadamia", "pine nut", "brazil nut", "chestnut", "pesto", "marzipan", "praline", "nutella",
-    "nut butter", "nut milk", "gianduja",
+    "nut butter", "nut milk", "gianduja", "nut", "mixed nut", "trail mix", "filbert", "nougat", "amaretto", "orgeat", "frangipane", "baklava",
   ],
   dairy: [
     "milk", "whey", "casein", "caseinate", "butter", "ghee", "cheese", "cheddar", "mozzarella", "parmesan", "feta", "ricotta", "gouda", "brie", "mascarpone", "halloumi",
     "paneer", "yogurt", "yoghurt", "kefir", "skyr", "cream", "custard", "buttermilk", "lactose", "curd", "half and half", "ice cream",
+    "queso", "provolone", "swiss", "gruyere", "pecorino", "romano", "alfredo", "bechamel", "tzatziki", "labneh", "quark", "creamer", "latte", "cappuccino", "gelato",
+    "milk chocolate", "ranch", "cheesecake", "buttercream",
   ],
-  egg: ["egg", "albumin", "ovalbumin", "mayonnaise", "mayo", "aioli", "hollandaise", "meringue", "eggnog"],
+  egg: [
+    "egg", "albumin", "ovalbumin", "mayonnaise", "mayo", "aioli", "hollandaise", "meringue", "eggnog", "omelet", "omelette", "frittata", "quiche", "souffle", "shakshuka",
+    "carbonara", "challah", "french toast", "benedict",
+  ],
   soy: ["soy", "soya", "soybean", "tofu", "tempeh", "edamame", "miso", "tamari", "teriyaki", "hoisin", "natto"],
   "wheat or gluten": [
     "wheat", "gluten", "flour", "bread", "breadcrumb", "pasta", "spaghetti", "macaroni", "noodle", "couscous", "semolina", "bulgur", "farro", "orzo", "panko", "tortilla",
     "barley", "rye", "seitan", "bagel", "pita", "naan", "cracker", "pretzel", "croissant", "udon", "ramen", "spelt", "kamut", "durum", "malt", "soy sauce",
     "toast", "sourdough", "baguette", "brioche", "ciabatta", "bun", "waffle", "pancake", "muffin", "biscuit",
+    "penne", "fettuccine", "linguine", "fusilli", "rigatoni", "lasagna", "lasagne", "ravioli", "tortellini", "gnocchi", "pizza", "cereal", "granola", "crouton", "dumpling",
+    "wrap", "chapati", "roti", "tempura", "breaded", "batter", "graham", "freekeh", "einkorn", "emmer", "beer", "pie crust", "cake", "cookie", "brownie", "donut", "doughnut",
   ],
   fish: [
     "fish", "salmon", "tuna", "cod", "tilapia", "halibut", "trout", "sardine", "anchovy", "mackerel", "haddock", "snapper", "mahi", "swordfish", "herring", "pollock",
     "catfish", "sea bass", "fish sauce", "worcestershire", "caesar",
+    "roe", "caviar", "surimi", "dashi", "bonito", "eel", "flounder", "sole", "perch", "carp", "grouper", "barramundi", "monkfish", "lox", "gravlax", "sushi", "sashimi", "poke",
+    "nigiri", "bass",
   ],
-  shellfish: ["shrimp", "prawn", "crab", "lobster", "mussel", "clam", "scallop", "oyster", "crawfish", "crayfish", "shellfish", "squid", "calamari", "octopus"],
-  sesame: ["sesame", "tahini", "hummus", "halva"],
+  shellfish: ["shrimp", "prawn", "crab", "lobster", "mussel", "clam", "scallop", "oyster", "crawfish", "crayfish", "shellfish", "squid", "calamari", "octopus",
+    "krill", "abalone", "langoustine", "cuttlefish", "conch", "whelk", "cockle", "scampi", "paella", "bisque", "cioppino", "etouffee",
+  ],
+  sesame: ["sesame", "tahini", "hummus", "halva", "zaatar", "za atar", "gomashio", "benne", "baba ganoush", "baba ghanoush"],
 };
+
+// "Gluten free pasta" is a pasta that names gluten only to say it has none. Each of these is stripped as a whole phrase, so the food word after it does not flag.
+const GLUTEN_FREE_FOODS = [
+  "bread", "pasta", "tortilla", "wrap", "noodle", "flour", "bun", "bagel", "cracker", "cereal", "pizza", "crust", "spaghetti", "penne", "macaroni", "waffle", "pancake",
+  "muffin", "toast", "granola", "pita", "naan", "roll", "cookie", "brownie", "cake", "couscous", "gnocchi", "lasagna", "ravioli", "pretzel", "breadcrumb", "panko", "beer",
+];
 
 // Phrases that contain an allergen word but are NOT that allergen. Removed before matching that allergen.
 export const SAFE_PHRASES: Partial<Record<AllergenKey, string[]>> = {
@@ -41,13 +58,21 @@ export const SAFE_PHRASES: Partial<Record<AllergenKey, string[]>> = {
     "coconut milk", "almond milk", "oat milk", "soy milk", "rice milk", "cashew milk", "hemp milk", "pea milk", "flax milk", "coconut cream", "coconut yogurt", "coconut yoghurt",
     "coconut butter", "peanut butter", "almond butter", "cashew butter", "nut butter", "sunflower butter", "sunflower seed butter", "seed butter", "apple butter", "cocoa butter",
     "shea butter", "cream of tartar", "coconut whipped cream", "oat cream", "soy yogurt", "almond yogurt", "plant milk", "plant based milk", "dairy free",
+    "butter lettuce", "butter bean", "butter squash", "cream of rice", "cream of coconut", "vegan cheese", "vegan butter", "vegan yogurt", "vegan yoghurt", "vegan cream",
+    "vegan milk", "cashew cheese", "plant based cheese", "plant based butter", "plant based yogurt", "bean curd", "non dairy", "swiss chard", "romano bean", "romano pepper",
   ],
   egg: ["flax egg", "chia egg", "egg free", "egg replacer", "vegan mayo", "vegan mayonnaise", "eggless"],
   "wheat or gluten": [
     "almond flour", "coconut flour", "rice flour", "chickpea flour", "corn flour", "tapioca flour", "cassava flour", "buckwheat flour", "potato flour", "oat flour", "banana flour",
     "rice noodle", "rice noodles", "rice pasta", "corn tortilla", "corn tortillas", "rice cracker", "rice crackers", "glass noodle", "glass noodles", "soba",
+    "lettuce wrap", "collard wrap", "nori wrap", "rice cake", "root beer", "ginger beer",
+    ...GLUTEN_FREE_FOODS.map((w) => `gluten free ${w}`),
+    ...GLUTEN_FREE_FOODS.map((w) => `wheat free ${w}`),
+    "gluten free", "wheat free",
   ],
-  "tree nut": ["peanut butter", "butternut", "nutmeg", "water chestnut", "water chestnuts"],
+  "tree nut": ["peanut butter", "butternut", "nutmeg", "water chestnut", "water chestnuts", "nut free"],
+  peanut: ["peanut free", "nut free", "pine nut", "brazil nut", "tree nut"],
+  shellfish: ["oyster mushroom", "crab apple", "lobster mushroom"],
   fish: ["fish free", "fishless"],
   soy: [],
 };
@@ -55,9 +80,11 @@ export const SAFE_PHRASES: Partial<Record<AllergenKey, string[]>> = {
 // Meat and poultry words, for the diet rules (a vegetarian, vegan or pescatarian is never offered these).
 const MEAT_TERMS = [
   "beef", "steak", "pork", "bacon", "ham", "sausage", "chicken", "turkey", "lamb", "veal", "duck", "venison", "bison", "prosciutto", "salami", "pepperoni", "jerky",
-  "meatball", "brisket", "ribs", "hot dog", "meat", "gelatin", "lard", "tallow", "goose", "rabbit", "mutton", "chorizo", "pancetta",
+  "meatball", "brisket", "ribs", "hot dog", "meat", "gelatin", "lard", "tallow", "goose", "rabbit", "mutton", "chorizo", "pancetta", "bone broth", "pate", "foie gras",
 ];
 const NOT_MEAT_MARKERS = ["plant based", "vegan", "meatless", "meat free", "vegetarian", "meat alternative", "veggie"];
+// A marker only clears the ONE word it sits on ("plant based chicken", "vegan sausage"), never the whole line: "chicken breast with vegan pesto" is still chicken.
+const NOT_MEAT_RE = new RegExp(`(?<![a-z0-9])(?:${NOT_MEAT_MARKERS.join("|")})(?: [a-z0-9]+)?(?![a-z0-9])`, "g");
 
 // Words people type that mean one of the groups above ("lactose", "gluten", "tree nuts").
 const ALIASES: Record<string, AllergenKey> = {
@@ -149,8 +176,8 @@ export interface FoodRules {
 
 function dietHit(normalized: string, dietType: string | null | undefined): { label: string; matched: string } | null {
   if (dietType !== "vegetarian" && dietType !== "vegan" && dietType !== "pescatarian") return null;
-  // A line that says it is plant-based is not meat, whatever animal it is named after.
-  const meatText = NOT_MEAT_MARKERS.some((m) => normalized.includes(` ${m} `)) ? "  " : normalized;
+  // "Plant based chicken" is not meat, whatever animal it is named after; only the marked word is cleared.
+  const meatText = normalized.replace(NOT_MEAT_RE, " ");
   const meat = firstMatch(meatText, MEAT_TERMS);
   if (meat) return { label: dietType, matched: meat };
   if (dietType === "vegetarian" || dietType === "vegan") {
@@ -158,7 +185,7 @@ function dietHit(normalized: string, dietType: string | null | undefined): { lab
     if (fish) return { label: dietType, matched: fish };
   }
   if (dietType === "vegan") {
-    const animal = textHasAllergen(normalized, "dairy") ?? textHasAllergen(normalized, "egg");
+    const animal = textHasAllergen(normalized, "dairy") ?? textHasAllergen(normalized, "egg") ?? firstMatch(normalized, ["honey"]);
     if (animal) return { label: dietType, matched: animal };
   }
   return null;

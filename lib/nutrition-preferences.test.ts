@@ -150,3 +150,19 @@ describe("the restrictions line for the generator", () => {
     expect(restrictionsTextFromPreferences({ allergies: ["tree nut"], intolerances: [], dislikes: [], dietType: "omnivore" })).toBe("no tree nuts");
   });
 });
+
+describe("turning check-in text into starting rules", () => {
+  it("names the allergens and the diet in the text", async () => {
+    const { prefillFromRestrictionsText, DEFAULT_PREFERENCES } = await import("@/lib/nutrition-preferences");
+    const out = prefillFromRestrictionsText(DEFAULT_PREFERENCES, "No peanuts or shellfish, mostly vegetarian");
+    expect(out.allergies.sort()).toEqual(["peanut", "shellfish"]);
+    expect(out.dietType).toBe("vegetarian");
+  });
+  it("keeps what is already there and does not change an unrelated diet", async () => {
+    const { prefillFromRestrictionsText, DEFAULT_PREFERENCES } = await import("@/lib/nutrition-preferences");
+    const out = prefillFromRestrictionsText({ ...DEFAULT_PREFERENCES, allergies: ["egg"] }, "lactose, gluten free");
+    expect(out.allergies).toContain("egg");
+    expect(out.allergies).toContain("dairy");
+    expect(out.dietType).toBe("omnivore");
+  });
+});

@@ -1,4 +1,4 @@
-import { ALLERGEN_KEYS } from "@/lib/allergen-check";
+import { ALLERGEN_KEYS, textHasAllergen } from "@/lib/allergen-check";
 
 // One client's food preferences and the protein rules the coach sets for them. The database row is client_nutrition_preferences (one per CLIENT, not per group); this
 // file is everything about it that needs no database: the shape, the defaults, validation, and how protein is judged.
@@ -229,4 +229,20 @@ export function restrictionsTextFromPreferences(p: Pick<NutritionPreferences, "a
   for (const i of p.intolerances) parts.push(`no ${i.toLowerCase()}`);
   for (const d of p.dislikes) parts.push(`no ${d.toLowerCase()}`);
   return parts.join(", ");
+}
+
+// A client whose only restrictions were typed into a check-in ("no peanuts, vegetarian"): a starting point for real rules. Every allergen group the text names becomes an
+// ALLERGY (the safe side: it is a hard drop until the coach says otherwise), and a diet word sets the diet type. The coach reviews and saves; nothing is saved from here.
+export function prefillFromRestrictionsText(base: NutritionPreferences, text: string): NutritionPreferences {
+  const lower = text.toLowerCase();
+  const allergies = new Set(base.allergies);
+  for (const key of ALLERGEN_KEYS) if (textHasAllergen(text, key)) allergies.add(key);
+  let dietType = base.dietType;
+  if (/\bvegan\b/.test(lower)) dietType = "vegan";
+  else if (/\bvegetarian\b/.test(lower)) dietType = "vegetarian";
+  else if (/\bpesc(?:a|e)tarian\b/.test(lower)) dietType = "pescatarian";
+  else if (/\bketo\b/.test(lower)) dietType = "keto";
+  else if (/\bpaleo\b/.test(lower)) dietType = "paleo";
+  else if (/\bcarnivore\b/.test(lower)) dietType = "carnivore";
+  return { ...base, allergies: [...allergies], dietType };
 }

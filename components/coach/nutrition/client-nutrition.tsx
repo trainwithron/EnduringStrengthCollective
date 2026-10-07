@@ -462,6 +462,7 @@ export async function ClientNutrition({
           updatedByName={updatedByName}
           updatedAtLabel={prefs.updatedAt ? shortDateLabel(prefs.updatedAt.slice(0, 10)) : null}
           clientName={firstName}
+          checkinRestrictions={lastCheckinRow?.dietary_restrictions?.trim() || null}
         />
       </section>
 

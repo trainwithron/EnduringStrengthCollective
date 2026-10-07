@@ -109,10 +109,18 @@ export async function POST(request: Request) {
   }
 
   // The client's own rules are read here, on the server, from the database (never from what the browser sent), through the coach's own session so row security decides
-  // whether this coach may see them. A missing row, or a client who is not theirs, simply means no structured rules.
+  // whether this coach may see them. A missing row, or no client at all (the standalone tools), simply means no structured rules. FAIL CLOSED: a client id that is
+  // malformed, or rules that could not be READ, stop the request: nothing is generated that has not been checked against them.
   let rules: { allergies: string[]; intolerances: string[]; dislikes: string[]; dietType: string } | null = null;
-  if (typeof athleteId === "string" && /^[0-9a-f-]{36}$/i.test(athleteId)) {
-    const { data: prefsRow } = await supabase.from("client_nutrition_preferences").select("*").eq("athlete_id", athleteId).maybeSingle();
+  if (athleteId != null) {
+    if (typeof athleteId !== "string" || !/^[0-9a-f-]{36}$/i.test(athleteId)) {
+      return NextResponse.json({ error: "Couldn't check this client's food rules, so nothing was generated." }, { status: 400 });
+    }
+    const { data: prefsRow, error: prefsError } = await supabase.from("client_nutrition_preferences").select("*").eq("athlete_id", athleteId).maybeSingle();
+    if (prefsError) {
+      console.error("[generate-meal-plan] could not read food rules:", prefsError.message);
+      return NextResponse.json({ error: "Couldn't check this client's food rules, so nothing was generated. Try again in a moment." }, { status: 503 });
+    }
     if (prefsRow) {
       const p = rowToPreferences(prefsRow as Record<string, unknown>);
       rules = { allergies: p.allergies, intolerances: p.intolerances, dislikes: p.dislikes, dietType: p.dietType };

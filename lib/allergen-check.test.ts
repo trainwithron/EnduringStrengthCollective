@@ -168,3 +168,55 @@ describe("messages and helpers", () => {
     expect(hits[0].matched).toBe("shrimp");
   });
 });
+
+describe("Assistant review: false misses that must be caught", () => {
+  const caught: [string, string[]][] = [
+    ["tree nut", ["1 oz mixed nuts", "trail mix", "filberts", "nougat", "amaretto", "baklava"]],
+    ["peanut", ["1 oz mixed nuts", "trail mix"]],
+    ["wheat or gluten", ["1 cup cooked penne", "fettuccine alfredo", "lasagna", "cheese ravioli", "gnocchi", "pizza slice", "granola", "croutons", "chicken tempura", "beer battered cod"]],
+    ["dairy", ["queso dip", "provolone slices", "swiss cheese", "gruyere", "alfredo sauce", "coffee creamer", "caffe latte", "gelato", "ranch dressing", "cheesecake"]],
+    ["egg", ["veggie omelette", "frittata", "quiche lorraine", "shakshuka", "spaghetti carbonara", "challah", "french toast", "eggs benedict"]],
+    ["fish", ["fish roe", "caviar", "sushi roll", "salmon sashimi", "tuna poke", "bonito flakes", "grilled sole", "lox"]],
+    ["shellfish", ["shrimp paella", "lobster bisque", "cioppino", "krill oil", "abalone"]],
+    ["sesame", ["za'atar", "baba ganoush"]],
+  ];
+  for (const [key, lines] of caught) {
+    it(`${key}: ${lines.length} more lines are caught`, () => {
+      for (const line of lines) expect(allergyHits(line, key).length, `${key} in "${line}"`).toBeGreaterThan(0);
+    });
+  }
+});
+
+describe("Assistant review: plant-based food must not be flagged", () => {
+  const clean: [string, string[]][] = [
+    ["shellfish", ["oyster mushrooms, sauteed", "crab apple slices", "lobster mushroom"]],
+    ["dairy", ["butter lettuce wraps", "butter beans", "butter squash soup", "cream of rice", "cream of coconut", "vegan cheese", "vegan butter", "vegan yogurt", "cashew cheese", "plant based cheese", "bean curd", "swiss chard"]],
+    ["tree nut", ["nut free granola", "butternut squash", "nutmeg"]],
+    ["peanut", ["peanut free bar", "pine nuts", "brazil nuts"]],
+    ["wheat or gluten", ["wheat free bread", "gluten free pasta", "gluten free bread, 2 slices", "lettuce wrap", "rice cake", "root beer"]],
+  ];
+  for (const [key, lines] of clean) {
+    it(`${key}: ${lines.length} lines are not flagged`, () => {
+      for (const line of lines) expect(allergyHits(line, key), `${key} should not be in "${line}"`).toHaveLength(0);
+    });
+  }
+  it("a gluten free pasta is fine, but a plain pasta beside it still is not", () => {
+    expect(allergyHits("gluten free pasta with regular pasta", "wheat or gluten").length).toBeGreaterThan(0);
+  });
+});
+
+describe("Assistant review: a plant-based word clears only the word it sits on", () => {
+  it("chicken breast with vegan pesto is still chicken for a vegetarian", () => {
+    const hits = checkLines(["Chicken breast with vegan pesto"], { dietType: "vegetarian" });
+    expect(hits.map((h) => h.matched)).toContain("chicken");
+  });
+  it("plant based chicken and vegan sausage are fine", () => {
+    expect(checkLines(["plant based chicken strips", "vegan sausage", "meatless meatballs", "veggie burger"], { dietType: "vegan" })).toHaveLength(0);
+  });
+  it("bone broth and pate are meat; honey is not vegan", () => {
+    expect(checkLines(["bone broth"], { dietType: "vegetarian" })).toHaveLength(1);
+    expect(checkLines(["pate on toast"], { dietType: "vegetarian" })).toHaveLength(1);
+    expect(checkLines(["honey drizzle"], { dietType: "vegan" })).toHaveLength(1);
+    expect(checkLines(["honey drizzle"], { dietType: "vegetarian" })).toHaveLength(0);
+  });
+});

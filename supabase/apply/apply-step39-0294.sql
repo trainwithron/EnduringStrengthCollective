@@ -1,8 +1,8 @@
--- STEP 39: 0294 food preferences and allergy safety: one preferences row per client (allergies, dislikes, diet type, protein target and floor) that the client edits for their tastes and a coach edits for the rules, a fixed-wording notice to the coaches when allergies or dislikes change, the client's answer to 'are you happy with your meal plan', and two new notification types added to the list the database already has
+-- STEP 39: 0294 food preferences and allergy safety: one preferences row per client (allergies, dislikes, diet type, protein target and floor) that the client edits for their tastes and a coach edits for the rules, a fixed-wording notice to the coaches when allergies or dislikes change, the client's answer to 'are you happy with your meal plan', and three new notification types added to the list the database already has
 --
 -- Run apply-precheck first (every row ok = true). Then paste THIS file and run it once.
 -- WHAT YOU SHOULD SEE: "Success. No rows returned."
--- AFTERWARDS: Nothing changes for anyone until the code in the same release is live. After that: a client sees 'My food preferences' on their Nutrition tab and a coach sees Preferences in the client's Nutrition area; a meal option that names an allergen or a food the client does not eat is never offered and is hidden from the client if it was assigned before; a change to allergies or dislikes sends the client's coaches one short notice. No existing data changes and no existing function is replaced. Run it together with the release's code deploy.
+-- AFTERWARDS: Nothing changes for anyone until the code in the same release is live. After that: a client sees 'My food preferences' on their Nutrition tab and a coach sees Preferences in the client's Nutrition area; a meal option that names an allergen or a food the client does not eat is never offered and is hidden from the client if it was assigned before; a change to allergies or dislikes sends the client's coaches one short notice, and a change to a client's allergies or intolerances by someone else sends the client one. No existing data changes and no existing function is replaced. Run it together with the release's code deploy.
 -- ON ERROR: it is all or nothing, so nothing was applied. Run   rollback;   once, copy the red error text, and send it back. Do not run the file again.
 -- It contains no text searching, so editor re-indenting cannot break it.
 
@@ -31,10 +31,10 @@ $guard$;
 --    work around the screen. updated_by and updated_at come from the caller, never from what was sent.
 --  * Protein has a TARGET (default 1.0 g per pound) and a SUCCESS FLOOR (default 0.8 g per pound); the floor can never be above the target.
 --  * A change to allergies, dislikes or intolerances tells the client's coaches with FIXED wording ("Sam changed their food preferences"), never the free text,
---    and never twice in an hour while the first is still unread.
+--    and never twice in an hour while the first is still unread. When SOMEONE ELSE changes the client's allergies or intolerances, the client is told too (fixed wording).
 --  * client_nutrition_feedback: the client's answer to "are you happy with your meal plan?" after a new target (the screens come with the recalculation release,
---    the table is here so that release needs no database change). One answer per target change; the client can only add, the coach can only mark it handled.
---  * Notification types: the two new types are added to the list the database ALREADY has (read at apply time, never typed from an older migration), so this and any
+--    the table is here so that release needs no database change). One answer per REAL target change (the date must be a date a target actually took effect for them), at most five a day; the client can only add, the coach can only mark it handled.
+--  * Notification types: the three new types are added to the list the database ALREADY has (read at apply time, never typed from an older migration), so this and any
 --    other release that widens the same list can apply in either order without dropping the other's types.
 -- New objects only (no existing function is replaced). Re-runnable.
 
@@ -198,6 +198,11 @@ create policy "client_nutrition_feedback_insert_client" on public.client_nutriti
       select 1 from public.group_memberships gm
       where gm.group_id = client_nutrition_feedback.group_id and gm.profile_id = client_nutrition_feedback.athlete_id and gm.role = 'athlete'
     )
+    -- The date must be one a target really took effect for this client, so a client cannot invent dates to send their coaches notices.
+    and exists (
+      select 1 from public.client_macro_target_history h
+      where h.athlete_id = client_nutrition_feedback.athlete_id and h.group_id = client_nutrition_feedback.group_id and h.effective_from = client_nutrition_feedback.target_effective_from
+    )
   );
 
 -- A coach of the group marks an answer handled (the trigger below allows nothing else to change).
@@ -216,6 +221,13 @@ set search_path to 'public'
 as $function$
 begin
   if coalesce(auth.role(), '') not in ('authenticated', 'anon') then
+    return new;
+  end if;
+  -- Never a flood: at most five answers a day per client (counted here, because a policy cannot count rows of its own table).
+  if tg_op = 'INSERT' then
+    if (select count(*) from public.client_nutrition_feedback f where f.athlete_id = new.athlete_id and f.created_at > now() - interval '1 day') >= 5 then
+      raise exception 'You have sent the most answers allowed in a day. Try again tomorrow.';
+    end if;
     return new;
   end if;
   -- The answer itself never changes; only whether it has been handled, by whom, and when (taken from the caller, never from what was sent).
@@ -241,15 +253,17 @@ $function$;
 
 drop trigger if exists client_nutrition_feedback_guard on public.client_nutrition_feedback;
 create trigger client_nutrition_feedback_guard
-  before update on public.client_nutrition_feedback
+  before insert or update on public.client_nutrition_feedback
   for each row execute function public.guard_client_nutrition_feedback();
 
--- ---- notification types: the live list plus the two new ones ----
+-- ---- notification types: the live list plus the three new ones ----
 do $types$
 declare
   v_def text;
   v_have text[];
   v_all text[];
+  v_new_def text;
+  v_after int;
 begin
   select pg_get_constraintdef(c.oid) into v_def
   from pg_constraint c
@@ -257,16 +271,23 @@ begin
   if v_def is null then
     raise exception 'notifications_type_check was not found, so the notification types cannot be widened. NOTHING was changed.';
   end if;
-  select coalesce(array_agg(m[1] order by m[1]), '{}') into v_have from regexp_matches(v_def, '''([a-z_]+)''::text', 'g') as m;
+  -- Every quoted value in the live list, whatever characters it has (a type with a digit or a capital is not dropped).
+  select coalesce(array_agg(m[1] order by m[1]), '{}') into v_have from regexp_matches(v_def, '''([^'']+)''::text', 'g') as m;
   if coalesce(cardinality(v_have), 0) < 5 then
     raise exception 'Could not read the existing notification types from the live constraint (%). NOTHING was changed.', v_def;
   end if;
-  select array_agg(distinct t order by t) into v_all from unnest(v_have || array['nutrition_preferences_changed', 'nutrition_prompt_answered']) as t;
+  select array_agg(distinct t order by t) into v_all from unnest(v_have || array['nutrition_preferences_changed', 'nutrition_prompt_answered', 'nutrition_allergies_updated']) as t;
   alter table public.notifications drop constraint notifications_type_check;
   execute format(
     'alter table public.notifications add constraint notifications_type_check check (type = any (array[%s]))',
     (select string_agg(quote_literal(t) || '::text', ', ') from unnest(v_all) as t)
   );
+  -- The rebuilt list must hold EVERY type the old one did, plus the new ones. If the count is off, stop and put everything back (the whole paste rolls back).
+  select pg_get_constraintdef(c.oid) into v_new_def from pg_constraint c where c.conname = 'notifications_type_check' and c.conrelid = 'public.notifications'::regclass;
+  select count(*) into v_after from regexp_matches(v_new_def, '''([^'']+)''::text', 'g');
+  if v_after <> cardinality(v_all) or cardinality(v_all) < cardinality(v_have) or exists (select 1 from unnest(v_have) t where t <> all (v_all)) then
+    raise exception 'The rebuilt notification type list does not match the live one (% before, % after). NOTHING was changed.', cardinality(v_have), v_after;
+  end if;
 end
 $types$;
 
@@ -282,6 +303,9 @@ declare
   v_name text;
   v_changed boolean;
   v_path text;
+  v_rules_changed boolean;
+  v_client_group uuid;
+  v_client_path text;
   c record;
 begin
   if tg_op = 'INSERT' then
@@ -291,6 +315,29 @@ begin
   end if;
   if not v_changed then
     return new;
+  end if;
+  -- Someone other than the client changed their allergy or intolerance list: the client is told too, with fixed wording (removing "peanut" makes peanut meals appear again).
+  if tg_op = 'INSERT' then
+    v_rules_changed := coalesce(cardinality(new.allergies), 0) > 0 or coalesce(cardinality(new.intolerances), 0) > 0;
+  else
+    v_rules_changed := new.allergies is distinct from old.allergies or new.intolerances is distinct from old.intolerances;
+  end if;
+  if v_rules_changed and v_actor is not null and v_actor <> new.athlete_id then
+    select gm.group_id into v_client_group
+    from public.group_memberships gm
+    where gm.profile_id = new.athlete_id and gm.role = 'athlete'
+    order by exists (select 1 from public.group_memberships cg where cg.group_id = gm.group_id and cg.profile_id = v_actor and cg.role = 'coach') desc, gm.group_id
+    limit 1;
+    if v_client_group is not null then
+      v_client_path := '/groups/' || v_client_group::text || '/nutrition';
+      if not exists (
+        select 1 from public.notifications n
+        where n.profile_id = new.athlete_id and n.type = 'nutrition_allergies_updated' and n.read_at is null and n.created_at > now() - interval '1 hour'
+      ) then
+        insert into public.notifications (profile_id, group_id, type, body, link_path)
+        values (new.athlete_id, v_client_group, 'nutrition_allergies_updated', 'Your coach updated your allergy and food list. Check it is right.', v_client_path);
+      end if;
+    end if;
   end if;
   select coalesce(nullif(btrim(full_name), ''), 'Your client') into v_name from public.profiles where id = new.athlete_id;
   for c in

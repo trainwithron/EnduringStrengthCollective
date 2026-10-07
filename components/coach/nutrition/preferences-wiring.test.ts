@@ -94,3 +94,30 @@ describe("the client side", () => {
     expect(dayPage).not.toContain("<DayMealsView meals={dayMeals}");
   });
 });
+
+describe("Assistant review: fail closed, notices, banner", () => {
+  const exportRoute = src("../../../app/api/account/export/route.ts");
+  it("the AI route refuses to generate when the client's rules cannot be read", () => {
+    expect(route).toContain("if (prefsError)");
+    expect(route).toContain("status: 503");
+    expect(route).toContain("so nothing was generated");
+    expect(route).toContain("athleteId != null");
+  });
+  it("the client's pages hide every recipe when the rules cannot be read", () => {
+    expect(clientPage).toContain("prefsError");
+    expect(clientPage).toContain("hidePlanRecipes(savedPlanMeals)");
+    expect(clientPage).toContain("filterGeneratedMealsForClient(todayMealsRaw, clientRules)");
+    expect(dayPage).toContain("dayPrefsError");
+    expect(dayPage).toContain("hidePlanRecipes(dayMeals)");
+  });
+  it("the coach is asked before an allergy is removed, and sees a banner for restrictions typed only in a check-in", () => {
+    expect(coachSection).toContain("window.confirm(");
+    expect(coachSection).toContain("Remove ");
+    expect(coachSection).toContain("prefillFromRestrictionsText(prefs, checkinRestrictions)");
+    expect(clientNutrition).toContain("checkinRestrictions=");
+  });
+  it("the client's data export includes the two new tables", () => {
+    expect(exportRoute).toContain('from("client_nutrition_preferences")');
+    expect(exportRoute).toContain('from("client_nutrition_feedback")');
+  });
+});

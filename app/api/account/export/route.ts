@@ -32,6 +32,8 @@ export async function GET() {
     { data: videoComments },
     { data: creditPurchases },
     { data: sessionCredits },
+    { data: foodPreferences },
+    { data: nutritionFeedback },
   ] = await Promise.all([
     supabase.from("profiles").select("full_name, avatar_url").eq("id", userId).maybeSingle(),
     supabase.from("athlete_profile_details").select("*").eq("athlete_id", userId).maybeSingle(),
@@ -50,6 +52,8 @@ export async function GET() {
     supabase.from("exercise_video_comments").select("id, body, created_at").eq("author_id", userId),
     supabase.from("credit_purchases").select("credits_purchased, amount_cents, created_at").eq("athlete_id", userId),
     supabase.from("session_credits").select("group_id, balance").eq("athlete_id", userId),
+    supabase.from("client_nutrition_preferences").select("*").eq("athlete_id", userId).maybeSingle(),
+    supabase.from("client_nutrition_feedback").select("*").eq("athlete_id", userId),
   ]);
 
   const exportData = {
@@ -71,6 +75,8 @@ export async function GET() {
     videoComments,
     creditPurchases,
     sessionCredits,
+    foodPreferences,
+    nutritionFeedback,
   };
 
   return new NextResponse(JSON.stringify(exportData, null, 2), {

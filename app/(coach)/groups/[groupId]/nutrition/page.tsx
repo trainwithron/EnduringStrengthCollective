@@ -18,7 +18,7 @@ import type { MealEntryPayload } from "@/lib/meal-plan-assignment";
 import { DayMealsView } from "@/components/athlete/day-meals-view";
 import { NutritionPreferencesCard } from "@/components/athlete/nutrition-preferences-card";
 import { rowToPreferences } from "@/lib/nutrition-preferences";
-import { filterPlanForClient } from "@/lib/plan-preference-check";
+import { filterGeneratedMealsForClient, filterPlanForClient, hidePlanRecipes } from "@/lib/plan-preference-check";
 import type { FoodLogEntry } from "@/components/athlete/meal-checkoff-list";
 import { computeTodaysMicronutrients } from "@/lib/todays-micronutrients";
 import { Key12NutrientGrid } from "@/components/athlete/key12-nutrient-grid";
@@ -286,21 +286,22 @@ export default async function NutritionPage(
   }));
   // A saved plan's meals are an OBJECT keyed by day type ({ daily | train | rest: [...] }), not a list; the checklist below wants a list, and handing it the
   // object throws on the client's page the day a coach saves a plan. So the checklist only gets a real list, and the saved plan is shown by DayMealsView.
-  const todayMeals: GeneratedMeal[] = Array.isArray(todayMealPlan?.meals) ? (todayMealPlan?.meals as unknown as GeneratedMeal[]) : [];
+  const todayMealsRaw: GeneratedMeal[] = Array.isArray(todayMealPlan?.meals) ? (todayMealPlan?.meals as unknown as GeneratedMeal[]) : [];
   const savedPlanMeals =
     todayMealPlan?.meals && typeof todayMealPlan.meals === "object" && !Array.isArray(todayMealPlan.meals)
       ? (todayMealPlan.meals as unknown as Record<string, MealEntryPayload[]>)
       : null;
 
   // The client's own food preferences, and the saved plan with anything that breaks them left out (a missing row, or a database without the table yet, is no rules).
-  const { data: prefsRow } = await supabase.from("client_nutrition_preferences").select("*").eq("athlete_id", athleteId).maybeSingle();
+  // A client with NO row simply has no rules. A row that could not be READ is different: nothing can be checked, so no recipe is shown (the meals say the coach is updating them).
+  const { data: prefsRow, error: prefsError } = await supabase.from("client_nutrition_preferences").select("*").eq("athlete_id", athleteId).maybeSingle();
+  if (prefsError) console.error("[nutrition] could not read food rules:", prefsError.message);
   const clientPrefs = rowToPreferences(prefsRow as Record<string, unknown> | null);
-  const clientPlan = filterPlanForClient(savedPlanMeals, {
-    allergies: clientPrefs.allergies,
-    intolerances: clientPrefs.intolerances,
-    dislikes: clientPrefs.dislikes,
-    dietType: clientPrefs.dietType,
-  });
+  const clientRules = prefsError
+    ? ("unreadable" as const)
+    : { allergies: clientPrefs.allergies, intolerances: clientPrefs.intolerances, dislikes: clientPrefs.dislikes, dietType: clientPrefs.dietType };
+  const todayMeals = filterGeneratedMealsForClient(todayMealsRaw, clientRules);
+  const clientPlan = clientRules === "unreadable" ? hidePlanRecipes(savedPlanMeals) : filterPlanForClient(savedPlanMeals, clientRules);
 
   const recentFoodOptions = dedupeRecentFoodLogs(
     (recentFoodLogRows ?? []).map((r) => ({

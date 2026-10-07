@@ -1,5 +1,5 @@
 // 0294: food preferences (one row per CLIENT), the protein target and floor, a fixed-wording notice to the coaches when allergies or dislikes change, the client's
-// answer to "are you happy with your meal plan?", and two new notification types added to the list the database already has.
+// answer to "are you happy with your meal plan?", and three new notification types added to the list the database already has.
 const tryQ = async (db, sql, params) => {
   try { return { rows: (await db.query(sql, params)).rows }; } catch (e) { return { error: String(e.message).split("\n")[0] }; }
 };
@@ -13,6 +13,10 @@ export default {
       h.check("baseline: neither table exists yet", !t.prefs && !t.fb, JSON.stringify(t));
       const c = await h.one(`select pg_get_constraintdef(oid) as def from pg_constraint where conname = 'notifications_type_check'`);
       h.check("baseline: the notification types do not include the new ones", !/nutrition_preferences_changed/.test(c.def), c.def);
+      // Another release may have added a type with a digit or a capital: the rebuild must keep it (the old reader dropped anything that was not a-z and underscore).
+      const list = [...c.def.matchAll(/'([^']+)'::text/g)].map((m) => m[1]).concat(["Legacy_Type2"]);
+      await db.query(`alter table public.notifications drop constraint notifications_type_check`);
+      await db.query(`alter table public.notifications add constraint notifications_type_check check (type = any (array[${list.map((t) => `'${t}'::text`).join(", ")}]))`);
     },
 
     async "0294"({ db, h }) {
@@ -33,7 +37,8 @@ export default {
 
       // ---- the notification types ----
       const c = await h.one(`select pg_get_constraintdef(oid) as def from pg_constraint where conname = 'notifications_type_check'`);
-      h.check("the two new types are in the list", /nutrition_preferences_changed/.test(c.def) && /nutrition_prompt_answered/.test(c.def), c.def);
+      h.check("the three new types are in the list", /nutrition_preferences_changed/.test(c.def) && /nutrition_prompt_answered/.test(c.def) && /nutrition_allergies_updated/.test(c.def), c.def);
+      h.check("a type with a digit and a capital that the database already had is kept", c.def.includes("'Legacy_Type2'"), c.def);
       const oldTypes = ["comment", "program_assigned", "macros_assigned", "partner_request", "partner_request_accepted", "milestone_celebration", "gym_visitor_lead", "trainer_dispatch_offer", "trainer_dispatch_question", "session_pattern_note", "credits_expired", "waitlist_slot_offered", "recurring_booking_conflict", "email_changed", "direct_message", "late_change", "booking_request", "request_decision", "goal_proposed", "goal_answered"];
       h.check("every type the database already had is still allowed (nothing dropped)", oldTypes.every((t) => c.def.includes(`'${t}'`)), c.def);
       await h.asSuper();
@@ -137,6 +142,18 @@ export default {
       await h.asSuper();
       const n2 = await h.rows(`select profile_id from public.notifications where type = 'nutrition_preferences_changed'`);
       h.check("when a coach changes the allergies, the other coach is told and the coach who made the change is not", n2.length === 1 && n2[0].profile_id === coach2, JSON.stringify(n2));
+      const toClient = await h.rows(`select profile_id, group_id, body, link_path from public.notifications where type = 'nutrition_allergies_updated'`);
+      h.check("when a coach changes the client's allergies, the CLIENT is told too, in the coach's group, with fixed wording", toClient.length === 1 && toClient[0].profile_id === ann && toClient[0].group_id === gA && toClient[0].body === "Your coach updated your allergy and food list. Check it is right." && !/peanut|kiwi|egg/i.test(toClient[0].body), JSON.stringify(toClient));
+      h.check("the client's own change never sends the client that notice", (await h.one(`select count(*)::int as n from public.notifications where type = 'nutrition_allergies_updated'`)).n === 1);
+      await h.as(coach1);
+      await db.query(`update public.client_nutrition_preferences set allergies = array['peanut', 'other: kiwi'] where athlete_id = $1`, [ann]);
+      await h.asSuper();
+      h.check("removing an allergy tells the client again only if the first notice was read", (await h.one(`select count(*)::int as n from public.notifications where type = 'nutrition_allergies_updated'`)).n === 1);
+      await db.query(`update public.notifications set read_at = now() where type = 'nutrition_allergies_updated'`);
+      await h.as(coach1);
+      await db.query(`update public.client_nutrition_preferences set allergies = array['peanut'] where athlete_id = $1`, [ann]);
+      await h.asSuper();
+      h.check("after the client read it, a later removal sends a fresh notice", (await h.one(`select count(*)::int as n from public.notifications where type = 'nutrition_allergies_updated'`)).n === 2);
 
       // ---- the server (service role) is not held back by the client guard ----
       await h.asService();
@@ -145,7 +162,15 @@ export default {
       await h.asSuper();
 
       // ---- the answer to "are you happy with your meal plan?" ----
+      // An answer must name a date a target really took effect for the client.
+      await h.asSuper();
+      for (const d of ["2026-10-14", "2026-10-17", "2026-10-20"]) {
+        await db.query(`insert into public.client_macro_target_history (athlete_id, group_id, effective_from, calories) values ($1, $2, $3, 2200)`, [ann, gA, d]);
+      }
+      await db.query(`insert into public.client_macro_target_history (athlete_id, group_id, effective_from, calories) values ($1, $2, '2026-10-16', 2200)`, [bob, gA]);
       await h.as(ann);
+      const invented = await tryQ(db, `insert into public.client_nutrition_feedback (athlete_id, group_id, target_effective_from, happy) values ($1, $2, '2026-12-31', true)`, [ann, gA]);
+      h.check("an answer for a date no target took effect on is refused", /row-level security/.test(invented.error ?? ""), JSON.stringify(invented));
       const f1 = await tryQ(db, `insert into public.client_nutrition_feedback (athlete_id, group_id, target_effective_from, happy, change_text, requests_text, boring) values ($1, $2, '2026-10-14', false, 'less rice', 'more fish', true) returning id, status`, [ann, gA]);
       h.check("a client can answer for themself, in a group they are a client in", !f1.error && f1.rows?.[0]?.status === "new", JSON.stringify(f1));
       const dup = await tryQ(db, `insert into public.client_nutrition_feedback (athlete_id, group_id, target_effective_from, happy) values ($1, $2, '2026-10-14', true)`, [ann, gA]);
@@ -178,6 +203,21 @@ export default {
       await h.as(coach1);
       const coachDel = await tryQ(db, `delete from public.client_nutrition_feedback returning 1`);
       h.check("a coach cannot delete an answer", (coachDel.rows ?? []).length === 0, JSON.stringify(coachDel));
+      await h.asSuper();
+      // at most five answers a day, even with real dates
+      await db.query(`delete from public.client_nutrition_feedback`);
+      for (let i = 1; i <= 6; i++) {
+        await db.query(`insert into public.client_macro_target_history (athlete_id, group_id, effective_from, calories) values ($1, $2, $3, 2200)`, [ann, gA, `2026-11-0${i}`]);
+      }
+      await h.as(ann);
+      let accepted = 0;
+      let lastError = "";
+      for (let i = 1; i <= 6; i++) {
+        const r = await tryQ(db, `insert into public.client_nutrition_feedback (athlete_id, group_id, target_effective_from, happy) values ($1, $2, $3, true)`, [ann, gA, `2026-11-0${i}`]);
+        if (r.error) lastError = r.error;
+        else accepted++;
+      }
+      h.check("a client can send five answers in a day and the sixth is refused", accepted === 5 && /most answers/.test(lastError), `accepted=${accepted} ${lastError}`);
       await h.asSuper();
 
       // ---- no new function a signed-in person can run directly ----

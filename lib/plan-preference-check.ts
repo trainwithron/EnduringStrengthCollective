@@ -72,6 +72,34 @@ export function filterPlanForClient(meals: PlanMeals, rules: FoodRules): ClientP
   return { meals: result, hiddenCount: flagged.length, emptiedMeals };
 }
 
+// FAIL CLOSED. When the client's food rules could not be READ (a database error, as opposed to a client who simply has none), nothing can be checked, so nothing is shown:
+// every recipe option is hidden and each meal says the coach is updating it. Showing an unchecked plan would turn a broken read into an allergen reaching a client.
+export function hidePlanRecipes(meals: PlanMeals): ClientPlanView {
+  if (!meals) return { meals: null, hiddenCount: 0, emptiedMeals: [] };
+  let hiddenCount = 0;
+  const emptiedMeals: ClientPlanView["emptiedMeals"] = [];
+  const result: Record<string, MealEntryPayload[]> = {};
+  for (const [bucket, entries] of Object.entries(meals)) {
+    result[bucket] = (entries ?? []).map((meal) => {
+      const choices = mealRecipeChoices(meal);
+      if (choices.length === 0) return meal;
+      hiddenCount += choices.length;
+      emptiedMeals.push({ bucket, mealId: meal.mealId, title: meal.title });
+      return { ...meal, recipes: [], recipeId: null, recipeName: null, ingredients: [] };
+    });
+  }
+  return { meals: result, hiddenCount, emptiedMeals };
+}
+
+// The older list-shaped plan (meal slots with up to three options each): the same rules, applied to each option.
+export function filterGeneratedMealsForClient<T extends { options: { recipeName: string | null; ingredients: string[] }[] }>(meals: T[], rules: FoodRules | "unreadable"): T[] {
+  if (rules === "unreadable") return meals.map((m) => ({ ...m, options: [] }));
+  return meals.map((m) => {
+    const { kept } = filterOptionsByRules(m.options, rules);
+    return kept.length === m.options.length ? m : { ...m, options: kept };
+  });
+}
+
 export interface FlaggedDay {
   date: string;
   flagged: FlaggedChoice[];
@@ -116,7 +144,13 @@ export function filterOptionsByRules<T extends { recipeName: string | null; ingr
 // The structured rules as plain lines for a prompt ("Allergies (never include): peanut, shellfish."). Empty when there are none.
 export function rulesForPrompt(rules: FoodRules): string {
   const lines: string[] = [];
-  const names = (xs: string[] | undefined) => (xs ?? []).map((x) => (x.toLowerCase().startsWith("other: ") ? x.slice(7) : x)).join(", ");
+  // A typed item ("other: kiwi", a dislike) is free text. Only letters, digits, spaces and hyphens reach the model, so a typed instruction cannot steer it.
+  const clean = (x: string) => x.replace(/[^A-Za-z0-9 -]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 60);
+  const names = (xs: string[] | undefined) =>
+    (xs ?? [])
+      .map((x) => clean(x.toLowerCase().startsWith("other: ") ? x.slice(7) : x))
+      .filter(Boolean)
+      .join(", ");
   if ((rules.allergies ?? []).length > 0) lines.push(`Allergies (a hard rule, never include any trace of these): ${names(rules.allergies)}`);
   if ((rules.intolerances ?? []).length > 0) lines.push(`Intolerances (avoid): ${names(rules.intolerances)}`);
   if ((rules.dislikes ?? []).length > 0) lines.push(`Foods they dislike (avoid): ${names(rules.dislikes)}`);

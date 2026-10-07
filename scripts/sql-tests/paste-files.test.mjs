@@ -274,8 +274,8 @@ for (const s of steps) {
   const again = await run(file);
   check("release-h: a second run is refused, naming step 38 (" + again + ")", !!again && /step 38 \(0293\) cannot run/.test(again) && /already applied/.test(again));
 }
-// Release I (step 39): food preferences. Applies on the live-shaped state, the undo puts the notification types back to the live list without the two new ones, and a
-// second run is refused.
+// Release I (step 39): food preferences. Applies on the live-shaped state, the undo puts the notification types back to the live list without the three new ones, and a
+// second run is refused. A live type with a digit and a capital (what another release might add) must come through the apply and the undo unchanged.
 {
   const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
   const bundle = bundles.find((b) => b.id === "release-i");
@@ -286,20 +286,33 @@ for (const s of steps) {
       to_regclass('public.client_nutrition_feedback') is not null as fb,
       coalesce((select pg_get_constraintdef(oid) like '%nutrition_preferences_changed%' from pg_constraint where conname = 'notifications_type_check'), false) as new_type,
       coalesce((select pg_get_constraintdef(oid) like '%goal_answered%' and pg_get_constraintdef(oid) like '%comment%' from pg_constraint where conname = 'notifications_type_check'), false) as old_types`)).rows[0];
+  const typeList = async () => {
+    const def = (await db.query(`select pg_get_constraintdef(oid) as d from pg_constraint where conname = 'notifications_type_check'`)).rows[0].d;
+    return [...def.matchAll(/'([^']+)'::text/g)].map((m) => m[1]).sort();
+  };
+  const widenedList = [...(await typeList()), "Legacy_Type2"];
+  await db.query("alter table public.notifications drop constraint notifications_type_check");
+  await db.query(`alter table public.notifications add constraint notifications_type_check check (type = any (array[${widenedList.map((t) => "'" + t + "'::text").join(", ")}]))`);
   const eu = await run(`apply/undo-step${st.n}-${st.slug}.sql`);
   check("release-i: undo-step39-0294.sql runs before the step (nothing to undo)" + (eu ? ": " + eu : ""), !eu);
+  const listBefore = await typeList();
   const before = await state();
   check("release-i: before it runs neither table exists and the new types are not allowed", !before.prefs && !before.fb && !before.new_type && before.old_types, JSON.stringify(before));
   const err = await run(file);
   check("release-i bundle applies on the live-shaped state" + (err ? ": " + err : ""), !err);
   const after = await state();
-  check("release-i: both tables exist, the two new types are allowed and every old type still is", after.prefs && after.fb && after.new_type && after.old_types, JSON.stringify(after));
+  check("release-i: both tables exist, the new types are allowed and every old type still is", after.prefs && after.fb && after.new_type && after.old_types, JSON.stringify(after));
+  const listAfter = await typeList();
+  const newThree = ["nutrition_preferences_changed", "nutrition_prompt_answered", "nutrition_allergies_updated"];
+  check("release-i: the full live type list before is inside the list after (including Legacy_Type2), plus exactly the three new types", listBefore.every((t) => listAfter.includes(t)) && listAfter.includes("Legacy_Type2") && listAfter.length === listBefore.length + 3 && newThree.every((t) => listAfter.includes(t)), JSON.stringify({ before: listBefore.length, after: listAfter.length }));
   const again = await run(file);
   check("release-i: a second run is refused, naming step 39 (" + again + ")", !!again && /step 39 \(0294\) cannot run/.test(again) && /already applied/.test(again));
   const eu2 = await run(`apply/undo-step${st.n}-${st.slug}.sql`);
   check("release-i: the undo runs after the step" + (eu2 ? ": " + eu2 : ""), !eu2);
   const undone = await state();
   check("release-i: after the undo both tables are gone, the new types are gone and every old type is kept", !undone.prefs && !undone.fb && !undone.new_type && undone.old_types, JSON.stringify(undone));
+  const listUndone = await typeList();
+  check("release-i: after the undo the type list is exactly what it was before the step", JSON.stringify(listUndone) === JSON.stringify(listBefore), JSON.stringify({ before: listBefore.length, undone: listUndone.length }));
   const err2 = await run(file);
   check("release-i: the bundle applies again after an undo" + (err2 ? ": " + err2 : ""), !err2);
 }

@@ -1,4 +1,4 @@
--- STEP 39 (PRECHECK, run first, changes nothing): 0294 food preferences and allergy safety: one preferences row per client (allergies, dislikes, diet type, protein target and floor) that the client edits for their tastes and a coach edits for the rules, a fixed-wording notice to the coaches when allergies or dislikes change, the client's answer to 'are you happy with your meal plan', and two new notification types added to the list the database already has
+-- STEP 39 (PRECHECK, run first, changes nothing): 0294 food preferences and allergy safety: one preferences row per client (allergies, dislikes, diet type, protein target and floor) that the client edits for their tastes and a coach edits for the rules, a fixed-wording notice to the coaches when allergies or dislikes change, the client's answer to 'are you happy with your meal plan', and three new notification types added to the list the database already has
 --
 -- Paste into the Supabase SQL editor and run. Every row must say ok = true.
 -- If any row says false: do NOT run the apply file. Copy the result table and send it back.

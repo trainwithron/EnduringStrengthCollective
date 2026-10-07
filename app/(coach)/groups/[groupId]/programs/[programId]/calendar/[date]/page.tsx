@@ -19,7 +19,7 @@ import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { TodayWidget } from "@/components/athlete/today-widget";
 import { DayMealsView } from "@/components/athlete/day-meals-view";
 import { rowToPreferences } from "@/lib/nutrition-preferences";
-import { filterPlanForClient } from "@/lib/plan-preference-check";
+import { filterPlanForClient, hidePlanRecipes } from "@/lib/plan-preference-check";
 import { computeScheduledDates } from "@/lib/program-schedule";
 import { isHabitDueOn } from "@/lib/habits";
 import { resolveDayMacros, standingForDate } from "@/lib/macro-resolution";
@@ -174,9 +174,13 @@ export default async function DayDetailPage(
         .maybeSingle();
       dayMeals = (mealPlanRow?.meals as any) ?? null;
       // What the client is shown leaves out any option that breaks their food preferences (an allergy added after the plan was made).
-      const { data: dayPrefsRow } = await supabase.from("client_nutrition_preferences").select("*").eq("athlete_id", athleteId).maybeSingle();
+      // If the rules cannot be READ, nothing can be checked, so no recipe is shown (a client with no row has no rules).
+      const { data: dayPrefsRow, error: dayPrefsError } = await supabase.from("client_nutrition_preferences").select("*").eq("athlete_id", athleteId).maybeSingle();
+      if (dayPrefsError) console.error("[calendar day] could not read food rules:", dayPrefsError.message);
       const dayPrefs = rowToPreferences(dayPrefsRow as Record<string, unknown> | null);
-      dayMealsView = filterPlanForClient(dayMeals, { allergies: dayPrefs.allergies, intolerances: dayPrefs.intolerances, dislikes: dayPrefs.dislikes, dietType: dayPrefs.dietType });
+      dayMealsView = dayPrefsError
+        ? hidePlanRecipes(dayMeals)
+        : filterPlanForClient(dayMeals, { allergies: dayPrefs.allergies, intolerances: dayPrefs.intolerances, dislikes: dayPrefs.dislikes, dietType: dayPrefs.dietType });
 
       // A day's meal plan carries its own macros, computed for the exact
       // meals shown below — that target wins over daily_macros when both
