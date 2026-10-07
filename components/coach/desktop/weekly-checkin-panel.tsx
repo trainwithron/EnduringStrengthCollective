@@ -18,7 +18,6 @@ import { notifyPush } from "@/lib/push-notify";
 import { isBelowFloor } from "@/lib/calorie-floor";
 import { ApplyFromField } from "@/components/coach/nutrition/apply-from-field";
 import { CalorieFloorWarning } from "@/components/coach/nutrition/calorie-floor-warning";
-import { localDateKey } from "@/lib/timezone";
 
 // Purely a display band for the slider below — the real min/max/step/
 // default (1-15%, default 5%) are untouched; this just marks where most
@@ -36,10 +35,6 @@ const PHASE_LABELS: Record<NutritionPhase, string> = {
 // The check-in code below reads "{ error }" off whichever save ran; adapt the standing-target result to that shape.
 function standingSaveAsSupabaseResult(r: { ok: boolean }) {
   return { error: r.ok ? null : { message: "standing target save failed" } };
-}
-
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
 }
 
 // Coach-facing action that runs Ron's own weekly calorie-periodization
@@ -64,7 +59,6 @@ export function WeeklyCheckinPanel({
   maintenanceCalories,
   injurySurplusPct,
   defaultPhase,
-  hasStandingTarget = false,
   todayKey,
   floorCalories = null,
   clientName = "this client",
@@ -95,9 +89,6 @@ export function WeeklyCheckinPanel({
   // only backs it up when there's no check-in history yet at all — a
   // brand-new tagged client no longer always starts on "Fat loss."
   defaultPhase?: NutritionPhase | null;
-  // When the client has a standing target, a check-in updates THAT by default, so the new
-  // numbers keep applying after one date. Without it the old one-date apply is the default.
-  hasStandingTarget?: boolean;
   // The coach's calendar day (from the server, in the coach's zone) and the soft calorie floor for this client when it can be worked out.
   todayKey: string;
   floorCalories?: number | null;

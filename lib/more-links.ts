@@ -33,7 +33,9 @@ export function buildMoreSections(opts: {
     {
       title: "Body and food",
       links: [
-        { label: "Macro calculator", hint: "Work out calories and macros", href: `${g}/tools/macro-calculator` },
+        opts.isCoach
+          ? { label: "Nutrition", hint: "Targets, meal plans and the calculator", href: `${g}/nutrition` }
+          : { label: "Macro calculator", hint: "Work out calories and macros", href: `${g}/tools/macro-calculator` },
         { label: "My progress photos", hint: "Private unless you share them", href: `${g}/progress-photos` },
       ],
     },

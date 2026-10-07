@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { saveStandingTarget } from "@/lib/standing-macros";
 import { localDateKey } from "@/lib/timezone";
+import { CalorieFloorWarning } from "@/components/coach/nutrition/calorie-floor-warning";
 
 interface Target {
   calories: number | null;
@@ -44,6 +45,8 @@ export function StandingMacroTargetCard({
   latestExplicit,
   upcomingOverrides,
   calendarHref,
+  floorCalories = null,
+  clientName = "this client",
 }: {
   athleteId: string;
   groupId: string;
@@ -53,6 +56,9 @@ export function StandingMacroTargetCard({
   latestExplicit: { date: string; calories: number } | null;
   upcomingOverrides: { date: string; calories: number }[];
   calendarHref: string;
+  // The soft calorie floor for this client, when it can be worked out: only ever a warning under the number, never a block.
+  floorCalories?: number | null;
+  clientName?: string;
 }) {
   const router = useRouter();
   const [saved, setSaved] = useState<Target | null>(initial);
@@ -170,6 +176,10 @@ export function StandingMacroTargetCard({
             />
           </label>
         ))}
+      </div>
+
+      <div className="mt-3">
+        <CalorieFloorWarning calories={draft.calories.trim() === "" ? null : Number(draft.calories)} floor={floorCalories} who={clientName} />
       </div>
 
       <div className="flex flex-wrap items-center gap-3 mt-3">

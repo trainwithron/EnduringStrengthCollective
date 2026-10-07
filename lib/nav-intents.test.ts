@@ -7,7 +7,8 @@ import { HOWTOS } from "@/lib/howto-library";
 const ROOT = path.resolve(__dirname, "..");
 
 function routeExists(template: string): boolean {
-  const rel = template.replace("{groupId}", "[groupId]").replace("/messages/{athleteId}", "/messages/[otherId]").replace("{athleteId}", "[athleteId]").replace(/^\//, "");
+  // A path may carry a query ("?tab=favorites"); only the page itself has to exist.
+  const rel = template.split("?")[0].replace("{groupId}", "[groupId]").replace("/messages/{athleteId}", "/messages/[otherId]").replace("{athleteId}", "[athleteId]").replace(/^\//, "");
   // The coach areas live in the (coach) route group, which is not part of the address.
   return ["app", "app/(coach)"].some((base) => fs.existsSync(path.join(ROOT, base, rel, "page.tsx")));
 }
@@ -84,8 +85,8 @@ const COACH_DESKTOP: [string, string][] = [
   ["nutrition", "/groups/g1/nutrition"],
   ["meal plans", "/groups/g1/nutrition"],
   ["macros", "/groups/g1/nutrition"],
-  ["recipes", "/groups/g1/recipes"],
-  ["macro calculator", "/groups/g1/tools/macro-calculator"],
+  ["recipes", "/groups/g1/nutrition?tab=favorites"],
+  ["macro calculator", "/groups/g1/nutrition?tab=calculator"],
   ["1rm calculator", "/groups/g1/tools/one-rep-max"],
   ["one rep max", "/groups/g1/tools/one-rep-max"],
   ["records", "/groups/g1/records"],
@@ -199,8 +200,8 @@ const COACH_PHONE: [string, string][] = [
   ["log a session for jordan", "/groups/g1/athletes/a-jordan/log"],
   ["jordan's workout history", "/groups/g1/athletes/a-jordan/history"],
   ["show me the 1rm calculator", "/groups/g1/tools/one-rep-max"],
-  ["macro calculator", "/groups/g1/tools/macro-calculator"],
-  ["recipes", "/groups/g1/recipes"],
+  ["macro calculator", "/groups/g1/nutrition?tab=calculator"],
+  ["recipes", "/groups/g1/nutrition?tab=favorites"],
   ["challenges", "/groups/g1/challenges"],
   ["video check ins", "/groups/g1/video-checkins"],
   ["pro shop", "/groups/g1/resources"],
@@ -498,7 +499,7 @@ describe("a named client: the place is asked as a question, never a silent jump"
       return r.kind === "navigate" ? r.chips[0].href : null;
     };
     expect(href("let me see Johann's calendar")).toBe("/groups/g9/athletes/c-johann/calendar");
-    expect(href("Johann's nutrition")).toBe("/groups/g9/athletes/c-johann/calendar");
+    expect(href("Johann's nutrition")).toBe("/groups/g9/athletes/c-johann?tab=nutrition");
     expect(href("open Johann's messages")).toBe("/groups/g9/messages/c-johann");
     expect(href("Karina's workout history")).toBe("/groups/g2/athletes/c-karina/history");
     expect(href("Karina's goals")).toBe("/groups/g2/athletes/c-karina");
