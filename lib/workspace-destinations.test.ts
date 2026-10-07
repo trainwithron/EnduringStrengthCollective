@@ -61,7 +61,7 @@ describe("what a pane may load", () => {
     expect(isAllowedWorkspacePath(`/groups/${G}`)).toBe(true);
   });
   it("refuses outside addresses and tricks", () => {
-    for (const bad of ["https://evil.example/x", "//evil.example", "/\\evil.example", "javascript:alert(1)", "/admin/organizations", `/groups/${G}/../../admin`, "/groups/x/calendar", "", "groups/abc", "/api/clients/delete"]) {
+    for (const bad of ["https://evil.example/x", "//evil.example", "/\\evil.example", "javascript:alert(1)", "/admin/organizations", `/groups/${G}/../../admin`, "/groups/x/calendar", "", "groups/abc", "/api/clients/delete", `/groups/${G}/%2e%2e/admin`, `/groups/${G}/%2E%2E/%2e%2e/admin`, `/groups/${G}/a%2fb`, `/groups/${G}/a%5cb`]) {
       expect(isAllowedWorkspacePath(bad), bad).toBe(false);
     }
     expect(isAllowedWorkspacePath("/groups/" + G + "/x\u0000y")).toBe(false);

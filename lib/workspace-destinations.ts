@@ -67,6 +67,8 @@ export function isAllowedWorkspacePath(path: string): boolean {
   if (typeof path !== "string" || path.length === 0 || path.length > 500) return false;
   if (!path.startsWith("/") || path.startsWith("//") || path.includes("\\")) return false;
   if (/[\u0000-\u001f]/.test(path)) return false;
+  // An encoded dot, slash or backslash is read by the browser as the real thing ("%2e%2e" is ".."): none is allowed.
+  if (/%(2e|2f|5c)/i.test(path)) return false;
   const first = path.split(/[?#]/)[0];
   if (first.includes("..")) return false;
   return first === "/dashboard" || first === "/clients" || /^\/groups\/[0-9a-fA-F-]{8,40}(\/|$)/.test(first);
