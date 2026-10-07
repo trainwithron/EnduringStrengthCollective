@@ -28,6 +28,8 @@ export interface ShareImageInput {
   totalWorkoutCount: number | null;
   createdAt: string;
   background: ScenicBackgroundKey | null;
+  // One light line (a volume comparison, or a joke), already chosen and seeded per workout by the caller so the same workout always shows the same one.
+  funLine?: string | null;
 }
 
 export interface ShareImageModel {
@@ -40,6 +42,7 @@ export interface ShareImageModel {
   lifts: { name: string; detail: string }[];
   dateLabel: string;
   background: ScenicBackgroundKey | null;
+  funLine: string | null;
 }
 
 const WORDMARK = "SPOTLIGHT";
@@ -106,6 +109,7 @@ export function buildShareImageModel(input: ShareImageInput): ShareImageModel {
       .toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
       .toUpperCase(),
     background: input.background,
+    funLine: input.funLine?.trim() ? input.funLine.trim() : null,
   };
 }
 
@@ -201,6 +205,35 @@ export function fitText(
   return { text: `${trimmed.trimEnd()}…`, size };
 }
 
+// Breaks text into at most maxLines lines that fit the width (words are never split); the last line is trimmed with an ellipsis if the text still does not fit.
+export function wrapLines(ctx: DrawContext, text: string, maxWidth: number, maxLines: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let current = "";
+  for (let i = 0; i < words.length; i++) {
+    const next = current ? `${current} ${words[i]}` : words[i];
+    if (ctx.measureText(next).width <= maxWidth || !current) {
+      current = next;
+      continue;
+    }
+    lines.push(current);
+    current = words[i];
+    if (lines.length === maxLines - 1) {
+      current = words.slice(i).join(" ");
+      break;
+    }
+  }
+  if (current) lines.push(current);
+  if (lines.length > maxLines) lines.length = maxLines;
+  const last = lines.length - 1;
+  if (last >= 0 && ctx.measureText(lines[last]).width > maxWidth) {
+    let t = lines[last];
+    while (t.length > 1 && ctx.measureText(`${t}…`).width > maxWidth) t = t.slice(0, -1);
+    lines[last] = `${t.trimEnd()}…`;
+  }
+  return lines;
+}
+
 interface Plan {
   safeTop: number; // story UIs (Instagram, Facebook) cover the top and bottom of the frame
   brandY: number;
@@ -213,6 +246,9 @@ interface Plan {
   statValueSize: number;
   statLabelSize: number;
   chipY: number;
+  funY: number; // baseline of the first line of the fun line
+  funSize: number;
+  funLineH: number;
   liftsTitleY: number;
   liftsStartY: number;
   liftRowH: number;
@@ -234,11 +270,14 @@ export function planFor(format: ShareImageFormat): Plan {
       statsY: 740,
       statValueSize: 120,
       statLabelSize: 32,
-      chipY: 990,
-      liftsTitleY: 1100,
-      liftsStartY: 1140,
-      liftRowH: 120,
-      liftGap: 18,
+      chipY: 960,
+      funY: 1040,
+      funSize: 36,
+      funLineH: 46,
+      liftsTitleY: 1150,
+      liftsStartY: 1186,
+      liftRowH: 104,
+      liftGap: 14,
       footerY: 1604,
       margin: 90,
     };
@@ -255,10 +294,13 @@ export function planFor(format: ShareImageFormat): Plan {
     statValueSize: 90,
     statLabelSize: 26,
     chipY: 520,
+    funY: 892,
+    funSize: 28,
+    funLineH: 34,
     liftsTitleY: 588,
     liftsStartY: 612,
-    liftRowH: 80,
-    liftGap: 12,
+    liftRowH: 72,
+    liftGap: 10,
     footerY: 968,
     margin: 80,
   };
@@ -357,6 +399,14 @@ export function drawShareImage(ctx: DrawContext, format: ShareImageFormat, model
     ctx.fillStyle = theme.rust;
     ctx.fillText(model.chip, w / 2, p.chipY);
     setLetterSpacing(ctx, 0);
+  }
+
+  // One light line (a volume comparison or a joke), centred, at most two lines
+  if (model.funLine) {
+    ctx.textAlign = "center";
+    ctx.font = body(p.funSize);
+    ctx.fillStyle = theme.chalk;
+    wrapLines(ctx, model.funLine, maxText, 2).forEach((line, i) => ctx.fillText(line, w / 2, p.funY + i * p.funLineH));
   }
 
   // Top lifts

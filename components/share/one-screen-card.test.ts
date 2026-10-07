@@ -15,9 +15,26 @@ describe("one-screen card rules", () => {
   });
   it("drops the least important lines on a short screen instead of overflowing", () => {
     expect(source).toContain("max-height:620px");
+    expect(source).toContain("max-height:700px");
   });
   it("never uses a fixed pixel height for the card", () => {
     expect(source).not.toMatch(/\bh-\[\d+px\]/);
+  });
+  it("shows the fun line without a fixed height, drops it on a very short screen, and offers Another one only when given a handler", () => {
+    expect(source).toContain("model.funLine");
+    expect(source).toContain("line-clamp-2");
+    expect(source).toContain("max-height:600px");
+    expect(source).toContain("onShuffle &&");
+    expect(source).toContain("min-h-[2.75rem]");
+  });
+  it("the fun line is fresh per card and remembered on the client's device, and the picture follows the same line", () => {
+    const screen = readFileSync(new URL("./share-screen.tsx", import.meta.url), "utf8");
+    expect(screen).toContain("pickFreshFunLine(facts, memory.recent)");
+    expect(screen).toContain("rerollFunLine(facts, memory.recent, line.id)");
+    expect(screen).toContain("funLine: line.text");
+    expect(screen).toContain("isOwner && !!viewerId");
+    expect(page).toContain("<ShareScreen");
+    expect(page).toContain("pickSeededFunLine(funFacts, params.postId)");
   });
   it("the page gives the card the visible screen and keeps the rest below it", () => {
     expect(page).toContain("h-[100dvh]");

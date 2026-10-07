@@ -10,12 +10,15 @@ export function OneScreenCard({
   background,
   coachLine,
   hasPr,
+  onShuffle,
 }: {
   model: ShareImageModel;
   // The scene behind the card (a scenic background or the group's own image), already positioned to fill it.
   background: ReactNode;
   coachLine: { coachFirstName: string; text: string } | null;
   hasPr: boolean;
+  // Present only for the client who owns the card: rolls a different fun line.
+  onShuffle?: () => void;
 }) {
   return (
     <div
@@ -70,6 +73,27 @@ export function OneScreenCard({
           </p>
         )}
 
+        {model.funLine && (
+          <div className="py-[clamp(4px,1.2dvh,10px)] [@media(max-height:600px)]:hidden">
+            <p
+              data-testid="share-fun-line"
+              className="font-body text-chalk/90 text-[clamp(11px,1.75dvh,14px)] leading-snug line-clamp-2 drop-shadow-[0_1px_3px_rgba(0,0,0,.7)]"
+            >
+              {model.funLine}
+            </p>
+            {onShuffle && (
+              <button
+                type="button"
+                onClick={onShuffle}
+                data-testid="share-fun-shuffle"
+                className="mx-auto flex items-center justify-center min-h-[2.75rem] -my-2 px-4 font-body text-[11px] uppercase tracking-wide text-steel underline underline-offset-2 active:text-chalk"
+              >
+                Another one
+              </button>
+            )}
+          </div>
+        )}
+
         {model.lifts.length > 0 && (
           <div className="text-left">
             <p className="font-body text-[10px] text-steel uppercase tracking-wide mb-[clamp(3px,0.8dvh,6px)]">
@@ -79,7 +103,7 @@ export function OneScreenCard({
               {model.lifts.map((lift) => (
                 <div
                   key={lift.name}
-                  className="flex items-center justify-between gap-2 px-3 py-[clamp(4px,1dvh,9px)] rounded-lg bg-chalk/[0.06] last:[@media(max-height:620px)]:hidden"
+                  className="flex items-center justify-between gap-2 px-3 py-[clamp(4px,1dvh,9px)] rounded-lg bg-chalk/[0.06] last:[@media(max-height:700px)]:hidden"
                 >
                   <span className="font-display uppercase text-[clamp(13px,2.1dvh,17px)] truncate">{lift.name}</span>
                   <span className="font-body text-[clamp(11px,1.8dvh,14px)] text-chalk/80 shrink-0 [font-variant-numeric:tabular-nums]">

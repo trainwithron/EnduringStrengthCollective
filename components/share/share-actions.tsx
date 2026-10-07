@@ -45,20 +45,24 @@ export function ShareActions({
     return () => {
       cancelled = true;
     };
-    // The input is fixed for this page; only the two choices change the picture.
+    // The input is fixed for this page; the two choices and the fun line are what change the picture.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [format, showName]);
+  }, [format, showName, input.funLine]);
 
   const file = useMemo(
     () => (blob ? new File([blob], `workout-${format}.png`, { type: "image/png" }) : null),
     [blob, format]
   );
+  // What this browser can do is only known once it is running in the browser. The server (and the first browser render) assume nothing, so the two agree and
+  // the Copy button appears right after, instead of a mismatch between the server page and the browser.
+  const [inBrowser, setInBrowser] = useState(false);
+  useEffect(() => setInBrowser(true), []);
   const caps = useMemo(
     () =>
-      typeof navigator === "undefined"
+      !inBrowser || typeof navigator === "undefined"
         ? { nativeShare: false, copyImage: false }
         : deliveryCapabilities(navigator, typeof ClipboardItem !== "undefined", file),
-    [file]
+    [file, inBrowser]
   );
 
   function say(message: string) {

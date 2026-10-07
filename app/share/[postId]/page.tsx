@@ -6,8 +6,8 @@ import { getVolumeEquivalence } from "@/lib/volume-equivalence";
 import { pickGymJoke } from "@/lib/gym-jokes";
 import { getSharedWorkout } from "@/lib/shared-workout";
 import { PrListToggle } from "@/components/share/pr-list-toggle";
-import { ShareActions } from "@/components/share/share-actions";
-import { OneScreenCard } from "@/components/share/one-screen-card";
+import { ShareScreen } from "@/components/share/share-screen";
+import { pickSeededFunLine, type WorkoutFacts } from "@/lib/workout-fun-line";
 import { buildShareImageModel } from "@/lib/share-image";
 import { CustomizeSharePanel } from "@/components/share/customize-share-panel";
 import { BackgroundPicker } from "@/components/share/background-picker";
@@ -175,6 +175,17 @@ export default async function ShareWorkoutPage(
     createdAt: shared.createdAt,
     background: scenicBackground?.key ?? null,
   };
+  // The light line on the card. The default (what anyone but the client sees, and the server's first render) is picked from this workout's own numbers with a
+  // repeatable seed; the client's own device replaces it with a fresh one that is not among their last 20 (components/share/share-screen.tsx).
+  const funFacts: WorkoutFacts = {
+    totalVolume: shared.totalVolume,
+    durationSeconds: shared.durationSeconds,
+    totalSets: shared.totalSetsCompleted,
+    weekStreak: shared.weekStreak,
+    prCount: shared.celebratePrs.length,
+    totalWorkoutCount: shared.totalWorkoutCount,
+  };
+  const defaultFunLine = pickSeededFunLine(funFacts, params.postId);
   const screenModel = buildShareImageModel({ ...imageInput, showName: true });
   const screenBackground = useOrgCustomImage ? (
     // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL
@@ -186,13 +197,20 @@ export default async function ShareWorkoutPage(
   return (
     <main id="top" className="bg-graphite text-chalk font-body">
       <section className="h-[100dvh] min-h-[540px] max-w-md mx-auto flex flex-col gap-3 px-4 pt-[max(12px,env(safe-area-inset-top))] pb-[max(12px,env(safe-area-inset-bottom))]">
-        <OneScreenCard
+        <ShareScreen
+          postId={params.postId}
+          viewerId={user?.id ?? null}
+          isOwner={viewerIsAuthor}
+          facts={funFacts}
+          defaultLine={defaultFunLine}
           model={screenModel}
           background={screenBackground}
           coachLine={coachCongrats}
           hasPr={shared.celebratePrs.length > 0}
+          imageInput={imageInput}
+          title={shareTitle}
+          homeHref={user ? `/groups/${shared.groupId}` : null}
         />
-        <ShareActions input={imageInput} title={shareTitle} homeHref={user ? `/groups/${shared.groupId}` : null} />
       </section>
 
       <section id="full-workout" className="min-h-screen flex items-center justify-center px-6 py-16">

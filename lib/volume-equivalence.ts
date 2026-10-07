@@ -24,7 +24,7 @@ interface ReferenceObject {
 // singles.
 const REFERENCE_OBJECTS: ReferenceObject[] = [
   // Featherweight (~1-15 lbs)
-  { name: "a Nintendo Switch", pluralName: "Nintendo Switches", weightLbs: 0.7, emoji: "🎮" },
+  { name: "a handheld game console", pluralName: "handheld game consoles", weightLbs: 0.7, emoji: "🎮" },
   { name: "a bag of flour", pluralName: "bags of flour", weightLbs: 5, emoji: "🌾" },
   { name: "a chihuahua", pluralName: "chihuahuas", weightLbs: 6, emoji: "🐕" },
   { name: "a gallon of milk", pluralName: "gallons of milk", weightLbs: 8, emoji: "🥛" },
@@ -55,11 +55,11 @@ const REFERENCE_OBJECTS: ReferenceObject[] = [
   { name: "a photo booth", pluralName: "photo booths", weightLbs: 800, emoji: "📸" },
   { name: "a bull", pluralName: "bulls", weightLbs: 1500, emoji: "🐂" },
   { name: "a hot tub", pluralName: "hot tubs", weightLbs: 1200, emoji: "🛁" },
-  { name: "a Volkswagen Beetle", pluralName: "Volkswagen Beetles", weightLbs: 2000, emoji: "🚗" },
+  { name: "a little vintage car", pluralName: "little vintage cars", weightLbs: 2000, emoji: "🚗" },
 
   // Extra large (~2,000-10,000 lbs)
   { name: "a wrecking ball", pluralName: "wrecking balls", weightLbs: 3000, emoji: "💥" },
-  { name: "a Smart car", pluralName: "Smart cars", weightLbs: 2000, emoji: "🚙" },
+  { name: "a tiny city car", pluralName: "tiny city cars", weightLbs: 2000, emoji: "🚙" },
   { name: "a pickup truck", pluralName: "pickup trucks", weightLbs: 5000, emoji: "🛻" },
   { name: "a hippopotamus", pluralName: "hippopotamuses", weightLbs: 4000, emoji: "🦛" },
   { name: "a great white shark", pluralName: "great white sharks", weightLbs: 5000, emoji: "🦈" },
@@ -72,7 +72,7 @@ const REFERENCE_OBJECTS: ReferenceObject[] = [
   { name: "a firetruck", pluralName: "firetrucks", weightLbs: 30000, emoji: "🚒" },
 
   // Absurd (~90,000+ lbs)
-  { name: "a Boeing 737", pluralName: "Boeing 737s", weightLbs: 90000, emoji: "✈️" },
+  { name: "a passenger jet", pluralName: "passenger jets", weightLbs: 90000, emoji: "✈️" },
   { name: "a blue whale", pluralName: "blue whales", weightLbs: 300000, emoji: "🐋" },
 ].sort((a, b) => a.weightLbs - b.weightLbs);
 
@@ -91,6 +91,7 @@ const PHRASE_TEMPLATES: ((label: string, singular: string, emoji: string) => str
 ];
 
 export interface VolumeEquivalence {
+  id: string; // stable per object ("equiv:a grizzly bear"), so a line can be remembered and not repeated
   count: number;
   singular: string;
   plural: string;
@@ -135,6 +136,7 @@ export function getVolumeEquivalence(totalVolumeLbs: number, seed: string): Volu
   const template = seededPick(PHRASE_TEMPLATES, `${seed}:phrase`);
 
   return {
+    id: `equiv:${ref.name}`,
     count,
     singular: ref.name,
     plural: ref.pluralName,

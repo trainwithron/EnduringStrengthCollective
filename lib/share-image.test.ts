@@ -10,6 +10,7 @@ import {
   firstNameOnly,
   fitText,
   formatDuration,
+  wrapLines,
   planFor,
   renderShareImageBlob,
   type DrawContext,
@@ -35,6 +36,7 @@ const base: ShareImageInput = {
   totalWorkoutCount: 31,
   createdAt: "2026-10-06T15:00:00Z",
   background: null,
+  funLine: "You lifted 12,450 pounds in only 52 minutes. Too bad we can't make money at that rate. 💸",
 };
 
 // A recording canvas: text width is a fixed fraction of the font size, so overflow can be checked without a browser.
@@ -130,6 +132,37 @@ describe("the picture model", () => {
   });
 });
 
+describe("the fun line in the model", () => {
+  it("is trimmed, and null when empty or missing", () => {
+    expect(buildShareImageModel({ ...base, funLine: "  hello  " }).funLine).toBe("hello");
+    expect(buildShareImageModel({ ...base, funLine: "" }).funLine).toBeNull();
+    expect(buildShareImageModel({ ...base, funLine: undefined }).funLine).toBeNull();
+  });
+});
+
+describe("wrapLines", () => {
+  const { ctx } = recorder();
+  ctx.font = "500 20px x"; // 10px per character in the recorder
+  it("keeps short text on one line and wraps at word boundaries", () => {
+    expect(wrapLines(ctx, "short line", 400, 2)).toEqual(["short line"]);
+    expect(wrapLines(ctx, "aaaa bbbb cccc dddd", 100, 3)).toEqual(["aaaa bbbb", "cccc dddd"]);
+  });
+  it("never uses more lines than allowed, trimming the last with an ellipsis", () => {
+    const lines = wrapLines(ctx, "one two three four five six seven eight nine ten", 100, 2);
+    expect(lines).toHaveLength(2);
+    expect(lines[1].endsWith("…")).toBe(true);
+    for (const l of lines) expect(ctx.measureText(l).width).toBeLessThanOrEqual(100);
+  });
+  it("does not lose or split a word that is too long for a line", () => {
+    const lines = wrapLines(ctx, "supercalifragilisticexpialidocious ok", 100, 2);
+    expect(lines.length).toBeLessThanOrEqual(2);
+    expect(lines[0].startsWith("supercal")).toBe(true);
+  });
+  it("is empty for empty text", () => {
+    expect(wrapLines(ctx, "   ", 100, 2)).toEqual([]);
+  });
+});
+
 describe("session length", () => {
   it("accepts a normal length and rejects a mis-tap or a forgotten Finish", () => {
     expect(believableDurationSeconds(3120, null, null)).toBe(3120);
@@ -205,6 +238,35 @@ describe.each<ShareImageFormat>(["story", "post"])("%s picture fits its frame", 
       expect(d.y - d.size, d.text).toBeGreaterThanOrEqual(planFor("story").safeTop - 60);
       expect(d.y, d.text).toBeLessThanOrEqual(height - 250);
     }
+  });
+
+  it("draws the fun line in at most two lines, inside the frame, clear of the lifts and the footer", () => {
+    const drawn = render({ funLine: "A very long fun line that goes on and on about how much was lifted today and how nice that was to see, honestly. 🏋️" });
+    const p = planFor(format);
+    const fun = drawn.filter((d) => d.size === p.funSize);
+    expect(fun.length).toBeGreaterThanOrEqual(1);
+    expect(fun.length).toBeLessThanOrEqual(2);
+    for (const d of fun) {
+      const [left, right] = bounds(d);
+      expect(left).toBeGreaterThanOrEqual(0);
+      expect(right).toBeLessThanOrEqual(width);
+    }
+    const lastRowBottom = p.liftsStartY + 2 * (p.liftRowH + p.liftGap) + p.liftRowH;
+    const funTop = p.funY - p.funSize * 0.72;
+    const funBottom = p.funY + (fun.length - 1) * p.funLineH + p.funSize * 0.08;
+    if (format === "post") {
+      expect(funTop).toBeGreaterThan(lastRowBottom);
+      expect(funBottom).toBeLessThan(p.footerY - 40 * 0.72);
+    } else {
+      expect(funBottom).toBeLessThan(p.liftsTitleY - p.statLabelSize * 0.72);
+      expect(funTop).toBeGreaterThan(p.chipY);
+    }
+  });
+
+  it("draws nothing for the fun line when there is none", () => {
+    const p = planFor(format);
+    expect(render({ funLine: null }).filter((d) => d.size === p.funSize)).toHaveLength(0);
+    expect(render({ funLine: "   " }).filter((d) => d.size === p.funSize)).toHaveLength(0);
   });
 
   it("draws the wordmark and no link", () => {
