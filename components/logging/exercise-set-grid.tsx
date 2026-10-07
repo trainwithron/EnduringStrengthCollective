@@ -16,6 +16,7 @@ import { parseNumericReps } from "@/lib/program-card-visuals";
 import { isExerciseUnlocked, type PriorBest } from "@/lib/obstacle-unlock";
 import { Check, Lock, LockOpen } from "lucide-react";
 import { InfoTip } from "@/components/shared/info-tip";
+import { formatRest, restForSet } from "@/lib/rest-time";
 
 // Metrics-as-rows, sets-as-columns — one row per tracked field (Reps,
 // Weight, RPE, ...), one cell per set, scrolling horizontally instead of
@@ -91,9 +92,12 @@ function GridCell({
   onTouched,
   setNumber,
   locked,
+  coachRest,
 }: {
   set: SetLogEntry;
   field: TrackedField;
+  // The rest the coach prescribed for this set (own or inherited): shown here as a fixed time, not an input.
+  coachRest?: number | null;
   readOnly: boolean;
   onChange: (patch: Partial<SetLogEntry>) => void;
   // The athlete interacted with this set (focused/blurred/swiped a cell) —
@@ -205,6 +209,17 @@ function GridCell({
   // never a meaningful signal that the goal had actually been attempted).
   const showLock = !!locked && hasGoalToProtect;
 
+  if (field === "rest" && coachRest != null) {
+    return (
+      <div
+        className="w-16 h-10 shrink-0 flex items-center justify-center rounded-token-pill bg-surface/40 border border-steel/20 text-chalk font-body text-sm tabular-nums"
+        aria-label={`Rest after set ${setNumber}: ${formatRest(coachRest)}, set by your coach`}
+      >
+        {formatRest(coachRest)}
+      </div>
+    );
+  }
+
   return (
     <div className="relative w-16 h-10 shrink-0">
       <input
@@ -283,6 +298,7 @@ function SetCompletionSync({
   readOnly,
   touched,
   weightOptional,
+  restPrescribed,
   onChange,
 }: {
   set: SetLogEntry;
@@ -290,6 +306,8 @@ function SetCompletionSync({
   readOnly: boolean;
   // Bodyweight movements: reps alone complete the set (no typing 0 lbs).
   weightOptional: boolean;
+  // The coach prescribed this set's rest (own or inherited): it is not logged by the client, so it is not needed to complete the set.
+  restPrescribed: boolean;
   // Whether the athlete has interacted with this set this session.
   touched: boolean;
   onChange: (patch: Partial<SetLogEntry>) => void;
@@ -299,6 +317,8 @@ function SetCompletionSync({
     if (readOnly || set.status === "skipped") return;
     const requiredProps = orderTrackedFields(trackedFields)
       .filter((f) => !(weightOptional && f === "weight"))
+      // A coach-prescribed rest is not something the client logs: it is not needed to complete the set.
+      .filter((f) => !(restPrescribed && f === "rest"))
       .map((f) => ACTUAL_PROP[f] as keyof SetLogEntry);
     const allFilled =
       requiredProps.length > 0 &&
@@ -337,6 +357,7 @@ function SetCompletionSync({
     set.height,
     set.distance,
     set.restSeconds,
+    restPrescribed,
     set.pace,
     set.status,
     readOnly,
@@ -520,6 +541,7 @@ export function ExerciseSetGrid({
           readOnly={readOnly}
           touched={touchedSetIds.has(set.id)}
           weightOptional={weightOptional}
+          restPrescribed={restForSet(sets, set.id)?.source === "coach"}
           onChange={(patch) => onSetChange(set.id, patch)}
         />
       ))}
@@ -559,6 +581,10 @@ export function ExerciseSetGrid({
                 onTouched={() => markTouched(set.id)}
                 onChange={(patch) => onSetChange(set.id, patch)}
                 locked={field === "weight" && !unlocked}
+                coachRest={(() => {
+                  const r = restForSet(sets, set.id);
+                  return r && r.source === "coach" ? r.seconds : null;
+                })()}
               />
             ))}
           </div>

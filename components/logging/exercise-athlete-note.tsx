@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { createNoteAutosaver, type NoteAutosaver } from "@/lib/note-autosave";
+import { clearNoteDraft, decideDraft, readNoteDraft, writeNoteDraft } from "@/lib/note-draft";
 import { useSetSave } from "./set-save-context";
 
 // A place to leave a note on this exact exercise ("shoulder felt off today"), separate from the heavier video-comment system
@@ -12,29 +13,8 @@ import { useSetSave } from "./set-save-context";
 //
 // Nothing typed or dictated is lost (lib/note-autosave.ts): it saves shortly after typing pauses, when the field loses focus (reading the value from the field
 // itself), when the screen is left or the app is hidden, and Complete workout waits for it like it waits for the sets. A failed save shows Retry and tries
-// again by itself.
-function readDraft(key: string): string | null {
-  try {
-    return window.localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-function writeDraft(key: string, value: string) {
-  try {
-    window.localStorage.setItem(key, value);
-  } catch {
-    // storage blocked: the autosave still works
-  }
-}
-function clearDraft(key: string) {
-  try {
-    window.localStorage.removeItem(key);
-  } catch {
-    // nothing to clear
-  }
-}
-
+// again by itself. Text that never reached the server is kept on this phone (lib/note-draft.ts): restored silently when the server note is unchanged, offered
+// ("Use it" / "Discard") when someone else changed the note meanwhile, dropped after a week and removed at sign-out.
 export function ExerciseAthleteNote({
   sessionExerciseId,
   initialNote,
@@ -47,12 +27,13 @@ export function ExerciseAthleteNote({
   // False when a coach is typing in a client's session (the note is stored as the exercise's note, the label says whose it is).
   ownNote?: boolean;
 }) {
-  // A draft that never reached the server (a failed last save, the app killed) is kept on this phone and restored, so typed or dictated text is never lost.
-  const draftKey = `note-draft:${sessionExerciseId}`;
-  // (Restored in the mount effect below, not here: reading storage while rendering would make the first client render differ from the server's HTML.)
+  // (A kept draft is restored in the mount effect below, not here: reading storage while rendering would make the first client render differ from the server's HTML.)
   const [draft, setDraft] = useState(initialNote ?? "");
+  const [staleDraft, setStaleDraft] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [savedNote, setSavedNote] = useState(initialNote);
+  // The note the server holds (what a kept draft is typed over).
+  const serverNoteRef = useRef(initialNote ?? "");
   const { registerPending } = useSetSave();
   const saverRef = useRef<NoteAutosaver | null>(null);
   if (!saverRef.current) {
@@ -64,8 +45,10 @@ export function ExerciseAthleteNote({
         const { data, error } = await supabase.from("session_exercises").update({ athlete_note: trimmed }).eq("id", sessionExerciseId).select("id");
         if (!error && Array.isArray(data) && data.length === 1) {
           setSavedNote(trimmed);
+          serverNoteRef.current = trimmed ?? "";
           // Clear the kept draft only if it is exactly what was just saved: if the person kept typing while the save was in flight, the newer text stays.
-          if ((readDraft(draftKey) ?? "").trim() === (trimmed ?? "")) clearDraft(draftKey);
+          const kept = readNoteDraft(sessionExerciseId);
+          if (kept && kept.text.trim() === (trimmed ?? "")) clearNoteDraft(sessionExerciseId);
           return true;
         }
         return false;
@@ -75,14 +58,15 @@ export function ExerciseAthleteNote({
   }
   const saver = saverRef.current;
 
-  // A draft kept on this phone that differs from what the server has is put back in the field and saved right away.
+  // A draft kept on this phone: put back and saved if the server note is the one it was typed over, offered if the note changed since, dropped if identical.
   useEffect(() => {
     if (readOnly) return;
-    const stored = readDraft(draftKey);
-    if (stored != null && stored.trim() !== (initialNote ?? "").trim()) {
-      setDraft(stored);
-      saver.change(stored);
-    }
+    const decision = decideDraft(readNoteDraft(sessionExerciseId), initialNote);
+    if (decision.kind === "discard") clearNoteDraft(sessionExerciseId);
+    else if (decision.kind === "restore") {
+      setDraft(decision.text);
+      saver.change(decision.text);
+    } else if (decision.kind === "ask") setStaleDraft(decision.text);
     // only on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -135,12 +119,41 @@ export function ExerciseAthleteNote({
           </span>
         )}
       </div>
+      {staleDraft !== null && (
+        <div className="mb-2 border border-steel/30 bg-surface/40 px-3 py-2" role="alert">
+          <p className="font-body text-xs text-chalk">You have unsaved text from earlier on this phone, and this note has changed since.</p>
+          <div className="flex gap-3 mt-1">
+            <button
+              type="button"
+              onClick={() => {
+                setDraft(staleDraft);
+                writeNoteDraft(sessionExerciseId, serverNoteRef.current, staleDraft);
+                saver.change(staleDraft);
+                setStaleDraft(null);
+              }}
+              className="min-h-[44px] font-body text-xs text-rust"
+            >
+              Use it
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                clearNoteDraft(sessionExerciseId);
+                setStaleDraft(null);
+              }}
+              className="min-h-[44px] font-body text-xs text-steel"
+            >
+              Discard
+            </button>
+          </div>
+        </div>
+      )}
       <textarea
         id={fieldId}
         value={draft}
         onChange={(e) => {
           setDraft(e.target.value);
-          writeDraft(draftKey, e.target.value);
+          writeNoteDraft(sessionExerciseId, serverNoteRef.current, e.target.value);
           saver.change(e.target.value);
         }}
         onBlur={(e) => void saver.flush(e.currentTarget.value)}

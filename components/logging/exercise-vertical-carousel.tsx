@@ -5,6 +5,7 @@ import { ChevronDown, ChevronUp, List, X } from "lucide-react";
 import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
 import type { TrackedField } from "@/lib/exercise-fields";
 import { ExerciseCard } from "./exercise-card";
+import type { RestForSet } from "@/lib/rest-time";
 import { ExerciseNoteCallout } from "./exercise-note-callout";
 
 // Vertical-swipe variant of the exercise logging carousel
@@ -60,7 +61,7 @@ export function ExerciseVerticalCarousel({
   athleteId: string;
   viewerId: string | null;
   canUploadVideo: boolean;
-  onSetCompleted: (set: SetLogEntry) => void;
+  onSetCompleted: (set: SetLogEntry, rest?: RestForSet | null) => void;
   gamificationEnabled: boolean;
   // Same shared-strip mirror as exercise-swipe-carousel.tsx — kept
   // identical between both variants so the pinned-strip/next-preview

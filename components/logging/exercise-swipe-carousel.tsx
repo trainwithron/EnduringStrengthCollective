@@ -5,6 +5,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
 import type { TrackedField } from "@/lib/exercise-fields";
 import { ExerciseCard } from "./exercise-card";
+import type { RestForSet } from "@/lib/rest-time";
 import { ExerciseNoteCallout } from "./exercise-note-callout";
 
 // Replaces the old scroll-past exercise list with a snap-to-card
@@ -62,7 +63,7 @@ export function ExerciseSwipeCarousel({
   athleteId: string;
   viewerId: string | null;
   canUploadVideo: boolean;
-  onSetCompleted: (set: SetLogEntry) => void;
+  onSetCompleted: (set: SetLogEntry, rest?: RestForSet | null) => void;
   gamificationEnabled: boolean;
   // SessionLogger mirrors this into its own state to drive the shared
   // pinned-strip/next-exercise preview (SessionProgressStrip) above both

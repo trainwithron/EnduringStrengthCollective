@@ -25,7 +25,7 @@ export const TRACKED_FIELD_DEFS: { key: TrackedField; label: string; kind: "numb
   { key: "time", label: "Sec", kind: "number" },
   { key: "height", label: "Height", kind: "number" },
   { key: "distance", label: "Distance", kind: "number" },
-  { key: "rest", label: "Rest (s)", kind: "number" },
+  { key: "rest", label: "Rest", kind: "number" },
   // Free text, same convention as Tempo — holds a real pace ("8:30/mi"),
   // an effort label ("easy"), or an RPE-per-mile note.
   { key: "pace", label: "Pace", kind: "text" },

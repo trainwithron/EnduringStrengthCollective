@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { computeRemainingSeconds, formatMMSS } from "@/lib/rest-timer-math";
 import { readRestTimerState, writeRestTimerState, clearRestTimerState } from "@/lib/rest-timer-storage";
 import { playRestAlert } from "@/lib/rest-alert";
+import { formatRest } from "@/lib/rest-time";
 import { MIN_REST_SECONDS_FOR_GAME } from "@/lib/rest-timer-difficulty";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { SessionStopwatch } from "./session-stopwatch";
@@ -46,6 +47,9 @@ const GAME_ORDER: GameKey[] = ["snake", "flappy", "runner", "whack-a-mole", "bre
 interface RunningState {
   startedAtMs: number;
   durationSeconds: number;
+  // "coach": the rest the coach prescribed for this set (no extending it); "typed": a rest the client typed (as before).
+  source?: "coach" | "typed";
+  prescribedSeconds?: number;
 }
 
 export function RestTimerBar({
@@ -64,7 +68,7 @@ export function RestTimerBar({
   // to that exercise's own target rest if it has one. When isPrescribed
   // is true, the coach actually specified this rest period, so the
   // countdown auto-starts immediately instead of waiting for a tap.
-  pendingPrompt: { defaultSeconds: number; isPrescribed: boolean } | null;
+  pendingPrompt: { defaultSeconds: number; isPrescribed: boolean; source?: "coach" | "typed" } | null;
   onPromptHandled: () => void;
   // A real pending item (a due habit, an unanswered wellness check-in)
   // gates the game picker behind resolving it first — null whenever
@@ -150,8 +154,13 @@ export function RestTimerBar({
     return () => clearInterval(interval);
   }, [running, sessionId]);
 
-  function startPreset(seconds: number) {
-    const next: RunningState = { startedAtMs: Date.now(), durationSeconds: seconds };
+  function startPreset(seconds: number, source?: "coach" | "typed") {
+    const next: RunningState = {
+      startedAtMs: Date.now(),
+      durationSeconds: seconds,
+      ...(source ? { source } : {}),
+      ...(source === "coach" ? { prescribedSeconds: seconds } : {}),
+    };
     setRunning(next);
     setRemaining(seconds);
     writeRestTimerState(sessionId, next);
@@ -165,13 +174,14 @@ export function RestTimerBar({
   // still falls through to the tap-a-preset prompt below.
   useEffect(() => {
     if (pendingPrompt?.isPrescribed && !running) {
-      startPreset(pendingPrompt.defaultSeconds);
+      startPreset(pendingPrompt.defaultSeconds, pendingPrompt.source);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingPrompt]);
 
   function addFifteen() {
-    if (!running) return;
+    // The coach's rest for this set is exactly that long: it is not extended from the app.
+    if (!running || running.source === "coach") return;
     const next: RunningState = { ...running, durationSeconds: running.durationSeconds + 15 };
     setRunning(next);
     writeRestTimerState(sessionId, next);
@@ -212,13 +222,15 @@ export function RestTimerBar({
             <p className="font-display text-3xl leading-none text-rust tabular-nums">
               {formatMMSS(remaining)}
             </p>
-            <button
-              type="button"
-              onClick={addFifteen}
-              className="h-11 px-2.5 border border-steel/30 text-steel font-body text-xs"
-            >
-              +15s
-            </button>
+            {running.source !== "coach" && (
+              <button
+                type="button"
+                onClick={addFifteen}
+                className="h-11 px-2.5 border border-steel/30 text-steel font-body text-xs"
+              >
+                +15s
+              </button>
+            )}
             <button
               type="button"
               onClick={skip}
@@ -305,6 +317,12 @@ export function RestTimerBar({
           <p className="font-body text-sm text-rust">Rest complete! 💪</p>
         )}
       </div>
+
+      {running && running.source === "coach" && (
+        <p className="font-body text-xs text-steel mt-1.5">
+          Rest {formatRest(running.prescribedSeconds ?? running.durationSeconds)} (set by your coach)
+        </p>
+      )}
 
       {running && selectedGame && (
         <MiniGameSlot

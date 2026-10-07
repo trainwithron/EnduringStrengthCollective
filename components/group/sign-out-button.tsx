@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { clearWorkspaceStorage } from "@/lib/workspace-layout";
+import { clearAllNoteDrafts } from "@/lib/note-draft";
 
 export function SignOutButton() {
   const [signingOut, setSigningOut] = useState(false);
@@ -14,6 +15,8 @@ export function SignOutButton() {
     const supabase = createBrowserClient();
     await supabase.auth.signOut();
     clearWorkspaceStorage(window.localStorage);
+    // A shared phone must not keep someone's unsaved exercise notes (they can be about pain or injury).
+    clearAllNoteDrafts();
     router.push("/login");
     router.refresh();
   }

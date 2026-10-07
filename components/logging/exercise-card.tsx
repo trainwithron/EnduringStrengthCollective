@@ -6,6 +6,7 @@ import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
 import { TRACKED_FIELD_DEFS, ACTUAL_COLUMN, ACTUAL_PROP, fieldDef, type TrackedField } from "@/lib/exercise-fields";
 import { ExerciseSetGrid } from "./exercise-set-grid";
 import { SetStepper } from "./set-stepper";
+import { restForSet, type RestForSet } from "@/lib/rest-time";
 import { UNDO_REMOVE_SET_MS, canRemoveSet, lastSet, prescribedNote, removeSetConfirmText, restoreSetRow, setHasLoggedWork } from "@/lib/set-removal";
 import { useSetSave } from "./set-save-context";
 import { classifyEquipmentType } from "@/lib/equipment-classifier";
@@ -57,7 +58,7 @@ export function ExerciseCard({
   athleteId: string;
   viewerId: string | null;
   canUpload: boolean;
-  onSetCompleted?: (set: SetLogEntry) => void;
+  onSetCompleted?: (set: SetLogEntry, rest?: RestForSet | null) => void;
   gamificationEnabled?: boolean;
 }) {
   const { discard: discardPendingSaves, remove: removeSetRow, unsavedIds } = useSetSave();
@@ -468,7 +469,7 @@ export function ExerciseCard({
           const wasCompleted = set?.status === "completed";
           onSetChange(setId, patch);
           if (patch.status === "completed" && !wasCompleted && set) {
-            onSetCompleted?.({ ...set, ...patch });
+            onSetCompleted?.({ ...set, ...patch }, restForSet(exercise.sets, setId));
           }
           if ("weight" in patch && patch.weight != null) {
             setJustConfirmedWeightSetId(setId);

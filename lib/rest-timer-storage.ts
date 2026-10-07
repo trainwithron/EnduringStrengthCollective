@@ -6,6 +6,9 @@
 export interface RestTimerState {
   startedAtMs: number;
   durationSeconds: number;
+  // Set when the coach prescribed this rest: it is shown as "set by your coach" and cannot be extended.
+  source?: "coach" | "typed";
+  prescribedSeconds?: number;
 }
 
 function storageKey(sessionId: string): string {
@@ -19,7 +22,12 @@ export function readRestTimerState(sessionId: string): RestTimerState | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (typeof parsed?.startedAtMs === "number" && typeof parsed?.durationSeconds === "number") {
-      return parsed;
+      return {
+        startedAtMs: parsed.startedAtMs,
+        durationSeconds: parsed.durationSeconds,
+        ...(parsed.source === "coach" || parsed.source === "typed" ? { source: parsed.source } : {}),
+        ...(typeof parsed.prescribedSeconds === "number" ? { prescribedSeconds: parsed.prescribedSeconds } : {}),
+      };
     }
     return null;
   } catch {

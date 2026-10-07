@@ -13,6 +13,7 @@ import { RestTimerBar, type PendingGateTask } from "@/components/session/rest-ti
 import { QuickAddNlButton } from "./quick-add-nl-button";
 import { SessionProgressStrip } from "./session-progress-strip";
 import { DemoLibraryProvider } from "./demo-library-context";
+import type { RestForSet } from "@/lib/rest-time";
 import { DemoBrowserSheet } from "./demo-browser-sheet";
 import type { DemoRow } from "@/lib/exercise-demo";
 
@@ -93,6 +94,7 @@ export function SessionLogger({
   const [pendingRestPrompt, setPendingRestPrompt] = useState<{
     defaultSeconds: number;
     isPrescribed: boolean;
+    source?: "coach" | "typed";
   } | null>(null);
 
   // Smart-default rest duration: the set's own prescribed rest (from the
@@ -101,9 +103,15 @@ export function SessionLogger({
   // `isPrescribed` tells the timer bar to auto-start the countdown at
   // that duration immediately, rather than waiting for a manual pick —
   // there's nothing to choose when the coach already specified it.
-  function handleSetCompleted(set: SetLogEntry) {
-    const prescribed = set.restSeconds ?? set.targetRestSeconds ?? null;
-    setPendingRestPrompt({ defaultSeconds: prescribed ?? 90, isPrescribed: prescribed != null });
+  function handleSetCompleted(set: SetLogEntry, rest?: RestForSet | null) {
+    // The coach's rest for THIS set (or the last prescribed set before it, for a set the client added) is the only option: the timer starts it by itself. A rest
+    // the client typed is used only when the coach prescribed none, and with nothing at all the usual 60/90/120 picker shows.
+    if (rest && rest.source === "coach") {
+      setPendingRestPrompt({ defaultSeconds: rest.seconds, isPrescribed: true, source: "coach" });
+      return;
+    }
+    const typed = set.restSeconds ?? null;
+    setPendingRestPrompt({ defaultSeconds: typed ?? 90, isPrescribed: typed != null, source: typed != null ? "typed" : undefined });
   }
   const [addingExercise, setAddingExercise] = useState(false);
   const [newExerciseName, setNewExerciseName] = useState("");

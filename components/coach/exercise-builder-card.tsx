@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { formatRest, parseRestInput } from "@/lib/rest-time";
 import { ExerciseNameInput } from "./exercise-name-input";
 import { ExerciseDemoButton } from "@/components/logging/exercise-demo-button";
 import type { AliasEntry } from "@/lib/exercise-matching";
@@ -56,6 +57,7 @@ function TargetCell({
   return (
     <input
       type={kind === "number" ? "number" : "text"}
+      placeholder={label.startsWith("Rest") ? "m:ss" : undefined}
       inputMode={kind === "number" ? "decimal" : undefined}
       min={kind === "number" ? "0" : undefined}
       aria-label={label}
@@ -80,7 +82,10 @@ function TargetCell({
 function targetValue(set: ExerciseSetTarget, field: TrackedField): string {
   const prop = TARGET_PROP[field] as keyof ExerciseSetTarget;
   const v = set[prop];
-  return v === null || v === undefined ? "" : String(v);
+  if (v === null || v === undefined) return "";
+  // Rest is shown as m:ss (5:00), and typed as 5:00, 300 or 90s.
+  if (field === "rest" && typeof v === "number") return formatRest(v);
+  return String(v);
 }
 
 export function ExerciseBuilderCard({
@@ -783,13 +788,22 @@ export function ExerciseBuilderCard({
                       <TargetCell
                         key={set.id}
                         value={targetValue(set, field)}
-                        kind={def.kind}
-                        label={`${def.label}, set ${i + 1}`}
-                        onCommit={(raw) =>
-                          set.id === firstSetId && exercise.sets.length > 1
+                        kind={field === "rest" ? "text" : def.kind}
+                        label={field === "rest" ? `Rest (m:ss), set ${i + 1}` : `${def.label}, set ${i + 1}`}
+                        onCommit={(typed) => {
+                          let raw = typed;
+                          if (field === "rest") {
+                            const parsed = parseRestInput(typed);
+                            if (!parsed.ok) {
+                              flashSaveError("Rest looks like 5:00, 300 or 90s.");
+                              return;
+                            }
+                            raw = parsed.seconds === null ? "" : String(parsed.seconds);
+                          }
+                          return set.id === firstSetId && exercise.sets.length > 1
                             ? handleFirstSetCommit(set.id, field, raw)
-                            : handleCellCommit(set.id, field, raw)
-                        }
+                            : handleCellCommit(set.id, field, raw);
+                        }}
                       />
                     ))}
                     <button
