@@ -284,3 +284,30 @@ body::before {
 .scroll-hidden::-webkit-scrollbar {
   display: none;
 }
+
+/* A client's profile (app/groups/[groupId]/athletes/[athleteId]): the tab strip sets data-active-tab on #client-profile-body and every section carries data-tab
+   (one or more tab names). A section shows only on its tab(s). Everything stays rendered, so switching is instant. Off the Overview tab the two columns stack. */
+#client-profile-body[data-active-tab="overview"] [data-tab]:not([data-tab~="overview"]) {
+  display: none;
+}
+#client-profile-body[data-active-tab="program"] [data-tab]:not([data-tab~="program"]) {
+  display: none;
+}
+#client-profile-body[data-active-tab="nutrition"] [data-tab]:not([data-tab~="nutrition"]) {
+  display: none;
+}
+#client-profile-body[data-active-tab="progress"] [data-tab]:not([data-tab~="progress"]) {
+  display: none;
+}
+#client-profile-body[data-active-tab="forms"] [data-tab]:not([data-tab~="forms"]) {
+  display: none;
+}
+#client-profile-body[data-active-tab="settings"] [data-tab]:not([data-tab~="settings"]) {
+  display: none;
+}
+#client-profile-body:not([data-active-tab="overview"]) .profile-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+#client-profile-body:not([data-active-tab="overview"]) .profile-grid > div {
+  max-width: 56rem;
+}

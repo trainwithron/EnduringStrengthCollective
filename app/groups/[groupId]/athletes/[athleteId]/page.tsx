@@ -1,3 +1,6 @@
+import { ClientProfileTabs } from "@/components/coach/desktop/client-profile-tabs";
+import { ClientProgramsSection } from "@/components/coach/desktop/client-programs-section";
+import { isClientProfileTab } from "@/lib/client-profile-tabs";
 import Link from "next/link";
 import { NoAccess } from "@/components/shared/no-access";
 import { calorieSeriesWithStanding, latestStanding, standingForDate } from "@/lib/macro-resolution";
@@ -78,9 +81,12 @@ function last7DatesForTargets(startKey: string, endKey: string): string[] {
 export default async function AthleteProfilePage(
   props: {
     params: Promise<{ groupId: string; athleteId: string }>;
+    searchParams?: Promise<{ tab?: string }>;
   }
 ) {
   const params = await props.params;
+  const tabParam = (await props.searchParams)?.tab;
+  const initialTab = isClientProfileTab(tabParam) ? tabParam : "overview";
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -930,7 +936,7 @@ export default async function AthleteProfilePage(
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="clients">
       <div className="pb-6 border-b border-steel/20 mb-6">
         <Link
-          href={`/groups/${params.groupId}/clients`}
+          href="/clients"
           className="font-body text-xs text-steel uppercase tracking-wide"
         >
           &larr; Back to clients
@@ -1012,8 +1018,15 @@ export default async function AthleteProfilePage(
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6 lg:gap-10 items-start">
+      <div id="client-profile-body" data-active-tab={initialTab}>
+        <ClientProfileTabs groupId={params.groupId} athleteId={params.athleteId} initial={initialTab} />
+        <div data-tab="program" className="mb-8 max-w-3xl">
+          <ClientProgramsSection groupId={params.groupId} athleteId={params.athleteId} />
+        </div>
+
+      <div className="profile-grid grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6 lg:gap-10 items-start">
         <div className="space-y-8 min-w-0">
+          <div data-tab="overview">
           {signInStatus !== "active" && (
             <ClientSignInPanel
               groupId={params.groupId}
@@ -1024,6 +1037,8 @@ export default async function AthleteProfilePage(
               coachFirstName={coachFirstName}
             />
           )}
+          </div>
+          <div data-tab="overview">
           {signInStatus === "active" && (
             <CorrectClientEmail
               groupId={params.groupId}
@@ -1031,6 +1046,8 @@ export default async function AthleteProfilePage(
               clientName={profile?.full_name ?? "Client"}
             />
           )}
+          </div>
+          <div data-tab="overview forms">
           {(hasAboutInfo || parQAnswers.length > 0 || !!intake) && (
             <RosterSection
               title="Personal Info"
@@ -1086,6 +1103,8 @@ export default async function AthleteProfilePage(
               </div>
             </RosterSection>
           )}
+          </div>
+          <div data-tab="overview">
           <InjuryStatusToggle
             athleteId={params.athleteId}
             groupId={params.groupId}
@@ -1093,6 +1112,8 @@ export default async function AthleteProfilePage(
             initialIsInjured={injuryStatusRow?.is_injured ?? false}
             initialSurplusPct={injuryStatusRow?.surplus_pct ?? 0}
           />
+          </div>
+          <div data-tab="overview progress">
           <section>
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
               Stats
@@ -1132,7 +1153,9 @@ export default async function AthleteProfilePage(
               </div>
             )}
           </section>
+          </div>
 
+          <div data-tab="progress">
           {sharedPhotos.length > 0 && (
             <section>
               <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
@@ -1160,7 +1183,9 @@ export default async function AthleteProfilePage(
               </div>
             </section>
           )}
+          </div>
 
+          <div data-tab="overview">
           {(activeHabits.length > 0 || daysWithMacroTarget > 0) && (
             <section>
               <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
@@ -1200,7 +1225,9 @@ export default async function AthleteProfilePage(
               </div>
             </section>
           )}
+          </div>
 
+          <div data-tab="progress">
           {(trainingMaxRows ?? []).length > 0 && (
             <section>
               <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
@@ -1222,7 +1249,9 @@ export default async function AthleteProfilePage(
               </div>
             </section>
           )}
+          </div>
 
+          <div data-tab="program">
           {eventWindow && inTaperWindow && !isStrengthMeetGoal && (
             <section>
               <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
@@ -1251,7 +1280,9 @@ export default async function AthleteProfilePage(
               </div>
             </section>
           )}
+          </div>
 
+          <div data-tab="program">
           {isStrengthMeetGoal && eventWindow && (
             <section>
               <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
@@ -1317,7 +1348,9 @@ export default async function AthleteProfilePage(
               </div>
             </section>
           )}
+          </div>
 
+          <div data-tab="forms">
           {isMinor && (
             <section className="space-y-3">
               <MinorConsentControl
@@ -1336,7 +1369,9 @@ export default async function AthleteProfilePage(
               />
             </section>
           )}
+          </div>
 
+          <div data-tab="overview forms">
           {latestGoalRow?.status === "proposed" && latestGoalRow.created_by !== params.athleteId && (
             <section>
               <GoalWaitingOnClient
@@ -1351,7 +1386,9 @@ export default async function AthleteProfilePage(
               />
             </section>
           )}
+          </div>
 
+          <div data-tab="forms">
           {helpAnswer && (
             <section className="border border-steel/20 p-3">
               <h2 className="font-body text-xs text-steel uppercase tracking-wide font-bold">
@@ -1379,7 +1416,9 @@ export default async function AthleteProfilePage(
               )}
             </section>
           )}
+          </div>
 
+          <div data-tab="overview forms">
           {latestGoalRow?.status !== "proposed" && (
             <section>
               <details className="border border-steel/20 p-3">
@@ -1390,7 +1429,9 @@ export default async function AthleteProfilePage(
               </details>
             </section>
           )}
+          </div>
 
+          <div data-tab="overview forms">
           {latestGoalRow?.status === "proposed" && latestGoalRow.created_by === params.athleteId && (
             <section>
               <GoalConfirmationControl
@@ -1404,8 +1445,10 @@ export default async function AthleteProfilePage(
               />
             </section>
           )}
+          </div>
 
           <section className="space-y-4">
+            <div data-tab="settings">
             <SettingsGroup label="Billing">
               <p className="font-body text-sm text-chalk mb-3">
                 {coachCreditSentence(
@@ -1426,7 +1469,9 @@ export default async function AthleteProfilePage(
                 initialBalance={creditsRow?.balance ?? 0}
               />
             </SettingsGroup>
+            </div>
 
+            <div data-tab="program">
             <SettingsGroup label="Assign sessions">
               <AssignSessionsControl
                 key={`assign-${creditsRow?.balance ?? 0}`}
@@ -1436,7 +1481,9 @@ export default async function AthleteProfilePage(
                 initialBalance={creditsRow?.balance ?? 0}
               />
             </SettingsGroup>
+            </div>
 
+            <div data-tab="program">
             <SettingsGroup label="Weekly schedule">
               <ClientSeriesPanel
                 groupId={params.groupId}
@@ -1446,11 +1493,15 @@ export default async function AthleteProfilePage(
                 series={scheduleViews}
               />
             </SettingsGroup>
+            </div>
 
+            <div data-tab="settings">
             <SettingsGroup label="Session ledger">
               <SessionLedgerList balance={creditsRow?.balance ?? 0} entries={ledgerEntries.slice(0, 10)} />
             </SettingsGroup>
+            </div>
 
+            <div data-tab="program">
             <SettingsGroup label="Workout Logging">
               <SwipeDirectionSetting
                 athleteId={params.athleteId}
@@ -1461,7 +1512,9 @@ export default async function AthleteProfilePage(
                 }
               />
             </SettingsGroup>
+            </div>
 
+            <div data-tab="nutrition">
             <SettingsGroup label="Nutrition">
               <NutritionPhaseControl
                 athleteId={params.athleteId}
@@ -1482,7 +1535,9 @@ export default async function AthleteProfilePage(
                 </p>
               )}
             </SettingsGroup>
+            </div>
 
+            <div data-tab="settings">
             <SettingsGroup label="Packages">
               <PackageAssignmentControl
                 athleteId={params.athleteId}
@@ -1496,7 +1551,9 @@ export default async function AthleteProfilePage(
                 initialAssignedIds={assignedPackageIds}
               />
             </SettingsGroup>
+            </div>
 
+            <div data-tab="settings">
             <SettingsGroup label="Privacy">
               <PrivateFromOrgToggle
                 athleteId={params.athleteId}
@@ -1504,7 +1561,9 @@ export default async function AthleteProfilePage(
                 initialValue={athleteMembership.private_from_org ?? false}
               />
             </SettingsGroup>
+            </div>
 
+            <div data-tab="settings">
             {(orgClientTagRows ?? []).length > 0 && (
               <SettingsGroup label="Tags">
                 <ClientTagAssignmentControl
@@ -1516,11 +1575,13 @@ export default async function AthleteProfilePage(
                 />
               </SettingsGroup>
             )}
+            </div>
           </section>
 
           {/* "Move client" is hidden for now (Release F, Oct 7): move_client_to_group moves the balance but leaves the ledger, series, requests and waiting list behind
               (r2_03a M5), so the books stop adding up. components/coach/change-client-group-control.tsx is kept; put it back once the function is completed. */}
 
+          <div data-tab="settings">
           <section>
             <AddSocialOnlyMembershipControl
               athleteId={params.athleteId}
@@ -1528,15 +1589,21 @@ export default async function AthleteProfilePage(
               currentGroupId={params.groupId}
             />
           </section>
+          </div>
 
+          <div data-tab="settings">
           <section>
             <SetAsideControl athleteId={params.athleteId} groupId={params.groupId} />
           </section>
+          </div>
 
+          <div data-tab="settings">
           <section>
             <DeleteClientControl groupId={params.groupId} athleteId={params.athleteId} athleteName={profile?.full_name ?? "This client"} />
           </section>
+          </div>
 
+          <div data-tab="forms">
           <section>
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
               Coach notes
@@ -1548,7 +1615,9 @@ export default async function AthleteProfilePage(
               initialBody={noteRow?.body ?? ""}
             />
           </section>
+          </div>
 
+          <div data-tab="progress">
           {ouraConnection && (
             <section>
               <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
@@ -1568,7 +1637,9 @@ export default async function AthleteProfilePage(
               </div>
             </section>
           )}
+          </div>
 
+          <div data-tab="progress">
           {withingsConnection && (
             <section>
               <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
@@ -1582,9 +1653,11 @@ export default async function AthleteProfilePage(
               </div>
             </section>
           )}
+          </div>
         </div>
 
         <div>
+          <div data-tab="progress">
           <section>
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
               Progress
@@ -1608,7 +1681,9 @@ export default async function AthleteProfilePage(
               </div>
             </div>
           </section>
+          </div>
 
+          <div data-tab="overview progress">
           <section>
           <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
             Logged workouts
@@ -1659,6 +1734,7 @@ export default async function AthleteProfilePage(
             </div>
           )}
           </section>
+          </div>
         </div>
       </div>
 
@@ -1669,8 +1745,8 @@ export default async function AthleteProfilePage(
           the very bottom of the page, after everything else — now sits
           alongside them instead, turning that wasted scroll into real
           horizontal use of the page. */}
-      <div className={`border-t border-steel/20 pt-6 mt-8 grid gap-10 ${macrosEnabled ? "lg:grid-cols-2" : ""}`}>
-        <div className="space-y-8">
+      <div data-tab="progress nutrition" className={`profile-grid border-t border-steel/20 pt-6 mt-8 grid gap-10 ${macrosEnabled ? "lg:grid-cols-2" : ""}`}>
+        <div data-tab="progress" className="space-y-8">
           {(wellnessRows ?? []).length > 0 && (
             <RosterSection title="Wellness" summary="Sleep, soreness & energy trends" defaultExpanded>
               <div className="space-y-4 pb-2">
@@ -1732,7 +1808,7 @@ export default async function AthleteProfilePage(
         </div>
 
         {macrosEnabled && (
-          <section>
+          <section data-tab="nutrition">
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
               Nutrition
             </h2>
@@ -1771,6 +1847,7 @@ export default async function AthleteProfilePage(
             />
           </section>
         )}
+      </div>
       </div>
     </CoachDesktopShell>
   );
