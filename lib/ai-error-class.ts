@@ -13,7 +13,7 @@ export type AiErrorClass =
   | "timeout"
   | "unknown";
 
-const CREDIT_WORDS = /credit balance|billing|spend limit|usage limit|purchase credits|plans & billing/i;
+const CREDIT_WORDS = /credit balance|billing|spend limit|spend_limit|usage limit|purchase credits|plans & billing/i;
 
 // An error answer from the API: its HTTP status and (optionally) its body text, which is only searched, never kept.
 export function classifyAiHttpError(status: number, body = ""): AiErrorClass {

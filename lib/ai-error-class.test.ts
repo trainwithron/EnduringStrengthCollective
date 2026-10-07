@@ -10,6 +10,7 @@ describe("AI error class", () => {
     expect(classifyAiHttpError(402)).toBe("credit");
     expect(classifyAiHttpError(400, '{"error":{"message":"Your credit balance is too low to access the Anthropic API."}}')).toBe("credit");
     expect(classifyAiHttpError(429, "You have reached your specified API usage limit")).toBe("credit");
+    expect(classifyAiHttpError(429, '{"error_code":"enforced_spend_limit_reached"}')).toBe("credit");
   });
   it("tells a plain rate limit from a credit problem", () => {
     expect(classifyAiHttpError(429, "rate_limit_error")).toBe("rate_limit");

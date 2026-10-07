@@ -185,7 +185,7 @@ create policy "athlete_exercise_videos_select_own_or_coach" on storage.objects f
     bucket_id = 'athlete-exercise-videos'
     and (
       owner = (select auth.uid())
-      or public.is_group_coach(((storage.foldername(name))[1])::uuid)
+      or case when (storage.foldername(name))[1] ~ '^[0-9a-f-]{36}$' then public.is_group_coach(((storage.foldername(name))[1])::uuid) else false end
       or exists (select 1 from public.session_exercise_videos v where v.video_path = name and v.athlete_id = (select auth.uid()))
     )
   );
@@ -196,7 +196,7 @@ create policy "coach_video_checkins_select_recipient_or_coach" on storage.object
   using (
     bucket_id = 'coach-video-checkins'
     and (
-      public.is_group_coach(((storage.foldername(name))[1])::uuid)
+      case when (storage.foldername(name))[1] ~ '^[0-9a-f-]{36}$' then public.is_group_coach(((storage.foldername(name))[1])::uuid) else false end
       or (storage.foldername(name))[2] = (select auth.uid())::text
     )
   );

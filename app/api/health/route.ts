@@ -40,6 +40,8 @@ export async function GET() {
     return NextResponse.json({
       status: stale.length > 0 ? "degraded" : "ok",
       database: "reachable",
+      // An intentional switch-off (AI_DISABLED=true) must not read as a quiet system.
+      ai: process.env.AI_DISABLED === "true" ? "paused on purpose" : "on",
       jobs: monitoring ? (stale.length > 0 ? { status: "attention", stale } : { status: "ok" }) : { status: "not monitored yet" },
       responseTimeMs: Date.now() - startedAt,
       timestamp: new Date().toISOString(),
