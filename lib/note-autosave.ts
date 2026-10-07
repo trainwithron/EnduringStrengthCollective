@@ -14,6 +14,8 @@ export interface NoteAutosaver {
   // True while the latest text has not been saved.
   isDirty: () => boolean;
   dispose: () => void;
+  // Undo dispose (React StrictMode runs an effect cleanup and then the effect again on the same object): status reporting and retries work again.
+  reopen: () => void;
 }
 
 export function createNoteAutosaver(opts: {
@@ -98,6 +100,9 @@ export function createNoteAutosaver(opts: {
       return run();
     },
     isDirty: dirty,
+    reopen() {
+      disposed = false;
+    },
     dispose() {
       disposed = true;
       if (timer) {

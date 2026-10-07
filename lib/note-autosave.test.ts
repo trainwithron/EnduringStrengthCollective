@@ -165,3 +165,22 @@ describe("retrying a failed note save", () => {
     expect(m.pending()).toBe(1);
   });
 });
+
+describe("reopening after a dispose (React StrictMode)", () => {
+  it("status reports and retries work again after dispose then reopen", async () => {
+    const m = manual();
+    const statuses: string[] = [];
+    let up = false;
+    const write = vi.fn(async () => up);
+    const s = createNoteAutosaver({ initial: null, write, onStatus: (st) => statuses.push(st), schedule: m.schedule, cancel: m.cancel });
+    s.dispose();
+    s.reopen();
+    await s.flush("Back again");
+    expect(statuses).toEqual(["saving", "error"]);
+    expect(m.pending()).toBe(1); // the retry is scheduled again
+    up = true;
+    m.fire();
+    await tick();
+    expect(s.isDirty()).toBe(false);
+  });
+});

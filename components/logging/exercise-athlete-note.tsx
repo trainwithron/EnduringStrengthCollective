@@ -13,6 +13,28 @@ import { useSetSave } from "./set-save-context";
 // Nothing typed or dictated is lost (lib/note-autosave.ts): it saves shortly after typing pauses, when the field loses focus (reading the value from the field
 // itself), when the screen is left or the app is hidden, and Complete workout waits for it like it waits for the sets. A failed save shows Retry and tries
 // again by itself.
+function readDraft(key: string): string | null {
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+function writeDraft(key: string, value: string) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // storage blocked: the autosave still works
+  }
+}
+function clearDraft(key: string) {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // nothing to clear
+  }
+}
+
 export function ExerciseAthleteNote({
   sessionExerciseId,
   initialNote,
@@ -25,7 +47,12 @@ export function ExerciseAthleteNote({
   // False when a coach is typing in a client's session (the note is stored as the exercise's note, the label says whose it is).
   ownNote?: boolean;
 }) {
-  const [draft, setDraft] = useState(initialNote ?? "");
+  // A draft that never reached the server (a failed last save, the app killed) is kept on this phone and restored, so typed or dictated text is never lost.
+  const draftKey = `note-draft:${sessionExerciseId}`;
+  const [draft, setDraft] = useState(() => {
+    const stored = readDraft(draftKey);
+    return stored != null && stored.trim() !== (initialNote ?? "").trim() ? stored : initialNote ?? "";
+  });
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [savedNote, setSavedNote] = useState(initialNote);
   const { registerPending } = useSetSave();
@@ -39,6 +66,7 @@ export function ExerciseAthleteNote({
         const { data, error } = await supabase.from("session_exercises").update({ athlete_note: trimmed }).eq("id", sessionExerciseId).select("id");
         if (!error && Array.isArray(data) && data.length === 1) {
           setSavedNote(trimmed);
+          clearDraft(draftKey);
           return true;
         }
         return false;
@@ -48,9 +76,17 @@ export function ExerciseAthleteNote({
   }
   const saver = saverRef.current;
 
+  // A restored draft is saved right away (it differs from what the server has).
+  useEffect(() => {
+    if (!readOnly && draft.trim() !== (initialNote ?? "").trim()) saver.change(draft);
+    // only on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Complete workout waits for a pending note; leaving the screen or hiding the app saves it; the connection coming back retries it.
   useEffect(() => {
     if (readOnly) return;
+    saver.reopen();
     const unregister = registerPending(() => saver.flush());
     const onHide = () => {
       if (document.visibilityState === "hidden") void saver.flush();
@@ -100,6 +136,7 @@ export function ExerciseAthleteNote({
         value={draft}
         onChange={(e) => {
           setDraft(e.target.value);
+          writeDraft(draftKey, e.target.value);
           saver.change(e.target.value);
         }}
         onBlur={(e) => void saver.flush(e.currentTarget.value)}
