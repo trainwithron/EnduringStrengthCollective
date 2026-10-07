@@ -1,5 +1,5 @@
 import { IngredientLine } from "@/components/shared/ingredient-line";
-import { mealRecipeChoices, type MealEntryPayload, type MealPlanBucket } from "@/lib/meal-plan-assignment";
+import { choicesFeaturedFirst, type MealEntryPayload, type MealPlanBucket } from "@/lib/meal-plan-assignment";
 
 const BUCKET_LABELS: Record<MealPlanBucket, string> = {
   daily: "Meals",
@@ -43,7 +43,7 @@ export function DayMealsView({
             )}
             <div className="divide-y divide-steel/15">
               {meals[bucket].map((m) => {
-                const choices = mealRecipeChoices(m);
+                const choices = choicesFeaturedFirst(m);
                 return (
                   <div key={m.mealId} className="py-2">
                     <p className="font-body text-xs text-steel uppercase tracking-wide">{m.title}</p>
@@ -51,6 +51,11 @@ export function DayMealsView({
                       choices.map((choice, i) => (
                         <div key={i} className="mt-0.5">
                           <p className="font-body text-sm font-medium">{choice.recipeName ?? m.title}</p>
+                          {choice.macros && (
+                            <p className="font-body text-xs text-steel">
+                              {choice.macros.calories} kcal · {choice.macros.proteinG}p / {choice.macros.carbsG}c / {choice.macros.fatG}f
+                            </p>
+                          )}
                           {choice.ingredients.length > 0 && (
                             <ul className="mt-1 space-y-0.5 pl-3">
                               {

@@ -22,7 +22,9 @@ export interface FlaggedChoice {
 const plain = (s: string) => s.replace(/<[^>]+>/g, " ");
 
 function linesOf(choice: MealRecipeChoice): string[] {
-  return [...(choice.recipeName ? [choice.recipeName] : []), ...choice.ingredients.map(plain)];
+  // A library-first option also carries its structured lines: each food's name AND its printed label are checked, not only the printed text.
+  const structured = (choice.lines ?? []).flatMap((l) => (l.label && l.label !== l.name ? [l.name, l.label] : [l.name]));
+  return [...(choice.recipeName ? [choice.recipeName] : []), ...choice.ingredients.map(plain), ...structured];
 }
 
 export function checkPlanAgainstPreferences(meals: PlanMeals, rules: FoodRules): FlaggedChoice[] {
@@ -65,8 +67,12 @@ export function filterPlanForClient(meals: PlanMeals, rules: FoodRules): ClientP
       const keep = choices.filter((_, i) => !bad.has(key(bucket, meal.mealId, i)));
       if (keep.length === choices.length) return meal;
       if (keep.length === 0) emptiedMeals.push({ bucket, mealId: meal.mealId, title: meal.title });
-      // The legacy single-recipe fields are cleared too, or the hidden option would come back through them.
-      return { ...meal, recipes: keep, recipeId: null, recipeName: null, ingredients: [] };
+      // The legacy single-recipe fields are cleared too, or the hidden option would come back through them. The featured option keeps its place if it is still shown.
+      const featured = meal.featuredIndex !== undefined ? choices[meal.featuredIndex] : undefined;
+      const featuredIndex = featured ? keep.indexOf(featured) : -1;
+      const { featuredIndex: _dropped, ...rest } = meal;
+      void _dropped;
+      return { ...rest, ...(featuredIndex >= 0 ? { featuredIndex } : {}), recipes: keep, recipeId: null, recipeName: null, ingredients: [] };
     });
   }
   return { meals: result, hiddenCount: flagged.length, emptiedMeals };
@@ -85,7 +91,9 @@ export function hidePlanRecipes(meals: PlanMeals): ClientPlanView {
       if (choices.length === 0) return meal;
       hiddenCount += choices.length;
       emptiedMeals.push({ bucket, mealId: meal.mealId, title: meal.title });
-      return { ...meal, recipes: [], recipeId: null, recipeName: null, ingredients: [] };
+      const { featuredIndex: _dropped, ...rest } = meal;
+      void _dropped;
+      return { ...rest, recipes: [], recipeId: null, recipeName: null, ingredients: [] };
     });
   }
   return { meals: result, hiddenCount, emptiedMeals };

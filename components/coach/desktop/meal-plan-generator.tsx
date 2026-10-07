@@ -7,24 +7,26 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import {
   computeCarbCyclingTargets,
   matchFlexTreat,
-  generateFullMealPlan,
-  generateMealOptions,
   detectDietArchetype,
   QUICK_SWAP_NOTES,
   type Phase,
   type MacroTargets,
   type GeneratedMeal,
   type MealOption,
-  type MealPlanContext,
-  type Recipe,
 } from "@/lib/meal-engine";
 import { runCheckInEngine } from "@/lib/nutrition-checkin";
 import { computeArchetypeMacros, detectDietArchetype as detectMacroArchetype } from "@/lib/macros";
 import { filterOptionsByRules } from "@/lib/plan-preference-check";
 import type { FoodRules } from "@/lib/allergen-check";
-import { fetchCustomRecipes } from "@/lib/custom-recipes";
+import { loadLibraryContext, type LibraryContextData } from "@/lib/library-data";
+import { varietySettings, selectOptions, type SelectionContext } from "@/lib/library-selection";
+import { choiceFromOption, generateLibraryDay, generateLibraryWeek, optionFromScaled } from "@/lib/library-meal-plan";
+import { buildAiRecipeRows } from "@/lib/ai-recipe-save";
+import { DIET_TYPES, type DietType, type Slot } from "@/lib/meal-templates/types";
+import { specTarget } from "@/lib/library-meal-plan";
 import {
   getDatesForWeekdays,
+  getWeekDates,
   mergeMealIntoPlan,
   type MealEntryPayload,
   type MealPlanRow,
@@ -153,17 +155,6 @@ export function MealPlanGenerator({
   const [mealsByView, setMealsByView] = useState<Record<DayView, GeneratedMeal[]>>({ daily: [], train: [], rest: [] });
   // Options left out because they break this client's food rules (an allergy is never offered), counted so the coach is told rather than left to wonder.
   const [leftOutForRules, setLeftOutForRules] = useState(0);
-  function keepSafe(meals: GeneratedMeal[]): GeneratedMeal[] {
-    if (!foodRules) return meals;
-    let dropped = 0;
-    const safe = meals.map((m) => {
-      const r = filterOptionsByRules(m.options, foodRules);
-      dropped += r.dropped.length;
-      return r.dropped.length > 0 ? { ...m, options: r.kept } : m;
-    });
-    setLeftOutForRules((n) => n + dropped);
-    return safe;
-  }
   // Which option indices are checked per meal slot — a slot can have
   // several recipes selected at once (e.g. two breakfast options a
   // client can alternate between), not just one.
@@ -197,7 +188,10 @@ export function MealPlanGenerator({
   // the built-in RECIPE_DATABASE every time a plan generates. Fetched once
   // on mount since the coach viewing this page is always the one whose
   // recipes should appear (this page is coach-gated one level up).
-  const [customRecipes, setCustomRecipes] = useState<Recipe[]>([]);
+  // Library-first (nutrition phase 4b): the coach's own recipes, the foods this client likes, what they have eaten (their favorites) and what they were offered lately, read once
+  // when the planner opens. A build before this has loaded is held back, so a menu is never made without the client's history.
+  const [libraryData, setLibraryData] = useState<LibraryContextData | null>(null);
+  const [coachId, setCoachId] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     async function run() {
@@ -206,17 +200,58 @@ export function MealPlanGenerator({
         data: { user },
       } = await supabase.auth.getUser();
       if (!user || cancelled) return;
-      const recipes = await fetchCustomRecipes(user.id);
-      if (!cancelled) setCustomRecipes(recipes);
+      setCoachId(user.id);
+      const data = await loadLibraryContext(supabase, { coachId: user.id, athleteId, todayKey: date });
+      if (!cancelled) setLibraryData(data);
     }
     run();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [athleteId, date]);
+
+  // The diet the library is filtered by: the client's own diet type when they have one, else what the restrictions text says.
+  function libraryDiet(recipeArchetype: string): DietType {
+    const own = foodRules?.dietType;
+    if (own && (DIET_TYPES as string[]).includes(own)) return own as DietType;
+    return (DIET_TYPES as string[]).includes(recipeArchetype) ? (recipeArchetype as DietType) : "omnivore";
+  }
+
+  function selectionCtx(recipeArchetype: string, excludeKeys?: Set<string>): SelectionContext {
+    const v = varietySettings(libraryData?.variety);
+    return {
+      rules: foodRules ?? {},
+      diet: libraryDiet(recipeArchetype),
+      likes: libraryData?.likes ?? [],
+      favorites: { ids: new Set(libraryData?.favorites.ids ?? []), names: new Set(libraryData?.favorites.names ?? []) },
+      recentlyOffered: libraryData?.recentlyOffered ?? new Map(),
+      mixItUp: v.mixItUp,
+      recentDays: v.recentDays,
+      coachRecipes: libraryData?.coachRecipes ?? [],
+      excludeKeys,
+    };
+  }
+
+  // One day from the library; counts what the client's food rules removed, and checks every option by default (the client picks among what is saved).
+  function libraryDay(macros: MacroTargets, nMeals: number, snack: boolean, ctx: SelectionContext): GeneratedMeal[] {
+    const meals = generateLibraryDay(macros, nMeals, snack, ctx);
+    const removed = meals.reduce((n, m) => n + (m.leftOutForRules ?? 0), 0);
+    if (removed > 0) setLeftOutForRules((n) => n + removed);
+    return meals;
+  }
+  // Every option is checked by default: the client sees all of them and picks. (A training-day and a rest-day view share the same meal ids, so the count is the larger of the two.)
+  const allOptionsSelected = (...views: GeneratedMeal[][]): Record<string, number[]> => {
+    const most = new Map<string, number>();
+    for (const meals of views) for (const m of meals) most.set(m.spec.id, Math.max(most.get(m.spec.id) ?? 0, m.options.length));
+    return Object.fromEntries([...most].map(([id, n]) => [id, Array.from({ length: n }, (_, i) => i)]));
+  };
 
   function handleGenerate() {
     setError(null);
+    if (!libraryData) {
+      setError("Still loading this client's history and your recipes. Try again in a moment.");
+      return;
+    }
     const currW = parseFloat(currentWeight) || 0;
     const currC = parseInt(currentCalories, 10) || 0;
     if (!currW || !currC) {
@@ -267,39 +302,25 @@ export function MealPlanGenerator({
     setArchetype(recipeArchetype);
     setDailyMacros(dailyBaseline);
 
-    const context = {
-      archetype: recipeArchetype,
-      bioScores: {
-        strength: parseInt(rateStrength, 10) || 4,
-        recovery: parseInt(rateRecovery, 10) || 4,
-        digestion: parseInt(rateDigestion, 10) || 5,
-        satiety: parseInt(rateSatiety, 10) || 4,
-      },
-      phase,
-      dietaryRestrictions,
-      favoriteFoods,
-    };
-
     setLeftOutForRules(0);
     const nMeals = parseInt(mealCount, 10) || 4;
     const isCycling = carbCycling && recipeArchetype !== "carnivore";
+    const ctx = selectionCtx(recipeArchetype);
 
+    let views: Record<DayView, GeneratedMeal[]>;
     if (isCycling) {
       const { trainingDay, restDay } = computeCarbCyclingTargets(dailyBaseline, parseInt(trainingDays, 10) || 4);
       setTrainMacros(trainingDay);
       setRestMacros(restDay);
-      setMealsByView({
-        daily: [],
-        train: keepSafe(generateFullMealPlan(trainingDay, nMeals, includeSnack, context, customRecipes)),
-        rest: keepSafe(generateFullMealPlan(restDay, nMeals, includeSnack, context, customRecipes)),
-      });
+      views = { daily: [], train: libraryDay(trainingDay, nMeals, includeSnack, ctx), rest: libraryDay(restDay, nMeals, includeSnack, ctx) };
       setDayView("train");
     } else {
       setTrainMacros(null);
       setRestMacros(null);
-      setMealsByView({ daily: keepSafe(generateFullMealPlan(dailyBaseline, nMeals, includeSnack, context, customRecipes)), train: [], rest: [] });
+      views = { daily: libraryDay(dailyBaseline, nMeals, includeSnack, ctx), train: [], rest: [] };
       setDayView("daily");
     }
+    setMealsByView(views);
 
     const flex = matchFlexTreat(favoriteFoods, recipeArchetype);
     setFlexTreatText(
@@ -307,7 +328,7 @@ export function MealPlanGenerator({
         ? `Requested ${flex.treat.name} (~${flex.treat.cals} kcal). Weekly buffer: trim ~${flex.dailyTrimCalories} kcal/day on the other 6 days. Same-day swap: drop ${flex.sameDayCarbDrop}g carbs and ${flex.sameDayFatDrop}g fat that day instead, keeping protein locked in.`
         : null
     );
-    setSelections({});
+    setSelections(allOptionsSelected(views.daily, views.train, views.rest));
   }
 
   // Lets the Macro Calculator hand its numbers straight to this
@@ -330,20 +351,12 @@ export function MealPlanGenerator({
     setDayView("daily");
     setRationale("Calories & macros imported from the Macro Calculator.");
 
-    const context = {
-      archetype: arch,
-      bioScores: {
-        strength: parseInt(rateStrength, 10) || 4,
-        recovery: parseInt(rateRecovery, 10) || 4,
-        digestion: parseInt(rateDigestion, 10) || 5,
-        satiety: parseInt(rateSatiety, 10) || 4,
-      },
-      phase,
-      dietaryRestrictions,
-      favoriteFoods,
-    };
+    // The library's history has to be loaded first; the effect runs again when it is.
+    if (!libraryData) return;
     const nMeals = parseInt(mealCount, 10) || 4;
-    setMealsByView({ daily: generateFullMealPlan(macros, nMeals, includeSnack, context, customRecipes), train: [], rest: [] });
+    setLeftOutForRules(0);
+    const importedMeals = libraryDay(macros, nMeals, includeSnack, selectionCtx(arch));
+    setMealsByView({ daily: importedMeals, train: [], rest: [] });
 
     const flex = matchFlexTreat(favoriteFoods, arch);
     setFlexTreatText(
@@ -351,11 +364,11 @@ export function MealPlanGenerator({
         ? `Requested ${flex.treat.name} (~${flex.treat.cals} kcal). Weekly buffer: trim ~${flex.dailyTrimCalories} kcal/day on the other 6 days. Same-day swap: drop ${flex.sameDayCarbDrop}g carbs and ${flex.sameDayFatDrop}g fat that day instead, keeping protein locked in.`
         : null
     );
-    setSelections({});
+    setSelections(allOptionsSelected(importedMeals));
     setError(null);
     resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [importedMacros?.key]);
+  }, [importedMacros?.key, libraryData]);
 
   function activeMacros(): MacroTargets | null {
     if (dayView === "train") return trainMacros;
@@ -377,15 +390,10 @@ export function MealPlanGenerator({
     const buildMealsPayload = (meals: GeneratedMeal[]) =>
       meals.map((m) => {
         const selIdxs = selections[m.spec.id]?.length ? selections[m.spec.id] : [0];
-        const recipes: MealRecipeChoice[] = selIdxs
-          .map((idx) => m.options[idx])
-          .filter((opt): opt is NonNullable<typeof opt> => !!opt)
-          .map((opt) => ({
-            recipeId: opt.recipeId ?? null,
-            recipeName: opt.recipeName ?? null,
-            ingredients: opt.ingredients ?? [],
-            isAi: opt.isAi,
-          }));
+        const chosen = selIdxs.map((idx) => ({ idx, opt: m.options[idx] })).filter((x): x is { idx: number; opt: MealOption } => !!x.opt);
+        const recipes: MealRecipeChoice[] = chosen.map((x) => choiceFromOption(x.opt));
+        // The option the client's card shows first: the one the build featured, if it is among the saved ones.
+        const featured = chosen.findIndex((x) => x.idx === (m.featuredIndex ?? 0));
         return {
           mealId: m.spec.id,
           title: m.spec.title,
@@ -393,6 +401,7 @@ export function MealPlanGenerator({
           carbsTarget: m.spec.carbsTarget,
           fatTarget: m.spec.fatTarget,
           recipes,
+          ...(featured > 0 ? { featuredIndex: featured } : {}),
         };
       });
 
@@ -435,15 +444,9 @@ export function MealPlanGenerator({
   async function handleAssignDays(meal: GeneratedMeal) {
     const weekdays = dayPicker[meal.spec.id] ?? [];
     const selIdxs = selections[meal.spec.id]?.length ? selections[meal.spec.id] : [0];
-    const chosenRecipes: MealRecipeChoice[] = selIdxs
-      .map((idx) => meal.options[idx])
-      .filter((opt): opt is NonNullable<typeof opt> => !!opt)
-      .map((opt) => ({
-        recipeId: opt.recipeId ?? null,
-        recipeName: opt.recipeName ?? null,
-        ingredients: opt.ingredients ?? [],
-        isAi: opt.isAi,
-      }));
+    const chosenOptions = selIdxs.map((idx) => ({ idx, opt: meal.options[idx] })).filter((x): x is { idx: number; opt: MealOption } => !!x.opt);
+    const chosenRecipes: MealRecipeChoice[] = chosenOptions.map((x) => choiceFromOption(x.opt));
+    const assignedFeatured = chosenOptions.findIndex((x) => x.idx === (meal.featuredIndex ?? 0));
     if (weekdays.length === 0 || chosenRecipes.length === 0) return;
 
     setAssigning(meal.spec.id);
@@ -473,6 +476,7 @@ export function MealPlanGenerator({
       carbsTarget: meal.spec.carbsTarget,
       fatTarget: meal.spec.fatTarget,
       recipes: chosenRecipes,
+      ...(assignedFeatured > 0 ? { featuredIndex: assignedFeatured } : {}),
     };
     const fallbackMacros = isCycling ? { train: trainMacros, rest: restMacros } : { daily: dailyMacros };
 
@@ -510,6 +514,119 @@ export function MealPlanGenerator({
     }));
     setDayPicker((prev) => ({ ...prev, [meal.spec.id]: [] }));
     router.refresh();
+  }
+
+  // Builds the whole week (the Sun to Sat week containing this date) from the library in one go: up to three options per meal per day, a featured one for the client's card,
+  // meals varied from day to day, the client's favorites repeating, their food rules applied. Replaces what is already planned for those days (after a confirmation).
+  const [weekBusy, setWeekBusy] = useState(false);
+  const [weekMsg, setWeekMsg] = useState<string | null>(null);
+  async function handleBuildWeek() {
+    setWeekMsg(null);
+    setError(null);
+    if (!libraryData) {
+      setError("Still loading this client's history and your recipes. Try again in a moment.");
+      return;
+    }
+    if (!dailyMacros || !archetype) {
+      setError("Generate a meal plan first, so there are targets to build the week from.");
+      return;
+    }
+    setWeekBusy(true);
+    try {
+      const supabase = createBrowserClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+      const dates = getWeekDates(date);
+      const nMeals = parseInt(mealCount, 10) || 4;
+      const isCycling = trainMacros != null && restMacros != null;
+      const ctx = selectionCtx(archetype);
+      const rotateFeatured = varietySettings(libraryData.variety).rotateFeatured;
+      const build = (macros: MacroTargets) => generateLibraryWeek({ dates, dayMacros: () => macros, mealCount: nMeals, includeSnack, ctx, rotateFeatured });
+      const dailyWeek = isCycling ? null : build(dailyMacros);
+      const trainWeek = isCycling ? build(trainMacros) : null;
+      const restWeek = isCycling ? build(restMacros) : null;
+
+      const { data: existingRows, error: existingError } = await supabase.from("meal_plans").select("log_date").eq("athlete_id", athleteId).in("log_date", dates);
+      if (existingError) {
+        setError("Couldn't check what is already planned this week, so nothing was changed. Try again.");
+        return;
+      }
+      const existingCount = (existingRows ?? []).length;
+      if (existingCount > 0 && !window.confirm(`This replaces the meals already planned for ${existingCount} ${existingCount === 1 ? "day" : "days"} this week. Continue?`)) return;
+
+      const toEntries = (meals: GeneratedMeal[]) =>
+        meals.map((m) => ({
+          mealId: m.spec.id,
+          title: m.spec.title,
+          proteinTarget: m.spec.proteinTarget,
+          carbsTarget: m.spec.carbsTarget,
+          fatTarget: m.spec.fatTarget,
+          recipes: m.options.map(choiceFromOption),
+          ...((m.featuredIndex ?? 0) > 0 ? { featuredIndex: m.featuredIndex } : {}),
+        }));
+      const rows = dates.map((d) => ({
+        athlete_id: athleteId,
+        group_id: groupId,
+        log_date: d,
+        archetype,
+        meal_count: nMeals,
+        include_snack: includeSnack,
+        carb_cycling: isCycling,
+        rationale: "Built from the recipe library for the week.",
+        macros: isCycling ? { train: trainMacros, rest: restMacros } : { daily: dailyMacros },
+        meals: isCycling ? { train: toEntries(trainWeek![d]), rest: toEntries(restWeek![d]) } : { daily: toEntries(dailyWeek![d]) },
+        created_by: user.id,
+      }));
+      const { error: saveError } = await supabase.from("meal_plans").upsert(rows, { onConflict: "athlete_id,log_date" });
+      if (saveError) {
+        setError("Couldn't save the week. Nothing was changed. Try again.");
+        return;
+      }
+      const all = [dailyWeek, trainWeek, restWeek].filter((w): w is Record<string, GeneratedMeal[]> => !!w);
+      const short = new Map<string, number>();
+      for (const w of all) for (const d of dates) for (const m of w[d] ?? []) if ((m.shortfall ?? 0) > 0) short.set(m.spec.title, (short.get(m.spec.title) ?? 0) + 1);
+      setWeekMsg(
+        short.size === 0
+          ? "Built the week: three library options for every meal."
+          : `Built the week. Fewer than three library options for: ${[...short].map(([t, n]) => `${t} (${n} ${n === 1 ? "day" : "days"})`).join(", ")}. Use "Ask the Nutrition Spot" on a meal to fill the rest.`
+      );
+      router.refresh();
+    } finally {
+      setWeekBusy(false);
+    }
+  }
+
+  // Saves an approved AI option into this coach's private library (the option was already generated and verified; nothing is asked of the AI here).
+  const [libraryMsg, setLibraryMsg] = useState<Record<string, string>>({});
+  async function handleSaveToLibrary(meal: GeneratedMeal, opt: MealOption) {
+    if (!coachId) return;
+    const slot: Slot = meal.spec.slot === "any" ? "lunch" : meal.spec.slot;
+    const say = (text: string) => setLibraryMsg((prev) => ({ ...prev, [opt.recipeId]: text }));
+    const built = await buildAiRecipeRows(opt, slot);
+    if (!built.ok) {
+      say(built.reason);
+      return;
+    }
+    const supabase = createBrowserClient();
+    const { data: recipe, error } = await supabase
+      .from("recipes")
+      .insert({ created_by: coachId, ...built.rows.recipe })
+      .select("id")
+      .single();
+    if (error || !recipe) {
+      // 23505: the same lines are already saved (the fingerprint is unique per coach).
+      say(error?.code === "23505" ? "This meal is already in your library." : "Couldn't save this meal to your library.");
+      return;
+    }
+    const { error: linesError } = await supabase.from("recipe_ingredients").insert(built.rows.ingredients.map((i) => ({ recipe_id: recipe.id, ...i })));
+    if (linesError) {
+      await supabase.from("recipes").delete().eq("id", recipe.id);
+      say("Couldn't save this meal to your library.");
+      return;
+    }
+    say("Saved to your library. It will be offered first from now on.");
   }
 
   // The Nutrition Spot (nutrition_spot_revamp_scoping_sept19.md) — AI is
@@ -550,31 +667,14 @@ export function MealPlanGenerator({
     }
 
     function runFallback(reason: string) {
-      const context = {
-        archetype: (archetype || "omnivore") as MealPlanContext["archetype"],
-        bioScores: {
-          strength: parseInt(rateStrength, 10) || 4,
-          recovery: parseInt(rateRecovery, 10) || 4,
-          digestion: parseInt(rateDigestion, 10) || 5,
-          satiety: parseInt(rateSatiety, 10) || 4,
-        },
-        phase,
-        dietaryRestrictions,
-        favoriteFoods,
-      };
-      const fallback = generateMealOptions(meal.spec, activeMacros() ?? { calories: 0, protein: 0, carbs: 0, fats: 0 }, context, customRecipes);
-      appendOptions(
-        fallback.options.map((o) => ({ ...o, recipeId: `fallback-${Date.now()}-${o.recipeId}`, isFallback: true }))
-      );
-      // ai_output_validation_audit_findings_sept30.md — the deterministic
-      // fallback silently drops a stated dietary restriction when nothing
-      // compliant exists for this slot; surface that instead of letting
-      // it read as a clean, restriction-respecting option.
+      // When the AI is unavailable, more of the library is offered instead: meals already shown for this slot are left out, and the client's food rules still apply.
+      const shown = new Set(meal.options.map((o) => o.key).filter((k): k is string => !!k));
+      const slot: Slot = meal.spec.slot === "any" ? "lunch" : meal.spec.slot;
+      const more = selectOptions(slot, specTarget(meal.spec), selectionCtx(archetype || "omnivore", shown));
+      appendOptions(more.options.map((m) => ({ ...optionFromScaled(m), recipeId: `fallback-${Date.now()}-${m.recipeId}`, isFallback: true })));
       setAiError((prev) => ({
         ...prev,
-        [meal.spec.id]: fallback.restrictionDropped
-          ? `${reason} ⚠ No option matched your stated dietary restriction for this slot — showing one that may not comply.`
-          : reason,
+        [meal.spec.id]: more.options.length === 0 ? `${reason} No other library meal fits this slot either.` : reason,
       }));
     }
 
@@ -606,7 +706,16 @@ export function MealPlanGenerator({
 
       const verifiedOptions: {
         recipeName: string;
-        ingredients: { rawLine: string; grams: number | null }[];
+        ingredients: {
+          rawLine: string;
+          name?: string | null;
+          grams: number | null;
+          matchedFdcId?: number | null;
+          matchedDescription?: string | null;
+          protein?: number | null;
+          carbs?: number | null;
+          fat?: number | null;
+        }[];
         totalProtein: number;
         totalCarbs: number;
         totalFat: number;
@@ -631,6 +740,19 @@ export function MealPlanGenerator({
         ingredients: o.ingredients.map((line) => line.rawLine),
         isAi: true,
         verifiedMacros: { protein: o.totalProtein, carbs: o.totalCarbs, fat: o.totalFat, kcal: o.totalKcal },
+        source: "ai" as const,
+        // Each line's food name (the real food it was matched to) AND the line as written, so the client's food rules are checked against both when the plan is opened.
+        lines: o.ingredients.map((line) => ({ name: line.matchedDescription ?? line.name ?? line.rawLine, label: line.rawLine, grams: line.grams })),
+        // Kept so the coach can save this option to their library (its lines are matched to real foods).
+        aiLines: o.ingredients.map((line) => ({
+          rawLine: line.rawLine,
+          name: line.matchedDescription ?? line.name ?? null,
+          grams: line.grams,
+          fdcId: line.matchedFdcId ?? null,
+          proteinG: line.protein ?? null,
+          carbsG: line.carbs ?? null,
+          fatG: line.fat ?? null,
+        })),
       }));
       appendOptions(newOptions);
       return true;
@@ -985,9 +1107,33 @@ export function MealPlanGenerator({
             )}
           </div>
 
+          <div className="border border-steel/20 p-3 space-y-2">
+            <p className="font-body text-sm text-chalk">Build the week from the library</p>
+            <p className="font-body text-xs text-steel">
+              Three options for every meal, every day this week, from Ron&apos;s recipes and your own. Meals change from day to day, this client&apos;s favorites repeat, and their
+              food preferences are applied. This replaces what is already planned for the week.
+            </p>
+            <button
+              type="button"
+              onClick={handleBuildWeek}
+              disabled={weekBusy || meals.length === 0}
+              className="h-9 px-4 bg-positive text-graphite font-body text-sm font-medium disabled:opacity-40"
+            >
+              {weekBusy ? "Building the week…" : "Build the week"}
+            </button>
+            {weekMsg && (
+              <p role="status" className="font-body text-xs text-positive">
+                {weekMsg}
+              </p>
+            )}
+          </div>
+
           <div className="space-y-3">
             {meals.map((meal) => {
               const selIdxs = selections[meal.spec.id] ?? [];
+              const libraryCount = meal.options.filter((o) => o.source === "library" || o.source === "coach").length;
+              const aiCount = meal.options.filter((o) => o.isAi).length;
+              const missing = Math.max(0, 3 - meal.options.length);
               return (
                 <div key={meal.spec.id} className="border border-steel/20 p-3">
                   <div className="flex items-center justify-between mb-2">
@@ -996,6 +1142,13 @@ export function MealPlanGenerator({
                       {meal.spec.proteinTarget}g P · {meal.spec.carbsTarget}g C · {meal.spec.fatTarget}g F
                     </span>
                   </div>
+                  {meal.shortfall !== undefined && (
+                    <p className={`font-body text-xs mb-2 ${missing > 0 ? "text-amber-400" : "text-steel"}`}>
+                      {libraryCount} from the library
+                      {aiCount > 0 ? `, ${aiCount} from the Nutrition Spot` : ""}
+                      {missing > 0 ? `, ${missing} to generate` : ""}
+                    </p>
+                  )}
                   <div className="space-y-2">
                     {meal.options.map((opt, idx) => {
                       const checked = selIdxs.includes(idx);
@@ -1030,6 +1183,12 @@ export function MealPlanGenerator({
                           )}
                           <RecipeVoteFavorite recipeId={opt.recipeId} />
                         </div>
+                        {opt.macros && (
+                          <p className="font-body text-xs text-steel pl-6 mb-1">
+                            {opt.source === "coach" ? "Your recipe · " : "Library · "}
+                            {opt.macros.calories} kcal — {opt.macros.proteinG}p / {opt.macros.carbsG}c / {opt.macros.fatG}f
+                          </p>
+                        )}
                         {opt.verifiedMacros && (
                           <p className="font-body text-xs text-steel pl-6 mb-1">
                             Verified: {opt.verifiedMacros.kcal} kcal — {opt.verifiedMacros.protein}p /{" "}
@@ -1046,6 +1205,21 @@ export function MealPlanGenerator({
                             ))
                           }
                         </ul>
+                        {opt.isAi && opt.aiLines && (
+                          <div className="pl-6 mt-1.5" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleSaveToLibrary(meal, opt);
+                              }}
+                              className="h-7 px-3 font-body text-xs border border-steel/40 text-chalk"
+                            >
+                              Save to my library
+                            </button>
+                            {libraryMsg[opt.recipeId] && <span className="font-body text-xs text-steel ml-2">{libraryMsg[opt.recipeId]}</span>}
+                          </div>
+                        )}
                       </label>
                       );
                     })}

@@ -69,7 +69,9 @@ describe("no unsafe option is ever created", () => {
   it("the generator sends the client id (never the rules) and filters library options, fallback options and AI options", () => {
     expect(generator).toContain("athleteId,");
     expect(generator).not.toMatch(/body: JSON\.stringify\(\{[^}]*allergies/);
-    expect(generator).toContain("keepSafe(generateFullMealPlan(");
+    // Library options are chosen by the library-first selection, which checks the client's rules on what each meal really contains (lib/library-selection.ts).
+    expect(generator).toContain("generateLibraryDay(");
+    expect(generator).toContain("rules: foodRules ?? {}");
     expect(generator).toContain("filterOptionsByRules(offered, foodRules)");
     expect(generator).toContain("left out because");
     expect(clientNutrition).toContain("foodRules={foodRules}");
@@ -84,7 +86,9 @@ describe("the client side", () => {
   });
   it("Today's meals hides an option that breaks their rules, and says the coach will update it", () => {
     expect(clientPage).toContain("filterPlanForClient(savedPlanMeals");
-    expect(clientPage).toContain("hiddenCount={clientPlan.hiddenCount}");
+    expect(clientPage).toContain("hiddenCount: clientPlan.hiddenCount");
+    expect(src("../../athlete/todays-meal-cards.tsx")).toContain("Your coach is updating");
+    expect(src("../../athlete/todays-meal-cards.tsx")).toContain("Your coach is updating this meal.");
     expect(dayView).toContain("Your coach is updating");
     expect(dayView).toContain("Your coach is updating this meal.");
   });

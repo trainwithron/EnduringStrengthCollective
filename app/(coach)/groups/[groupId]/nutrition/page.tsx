@@ -15,7 +15,6 @@ import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { FoodLogSection } from "@/components/athlete/food-log-section";
 import type { GeneratedMeal } from "@/lib/meal-engine";
 import type { MealEntryPayload } from "@/lib/meal-plan-assignment";
-import { DayMealsView } from "@/components/athlete/day-meals-view";
 import { NutritionPreferencesCard } from "@/components/athlete/nutrition-preferences-card";
 import { rowToPreferences } from "@/lib/nutrition-preferences";
 import { filterGeneratedMealsForClient, filterPlanForClient, hidePlanRecipes } from "@/lib/plan-preference-check";
@@ -286,7 +285,7 @@ export default async function NutritionPage(
     fatG: r.fat_g,
   }));
   // A saved plan's meals are an OBJECT keyed by day type ({ daily | train | rest: [...] }), not a list; the checklist below wants a list, and handing it the
-  // object throws on the client's page the day a coach saves a plan. So the checklist only gets a real list, and the saved plan is shown by DayMealsView.
+  // object throws on the client's page the day a coach saves a plan. So the checklist only gets a real list, and the saved plan is shown by TodaysMealCards (inside FoodLogSection).
   const todayMealsRaw: GeneratedMeal[] = Array.isArray(todayMealPlan?.meals) ? (todayMealPlan?.meals as unknown as GeneratedMeal[]) : [];
   const savedPlanMeals =
     todayMealPlan?.meals && typeof todayMealPlan.meals === "object" && !Array.isArray(todayMealPlan.meals)
@@ -443,12 +442,8 @@ export default async function NutritionPage(
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
               Today&apos;s meals
             </h2>
-            {savedPlanMeals && (
-              <div className="mb-3">
-                <DayMealsView meals={clientPlan.meals} hiddenCount={clientPlan.hiddenCount} emptiedMeals={clientPlan.emptiedMeals} />
-              </div>
-            )}
             <FoodLogSection
+              plan={savedPlanMeals ? { meals: clientPlan.meals, hiddenCount: clientPlan.hiddenCount, emptiedMeals: clientPlan.emptiedMeals } : null}
               athleteId={athleteId}
               groupId={params.groupId}
               logDate={todayKey}

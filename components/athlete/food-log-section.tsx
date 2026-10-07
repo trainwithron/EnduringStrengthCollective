@@ -3,6 +3,8 @@
 import { useState } from "react";
 import type { GeneratedMeal } from "@/lib/meal-engine";
 import { MealCheckoffList, type FoodLogEntry } from "./meal-checkoff-list";
+import { TodaysMealCards } from "./todays-meal-cards";
+import type { MealEntryPayload } from "@/lib/meal-plan-assignment";
 import { QuickLogFoodButton } from "./quick-log-food-button";
 import { BarcodeScanButton } from "./barcode-scan-button";
 import { PhotoLogFoodButton } from "./photo-log-food-button";
@@ -20,6 +22,7 @@ export function FoodLogSection({
   meals,
   initialEntries,
   recents,
+  plan,
 }: {
   athleteId: string;
   groupId: string;
@@ -27,7 +30,10 @@ export function FoodLogSection({
   meals: GeneratedMeal[];
   initialEntries: FoodLogEntry[];
   recents: RecentFoodLogOption[];
+  // The saved plan for today (already filtered against this client's food preferences). When it has meals they are shown as option cards; otherwise the plain checklist.
+  plan?: { meals: Record<string, MealEntryPayload[]> | null; hiddenCount: number; emptiedMeals: { bucket: string; mealId: string }[] } | null;
 }) {
+  const planHasMeals = !!plan?.meals && Object.values(plan.meals).some((entries) => (entries ?? []).length > 0);
   const [quickLogEntries, setQuickLogEntries] = useState(initialEntries.filter((e) => !e.mealSlot));
   const [allEntries, setAllEntries] = useState(initialEntries);
 
@@ -67,14 +73,27 @@ export function FoodLogSection({
         </div>
       )}
 
-      <MealCheckoffList
-        athleteId={athleteId}
-        groupId={groupId}
-        logDate={logDate}
-        meals={meals}
-        initialEntries={initialEntries}
-        onEntryLogged={handleMealEntryLogged}
-      />
+      {planHasMeals ? (
+        <TodaysMealCards
+          athleteId={athleteId}
+          groupId={groupId}
+          logDate={logDate}
+          meals={plan!.meals}
+          hiddenCount={plan!.hiddenCount}
+          emptiedMeals={plan!.emptiedMeals}
+          entries={allEntries}
+          onEntryLogged={handleMealEntryLogged}
+        />
+      ) : (
+        <MealCheckoffList
+          athleteId={athleteId}
+          groupId={groupId}
+          logDate={logDate}
+          meals={meals}
+          initialEntries={initialEntries}
+          onEntryLogged={handleMealEntryLogged}
+        />
+      )}
 
       <div className="space-y-2">
         <QuickLogFoodButton

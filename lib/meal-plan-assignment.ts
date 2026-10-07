@@ -13,6 +13,22 @@ export interface MealRecipeChoice {
   // makes. Preserved through the save so a later renderer (the athlete's
   // day view) knows which rendering rule applies without guessing.
   isAi?: boolean;
+  // What the library-first builder adds (all optional: a plan saved before it reads exactly as it did). The structured lines are what the checks read (the food's name AND the
+  // label that is printed), the macros are what this option really contains at the printed amounts, and source says where it came from.
+  source?: "library" | "coach" | "ai";
+  lines?: { name: string; label: string; grams: number | null }[];
+  macros?: { proteinG: number; carbsG: number; fatG: number; calories: number };
+  mainProtein?: string | null;
+  // The meal's stable key ("t:<template id>" or "r:<recipe id>"), so a later build knows what was offered before.
+  key?: string;
+}
+
+// The key of a saved option. Plans saved before keys existed are read from the recipe id: a starter-library id starts with a slot letter and an underscore ("l_chicken..."),
+// anything else is a coach recipe's database id.
+export function choiceKey(choice: MealRecipeChoice): string | null {
+  if (choice.key) return choice.key;
+  if (!choice.recipeId) return null;
+  return /^[bdls]_/.test(choice.recipeId) ? `t:${choice.recipeId}` : `r:${choice.recipeId}`;
 }
 
 export interface MealEntryPayload {
@@ -32,6 +48,16 @@ export interface MealEntryPayload {
   recipeId?: string | null;
   recipeName?: string | null;
   ingredients?: string[];
+  // Index into the choices of the option the client's card shows first. Absent = the first.
+  featuredIndex?: number;
+}
+
+// The choices in the order a client sees them: the featured option first, the rest in their saved order.
+export function choicesFeaturedFirst(entry: MealEntryPayload): MealRecipeChoice[] {
+  const choices = mealRecipeChoices(entry);
+  const i = entry.featuredIndex;
+  if (i === undefined || !Number.isInteger(i) || i <= 0 || i >= choices.length) return choices;
+  return [choices[i], ...choices.slice(0, i), ...choices.slice(i + 1)];
 }
 
 // Normalizes either shape (new `recipes` array, or the old singular
