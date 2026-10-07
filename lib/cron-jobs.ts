@@ -31,6 +31,7 @@ export const CRON_JOBS: CronJob[] = [
   { job: "expire-session-credits", path: "/api/cron/expire-session-credits", maxAgeHours: DAILY },
   { job: "process-booking-waitlist", path: "/api/cron/process-booking-waitlist", maxAgeHours: FREQUENT },
   { job: "flag-recurring-booking-conflicts", path: "/api/cron/flag-recurring-booking-conflicts", maxAgeHours: DAILY },
+  { job: "schedule-requests", path: "/api/cron/schedule-requests", maxAgeHours: DAILY },
   { job: "series-top-up", path: "/api/cron/series-top-up", maxAgeHours: DAILY },
   { job: "cron-watchdog", path: "/api/cron/cron-watchdog", maxAgeHours: DAILY },
 ];

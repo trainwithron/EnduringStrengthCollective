@@ -77,6 +77,10 @@
       "schedule": "0 7 * * *"
     },
     {
+      "path": "/api/cron/schedule-requests",
+      "schedule": "15 7 * * *"
+    },
+    {
       "path": "/api/cron/series-top-up",
       "schedule": "30 7 * * *"
     },
