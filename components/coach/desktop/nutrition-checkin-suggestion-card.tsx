@@ -7,6 +7,7 @@ import { applyStandingTarget, insertCheckinOnce, pushMessageForApply, type Apply
 import { notifyPush } from "@/lib/push-notify";
 import { isBelowFloor } from "@/lib/calorie-floor";
 import { ensurePhasePlan } from "@/lib/phase-plan-write";
+import { AGE_UNKNOWN_NOTE } from "@/lib/minor-safety";
 import type { NutritionPhase } from "@/lib/nutrition-checkin";
 import { ApplyFromField } from "@/components/coach/nutrition/apply-from-field";
 import { CalorieFloorWarning } from "@/components/coach/nutrition/calorie-floor-warning";
@@ -55,6 +56,7 @@ export function NutritionCheckinSuggestionCard({
   floorCalories = null,
   floorNote = null,
   clientName = "this client",
+  ageKnown = true,
 }: {
   athleteId: string;
   groupId: string;
@@ -65,6 +67,8 @@ export function NutritionCheckinSuggestionCard({
   floorCalories?: number | null;
   floorNote?: string | null;
   clientName?: string;
+  // False when the client has no date of birth on file: the card says the under-18 rule could not be checked.
+  ageKnown?: boolean;
 }) {
   const [applyFrom, setApplyFrom] = useState(todayKey);
   const [busy, setBusy] = useState(false);
@@ -186,6 +190,11 @@ export function NutritionCheckinSuggestionCard({
         </div>
       </div>
       <CalorieFloorWarning calories={suggestion.newCalories} floor={floorCalories} who={clientName} note={floorNote} />
+      {!ageKnown && !isBaseline && (
+        <p className="font-body text-xs text-rust" role="note">
+          {AGE_UNKNOWN_NOTE}
+        </p>
+      )}
       {outcome ? (
         <div className="pt-2 border-t border-steel/15 space-y-2">
           <ApplyOutcomeNotice

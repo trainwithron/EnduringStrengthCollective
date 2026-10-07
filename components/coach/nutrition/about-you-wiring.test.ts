@@ -93,7 +93,7 @@ describe("the weekly job", () => {
   it("seeds a starting target for a client with no check-in and no standing target, once, and makes nothing from incomplete numbers", () => {
     expect(cron).toContain("seedBaselines(");
     expect(cron).toContain("hadBaseline.has(key)");
-    expect(cron).toContain("if (!outcome.ok) continue;");
+    expect(cron).toContain("if (!outcome.ok) return false;");
   });
 });
 

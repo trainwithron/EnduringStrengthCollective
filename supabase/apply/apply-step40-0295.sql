@@ -401,6 +401,7 @@ set search_path to 'public'
 as $function$
 declare
   v_name text;
+  v_existing uuid;
   c record;
 begin
   if new.kind <> 'baseline' then
@@ -408,8 +409,21 @@ begin
   end if;
   select coalesce(nullif(btrim(full_name), ''), 'your client') into v_name from public.profiles where id = new.athlete_id;
   for c in select profile_id from public.group_memberships where group_id = new.group_id and role = 'coach' loop
-    insert into public.notifications (profile_id, group_id, type, body, link_path)
-    values (c.profile_id, new.group_id, 'nutrition_baseline_ready', 'A starting target is ready for ' || v_name, '/groups/' || new.group_id::text || '/nutrition?athleteId=' || new.athlete_id::text);
+    -- ONE notice per coach and group while it is unread: a team coach whose athletes fill in About you over a week gets one line, not one per athlete. The first notice
+    -- names the client; a second one folds into it ("several clients", linking to the Nutrition list), so no count or name is ever stored beyond that.
+    select n.id into v_existing
+    from public.notifications n
+    where n.profile_id = c.profile_id and n.group_id = new.group_id and n.type = 'nutrition_baseline_ready' and n.read_at is null and n.created_at > now() - interval '1 day'
+    order by n.created_at desc
+    limit 1;
+    if v_existing is not null then
+      update public.notifications
+      set body = 'Starting targets are ready for several clients', link_path = '/groups/' || new.group_id::text || '/nutrition'
+      where id = v_existing;
+    else
+      insert into public.notifications (profile_id, group_id, type, body, link_path)
+      values (c.profile_id, new.group_id, 'nutrition_baseline_ready', 'A starting target is ready for ' || v_name, '/groups/' || new.group_id::text || '/nutrition?athleteId=' || new.athlete_id::text);
+    end if;
   end loop;
   return new;
 end;

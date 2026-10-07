@@ -165,6 +165,21 @@ export default {
       h.check("the notice links to that client in Nutrition", notes.every((n) => n.link_path === `/groups/${g}/nutrition?athleteId=${f}`), JSON.stringify(notes));
       h.check("the client and another group's coach are not told, and a weekly suggestion sends no baseline notice", !notes.some((n) => n.profile_id === f || n.profile_id === stranger || n.profile_id === coach2 && n.group_id !== g));
 
+      // ---- one notice per coach, not one per athlete ----
+      const secondBaseline = async (athlete) =>
+        db.query(`insert into public.nutrition_checkin_suggestions (athlete_id, group_id, phase, new_calories, rationale, protein_g, carbs_g, fat_g, diet_archetype, dietary_restrictions, status, kind, consecutive_surplus_spikes) values ($1, $2, 'maintenance', 2300, 'Starting target', 160, 260, 70, 'standard', '', 'pending', 'baseline', 0)`, [athlete, g]);
+      await secondBaseline(a);
+      await secondBaseline(c);
+      const digest = await h.rows(`select profile_id, body, link_path, read_at from public.notifications where type = 'nutrition_baseline_ready' and group_id = $1 order by profile_id`, [g]);
+      h.check("three athletes' starting targets leave each coach ONE notice, not three", digest.length === 2 && digest.some((n) => n.profile_id === coach) && digest.some((n) => n.profile_id === coach2), JSON.stringify(digest));
+      h.check("the folded notice has fixed wording, no name and no number, and opens the Nutrition list", digest.every((n) => n.body === "Starting targets are ready for several clients" && n.link_path === `/groups/${g}/nutrition`), JSON.stringify(digest));
+      await db.query(`update public.notifications set read_at = now() where type = 'nutrition_baseline_ready'`);
+      const digestClient = await h.user("P2 Digest Client");
+      await h.member(g, digestClient);
+      await secondBaseline(digestClient);
+      const fresh = await h.rows(`select body from public.notifications where type = 'nutrition_baseline_ready' and read_at is null and group_id = $1`, [g]);
+      h.check("once the coach has read it, the next starting target makes a new single notice that names the client", fresh.length === 2 && fresh.every((n) => n.body === "A starting target is ready for P2 Digest Client"), JSON.stringify(fresh));
+
       // ---- a goal can carry a proposed phase; it becomes the phase of record only when the CLIENT confirms it ----
       const mk = async (who, athlete, phase, type = "muscle_gain", extra = "") =>
         (await tryQ(db, `insert into public.client_goals (athlete_id, group_id, goal_type, status, created_by, target_date, nutrition_phase${extra}) values ($1, $2, '${type}', 'proposed', $3, '2027-03-01', $4) returning id, nutrition_phase`, [athlete, g, who, phase]));

@@ -38,6 +38,7 @@ import { BodyProfileEditor } from "@/components/coach/nutrition/body-profile-edi
 import { BaselinePrompt } from "@/components/coach/nutrition/baseline-prompt";
 import { PhaseOfRecordCard } from "@/components/coach/nutrition/phase-of-record-card";
 import { readDateOfBirth, rowToBodyProfile } from "@/lib/client-body-profile";
+import { minorSafetyLine } from "@/lib/minor-safety";
 import { rowToPhasePlan, resolvePhaseOfRecord } from "@/lib/phase-plan";
 import { chooseBaselinePhase, computeBaseline } from "@/lib/nutrition-baseline";
 
@@ -369,6 +370,8 @@ export async function ClientNutrition({
     dietType: prefs.dietType,
   });
   const baselineArchetype = prefs.dietType === "keto" ? "keto" : prefs.dietType === "carnivore" ? "carnivore" : "standard";
+  const ageYears = readDateOfBirth(bodyProfile) ? ageOnDate(readDateOfBirth(bodyProfile) as string, todayKey) : null;
+  const minorLine = minorSafetyLine({ ageYears, phase: phasePlan?.phase ?? derivedPhase?.phase ?? milestoneTagToNutritionPhase(phaseTag), clientName: firstName });
   const dobLabel = readDateOfBirth(bodyProfile) ? shortDateLabel(readDateOfBirth(bodyProfile) as string) : null;
 
   return (
@@ -402,6 +405,11 @@ export async function ClientNutrition({
         </div>
         <div className="mt-1.5">
           <CalorieFloorWarning calories={currentCalories} floor={floorCalories} who={firstName} note={floorNote} />
+          {minorLine && (
+            <p className="font-body text-xs text-rust mt-1" role="note">
+              {minorLine}
+            </p>
+          )}
         </div>
         <nav aria-label="Nutrition sections" className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-body text-xs text-steel">
           <a href="#targets" className="hover:text-chalk">Targets</a>
@@ -443,6 +451,7 @@ export async function ClientNutrition({
             floorCalories={floorCalories}
             floorNote={floorNote}
             clientName={firstName}
+            ageKnown={ageYears != null}
           />
           <StandingMacroTargetCard
             athleteId={athleteId}
@@ -507,7 +516,7 @@ export async function ClientNutrition({
                 proteinGPerLb={prefs.proteinGPerLb}
                 defaultDietaryRestrictions={rulesText}
                 weightUnit={bodyProfile.weightUnit}
-                ageYears={readDateOfBirth(bodyProfile) ? ageOnDate(readDateOfBirth(bodyProfile) as string, todayKey) : null}
+                ageYears={ageYears}
               />
             </div>
           </details>

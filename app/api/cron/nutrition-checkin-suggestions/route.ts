@@ -6,6 +6,7 @@ import { computeReadinessAverage } from "@/lib/wellness";
 import { computeArchetypeMacros, detectDietArchetype } from "@/lib/macros";
 import { estimateMaintenance } from "@/lib/nutrition-profile";
 import { withCronRun } from "@/lib/cron-monitor";
+import { pageAll } from "@/lib/page-all";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { addDaysToKey } from "@/lib/date-key";
 import { summarizeAdherence } from "@/lib/food-log-adherence";
@@ -14,7 +15,7 @@ import { rowToPhasePlan } from "@/lib/phase-plan";
 import { chooseBaselinePhase, computeBaseline } from "@/lib/nutrition-baseline";
 import { rowToPreferences } from "@/lib/nutrition-preferences";
 import { ageOnDate } from "@/lib/nutrition-profile";
-import { holdDeficitForMinor } from "@/lib/minor-safety";
+import { holdDeficitForMinor, AGE_UNKNOWN_NOTE } from "@/lib/minor-safety";
 
 // Weekly Check-In engine, made proactive (nutrition_checkin_engine_scoping
 // memory) — a coach shouldn't have to remember to open the panel and
@@ -49,12 +50,18 @@ async function handler(request: Request) {
   // of phase/continuation state (consecutive_surplus_spikes) is
   // persisted per athlete today. Take each athlete's single most recent
   // row as the continuation baseline.
-  const { data: recentCheckins } = await supabase
-    .from("nutrition_checkins")
-    .select(
-      "athlete_id, group_id, phase, new_calories, consecutive_surplus_spikes, dietary_restrictions, adjustment_pct, created_at"
-    )
-    .order("created_at", { ascending: false });
+  // The database returns at most 1,000 rows a call, so every list below is read a page at a time. A check-in list that could not be read in full would silently
+  // drop clients from the weekly run, so a failed read stops the run with an error rather than carrying on with part of the list.
+  const checkinPage = await pageAll((from, to) =>
+    supabase
+      .from("nutrition_checkins")
+      .select("athlete_id, group_id, phase, new_calories, consecutive_surplus_spikes, dietary_restrictions, adjustment_pct, created_at")
+      .order("created_at", { ascending: false })
+      .order("id")
+      .range(from, to)
+  );
+  if (checkinPage.failed) return NextResponse.json({ error: "Could not read the check-ins, so nothing was suggested." }, { status: 502 });
+  const recentCheckins = checkinPage.rows;
 
   interface RecentCheckinRow {
     athlete_id: string;
@@ -82,11 +89,20 @@ async function handler(request: Request) {
     return key;
   };
 
-  const { data: planRows } = await supabase.from("client_phase_plans").select("athlete_id, group_id, phase, started_on, review_on, planned_next_phase, last_reviewed_at");
+  const planPage = await pageAll((from, to) =>
+    supabase
+      .from("client_phase_plans")
+      .select("athlete_id, group_id, phase, started_on, review_on, planned_next_phase, last_reviewed_at")
+      .order("athlete_id")
+      .order("group_id")
+      .range(from, to)
+  );
+  if (planPage.failed) return NextResponse.json({ error: "Could not read the phase plans, so nothing was suggested." }, { status: 502 });
   const planByKey = new Map<string, ReturnType<typeof rowToPhasePlan>>();
-  for (const p of planRows ?? []) planByKey.set(`${p.athlete_id}|${p.group_id}`, rowToPhasePlan(p as Record<string, unknown>));
+  for (const p of planPage.rows) planByKey.set(`${p.athlete_id}|${p.group_id}`, rowToPhasePlan(p as Record<string, unknown>));
 
-  const results: { athleteId: string; suggested: boolean; loggedDays?: number; held?: boolean }[] = [];
+  // heldForAge: the engine wanted to lower a minor's calories and the cut was held (it writes no suggestion; the coach screen explains why on read).
+  const results: { athleteId: string; suggested: boolean; loggedDays?: number; held?: boolean; heldForAge?: boolean }[] = [];
 
   for (const [athleteId, last] of latestByAthlete) {
     const todayKey = await todayKeyFor(last.group_id);
@@ -187,13 +203,13 @@ async function handler(request: Request) {
     });
     // No calorie deficit is suggested for anyone under 18: a cut is held at their current calories, which writes no suggestion.
     const dob = readDateOfBirth(body);
-    const { result: engineResult } = holdDeficitForMinor({ ageYears: dob ? ageOnDate(dob, todayKey) : null, currentCalories: last.new_calories, result: rawResult });
+    const { result: engineResult, held: heldForAge } = holdDeficitForMinor({ ageYears: dob ? ageOnDate(dob, todayKey) : null, currentCalories: last.new_calories, result: rawResult });
 
     // Only a real, actionable recommendation is worth a coach's
     // attention — an "on track, hold steady" week (or a week held for low logging) would just be
     // per-athlete-per-week noise in a review inbox otherwise.
     if (engineResult.newCalories === last.new_calories) {
-      results.push({ athleteId, suggested: false, loggedDays: adherence.daysLogged, held: adherence.heldForLowLogging });
+      results.push({ athleteId, suggested: false, loggedDays: adherence.daysLogged, held: adherence.heldForLowLogging, heldForAge });
       continue;
     }
 
@@ -212,7 +228,8 @@ async function handler(request: Request) {
       recovery_rating: recoveryRating,
       consecutive_surplus_spikes: engineResult.consecutiveSurplusSpikes,
       new_calories: engineResult.newCalories,
-      rationale: engineResult.rationale,
+      // With no date of birth on file nothing can protect a minor, and the suggestion says so rather than staying silent.
+      rationale: dob ? engineResult.rationale : `${engineResult.rationale} ${AGE_UNKNOWN_NOTE}`,
       protein_g: macros.proteinG,
       carbs_g: macros.carbsG,
       fat_g: macros.fatG,
@@ -220,35 +237,44 @@ async function handler(request: Request) {
       diet_archetype: archetype,
       dietary_restrictions: last.dietary_restrictions ?? "",
     });
-    results.push({ athleteId, suggested: true, loggedDays: adherence.daysLogged, held: adherence.heldForLowLogging });
+    results.push({ athleteId, suggested: true, loggedDays: adherence.daysLogged, held: adherence.heldForLowLogging, heldForAge });
   }
 
   const baselines = await seedBaselines(supabase, latestByAthlete, planByKey, todayKeyFor);
-  return NextResponse.json({ athletes: results.length, results, baselinesSuggested: baselines });
+  return NextResponse.json({ athletes: results.length, results, baselinesSuggested: baselines.made, baselinesSkipped: baselines.skipped });
 }
 
 // A starting target for clients who have no check-in and no standing target yet, once their numbers are complete. At most one per client and group, ever: a
 // baseline the coach dismissed is not made again. Groups where the client is group-tier (no macros) are skipped. A cap keeps one run bounded.
+//
+// The lists that decide who already has a target are read in FULL (a page at a time). If any of them could not be read completely, NOTHING is seeded this run: a
+// partial list would hand a starting target to a client who already has one.
 const MAX_BASELINES_PER_RUN = 200;
+const BATCH = 10;
 
 async function seedBaselines(
   supabase: ReturnType<typeof createServiceRoleClient>,
   checkedAthletes: Map<string, unknown>,
   planByKey: Map<string, ReturnType<typeof rowToPhasePlan>>,
   todayKeyFor: (groupId: string) => Promise<string>
-): Promise<number> {
-  const [{ data: members }, { data: standingRows }, { data: baselineRows }] = await Promise.all([
-    supabase.from("group_memberships").select("profile_id, group_id, client_tier").eq("role", "athlete"),
-    supabase.from("client_macro_target_history").select("athlete_id, group_id"),
-    supabase.from("nutrition_checkin_suggestions").select("athlete_id, group_id").eq("kind", "baseline"),
+): Promise<{ made: number; skipped: string | null }> {
+  const [members, standing, baselines] = await Promise.all([
+    pageAll((from, to) => supabase.from("group_memberships").select("profile_id, group_id, client_tier").eq("role", "athlete").order("profile_id").order("group_id").range(from, to)),
+    pageAll((from, to) => supabase.from("client_macro_target_history").select("athlete_id, group_id").order("athlete_id").order("group_id").order("effective_from").range(from, to)),
+    pageAll((from, to) => supabase.from("nutrition_checkin_suggestions").select("athlete_id, group_id").eq("kind", "baseline").order("athlete_id").order("group_id").order("generated_at").range(from, to)),
   ]);
-  const hasStanding = new Set((standingRows ?? []).map((r) => `${r.athlete_id}|${r.group_id}`));
-  const hadBaseline = new Set((baselineRows ?? []).map((r) => `${r.athlete_id}|${r.group_id}`));
-  let made = 0;
-  for (const m of members ?? []) {
-    if (made >= MAX_BASELINES_PER_RUN) break;
+  if (members.failed || standing.failed || baselines.failed || members.truncated || standing.truncated || baselines.truncated) {
+    return { made: 0, skipped: "a list could not be read in full" };
+  }
+  const hasStanding = new Set(standing.rows.map((r) => `${r.athlete_id}|${r.group_id}`));
+  const hadBaseline = new Set(baselines.rows.map((r) => `${r.athlete_id}|${r.group_id}`));
+  const candidates = members.rows.filter((m) => {
     const key = `${m.profile_id}|${m.group_id}`;
-    if (m.client_tier === "group" || checkedAthletes.has(m.profile_id) || hasStanding.has(key) || hadBaseline.has(key)) continue;
+    return m.client_tier !== "group" && !checkedAthletes.has(m.profile_id) && !hasStanding.has(key) && !hadBaseline.has(key);
+  });
+
+  const seedOne = async (m: { profile_id: string; group_id: string }): Promise<boolean> => {
+    const key = `${m.profile_id}|${m.group_id}`;
     const todayKey = await todayKeyFor(m.group_id);
     const [{ data: details }, { data: intake }, { data: weightRow }, { data: prefsRow }, { data: goalRows }] = await Promise.all([
       supabase.from("athlete_profile_details").select("*").eq("athlete_id", m.profile_id).maybeSingle(),
@@ -274,7 +300,7 @@ async function seedBaselines(
       dietType: prefs.dietType,
     });
     // Incomplete numbers: nothing is made (and nothing is guessed); the coach screen says what is missing.
-    if (!outcome.ok) continue;
+    if (!outcome.ok) return false;
     const { error } = await supabase.from("nutrition_checkin_suggestions").insert({
       athlete_id: m.profile_id,
       group_id: m.group_id,
@@ -291,9 +317,15 @@ async function seedBaselines(
       below_floor: outcome.belowFloor,
       consecutive_surplus_spikes: 0,
     });
-    if (!error) made++;
+    return !error;
+  };
+
+  let made = 0;
+  for (let i = 0; i < candidates.length && made < MAX_BASELINES_PER_RUN; i += BATCH) {
+    const done = await Promise.all(candidates.slice(i, i + BATCH).map(seedOne));
+    made += done.filter(Boolean).length;
   }
-  return made;
+  return { made, skipped: null };
 }
 
 export const GET = withCronRun("nutrition-checkin-suggestions", handler);

@@ -16,3 +16,14 @@ export function holdDeficitForMinor<T extends { newCalories: number; rationale: 
   if (!isUnder18(args.ageYears) || args.result.newCalories >= args.currentCalories) return { result: args.result, held: false };
   return { result: { ...args.result, newCalories: args.currentCalories, rationale: `${args.result.rationale} ${MINOR_HOLD_NOTE}` }, held: true };
 }
+
+// Said wherever a suggestion is shown for a client with no date of birth: age is unknown, so the under-18 rule could not be checked.
+export const AGE_UNKNOWN_NOTE = "No date of birth on file, so age is unknown and no under-18 protection could be applied.";
+
+// What a coach is told on a client's Targets about the under-18 rule, or null when it has nothing to say: no date of birth (the rule cannot run), or a minor in a fat-loss
+// phase (a weekly cut is held, which writes no suggestion, so the coach would otherwise wonder why none appeared).
+export function minorSafetyLine(args: { ageYears: number | null | undefined; phase: string | null | undefined; clientName: string }): string | null {
+  if (args.ageYears == null) return `${AGE_UNKNOWN_NOTE} Ask ${args.clientName} to fill in About you.`;
+  if (isUnder18(args.ageYears) && args.phase === "fat_loss") return `${args.clientName} is under 18, so no calorie deficit is suggested: a weekly cut is held at their current calories.`;
+  return null;
+}

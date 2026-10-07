@@ -14,6 +14,7 @@ export function NutritionCheckinSuggestionsList({
   floorCalories = null,
   floorNote = null,
   clientName = "this client",
+  ageKnown = true,
 }: {
   athleteId: string;
   groupId: string;
@@ -22,6 +23,7 @@ export function NutritionCheckinSuggestionsList({
   floorCalories?: number | null;
   floorNote?: string | null;
   clientName?: string;
+  ageKnown?: boolean;
 }) {
   const [suggestions, setSuggestions] = useState(initialSuggestions);
   if (suggestions.length === 0) return null;
@@ -38,6 +40,7 @@ export function NutritionCheckinSuggestionsList({
           floorCalories={floorCalories}
           floorNote={floorNote}
           clientName={clientName}
+          ageKnown={ageKnown}
           onResolved={() => setSuggestions((prev) => prev.filter((p) => p.id !== s.id))}
         />
       ))}
