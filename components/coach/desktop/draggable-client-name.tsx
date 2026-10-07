@@ -27,7 +27,6 @@ export function DraggableClientName({
         e.dataTransfer.effectAllowed = "copy";
       }}
       className={`cursor-grab active:cursor-grabbing ${className ?? ""}`}
-      title="Drag onto a calendar day to schedule a session"
     >
       {children}
     </div>

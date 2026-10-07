@@ -42,16 +42,16 @@ export function CalendarClientList({ clients, selectedClientId }: { clients: Cal
                 {c.fullName}
               </button>
             </DraggableClientName>
-            <span className="flex items-center gap-2 shrink-0">
+            <span className="flex items-center justify-end gap-2 shrink-0 pr-2">
               {picture.owed > 0 && (
                 <span title="Already delivered beyond what they had" className="font-body text-[11px] text-rust">
                   owed {picture.owed}
                 </span>
               )}
               <span
-                title="Sessions still available to schedule"
-                aria-label={`${picture.toBook} to schedule`}
-                className={`font-body text-xs w-5 text-right ${picture.toBook > 0 ? "text-steel" : "text-steel/40"}`}
+                title={`${picture.toBook} left to schedule`}
+                aria-label={`${picture.toBook} left to schedule`}
+                className={`font-body text-sm tabular-nums w-7 text-right ${picture.toBook > 0 ? "text-chalk" : "text-steel/40"}`}
               >
                 {picture.toBook}
               </span>

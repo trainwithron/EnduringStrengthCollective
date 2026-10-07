@@ -256,3 +256,31 @@ body::before {
 .bg-surface {
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 20px -6px rgb(0 0 0 / 0.55);
 }
+
+/* Quiet scrollbars everywhere (Ron, Oct 6: the default chunky white track in the calendar's client list covered the numbers and looked ugly). Thin, a low-contrast
+   thumb, a transparent track, and no layout space taken beyond a few pixels. A list that must show a figure down its right edge can hide the bar completely with
+   .scroll-hidden. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(144, 139, 126, 0.35) transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(144, 139, 126, 0.35);
+  border-radius: 3px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(144, 139, 126, 0.6);
+}
+.scroll-hidden {
+  scrollbar-width: none;
+}
+.scroll-hidden::-webkit-scrollbar {
+  display: none;
+}

@@ -49,9 +49,10 @@ export function CalendarClientRail({
       </button>
       {open && (
         <>
-          <p className="font-body text-xs text-steel mt-1 mb-2">
+          <p className="font-body text-xs text-steel mt-1">
             {picked ? `${picked.fullName} is picked: tap a day, then a time.` : "Drag a name onto a day, or tap a name, then a day."}
           </p>
+          <p className="font-body text-[11px] text-steel/70 mb-2">The number is how many sessions are left to schedule.</p>
           <label className="relative block mb-2">
             <span className="sr-only">Search clients</span>
             <Search className="w-3.5 h-3.5 text-steel absolute left-2 top-1/2 -translate-y-1/2" aria-hidden="true" />
@@ -63,7 +64,7 @@ export function CalendarClientRail({
               className="w-full h-9 bg-graphite border border-steel/30 text-chalk pl-7 pr-2 font-body text-sm focus:outline-none focus:border-rust"
             />
           </label>
-          <div className="max-h-[52vh] overflow-y-auto pr-1">
+          <div className="max-h-[52vh] overflow-y-auto scroll-hidden">
             <CalendarClientList clients={rows} selectedClientId={selectedClientId} />
           </div>
           {picked && <ClientSchedulePanel key={picked.athleteId} client={picked} timezone={timezone} sessionTypes={sessionTypes} />}

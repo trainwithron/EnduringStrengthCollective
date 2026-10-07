@@ -146,7 +146,7 @@ export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client
         <>
           <p className="font-body text-sm text-chalk">{coachCreditSentence(picture, client.fullName, noun)}</p>
           <div className="flex items-center gap-1.5 mt-2 font-body text-xs text-steel">
-            <span>{t("session", "plural", { cap: true })}</span>
+            <span>{t("session", "plural", { cap: true })} left</span>
             <button type="button" onClick={() => adjustCredits(-1)} disabled={adjusting} aria-label={`Remove a ${noun.singular} from ${client.fullName}`} className="w-6 h-6 border border-steel/30 text-steel disabled:opacity-40">
               &minus;
             </button>

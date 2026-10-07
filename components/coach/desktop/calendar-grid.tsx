@@ -173,7 +173,7 @@ export function CalendarGrid({
 
   return (
     <div>
-      <div className="grid grid-cols-7 gap-px bg-steel/15 border border-steel/15">
+      <div className="grid grid-cols-[repeat(7,minmax(0,1fr))] gap-px bg-steel/15 border border-steel/15">
       {headerLabels.map((label, i) => (
         <div
           key={i}
@@ -219,7 +219,7 @@ export function CalendarGrid({
             }}
             onDragLeave={() => setDragOverKey((k) => (k === key ? null : k))}
             onDrop={(e) => handleDrop(e, key)}
-            className={`p-1.5 flex flex-col gap-0.5 relative group cursor-pointer transition-colors ${
+            className={`p-1.5 flex flex-col gap-0.5 relative group cursor-pointer transition-colors min-w-0 overflow-hidden ${
               isToday ? "bg-surface/50" : "bg-graphite hover:bg-surface/60"
             } ${isSelected ? "ring-2 ring-inset ring-rust" : ""} ${
               dragOverKey === key ? "ring-2 ring-inset ring-rust bg-rust/10" : ""
