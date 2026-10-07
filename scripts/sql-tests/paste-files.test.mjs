@@ -392,6 +392,46 @@ for (const s of steps) {
   const err2 = await run(file);
   check("release-k: the bundle applies again after an undo" + (err2 ? ": " + err2 : ""), !err2);
 }
+// Release L (step 42): schedule requests. Applies on the live-shaped state, a second run is refused, the undo removes exactly the new tables, columns and functions and
+// puts the notification types back to the list the database had, existing schedules survive both ways, and it applies again.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-l");
+  const file = `apply/${bundle.file}`;
+  const st = steps.find((x) => x.n === "42");
+  const state = async () => (await db.query(`select
+      to_regclass('public.schedule_requests') is not null as requests,
+      to_regclass('public.schedule_request_notes') is not null as notes,
+      exists (select 1 from information_schema.columns where table_name = 'recurring_booking_series' and column_name = 'frozen_from') as frozen,
+      exists (select 1 from information_schema.columns where table_name = 'recurring_booking_series' and column_name = 'resume_attempts') as attempts,
+      (select count(*)::int from pg_proc where pronamespace = 'public'::regnamespace and proname in ('request_schedule_change','withdraw_schedule_request','dismiss_schedule_request','claim_schedule_request','claim_due_schedule_requests','finish_schedule_request','end_schedule_freeze','claim_due_freeze_resumes','fail_freeze_resume','note_schedule_resumed','extend_expiry_for_freeze','schedule_request_recipients','schedule_local_today')) as fns,
+      (select count(*)::int from public.recurring_booking_series) as series`)).rows[0];
+  const typeList = async () => {
+    const def = (await db.query(`select pg_get_constraintdef(oid) as d from pg_constraint where conname = 'notifications_type_check'`)).rows[0].d;
+    return [...def.matchAll(/'([^']+)'::text/g)].map((m) => m[1]).sort();
+  };
+  const eu = await run(`apply/undo-step${st.n}-${st.slug}.sql`);
+  check("release-l: undo-step42-0297.sql runs before the step (nothing to undo)" + (eu ? ": " + eu : ""), !eu);
+  const before = await state();
+  const listBefore = await typeList();
+  check("release-l: before it runs none of the new objects exist", !before.requests && !before.notes && !before.frozen && !before.attempts && before.fns === 0, JSON.stringify(before));
+  const err = await run(file);
+  check("release-l bundle applies on the live-shaped state" + (err ? ": " + err : ""), !err);
+  const after = await state();
+  const listAfter = await typeList();
+  check("release-l: the tables, columns and 13 functions exist and no schedule was lost", after.requests && after.notes && after.frozen && after.attempts && after.fns === 13 && after.series === before.series, JSON.stringify(after));
+  check("release-l: the type list keeps every old type and adds exactly the three new ones", listBefore.every((t) => listAfter.includes(t)) && listAfter.length === listBefore.length + 3 && ["schedule_request", "schedule_applied", "schedule_resumed"].every((t) => listAfter.includes(t)), JSON.stringify({ before: listBefore.length, after: listAfter.length }));
+  const again = await run(file);
+  check("release-l: a second run is refused, naming step 42 (" + again + ")", !!again && /step 42 \(0297\) cannot run/.test(again) && /already applied/.test(again));
+  const eu2 = await run(`apply/undo-step${st.n}-${st.slug}.sql`);
+  check("release-l: the undo runs after the step" + (eu2 ? ": " + eu2 : ""), !eu2);
+  const undone = await state();
+  const listUndone = await typeList();
+  check("release-l: after the undo the new objects are gone and every schedule is still there", !undone.requests && !undone.notes && !undone.frozen && !undone.attempts && undone.fns === 0 && undone.series === before.series, JSON.stringify(undone));
+  check("release-l: after the undo the type list is exactly what it was before the step", JSON.stringify(listUndone) === JSON.stringify(listBefore), JSON.stringify({ before: listBefore.length, undone: listUndone.length }));
+  const err2 = await run(file);
+  check("release-l: the bundle applies again after an undo" + (err2 ? ": " + err2 : ""), !err2);
+}
 // Steps 30 and 31: the copy matches the original, both groups are gone, and everything in them was saved first.
 {
   const gone = (await db.query("select count(*)::int as n from public.groups where id in ('b292055b-edc6-4171-ad2b-a89d65dcd8db', 'c368ab0b-ccab-442e-a42e-38fb22293182')")).rows[0].n;

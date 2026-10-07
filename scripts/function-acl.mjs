@@ -29,7 +29,20 @@ export const RELEASE_F_SERVER_ONLY_SIGNATURES = [
 ];
 // Closed by 0293: the refund logic (either trigger, for a named coach) is server-only; the signed-in refund_coach_credit now accepts only the coach's own "this was wrong".
 export const RELEASE_H_SERVER_ONLY_SIGNATURES = [["refund_coach_credit_for", "uuid, text, text, text, text, uuid", false]];
-export const SERVER_ONLY = [...SERVER_ONLY_SIGNATURES, ...RELEASE_F_SERVER_ONLY_SIGNATURES, ...RELEASE_H_SERVER_ONLY_SIGNATURES].map((s) => s[0]);
+// Closed by 0297: the functions the server uses to apply a schedule request and to restart a freeze (a signed-in person can only ask, withdraw or mark handled).
+export const RELEASE_L_SERVER_ONLY_SIGNATURES = [
+  ["schedule_local_today", "text, uuid", false],
+  ["schedule_request_recipients", "uuid, uuid", false],
+  ["extend_expiry_for_freeze", "uuid, uuid, uuid, integer, text", false],
+  ["claim_schedule_request", "uuid, boolean", false],
+  ["claim_due_schedule_requests", "integer", false],
+  ["finish_schedule_request", "uuid, boolean, boolean, boolean, text", false],
+  ["end_schedule_freeze", "uuid, date", false],
+  ["claim_due_freeze_resumes", "integer", false],
+  ["fail_freeze_resume", "uuid, text", false],
+  ["note_schedule_resumed", "uuid, integer, integer", false],
+];
+export const SERVER_ONLY = [...SERVER_ONLY_SIGNATURES, ...RELEASE_F_SERVER_ONLY_SIGNATURES, ...RELEASE_H_SERVER_ONLY_SIGNATURES, ...RELEASE_L_SERVER_ONLY_SIGNATURES].map((s) => s[0]);
 export const AUDIT_WRITERS = SERVER_ONLY_SIGNATURES.filter((s) => s[2]).map((s) => s[0]);
 
 // Signed-in-callable SECURITY DEFINER functions with no caller check in their body that were reviewed and are meant to be (they answer about the

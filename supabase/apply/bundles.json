@@ -50,5 +50,13 @@
    "41"
   ],
   "file": "apply-release-k-all.sql"
+ },
+ {
+  "id": "release-l",
+  "name": "Release L (schedule requests)",
+  "steps": [
+   "42"
+  ],
+  "file": "apply-release-l-all.sql"
  }
 ]
