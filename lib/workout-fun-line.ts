@@ -1,5 +1,6 @@
 import { getVolumeEquivalence } from "./volume-equivalence";
 import { GYM_JOKES } from "./gym-jokes";
+import { FAMOUS_QUOTE_LINES } from "./famous-quotes";
 import { hashSeed, seededRandom } from "./seeded-pick";
 
 // The one light line on the post-workout card. It is picked when the card is made, from three kinds that are spread out over time:
@@ -172,7 +173,7 @@ export const RON_LINES: string[] = [
   "The only thing we have to fear is fear itself. - Franklin D. Roosevelt",
 ];
 
-export const ABSURD_LINES: string[] = [...GYM_JOKES, ...QUOTES, ...RON_LINES];
+export const ABSURD_LINES: string[] = [...GYM_JOKES, ...QUOTES, ...FAMOUS_QUOTE_LINES, ...RON_LINES];
 
 const FITS = (s: string) => s.length <= MAX_FUN_LINE_CHARS;
 

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { FAMOUS_QUOTES } from "./famous-quotes";
 import {
   ABSURD_LINES,
   ENCOURAGING_LINES,
@@ -171,6 +172,34 @@ describe("kindness: a small, short or empty session is never joked about", () =>
     }
     // The Roosevelt quote is kept straight: nothing is added to it or changed.
     expect(RON_LINES).toContain("The only thing we have to fear is fear itself. - Franklin D. Roosevelt");
+  });
+  it("the famous-quote bank: every quote is sourced, fits the card with its attribution, is not duplicated, and none is a known misattribution", () => {
+    expect(FAMOUS_QUOTES.length).toBeGreaterThanOrEqual(100);
+    const lines = new Set<string>();
+    for (const quote of FAMOUS_QUOTES) {
+      const line = `${quote.text} - ${quote.by}`;
+      expect(quote.source.trim().length, line).toBeGreaterThan(8);
+      expect(line.length, line).toBeLessThanOrEqual(110);
+      expect(lines.has(line), line).toBe(false);
+      lines.add(line);
+      expect(ABSURD_LINES, line).toContain(line);
+      expect(funLinePool(typical).map((l) => l.text), line).toContain(line);
+      expect(quote.text, line).not.toMatch(/[\u2018\u2019\u201c\u201d\u2013\u2014]/);
+    }
+    // Well-known lines that are commonly misattributed: they must never be added under the famous name.
+    const banned = [
+      /does not matter how slowly you go/i,
+      /whether you think you can/i,
+      /success is not final/i,
+      /power over your mind/i,
+      /preparation meets opportunity/i,
+      /excellence is never an accident/i,
+      /whatever you are, be a good one/i,
+      /nothing in this world can take the place of persistence/i,
+      /only place success comes before work/i,
+      /you miss 100%/i,
+    ];
+    for (const quote of FAMOUS_QUOTES) for (const re of banned) expect(quote.text, quote.by).not.toMatch(re);
   });
   it("no line mentions the body, weight loss, fat, shame or failure", () => {
     const all = [...ABSURD_LINES, ...ENCOURAGING_LINES, ...funLinePool({ ...typical, prCount: 1 }).map((l) => l.text)];
