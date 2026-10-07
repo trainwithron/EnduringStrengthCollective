@@ -40,6 +40,11 @@ describe("a coach-prescribed rest is the only option for that set", () => {
     expect(builder).toContain("parsed.bare && !window.confirm(");
     expect(builder).toContain('v > 0 ? formatRest(v) : ""');
   });
+  it("a refused or cancelled rest entry snaps the cell back to the saved value", () => {
+    expect(builder).toContain("onCommit(draft) === false) setDraft(value)");
+    expect(builder).toMatch(/up to 30:00\)\."\);\s*return false;/);
+    expect(builder).toContain("seconds?`)) return false;");
+  });
   it("the client's own Rest cell keeps its unit: the shared label is 'Rest (s)'", () => {
     const fields = src("../../lib/exercise-fields.ts");
     expect(fields).toContain('{ key: "rest", label: "Rest (s)", kind: "number" }');

@@ -36,7 +36,8 @@ function TargetCell({
 }: {
   value: string;
   kind: "number" | "text";
-  onCommit: (raw: string) => void;
+  // Returns false when nothing was saved (the typed value was refused or the coach cancelled): the cell then goes back to the saved value.
+  onCommit: (raw: string) => void | boolean | Promise<unknown>;
   label: string;
 }) {
   const [draft, setDraft] = useState(value);
@@ -51,7 +52,7 @@ function TargetCell({
   }, [value]);
 
   function commit() {
-    if (draft !== value) onCommit(draft);
+    if (draft !== value && onCommit(draft) === false) setDraft(value);
   }
 
   return (
@@ -796,9 +797,9 @@ export function ExerciseBuilderCard({
                             const parsed = parseRestInput(typed);
                             if (!parsed.ok) {
                               flashSaveError("Rest looks like 5:00, 3m or 90s (up to 30:00).");
-                              return;
+                              return false;
                             }
-                            if (parsed.bare && !window.confirm(`${parsed.seconds} means ${parsed.seconds} seconds. For minutes type ${parsed.seconds}:00 or ${parsed.seconds}m. Save ${parsed.seconds} seconds?`)) return;
+                            if (parsed.bare && !window.confirm(`${parsed.seconds} means ${parsed.seconds} seconds. For minutes type ${parsed.seconds}:00 or ${parsed.seconds}m. Save ${parsed.seconds} seconds?`)) return false;
                             raw = parsed.seconds === null ? "" : String(parsed.seconds);
                           }
                           return set.id === firstSetId && exercise.sets.length > 1
