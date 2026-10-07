@@ -9,6 +9,7 @@ import type { AiCallMeta } from "@/lib/ai-usage";
 import { reserveAiCall } from "@/lib/ai-usage-server";
 import { classifyAiHttpError, classifyAiThrown } from "@/lib/ai-error-class";
 import { noteAiAttempt } from "@/lib/ai-run-stats";
+import { modelCandidates } from "@/lib/ai-model";
 
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
@@ -16,6 +17,9 @@ const DEFAULT_MODEL = "claude-sonnet-5";
 
 // AI_DISABLED=true is the kill switch: set it in the host's environment and redeploy and every AI feature reports "not configured" and makes no call (and spends
 // nothing), without removing the key.
+// The id that last worked after a model-not-found retry (kept for the life of this server instance).
+let workingModel: string | null = null;
+
 export function isAiConfigured(): boolean {
   if (process.env.AI_DISABLED === "true") return false;
   return !!process.env.ANTHROPIC_API_KEY;
@@ -99,9 +103,8 @@ export async function callClaude({
   // the monthly ceiling; otherwise reserves the usage-log row up front.
   const usage = await reserveAiCall(meta);
 
-  let response: Response;
-  try {
-    response = await fetch(ANTHROPIC_API_URL, {
+  const send = (model: string) =>
+    fetch(ANTHROPIC_API_URL, {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -109,12 +112,28 @@ export async function callClaude({
         "anthropic-version": ANTHROPIC_VERSION,
       },
       body: JSON.stringify({
-        model: DEFAULT_MODEL,
+        model,
         max_tokens: maxTokens,
         system,
         messages: [{ role: "user", content }],
       }),
     });
+
+  // The model id comes from ANTHROPIC_MODEL (default below). If the API says the model is not found (404), ask once more with the fallback id and remember
+  // which one worked, so a retired or renamed id does not take every AI feature down (Oct 5 outage, cause not yet known).
+  const [primary, fallback] = modelCandidates(process.env.ANTHROPIC_MODEL, DEFAULT_MODEL, workingModel);
+  let response: Response;
+  try {
+    response = await send(primary);
+    if (response.status === 404 && fallback) {
+      console.warn(`AI model "${primary}" was not found; retrying once with "${fallback}".`);
+      const retry = await send(fallback);
+      if (retry.ok) {
+        workingModel = fallback;
+        console.warn(`AI model "${fallback}" worked. Set ANTHROPIC_MODEL=${fallback} to make it permanent.`);
+      }
+      response = retry;
+    }
   } catch (err) {
     const errorClass = classifyAiThrown(err);
     noteAiAttempt({ ok: false, errorClass });
