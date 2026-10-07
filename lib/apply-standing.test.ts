@@ -3,6 +3,8 @@ import {
   applyStandingTarget,
   conflictFixes,
   describeApplyOutcome,
+  describeRemovedScheduled,
+  scheduledConfirmMessage,
   describeConflicts,
   historyAfterApply,
   insertCheckinOnce,
@@ -83,10 +85,17 @@ describe("what the client will really see (A1)", () => {
     expect(p.todayAfterCalories).toBe(2000);
     expect(p.conflicts.map((c) => c.date)).toEqual(["2026-10-15"]);
   });
-  it("a scheduled later row that the apply removes is not left to take over (end to end through the planner)", () => {
+  it("a scheduled later row that the apply removes is not left to take over (end to end through the planner), and the coach is told which one went", () => {
     const scheduled: StandingHistory = [row("2026-09-01", 2000), row("2026-10-14", 2500)];
     const p = planApply({ history: scheduled, startKey: "2026-10-07", todayKey: "2026-10-07", target: T(2300), overrides: [], plans: [] });
     expect(p.historyAfter.map((r) => r.effective_from)).toEqual(["2026-09-01", "2026-10-07"]);
+    expect(p.removedScheduled).toEqual([{ date: "2026-10-14", calories: 2500 }]);
+    expect(describeRemovedScheduled(p.removedScheduled)).toEqual(["This also removed the target scheduled from Oct 14 (2,500)."]);
+  });
+  it("nothing scheduled, nothing removed; a row ON the start date is replaced, not reported as removed", () => {
+    const p = planApply({ history: [row("2026-09-01", 2000), row("2026-10-07", 2100)], startKey: "2026-10-07", todayKey: "2026-10-07", target: T(2300), overrides: [], plans: [] });
+    expect(p.removedScheduled).toEqual([]);
+    expect(describeRemovedScheduled([{ date: "2026-10-14", calories: null }])).toEqual(["This also removed the standing-target removal scheduled from Oct 14."]);
   });
 });
 
@@ -117,14 +126,14 @@ describe("the sentences for the coach", () => {
     expect(describeConflicts([{ date: "2026-10-09", source: "override", calories: null, hasPlan: false }])[0]).toContain("another number");
     expect(describeConflicts([])).toEqual([]);
   });
-  it("fixes: a lone one-day target is removed; a day with a plan gets the new target set", () => {
+  it("fixes: every one-day target is removed (no notice is ever sent for a removal); a meal plan is listed for a new plan, never overwritten", () => {
     const fixes = conflictFixes([
       { date: "2026-10-09", source: "override", calories: 2000, hasPlan: false },
       { date: "2026-10-10", source: "meal_plan", calories: 2300, hasPlan: true },
       { date: "2026-10-11", source: "override", calories: 2000, hasPlan: true },
     ]);
-    expect(fixes.removeDates).toEqual(["2026-10-09"]);
-    expect(fixes.setDates).toEqual(["2026-10-10", "2026-10-11"]);
+    expect(fixes.removeDates).toEqual(["2026-10-09", "2026-10-11"]);
+    expect(fixes.planDates).toEqual(["2026-10-10", "2026-10-11"]);
   });
 });
 
@@ -225,39 +234,53 @@ describe("applyStandingTarget and the fix", () => {
     const r = await applyStandingTarget(fake([], {}, "client_macro_target_history:upsert"), { athleteId: "a1", groupId: "g1", userId: "u1", target: T(2300), startKey: "2026-10-07", todayKey: "2026-10-07" });
     expect(r.ok).toBe(false);
   });
-  it("the fix removes a lone one-day target and sets the new target where a plan wins", async () => {
+  it("the fix only DELETES one-day targets (a delete sends the client nothing) and never writes a target, so it cannot stack up notices", async () => {
     const log: Log = [];
     const r = await updateConflictingDays(fake(log), {
       athleteId: "a1",
       groupId: "g1",
-      userId: "u1",
-      target: T(2300),
       conflicts: [
         { date: "2026-10-08", source: "override", calories: 1900, hasPlan: false },
         { date: "2026-10-10", source: "meal_plan", calories: 2000, hasPlan: true },
+        { date: "2026-10-11", source: "override", calories: 1800, hasPlan: true },
       ],
     });
-    expect(r).toEqual({ ok: true, removed: 1, set: 1 });
-    const del = log.find((l) => l.op === "delete")!;
-    expect(del.table).toBe("daily_macros");
-    expect(del.filters).toContainEqual(["in", "log_date", ["2026-10-08"]]);
-    const up = log.find((l) => l.op === "upsert")!;
-    expect((up.payload as { log_date: string; calories: number }[])[0]).toMatchObject({ log_date: "2026-10-10", calories: 2300 });
+    expect(r).toEqual({ ok: true, removed: 2 });
+    expect(log.map((l) => l.op)).toEqual(["delete"]);
+    expect(log[0].table).toBe("daily_macros");
+    expect(log[0].filters).toContainEqual(["in", "log_date", ["2026-10-08", "2026-10-11"]]);
+    expect(log.some((l) => l.op === "upsert")).toBe(false);
+  });
+  it("a plan-only conflict removes nothing and writes nothing", async () => {
+    const log: Log = [];
+    const r = await updateConflictingDays(fake(log), { athleteId: "a1", groupId: "g1", conflicts: [{ date: "2026-10-10", source: "meal_plan", calories: 2000, hasPlan: true }] });
+    expect(r).toEqual({ ok: true, removed: 0 });
+    expect(log).toEqual([]);
   });
   it("a failed fix says so", async () => {
     const r = await updateConflictingDays(fake([], {}, "daily_macros:delete"), {
       athleteId: "a1",
       groupId: "g1",
-      userId: "u1",
-      target: T(2300),
       conflicts: [{ date: "2026-10-08", source: "override", calories: 1900, hasPlan: false }],
     });
     expect(r.ok).toBe(false);
   });
 });
 
+describe("asking before a save removes a scheduled target", () => {
+  it("names each scheduled target and asks", () => {
+    expect(scheduledConfirmMessage([{ date: "2026-10-14", calories: 2500 }])).toBe("Saving this also removes the target scheduled from Oct 14 (2,500). Continue?");
+    expect(scheduledConfirmMessage([{ date: "2026-10-14", calories: 2500 }, { date: "2026-10-21", calories: null }])).toBe(
+      "Saving this also removes the target scheduled from Oct 14 (2,500) and the removal scheduled from Oct 21. Continue?"
+    );
+  });
+  it("says nothing when nothing is scheduled", () => {
+    expect(scheduledConfirmMessage([])).toBe("");
+  });
+});
+
 describe("the summary line", () => {
-  const base = { historyAfter: [], todayBeforeCalories: 2000, todayAfterCalories: 2300, todayChanged: true, conflicts: [] };
+  const base = { historyAfter: [], todayBeforeCalories: 2000, todayAfterCalories: 2300, todayChanged: true, conflicts: [], removedScheduled: [] };
   it("says what happened in the coach's terms", () => {
     expect(describeApplyOutcome({ plan: base, newCalories: 2300, startKey: "2026-10-07", todayKey: "2026-10-07" })).toBe("Applied. Today's target is now 2,300.");
     expect(describeApplyOutcome({ plan: { ...base, todayChanged: false, todayAfterCalories: 1900 }, newCalories: 2300, startKey: "2026-10-07", todayKey: "2026-10-07" })).toBe(

@@ -73,6 +73,8 @@ export interface ApplyPlan {
   todayAfterCalories: number | null;
   todayChanged: boolean;
   conflicts: DayConflict[];
+  // Standing rows scheduled for a LATER date that this apply removed (so they cannot take over again): the coach is told which.
+  removedScheduled: { date: string; calories: number | null }[];
 }
 
 export function planApply(args: {
@@ -101,7 +103,8 @@ export function planApply(args: {
       }
     }
   }
-  return { historyAfter, todayBeforeCalories: before, todayAfterCalories: after, todayChanged: before !== after, conflicts };
+  const removedScheduled = args.history.filter((r) => r.effective_from > args.startKey).map((r) => ({ date: r.effective_from, calories: r.calories }));
+  return { historyAfter, todayBeforeCalories: before, todayAfterCalories: after, todayChanged: before !== after, conflicts, removedScheduled };
 }
 
 const num = (n: number | null) => (n == null ? "another number" : n.toLocaleString("en-US"));
@@ -141,13 +144,21 @@ export function describeConflicts(conflicts: DayConflict[]): string[] {
   return out;
 }
 
-// What fixing those days means: a one-day target with no plan behind it is simply removed (the standing target then shows); a day with a plan gets the new target set
-// for that day (a day's own target wins over a plan).
-export function conflictFixes(conflicts: DayConflict[]): { removeDates: string[]; setDates: string[] } {
+// What the coach can do about those days from here. A one-day target is simply removed (the standing target, or the day's meal plan, then shows). A day's MEAL PLAN is
+// not changed from here: writing the new target over a plan would leave the client looking at a number that does not match the meals built for the old one, so those days
+// are listed for a new plan to be built. Removing a one-day target never notifies the client (only writing one does), so one click can never send a stack of notices.
+export function conflictFixes(conflicts: DayConflict[]): { removeDates: string[]; planDates: string[] } {
   return {
-    removeDates: conflicts.filter((c) => c.source === "override" && !c.hasPlan).map((c) => c.date),
-    setDates: conflicts.filter((c) => !(c.source === "override" && !c.hasPlan)).map((c) => c.date),
+    removeDates: conflicts.filter((c) => c.source === "override").map((c) => c.date),
+    planDates: conflicts.filter((c) => c.hasPlan).map((c) => c.date),
   };
+}
+
+// "This also removed the target scheduled from Oct 14 (2,500)." for every scheduled row an apply or a save took away; empty when none.
+export function describeRemovedScheduled(removed: { date: string; calories: number | null }[]): string[] {
+  return removed.map((r) =>
+    r.calories == null ? `This also removed the standing-target removal scheduled from ${shortDateLabel(r.date)}.` : `This also removed the target scheduled from ${shortDateLabel(r.date)} (${r.calories.toLocaleString("en-US")}).`
+  );
 }
 
 // What the client is told. "Your daily target is now N" only when today's number really changed because of this; a future start says what changes and when; if today
@@ -195,34 +206,23 @@ export async function applyStandingTarget(
   return { ok: true, ...plan };
 }
 
-// The coach's one-click fix for the days that did not follow the new target.
+// The coach's one-click fix: removes the one-day targets that still beat the new target. (It deletes; it never writes a target, so it never notifies the client.)
 export async function updateConflictingDays(
   supabase: SupabaseClient,
-  args: { athleteId: string; groupId: string; userId: string | null; target: TargetValues; conflicts: DayConflict[] }
-): Promise<{ ok: boolean; removed: number; set: number }> {
-  const { athleteId, groupId, userId, target, conflicts } = args;
-  const { removeDates, setDates } = conflictFixes(conflicts);
-  if (removeDates.length > 0) {
-    const { error } = await supabase.from("daily_macros").delete().eq("athlete_id", athleteId).eq("group_id", groupId).in("log_date", removeDates);
-    if (error) return { ok: false, removed: 0, set: 0 };
-  }
-  if (setDates.length > 0) {
-    const { error } = await supabase.from("daily_macros").upsert(
-      setDates.map((log_date) => ({
-        athlete_id: athleteId,
-        group_id: groupId,
-        log_date,
-        calories: target.calories,
-        protein_g: target.proteinG,
-        carbs_g: target.carbsG,
-        fat_g: target.fatG,
-        created_by: userId,
-      })),
-      { onConflict: "athlete_id,log_date" }
-    );
-    if (error) return { ok: false, removed: removeDates.length, set: 0 };
-  }
-  return { ok: true, removed: removeDates.length, set: setDates.length };
+  args: { athleteId: string; groupId: string; conflicts: DayConflict[] }
+): Promise<{ ok: boolean; removed: number }> {
+  const { athleteId, groupId, conflicts } = args;
+  const { removeDates } = conflictFixes(conflicts);
+  if (removeDates.length === 0) return { ok: true, removed: 0 };
+  const { error } = await supabase.from("daily_macros").delete().eq("athlete_id", athleteId).eq("group_id", groupId).in("log_date", removeDates);
+  return error ? { ok: false, removed: 0 } : { ok: true, removed: removeDates.length };
+}
+
+// What to ask before a save that would delete scheduled targets ("Saving this also removes the target scheduled from Oct 14 (2,500). Continue?"). Empty when none.
+export function scheduledConfirmMessage(scheduled: { date: string; calories: number | null }[]): string {
+  if (scheduled.length === 0) return "";
+  const parts = scheduled.map((r) => (r.calories == null ? `the removal scheduled from ${shortDateLabel(r.date)}` : `the target scheduled from ${shortDateLabel(r.date)} (${r.calories.toLocaleString("en-US")})`));
+  return `Saving this also removes ${parts.join(" and ")}. Continue?`;
 }
 
 // One line saying what the apply did, in the coach's terms.

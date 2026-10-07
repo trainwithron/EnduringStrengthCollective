@@ -17,7 +17,7 @@ import {
   milestoneTagToNutritionPhase,
   type MilestonePhaseTag,
 } from "@/lib/nutrition-trend-classifier";
-import { calorieSeriesWithStanding, latestStanding, resolveDayMacros, standingForDate } from "@/lib/macro-resolution";
+import { calorieSeriesWithStanding, resolveDayMacros, standingForDate } from "@/lib/macro-resolution";
 import { fetchStandingHistory } from "@/lib/standing-macros";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { addDaysToKey, daysBetweenKeys } from "@/lib/date-key";
@@ -69,7 +69,9 @@ export async function ClientNutrition({
   const firstName = clientName.split(" ")[0] || "this client";
 
   const standingHistory = await fetchStandingHistory(supabase, athleteId, groupId);
-  const standingTarget = latestStanding(standingHistory);
+  // The target in force TODAY (what the editor shows and edits); a target scheduled for a later date is listed separately and is not mistaken for the current one.
+  const standingTarget = standingForDate(standingHistory, todayKey);
+  const scheduledTargets = standingHistory.filter((r) => r.effective_from > todayKey).map((r) => ({ date: r.effective_from, calories: r.calories }));
 
   const [
     { data: weightLogs },
@@ -378,6 +380,7 @@ export async function ClientNutrition({
             floorNote={floorNote}
             clientName={firstName}
             todayKey={todayKey}
+            scheduled={scheduledTargets}
           />
           <div>
             <NutritionPhaseControl
