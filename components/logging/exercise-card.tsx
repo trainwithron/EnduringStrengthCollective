@@ -403,6 +403,7 @@ export function ExerciseCard({
         initialNote={exercise.athleteNote ?? null}
         readOnly={readOnly}
         ownNote={viewerId === athleteId}
+        viewerId={viewerId}
       />
 
       {!readOnly && (
