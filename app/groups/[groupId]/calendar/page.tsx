@@ -5,14 +5,19 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { CalendarPageTabs } from "@/components/coach/desktop/calendar-page-tabs";
 import { CalendarGrid, type CalendarEventEntry } from "@/components/coach/desktop/calendar-grid";
-import { CalendarClientList } from "@/components/coach/desktop/calendar-client-list";
+import { CalendarClientRail } from "@/components/coach/desktop/calendar-client-rail";
+import { CalendarAttentionChip } from "@/components/coach/desktop/calendar-attention-chip";
+import { CalendarSchedulingProvider } from "@/components/coach/desktop/calendar-scheduling-context";
+import { buildAttentionItems } from "@/lib/calendar-attention";
+import { monthCellKeys, weekKeys } from "@/lib/date-key";
+import { fetchInactiveKeys, inactiveKey } from "@/lib/inactive-ids";
+import { defaultSessionTypeId, lastTypeByClient, type ClientTierLite } from "@/lib/session-type-default";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { computeScheduledDates } from "@/lib/program-schedule";
-import { monthCellKeys, weekKeys } from "@/lib/date-key";
 import { ScheduleClientPicker } from "@/components/coach/schedule-client-picker";
 import { DEFAULT_COACH_TIMEZONE, dateKeyInZone } from "@/lib/timezone";
 import { formatInTimezone } from "@/lib/format-in-timezone";
@@ -20,7 +25,7 @@ import { getCoachClients } from "@/lib/coach-clients";
 import { coachBalanceLabel } from "@/lib/reup";
 import { formatSlotTime } from "@/lib/booking-slots";
 import { getEffectiveAthlete } from "@/lib/acting-as";
-import { computeQuietTier, QUIET_TIER_LABEL } from "@/lib/quiet-client-tier";
+import { computeQuietTier } from "@/lib/quiet-client-tier";
 import { gatherCalendarSpotterFindings } from "@/lib/calendar-spotter-gather";
 import { CalendarSpotterPanel } from "@/components/coach/desktop/calendar-spotter-panel";
 import { gatherSchedulingSpotterFlags } from "@/lib/calendar-spotter-phase2-gather";
@@ -891,13 +896,45 @@ export default async function CoachCalendarPage(
 
   const balanceByClientGroup = new Map((creditRows ?? []).map((r) => [`${r.athlete_id}:${r.group_id}`, r.balance as number]));
 
+  // Sessions the coach scheduled that have not happened yet (confirmed, not yet settled): they take a session when they do, so each client shows
+  // "2 left, 1 pending". A client's own workouts never appear here: they cost nothing.
+  const { data: pendingRows } = await supabase
+    .from("bookings")
+    .select("athlete_id, group_id")
+    .eq("coach_id", user.id)
+    .eq("status", "confirmed")
+    .eq("credit_state", "unsettled")
+    .limit(2000);
+  const pendingByClientGroup = new Map<string, number>();
+  for (const r of (pendingRows ?? []) as { athlete_id: string; group_id: string }[]) {
+    const k = `${r.athlete_id}:${r.group_id}`;
+    pendingByClientGroup.set(k, (pendingByClientGroup.get(k) ?? 0) + 1);
+  }
+
   const clients = coachClients.map((c) => ({
     profileId: c.id,
     fullName: c.fullName,
     groupId: c.groupId,
     balance: balanceByClientGroup.get(`${c.id}:${c.groupId}`) ?? 0,
+    pending: pendingByClientGroup.get(`${c.id}:${c.groupId}`) ?? 0,
   }));
 
+  // Who the coach has set aside (left out of the flags and hidden in the list until asked for), and what the app knows about each client's start: when they
+  // joined, whether they have signed in, and their tier (for their usual session type).
+  const clientGroupIds = Array.from(new Set(clients.map((c) => c.groupId)));
+  const setAsideKeySet = await fetchInactiveKeys(supabase, clientGroupIds);
+  const { data: clientMembershipRows } = await supabase
+    .from("group_memberships")
+    .select("profile_id, group_id, joined_at, client_tier, profiles ( claimed_at )")
+    .in("profile_id", clientIds.length > 0 ? clientIds : [""])
+    .in("group_id", clientGroupIds.length > 0 ? clientGroupIds : [""])
+    .eq("role", "athlete");
+  const membershipByClient = new Map(
+    ((clientMembershipRows ?? []) as any[]).map((m) => [
+      `${m.group_id}:${m.profile_id}`,
+      { joinedAt: (m.joined_at as string | null) ?? null, tier: (m.client_tier as ClientTierLite) ?? null, signedIn: !!m.profiles?.claimed_at },
+    ])
+  );
   const athleteNameById = new Map(clients.map((c) => [c.profileId, c.fullName]));
   const workoutsByDateKey = new Map<string, { title: string; athleteName: string | null }[]>();
   const programsMissingSchedule: { id: string; name: string; athleteName: string | null }[] = [];
@@ -985,17 +1022,29 @@ export default async function CoachCalendarPage(
   );
   const nowForQuietTier = new Date();
   const quietClients = clients
+    .filter((c) => !setAsideKeySet.has(inactiveKey(c.groupId, c.profileId)))
     .map((c) => {
       const last = lastLogByAthlete.get(c.profileId);
       const trainingDays = personalTrainingDaysByAthlete.get(c.profileId) ?? sharedActiveTrainingDays;
+      const member = membershipByClient.get(`${c.groupId}:${c.profileId}`);
+      // The same new-client rule as Home: not flagged within 14 days of being added (45 if they have not signed in yet).
       const tier = computeQuietTier({
         lastLoggedAt: last ? new Date(last) : null,
         now: nowForQuietTier,
+        addedAt: member?.joinedAt ? new Date(member.joinedAt) : null,
+        signedIn: member?.signedIn,
         trainingDays,
       });
-      return { ...c, tier };
+      return { ...c, tier, neverLogged: !last };
     })
     .filter((c) => c.tier !== "none");
+  const attentionItems = buildAttentionItems({
+    groupId: params.groupId,
+    programsWithNoWorkouts,
+    programsMissingSchedule: [],
+    clientsWithNoProgram: clientsWithNoProgram.filter((c) => !setAsideKeySet.has(inactiveKey(c.groupId, c.profileId))),
+    quietClients: quietClients.map((c) => ({ profileId: c.profileId, fullName: c.fullName, groupId: c.groupId, tier: c.tier as "mild" | "strong", neverLogged: c.neverLogged })),
+  });
 
   const calendarSpotterFindings = await gatherCalendarSpotterFindings(supabase, { groupId: params.groupId, coachId: user.id });
   const schedulingSpotterFlags = await gatherSchedulingSpotterFlags(supabase, {
@@ -1027,7 +1076,27 @@ export default async function CoachCalendarPage(
     endTime: e.end_time,
   }));
 
+  // Session types (Online, In person...) and each client's usual one: the type of their latest typed session, else the one type that fits their tier.
+  const { data: typeRows } = await supabase.from("session_types").select("id, name, location_kind").eq("coach_id", user.id).order("name", { ascending: true });
+  const sessionTypes = ((typeRows ?? []) as { id: string; name: string; location_kind: "in_person" | "online" | "either" | null }[]).map((t) => ({ id: t.id, name: t.name, locationKind: t.location_kind }));
+  const { data: typedBookingRows } = await supabase
+    .from("bookings")
+    .select("athlete_id, session_type_id, start_at")
+    .eq("coach_id", user.id)
+    .not("session_type_id", "is", null)
+    .order("start_at", { ascending: false })
+    .limit(500);
+  const lastTypes = lastTypeByClient((typedBookingRows ?? []) as { athlete_id: string; session_type_id: string | null; start_at: string }[]);
+  const defaultTypeByClient: Record<string, string | null> = {};
+  for (const c of clients) {
+    defaultTypeByClient[c.profileId] = defaultSessionTypeId({ lastTypeId: lastTypes[c.profileId], tier: membershipByClient.get(`${c.groupId}:${c.profileId}`)?.tier, types: sessionTypes });
+  }
+  // Which of the coach's types each window of hours is set aside for (a guide, never a block).
+  const { data: windowTypeRows } = await supabase.from("coach_availability_windows").select("id, session_type_id").eq("coach_id", user.id);
+  const windowTypeById = new Map(((windowTypeRows ?? []) as { id: string; session_type_id: string | null }[]).map((r) => [r.id, r.session_type_id]));
+  const windowsWithTypes = availabilityWindows.map((w) => ({ ...w, sessionTypeId: windowTypeById.get(w.id) ?? null }));
   const selectedClientId = searchParams.client;
+  const todayKeyCoach = dateKeyInZone(timezone);
 
   // Each day travels to the browser as a "YYYY-MM-DD" key (never a Date made here in UTC), so every day sits under its own weekday.
   const cells = monthCellKeys(year, monthIndex);
@@ -1064,9 +1133,9 @@ export default async function CoachCalendarPage(
       <div className="pb-6 border-b border-steel/20 mb-6">
         <h1 className="font-display font-bold text-3xl uppercase leading-none">Calendar</h1>
         <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
-          Every client&apos;s scheduled workouts and booked 1-on-1 sessions,
-          overlaid on one calendar — set your recurring hours on the
-          Availability tab below.
+          Your sessions with clients, your time off and your own events. A
+          client&apos;s workouts live on their own calendar: tap a name to open
+          it. Set your recurring hours on the Availability tab below.
         </p>
       </div>
 
@@ -1098,7 +1167,13 @@ export default async function CoachCalendarPage(
           column defuses that regardless of breakpoint; grid-cols-1
           below lg stacks the two columns instead of forcing them
           side-by-side at a width that was never going to fit both. */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-8 items-start">
+      <CalendarSchedulingProvider
+        initialClient={(() => {
+          const c = clients.find((x) => x.profileId === selectedClientId);
+          return c ? { athleteId: c.profileId, fullName: c.fullName, balance: c.balance, groupId: c.groupId } : null;
+        })()}
+      >
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-8 items-start">
         <div className="min-w-0">
           <div className="flex items-center gap-1 mb-4">
             <Link
@@ -1142,15 +1217,17 @@ export default async function CoachCalendarPage(
                 selectedClientId={selectedClientId}
                 headerLabels={WEEKDAY_LABELS}
                 cellKeys={cells}
-                todayKey={dateKeyInZone(timezone)}
+                todayKey={todayKeyCoach}
                 bookingsByDateKey={bookingsByDateKey}
                 eventsByDateKey={eventsByDateKey}
-                workoutsByDateKey={workoutsByDateKey}
                 blockedRanges={blockedRanges}
-                availabilityWindows={availabilityWindows}
+                availabilityWindows={windowsWithTypes}
                 timezone={timezone}
                 cellMinHeightPx={80}
                 showAllBookings={false}
+                bufferMinutes={gapPolicy?.buffer_minutes ?? 0}
+                sessionTypes={sessionTypes}
+                defaultTypeByClient={defaultTypeByClient}
               />
             </>
           ) : (
@@ -1172,88 +1249,34 @@ export default async function CoachCalendarPage(
                 selectedClientId={selectedClientId}
                 headerLabels={weekDays.map((d, i) => `${WEEKDAY_LABELS[i]} ${d.getDate()}`)}
                 cellKeys={weekKeys(dateKey(weekStart))}
-                todayKey={dateKeyInZone(timezone)}
+                todayKey={todayKeyCoach}
                 bookingsByDateKey={bookingsByDateKey}
                 eventsByDateKey={eventsByDateKey}
-                workoutsByDateKey={workoutsByDateKey}
                 blockedRanges={blockedRanges}
-                availabilityWindows={availabilityWindows}
+                availabilityWindows={windowsWithTypes}
                 timezone={timezone}
                 cellMinHeightPx={300}
                 showAllBookings
+                bufferMinutes={gapPolicy?.buffer_minutes ?? 0}
+                sessionTypes={sessionTypes}
+                defaultTypeByClient={defaultTypeByClient}
               />
             </>
           )}
         </div>
 
-        <div>
-          {(programsMissingSchedule.length > 0 ||
-            programsWithNoWorkouts.length > 0 ||
-            clientsWithNoProgram.length > 0 ||
-            quietClients.length > 0) && (
-            <div className="mb-6 border border-rust/30 bg-rust/5 rounded-token-lg p-3">
-              <h2 className="font-display uppercase text-sm tracking-wide text-rust mb-2">
-                Needs attention
-              </h2>
-              <div className="space-y-1.5">
-                {programsWithNoWorkouts.map((p) => (
-                  <Link
-                    key={`empty-${p.id}`}
-                    href={`/groups/${params.groupId}/programs/${p.id}`}
-                    className="block font-body text-xs text-chalk active:text-rust"
-                  >
-                    &ldquo;{p.name}&rdquo;{p.athleteName ? ` (${p.athleteName})` : ""} has no
-                    workouts built yet
-                  </Link>
-                ))}
-                {programsMissingSchedule.map((p) => (
-                  <Link
-                    key={`sched-${p.id}`}
-                    href={`/groups/${params.groupId}/programs/${p.id}`}
-                    className="block font-body text-xs text-chalk active:text-rust"
-                  >
-                    &ldquo;{p.name}&rdquo;{p.athleteName ? ` (${p.athleteName})` : ""} needs a
-                    start date to show on the calendar
-                  </Link>
-                ))}
-                {clientsWithNoProgram.map((c) => (
-                  <Link
-                    key={`noprog-${c.profileId}`}
-                    href={`/groups/${params.groupId}/athletes/${c.profileId}`}
-                    className="block font-body text-xs text-chalk active:text-rust"
-                  >
-                    {c.fullName} has no program assigned
-                  </Link>
-                ))}
-                {quietClients.map((c) => (
-                  <Link
-                    key={`quiet-${c.profileId}`}
-                    href={`/groups/${params.groupId}/athletes/${c.profileId}`}
-                    className="block font-body text-xs text-chalk active:text-rust"
-                  >
-                    {c.fullName} {QUIET_TIER_LABEL[c.tier as "mild" | "strong"]}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
-            Clients
-          </h2>
-          <p className="font-body text-xs text-steel mb-2">
-            Drag a name onto a day to book them, or click a name then click a
-            date. Use +/- to quickly adjust sessions.
-          </p>
-          <CalendarClientList
+        <div className="min-w-0">
+          <CalendarClientRail
             clients={clients}
-            groupId={params.groupId}
-            basePath={basePath}
-            monthParam={monthParam}
+            setAsideKeys={Array.from(setAsideKeySet)}
             selectedClientId={selectedClientId}
+            timezone={timezone}
+            sessionTypes={sessionTypes}
           />
+          <CalendarAttentionChip items={attentionItems} />
         </div>
       </div>
+      </CalendarSchedulingProvider>
       </CalendarPageTabs>
     </CoachDesktopShell>
   );

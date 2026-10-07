@@ -4,6 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { DraggableClientName } from "./draggable-client-name";
+import { useCalendarScheduling } from "./calendar-scheduling-context";
+import { coachCreditLine } from "@/lib/pending-credit-copy";
 
 export interface CalendarClientRow {
   profileId: string;
@@ -11,6 +13,8 @@ export interface CalendarClientRow {
   balance: number;
   // The client's own group (a one-on-one client lives in their own).
   groupId: string;
+  // Sessions the coach scheduled that have not happened yet: they take a session when they do, so they show beside the balance, not out of it.
+  pending?: number;
 }
 
 // The main calendar's client roster — same list used for drag-to-schedule,
@@ -19,14 +23,11 @@ export interface CalendarClientRow {
 // adjust a number.
 export function CalendarClientList({
   clients,
-  groupId,
-  basePath,
-  monthParam,
   selectedClientId,
 }: {
   clients: CalendarClientRow[];
-  groupId: string;
-  basePath: string;
+  groupId?: string;
+  basePath?: string;
   monthParam?: string;
   selectedClientId?: string;
 }) {
@@ -34,6 +35,8 @@ export function CalendarClientList({
     Object.fromEntries(clients.map((c) => [c.profileId, c.balance]))
   );
   const [adjusting, setAdjusting] = useState<string | null>(null);
+  // Tapping a name picks that client for scheduling (tap a client, tap a day, tap a time); tapping again lets go. Dragging a name works as before.
+  const { client: picked, setClient } = useCalendarScheduling();
 
   async function adjust(profileId: string, delta: number, clientGroupId: string) {
     setAdjusting(profileId);
@@ -50,25 +53,26 @@ export function CalendarClientList({
   }
 
   if (clients.length === 0) {
-    return <p className="font-body text-sm text-steel">No clients yet.</p>;
+    return <p className="font-body text-sm text-steel">No one to show.</p>;
   }
-
-  const monthQuery = monthParam ? `&month=${monthParam}` : "";
 
   return (
     <div className="divide-y divide-steel/15">
       {clients.map((c) => {
-        const isSelected = selectedClientId === c.profileId;
+        const isSelected = (picked ? picked.athleteId : selectedClientId) === c.profileId;
         const balance = balances[c.profileId] ?? c.balance;
         return (
           <div key={c.profileId} className="flex items-center justify-between py-2.5 gap-2">
             <DraggableClientName client={{ athleteId: c.profileId, fullName: c.fullName, balance, groupId: c.groupId }}>
-              <Link
-                href={`${c.groupId === groupId ? basePath : `/groups/${c.groupId}/calendar`}?client=${c.profileId}${monthQuery}`}
-                className={`font-body text-sm ${isSelected ? "text-rust font-medium" : ""}`}
+              <button
+                type="button"
+                aria-pressed={isSelected}
+                onClick={() => setClient(isSelected ? null : { athleteId: c.profileId, fullName: c.fullName, balance, groupId: c.groupId })}
+                className={`font-body text-sm text-left min-h-[32px] ${isSelected ? "text-rust font-medium" : "text-chalk"}`}
               >
                 {c.fullName}
-              </Link>
+              </button>
+              {(c.pending ?? 0) > 0 && <span className="block font-body text-[11px] text-steel">{coachCreditLine(balance, c.pending ?? 0)}</span>}
             </DraggableClientName>
             <div className="flex items-center gap-1.5 shrink-0">
               <button

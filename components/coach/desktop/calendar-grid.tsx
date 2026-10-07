@@ -1,15 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { X } from "lucide-react";
 import type { AvailabilityWindow } from "@/lib/booking-slots";
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
-import { dateFromKey, localDateKey as localKey } from "@/lib/date-key";
+import { dateFromKey } from "@/lib/date-key";
+import type { TypeLite } from "@/lib/session-type-default";
 import { CLIENT_DRAG_MIME, type DraggedClient } from "./draggable-client-name";
-import { ExpandedDayScheduler } from "./expanded-day-scheduler";
+import { DayTimeGrid } from "./day-time-grid";
+import { useCalendarScheduling } from "./calendar-scheduling-context";
 
 export interface CalendarEventEntry {
   id: string;
@@ -60,6 +61,9 @@ export function CalendarGrid({
   cellMinHeightPx,
   showAllBookings,
   timezone = DEFAULT_COACH_TIMEZONE,
+  bufferMinutes = 0,
+  sessionTypes = [],
+  defaultTypeByClient = {},
 }: {
   groupId: string;
   selectedClientId?: string;
@@ -73,7 +77,7 @@ export function CalendarGrid({
   // instead of a separate per-program view. athleteName is null for the
   // group's shared program.
   workoutsByDateKey?: Map<string, { title: string; athleteName: string | null }[]>;
-  availabilityWindows: AvailabilityWindow[];
+  availabilityWindows: (AvailabilityWindow & { sessionTypeId?: string | null })[];
   blockedRanges?: {
     kind: "one_off" | "recurring";
     startAt: string | null;
@@ -87,27 +91,25 @@ export function CalendarGrid({
   // cells have room to show everything.
   showAllBookings: boolean;
   // The coach's own IANA zone — start_time/end_time on availabilityWindows
-  // are their local wall-clock hours, and the day-scheduler this grid
-  // opens needs the same zone to compute real, correct slot instants.
+  // are their local wall-clock hours, and the day grid this opens needs the
+  // same zone to compute real, correct instants.
   timezone?: string;
+  // The coach's gap between sessions, shown around each booked session.
+  bufferMinutes?: number;
+  sessionTypes?: TypeLite[];
+  // Each client's usual session type id (their last typed session, or their tier).
+  defaultTypeByClient?: Record<string, string | null>;
 }) {
   const router = useRouter();
+  const { client, setClient } = useCalendarScheduling();
   const [dragOverKey, setDragOverKey] = useState<string | null>(null);
-  const [dropTarget, setDropTarget] = useState<{ key: string; date: Date; client: DraggedClient } | null>(
-    null
-  );
-  // "Select, don't navigate away" (the approved mockup's own framing of
-  // Linear's pattern) — a click used to router.push into a separate day
-  // page; now it opens an inline side panel built from the exact same
-  // bookings/events/workouts maps already passed into this grid, so the
-  // coach never loses their place in the month. The full day-detail page
-  // (slot assignment, custom events, the hour grid) is still one click
-  // away via the panel's own "Open day" link, not removed.
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  // The open day: a click, a tap or a drop opens it in place as a time grid, below the calendar. A day opened with no client shows what is on it and asks who.
+  const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
-  function dayHref(date: Date): string {
-    const base = `/groups/${groupId}/calendar/${localKey(date)}`;
-    return selectedClientId ? `${base}?client=${selectedClientId}` : base;
+  function dayHref(key: string): string {
+    const base = `/groups/${groupId}/calendar/${key}`;
+    const id = client?.athleteId ?? selectedClientId;
+    return id ? `${base}?client=${id}` : base;
   }
 
   async function handleDeleteEvent(id: string) {
@@ -116,14 +118,22 @@ export function CalendarGrid({
     router.refresh();
   }
 
-  function handleDrop(e: React.DragEvent, key: string, date: Date) {
+  function openDay(key: string) {
+    setExpandedKey((k) => (k === key && !client ? null : key));
+    // Bring the time grid into view on a long page.
+    setTimeout(() => document.getElementById("calendar-day-grid")?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 0);
+  }
+
+  function handleDrop(e: React.DragEvent, key: string) {
     e.preventDefault();
     setDragOverKey(null);
     const raw = e.dataTransfer.getData(CLIENT_DRAG_MIME);
     if (!raw) return;
     try {
-      const client = JSON.parse(raw) as DraggedClient;
-      setDropTarget({ key, date, client });
+      const dropped = JSON.parse(raw) as DraggedClient;
+      setClient(dropped);
+      setExpandedKey(key);
+      setTimeout(() => document.getElementById("calendar-day-grid")?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 0);
     } catch {
       // Malformed drag payload — ignore rather than crash the grid.
     }
@@ -157,11 +167,12 @@ export function CalendarGrid({
     ];
   }
 
-  const selectedDate = selectedKey && cellKeys.includes(selectedKey) ? dateFromKey(selectedKey) : null;
-  const selectedItems = selectedKey ? dotItemsFor(selectedKey) : [];
+  const expandedDate = expandedKey && cellKeys.includes(expandedKey) ? dateFromKey(expandedKey) : null;
+  // Sessions are in the time grid itself; this list keeps the day's workouts and calendar events (with their remove buttons) that the time axis does not draw.
+  const otherItems = expandedKey ? dotItemsFor(expandedKey).filter((i) => !i.key.startsWith("b-")) : [];
 
   return (
-    <>
+    <div>
       <div className="grid grid-cols-7 gap-px bg-steel/15 border border-steel/15">
       {headerLabels.map((label, i) => (
         <div
@@ -178,11 +189,10 @@ export function CalendarGrid({
         const date = dateFromKey(key);
         const isToday = key === todayKey;
         const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-        const isSelected = key === selectedKey;
+        const isSelected = key === expandedKey;
         const bookings = bookingsByDateKey.get(key) ?? [];
         const events = eventsByDateKey.get(key) ?? [];
         const workouts = workoutsByDateKey?.get(key) ?? [];
-        const isDropTarget = dropTarget?.key === key;
         const bookingsShown = showAllBookings ? bookings : bookings.slice(0, 3);
         const items = dotItemsFor(key);
         const DOT_CAP = showAllBookings ? 16 : 8;
@@ -194,12 +204,13 @@ export function CalendarGrid({
             key={i}
             role="button"
             aria-pressed={isSelected}
+            aria-label={date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
             tabIndex={0}
-            onClick={() => setSelectedKey((k) => (k === key ? null : key))}
+            onClick={() => openDay(key)}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === " ") {
                 e.preventDefault();
-                setSelectedKey((k) => (k === key ? null : key));
+                openDay(key);
               }
             }}
             onDragOver={(e) => {
@@ -207,12 +218,12 @@ export function CalendarGrid({
               setDragOverKey(key);
             }}
             onDragLeave={() => setDragOverKey((k) => (k === key ? null : k))}
-            onDrop={(e) => handleDrop(e, key, date)}
+            onDrop={(e) => handleDrop(e, key)}
             className={`p-1.5 flex flex-col gap-0.5 relative group cursor-pointer transition-colors ${
               isToday ? "bg-surface/50" : "bg-graphite hover:bg-surface/60"
             } ${isSelected ? "ring-2 ring-inset ring-rust" : ""} ${
               dragOverKey === key ? "ring-2 ring-inset ring-rust bg-rust/10" : ""
-            } ${isDropTarget ? "ring-2 ring-inset ring-rust" : ""}`}
+            }`}
             style={{ minHeight: cellMinHeightPx }}
           >
             <span className="inline-flex items-center gap-1">
@@ -296,65 +307,55 @@ export function CalendarGrid({
       })}
       </div>
 
-      {selectedDate && (
-        <div className="mt-4 bg-surface border border-steel/20 rounded-token-lg p-4">
-          <p className="font-display font-bold text-base uppercase leading-none mb-3">
-            {selectedDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-          </p>
-          {selectedItems.length === 0 ? (
-            <p className="font-body text-sm text-steel">Nothing scheduled this day.</p>
-          ) : (
-            <div className="divide-y divide-steel/15">
-              {selectedItems.map((item) => (
-                <div key={item.key} className="flex items-center gap-3 py-2 group/row">
-                  <span className="font-mono text-xs text-steel w-12 shrink-0">{item.time ?? ""}</span>
-                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${item.dotClass}`} />
-                  <span className="font-body text-sm text-chalk flex-1 truncate">{item.label}</span>
-                  {item.badge && (
-                    <span className="font-mono text-xs px-1.5 py-0.5 rounded-token-pill bg-rust/15 text-rust shrink-0">
-                      {item.badge}
-                    </span>
-                  )}
-                  {item.deleteId && (
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteEvent(item.deleteId!)}
-                      aria-label={`Remove ${item.label}`}
-                      className="shrink-0 opacity-0 group-hover/row:opacity-100 text-steel"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-              ))}
+      {expandedDate && expandedKey && (
+        <div id="calendar-day-grid">
+          <DayTimeGrid
+            key={expandedKey}
+            date={expandedDate}
+            groupId={groupId}
+            client={client}
+            bookings={bookingsByDateKey.get(expandedKey) ?? []}
+            events={[]}
+            availabilityWindows={availabilityWindows}
+            blockedRanges={blockedRanges}
+            bufferMinutes={bufferMinutes}
+            timezone={timezone}
+            sessionTypes={sessionTypes}
+            defaultTypeId={client ? defaultTypeByClient[client.athleteId] ?? null : null}
+            dayHref={dayHref(expandedKey)}
+            onClientDrop={(c) => setClient(c)}
+            onChanged={() => router.refresh()}
+            onClose={() => setExpandedKey(null)}
+          />
+          {otherItems.length > 0 && (
+            <div className="mt-2 bg-surface border border-steel/20 p-3">
+              <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">Also on this day</p>
+              <div className="divide-y divide-steel/15">
+                {otherItems.map((item) => (
+                  <div key={item.key} className="flex items-center gap-3 py-1.5 group/row">
+                    <span className="font-mono text-xs text-steel w-12 shrink-0">{item.time ?? ""}</span>
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${item.dotClass}`} />
+                    <span className="font-body text-sm text-chalk flex-1 truncate">{item.label}</span>
+                    {item.badge && (
+                      <span className="font-mono text-xs px-1.5 py-0.5 rounded-token-pill bg-rust/15 text-rust shrink-0">{item.badge}</span>
+                    )}
+                    {item.deleteId && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteEvent(item.deleteId!)}
+                        aria-label={`Remove ${item.label}`}
+                        className="shrink-0 opacity-0 group-hover/row:opacity-100 text-steel"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
-          <Link
-            href={dayHref(selectedDate)}
-            className="inline-block mt-3 font-body text-xs text-rust underline underline-offset-2"
-          >
-            Open day &rarr;
-          </Link>
         </div>
       )}
-
-      {dropTarget && (
-        <ExpandedDayScheduler
-          date={dropTarget.date}
-          groupId={groupId}
-          client={dropTarget.client}
-          bookings={bookingsByDateKey.get(dropTarget.key) ?? []}
-          events={eventsByDateKey.get(dropTarget.key) ?? []}
-          availabilityWindows={availabilityWindows}
-          blockedRanges={blockedRanges}
-          timezone={timezone}
-          onAssigned={() => {
-            setDropTarget(null);
-            router.refresh();
-          }}
-          onCancel={() => setDropTarget(null)}
-        />
-      )}
-    </>
+    </div>
   );
 }
