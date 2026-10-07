@@ -20,6 +20,8 @@ import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { FoodLogSection } from "@/components/athlete/food-log-section";
 import { computeAdherenceDays } from "@/lib/food-log-adherence";
 import type { GeneratedMeal } from "@/lib/meal-engine";
+import type { MealEntryPayload } from "@/lib/meal-plan-assignment";
+import { DayMealsView } from "@/components/athlete/day-meals-view";
 import type { FoodLogEntry } from "@/components/athlete/meal-checkoff-list";
 import { computeTodaysMicronutrients } from "@/lib/todays-micronutrients";
 import { Key12NutrientGrid } from "@/components/athlete/key12-nutrient-grid";
@@ -250,7 +252,13 @@ export default async function NutritionPage(
     carbsG: r.carbs_g,
     fatG: r.fat_g,
   }));
-  const todayMeals: GeneratedMeal[] = ((todayMealPlan?.meals as any) ?? []) as GeneratedMeal[];
+  // A saved plan's meals are an OBJECT keyed by day type ({ daily | train | rest: [...] }), not a list; the checklist below wants a list, and handing it the
+  // object throws on the client's page the day a coach saves a plan. So the checklist only gets a real list, and the saved plan is shown by DayMealsView.
+  const todayMeals: GeneratedMeal[] = Array.isArray(todayMealPlan?.meals) ? (todayMealPlan?.meals as unknown as GeneratedMeal[]) : [];
+  const savedPlanMeals =
+    todayMealPlan?.meals && typeof todayMealPlan.meals === "object" && !Array.isArray(todayMealPlan.meals)
+      ? (todayMealPlan.meals as unknown as Record<string, MealEntryPayload[]>)
+      : null;
 
   const recentFoodOptions = dedupeRecentFoodLogs(
     (recentFoodLogRows ?? []).map((r) => ({
@@ -386,6 +394,11 @@ export default async function NutritionPage(
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
               Today&apos;s meals
             </h2>
+            {savedPlanMeals && (
+              <div className="mb-3">
+                <DayMealsView meals={savedPlanMeals} />
+              </div>
+            )}
             <FoodLogSection
               athleteId={athleteId}
               groupId={params.groupId}
