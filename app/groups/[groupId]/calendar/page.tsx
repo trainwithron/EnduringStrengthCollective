@@ -12,6 +12,7 @@ import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { computeScheduledDates } from "@/lib/program-schedule";
+import { monthCellKeys, weekKeys } from "@/lib/date-key";
 import { ScheduleClientPicker } from "@/components/coach/schedule-client-picker";
 import { DEFAULT_COACH_TIMEZONE, dateKeyInZone } from "@/lib/timezone";
 import { formatInTimezone } from "@/lib/format-in-timezone";
@@ -1028,10 +1029,10 @@ export default async function CoachCalendarPage(
 
   const selectedClientId = searchParams.client;
 
-  const cells: (Date | null)[] = [
-    ...Array.from({ length: leadingBlanks }, () => null),
-    ...Array.from({ length: daysInMonth }, (_, i) => new Date(year, monthIndex, i + 1)),
-  ];
+  // Each day travels to the browser as a "YYYY-MM-DD" key (never a Date made here in UTC), so every day sits under its own weekday.
+  const cells = monthCellKeys(year, monthIndex);
+  void leadingBlanks;
+  void daysInMonth;
 
   const prevMonth = new Date(year, monthIndex - 1, 1);
   const nextMonth = new Date(year, monthIndex + 1, 1);
@@ -1140,8 +1141,8 @@ export default async function CoachCalendarPage(
                 groupId={params.groupId}
                 selectedClientId={selectedClientId}
                 headerLabels={WEEKDAY_LABELS}
-                cellDates={cells}
-                today={today}
+                cellKeys={cells}
+                todayKey={dateKeyInZone(timezone)}
                 bookingsByDateKey={bookingsByDateKey}
                 eventsByDateKey={eventsByDateKey}
                 workoutsByDateKey={workoutsByDateKey}
@@ -1170,8 +1171,8 @@ export default async function CoachCalendarPage(
                 groupId={params.groupId}
                 selectedClientId={selectedClientId}
                 headerLabels={weekDays.map((d, i) => `${WEEKDAY_LABELS[i]} ${d.getDate()}`)}
-                cellDates={weekDays}
-                today={today}
+                cellKeys={weekKeys(dateKey(weekStart))}
+                todayKey={dateKeyInZone(timezone)}
                 bookingsByDateKey={bookingsByDateKey}
                 eventsByDateKey={eventsByDateKey}
                 workoutsByDateKey={workoutsByDateKey}

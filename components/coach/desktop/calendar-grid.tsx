@@ -7,6 +7,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { X } from "lucide-react";
 import type { AvailabilityWindow } from "@/lib/booking-slots";
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
+import { dateFromKey, localDateKey as localKey } from "@/lib/date-key";
 import { CLIENT_DRAG_MIME, type DraggedClient } from "./draggable-client-name";
 import { ExpandedDayScheduler } from "./expanded-day-scheduler";
 
@@ -36,24 +37,21 @@ interface DotItem {
   deleteId?: string;
 }
 
-function dateKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate()
-  ).padStart(2, "0")}`;
-}
-
 const DOT_WORKOUT = "bg-positive";
 const DOT_BOOKING = "bg-blue-400";
 const DOT_SUGGESTION = "bg-yellow-500";
 const DOT_CUSTOM_GLOW =
   "bg-rust shadow-[0_0_5px_rgb(var(--rust)/0.7)]";
 
+// Each day arrives as a "YYYY-MM-DD" key, never a Date: a Date built on the server (UTC) reads as the evening before in a browser west of UTC, which put every
+// day one column to the right and a dropped client on the wrong day (Ron, Oct 6). The key is turned into a local Date here, in the browser, only to read the
+// day's own number and weekday.
 export function CalendarGrid({
   groupId,
   selectedClientId,
   headerLabels,
-  cellDates,
-  today,
+  cellKeys,
+  todayKey,
   bookingsByDateKey,
   eventsByDateKey,
   workoutsByDateKey,
@@ -66,8 +64,8 @@ export function CalendarGrid({
   groupId: string;
   selectedClientId?: string;
   headerLabels: string[];
-  cellDates: (Date | null)[];
-  today: Date;
+  cellKeys: (string | null)[];
+  todayKey: string;
   bookingsByDateKey: Map<string, { time: string; name: string; startMs?: number; endMs?: number }[]>;
   eventsByDateKey: Map<string, CalendarEventEntry[]>;
   // Every program's computed workout for this date, across the whole
@@ -106,10 +104,9 @@ export function CalendarGrid({
   // (slot assignment, custom events, the hour grid) is still one click
   // away via the panel's own "Open day" link, not removed.
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const todayKey = dateKey(today);
 
   function dayHref(date: Date): string {
-    const base = `/groups/${groupId}/calendar/${dateKey(date)}`;
+    const base = `/groups/${groupId}/calendar/${localKey(date)}`;
     return selectedClientId ? `${base}?client=${selectedClientId}` : base;
   }
 
@@ -160,7 +157,7 @@ export function CalendarGrid({
     ];
   }
 
-  const selectedDate = cellDates.find((d) => d && dateKey(d) === selectedKey) ?? null;
+  const selectedDate = selectedKey && cellKeys.includes(selectedKey) ? dateFromKey(selectedKey) : null;
   const selectedItems = selectedKey ? dotItemsFor(selectedKey) : [];
 
   return (
@@ -175,10 +172,10 @@ export function CalendarGrid({
         </div>
       ))}
 
-      {cellDates.map((date, i) => {
-        if (!date) return <div key={i} className="bg-graphite" style={{ minHeight: cellMinHeightPx }} />;
+      {cellKeys.map((key, i) => {
+        if (!key) return <div key={i} className="bg-graphite" style={{ minHeight: cellMinHeightPx }} />;
 
-        const key = dateKey(date);
+        const date = dateFromKey(key);
         const isToday = key === todayKey;
         const isWeekend = date.getDay() === 0 || date.getDay() === 6;
         const isSelected = key === selectedKey;
