@@ -48,5 +48,15 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0275 | yes | yes | 8 | 0275 a cancelled or moved week of an ongoing schedule stays skipped |
 | 0276 | yes | yes | 7 | 0276 new message notice |
 | 0277 | yes | yes | 18 | 0277 late cancel or move is flagged for the coach, not charged |
-| 0278 | yes | yes | 10 | 0278 self-booking is a per-coach switch, off by default |
-| 0279 | yes | yes | 18 | 0279 a client asks to move a session and the coach confirms |
+| 0278 | yes | yes | 12 | 0278 the coach's booking mode (free, request, coach schedules) |
+| 0279 | yes | yes | 34 | 0279 booking requests (new and move) confirmed by the coach |
+| 0280 | yes | yes | 23 | 0280 credit expiry stays human (hold, reinstate, undo) |
+| 0281 | yes | yes | 18 | 0281 inactive clients (coach-only, reversible, resurface on activity) |
+| 0282 | yes | yes | 20 | 0282 internal functions are server-only again |
+| 0283 | yes | yes | 9 | 0283 session length separate from the slot step |
+| 0284 | yes | yes | 23 | 0284 a coach proposes a goal and the client answers it |
+| 0285 | yes | yes | 4 | 0285 rest-day nudge record (server only) |
+| 0286 | yes | yes | 10 | 0286 favorite foods (private, frozen macros) |
+| 0287 | yes | yes | 10 | 0287 session longer than the slot step |
+| 0288 | yes | yes | 16 | 0288 overlapping bookings guard (per-coach lock) |
+| 0289 | yes | yes | 13 | 0289 session type on a window of hours |
