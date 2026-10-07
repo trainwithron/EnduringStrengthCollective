@@ -186,8 +186,15 @@ export async function writeSetLogRow(
   return !error && Array.isArray(data) && data.length === 1;
 }
 
-// Delete one set. A row that is already gone counts as done (a retry after a delete that actually landed must not fail forever); an error, such as
-// the database refusing the change to a finished workout, is a failure and stays visible as "not saved".
+// An error no retry can fix: the workout was finished (on another device) while this one was still open, so the database refuses any change to its sets.
+export function isTerminalSetLogError(error: unknown): boolean {
+  const message = (error as { message?: unknown } | null)?.message;
+  return typeof message === "string" && message.toLowerCase().includes("already completed");
+}
+
+// Delete one set. A row that is already gone counts as done (a retry after a delete that actually landed must not fail forever); any other error stays a
+// failure and stays visible as "not saved". The one exception is a finished workout: retrying can never succeed and would block Complete forever, so it
+// counts as done and `onTerminal` lets the screen reload to show the workout as it really is.
 export async function deleteSetLogRow(
   client: {
     from: (table: string) => {
@@ -196,9 +203,14 @@ export async function deleteSetLogRow(
       };
     };
   },
-  id: string
+  id: string,
+  onTerminal?: () => void
 ): Promise<boolean> {
   const { error } = await client.from("set_logs").delete().eq("id", id).select("id");
+  if (error && isTerminalSetLogError(error)) {
+    onTerminal?.();
+    return true;
+  }
   return !error;
 }
 
@@ -206,7 +218,8 @@ export async function deleteSetLogRow(
 export async function writeOrDeleteSetLogRow(
   client: Parameters<typeof writeSetLogRow>[0] & Parameters<typeof deleteSetLogRow>[0],
   id: string,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  onTerminal?: () => void
 ): Promise<boolean> {
-  return payload[SET_LOG_DELETE] === true ? deleteSetLogRow(client, id) : writeSetLogRow(client, id, payload);
+  return payload[SET_LOG_DELETE] === true ? deleteSetLogRow(client, id, onTerminal) : writeSetLogRow(client, id, payload);
 }

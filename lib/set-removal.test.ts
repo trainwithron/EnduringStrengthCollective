@@ -36,7 +36,24 @@ describe("taking a set off an exercise", () => {
 
   it("an untouched set, even one pre-filled by the program, goes without asking", () => {
     expect(setHasLoggedWork(set())).toBe(false);
-    expect(setHasLoggedWork(set({ weight: 185, reps: 5 }))).toBe(false);
+    // Starting a workout pre-fills the program's own weight and reps: equal to the prescription means nobody touched it.
+    expect(setHasLoggedWork(set({ weight: 185, reps: 5, targetWeight: 185, targetReps: 5 }))).toBe(false);
+    expect(setHasLoggedWork(set({ reps: 5, targetReps: 5 }))).toBe(false);
+  });
+
+  it("typed numbers count as logged work even if the set was never completed (they would be lost)", () => {
+    // reps typed on a set with no prescription, and reps changed from the prescription
+    expect(setHasLoggedWork(set({ reps: 8 }))).toBe(true);
+    expect(setHasLoggedWork(set({ reps: 8, targetReps: 5 }))).toBe(true);
+    // weight typed or changed
+    expect(setHasLoggedWork(set({ weight: 200 }))).toBe(true);
+    expect(setHasLoggedWork(set({ weight: 200, targetWeight: 185 }))).toBe(true);
+    // any of the other tracked numbers or notes
+    for (const field of ["rpe", "rir", "timeSeconds", "height", "distance", "restSeconds"] as const) {
+      expect(setHasLoggedWork(set({ [field]: 1 }))).toBe(true);
+    }
+    expect(setHasLoggedWork(set({ tempo: "3010" }))).toBe(true);
+    expect(setHasLoggedWork(set({ pace: "8:30" }))).toBe(true);
   });
 
   it("a completed, skipped or weight-confirmed set asks first", () => {

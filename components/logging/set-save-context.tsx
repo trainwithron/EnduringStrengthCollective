@@ -53,7 +53,11 @@ export function SetSaveProvider({ children }: { children: React.ReactNode }) {
   if (!saverRef.current) {
     const supabase = createBrowserClient();
     saverRef.current = new SetLogSaver({
-      write: (id, payload) => writeOrDeleteSetLogRow(supabase as never, id, payload),
+      write: (id, payload) =>
+        writeOrDeleteSetLogRow(supabase as never, id, payload, () => {
+          // The workout was finished on another device: show it as it really is instead of leaving a removal that can never save.
+          if (typeof window !== "undefined") window.location.reload();
+        }),
       onChange: ({ unsaved, failed }) => {
         setUnsavedCount(unsaved.length);
         setUnsavedIds(new Set(unsaved));

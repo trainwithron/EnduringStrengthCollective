@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { SetLogSaver, SET_LOG_DELETE, deleteSetLogRow, writeOrDeleteSetLogRow, writeSetLogRow } from "@/lib/set-log-saver";
+import { SetLogSaver, SET_LOG_DELETE, deleteSetLogRow, isTerminalSetLogError, writeOrDeleteSetLogRow, writeSetLogRow } from "@/lib/set-log-saver";
 
 // A manual scheduler so retries run exactly when the test says.
 function manualScheduler() {
@@ -226,8 +226,17 @@ describe("deleteSetLogRow / writeOrDeleteSetLogRow", () => {
     expect(await deleteSetLogRow(client({ data: [{ id: "s3" }], error: null }), "s3")).toBe(true);
     expect(await deleteSetLogRow(client({ data: [], error: null }), "s3")).toBe(true);
   });
-  it("a database error (for example a finished workout) stays a failure", async () => {
+  it("a database error stays a failure", async () => {
     expect(await deleteSetLogRow(client({ data: null, error: { message: "blocked" } }), "s3")).toBe(false);
+  });
+  it("a finished workout is terminal: it counts as done (so Complete is never blocked forever) and the screen is told to reload", async () => {
+    let told = 0;
+    const ok = await deleteSetLogRow(client({ data: null, error: { message: "This workout was already completed." } }), "s3", () => (told += 1));
+    expect(ok).toBe(true);
+    expect(told).toBe(1);
+    expect(isTerminalSetLogError({ message: "This workout was already completed." })).toBe(true);
+    expect(isTerminalSetLogError({ message: "network down" })).toBe(false);
+    expect(isTerminalSetLogError(null)).toBe(false);
   });
   it("routes a delete marker to a delete and anything else to an update", async () => {
     const seen: string[] = [];

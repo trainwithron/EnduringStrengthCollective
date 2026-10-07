@@ -83,6 +83,8 @@ export function ExerciseCard({
   // Taking a set off: a logged set asks first (confirmRemoveId), then can be put back for a few seconds (removed).
   const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
   const [removed, setRemoved] = useState<{ set: SetLogEntry; error?: string } | null>(null);
+  // True while Undo is putting a set back: adding or removing then could give two rows the same set number.
+  const [undoBusy, setUndoBusy] = useState(false);
   useEffect(() => {
     if (!removed) return;
     const t = setTimeout(() => setRemoved(null), UNDO_REMOVE_SET_MS);
@@ -148,7 +150,7 @@ export function ExerciseCard({
   }
 
   async function handleAddSet() {
-    if (addSetBusy) return;
+    if (addSetBusy || undoBusy) return;
     setAddSetBusy(true);
     try {
       const supabase = createBrowserClient();
@@ -185,10 +187,10 @@ export function ExerciseCard({
 
   // The minus on the Sets stepper: takes the LAST set off. An untouched set goes at once; a logged one asks first. An exercise keeps at least one set.
   function handleRemoveLastSet() {
-    if (!canRemoveSet(exercise.sets)) return;
+    if (undoBusy || confirmRemoveId || !canRemoveSet(exercise.sets)) return;
     const target = lastSet(exercise.sets);
     if (!target) return;
-    if (setHasLoggedWork(target) && confirmRemoveId !== target.id) {
+    if (setHasLoggedWork(target)) {
       setConfirmRemoveId(target.id);
       return;
     }
@@ -204,10 +206,12 @@ export function ExerciseCard({
   }
 
   async function handleUndoRemove() {
-    if (!removed || unsavedIds.has(removed.set.id)) return;
+    if (!removed || undoBusy || unsavedIds.has(removed.set.id)) return;
     const snapshot = removed.set;
+    setUndoBusy(true);
     const supabase = createBrowserClient();
     const { error } = await supabase.from("set_logs").insert(restoreSetRow(snapshot, exercise.id));
+    setUndoBusy(false);
     if (error) {
       setRemoved({ set: snapshot, error: "Couldn't put it back. Add a set instead." });
       return;
@@ -477,8 +481,8 @@ export function ExerciseCard({
       {!readOnly && (
         <SetStepper
           count={exercise.sets.length}
-          canRemove={canRemoveSet(exercise.sets)}
-          addBusy={addSetBusy}
+          canRemove={canRemoveSet(exercise.sets) && !undoBusy && !confirmRemoveId}
+          addBusy={addSetBusy || undoBusy}
           onAdd={handleAddSet}
           onRemove={handleRemoveLastSet}
           prescribedNote={prescribedNote(exercise.prescribedSetCount, exercise.sets.length)}
@@ -496,7 +500,7 @@ export function ExerciseCard({
             removed
               ? {
                   text: removed.error ?? `Set ${removed.set.setOrder + 1} removed.`,
-                  pending: unsavedIds.has(removed.set.id),
+                  pending: unsavedIds.has(removed.set.id) || undoBusy,
                   onUndo: handleUndoRemove,
                 }
               : null

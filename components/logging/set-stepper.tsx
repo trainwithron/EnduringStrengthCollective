@@ -30,7 +30,7 @@ export function SetStepper({
   undo: { text: string; pending: boolean; onUndo: () => void } | null;
 }) {
   const stepBtn =
-    "h-10 w-10 flex items-center justify-center border border-steel/30 text-steel active:border-rust active:text-rust transition-colors disabled:opacity-30 disabled:active:border-steel/30 disabled:active:text-steel";
+    "h-11 w-11 flex items-center justify-center border border-steel/30 text-steel active:border-rust active:text-rust transition-colors disabled:opacity-30 disabled:active:border-steel/30 disabled:active:text-steel";
   return (
     <div className="mt-2">
       <div className="flex items-center gap-3">

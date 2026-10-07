@@ -15,10 +15,22 @@ export function lastSet<T extends Pick<SetLogEntry, "setOrder">>(sets: T[]): T |
   return best;
 }
 
-// A set counts as logged work (so removing it asks first) when it was completed or skipped on purpose, or the athlete committed a weight.
-// A program's pre-filled weight and reps on a set nobody touched are NOT logged work: removing that set is free.
-export function setHasLoggedWork(set: Pick<SetLogEntry, "status" | "weightConfirmed">): boolean {
-  return set.status === "completed" || set.status === "skipped" || !!set.weightConfirmed;
+type WorkFields = Pick<
+  SetLogEntry,
+  "status" | "weightConfirmed" | "weight" | "reps" | "rpe" | "rir" | "tempo" | "timeSeconds" | "height" | "distance" | "restSeconds" | "pace" | "targetWeight" | "targetReps"
+>;
+
+// A set counts as logged work (so removing it asks first, and can be undone) when the athlete put anything into it: it was completed or skipped on purpose,
+// a weight was committed, or any number or note they typed is there, even if they never tapped complete. Starting a workout pre-fills only the program's own
+// weight and reps, so those two count only when they differ from the prescription; a set nobody touched is NOT logged work and removing it is free.
+export function setHasLoggedWork(set: WorkFields): boolean {
+  if (set.status === "completed" || set.status === "skipped" || set.weightConfirmed) return true;
+  if (set.rpe != null || set.rir != null || set.tempo != null || set.timeSeconds != null || set.height != null || set.distance != null || set.restSeconds != null || set.pace != null) {
+    return true;
+  }
+  if (set.reps != null && (set.targetReps == null || set.reps !== set.targetReps)) return true;
+  if (set.weight != null && (set.targetWeight == null || set.weight !== set.targetWeight)) return true;
+  return false;
 }
 
 export function removeSetConfirmText(position: number): string {
