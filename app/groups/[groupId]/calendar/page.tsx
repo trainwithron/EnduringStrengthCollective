@@ -30,7 +30,8 @@ import { gatherCalendarSpotterFindings } from "@/lib/calendar-spotter-gather";
 import { CalendarSpotterPanel } from "@/components/coach/desktop/calendar-spotter-panel";
 import { gatherSchedulingSpotterFlags } from "@/lib/calendar-spotter-phase2-gather";
 import { SchedulingSpotterPanel } from "@/components/coach/desktop/scheduling-spotter-panel";
-import { sessionBalanceLine } from "@/lib/session-credit-copy";
+import { NO_SESSIONS_LINE } from "@/lib/session-credit-copy";
+import { buildCreditPicture, clientCreditPictureLine, fetchBookingCounts } from "@/lib/credit-picture";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
@@ -473,6 +474,7 @@ export default async function CoachCalendarPage(
         .maybeSingle(),
     ]);
     const creditBalance = creditsRow?.balance ?? 0;
+    const creditBooked = (await fetchBookingCounts(supabase, { athleteId, groupId: params.groupId })).get(`${athleteId}:${params.groupId}`)?.booked ?? 0;
 
     let hasAvailability = false;
     let upcomingBookings: { id: string; start_at: string }[] = [];
@@ -600,7 +602,7 @@ export default async function CoachCalendarPage(
           </p>
           {coachMembership && (
             <p className="font-body text-xs text-steel mt-3">
-              {sessionBalanceLine(creditBalance)}
+              {clientCreditPictureLine(buildCreditPicture({ balance: creditBalance, booked: creditBooked, toMark: 0 }), NO_SESSIONS_LINE)}
             </p>
           )}
         </header>
@@ -898,25 +900,15 @@ export default async function CoachCalendarPage(
 
   // Sessions the coach scheduled that have not happened yet (confirmed, not yet settled): they take a session when they do, so each client shows
   // "2 left, 1 pending". A client's own workouts never appear here: they cost nothing.
-  const { data: pendingRows } = await supabase
-    .from("bookings")
-    .select("athlete_id, group_id")
-    .eq("coach_id", user.id)
-    .eq("status", "confirmed")
-    .eq("credit_state", "unsettled")
-    .limit(2000);
-  const pendingByClientGroup = new Map<string, number>();
-  for (const r of (pendingRows ?? []) as { athlete_id: string; group_id: string }[]) {
-    const k = `${r.athlete_id}:${r.group_id}`;
-    pendingByClientGroup.set(k, (pendingByClientGroup.get(k) ?? 0) + 1);
-  }
+  const bookingCounts = await fetchBookingCounts(supabase, { coachId: user.id });
 
   const clients = coachClients.map((c) => ({
     profileId: c.id,
     fullName: c.fullName,
     groupId: c.groupId,
     balance: balanceByClientGroup.get(`${c.id}:${c.groupId}`) ?? 0,
-    pending: pendingByClientGroup.get(`${c.id}:${c.groupId}`) ?? 0,
+    booked: bookingCounts.get(`${c.id}:${c.groupId}`)?.booked ?? 0,
+    toMark: bookingCounts.get(`${c.id}:${c.groupId}`)?.toMark ?? 0,
   }));
 
   // Who the coach has set aside (left out of the flags and hidden in the list until asked for), and what the app knows about each client's start: when they

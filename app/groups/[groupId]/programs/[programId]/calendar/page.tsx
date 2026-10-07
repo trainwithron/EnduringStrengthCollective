@@ -10,7 +10,8 @@ import { CancelBookingButton } from "@/components/athlete/cancel-booking-button"
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { Lock } from "lucide-react";
-import { sessionBalanceLine } from "@/lib/session-credit-copy";
+import { NO_SESSIONS_LINE } from "@/lib/session-credit-copy";
+import { buildCreditPicture, clientCreditPictureLine, fetchBookingCounts } from "@/lib/credit-picture";
 import { formatInTimezone } from "@/lib/format-in-timezone";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
@@ -187,6 +188,7 @@ export default async function ProgramCalendarPage(
   let hasAvailability = false;
   let upcomingBookings: { id: string; start_at: string }[] = [];
   let creditBalance = 0;
+  let creditBooked = 0;
 
   if (coachMembership) {
     const { count } = await supabase
@@ -217,6 +219,8 @@ export default async function ProgramCalendarPage(
       .eq("group_id", params.groupId)
       .maybeSingle();
     creditBalance = creditsRow?.balance ?? 0;
+    // Sessions the coach put on the calendar for them that have not happened yet: shown beside what is left, never taken out of it until they happen.
+    creditBooked = (await fetchBookingCounts(supabase, { athleteId, groupId: params.groupId })).get(`${athleteId}:${params.groupId}`)?.booked ?? 0;
   }
 
   // This group's coach's real wall-clock day, not the server's own UTC
@@ -294,7 +298,7 @@ export default async function ProgramCalendarPage(
         </h1>
         {viewingAsAthlete && coachMembership && (
           <p className="font-body text-xs text-steel mt-3">
-            {sessionBalanceLine(creditBalance)}
+            {clientCreditPictureLine(buildCreditPicture({ balance: creditBalance, booked: creditBooked, toMark: 0 }), NO_SESSIONS_LINE)}
           </p>
         )}
       </header>
