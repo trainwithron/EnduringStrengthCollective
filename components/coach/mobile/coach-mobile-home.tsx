@@ -8,6 +8,7 @@ import { computeRealIncomeInRange, computeRealMRR } from "@/lib/business-metrics
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { ViewModeToggle } from "@/components/coach/view-mode-toggle";
 import { LateChangesPanel } from "@/components/coach/late-changes-panel";
+import { ScheduleRequestsPanel } from "@/components/coach/schedule-requests-panel";
 import { ExpiryCheckInPanel } from "@/components/coach/expiry-checkin-panel";
 import { InactiveClientsPanel } from "@/components/coach/inactive-clients-panel";
 import { ProgressLookPanel } from "@/components/coach/progress-look-panel";
@@ -127,6 +128,7 @@ export async function CoachMobileHome({
 
         <div className="px-5">
           <LateChangesPanel />
+          <ScheduleRequestsPanel />
           <ExpiryCheckInPanel />
           <InactiveClientsPanel />
           <ProgressLookPanel />

@@ -24,6 +24,7 @@ import { isValidTimeZone } from "@/lib/format-in-timezone";
 import { isLowReadiness } from "@/lib/wellness";
 import { NeedsPaymentPanel } from "@/components/coach/desktop/needs-payment-panel";
 import { LateChangesPanel } from "@/components/coach/late-changes-panel";
+import { ScheduleRequestsPanel } from "@/components/coach/schedule-requests-panel";
 import { ExpiryCheckInPanel } from "@/components/coach/expiry-checkin-panel";
 import { InactiveClientsPanel } from "@/components/coach/inactive-clients-panel";
 import { ProgressLookPanel } from "@/components/coach/progress-look-panel";
@@ -586,6 +587,7 @@ export default async function CoachHomePage() {
       <NeedsReplyPanel coachId={user.id} threads={needsReplyThreads} />
 
       <LateChangesPanel />
+      <ScheduleRequestsPanel />
       <ExpiryCheckInPanel />
       <InactiveClientsPanel />
       <ProgressLookPanel />

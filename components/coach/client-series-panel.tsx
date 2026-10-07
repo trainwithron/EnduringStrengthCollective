@@ -6,6 +6,7 @@ import { SeriesScheduleForm } from "@/components/coach/series-schedule-form";
 import { wallClockOf } from "@/lib/series-schedule";
 import { zonedTimeToUtc } from "@/lib/timezone";
 import { formatInTimezone } from "@/lib/format-in-timezone";
+import { dayLabel } from "@/lib/schedule-request-ui";
 
 export interface SeriesUpcoming {
   bookingId: string;
@@ -20,6 +21,8 @@ export interface SeriesView {
   startTime: string;
   durationMinutes: number;
   occurrencesTotal: number | null;
+  // The day a frozen schedule starts again (a freeze is a pause with a restart day).
+  frozenUntil?: string | null;
   upcoming: SeriesUpcoming[];
 }
 
@@ -115,7 +118,7 @@ export function ClientSeriesPanel({
                 {WEEKDAYS[s.weekday]} at {clock12(s.startTime)} <span className="text-steel">· {s.durationMinutes} min · {label}</span>
               </p>
               <span className={`font-body text-xs px-1.5 py-0.5 border ${s.status === "paused" ? "border-steel/40 text-steel" : "border-rust text-rust"}`}>
-                {s.status === "paused" ? "Paused" : "Running"}
+                {s.status === "paused" ? (s.frozenUntil ? `Frozen until ${dayLabel(s.frozenUntil)}` : "Paused") : "Running"}
               </span>
             </div>
             <p className="font-body text-xs text-steel mt-1">

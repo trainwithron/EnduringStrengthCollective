@@ -747,7 +747,14 @@ export default async function AthleteProfilePage(
       upcomingBySeries.set(b.recurring_series_id, list);
     }
   }
+  // The day a frozen schedule starts again (0297). Read apart from the main query so the page works before that update is applied.
+  const frozenUntilById = new Map<string, string | null>();
+  if (seriesRows.length > 0) {
+    const { data: frozenRows } = await supabase.from("recurring_booking_series").select("id, frozen_until").in("id", seriesRows.map((r) => r.id));
+    for (const f of (frozenRows ?? []) as { id: string; frozen_until: string | null }[]) frozenUntilById.set(f.id, f.frozen_until ?? null);
+  }
   const scheduleViews: SeriesView[] = seriesRows.map((r) => ({
+    frozenUntil: frozenUntilById.get(r.id) ?? null,
     id: r.id,
     mode: r.mode === "ongoing" ? "ongoing" : "fixed",
     status: r.status as SeriesView["status"],
