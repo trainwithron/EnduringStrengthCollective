@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { isWriteRequest, debounce, createRefreshLimiter, isDraftField, noteDraftInput, noteDraftBlur, hasUnsavedTyping, paneActivity } from "./workspace-mutation";
+import { isWriteRequest, debounce, createRefreshLimiter, isDraftField, noteDraftInput, noteDraftBlur, hasUnsavedTyping, paneActivity, fieldIsEmpty, shouldReloadNow } from "./workspace-mutation";
 
 const ORIGIN = "https://app.example.com";
 const SB = "https://abcd.supabase.co";
@@ -94,7 +94,7 @@ describe("what counts as typed text that was not saved", () => {
     expect(isDraftField({ tag: "SELECT" })).toBe(false);
   });
 
-  const field = () => ({ isConnected: true }) as unknown as Element;
+  const field = () => ({ isConnected: true, value: "some text" }) as unknown as Element;
   it("typing counts as unsaved until the field is left and a save follows; an unrelated save does not clear it", () => {
     const f = field();
     noteDraftInput(f);
@@ -111,5 +111,31 @@ describe("what counts as typed text that was not saved", () => {
     expect(hasUnsavedTyping()).toBe(true);
     (f as unknown as { isConnected: boolean }).isConnected = false;
     expect(hasUnsavedTyping()).toBe(false);
+  });
+});
+
+describe("a message that was sent is not unsaved", () => {
+  const box = (value: string) => ({ isConnected: true, value }) as unknown as Element;
+  it("an emptied box (sent with Enter, never blurred) holds nothing to lose", () => {
+    const b = box("hello");
+    noteDraftInput(b);
+    expect(hasUnsavedTyping()).toBe(true);
+    (b as unknown as { value: string }).value = "";
+    expect(fieldIsEmpty(b)).toBe(true);
+    expect(hasUnsavedTyping()).toBe(false);
+  });
+  it("only spaces counts as empty; a contenteditable is judged by its text", () => {
+    expect(fieldIsEmpty(box("   "))).toBe(true);
+    expect(fieldIsEmpty(box("a"))).toBe(false);
+    expect(fieldIsEmpty({ textContent: " \n " } as unknown as Element)).toBe(true);
+    expect(fieldIsEmpty({ textContent: "note" } as unknown as Element)).toBe(false);
+  });
+});
+
+describe("the page restart guard", () => {
+  it("allows one restart, then none for 30 seconds", () => {
+    expect(shouldReloadNow(null, 1000)).toBe(true);
+    expect(shouldReloadNow(1000, 20_000)).toBe(false);
+    expect(shouldReloadNow(1000, 31_001)).toBe(true);
   });
 });

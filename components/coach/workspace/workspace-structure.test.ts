@@ -27,7 +27,7 @@ describe("the workspace is mounted above the pages", () => {
     expect(host).toMatch(/if \(embedded\) return <>\{children\}<\/>/);
   });
   it("the fetch wrapper is installed when the host loads, before any page creates a database client", () => {
-    expect(read("components/coach/workspace/workspace-host.tsx")).toContain('import "@/lib/workspace-mutation"');
+    expect(read("components/coach/workspace/workspace-host.tsx")).toMatch(/import [^;]*from "@\/lib\/workspace-mutation"/);
     expect(read("lib/workspace-mutation.ts").trimEnd().endsWith("ensureFetchWrapped();")).toBe(true);
   });
 });

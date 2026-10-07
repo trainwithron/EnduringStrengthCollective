@@ -8,7 +8,7 @@ import { WorkspaceFloating } from "./workspace-floating";
 import { WorkspaceToolbar } from "./workspace-toolbar";
 import { PanePicker } from "./pane-picker";
 // Loaded here so the page's fetch is wrapped before any page creates a database client (see lib/workspace-mutation.ts).
-import "@/lib/workspace-mutation";
+import { shouldReloadNow } from "@/lib/workspace-mutation";
 
 // What the coach's shell tells the host about the page it is showing: which group the page is anchored on (and the coach it believes it is, to catch an account switch).
 export interface ShellContext {
@@ -46,7 +46,24 @@ export function WorkspaceHost({ userId, children }: { userId: string | null; chi
       // The page believes a different person is signed in than the one this layout was built for (another tab signed in as someone else): this layout is out of
       // date, and the previous person's workspace must not be shown to the new one. Start over with a full reload.
       if (userId && next.coachId !== userId) {
-        window.location.reload();
+        // At most one restart in 30 seconds: if the two keep disagreeing it must not reload in a loop. Meanwhile the workspace stays hidden.
+        let last: number | null = null;
+        try {
+          const raw = window.sessionStorage.getItem("esc.workspace.reloadedAt");
+          last = raw ? Number(raw) : null;
+        } catch {
+          last = null;
+        }
+        setShellOn(false);
+        if (shouldReloadNow(last, Date.now())) {
+          try {
+            window.sessionStorage.setItem("esc.workspace.reloadedAt", String(Date.now()));
+          } catch {
+            // without storage the guard cannot remember: do not reload at all
+            return;
+          }
+          window.location.reload();
+        }
         return;
       }
       setShellOn(true);

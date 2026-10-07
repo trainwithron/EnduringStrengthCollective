@@ -113,9 +113,26 @@ function clearSavedFields(writeStartedAt: number) {
     }
   }
 }
+// A box that is empty again holds nothing to lose: a message sent with the Enter key (the box is cleared, it never loses focus) is not unsaved.
+export function fieldIsEmpty(el: Element): boolean {
+  const anyEl = el as unknown as { value?: unknown; textContent?: string | null; isContentEditable?: boolean };
+  if (typeof anyEl.value === "string") return anyEl.value.trim() === "";
+  return (anyEl.textContent ?? "").trim() === "";
+}
+
 export function hasUnsavedTyping(): boolean {
-  for (const el of Array.from(dirty)) if (!el.isConnected) dirty.delete(el);
+  for (const el of Array.from(dirty)) {
+    if (!el.isConnected || fieldIsEmpty(el)) {
+      dirty.delete(el);
+      blurredAt.delete(el);
+    }
+  }
   return dirty.size > 0;
+}
+
+// A page may be sent to start over (the signed-in person changed under it) at most once in a while: if it keeps disagreeing, it must not reload in a loop.
+export function shouldReloadNow(lastReloadMs: number | null, now: number, windowMs = 30_000): boolean {
+  return lastReloadMs === null || now - lastReloadMs >= windowMs;
 }
 
 // What a page can tell the workspace that holds it: how many saves are still in flight, and whether anything typed was never saved.
