@@ -73,6 +73,7 @@ export const RECIPES: TemplateRecipe[] = [
         { text: `<strong>Preparation:</strong> Eat a bowl of Corn Flakes with skim milk alongside whole eggs and sourdough toast.` },
         { name: "Whole Eggs", category: "proteins", qty: wholeEggs, unit: "large", text: `<strong>Whole Eggs:</strong> ${wholeEggs} large` },
         { name: "Corn Flakes", category: "starches", qty: cerealG, unit: "g", text: `<strong>Corn Flakes:</strong> ${cerealG}g` },
+        { name: "Skim Milk", category: "dairy", qty: 200, unit: "g", text: `<strong>Skim Milk:</strong> 200g` },
         { name: "Sourdough Bread", category: "starches", qty: slices, unit: "slices", text: `<strong>Sourdough Bread:</strong> ${slices} slice(s)` },
         { name: "Whey Protein Isolate", category: "proteins", qty: wheyG, unit: "g", text: `<strong>Whey Isolate (Side Shake):</strong> ${wheyG}g` },
         { name: "Grass-Fed Butter", category: "fats", qty: remFat, unit: "g", text: remFat > 2 ? `<strong>Butter:</strong> ${(remFat/4.5).toFixed(1)} tsp` : `` }
@@ -996,7 +997,7 @@ export const RECIPES: TemplateRecipe[] = [
     }
   },
   {
-    id: "s_string_cheese_jerky_apple", name: "String Cheese, Beef Jerky & Apple", slot: "snack", archetypes: ["omnivore", "keto", "paleo"], keywords: ["cheese", "jerky", "beef", "apple"],
+    id: "s_string_cheese_jerky_apple", name: "String Cheese, Beef Jerky & Apple", slot: "snack", archetypes: ["omnivore", "paleo"], keywords: ["cheese", "jerky", "beef", "apple"],
     build: (p, c, f) => {
       const cheese = Math.min(3, Math.max(1, Math.floor((f * 0.5) / (UNIT_WEIGHT_G.pieces * FOOD_DENSITY.string_cheese.fat))));
       const jerkyG = Math.round(Math.max(0, p - (cheese * UNIT_WEIGHT_G.pieces * FOOD_DENSITY.string_cheese.protein)) / FOOD_DENSITY.beef_jerky.protein);

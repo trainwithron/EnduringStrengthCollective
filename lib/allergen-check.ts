@@ -30,7 +30,7 @@ export const ALLERGEN_TERMS: Record<AllergenKey, string[]> = {
   "wheat or gluten": [
     "wheat", "gluten", "flour", "bread", "breadcrumb", "pasta", "spaghetti", "macaroni", "noodle", "couscous", "semolina", "bulgur", "farro", "orzo", "panko", "tortilla",
     "barley", "rye", "seitan", "bagel", "pita", "naan", "cracker", "pretzel", "croissant", "udon", "ramen", "spelt", "kamut", "durum", "malt", "soy sauce",
-    "toast", "sourdough", "baguette", "brioche", "ciabatta", "bun", "waffle", "pancake", "muffin", "biscuit",
+    "toast", "sourdough", "baguette", "brioche", "ciabatta", "bun", "waffle", "pancake", "muffin", "biscuit", "teriyaki", "hoisin",
     "penne", "fettuccine", "linguine", "fusilli", "rigatoni", "lasagna", "lasagne", "ravioli", "tortellini", "gnocchi", "pizza", "cereal", "granola", "crouton", "dumpling",
     "wrap", "chapati", "roti", "tempura", "breaded", "batter", "graham", "freekeh", "einkorn", "emmer", "beer", "pie crust", "cake", "cookie", "brownie", "donut", "doughnut",
   ],
@@ -49,7 +49,7 @@ export const ALLERGEN_TERMS: Record<AllergenKey, string[]> = {
 // "Gluten free pasta" is a pasta that names gluten only to say it has none. Each of these is stripped as a whole phrase, so the food word after it does not flag.
 const GLUTEN_FREE_FOODS = [
   "bread", "pasta", "tortilla", "wrap", "noodle", "flour", "bun", "bagel", "cracker", "cereal", "pizza", "crust", "spaghetti", "penne", "macaroni", "waffle", "pancake",
-  "muffin", "toast", "granola", "pita", "naan", "roll", "cookie", "brownie", "cake", "couscous", "gnocchi", "lasagna", "ravioli", "pretzel", "breadcrumb", "panko", "beer",
+  "muffin", "toast", "granola", "pita", "naan", "roll", "cookie", "brownie", "cake", "couscous", "gnocchi", "lasagna", "ravioli", "pretzel", "breadcrumb", "panko", "beer", "teriyaki",
 ];
 
 // Phrases that contain an allergen word but are NOT that allergen. Removed before matching that allergen.
@@ -141,6 +141,17 @@ function firstMatch(normalized: string, terms: string[]): string | null {
 export function textHasAllergen(text: string, key: AllergenKey): string | null {
   const normalized = stripPhrases(normalizeText(text), SAFE_PHRASES[key] ?? []);
   return firstMatch(normalized, ALLERGEN_TERMS[key]);
+}
+
+// EVERY word in the text that names this allergen group (textHasAllergen returns only the first), for checks that compare what a text names with what a recipe lists.
+export function allergenWordsIn(text: string, key: AllergenKey): string[] {
+  const normalized = stripPhrases(normalizeText(text), SAFE_PHRASES[key] ?? []);
+  const found: string[] = [];
+  for (const term of ALLERGEN_TERMS[key]) {
+    const m = termRegex(term).exec(normalized);
+    if (m) found.push(m[0].trim());
+  }
+  return [...new Set(found)];
 }
 
 // An allergy item as stored: one of the controlled names, or "other: kiwi" free text.

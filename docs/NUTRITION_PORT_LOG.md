@@ -39,7 +39,11 @@ A recipe prints nothing for a food whose amount is tiny (for example butter unde
 
 ### 2.5 The tolerance
 
-The design's numbers are used as written: calories and protein within 10 percent, protein never below 90 percent of the target, carbs and fat within 15 percent. **One addition:** carbs and fat also pass when they are within **5 g**, because 15 percent of a 6 g target is under a gram, finer than a food table can promise (keto and carnivore slots have a handful of carb grams).
+The design's numbers are used as written: calories and protein within 10 percent, protein never below 90 percent of the target, carbs and fat within 15 percent. **Additions (changed after the first review):**
+
+- Carbs and fat also pass inside a small **absolute allowance that grows with the target**: clamp(0.4 x target, 2 g, 5 g). The first version used a flat 5 g, which let a 4 g keto carb target show 9 g. Now a 4 g target allows 2 g (up to 6, never 9), 6 g allows 2.4 g, 12 g allows 4.8 g, 0 g allows 2 g, and a big target is unchanged (15 percent still applies when it is larger).
+- On a **low-carb target** (a meal of 20 g carbs or less, a day of 50 g or less) only going **over** the carbs counts as a miss. Fewer carbs than the target is on plan: a zero-carb plate on a 6 g slot is fine. On a normal target both sides count.
+- The **whole day** is checked on its own as well (`checkDayTolerance`): calories within 8 percent, protein within 10 percent, carbs and fat within 15 percent or clamp(0.1 x target, 3 g, 15 g). A meal inside its own tolerance can run a little high every time, and for carbs on a keto plan that adds up (four meals each 2 g over is 8 g on a 25 g budget). 4b runs this across the meals it actually picks.
 
 ### 2.6 Diets
 
@@ -51,7 +55,20 @@ All seven diets the old app declared are kept, including pescatarian (8 recipes)
 
 ### 2.8 Things the recipes mention but do not count
 
-Some recipes name small seasonings in the preparation text only: sugar-free teriyaki sauce, red onion, lime juice, cinnamon, turmeric, nutritional yeast, sea salt. They have no line, no amount and no macros in the old app and none here. They are negligible, but a coach should know the allergen tags read the recipe's **name and its ingredient lines**, not the preparation text: the Pineapple Chicken Teriyaki dinner is tagged soy (from "Teriyaki" in its name) and sesame (from its sesame oil line), while a spice named only in the preparation text is not seen.
+Some recipes name foods in the preparation text only: sugar-free teriyaki sauce, lime juice, vinegar, beef broth, garlic, cinnamon, turmeric, nutritional yeast, salt, pepper, water, and in one recipe "water or milk". They have no line, no amount and no macros in the old app and none here, and they are small. **But an allergy does not care whether a food is a line or only in the method**, so (changed after the first review):
+
+- The allergen and diet tags now read the **preparation text as well as the lines** (`tags.ts`). The teriyaki dinner is tagged soy and wheat or gluten (teriyaki and hoisin were added to the wheat terms; teriyaki sauce was added to the gluten-free exceptions list so a deliberately gluten-free one still passes).
+- Every such food is **declared** in `declared-prep.ts` with a reason (20 recipes). A permanent test fails when the preparation text names a seasoning or an allergen food that is neither a counted line nor declared, and when a declaration no longer matches the text. "Toast" as a verb is satisfied by the bread line in the same meal.
+- 4b passes both the ingredient name and the printed line label, and the preparation text, to the client's allergy and diet re-check when it selects a meal.
+
+### 2.9 Two more recipe fixes (after the first review)
+
+- **`b_cereal_bowl_eggs`** said "a bowl of Corn Flakes with skim milk" in the method but had no milk line, so the milk (and its dairy) was uncounted. A `Skim Milk` 200 g line was added after the Corn Flakes line (recorded in `gen-fixes.cjs`), so the milk is counted, shown and tagged dairy.
+- **`s_string_cheese_jerky_apple`** no longer declares keto: it landed on no keto target (it has an apple in it), so the tag only ever offered it to keto clients to be skipped. It stays omnivore and paleo.
+
+### 2.10 A cap on how far a meal may be re-aimed
+
+The scaler records how far it had to move the aim from the slot's own target (`drift`, as a share of the target). A meal that only lands after an aim more than **75 percent** away is skipped, because a plate built for a very different target can look odd to a client. Across the whole test grid the largest drift is 0.75 (counts per 0.25 band: 1,769 / 520 / 129 / 2 / 0).
 
 ## 3. Checks that now run on every change (`lib/meal-templates/diagnostics.test.ts`)
 
@@ -59,31 +76,37 @@ Some recipes name small seasonings in the preparation text only: sugar-free teri
 - The food table: 150 foods, no food weighs more than itself per gram, every key in the diet and name tables is a real food.
 - Every recipe built at the old app's five extreme targets **and** across the whole spread: nothing throws, no NaN, every printed ingredient is a known food.
 - A scaled meal has no negative or empty line, its macros are the sum of **all** shown lines, and it is inside the tolerance.
-- Every enabled recipe lands on **at least 3 of the 6 sizes** in its best target shape; a disabled one lands on none and has a written reason.
-- The coverage gaps in section 4 are an exact list: a recipe that closes a gap, or a change that opens one, fails the test until the list is updated on purpose.
-- Allergen and diet tags are **worked out from the ingredients** (never typed): every recipe fits every diet it declares (vegan has no animal food, vegetarian no meat or fish, pescatarian no meat, and the old food-by-diet table agrees).
+- Every enabled recipe lands on **at least one size** for some diet it declares, and a disabled one lands on none (with a written reason). Then, **per declared diet**, every (recipe, diet) pair landing on **fewer than three of the six sizes** is an exact list (6 pairs, section 4): a fix that widens one, or a change that narrows another, fails until the list is updated on purpose.
+- The coverage gaps in section 4 are an exact list too (51 combinations).
+- The tolerance: the allowance values (6 g -> 2.4 g, 12 g -> 4.8 g, 4 g -> 2 g, 0 g -> 2 g, big targets unchanged), a 4 g carb target never showing 9 g, the low-carb rule (under the target is never a miss), the whole-day check, the drift cap.
+- Per-unit foods: no food counted in units has more macros than the unit weighs (the rice cake is the one known exception: 14 g of macros in a 9 g cake is impossible, waiting for Ron's number).
+- Preparation text: every food it names is a counted line or is declared with a reason, and every declaration is still true (section 2.8). The teriyaki dinner is soy and wheat or gluten; the cereal bowl counts its milk and is dairy.
+- Allergen and diet tags are **worked out from the ingredients and the preparation text** (never typed): every recipe fits every diet it declares (vegan has no animal food, vegetarian no meat or fish, pescatarian no meat, and the old food-by-diet table agrees).
 - The renderer keeps each recipe's own line text and a metric client sees no ounce hints.
 
-**Target shapes tested.** Sizes from a small snack (15 g protein) to a big dinner (100 g). Each diet is tested on its own carb and fat shape: standard (balanced split), low carb, high carb, keto (a few grams of carbs, fat above protein), carnivore (no carbs, fat about equal to protein).
+**Target shapes tested.** Sizes from a small snack (15 g protein) to a big dinner (100 g), six sizes (0.6, 0.8, 1, 1.25, 1.6, 2 times the base). Seven shapes: standard (balanced split), low carb, high carb, **high protein** (up to about 1.5 g per lb a day), **light** (small calories), keto (a few grams of carbs, fat above protein), carnivore (no carbs, fat about equal to protein). Each diet is tested on its own shapes: the everyday diets (omnivore, vegetarian, vegan, paleo, pescatarian) on the five everyday shapes, keto and carnivore on their own.
 
 ## 4. What the starter library can and cannot fill
 
-32 of the diet / slot / target combinations have **no** recipe that lands (the exact list is in the test). In plain words:
+51 of the diet / slot / target combinations have **no** recipe that lands (the exact list is in the test). In plain words:
 
-- **Pescatarian breakfast**: nothing on a standard or high-carb plan (both pescatarian breakfasts are fatty fish, and their fat is too high for those targets); one on a low-carb plan.
-- **Pescatarian snack** on a low-carb plan, and most sizes on a high-carb plan.
-- **Carnivore snack**: none (the one recipe is switched off, 2.7).
-- **Keto**: large breakfasts (1.6 times the base and up) and snacks above a small size.
+- **Pescatarian breakfast**: nothing on a standard, high-carb, high-protein or light plan at any size (both pescatarian breakfasts are fatty fish, and their fat is too high for those targets); some on a low-carb plan.
+- **Pescatarian snack**: nothing on a low-carb plan, and gaps at several sizes on the high-carb, high-protein and light shapes.
+- **Carnivore snack**: none at any size (the one recipe is switched off, 2.7).
+- **Keto snack**: none at any size (the jerky snack is switched off and the string cheese snack no longer declares keto, 2.9). Keto breakfast and dinner have no gap.
+- **Vegan breakfast on a high-protein plan**, the four smaller sizes.
 
-Also thin (fewer than three meals): most vegan and vegetarian lunches, most keto slots, pescatarian dinners. This is what the Generate button (AI top-up, phase 5) and the coach's own saved meals are for; the library alone gives a three-option menu for omnivore and vegetarian breakfast, and for omnivore lunch, dinner and snack.
+**Narrow spots (a recipe landing on fewer than three of the six sizes for a diet it declares):** the Salmon, Eggs & Avocado breakfast (omnivore, pescatarian and paleo: none; keto: one size), the keto Ground Beef & Cabbage bowl as an omnivore meal (none), and the Flank Steak with Butter dinner as keto (two sizes). They still appear when they land; they just cannot carry a diet alone.
 
-Counts of enabled recipes per diet and slot: omnivore 17 / 15 / 15 / 6, vegetarian 13 / 3 / 3 / 4, vegan 2 / 3 / 3 / 1, keto 2 / 3 / 5 / 2, paleo 4 / 7 / 8 / 3, pescatarian 2 / 3 / 2 / 1, carnivore 1 / 1 / 1 / 0 (breakfast / lunch / dinner / snack).
+Also thin (fewer than three meals): most vegan and vegetarian lunches, most keto slots, pescatarian dinners. This is what the Generate button (AI top-up, phase 5) and the coach's own saved meals are for; the library alone gives a three-option menu for omnivore and vegetarian breakfast, and for omnivore lunch, dinner and snack. In the two new shapes (high protein, light) an omnivore always has at least two meals at every size, three in the classic shapes.
+
+Counts of enabled recipes per diet and slot: omnivore 17 / 15 / 15 / 6, vegetarian 13 / 3 / 3 / 4, vegan 2 / 3 / 3 / 1, keto 2 / 3 / 5 / 0, paleo 4 / 7 / 8 / 3, pescatarian 2 / 3 / 2 / 1, carnivore 1 / 1 / 1 / 0 (breakfast / lunch / dinner / snack).
 
 ## 5. The food table against real food data (USDA, 150 foods)
 
 Each food was compared with the closest USDA record (per 100 g; foods counted in whole units were converted at the weights the old app uses: egg 50 g, sourdough slice 40 g, whole-wheat slice 28 g, white slice 25 g, bagel 100 g, wrap 50 g, rice cake 9 g). A number is listed when it is **more than 8 percent and more than 1.5 g per 100 g** away from USDA. **No value in the table was changed**: these are for you to accept or correct.
 
-**No USDA record found in the stored data (cannot be checked here):** chicken breast, chicken tenderloin (no "meat only, raw" record), whey isolate, casein, pea protein, TVP, brown-rice pasta (supplements and some branded foods are not in the stored set). Chicken thigh and drumstick exist but are leaner in USDA (protein 19.7 and 19.4, fat 4.1 and 3.7) than the table (20 / 8 and 19 / 9): the table's chicken is fattier.
+**UNCHECKED: no USDA record found in the stored data (about 12 foods, mostly supplements, powders and cuts the stored set lacks; their numbers are Ron's own and have not been compared with anything):** chicken breast, chicken tenderloin (no "meat only, raw" record), whey isolate, casein, pea protein, TVP, brown-rice pasta (supplements and some branded foods are not in the stored set). Chicken thigh and drumstick exist but are leaner in USDA (protein 19.7 and 19.4, fat 4.1 and 3.7) than the table (20 / 8 and 19 / 9): the table's chicken is fattier.
 
 **Looks like a real difference, worth a look (table vs USDA):**
 
@@ -118,5 +141,5 @@ Each food was compared with the closest USDA record (per 100 g; foods counted in
 
 1. **Keep the re-aiming engine (2.3)?** It leaves your 66 formulas exactly as written and makes the meals land on target. The alternative is rewriting formulas one by one.
 2. **Pescatarian breakfast.** Both recipes use fatty fish. Add a lean-fish breakfast (white fish or tuna with toast), or let the AI top-up and the coach's own recipes cover it?
-3. **Which food-table numbers to correct** from section 5 (the first nine rows are the ones most likely wrong, and the rice cake and scallop figures change real meals).
+3. **Which food-table numbers to correct** (nothing was changed; the rice cake is the one that is physically impossible as written: 14 g of macros in a 9 g cake, and the test lists it as the one known exception) from section 5 (the first nine rows are the ones most likely wrong, and the rice cake and scallop figures change real meals).
 4. **Carnivore snack and large keto meals**: add a recipe or leave to the top-up.

@@ -1,16 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { ALLERGEN_KEYS } from "@/lib/allergen-check";
+import { ALLERGEN_KEYS, allergenWordsIn } from "@/lib/allergen-check";
 import { DIET_TYPES as PREFERENCE_DIET_TYPES } from "@/lib/nutrition-preferences";
+import { BREAD_LINE_WORDS, BREAD_VERB_WORDS, DECLARED_PREP_FOODS } from "./declared-prep";
 import { DISABLED_TEMPLATES } from "./disabled";
 import { ENABLED_TEMPLATES, RECIPES, templatesFor } from "./index";
-import { FOOD_DENSITY, PER_UNIT_KEYS } from "./food-table";
+import { FOOD_DENSITY, PER_UNIT_KEYS, UNIT_WEIGHT_G } from "./food-table";
 import { EXTRA_NAME_TO_KEY, FOOD_ARCHETYPES, NAME_TO_KEY } from "./food-names";
-import { familiesOf, familiesOfDiet, gridFor, SCALES } from "./grid";
+import { FAMILIES, familiesOf, familiesOfDiet, gridFor, SCALES } from "./grid";
 import { foodKeyOf, ingredientMacros, mealIngredients, mealMacros } from "./macros";
 import { renderLines, stripOunceHints, toOz } from "./render";
-import { scaleTemplate } from "./scale";
-import { dietProblems, templateAllergens } from "./tags";
-import { checkTolerance } from "./tolerance";
+import { MAX_DRIFT, scaleTemplate } from "./scale";
+import { dietProblems, preparationText, templateAllergens } from "./tags";
+import { absAllowanceG, carbFatAllowanceG, checkDayTolerance, checkTolerance } from "./tolerance";
 import { DIET_TYPES, SLOTS, isIngredient, type TemplateRecipe } from "./types";
 
 // The permanent check on the ported recipe library (the old app's "Diagnostics", made strict). Every recipe is built across a spread of slot targets, for every diet
@@ -63,6 +64,26 @@ describe("the food tables are consistent", () => {
       if (!PER_UNIT_KEYS.has(key)) expect(d.protein + d.carbs + d.fat, `${key} cannot weigh more than itself`).toBeLessThanOrEqual(1.001);
     }
     for (const k of PER_UNIT_KEYS) expect(FOOD_DENSITY, k).toHaveProperty(k);
+  });
+  it("a per-unit food cannot have more macros than the unit weighs (the rice cake is the one known exception, awaiting Ron's decision)", () => {
+    // Unit weights: the table's own UNIT_WEIGHT_G, plus a plain bagel (about 100 g) and the three bread kinds (a slice).
+    const unitG: Record<string, number> = {
+      egg_whole_large: UNIT_WEIGHT_G.large,
+      sourdough_slice: UNIT_WEIGHT_G.slices,
+      whole_wheat_bread: UNIT_WEIGHT_G.slices,
+      white_bread_slice: UNIT_WEIGHT_G.slices,
+      bagel_plain: 100,
+      whole_wheat_wrap: UNIT_WEIGHT_G.wraps,
+      rice_cake: UNIT_WEIGHT_G.cakes,
+    };
+    const KNOWN_IMPOSSIBLE_UNITS = ["rice_cake"];
+    const impossible: string[] = [];
+    for (const k of PER_UNIT_KEYS) {
+      const d = (FOOD_DENSITY as Record<string, { protein: number; carbs: number; fat: number }>)[k];
+      expect(unitG[k], `${k} needs a unit weight`).toBeGreaterThan(0);
+      if (d.protein + d.carbs + d.fat > unitG[k]) impossible.push(k);
+    }
+    expect(impossible).toEqual(KNOWN_IMPOSSIBLE_UNITS);
   });
   it("every diet-table and name-table key is a real food", () => {
     for (const k of Object.keys(FOOD_ARCHETYPES)) expect(FOOD_DENSITY, k).toHaveProperty(k);
@@ -121,17 +142,96 @@ describe("every recipe builds at every target: known foods only, real numbers, n
   });
 });
 
-describe("what lands inside the tolerance (calories and protein 10 percent, protein never under 90 percent, carbs and fat 15 percent)", () => {
-  it("every enabled recipe lands on at least half of the six target sizes in its best shape; a disabled one lands on none, with a written reason", () => {
+// How many of the six target sizes a recipe lands on, in the best target shape of ONE diet it declares.
+function bestPassesForDiet(r: TemplateRecipe, diet: (typeof DIET_TYPES)[number]): number {
+  return Math.max(...familiesOfDiet(diet).map((fam) => gridFor(fam, r.slot).filter((t) => scaleTemplate(r, t) !== null).length));
+}
+
+// (recipe | declared diet | best number of sizes) where an enabled recipe lands on FEWER than three of the six sizes for a diet it declares. These are real narrow spots,
+// listed so they are known and reviewed. The list must match exactly: a fix that widens one, or a change that narrows another, fails until the list is updated on purpose.
+const NY_TARGET = gridFor("standard", "breakfast")[3];
+
+const KNOWN_NARROW = [
+  "b_salmon_eggs_avocado|omnivore|0",
+  "b_salmon_eggs_avocado|pescatarian|0",
+  "b_salmon_eggs_avocado|keto|1",
+  "b_salmon_eggs_avocado|paleo|0",
+  "l_ground_beef_cabbage_bowl_keto|omnivore|0",
+  "d_flank_steak_butter_carnivore|keto|2",
+];
+
+describe("what lands inside the tolerance (calories and protein 10 percent, protein never under 90 percent, carbs and fat 15 percent or a small allowance)", () => {
+  it("every enabled recipe lands somewhere for at least one diet it declares; a disabled one lands on none, with a written reason", () => {
     for (const r of RECIPES) {
       if (r.id in DISABLED_TEMPLATES) {
-        expect(bestPasses(r), `${r.id} is disabled, so it must really land nowhere`).toBe(0);
+        for (const d of r.archetypes) expect(bestPassesForDiet(r, d), `${r.id} is disabled, so it must really land nowhere (${d})`).toBe(0);
+        expect(bestPasses(r), r.id).toBe(0);
         expect(DISABLED_TEMPLATES[r.id].length, r.id).toBeGreaterThan(40);
       } else {
-        expect(bestPasses(r), `${r.id} lands on too few targets: fix it or disable it with a reason`).toBeGreaterThanOrEqual(3);
+        const best = Math.max(...r.archetypes.map((d) => bestPassesForDiet(r, d)));
+        expect(best, `${r.id} lands nowhere in any diet it declares: fix it or disable it with a reason`).toBeGreaterThanOrEqual(1);
       }
     }
     for (const id of Object.keys(DISABLED_TEMPLATES)) expect(RECIPES.some((r) => r.id === id), id).toBe(true);
+  });
+  it("the narrow spots are exactly the known ones (an enabled recipe landing on fewer than three sizes for a diet it declares)", () => {
+    const narrow: string[] = [];
+    for (const r of RECIPES) {
+      if (r.id in DISABLED_TEMPLATES) continue;
+      for (const d of r.archetypes) {
+        const best = bestPassesForDiet(r, d);
+        if (best < 3) narrow.push(`${r.id}|${d}|${best}`);
+      }
+    }
+    expect(narrow).toEqual(KNOWN_NARROW);
+  });
+  it("the carb and fat allowance stays proportional to a small target (a 4 g keto carb target never shows 9 g)", () => {
+    expect(absAllowanceG(6)).toBeCloseTo(2.4, 6);
+    expect(absAllowanceG(12)).toBeCloseTo(4.8, 6);
+    expect(absAllowanceG(4)).toBe(2);
+    expect(absAllowanceG(0)).toBe(2);
+    expect(absAllowanceG(100)).toBe(5);
+    expect(carbFatAllowanceG(4)).toBe(2);
+    expect(carbFatAllowanceG(100)).toBe(15);
+    expect(carbFatAllowanceG(60)).toBe(9);
+    const target = { proteinG: 30, carbsG: 4, fatG: 30 };
+    const meal = { calories: 4 * 30 + 4 * 9 + 9 * 30, proteinG: 30, carbsG: 9, fatG: 30 };
+    expect(checkTolerance(meal, target).misses).toContain("carbs");
+    expect(checkTolerance({ ...meal, carbsG: 6, calories: 4 * 30 + 4 * 6 + 9 * 30 }, target).misses).not.toContain("carbs");
+  });
+  it("on a low-carb target, fewer carbs than the target is never a miss; on a normal target both sides count", () => {
+    const low = { proteinG: 30, carbsG: 6, fatG: 30 };
+    const zero = { calories: 4 * 30 + 9 * 30, proteinG: 30, carbsG: 0, fatG: 30 };
+    expect(checkTolerance(zero, low).ok).toBe(true);
+    const normal = { proteinG: 30, carbsG: 60, fatG: 20 };
+    const under = { calories: 4 * 30 + 4 * 40 + 9 * 20, proteinG: 30, carbsG: 40, fatG: 20 };
+    expect(checkTolerance(under, normal).misses).toContain("carbs");
+  });
+  it("the whole day is checked on its own, so small overshoots in every meal cannot add up on a keto plan", () => {
+    const day = { proteinG: 160, carbsG: 25, fatG: 130 };
+    const meal = (c: number) => ({ calories: 0, proteinG: 40, carbsG: c, fatG: 32.5 });
+    expect(checkDayTolerance([meal(6), meal(6), meal(6), meal(6)], day).ok).toBe(true);
+    expect(checkDayTolerance([meal(12), meal(12), meal(12), meal(12)], day).misses).toContain("carbs");
+    expect(checkDayTolerance([meal(0), meal(0), meal(0), meal(0)], day).ok).toBe(true);
+  });
+  it("a meal whose formula had to be aimed very far from the slot's own target is skipped (the drift cap)", () => {
+    for (const r of ENABLED_TEMPLATES) {
+      for (const fam of familiesOf(r.archetypes)) {
+        for (const t of gridFor(fam, r.slot)) {
+          const meal = scaleTemplate(r, t);
+          if (meal) expect(meal.drift, `${r.id} ${JSON.stringify(t)}`).toBeLessThanOrEqual(MAX_DRIFT);
+        }
+      }
+    }
+  });
+  it("the high-protein and light target shapes exist, with more and less protein than the standard shape", () => {
+    expect(FAMILIES).toEqual(expect.arrayContaining(["standard", "low_carb", "high_carb", "high_protein", "light", "keto", "carnivore"]));
+    for (const slot of SLOTS) {
+      const std = gridFor("standard", slot)[2];
+      expect(gridFor("high_protein", slot)[2].proteinG, slot).toBeGreaterThan(std.proteinG);
+      expect(gridFor("light", slot)[2].proteinG, slot).toBeLessThan(std.proteinG * 1.2);
+      expect(gridFor("light", slot)[2].fatG + gridFor("light", slot)[2].carbsG, slot).toBeLessThanOrEqual(std.fatG + std.carbsG + 10);
+    }
   });
   it("a fixed side can no longer hide: the string cheese snack counts its sticks as sticks", () => {
     const r = RECIPES.find((x) => x.id === "s_string_cheese_jerky_apple")!;
@@ -148,8 +248,13 @@ describe("what lands inside the tolerance (calories and protein 10 percent, prot
 // builder fills such a slot with the coach's own recipes or offers the AI top-up. The list must match exactly: a new recipe that closes a gap, or a change that opens
 // one, fails this test until the list is updated on purpose.
 const KNOWN_GAPS = [
-  "keto|breakfast|keto|1.6",
-  "keto|breakfast|keto|2",
+  "vegan|breakfast|high_protein|0.6",
+  "vegan|breakfast|high_protein|0.8",
+  "vegan|breakfast|high_protein|1",
+  "vegan|breakfast|high_protein|1.25",
+  "keto|snack|keto|0.6",
+  "keto|snack|keto|0.8",
+  "keto|snack|keto|1",
   "keto|snack|keto|1.25",
   "keto|snack|keto|1.6",
   "keto|snack|keto|2",
@@ -165,6 +270,18 @@ const KNOWN_GAPS = [
   "pescatarian|breakfast|high_carb|1.25",
   "pescatarian|breakfast|high_carb|1.6",
   "pescatarian|breakfast|high_carb|2",
+  "pescatarian|breakfast|high_protein|0.6",
+  "pescatarian|breakfast|high_protein|0.8",
+  "pescatarian|breakfast|high_protein|1",
+  "pescatarian|breakfast|high_protein|1.25",
+  "pescatarian|breakfast|high_protein|1.6",
+  "pescatarian|breakfast|high_protein|2",
+  "pescatarian|breakfast|light|0.6",
+  "pescatarian|breakfast|light|0.8",
+  "pescatarian|breakfast|light|1",
+  "pescatarian|breakfast|light|1.25",
+  "pescatarian|breakfast|light|1.6",
+  "pescatarian|breakfast|light|2",
   "pescatarian|snack|low_carb|0.6",
   "pescatarian|snack|low_carb|0.8",
   "pescatarian|snack|low_carb|1",
@@ -174,6 +291,8 @@ const KNOWN_GAPS = [
   "pescatarian|snack|high_carb|1",
   "pescatarian|snack|high_carb|1.6",
   "pescatarian|snack|high_carb|2",
+  "pescatarian|snack|high_protein|0.6",
+  "pescatarian|snack|light|0.6",
   "carnivore|snack|carnivore|0.6",
   "carnivore|snack|carnivore|0.8",
   "carnivore|snack|carnivore|1",
@@ -198,11 +317,11 @@ describe("coverage: which diets and slots the starter library can fill", () => {
     }
     expect(gaps).toEqual(KNOWN_GAPS);
   });
-  it("an everyday omnivore always has at least three meals in every slot at every size", () => {
+  it("an everyday omnivore always has at least three meals in every slot at every size of the three classic shapes, and at least two in the high-protein and light shapes", () => {
     for (const slot of SLOTS) {
       for (const fam of familiesOfDiet("omnivore")) {
         gridFor(fam, slot).forEach((t) => {
-          expect(templatesFor(slot, "omnivore").filter((r) => scaleTemplate(r, t) !== null).length, `${slot} ${fam} ${JSON.stringify(t)}`).toBeGreaterThanOrEqual(3);
+          expect(templatesFor(slot, "omnivore").filter((r) => scaleTemplate(r, t) !== null).length, `${slot} ${fam} ${JSON.stringify(t)}`).toBeGreaterThanOrEqual(fam === "high_protein" || fam === "light" ? 2 : 3);
         });
       }
     }
@@ -221,6 +340,44 @@ describe("tags: allergens and diets are worked out from what is in the recipe", 
     expect(tags("d_chicken_pineapple_broccoli")).toEqual(expect.arrayContaining(["soy"]));
     expect(tags("b_tofu_scramble_berries_vegan")).toContain("soy");
   });
+  it("a food named only in the preparation text is seen by the checks: the teriyaki chicken is soy and wheat or gluten", () => {
+    const r = RECIPES.find((x) => x.id === "d_chicken_pineapple_broccoli")!;
+    expect(preparationText(r)).toMatch(/teriyaki/i);
+    expect(allergenWordsIn("sugar-free teriyaki sauce", "wheat or gluten")).toContain("teriyaki");
+    expect(templateAllergens(r)).toEqual(expect.arrayContaining(["soy", "wheat or gluten"]));
+  });
+  it("the cereal bowl counts its milk: it has a milk line and is tagged dairy", () => {
+    const r = RECIPES.find((x) => x.id === "b_cereal_bowl_eggs")!;
+    const meal = scaleTemplate(r, gridFor("standard", "breakfast")[2])!;
+    expect(meal).not.toBeNull();
+    expect(meal.ingredients.some((i) => /milk/i.test(i.name))).toBe(true);
+    expect(templateAllergens(r)).toContain("dairy");
+  });
+  it("every food the preparation text names is a counted line or is declared (with the reason), and every declaration is still true", () => {
+    const SEASONINGS = ["teriyaki", "garlic", "lime", "lemon", "onion", "vinegar", "broth", "vanilla", "turmeric", "nutritional yeast", "cinnamon", "paprika", "pepper", "chili", "salt", "mint", "water", "hoisin", "soy sauce"];
+    for (const r of RECIPES) {
+      const prep = [...new Set(FAMILIES.map((fam) => preparationText(r, fam === "keto" ? "keto" : fam === "carnivore" ? "carnivore" : "omnivore")))].join(" ").toLowerCase();
+      const names = new Set<string>();
+      for (const fam of FAMILIES) {
+        for (const t of gridFor(fam, r.slot)) for (const i of r.build(t.proteinG, t.carbsG, t.fatG)) if (isIngredient(i)) names.add(i.name.toLowerCase());
+      }
+      const lines = [...names].join(" | ");
+      const found = new Set<string>(SEASONINGS.filter((t) => new RegExp(`\\b${t}\\b`).test(prep)));
+      for (const k of ALLERGEN_KEYS) for (const w of allergenWordsIn(prep, k)) found.add(w);
+      const declared = DECLARED_PREP_FOODS[r.id]?.foods ?? [];
+      const undeclared = [...found].filter((w) => {
+        if (lines.includes(w) || lines.includes(w.replace(/s$/, "")) || lines.includes(w.replace(/ies$/, "y"))) return false;
+        if (BREAD_VERB_WORDS.includes(w) && BREAD_LINE_WORDS.some((b) => lines.includes(b))) return false;
+        return !declared.some((d) => d.includes(w) || w.includes(d));
+      });
+      expect(undeclared, `${r.id}: foods named in the preparation text that are not a line and not declared`).toEqual([]);
+      for (const d of declared) expect(prep, `${r.id}: declared food "${d}" is no longer in the preparation text`).toContain(d);
+    }
+    for (const id of Object.keys(DECLARED_PREP_FOODS)) {
+      expect(RECIPES.some((r) => r.id === id), `${id} is declared but is not a recipe`).toBe(true);
+      expect(DECLARED_PREP_FOODS[id].reason.length, id).toBeGreaterThan(5);
+    }
+  });
   it("a vegan recipe is never tagged with dairy, egg, fish or shellfish; a pescatarian one never with meat-only logic breaking", () => {
     for (const r of RECIPES.filter((x) => x.archetypes.includes("vegan"))) {
       const t = templateAllergens(r);
@@ -233,7 +390,7 @@ describe("tags: allergens and diets are worked out from what is in the recipe", 
 describe("rendering", () => {
   it("keeps the lines the recipe wrote and leaves out the blank ones", () => {
     const r = RECIPES.find((x) => x.id === "b_ny_strip_eggs_cor")!;
-    const meal = scaleTemplate(r, { proteinG: 40, carbsG: 60, fatG: 15 })!;
+    const meal = scaleTemplate(r, NY_TARGET)!;
     const lines = renderLines(meal.items);
     expect(lines.length).toBeGreaterThan(3);
     expect(lines[0]).toContain("<strong>Preparation:</strong>");
@@ -244,7 +401,7 @@ describe("rendering", () => {
     expect(toOz(283.495)).toBe("(~10.0 oz)");
     expect(stripOunceHints("<strong>NY Strip (Raw):</strong> 180g (~6.3 oz)")).toBe("<strong>NY Strip (Raw):</strong> 180g");
     const r = RECIPES.find((x) => x.id === "b_ny_strip_eggs_cor")!;
-    const lines = renderLines(scaleTemplate(r, { proteinG: 40, carbsG: 60, fatG: 15 })!.items, { metric: true });
+    const lines = renderLines(scaleTemplate(r, NY_TARGET)!.items, { metric: true });
     expect(lines.some((l) => l.includes("oz)"))).toBe(false);
   });
   it("a line too small to show is not part of the meal, and its macros are not counted", () => {
@@ -268,12 +425,13 @@ describe("rendering", () => {
 });
 
 describe("the scaler", () => {
-  it("lands a formula that overshoots through its fixed sides (the old NY strip breakfast at 40/60/15 raw is 49 g protein and 26 g fat)", () => {
+  it("lands a formula that overshoots through its fixed sides (the old NY strip breakfast, built raw at the slot target, misses it; the scaler re-aims it onto the target)", () => {
     const r = RECIPES.find((x) => x.id === "b_ny_strip_eggs_cor")!;
-    const raw = mealMacros(r.build(40, 60, 15)).macros;
-    expect(checkTolerance(raw, { proteinG: 40, carbsG: 60, fatG: 15 }).ok).toBe(false);
-    const meal = scaleTemplate(r, { proteinG: 40, carbsG: 60, fatG: 15 });
-    expect(meal === null || meal.passes > 1).toBe(true);
+    const raw = mealMacros(r.build(NY_TARGET.proteinG, NY_TARGET.carbsG, NY_TARGET.fatG)).macros;
+    expect(checkTolerance(raw, NY_TARGET).ok).toBe(false);
+    const meal = scaleTemplate(r, NY_TARGET);
+    expect(meal).not.toBeNull();
+    expect(meal!.passes).toBeGreaterThan(1);
   });
   it("returns null, never a bad meal, when a recipe cannot land", () => {
     const r = RECIPES.find((x) => x.id === "s_jerky_eggs_carnivore")!;
