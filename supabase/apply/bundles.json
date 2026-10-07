@@ -1,0 +1,12 @@
+[
+ {
+  "id": "release-d",
+  "name": "Release D",
+  "steps": [
+   "32",
+   "33",
+   "34"
+  ],
+  "file": "apply-release-d-all.sql"
+ }
+]

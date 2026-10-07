@@ -143,6 +143,72 @@ for (const s of steps) {
     check("step 06: the existing plain PIN was copied across hashed", hashed === 1);
   }
 }
+// ---- release bundles: ONE paste per release ----
+// Steps 32 to 34 are applied at this point. Take them back with their own undo files (newest first), so the bundle runs on the same state live has before Release D.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-d");
+  const file = `apply/${bundle.file}`;
+  const stepFiles = bundle.steps.map((n) => steps.find((x) => x.n === n));
+  const undoAll = async () => {
+    for (const st of [...stepFiles].reverse()) {
+      const eu = await run(`apply/undo-step${st.n}-${st.slug}.sql`);
+      if (eu) return eu;
+    }
+    return null;
+  };
+  const state = async () => (await db.query(`select
+      exists (select 1 from pg_constraint where conname = 'coach_availability_windows_session_minutes_range' and pg_get_constraintdef(oid) like '%slot_duration_minutes%') as old_rule,
+      exists (select 1 from pg_trigger where tgname = 'bookings_guard_overlap') as has_guard,
+      exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_availability_windows' and column_name = 'session_type_id') as has_tag`)).rows[0];
+
+  check(`bundle ${bundle.id}: the steps can be taken back with their own undo files first`, !(await undoAll()));
+  const before = await state();
+  check("bundle: before it runs, none of its three changes is in place", before.old_rule && !before.has_guard && !before.has_tag, JSON.stringify(before));
+
+  // All or nothing: make the LAST step's state wrong (its column already exists), and the whole bundle must refuse, naming step 34, and keep NOTHING of steps 32 and 33.
+  await db.exec("alter table public.coach_availability_windows add column session_type_id uuid");
+  const refusedLate = await run(file);
+  const afterLate = await state();
+  check("bundle: a wrong state in the LAST step refuses with the step named (" + refusedLate + ")", !!refusedLate && /step 34 \(0289\) cannot run/.test(refusedLate) && /already applied/.test(refusedLate));
+  check("bundle: that refusal kept NOTHING of the earlier steps (all or nothing)", afterLate.old_rule && !afterLate.has_guard, JSON.stringify(afterLate));
+  await db.exec("alter table public.coach_availability_windows drop column session_type_id");
+
+  // The real run: applies, and the result row says every step is in place.
+  const bundleSql = read(file);
+  let result;
+  let errBundle = null;
+  try {
+    result = await db.exec(bundleSql);
+  } catch (err) {
+    errBundle = err.message.split("\n")[0];
+    await db.exec("rollback").catch(() => {});
+  }
+  const rowsOut = Array.isArray(result) ? result[result.length - 1].rows : result?.rows ?? [];
+  check("bundle applies on the live-shaped state" + (errBundle ? ": " + errBundle : ""), !errBundle);
+  check("bundle: ends with a read-only result, one row per step, every in_place = true " + JSON.stringify(rowsOut.map((r) => [r.step, r.in_place])), rowsOut.length === 3 && rowsOut.every((r) => r.in_place === true));
+  const after = await state();
+  check("bundle: all three changes are in place", !after.old_rule && after.has_guard && after.has_tag, JSON.stringify(after));
+
+  // Running it again (or after any step was applied by hand) is refused at the first applied step, naming it, and changes nothing.
+  const again = await run(file);
+  check("bundle: a second run is refused, naming step 32 (" + again + ")", !!again && /step 32 \(0287\) cannot run/.test(again) && /already applied/.test(again));
+  const afterAgain = await state();
+  check("bundle: the refused second run changed nothing", !afterAgain.old_rule && afterAgain.has_guard && afterAgain.has_tag);
+
+  // The per-step undo files still work after the bundle, and each step can be applied again by its own file (the fallback).
+  for (const st of [...stepFiles].reverse()) {
+    const eu = await run(`apply/undo-step${st.n}-${st.slug}.sql`);
+    check(`bundle: undo-step${st.n}-${st.slug}.sql runs after the bundle` + (eu ? ": " + eu : ""), !eu);
+  }
+  const undone = await state();
+  check("bundle: after the undo files everything is back to the old state", undone.old_rule && !undone.has_guard && !undone.has_tag, JSON.stringify(undone));
+  for (const st of stepFiles) {
+    const rows = await pre(`apply/apply-step${st.n}-${st.slug}-precheck.sql`);
+    const ea = await run(`apply/apply-step${st.n}-${st.slug}.sql`);
+    check(`bundle fallback: step ${st.n} precheck all true, and its own file applies after the undo` + (ea ? ": " + ea : ""), rows.every((r) => r.ok) && !ea);
+  }
+}
 // Steps 30 and 31: the copy matches the original, both groups are gone, and everything in them was saved first.
 {
   const gone = (await db.query("select count(*)::int as n from public.groups where id in ('b292055b-edc6-4171-ad2b-a89d65dcd8db', 'c368ab0b-ccab-442e-a42e-38fb22293182')")).rows[0].n;

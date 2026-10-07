@@ -761,6 +761,65 @@ for (const s of STEPS) {
     );
   }
 }
+// ---- release bundles: ONE paste file per release (apply-release-<x>-all.sql) ----
+// All of a release's steps, in order, inside ONE all-or-nothing transaction. Every check row of every step (its precheck, including "not already applied") is folded
+// into a guard in front of that step, evaluated inside the transaction (so a later step sees the earlier ones' changes). A false row stops everything with a message
+// that names the release, the step and the failed checks, and nothing is kept. After the commit one read-only result row per step says whether it is in place.
+// The individual step files stay as the fallback (and for a release that was partly applied by hand: the bundle refuses at the first applied step).
+const BUNDLES = [
+  { id: "release-d", name: "Release D", steps: ["32", "33", "34"] },
+];
+for (const b of BUNDLES) {
+  const stepsIn = b.steps.map((n) => STEPS.find((x) => x.n === n));
+  const parts = [];
+  const summary = [];
+  for (const s of stepsIn) {
+    const values = s.rows.map(([name, expr]) => `      ('${name.replace(/'/g, "''")}', ${expr})`).join(",\n");
+    const tag = `g${s.n}`;
+    parts.push(
+      [
+        `-- ===== ${b.name}, step ${s.n}: ${s.title}`,
+        `do $${tag}$`,
+        "declare",
+        "  failed text;",
+        "begin",
+        "  select string_agg(check_name, '; ') into failed from (",
+        "    values",
+        values,
+        "  ) as checks(check_name, ok) where not ok;",
+        "  if failed is not null then",
+        `    raise exception '${b.name}, step ${s.n} (${s.slug}) cannot run: this step looks already applied, or the database is not in the state it expects. Failed checks: %. NOTHING was changed (the whole bundle is all or nothing). If an earlier step was applied by hand, use the single-step files for the rest, and send Spot this message.', failed;`,
+        "  end if;",
+        "end",
+        `$${tag}$;`,
+        "",
+        s.bodySql
+          ? s.bodySql
+          : s.migrations.map((n) => `${bar}\n-- migration ${index[n]}\n${bar}\n\n${migrationSql(n)}`).join("\n\n"),
+        "",
+      ].join("\n")
+    );
+    // "In place" for the result row: the step's own "not already applied" checks are no longer all true.
+    const guards = s.rows.filter(([name]) => /not already applied/.test(name));
+    const placed = guards.length ? `not (${guards.map(([, e]) => `(${e})`).join(" and ")})` : "true";
+    summary.push(`  select 'step ${s.n} (${s.slug})' as step, '${s.title.split(/[(,;]/)[0].trim().replace(/'/g, "''")}' as what, ${placed} as in_place`);
+  }
+  const head = [
+    `-- ${b.name.toUpperCase()}: ONE paste. Steps ${b.steps.join(", ")} in order, all or nothing.`,
+    "--",
+    "-- Paste this whole file into the Supabase SQL editor and run it once. It replaces the separate precheck and apply files for these steps (they stay as the fallback).",
+    "-- Every check from each step's precheck is built in as a guard in front of that step. If any check is false, the run stops with a message that names the step and the",
+    "-- failed check, and NOTHING is kept, so a second run after a refusal is safe.",
+    "-- WHAT YOU SHOULD SEE: first \"Success\" for the transaction, then a result table with one row per step and in_place = true on every row.",
+    "-- ON ERROR: run   rollback;   once, copy the red text, send it to Spot. Do not run it again.",
+    ...stepsIn.flatMap((s) => [`-- AFTER STEP ${s.n}: ${s.afterwards}`]),
+    "-- It contains no text searching, so editor re-indenting cannot break it.",
+  ].join("\n");
+  const sql = `${head}\n\nbegin;\n\n${parts.join("\n")}\ncommit;\n\n-- Read-only result (after the commit): every row must say in_place = true.\nselect step, what, in_place from (\n${summary.join("\n  union all\n")}\n) as result order by step;\n`;
+  writeFileSync(new URL(`apply-${b.id}-all.sql`, outDir), sql);
+}
+writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) => ({ ...b, file: `apply-${b.id}-all.sql` })), null, 1));
+
 // ---- restore-step31-from-backup.sql: puts back what step 31 deleted, from the most recent cleanup_backups record ----
 {
   const order = [

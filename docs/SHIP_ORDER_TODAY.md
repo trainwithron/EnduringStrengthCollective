@@ -1,6 +1,12 @@
 # Ship order (Oct 6)
 
+## HOW EVERY RELEASE IS PASTED FROM NOW ON: ONE file
+
+Each release gets **one bundled paste file**, `supabase\apply\apply-release-<x>-all.sql`. It runs all of that release's steps, in the right order, inside one all-or-nothing transaction. Each step's checks (everything its separate precheck says, including "not already applied") are built in as a guard in front of it, so there is **no separate precheck paste**. If a check is false the run stops with a red message that names the release, the step and the failed check, and nothing is kept, so it is safe to try again after fixing what it names. After the commit it shows a read-only result table, one row per step, and every row must say `in_place = true`. The separate `apply-stepNN-...` and `undo-stepNN-...` files stay as the fallback and for undoing one step at a time. If a step was already applied by hand, the bundle refuses at that step (by name); use the single-step files for the rest. The paste test applies each bundle on the live-shaped schema, proves a bad state in the last step keeps nothing of the earlier ones, proves a second run is refused, and proves each step's undo file still works afterwards.
+
 ## RELEASE D: ready, not pushed (the list below it is Release C, which is live)
+
+**One-file way (Release D): `apply-release-d-all.sql`** runs steps 32, 33 and 34 together; use it only if none of them is applied yet. Steps already applied by hand (32 done, 33 in progress) are covered by the numbered list below.
 
 Branch `release-d` (one merged, green branch: booking at any time, the fixes from the live check, session types on hours, the vocabulary change). Nothing in it is applied or deployed. Do the pastes first, in this order, each only after Assistant has reviewed it against live (each file refuses by itself if it was already applied or is out of order):
 

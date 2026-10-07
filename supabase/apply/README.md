@@ -1,5 +1,7 @@
 # Paste files: status and order
 
+**One file per release.** `apply-release-<x>-all.sql` (for example `apply-release-d-all.sql`, steps 32 to 34) runs all of a release's steps in order in one all-or-nothing transaction, with every step's prechecks built in as named guards (no separate precheck paste), and ends with a read-only result table (every row `in_place = true`). It refuses at the first step that is already applied or out of order, naming the step. The individual step and undo files below stay as the fallback. Bundles are listed in `bundles.json` and defined in `scripts/build-paste-files.mjs` (`BUNDLES`).
+
 Each step has two files: `apply-stepNN-...-precheck.sql` (read-only, every row must say ok = true) and `apply-stepNN-....sql` (all or nothing). Run the precheck, then the apply file. On any error: run `rollback;` once, copy the red text, send it to Spot, do not retry.
 
 ## Already applied. NEVER re-run these.
