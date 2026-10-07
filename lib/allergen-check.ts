@@ -154,6 +154,46 @@ export function allergenWordsIn(text: string, key: AllergenKey): string[] {
   return [...new Set(found)];
 }
 
+// FOOD GROUPS people type or save as a dislike ("no pork", "no beef", "no seafood", "no meat"): the group's own words, so bacon, ham and sausage count for "no pork" and steak,
+// brisket and jerky for "no beef". A line that names a group word inside a meat-free or other-animal phrase ("turkey sausage", "veggie burger", "tuna steak") is not that group.
+const SEAFOOD_TERMS = [...ALLERGEN_TERMS.fish, ...ALLERGEN_TERMS.shellfish];
+const PORK_TERMS = ["pork", "bacon", "ham", "sausage", "pepperoni", "prosciutto", "pancetta", "chorizo", "salami", "hot dog", "lard"];
+const BEEF_TERMS = [
+  "beef", "steak", "sirloin", "ribeye", "ny strip", "strip steak", "brisket", "jerky", "burger", "meatball", "chuck roast", "ground chuck", "flank", "porterhouse", "t bone",
+  "short rib", "veal", "tallow",
+];
+const POULTRY_TERMS = ["chicken", "turkey", "duck", "goose", "poultry", "drumstick", "wings"];
+const LAMB_TERMS = ["lamb", "mutton"];
+// Phrases that contain a red-meat word but are another food ("turkey sausage", "veggie burger", "tuna steak"): not beef or pork. Poultry and "meat" groups do NOT use these
+// (turkey sausage is still meat).
+const RED_MEAT_SAFE = [
+  "turkey sausage", "chicken sausage", "turkey bacon", "chicken bacon", "turkey ham", "turkey pepperoni", "turkey burger", "chicken burger", "veggie burger", "bean burger",
+  "black bean burger", "salmon burger", "tuna burger", "tuna steak", "salmon steak", "fish steak", "swordfish steak", "tofu steak", "cauliflower steak", "portobello steak",
+  "turkey meatball", "chicken meatball", "turkey hot dog", "chicken hot dog", "coconut bacon", "tempeh bacon",
+];
+const FISH_SAFE = [...(SAFE_PHRASES.fish ?? []), ...(SAFE_PHRASES.shellfish ?? [])];
+const FOOD_GROUPS: Record<string, { terms: string[]; safe: string[] }> = {
+  pork: { terms: PORK_TERMS, safe: RED_MEAT_SAFE },
+  beef: { terms: BEEF_TERMS, safe: RED_MEAT_SAFE },
+  chicken: { terms: ["chicken", "drumstick", "wings", "poultry"], safe: [] },
+  poultry: { terms: POULTRY_TERMS, safe: [] },
+  turkey: { terms: ["turkey"], safe: [] },
+  lamb: { terms: LAMB_TERMS, safe: [] },
+  "red meat": { terms: [...BEEF_TERMS, ...PORK_TERMS, ...LAMB_TERMS, "venison", "bison"], safe: RED_MEAT_SAFE },
+  seafood: { terms: SEAFOOD_TERMS, safe: FISH_SAFE },
+  meat: { terms: MEAT_TERMS, safe: [] },
+  "animal products": {
+    terms: [...MEAT_TERMS, ...SEAFOOD_TERMS, ...ALLERGEN_TERMS.dairy, ...ALLERGEN_TERMS.egg, "honey"],
+    safe: [...FISH_SAFE, ...(SAFE_PHRASES.dairy ?? []), ...(SAFE_PHRASES.egg ?? [])],
+  },
+};
+type RuleEntry = { label: string; key: AllergenKey | null; terms: string[]; group?: boolean; safe?: string[] };
+function groupEntry(raw: string): RuleEntry | null {
+  const name = raw.trim().toLowerCase().replace(/\s+/g, " ");
+  const g = FOOD_GROUPS[name] ?? FOOD_GROUPS[name.replace(/s$/, "")];
+  return g ? { label: name, key: null, terms: g.terms, group: true, safe: g.safe } : null;
+}
+
 // An allergy item as stored: one of the controlled names, or "other: kiwi" free text.
 function allergyTerms(item: string): { label: string; key: AllergenKey | null; terms: string[] } | null {
   const raw = item.trim().toLowerCase();
@@ -162,10 +202,10 @@ function allergyTerms(item: string): { label: string; key: AllergenKey | null; t
     const word = raw.slice("other:".length).trim();
     if (!word) return null;
     const key = ALIASES[word] ?? null;
-    return key ? { label: word, key, terms: ALLERGEN_TERMS[key] } : { label: word, key: null, terms: [word] };
+    return key ? { label: word, key, terms: ALLERGEN_TERMS[key] } : groupEntry(word) ?? { label: word, key: null, terms: [word] };
   }
   const key = (ALLERGEN_KEYS as string[]).includes(raw) ? (raw as AllergenKey) : ALIASES[raw] ?? null;
-  return key ? { label: key, key, terms: ALLERGEN_TERMS[key] } : { label: raw, key: null, terms: [raw] };
+  return key ? { label: key, key, terms: ALLERGEN_TERMS[key] } : groupEntry(raw) ?? { label: raw, key: null, terms: [raw] };
 }
 
 // The controlled allergen groups a client's allergy list covers (a typed alias such as "lactose" or "other: gluten" counts; free text that is no group does not).
@@ -183,7 +223,7 @@ function looseTerms(item: string): { label: string; key: AllergenKey | null; ter
   const raw = item.trim().toLowerCase();
   if (!raw) return null;
   const key = ALIASES[raw] ?? null;
-  return key ? { label: raw, key, terms: ALLERGEN_TERMS[key] } : { label: raw, key: null, terms: [raw] };
+  return key ? { label: raw, key, terms: ALLERGEN_TERMS[key] } : groupEntry(raw) ?? { label: raw, key: null, terms: [raw] };
 }
 
 export type DietType = "omnivore" | "vegetarian" | "vegan" | "pescatarian" | "carnivore" | "keto" | "paleo";
@@ -222,8 +262,9 @@ export function checkLines(lines: string[], rules: FoodRules): AllergenHit[] {
   for (const line of lines) {
     if (!line || !line.trim()) continue;
     const base = normalizeText(line);
-    const test = (entry: { label: string; key: AllergenKey | null; terms: string[] }, kind: AllergenHit["kind"]) => {
-      const text = entry.key ? stripPhrases(base, SAFE_PHRASES[entry.key] ?? []) : base;
+    const test = (entry: RuleEntry, kind: AllergenHit["kind"]) => {
+      // A group word inside a meat-free or other-animal phrase ("vegan sausage", "turkey sausage") is not that group.
+      const text = entry.key ? stripPhrases(base, SAFE_PHRASES[entry.key] ?? []) : entry.group ? stripPhrases(base.replace(NOT_MEAT_RE, " "), entry.safe ?? []) : base;
       const matched = firstMatch(text, entry.terms);
       if (matched) hits.push({ kind, label: entry.label, matched, line });
     };

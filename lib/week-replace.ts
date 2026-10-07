@@ -4,6 +4,8 @@
 import { dateFromKey } from "@/lib/date-key";
 
 export const LIBRARY_WEEK_RATIONALE = "Built from the recipe library for the week.";
+// What a library-built day says once a coach has changed it by hand (drag and drop, "Assign to days"). It is not the library's text, so the day counts as hand-built.
+export const EDITED_BY_HAND_RATIONALE = "Built from the recipe library, then edited by hand.";
 
 export interface ExistingDay {
   log_date: string;

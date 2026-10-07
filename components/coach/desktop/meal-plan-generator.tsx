@@ -235,7 +235,7 @@ export function MealPlanGenerator({
     return {
       rules: effectiveRules,
       diet: libraryDiet(recipeArchetype),
-      likes: [...(libraryData?.likes ?? []), ...favoriteFoods.split(/[,/]/).map((x) => x.trim()).filter(Boolean)],
+      likes: [...(libraryData?.likes ?? []), ...typedRules.likes, ...favoriteFoods.split(/[,/]/).map((x) => x.trim()).filter(Boolean)],
       favorites: { ids: new Set(libraryData?.favorites.ids ?? []), names: new Set(libraryData?.favorites.names ?? []) },
       recentlyOffered: libraryData?.recentlyOffered ?? new Map(),
       mixItUp: v.mixItUp,
@@ -738,6 +738,9 @@ export function MealPlanGenerator({
           archetype,
           dietaryRestrictions,
           favoriteFoods,
+          // What the coach typed in the note, as structured items. They can only ADD restrictions on the server (it still reads the saved rules itself, from the database).
+          extraAllergies: typedRules.allergies,
+          extraDislikes: typedRules.dislikes,
           // The server reads this client's food rules itself, from the database.
           athleteId,
         }),

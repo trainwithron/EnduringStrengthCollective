@@ -91,6 +91,8 @@ export async function POST(request: Request) {
     dietaryRestrictions,
     favoriteFoods,
     athleteId,
+    extraAllergies,
+    extraDislikes,
   } = await request.json();
 
   if (
@@ -125,6 +127,26 @@ export async function POST(request: Request) {
       const p = rowToPreferences(prefsRow as Record<string, unknown>);
       rules = { allergies: p.allergies, intolerances: p.intolerances, dislikes: p.dislikes, dietType: p.dietType };
     }
+  }
+  // Items the coach typed in the planner's note, sent as structured allergies and dislikes. They can only ADD restrictions: they are unioned into the saved rules (never
+  // replace or relax them), limited in number and length, and letters only.
+  const cleanExtra = (v: unknown): string[] =>
+    Array.isArray(v)
+      ? v
+          .filter((x): x is string => typeof x === "string")
+          .map((x) => x.trim().toLowerCase())
+          .filter((x) => /^[a-z][a-z -]{1,39}$/.test(x))
+          .slice(0, 20)
+      : [];
+  const extraA = cleanExtra(extraAllergies);
+  const extraD = cleanExtra(extraDislikes);
+  if (extraA.length > 0 || extraD.length > 0) {
+    rules = {
+      allergies: [...new Set([...(rules?.allergies ?? []), ...extraA])],
+      intolerances: rules?.intolerances ?? [],
+      dislikes: [...new Set([...(rules?.dislikes ?? []), ...extraD])],
+      dietType: rules?.dietType ?? "omnivore",
+    };
   }
   const rulesText = rules ? rulesForPrompt(rules) : "";
 

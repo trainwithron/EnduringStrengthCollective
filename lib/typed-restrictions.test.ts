@@ -32,7 +32,7 @@ describe("the coach's typed note becomes rules", () => {
     expect(rulesFromTypedText("Vegan, Keto, No eggs").dietType).toMatch(/vegan|keto/);
   });
   it("nothing typed, or 'none', is no rule", () => {
-    for (const x of ["", "  ", "none", "No restrictions", "n/a", null, undefined]) expect(rulesFromTypedText(x)).toEqual({ allergies: [], dislikes: [], dietType: null });
+    for (const x of ["", "  ", "none", "No restrictions", "n/a", null, undefined]) expect(rulesFromTypedText(x)).toEqual({ allergies: [], dislikes: [], dietType: null, likes: [] });
   });
   it("merges with the saved rules: unions for allergies and dislikes, the saved diet wins unless it is the default", () => {
     const typed = rulesFromTypedText("no dairy, hates kale, vegan");
@@ -41,7 +41,9 @@ describe("the coach's typed note becomes rules", () => {
     expect(merged.dislikes?.sort()).toEqual(["beets", "kale"]);
     expect(merged.intolerances).toEqual(["lactose"]);
     expect(merged.dietType).toBe("vegan");
-    expect(mergeRules({ dietType: "keto" }, typed).dietType).toBe("keto");
+    // A typed meat-free diet tightens a saved style of eating; a saved meat-free diet is never relaxed.
+    expect(mergeRules({ dietType: "keto" }, typed).dietType).toBe("vegan");
+    expect(mergeRules({ dietType: "keto" }, rulesFromTypedText("paleo")).dietType).toBe("keto");
     expect(mergeRules(undefined, rulesFromTypedText("")).allergies).toEqual([]);
   });
   it("says what was understood and whether it is new to the saved rules", () => {

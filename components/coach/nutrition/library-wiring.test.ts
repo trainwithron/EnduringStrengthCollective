@@ -135,3 +135,25 @@ describe("review fixes", () => {
     expect(cards).toContain("window.localStorage");
   });
 });
+
+describe("second review: typed items reach the AI route, edits relabel a library day", () => {
+  const aiRoute = src("../../../app/api/ai/generate-meal-plan/route.ts");
+  const assignment = src("../../../lib/meal-plan-assignment.ts");
+  it("the planner sends the typed allergies and dislikes as structured items, and the route can only ADD them to the saved rules", () => {
+    expect(generator).toContain("extraAllergies: typedRules.allergies");
+    expect(generator).toContain("extraDislikes: typedRules.dislikes");
+    expect(aiRoute).toContain("extraAllergies");
+    expect(aiRoute).toContain("...(rules?.allergies ?? []), ...extraA");
+    expect(aiRoute).toContain("/^[a-z][a-z -]{1,39}$/");
+    // the saved rules are read before the extras are merged in, and the prompt is built after
+    expect(aiRoute.indexOf("const extraA")).toBeGreaterThan(aiRoute.indexOf("rowToPreferences("));
+    expect(aiRoute.indexOf("const extraA")).toBeLessThan(aiRoute.indexOf("rulesForPrompt(rules)"));
+  });
+  it("changing a library-built day by hand relabels it, so the next Build the week asks", () => {
+    expect(assignment).toContain("EDITED_BY_HAND_RATIONALE");
+    expect(assignment).toContain("base.rationale === LIBRARY_WEEK_RATIONALE");
+  });
+  it("what the note says the client likes boosts meals", () => {
+    expect(generator).toContain("...typedRules.likes");
+  });
+});

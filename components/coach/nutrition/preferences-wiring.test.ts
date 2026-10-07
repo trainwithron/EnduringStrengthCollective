@@ -68,7 +68,8 @@ describe("no unsafe option is ever created", () => {
   });
   it("the generator sends the client id (never the rules) and filters library options, fallback options and AI options", () => {
     expect(generator).toContain("athleteId,");
-    expect(generator).not.toMatch(/body: JSON\.stringify\(\{[^}]*allergies/);
+    // The saved rules are never sent (the server reads them itself); only the items the coach typed in the note are, and the server can only add them.
+    expect(generator).not.toMatch(/body: JSON\.stringify\(\{[^}]*(?:foodRules|effectiveRules)/);
     // Library options are chosen by the library-first selection, which checks the client's rules on what each meal really contains (lib/library-selection.ts).
     expect(generator).toContain("generateLibraryDay(");
     expect(generator).toContain("rules: effectiveRules");

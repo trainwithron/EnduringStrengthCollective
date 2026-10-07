@@ -4,6 +4,8 @@
 // time. Pure date math + JSON-merge logic, kept independent of Supabase
 // so it's directly testable.
 
+import { EDITED_BY_HAND_RATIONALE, LIBRARY_WEEK_RATIONALE } from "@/lib/week-replace";
+
 export interface MealRecipeChoice {
   recipeId: string | null;
   recipeName: string | null;
@@ -183,5 +185,8 @@ export function mergeMealIntoPlan(
   const idx = bucketMeals.findIndex((m) => m.mealId === entry.mealId);
   if (idx >= 0) bucketMeals[idx] = entry;
   else bucketMeals.push(entry);
-  return { ...base, meals: { ...base.meals, [bucket]: bucketMeals } };
+  // A day the library built (its rationale says so) that a coach then changes by hand is no longer the library's: it is relabelled, so the next "Build the week" asks before it
+  // replaces it instead of overwriting the coach's edit.
+  const rationale = base.rationale === LIBRARY_WEEK_RATIONALE ? EDITED_BY_HAND_RATIONALE : base.rationale;
+  return { ...base, rationale, meals: { ...base.meals, [bucket]: bucketMeals } };
 }
