@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { establishSessionFromLink } from "@/lib/auth-link-client";
 
@@ -26,9 +27,9 @@ export function LinkConflictNotice({ currentEmail }: { currentEmail: string }) {
           <button type="button" onClick={useTheLink} disabled={busy} className="h-11 px-6 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-50">
             {busy ? "Switching…" : "Use this link"}
           </button>
-          <a href="/" className="h-11 flex items-center justify-center border border-steel/40 text-chalk font-body text-sm">
+          <Link href="/" className="h-11 flex items-center justify-center border border-steel/40 text-chalk font-body text-sm">
             Stay signed in as {currentEmail}
-          </a>
+          </Link>
         </div>
       </div>
     </main>
