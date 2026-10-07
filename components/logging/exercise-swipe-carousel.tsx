@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
 import type { TrackedField } from "@/lib/exercise-fields";
@@ -83,6 +83,20 @@ export function ExerciseSwipeCarousel({
   const scrollerRef = useRef<HTMLDivElement>(null);
   const dotsRef = useRef<HTMLDivElement>(null);
   const scrubIndexRef = useRef<number | null>(null);
+  // The scroller is as tall as the ACTIVE card, not the tallest card in the day. A flex row stretches every card to the tallest one (and reserves that height
+  // for the row), which left a large empty dark area inside a short card (Johann, beta: "quite a bit of room at the bottom"). The height is measured, so it
+  // follows the card as sets are added or removed and when the next exercise comes into view.
+  const [activeHeight, setActiveHeight] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const slide = scrollerRef.current?.children[activeIndex] as HTMLElement | undefined;
+    if (!slide) return;
+    const measure = () => setActiveHeight(slide.offsetHeight);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(slide);
+    return () => ro.disconnect();
+  }, [activeIndex, exercises.length]);
 
   function scrollToIndex(index: number) {
     const scroller = scrollerRef.current;
@@ -194,8 +208,8 @@ export function ExerciseSwipeCarousel({
       <div
         ref={scrollerRef}
         onScroll={handleScroll}
-        className="flex overflow-x-auto snap-x snap-mandatory scroll-smooth -mx-5 px-5 gap-4"
-        style={{ scrollbarWidth: "none" }}
+        className="flex items-start overflow-x-auto overflow-y-hidden snap-x snap-mandatory scroll-smooth -mx-5 px-5 gap-4"
+        style={{ scrollbarWidth: "none", height: activeHeight ?? undefined }}
       >
         {exercises.map((exercise) => {
           const expanded = expandedId === exercise.id;

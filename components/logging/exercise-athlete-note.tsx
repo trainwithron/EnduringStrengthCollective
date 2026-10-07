@@ -3,13 +3,10 @@
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 
-// coach_dashboard_redesign_scoping.md's injury-keyword-flag prerequisite
-// — a plain, low-friction place for an athlete to leave a note on this
-// exact exercise instance ("shoulder felt off today"), separate from the
-// heavier video-comment system. Collapsed by default (most exercises get
-// no note at all) so it never adds visual weight to normal logging;
-// blur-persist, same immediate-save convention as
-// components/coach/athlete-notes-editor.tsx.
+// A place for an athlete to leave a note on this exact exercise instance ("shoulder felt off today"), separate from the heavier video-comment system
+// (coach_dashboard_redesign_scoping.md's injury-keyword-flag prerequisite). It used to be a small "+ Add a note" link that was easy to miss; a beta client
+// suggested a more prominent note section, so it is now a VISIBLE field: a labelled box that is always there while logging, two lines tall, saved when
+// the athlete leaves it (the same blur-persist convention as components/coach/athlete-notes-editor.tsx). The text is 16 px so a phone does not zoom in on focus.
 export function ExerciseAthleteNote({
   sessionExerciseId,
   initialNote,
@@ -20,22 +17,24 @@ export function ExerciseAthleteNote({
   readOnly: boolean;
 }) {
   const [saved, setSaved] = useState(initialNote);
-  const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(initialNote ?? "");
-  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   async function handleBlur() {
-    setEditing(false);
     const trimmed = draft.trim();
     if (trimmed === (saved ?? "")) return;
-    setSaving(true);
+    setStatus("saving");
     const supabase = createBrowserClient();
     const { error } = await supabase
       .from("session_exercises")
       .update({ athlete_note: trimmed || null })
       .eq("id", sessionExerciseId);
-    setSaving(false);
-    if (!error) setSaved(trimmed || null);
+    if (error) {
+      setStatus("error");
+      return;
+    }
+    setSaved(trimmed || null);
+    setStatus("saved");
   }
 
   if (readOnly) {
@@ -43,33 +42,30 @@ export function ExerciseAthleteNote({
     return <p className="font-body text-xs text-steel mb-2 italic">Note: {saved}</p>;
   }
 
-  if (editing) {
-    return (
-      <div className="mb-2">
-        <textarea
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={handleBlur}
-          autoFocus
-          rows={2}
-          placeholder="Anything worth noting on this exercise today?"
-          className="w-full bg-surface border border-steel/30 text-chalk px-2 py-1.5 font-body text-xs focus:outline-none focus:border-rust resize-none"
-        />
-        {saving && <p className="font-body text-xs text-steel mt-1">Saving…</p>}
-      </div>
-    );
-  }
-
+  const fieldId = `note-${sessionExerciseId}`;
   return (
-    <button
-      type="button"
-      onClick={() => {
-        setDraft(saved ?? "");
-        setEditing(true);
-      }}
-      className="font-body text-xs text-steel active:text-rust transition-colors mb-2 block"
-    >
-      {saved ? `Note: ${saved}` : "+ Add a note"}
-    </button>
+    <div className="mb-3">
+      <div className="flex items-center justify-between mb-1">
+        <label htmlFor={fieldId} className="font-body text-xs text-steel uppercase tracking-wide">
+          Your notes
+        </label>
+        <span className="font-body text-xs text-steel" role="status" aria-live="polite">
+          {status === "saving" ? "Saving…" : status === "saved" ? "Saved" : status === "error" ? "Couldn't save, try again" : ""}
+        </span>
+      </div>
+      <textarea
+        id={fieldId}
+        value={draft}
+        onChange={(e) => {
+          setDraft(e.target.value);
+          if (status !== "idle") setStatus("idle");
+        }}
+        onBlur={handleBlur}
+        rows={2}
+        maxLength={1000}
+        placeholder="How did it feel? Anything your coach should know?"
+        className="w-full min-h-[64px] bg-surface border border-steel/30 text-chalk px-3 py-2 font-body text-base focus:outline-none focus:border-rust resize-none"
+      />
+    </div>
   );
 }

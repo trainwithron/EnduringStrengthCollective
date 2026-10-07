@@ -188,7 +188,7 @@ export function ExerciseVerticalCarousel({
       <div
         ref={scrollerRef}
         onScroll={handleScroll}
-        className="flex flex-col overflow-y-auto snap-y snap-mandatory scroll-smooth gap-4 h-[65vh]"
+        className="flex flex-col overflow-y-auto snap-y snap-mandatory scroll-smooth gap-4 max-h-[65vh]"
         style={{ scrollbarWidth: "none" }}
       >
         {exercises.map((exercise) => {
