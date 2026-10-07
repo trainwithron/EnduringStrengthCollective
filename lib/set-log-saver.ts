@@ -6,6 +6,10 @@
 // exactly one row was updated — a 0-row update (RLS, a deleted row) is a
 // failure, not a success.
 
+// A queued change with this key set to true means "delete this set" instead of "update it": removing a set rides the same retry queue, so
+// it survives a bad signal exactly like a logged value does. A delete wins over any update queued for the same set.
+export const SET_LOG_DELETE = "__delete";
+
 export type SetLogWrite = (id: string, payload: Record<string, unknown>) => Promise<boolean>;
 
 export interface SetLogSaverOptions {
@@ -180,4 +184,29 @@ export async function writeSetLogRow(
 ): Promise<boolean> {
   const { data, error } = await client.from("set_logs").update(payload).eq("id", id).select("id");
   return !error && Array.isArray(data) && data.length === 1;
+}
+
+// Delete one set. A row that is already gone counts as done (a retry after a delete that actually landed must not fail forever); an error, such as
+// the database refusing the change to a finished workout, is a failure and stays visible as "not saved".
+export async function deleteSetLogRow(
+  client: {
+    from: (table: string) => {
+      delete: () => {
+        eq: (c: string, v: string) => { select: (cols: string) => PromiseLike<{ data: unknown[] | null; error: unknown }> };
+      };
+    };
+  },
+  id: string
+): Promise<boolean> {
+  const { error } = await client.from("set_logs").delete().eq("id", id).select("id");
+  return !error;
+}
+
+// Routes one queued change to the right write.
+export async function writeOrDeleteSetLogRow(
+  client: Parameters<typeof writeSetLogRow>[0] & Parameters<typeof deleteSetLogRow>[0],
+  id: string,
+  payload: Record<string, unknown>
+): Promise<boolean> {
+  return payload[SET_LOG_DELETE] === true ? deleteSetLogRow(client, id) : writeSetLogRow(client, id, payload);
 }

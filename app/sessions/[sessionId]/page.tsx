@@ -120,6 +120,7 @@ export default async function SessionPage(
     .map((se: any) => se.group_workout_exercise_id)
     .filter((id: string | null): id is string => id != null);
 
+  const prescribedSetCountByExercise = new Map<string, number>();
   const targetsByExerciseAndOrder = new Map<
     string,
     {
@@ -143,6 +144,7 @@ export default async function SessionPage(
       )
       .in("group_workout_exercise_id", templateExerciseIds);
     for (const t of templateSets ?? []) {
+      prescribedSetCountByExercise.set(t.group_workout_exercise_id, (prescribedSetCountByExercise.get(t.group_workout_exercise_id) ?? 0) + 1);
       targetsByExerciseAndOrder.set(`${t.group_workout_exercise_id}:${t.set_order}`, {
         rpe: t.target_rpe,
         rir: t.target_rir,
@@ -319,6 +321,7 @@ export default async function SessionPage(
         equipmentType: (media?.equipmentType as SessionExerciseEntry["equipmentType"]) ?? null,
         notes: se.group_workout_exercises?.notes ?? null,
         athleteNote: se.athlete_note ?? null,
+        prescribedSetCount: se.group_workout_exercise_id ? prescribedSetCountByExercise.get(se.group_workout_exercise_id) ?? null : null,
         priorBest: priorBestByExerciseName.get(se.exercise_name) ?? {
           maxWeight: null,
           maxReps: null,

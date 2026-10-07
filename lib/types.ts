@@ -103,6 +103,9 @@ export interface SessionExerciseEntry {
   // (e.g. the coach-builder preview), same convention as priorBest.
   athleteNote?: string | null;
   sets: SetLogEntry[];
+  // How many sets the coach prescribed for this exercise (the program's own count), so the Sets stepper can say "Prescribed 4" when the athlete did 3.
+  // Optional/undefined for an exercise with no program behind it (one the athlete added) and on any render path that does not compute it.
+  prescribedSetCount?: number | null;
   // This athlete's real all-time best (weight/reps/single-set volume) on
   // this exact exercise name, from every other completed session — the
   // obstacle-unlock mechanic's PR-path input (lib/obstacle-unlock.ts).

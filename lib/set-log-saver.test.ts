@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { SetLogSaver, writeSetLogRow } from "@/lib/set-log-saver";
+import { SetLogSaver, SET_LOG_DELETE, deleteSetLogRow, writeOrDeleteSetLogRow, writeSetLogRow } from "@/lib/set-log-saver";
 
 // A manual scheduler so retries run exactly when the test says.
 function manualScheduler() {
@@ -167,5 +167,72 @@ describe("discard", () => {
     expect(saver.unsaved).toEqual([]);
     expect(saver.failed).toEqual([]);
     expect(await saver.flush()).toBe(true);
+  });
+});
+
+describe("removing a set rides the same queue", () => {
+  it("queues a delete, retries it on a bad signal, and clears it once the database confirms", async () => {
+    const sched = manualScheduler();
+    let up = false;
+    const write = vi.fn(async (_id: string, payload: Record<string, unknown>) => up && payload[SET_LOG_DELETE] === true);
+    const saver = new SetLogSaver({ write, ...sched, backoffMs: [1000] });
+    saver.queue("s3", { [SET_LOG_DELETE]: true });
+    await tick();
+    expect(saver.unsaved).toEqual(["s3"]);
+    expect(saver.failed).toEqual(["s3"]);
+    up = true;
+    saver.retryAll();
+    await tick();
+    expect(saver.unsaved).toEqual([]);
+  });
+
+  it("a delete wins over an edit queued for the same set", async () => {
+    const write = vi.fn(async (_id: string, _payload: Record<string, unknown>) => false);
+    const saver = new SetLogSaver({ write, backoffMs: [] });
+    saver.queue("s3", { reps: 5 });
+    saver.queue("s3", { [SET_LOG_DELETE]: true });
+    await tick();
+    saver.retryAll();
+    await tick();
+    const calls = write.mock.calls;
+    expect(calls[calls.length - 1][1][SET_LOG_DELETE]).toBe(true);
+  });
+});
+
+describe("deleteSetLogRow / writeOrDeleteSetLogRow", () => {
+  function client(result: { data: unknown[] | null; error: unknown }, seen: string[] = []) {
+    return {
+      from: (table: string) => ({
+        update: () => ({
+          eq: () => ({
+            select: async () => {
+              seen.push(`update ${table}`);
+              return result;
+            },
+          }),
+        }),
+        delete: () => ({
+          eq: (_c: string, v: string) => ({
+            select: async () => {
+              seen.push(`delete ${table} ${v}`);
+              return result;
+            },
+          }),
+        }),
+      }),
+    };
+  }
+  it("a delete counts as done whether one row or none was left to delete (a retry after it landed must not fail forever)", async () => {
+    expect(await deleteSetLogRow(client({ data: [{ id: "s3" }], error: null }), "s3")).toBe(true);
+    expect(await deleteSetLogRow(client({ data: [], error: null }), "s3")).toBe(true);
+  });
+  it("a database error (for example a finished workout) stays a failure", async () => {
+    expect(await deleteSetLogRow(client({ data: null, error: { message: "blocked" } }), "s3")).toBe(false);
+  });
+  it("routes a delete marker to a delete and anything else to an update", async () => {
+    const seen: string[] = [];
+    await writeOrDeleteSetLogRow(client({ data: [{ id: "s3" }], error: null }, seen), "s3", { [SET_LOG_DELETE]: true });
+    await writeOrDeleteSetLogRow(client({ data: [{ id: "s3" }], error: null }, seen), "s3", { reps: 5 });
+    expect(seen).toEqual(["delete set_logs s3", "update set_logs"]);
   });
 });

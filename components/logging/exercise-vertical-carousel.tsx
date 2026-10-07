@@ -29,6 +29,7 @@ export function ExerciseVerticalCarousel({
   readOnly,
   onSetChange,
   onSetAdded,
+  onSetRemoved,
   onRenamed,
   onTrackedFieldsChange,
   onDelete,
@@ -49,6 +50,7 @@ export function ExerciseVerticalCarousel({
   readOnly: boolean;
   onSetChange: (exerciseId: string, setId: string, patch: Partial<SetLogEntry>) => void;
   onSetAdded: (exerciseId: string, set: SetLogEntry) => void;
+  onSetRemoved: (exerciseId: string, setId: string) => void;
   onRenamed: (exerciseId: string, name: string) => void;
   onTrackedFieldsChange: (exerciseId: string, fields: TrackedField[]) => void;
   onDelete: (exerciseId: string) => void;
@@ -223,6 +225,7 @@ export function ExerciseVerticalCarousel({
                 readOnly={readOnly}
                 onSetChange={(setId, patch) => onSetChange(exercise.id, setId, patch)}
                 onSetAdded={(set) => onSetAdded(exercise.id, set)}
+                onSetRemoved={(setId) => onSetRemoved(exercise.id, setId)}
                 onRenamed={(name) => onRenamed(exercise.id, name)}
                 onTrackedFieldsChange={(fields) => onTrackedFieldsChange(exercise.id, fields)}
                 onDelete={() => onDelete(exercise.id)}

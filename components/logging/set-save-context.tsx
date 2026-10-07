@@ -2,13 +2,17 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { SetLogSaver, writeSetLogRow } from "@/lib/set-log-saver";
+import { SetLogSaver, SET_LOG_DELETE, writeOrDeleteSetLogRow, writeSetLogRow } from "@/lib/set-log-saver";
 
 interface SetSaveApi {
   // Queue a set_logs change. The value stays on screen; failures retry.
   save: (setId: string, payload: Record<string, unknown>) => void;
+  // Remove a set: queued like any other change, retried until the database confirms.
+  remove: (setId: string) => void;
   // Sets whose last save failed (shown as "not saved").
   failedIds: Set<string>;
+  // Sets with anything still waiting to save (a removal that has not landed yet is in here).
+  unsavedIds: Set<string>;
   unsavedCount: number;
   retryAll: () => void;
   // Drop pending saves for sets that were deleted.
@@ -25,7 +29,11 @@ const FALLBACK: SetSaveApi = {
   save: (setId, payload) => {
     void writeSetLogRow(createBrowserClient() as never, setId, payload);
   },
+  remove: (setId) => {
+    void writeOrDeleteSetLogRow(createBrowserClient() as never, setId, { [SET_LOG_DELETE]: true });
+  },
   failedIds: new Set(),
+  unsavedIds: new Set(),
   unsavedCount: 0,
   retryAll: () => {},
   discard: () => {},
@@ -39,14 +47,16 @@ export function useSetSave(): SetSaveApi {
 export function SetSaveProvider({ children }: { children: React.ReactNode }) {
   const [failedIds, setFailedIds] = useState<Set<string>>(new Set());
   const [unsavedCount, setUnsavedCount] = useState(0);
+  const [unsavedIds, setUnsavedIds] = useState<Set<string>>(new Set());
 
   const saverRef = useRef<SetLogSaver | null>(null);
   if (!saverRef.current) {
     const supabase = createBrowserClient();
     saverRef.current = new SetLogSaver({
-      write: (id, payload) => writeSetLogRow(supabase as never, id, payload),
+      write: (id, payload) => writeOrDeleteSetLogRow(supabase as never, id, payload),
       onChange: ({ unsaved, failed }) => {
         setUnsavedCount(unsaved.length);
+        setUnsavedIds(new Set(unsaved));
         setFailedIds(new Set(failed));
       },
     });
@@ -72,13 +82,14 @@ export function SetSaveProvider({ children }: { children: React.ReactNode }) {
   }, [unsavedCount]);
 
   const save = useCallback((id: string, payload: Record<string, unknown>) => saver.queue(id, payload), [saver]);
+  const remove = useCallback((id: string) => saver.queue(id, { [SET_LOG_DELETE]: true }), [saver]);
   const retryAll = useCallback(() => saver.retryAll(), [saver]);
   const flush = useCallback(() => saver.flush(), [saver]);
   const discard = useCallback((ids: string[]) => saver.discard(ids), [saver]);
 
   const api = useMemo<SetSaveApi>(
-    () => ({ save, failedIds, unsavedCount, retryAll, discard, flush }),
-    [save, failedIds, unsavedCount, retryAll, discard, flush]
+    () => ({ save, remove, failedIds, unsavedIds, unsavedCount, retryAll, discard, flush }),
+    [save, remove, failedIds, unsavedIds, unsavedCount, retryAll, discard, flush]
   );
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;

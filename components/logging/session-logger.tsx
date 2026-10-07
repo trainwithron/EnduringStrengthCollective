@@ -145,8 +145,13 @@ export function SessionLogger({
     }));
   }
 
+  // Kept in set order, so a set put back by Undo lands where it was.
   function handleSetAdded(exerciseId: string, set: SetLogEntry) {
-    updateExercise(exerciseId, (ex) => ({ ...ex, sets: [...ex.sets, set] }));
+    updateExercise(exerciseId, (ex) => ({ ...ex, sets: [...ex.sets, set].sort((a, b) => a.setOrder - b.setOrder) }));
+  }
+
+  function handleSetRemoved(exerciseId: string, setId: string) {
+    updateExercise(exerciseId, (ex) => ({ ...ex, sets: ex.sets.filter((s) => s.id !== setId) }));
   }
 
   function handleRenamed(exerciseId: string, name: string) {
@@ -265,6 +270,7 @@ export function SessionLogger({
           readOnly={isCompleted}
           onSetChange={handleSetChange}
           onSetAdded={handleSetAdded}
+          onSetRemoved={handleSetRemoved}
           onRenamed={handleRenamed}
           onTrackedFieldsChange={handleTrackedFieldsChange}
           onDelete={handleDeleteExercise}
@@ -287,6 +293,7 @@ export function SessionLogger({
           readOnly={isCompleted}
           onSetChange={handleSetChange}
           onSetAdded={handleSetAdded}
+          onSetRemoved={handleSetRemoved}
           onRenamed={handleRenamed}
           onTrackedFieldsChange={handleTrackedFieldsChange}
           onDelete={handleDeleteExercise}

@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
 import { TRACKED_FIELD_DEFS, ACTUAL_COLUMN, ACTUAL_PROP, fieldDef, type TrackedField } from "@/lib/exercise-fields";
 import { ExerciseSetGrid } from "./exercise-set-grid";
+import { SetStepper } from "./set-stepper";
+import { UNDO_REMOVE_SET_MS, canRemoveSet, lastSet, prescribedNote, removeSetConfirmText, restoreSetRow, setHasLoggedWork } from "@/lib/set-removal";
 import { useSetSave } from "./set-save-context";
 import { classifyEquipmentType } from "@/lib/equipment-classifier";
 import { ExerciseVideoThread } from "./exercise-video-thread";
@@ -26,6 +28,7 @@ export function ExerciseCard({
   readOnly,
   onSetChange,
   onSetAdded,
+  onSetRemoved,
   onRenamed,
   onTrackedFieldsChange,
   onDelete,
@@ -44,6 +47,7 @@ export function ExerciseCard({
   readOnly: boolean;
   onSetChange: (setId: string, patch: Partial<SetLogEntry>) => void;
   onSetAdded: (set: SetLogEntry) => void;
+  onSetRemoved: (setId: string) => void;
   onRenamed: (name: string) => void;
   onTrackedFieldsChange: (fields: TrackedField[]) => void;
   onDelete?: () => void;
@@ -56,7 +60,7 @@ export function ExerciseCard({
   onSetCompleted?: (set: SetLogEntry) => void;
   gamificationEnabled?: boolean;
 }) {
-  const { discard: discardPendingSaves } = useSetSave();
+  const { discard: discardPendingSaves, remove: removeSetRow, unsavedIds } = useSetSave();
   // The demo is found from the exercise's current name (so a swapped or added exercise has one too); a client can hide the button in Settings.
   const demoLibrary = useDemoLibrary();
   const openDemo = useOpenDemo();
@@ -76,6 +80,14 @@ export function ExerciseCard({
   // two set_logs rows with the same set_order (found and fixed for the
   // coach-builder equivalent of this same bug tonight).
   const [addSetBusy, setAddSetBusy] = useState(false);
+  // Taking a set off: a logged set asks first (confirmRemoveId), then can be put back for a few seconds (removed).
+  const [confirmRemoveId, setConfirmRemoveId] = useState<string | null>(null);
+  const [removed, setRemoved] = useState<{ set: SetLogEntry; error?: string } | null>(null);
+  useEffect(() => {
+    if (!removed) return;
+    const t = setTimeout(() => setRemoved(null), UNDO_REMOVE_SET_MS);
+    return () => clearTimeout(t);
+  }, [removed]);
   const [fieldsOpen, setFieldsOpen] = useState(false);
   const [fieldsBusy, setFieldsBusy] = useState(false);
   // Phase 3 (custom_shape_theming_idea.md) — the per-set equipment-visual
@@ -169,6 +181,39 @@ export function ExerciseCard({
     } finally {
       setAddSetBusy(false);
     }
+  }
+
+  // The minus on the Sets stepper: takes the LAST set off. An untouched set goes at once; a logged one asks first. An exercise keeps at least one set.
+  function handleRemoveLastSet() {
+    if (!canRemoveSet(exercise.sets)) return;
+    const target = lastSet(exercise.sets);
+    if (!target) return;
+    if (setHasLoggedWork(target) && confirmRemoveId !== target.id) {
+      setConfirmRemoveId(target.id);
+      return;
+    }
+    removeLastSet(target);
+  }
+
+  function removeLastSet(target: SetLogEntry) {
+    setConfirmRemoveId(null);
+    // Queued like any other logging write: it keeps retrying on a bad signal, and Complete workout waits for it.
+    removeSetRow(target.id);
+    onSetRemoved(target.id);
+    setRemoved(setHasLoggedWork(target) ? { set: target } : null);
+  }
+
+  async function handleUndoRemove() {
+    if (!removed || unsavedIds.has(removed.set.id)) return;
+    const snapshot = removed.set;
+    const supabase = createBrowserClient();
+    const { error } = await supabase.from("set_logs").insert(restoreSetRow(snapshot, exercise.id));
+    if (error) {
+      setRemoved({ set: snapshot, error: "Couldn't put it back. Add a set instead." });
+      return;
+    }
+    onSetAdded(snapshot);
+    setRemoved(null);
   }
 
   // Which metrics this exercise actually tracks is a per-session-instance
@@ -430,14 +475,33 @@ export function ExerciseCard({
       />
 
       {!readOnly && (
-        <button
-          type="button"
-          onClick={handleAddSet}
-          disabled={addSetBusy}
-          className="mt-2 font-body text-xs text-steel active:text-rust transition-colors disabled:opacity-40"
-        >
-          + Add set
-        </button>
+        <SetStepper
+          count={exercise.sets.length}
+          canRemove={canRemoveSet(exercise.sets)}
+          addBusy={addSetBusy}
+          onAdd={handleAddSet}
+          onRemove={handleRemoveLastSet}
+          prescribedNote={prescribedNote(exercise.prescribedSetCount, exercise.sets.length)}
+          confirmText={
+            confirmRemoveId && lastSet(exercise.sets)?.id === confirmRemoveId
+              ? removeSetConfirmText(exercise.sets.findIndex((s) => s.id === confirmRemoveId) + 1)
+              : null
+          }
+          onConfirmRemove={() => {
+            const target = lastSet(exercise.sets);
+            if (target) removeLastSet(target);
+          }}
+          onKeep={() => setConfirmRemoveId(null)}
+          undo={
+            removed
+              ? {
+                  text: removed.error ?? `Set ${removed.set.setOrder + 1} removed.`,
+                  pending: unsavedIds.has(removed.set.id),
+                  onUndo: handleUndoRemove,
+                }
+              : null
+          }
+        />
       )}
 
       <ExerciseVideoThread
