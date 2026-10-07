@@ -12,9 +12,11 @@ import { TOP_OFFSET, useWorkspace } from "./workspace-context";
 export function WorkspaceDock() {
   const ws = useWorkspace();
   const dragRef = useRef<{ pointerId: number } | null>(null);
-  if (!ws || !ws.enabled || !ws.ready || ws.dockWidth === 0) return null;
+  if (!ws || !ws.enabled || !ws.ready || ws.layout.dock.panes.length === 0) return null;
   const { dock } = ws.layout;
-  const width = ws.dockWidth;
+  // Closed, or no coach page on screen: hidden, never unmounted (what is loaded in the panes, and anything typed in them, stays).
+  const shown = ws.dockWidth > 0;
+  const width = ws.dockWidth || dock.width;
 
   function onDividerDown(e: React.PointerEvent<HTMLDivElement>) {
     e.preventDefault();
@@ -59,7 +61,7 @@ export function WorkspaceDock() {
 
   const small = "w-9 h-10 shrink-0 flex items-center justify-center text-steel hover:text-chalk";
   return (
-    <aside aria-label="Workspace panel" className="hidden lg:flex fixed right-0 z-30 flex-col border-l border-steel/20 bg-graphite" style={{ width, top: TOP_OFFSET, height: `calc(100vh - ${TOP_OFFSET}px)` }}>
+    <aside aria-label="Workspace panel" className={`${shown ? "hidden lg:flex" : "hidden"} fixed right-0 z-30 flex-col border-l border-steel/20 bg-graphite`} style={{ width, top: TOP_OFFSET, height: `calc(100vh - ${TOP_OFFSET}px)` }}>
       <div
         role="separator"
         aria-orientation="vertical"

@@ -41,6 +41,14 @@ describe("one vocabulary: what clients and visitors read", () => {
     expect(files.length).toBeGreaterThan(20);
   });
 
+  // A listed place that does not exist is scanned as nothing and the check would pass anyway (it happened when the coach areas moved into the (coach) route group).
+  it("every listed place exists and holds files to scan", () => {
+    for (const rel of CLIENT_FACING_PATHS) {
+      expect(existsSync(join(root, rel)), `${rel} does not exist: fix lib/vocabulary.ts`).toBe(true);
+      expect(filesUnder(rel).length, `${rel} holds no files to scan`).toBeGreaterThan(0);
+    }
+  });
+
   for (const rule of CLIENT_FACING_RULES) {
     it(`says ${rule.use}`, () => {
       const offenders: string[] = [];

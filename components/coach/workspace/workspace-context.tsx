@@ -16,6 +16,7 @@ import {
 } from "@/lib/workspace-layout";
 import type { WorkspaceDestination } from "@/lib/workspace-destinations";
 import { readCardStackLayout, readLayoutMode } from "@/lib/coach-shell-panel-storage";
+import { clearWorkspaceStorage } from "@/lib/workspace-layout";
 import { MUTATION_MESSAGE, REFRESH_MESSAGE, SIGNED_OUT_MESSAGE, createRefreshLimiter, debounce, installMutationReporter, paneActivity } from "@/lib/workspace-mutation";
 
 // The unified workspace's state for one coach in one browser: what is open in the right-hand panel and as floating cards (lib/workspace-layout.ts holds the rules),
@@ -53,6 +54,8 @@ interface WorkspaceApi {
   refreshNow: () => void;
   // A pane found the session has ended.
   signedOut: boolean;
+  // No coach page is on screen right now (an athlete page, say): the workspace is kept, but hidden, never torn down.
+  suspended: boolean;
 }
 
 const Ctx = createContext<WorkspaceApi | null>(null);
@@ -70,12 +73,14 @@ export function WorkspaceProvider({
   groupId,
   groupName,
   isShared,
+  suspended,
   children,
 }: {
   coachId: string | null;
   groupId: string;
   groupName: string;
   isShared: boolean;
+  suspended: boolean;
   children: React.ReactNode;
 }) {
   const router = useRouter();
@@ -85,6 +90,8 @@ export function WorkspaceProvider({
   const [viewport, setViewport] = useState({ width: 1440, height: 900 });
   const [refreshPaused, setRefreshPaused] = useState(false);
   const [signedOut, setSignedOut] = useState(false);
+  // After the session ends nothing more is saved (and what was saved is cleared): a signed-out browser keeps no client names.
+  const sessionEnded = useRef(false);
   const frames = useRef(new Map<string, HTMLIFrameElement>());
   const tabId = useRef(newId());
   // The layout a message from another tab carried: when our state becomes exactly that, it is not sent back out.
@@ -145,6 +152,7 @@ export function WorkspaceProvider({
   useEffect(() => {
     if (!ready || !coachId) return;
     const timer = setTimeout(() => {
+      if (sessionEnded.current) return;
       writeLayout(coachId, stored, window.localStorage);
       if (echoOf.current !== null && JSON.stringify(stored) === echoOf.current) {
         echoOf.current = null;
@@ -159,10 +167,10 @@ export function WorkspaceProvider({
 
   // The panel's width, and the room it takes from the page (the page keeps this much clear on its right: see the shell's main).
   const dockWidth = useMemo(() => {
-    if (!enabled || !ready || viewport.width < 1024) return 0;
+    if (!enabled || !ready || suspended || viewport.width < 1024) return 0;
     if (!layout.dock.open || layout.dock.panes.length === 0) return 0;
     return Math.min(layout.dock.width, Math.max(300, viewport.width - RAIL_WIDTH - 360));
-  }, [enabled, ready, layout.dock.open, layout.dock.panes.length, layout.dock.width, viewport.width]);
+  }, [enabled, ready, suspended, layout.dock.open, layout.dock.panes.length, layout.dock.width, viewport.width]);
   useEffect(() => {
     document.documentElement.style.setProperty("--ws-dock", `${dockWidth}px`);
     return () => {
@@ -183,13 +191,14 @@ export function WorkspaceProvider({
   // Which panes the coach can see right now. A pane that is hidden (another tab, a closed panel, a minimized card) is not refreshed; it is refreshed when it is shown.
   const visibleIds = useMemo(() => {
     const ids = new Set<string>();
+    if (suspended) return ids;
     if (layout.dock.open) {
       const active = layout.dock.panes.find((p) => p.id === layout.dock.activeId) ?? layout.dock.panes[0];
       if (active) ids.add(active.id);
     }
     for (const c of layout.floating) if (!c.minimized) ids.add(c.id);
     return ids;
-  }, [layout]);
+  }, [layout, suspended]);
   const visibleRef = useRef(visibleIds);
   visibleRef.current = visibleIds;
   const stale = useRef(new Set<string>());
@@ -264,6 +273,8 @@ export function WorkspaceProvider({
       if (!known) return;
       if (e.data?.type === SIGNED_OUT_MESSAGE) {
         setSignedOut(true);
+        sessionEnded.current = true;
+        clearWorkspaceStorage(window.localStorage);
         return;
       }
       if (e.data?.type !== MUTATION_MESSAGE || Date.now() < quietUntil.current) return;
@@ -310,8 +321,8 @@ export function WorkspaceProvider({
   );
 
   const api = useMemo<WorkspaceApi>(
-    () => ({ ready, enabled, layout, viewportWidth: viewport.width, area, dockWidth, dispatch, openDest, pickerOpen, setPickerOpen, groupId, groupName, isShared, registerFrame, requestClose, refreshPaused, refreshNow, signedOut }),
-    [ready, enabled, layout, viewport.width, area, dockWidth, openDest, pickerOpen, groupId, groupName, isShared, registerFrame, requestClose, refreshPaused, refreshNow, signedOut]
+    () => ({ ready, enabled, layout, viewportWidth: viewport.width, area, dockWidth, dispatch, openDest, pickerOpen, setPickerOpen, groupId, groupName, isShared, registerFrame, requestClose, refreshPaused, refreshNow, signedOut, suspended }),
+    [ready, enabled, layout, viewport.width, area, dockWidth, openDest, pickerOpen, groupId, groupName, isShared, registerFrame, requestClose, refreshPaused, refreshNow, signedOut, suspended]
   );
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
 }

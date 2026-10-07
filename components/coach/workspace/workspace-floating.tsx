@@ -13,9 +13,10 @@ const TITLE_HEIGHT = 36;
 export function WorkspaceFloating() {
   const ws = useWorkspace();
   if (!ws || !ws.enabled || !ws.ready || ws.layout.floating.length === 0) return null;
+  // With no coach page on screen the cards are hidden, not unmounted (what is loaded in them stays).
   const { floating } = ws.layout;
   return (
-    <div className="hidden lg:block fixed z-40 pointer-events-none" style={{ left: RAIL_WIDTH, top: TOP_OFFSET, width: ws.area.width, height: ws.area.height }}>
+    <div className={`${ws.suspended ? "hidden" : "hidden lg:block"} fixed z-40 pointer-events-none`} style={{ left: RAIL_WIDTH, top: TOP_OFFSET, width: ws.area.width, height: ws.area.height }}>
       {floating.map((card, index) => (
         <Card key={card.id} card={card} z={10 + index} />
       ))}

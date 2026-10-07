@@ -7,8 +7,10 @@
 
 const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
-// The app's own routes that SAVE coach or client data. Anything else under /api (chat, AI, search, calculators, push, health...) is not a save.
-const SAVING_API = /^\/api\/(clients|invites|series|bookings|credits|group-sessions|organizations|broadcast|sms|webhooks|reup|legal|account|calendar-spotter|google-calendar|coach\/(packages|package-assignments|set-swipe-direction|video-checkin))(\/|$)/;
+// The app's own routes that SAVE coach or client data. A test (workspace-mutation.test.ts) walks every route that can write and fails if a route is neither here nor in
+// that test's explicit NOT_A_SAVE list, so a new route cannot be missed by accident.
+export const SAVING_API =
+  /^\/api\/(clients|invites|bookings|credits|group-sessions|organizations|broadcast|sms|webhooks|reup|legal|account|calendar-spotter|google-calendar|zapier|assistant\/action|kiosk\/checkin|org-dispatch\/(accept|decline|reply|ask-question)|programming-spotter\/(dismiss|feedback|stop-suggesting)|coaches\/invite|series(?!\/preview)|ai\/(refund-credit|meal-plan-credit-charge|program-chat\/confirm-rule)|coach\/(packages|package-assignments|set-swipe-direction|dashboard-layout|api-key|video-checkin))(\/|$)/;
 
 // Database functions that only read (named like reads). Everything else called through /rest/v1/rpc/ is treated as a save.
 const READ_RPC = /^((get|list|search|check|is|has|can|fetch|count|find|preview)_|coach_roster|booking_counts|group_leaderboard|athlete_|coach_client_steps|coach_inbox|org_billable|org_coach_seats|group_session_counts|training_partner)/;
@@ -68,8 +70,61 @@ export const MUTATION_MESSAGE = "esc-workspace-mutated";
 export const REFRESH_MESSAGE = "esc-workspace-refresh";
 export const SIGNED_OUT_MESSAGE = "esc-workspace-signed-out";
 
-// What a page can tell the workspace that holds it: how many saves are still in flight, and whether the coach typed something that has not been saved since.
-export const paneActivity = { inFlight: 0, typed: false };
+// ---- typed text that has not been saved (so closing a pane never throws a draft away) ----
+// Only a field a person WRITES in counts (a message box, a note, a text input): not a search or filter box, a checkbox or a number stepper.
+export interface FieldInfo {
+  tag: string;
+  type?: string | null;
+  role?: string | null;
+  placeholder?: string | null;
+  ariaLabel?: string | null;
+  inSearchRegion?: boolean;
+  contentEditable?: boolean;
+}
+const WRITING_INPUT_TYPES = new Set(["text", "email", "tel", "url", "password", ""]);
+export function isDraftField(f: FieldInfo): boolean {
+  if (f.inSearchRegion || f.role === "searchbox" || f.role === "combobox") return false;
+  if (/search|filter/i.test(`${f.placeholder ?? ""} ${f.ariaLabel ?? ""}`)) return false;
+  const tag = f.tag.toUpperCase();
+  if (tag === "TEXTAREA" || f.contentEditable) return true;
+  if (tag === "INPUT") return WRITING_INPUT_TYPES.has((f.type ?? "").toLowerCase()) && (f.type ?? "").toLowerCase() !== "password";
+  return false;
+}
+
+// A field counts as saved when it was left and a save that began right after it succeeded (the app saves a field when it loses focus). An unrelated save does not
+// clear it, and a message that was never sent (no save follows) stays unsaved.
+const SAVE_AFTER_BLUR_MS = 3000;
+const dirty = new Set<Element>();
+const blurredAt = new Map<Element, number>();
+
+export function noteDraftInput(el: Element) {
+  dirty.add(el);
+  blurredAt.delete(el);
+}
+export function noteDraftBlur(el: Element, now: number = Date.now()) {
+  if (dirty.has(el)) blurredAt.set(el, now);
+}
+function clearSavedFields(writeStartedAt: number) {
+  for (const el of Array.from(dirty)) {
+    const left = blurredAt.get(el);
+    if (!el.isConnected || (left !== undefined && writeStartedAt >= left - 50 && writeStartedAt - left <= SAVE_AFTER_BLUR_MS)) {
+      dirty.delete(el);
+      blurredAt.delete(el);
+    }
+  }
+}
+export function hasUnsavedTyping(): boolean {
+  for (const el of Array.from(dirty)) if (!el.isConnected) dirty.delete(el);
+  return dirty.size > 0;
+}
+
+// What a page can tell the workspace that holds it: how many saves are still in flight, and whether anything typed was never saved.
+export const paneActivity = {
+  inFlight: 0,
+  get typed(): boolean {
+    return hasUnsavedTyping();
+  },
+};
 
 const writeListeners = new Set<() => void>();
 let wrapped = false;
@@ -90,11 +145,12 @@ function ensureFetchWrapped() {
       // Reporting is never allowed to break a request.
     }
     if (!isWrite) return original.call(window, input, init);
+    const startedAt = Date.now();
     paneActivity.inFlight += 1;
     try {
       const response = await original.call(window, input, init);
       if (response.ok) {
-        paneActivity.typed = false;
+        clearSavedFields(startedAt);
         writeListeners.forEach((fn) => {
           try {
             fn();

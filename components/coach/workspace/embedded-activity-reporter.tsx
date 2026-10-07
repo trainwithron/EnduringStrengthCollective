@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { MUTATION_MESSAGE, REFRESH_MESSAGE, debounce, installMutationReporter, paneActivity } from "@/lib/workspace-mutation";
+import { MUTATION_MESSAGE, REFRESH_MESSAGE, debounce, installMutationReporter, isDraftField, noteDraftBlur, noteDraftInput, paneActivity } from "@/lib/workspace-mutation";
 
 // Inside a workspace pane. It (1) tells the page that holds the pane when something is saved here, (2) refreshes this page's data softly when asked (router.refresh,
 // which keeps what is typed), (3) lets the holder see whether saves are still going and whether typed text was never saved (so closing a pane never loses work),
@@ -32,12 +32,27 @@ export function EmbeddedActivityReporter() {
     }
     window.addEventListener("message", onMessage);
 
-    // Typed text that has not been saved since: any typing in a field, cleared by the next successful save (lib/workspace-mutation.ts).
+    // Typed text that has not been saved: only fields a person writes in (not search or filter boxes), cleared when the field is left and a save follows
+    // (lib/workspace-mutation.ts), so an unrelated save never clears it.
+    const describe = (t: HTMLElement) => ({
+      tag: t.tagName,
+      type: (t as HTMLInputElement).type ?? null,
+      role: t.getAttribute("role"),
+      placeholder: t.getAttribute("placeholder"),
+      ariaLabel: t.getAttribute("aria-label"),
+      inSearchRegion: !!t.closest('[role="search"]'),
+      contentEditable: t.isContentEditable,
+    });
     function onInput(e: Event) {
       const t = e.target as HTMLElement | null;
-      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) paneActivity.typed = true;
+      if (t && isDraftField(describe(t))) noteDraftInput(t);
+    }
+    function onBlur(e: Event) {
+      const t = e.target as HTMLElement | null;
+      if (t) noteDraftBlur(t);
     }
     document.addEventListener("input", onInput, true);
+    document.addEventListener("focusout", onBlur, true);
 
     // A link to another site would be refused in a pane (blank box): open it in a new tab.
     function onClick(e: MouseEvent) {
@@ -58,6 +73,7 @@ export function EmbeddedActivityReporter() {
       stopReporting();
       window.removeEventListener("message", onMessage);
       document.removeEventListener("input", onInput, true);
+      document.removeEventListener("focusout", onBlur, true);
       document.removeEventListener("click", onClick, true);
     };
   }, [router]);

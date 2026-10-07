@@ -31,3 +31,23 @@ describe("the workspace is mounted above the pages", () => {
     expect(read("lib/workspace-mutation.ts").trimEnd().endsWith("ensureFetchWrapped();")).toBe(true);
   });
 });
+
+describe("the workspace never depends on a page announcing the coach", () => {
+  it("the layout reads the signed-in person on the server and hands it to the host", () => {
+    const layout = read("app/(coach)/layout.tsx");
+    expect(layout).toContain("auth.getUser()");
+    expect(layout).toContain("<WorkspaceHost userId={userId}>");
+  });
+  it("the provider is keyed by the person and gets the coach from that, not from a page", () => {
+    const host = read("components/coach/workspace/workspace-host.tsx");
+    expect(host).toContain('key={userId ?? "none"}');
+    expect(host).toContain("coachId={userId && ctx ? userId : null}");
+  });
+  it("losing the page context hides the workspace, it does not unmount it", () => {
+    const host = read("components/coach/workspace/workspace-host.tsx");
+    expect(host).toContain("suspended={!shellOn}");
+    // the hide timer must not clear the kept context
+    expect(host).not.toMatch(/setCtx\(null\)/);
+    expect(read("components/coach/workspace/workspace-dock.tsx")).not.toMatch(/dockWidth === 0\) return null/);
+  });
+});
