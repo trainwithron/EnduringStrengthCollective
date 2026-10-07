@@ -350,7 +350,7 @@ export function ExerciseCard({
 
       {/* The demo thumbnail and "Last time" / history side by side, so one short row has both: glanceable, and a tap opens the demo sheet. */}
       {((demo && !demosHidden) || lastTime || (exercise.volumeHistory && exercise.volumeHistory.length > 0)) && (
-        <div className="flex items-start gap-3 mb-2">
+        <div className="flex flex-col min-[380px]:flex-row items-start gap-3 mb-2">
           {demo && !demosHidden && openDemo && (
             <DemoThumb title={exercise.exerciseName || "Exercise"} youtubeUrl={demo.youtubeUrl} onOpen={() => openDemo(exercise.id)} />
           )}
@@ -401,6 +401,7 @@ export function ExerciseCard({
         sessionExerciseId={exercise.id}
         initialNote={exercise.athleteNote ?? null}
         readOnly={readOnly}
+        ownNote={viewerId === athleteId}
       />
 
       {!readOnly && (

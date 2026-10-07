@@ -191,11 +191,14 @@ export function ExerciseVerticalCarousel({
         className="flex flex-col overflow-y-auto snap-y snap-mandatory scroll-smooth gap-4 max-h-[65vh]"
         style={{ scrollbarWidth: "none" }}
       >
-        {exercises.map((exercise) => {
+        {exercises.map((exercise, exerciseIndex) => {
           const expanded = expandedId === exercise.id;
           return (
             <div
               key={exercise.id}
+              data-exercise-id={exercise.id}
+              onFocusCapture={() => setActiveIndex(exerciseIndex)}
+              onPointerDownCapture={() => setActiveIndex(exerciseIndex)}
               className="snap-center shrink-0 border border-steel/20 bg-surface/20 p-4"
             >
               <div className="flex items-center justify-between gap-2 mb-2">
@@ -205,7 +208,7 @@ export function ExerciseVerticalCarousel({
                 <button
                   type="button"
                   onClick={() => setExpandedId(expanded ? null : exercise.id)}
-                  className="flex items-center gap-1 font-body text-xs text-steel uppercase tracking-wide active:text-rust"
+                  className="flex items-center gap-1 min-h-[44px] px-2 -mr-2 font-body text-xs text-steel uppercase tracking-wide active:text-rust"
                 >
                   {expanded ? "Less room" : "More room"}
                   {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}

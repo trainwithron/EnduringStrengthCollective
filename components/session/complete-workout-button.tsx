@@ -116,7 +116,7 @@ export function CompleteWorkoutButton({
     // total the workout — the server counts only what's actually saved.
     const allSaved = await flushSets();
     if (!allSaved) {
-      setError("Some sets haven't saved yet — check your signal, then tap Complete again. Nothing you entered is lost.");
+      setError("Some changes (a set or a note) haven't saved yet — check your signal, then tap Complete again. Nothing you entered is lost.");
       setSubmitting(false);
       return;
     }

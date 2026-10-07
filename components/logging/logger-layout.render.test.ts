@@ -51,3 +51,41 @@ describe("the exercise cards size to their content", () => {
     expect(vertical).not.toMatch(/(?<!max-)h-\[65vh\]/);
   });
 });
+
+describe("the review fixes for the layout (Assistant, Oct 7)", () => {
+  const swipe = readFileSync(new URL("./exercise-swipe-carousel.tsx", import.meta.url), "utf8");
+  const vertical = readFileSync(new URL("./exercise-vertical-carousel.tsx", import.meta.url), "utf8");
+  const card = readFileSync(new URL("./exercise-card.tsx", import.meta.url), "utf8");
+  const thumb = readFileSync(new URL("./demo-thumb.tsx", import.meta.url), "utf8");
+  const note = readFileSync(new URL("./exercise-athlete-note.tsx", import.meta.url), "utf8");
+  it("the swipe row always shows the top of the active card (a field focused in a neighbour cannot leave it scrolled), rounds the height UP, follows the right element and eases the change", () => {
+    expect(swipe).toContain("scroller.scrollTop = 0");
+    expect(swipe).toContain("Math.ceil(slide.getBoundingClientRect().height)");
+    expect(swipe).toContain("activeExerciseId");
+    expect(swipe).toContain("transition-[height]");
+    expect(swipe).toContain("motion-reduce:transition-none");
+  });
+  it("on a small phone the demo stacks above Last time (side by side from 380 px), so Last time and the volume chart keep their width", () => {
+    expect(card).toContain("flex flex-col min-[380px]:flex-row");
+    expect(thumb).toContain("w-full max-w-[208px] min-[380px]:w-40");
+  });
+  it("the vertical list marks the exercise the athlete touches or types in as the active one (when everything fits nothing scrolls)", () => {
+    expect(vertical).toContain("onFocusCapture");
+    expect(vertical).toContain("onPointerDownCapture");
+  });
+  it("More room is a 44 px target in both carousels", () => {
+    expect(swipe).toContain("min-h-[44px]");
+    expect(vertical).toContain("min-h-[44px]");
+  });
+  it("the note saves as you type, on leaving, when hidden, registers with Complete workout, and has a Retry", () => {
+    expect(note).toContain("registerPending");
+    expect(note).toContain("visibilitychange");
+    expect(note).toContain("pagehide");
+    expect(note).toContain("Retry");
+    expect(note).toContain("e.currentTarget.value");
+  });
+  it("a coach typing in a client's session sees whose note it is", () => {
+    const html = renderToStaticMarkup(createElement(ExerciseAthleteNote, { sessionExerciseId: "e2", initialNote: null, readOnly: false, ownNote: false }));
+    expect(html).toContain("Notes for this exercise");
+  });
+});

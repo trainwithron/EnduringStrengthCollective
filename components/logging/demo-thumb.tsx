@@ -15,7 +15,7 @@ export function DemoThumb({ title, youtubeUrl, onOpen }: { title: string; youtub
       type="button"
       onClick={onOpen}
       aria-label={`Watch the ${title} demo`}
-      className="relative shrink-0 w-40 sm:w-52 aspect-video rounded-xl overflow-hidden bg-surface border border-steel/30 active:border-rust"
+      className="relative shrink-0 w-full max-w-[208px] min-[380px]:w-40 min-[380px]:max-w-none sm:w-52 aspect-video rounded-xl overflow-hidden bg-surface border border-steel/30 active:border-rust"
     >
       {src && !broken && (
         // eslint-disable-next-line @next/next/no-img-element

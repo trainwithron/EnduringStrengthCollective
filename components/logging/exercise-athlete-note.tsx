@@ -1,68 +1,110 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { createNoteAutosaver, type NoteAutosaver } from "@/lib/note-autosave";
+import { useSetSave } from "./set-save-context";
 
-// A place for an athlete to leave a note on this exact exercise instance ("shoulder felt off today"), separate from the heavier video-comment system
+// A place to leave a note on this exact exercise ("shoulder felt off today"), separate from the heavier video-comment system
 // (coach_dashboard_redesign_scoping.md's injury-keyword-flag prerequisite). It used to be a small "+ Add a note" link that was easy to miss; a beta client
-// suggested a more prominent note section, so it is now a VISIBLE field: a labelled box that is always there while logging, two lines tall, saved when
-// the athlete leaves it (the same blur-persist convention as components/coach/athlete-notes-editor.tsx). The text is 16 px so a phone does not zoom in on focus.
+// suggested a more prominent note section, so it is now a VISIBLE field: a labelled box that is always there while logging, two lines tall. A plain textarea
+// (not an editable div), so the phone keyboard's microphone dictation works, and its text is 16 px so the phone does not zoom in on focus.
+//
+// Nothing typed or dictated is lost (lib/note-autosave.ts): it saves shortly after typing pauses, when the field loses focus (reading the value from the field
+// itself), when the screen is left or the app is hidden, and Complete workout waits for it like it waits for the sets. A failed save shows Retry and tries
+// again by itself.
 export function ExerciseAthleteNote({
   sessionExerciseId,
   initialNote,
   readOnly,
+  ownNote = true,
 }: {
   sessionExerciseId: string;
   initialNote: string | null;
   readOnly: boolean;
+  // False when a coach is typing in a client's session (the note is stored as the exercise's note, the label says whose it is).
+  ownNote?: boolean;
 }) {
-  const [saved, setSaved] = useState(initialNote);
   const [draft, setDraft] = useState(initialNote ?? "");
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
-
-  async function handleBlur() {
-    const trimmed = draft.trim();
-    if (trimmed === (saved ?? "")) return;
-    setStatus("saving");
-    const supabase = createBrowserClient();
-    const { error } = await supabase
-      .from("session_exercises")
-      .update({ athlete_note: trimmed || null })
-      .eq("id", sessionExerciseId);
-    if (error) {
-      setStatus("error");
-      return;
-    }
-    setSaved(trimmed || null);
-    setStatus("saved");
+  const [savedNote, setSavedNote] = useState(initialNote);
+  const { registerPending } = useSetSave();
+  const saverRef = useRef<NoteAutosaver | null>(null);
+  if (!saverRef.current) {
+    saverRef.current = createNoteAutosaver({
+      initial: initialNote,
+      write: async (trimmed) => {
+        const supabase = createBrowserClient();
+        // A zero-row update (a rule refused it) is a failure, not a success.
+        const { data, error } = await supabase.from("session_exercises").update({ athlete_note: trimmed }).eq("id", sessionExerciseId).select("id");
+        if (!error && Array.isArray(data) && data.length === 1) {
+          setSavedNote(trimmed);
+          return true;
+        }
+        return false;
+      },
+      onStatus: (st) => setStatus(st),
+    });
   }
+  const saver = saverRef.current;
+
+  // Complete workout waits for a pending note; leaving the screen or hiding the app saves it; the connection coming back retries it.
+  useEffect(() => {
+    if (readOnly) return;
+    const unregister = registerPending(() => saver.flush());
+    const onHide = () => {
+      if (document.visibilityState === "hidden") void saver.flush();
+    };
+    const onPageHide = () => void saver.flush();
+    const onOnline = () => {
+      if (saver.isDirty()) void saver.retry();
+    };
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", onPageHide);
+    window.addEventListener("online", onOnline);
+    return () => {
+      unregister();
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", onPageHide);
+      window.removeEventListener("online", onOnline);
+      // Leaving this card or screen with unsaved text: save it now (a flush still works after dispose; it just stops reporting status).
+      void saver.flush();
+      saver.dispose();
+    };
+  }, [readOnly, registerPending, saver]);
 
   if (readOnly) {
-    if (!saved) return null;
-    return <p className="font-body text-xs text-steel mb-2 italic">Note: {saved}</p>;
+    if (!savedNote) return null;
+    return <p className="font-body text-xs text-steel mb-2 italic">Note: {savedNote}</p>;
   }
 
   const fieldId = `note-${sessionExerciseId}`;
   return (
     <div className="mb-3">
-      <div className="flex items-center justify-between mb-1">
+      <div className="flex items-center justify-between min-h-[24px] mb-1">
         <label htmlFor={fieldId} className="font-body text-xs text-steel uppercase tracking-wide">
-          Your notes
+          {ownNote ? "Your notes" : "Notes for this exercise"}
         </label>
-        <span className="font-body text-xs text-steel" role="status" aria-live="polite">
-          {status === "saving" ? "Saving…" : status === "saved" ? "Saved" : status === "error" ? "Couldn't save, try again" : ""}
-        </span>
+        {status === "error" ? (
+          <button type="button" onClick={() => void saver.retry()} className="min-h-[44px] -my-2 px-2 font-body text-xs text-rust">
+            Couldn&apos;t save. Retry
+          </button>
+        ) : (
+          <span className="font-body text-xs text-steel" role="status" aria-live="polite">
+            {status === "saving" ? "Saving…" : status === "saved" ? "Saved" : ""}
+          </span>
+        )}
       </div>
       <textarea
         id={fieldId}
         value={draft}
         onChange={(e) => {
           setDraft(e.target.value);
-          if (status !== "idle") setStatus("idle");
+          saver.change(e.target.value);
         }}
-        onBlur={handleBlur}
+        onBlur={(e) => void saver.flush(e.currentTarget.value)}
         rows={2}
-        maxLength={1000}
+        maxLength={2000}
         placeholder="How did it feel? Anything your coach should know?"
         className="w-full min-h-[64px] bg-surface border border-steel/30 text-chalk px-3 py-2 font-body text-base focus:outline-none focus:border-rust resize-none"
       />

@@ -87,16 +87,27 @@ export function ExerciseSwipeCarousel({
   // for the row), which left a large empty dark area inside a short card (Johann, beta: "quite a bit of room at the bottom"). The height is measured, so it
   // follows the card as sets are added or removed and when the next exercise comes into view.
   const [activeHeight, setActiveHeight] = useState<number | null>(null);
+  const activeExerciseId = exercises[Math.min(activeIndex, exercises.length - 1)]?.id;
+  // After exercises are deleted the active index can point past the end: clamp it back.
+  useEffect(() => {
+    if (exercises.length > 0 && activeIndex > exercises.length - 1) setActiveIndex(exercises.length - 1);
+  }, [exercises.length, activeIndex]);
   useLayoutEffect(() => {
-    const slide = scrollerRef.current?.children[activeIndex] as HTMLElement | undefined;
-    if (!slide) return;
-    const measure = () => setActiveHeight(slide.offsetHeight);
+    const scroller = scrollerRef.current;
+    const slide = scroller?.children[activeIndex] as HTMLElement | undefined;
+    if (!scroller || !slide) return;
+    // The row is overflow-y: hidden, but a browser still scrolls it to reveal a field focused in a neighbouring (taller) card; once the active card changes and
+    // the row grows, that leftover offset would cut the top of the card off. Always show the top. The height is rounded UP so a fractional card height cannot
+    // clip its bottom border or focus ring.
+    scroller.scrollTop = 0;
+    const measure = () => setActiveHeight(Math.ceil(slide.getBoundingClientRect().height));
     measure();
     if (typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver(measure);
     ro.observe(slide);
     return () => ro.disconnect();
-  }, [activeIndex, exercises.length]);
+    // The active exercise id is a dependency so a swap or reorder (same count) re-targets the observer to the right element.
+  }, [activeIndex, activeExerciseId, exercises.length]);
 
   function scrollToIndex(index: number) {
     const scroller = scrollerRef.current;
@@ -208,7 +219,7 @@ export function ExerciseSwipeCarousel({
       <div
         ref={scrollerRef}
         onScroll={handleScroll}
-        className="flex items-start overflow-x-auto overflow-y-hidden snap-x snap-mandatory scroll-smooth -mx-5 px-5 gap-4"
+        className="flex items-start overflow-x-auto overflow-y-hidden snap-x snap-mandatory scroll-smooth -mx-5 px-5 gap-4 transition-[height] duration-200 ease-out motion-reduce:transition-none"
         style={{ scrollbarWidth: "none", height: activeHeight ?? undefined }}
       >
         {exercises.map((exercise) => {
@@ -226,7 +237,7 @@ export function ExerciseSwipeCarousel({
                 <button
                   type="button"
                   onClick={() => setExpandedId(expanded ? null : exercise.id)}
-                  className="flex items-center gap-1 font-body text-xs text-steel uppercase tracking-wide active:text-rust"
+                  className="flex items-center gap-1 min-h-[44px] px-2 -mr-2 font-body text-xs text-steel uppercase tracking-wide active:text-rust"
                 >
                   {expanded ? "Less room" : "More room"}
                   {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}

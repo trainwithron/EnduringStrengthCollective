@@ -17,8 +17,10 @@ interface SetSaveApi {
   retryAll: () => void;
   // Drop pending saves for sets that were deleted.
   discard: (setIds: string[]) => void;
-  // Try everything pending right now; true only if all of it saved.
+  // Try everything pending right now; true only if all of it saved (sets AND anything registered below, such as a note).
   flush: () => Promise<boolean>;
+  // Something other than a set that must land before the workout is completed (a note): its own flush is run by flush() above. Returns the unregister function.
+  registerPending: (flusher: () => Promise<boolean>) => () => void;
 }
 
 const Ctx = createContext<SetSaveApi | null>(null);
@@ -38,6 +40,7 @@ const FALLBACK: SetSaveApi = {
   retryAll: () => {},
   discard: () => {},
   flush: async () => true,
+  registerPending: () => () => {},
 };
 
 export function useSetSave(): SetSaveApi {
@@ -88,12 +91,22 @@ export function SetSaveProvider({ children }: { children: React.ReactNode }) {
   const save = useCallback((id: string, payload: Record<string, unknown>) => saver.queue(id, payload), [saver]);
   const remove = useCallback((id: string) => saver.queue(id, { [SET_LOG_DELETE]: true }), [saver]);
   const retryAll = useCallback(() => saver.retryAll(), [saver]);
-  const flush = useCallback(() => saver.flush(), [saver]);
+  const pendingRef = useRef(new Set<() => Promise<boolean>>());
+  const registerPending = useCallback((flusher: () => Promise<boolean>) => {
+    pendingRef.current.add(flusher);
+    return () => {
+      pendingRef.current.delete(flusher);
+    };
+  }, []);
+  const flush = useCallback(async () => {
+    const results = await Promise.all([saver.flush(), ...[...pendingRef.current].map((f) => f().catch(() => false))]);
+    return results.every(Boolean);
+  }, [saver]);
   const discard = useCallback((ids: string[]) => saver.discard(ids), [saver]);
 
   const api = useMemo<SetSaveApi>(
-    () => ({ save, remove, failedIds, unsavedIds, unsavedCount, retryAll, discard, flush }),
-    [save, remove, failedIds, unsavedIds, unsavedCount, retryAll, discard, flush]
+    () => ({ save, remove, failedIds, unsavedIds, unsavedCount, retryAll, discard, flush, registerPending }),
+    [save, remove, failedIds, unsavedIds, unsavedCount, retryAll, discard, flush, registerPending]
   );
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
