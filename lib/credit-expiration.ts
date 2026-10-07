@@ -13,6 +13,16 @@ export function isCreditBalanceExpired(
   return now.getTime() >= cutoff;
 }
 
+// The date the client's unused sessions expire: the normal expiry, or the coach's hold (or a freeze's) when that is later. The nightly job skips a balance while a hold is in
+// the future, so this is the date it will actually start to count from.
+export function creditExpiryWithHold(lastGrantedAt: string | null, creditExpiryDays: number, holdUntil: string | null): Date | null {
+  const normal = creditExpiryDate(lastGrantedAt, creditExpiryDays);
+  if (!normal) return null;
+  if (!holdUntil) return normal;
+  const hold = new Date(holdUntil);
+  return Number.isNaN(hold.getTime()) || hold.getTime() < normal.getTime() ? normal : hold;
+}
+
 export function creditExpiryDate(lastGrantedAt: string | null, creditExpiryDays: number): Date | null {
   if (creditExpiryDays <= 0 || !lastGrantedAt) return null;
   return new Date(new Date(lastGrantedAt).getTime() + creditExpiryDays * 86400000);

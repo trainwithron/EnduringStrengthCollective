@@ -1,4 +1,5 @@
 import { endSeries, pauseSeries, resumeSeries, type SeriesStore } from "@/lib/series-engine";
+import { wallClockOf } from "@/lib/series-schedule";
 
 // Applying a client's schedule request (migration 0297). The database hands out the work and keeps the rules (who may ask, one open request per schedule, the private
 // note); this file does the part the database cannot: it changes the schedule with the existing engine (pause, end, resume) and tells the database how it went.
@@ -28,7 +29,15 @@ export interface ApplyResult {
   message: string;
 }
 
-const short = (s: string) => s.replace(/\s+/g, " ").trim().slice(0, 160);
+// What is stored on a request or a schedule for the coach to read is always one of these fixed sentences, never an engine message or an exception: the request row is
+// readable by the client who made it.
+const WHY = {
+  notFound: "this schedule was not found",
+  ended: "this schedule has already ended",
+  failed: "the schedule could not be changed",
+  resume: "the schedule could not be restarted",
+  other: "something went wrong",
+} as const;
 
 // Applies one CLAIMED request and records the result. Safe to run twice: a schedule that is already in the state the request asks for counts as done (a coach may have
 // paused it by hand in the meantime, or a run may have stopped between the change and the record).
@@ -47,21 +56,29 @@ export async function applyClaimedRequest(db: Rpc, store: SeriesStore, claim: Cl
   };
 
   const series = await store.getSeries(claim.series_id);
-  if (!series) return finish(false, "this schedule was not found");
+  if (!series) return finish(false, WHY.notFound);
   if (series.status === "ended" || series.status === "cancelled") {
     // A cancel is already true. Anything else cannot be applied to a schedule that has ended: the coach is told and handles it.
-    return claim.kind === "cancel" ? finish(true, null) : finish(false, "this schedule has already ended");
+    return claim.kind === "cancel" ? finish(true, null) : finish(false, WHY.ended);
   }
 
   if (claim.kind === "cancel") {
     const r = await endSeries(store, claim.series_id, now, { cancelUpcoming: true });
-    return r.ok ? finish(true, null) : finish(false, short(r.message));
+    if (!r.ok) console.error(`schedule request ${claim.request_id}: ${r.message}`);
+    return r.ok ? finish(true, null) : finish(false, WHY.failed);
   }
 
-  // Pause and freeze both pause the schedule now; a freeze is told its resume day by the database when the result is recorded.
+  // A freeze whose restart day has already come has nothing to freeze: the schedule is left running and the database tells the client so.
+  if (claim.kind === "freeze" && claim.resume_on) {
+    const todayKey = wallClockOf(now, series.timezone ?? "America/New_York").dateKey;
+    if (claim.resume_on <= todayKey) return finish(true, null);
+  }
+
+  // Pause and freeze both pause the schedule now; a freeze is given its dates by the database when the result is recorded.
   if (series.status === "paused") return finish(true, null);
   const r = await pauseSeries(store, claim.series_id, now);
-  return r.ok ? finish(true, null) : finish(false, short(r.message));
+  if (!r.ok) console.error(`schedule request ${claim.request_id}: ${r.message}`);
+  return r.ok ? finish(true, null) : finish(false, WHY.failed);
 }
 
 // The daily run: every request whose chosen day has ended.
@@ -78,7 +95,7 @@ export async function runDueScheduleRequests(db: Rpc, store: SeriesStore, now: D
     } catch (err) {
       failed += 1;
       console.error(`schedule request ${claim.request_id} failed:`, err instanceof Error ? err.message : err);
-      await db.rpc("finish_schedule_request", { p_request_id: claim.request_id, p_ok: false, p_early: false, p_by_system: true, p_error: "something went wrong" });
+      await db.rpc("finish_schedule_request", { p_request_id: claim.request_id, p_ok: false, p_early: false, p_by_system: true, p_error: WHY.other });
     }
   }
   return { applied, failed };
@@ -101,14 +118,15 @@ export async function runDueFreezeResumes(db: Rpc, store: SeriesStore, now: Date
     try {
       const series = await store.getSeries(row.series_id);
       if (!series || series.status !== "paused") {
-        // Someone restarted or ended it already: only clear the freeze.
+        // Someone restarted or ended it already (the database settled the freeze when the status changed): only make sure the freeze is cleared.
         await db.rpc("end_schedule_freeze", { p_series_id: row.series_id });
         continue;
       }
       const r = await resumeSeries(store, row.series_id, now);
       if (!r.ok) {
         failed += 1;
-        await db.rpc("fail_freeze_resume", { p_series_id: row.series_id, p_error: short(r.message) });
+        console.error(`freeze resume ${row.series_id}: ${r.message}`);
+        await db.rpc("fail_freeze_resume", { p_series_id: row.series_id, p_error: WHY.resume });
         continue;
       }
       await db.rpc("end_schedule_freeze", { p_series_id: row.series_id });
@@ -117,7 +135,7 @@ export async function runDueFreezeResumes(db: Rpc, store: SeriesStore, now: Date
     } catch (err) {
       failed += 1;
       console.error(`freeze resume ${row.series_id} failed:`, err instanceof Error ? err.message : err);
-      await db.rpc("fail_freeze_resume", { p_series_id: row.series_id, p_error: "something went wrong" });
+      await db.rpc("fail_freeze_resume", { p_series_id: row.series_id, p_error: WHY.other });
     }
   }
   return { resumed, failed };

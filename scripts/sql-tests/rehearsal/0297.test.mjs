@@ -331,6 +331,181 @@ export default {
       await h.asSuper();
       const noHold = await h.one(`select expiry_hold_until from public.session_credits where athlete_id = $1 and group_id = $2`, [sv4.ann, sv4.group]);
       h.check("with no expiry window a freeze leaves the credits alone (no hold)", noHold.expiry_hold_until === null, JSON.stringify(noHold));
+
+      // ======== review fixes and the freeze guard ========
+      const DAY = 86400000;
+      const freezeNow = async (sv, series, days) => {
+        // the way the app does it: the schedule is paused first, then the request is claimed and finished
+        await h.as(sv.ann);
+        const r = await tryQ(db, `select public.request_schedule_change($1, 'freeze', $2, $3, null) as id`, [series, sPlus(0), sPlus(days)]);
+        if (r.error) throw new Error("freezeNow: " + r.error);
+        await h.asSuper();
+        await db.query(`update public.recurring_booking_series set status = 'paused' where id = $1`, [series]);
+        await h.asService();
+        await tryQ(db, `select public.claim_schedule_request($1, true)`, [r.rows[0].id]);
+        await tryQ(db, `select public.finish_schedule_request($1, true, true, false, null)`, [r.rows[0].id]);
+        await h.asSuper();
+        return r.rows[0].id;
+      };
+      const normalExpiry = async (sv) => {
+        const g = await h.one(`select last_granted_at from public.session_credits where athlete_id = $1 and group_id = $2`, [sv.ann, sv.group]);
+        return new Date(g.last_granted_at).getTime() + 60 * DAY;
+      };
+      const holdBeyond = async (sv) => {
+        const c = await h.one(`select expiry_hold_until from public.session_credits where athlete_id = $1 and group_id = $2`, [sv.ann, sv.group]);
+        return c.expiry_hold_until === null ? null : Math.round((new Date(c.expiry_hold_until).getTime() - (await normalExpiry(sv))) / DAY);
+      };
+      const ageFreeze = async (series, days) => {
+        await h.asSuper();
+        await db.query(`update public.recurring_booking_series set frozen_from = frozen_from - $2::int where id = $1`, [series, days]);
+      };
+      const withWindow = async (sv, balance = 8, grantedDaysAgo = 50) => {
+        await h.asSuper();
+        await db.query(`insert into public.coach_booking_policies (coach_id, credit_expiry_days) values ($1, 60) on conflict (coach_id) do update set credit_expiry_days = 60`, [sv.coach]);
+        await db.query(`insert into public.session_credits (athlete_id, group_id, balance, last_granted_at) values ($1, $2, $3, now() - make_interval(days => $4::int))`, [sv.ann, sv.group, balance, grantedDaysAgo]);
+      };
+
+      // ---- the cap: 24 weeks beyond the normal expiry, all freezes together ----
+      const cap = await scene(h, db, "C1");
+      await withWindow(cap);
+      await freezeNow(cap, cap.annSeries, 84);
+      h.check("a single long freeze (12 weeks) moves the expiry out by its full 84 days", (await holdBeyond(cap)) === 84, String(await holdBeyond(cap)));
+      await ageFreeze(cap.annSeries, 84);
+      await db.query(`update public.recurring_booking_series set status = 'active' where id = $1`, [cap.annSeries]);
+      h.check("restarting on the planned day settles to exactly the same hold (nothing added or taken back)", (await holdBeyond(cap)) === 84);
+      h.check("the freeze dates are cleared by the restart", (await h.one(`select frozen_from, frozen_hold_days from public.recurring_booking_series where id = $1`, [cap.annSeries])).frozen_from === null);
+      await freezeNow(cap, cap.annSeries, 84);
+      h.check("a second 12-week freeze brings the total to 168 days (24 weeks)", (await holdBeyond(cap)) === 168, String(await holdBeyond(cap)));
+      await ageFreeze(cap.annSeries, 84);
+      await db.query(`update public.recurring_booking_series set status = 'active' where id = $1`, [cap.annSeries]);
+      await freezeNow(cap, cap.annSeries, 84);
+      h.check("a third freeze cannot go past the 24-week cap (repeated freeze and restart cycles cannot stretch it)", (await holdBeyond(cap)) === 168, String(await holdBeyond(cap)));
+      h.check("the days that were not added are not remembered as added", (await h.one(`select frozen_hold_days from public.recurring_booking_series where id = $1`, [cap.annSeries])).frozen_hold_days === 0);
+      await ageFreeze(cap.annSeries, 84);
+      await db.query(`update public.recurring_booking_series set status = 'active' where id = $1`, [cap.annSeries]);
+      h.check("ending the capped freeze does not stretch the hold either", (await holdBeyond(cap)) === 168, String(await holdBeyond(cap)));
+
+      const earlyEnd = await scene(h, db, "C2");
+      await withWindow(earlyEnd);
+      await freezeNow(earlyEnd, earlyEnd.annSeries, 84);
+      await ageFreeze(earlyEnd.annSeries, 30);
+      await db.query(`update public.recurring_booking_series set status = 'active' where id = $1`, [earlyEnd.annSeries]);
+      h.check("a freeze that ends after 30 of 84 days gives the unused 54 days back (the hold is now 30 days past the normal expiry)", (await holdBeyond(earlyEnd)) === 30, String(await holdBeyond(earlyEnd)));
+      const earlyLedger = await h.rows(`select note from public.session_credit_ledger where athlete_id = $1 and group_id = $2 and kind = 'adjusted' order by created_at`, [earlyEnd.ann, earlyEnd.group]);
+      h.check("both changes are in the client's session ledger with amount 0", earlyLedger.length === 2 && /54 days/.test(earlyLedger[1].note), JSON.stringify(earlyLedger));
+
+      const canc = await scene(h, db, "C3");
+      await withWindow(canc);
+      await freezeNow(canc, canc.annSeries, 84);
+      await ageFreeze(canc.annSeries, 10);
+      await db.query(`update public.recurring_booking_series set status = 'ended' where id = $1`, [canc.annSeries]);
+      h.check("cancelling a frozen schedule after 10 days keeps only those 10 days of the extension", (await holdBeyond(canc)) === 10, String(await holdBeyond(canc)));
+
+      const gone = await scene(h, db, "C4");
+      await withWindow(gone);
+      await freezeNow(gone, gone.annSeries, 20);
+      await db.query(`update public.recurring_booking_series set status = 'ended' where id = $1`, [gone.annSeries]);
+      h.check("a freeze cancelled the same day leaves no hold at all (never below the normal expiry)", (await holdBeyond(gone)) === null);
+
+      const manual = await scene(h, db, "C5");
+      await withWindow(manual);
+      await db.query(`update public.session_credits set expiry_hold_until = last_granted_at + interval '65 days' where athlete_id = $1 and group_id = $2`, [manual.ann, manual.group]);
+      await freezeNow(manual, manual.annSeries, 20);
+      h.check("a coach's own hold is extended from where it was (65 + 20 days after the grant = 25 days past the normal expiry)", (await holdBeyond(manual)) === 25, String(await holdBeyond(manual)));
+      await db.query(`update public.recurring_booking_series set status = 'ended' where id = $1`, [manual.annSeries]);
+      h.check("and ending the freeze at once puts back the coach's own hold, not lower", (await holdBeyond(manual)) === 5, String(await holdBeyond(manual)));
+
+      // ---- F1: an old freeze can never restart a later, ordinary pause ----
+      const oldFz = await scene(h, db, "F1");
+      await withWindow(oldFz);
+      await freezeNow(oldFz, oldFz.annSeries, 14);
+      await db.query(`update public.recurring_booking_series set status = 'active' where id = $1`, [oldFz.annSeries]);
+      await db.query(`update public.recurring_booking_series set status = 'paused' where id = $1`, [oldFz.annSeries]);
+      await h.asService();
+      const oldFzClaim = await tryQ(db, `select * from public.claim_due_freeze_resumes(50)`);
+      h.check("a freeze the coach restarted by hand cannot restart a later ordinary pause", !(oldFzClaim.rows ?? []).some((r) => r.series_id === oldFz.annSeries), JSON.stringify(oldFzClaim));
+      await h.asSuper();
+      h.check("the old freeze dates were cleared when the coach restarted it", (await h.one(`select frozen_from, frozen_until from public.recurring_booking_series where id = $1`, [oldFz.annSeries])).frozen_until === null);
+
+      // ---- F2: the window of the longest-window coach in the group ----
+      const two = await scene(h, db, "F2");
+      const coach2 = await h.user("F2 Second Coach");
+      await h.member(two.group, coach2, "coach");
+      await h.asSuper();
+      await db.query(`insert into public.coach_booking_policies (coach_id, credit_expiry_days) values ($1, 60) on conflict (coach_id) do update set credit_expiry_days = 60`, [coach2]);
+      await db.query(`insert into public.session_credits (athlete_id, group_id, balance, last_granted_at) values ($1, $2, 6, now() - interval '50 days')`, [two.ann, two.group]);
+      await freezeNow(two, two.annSeries, 14);
+      h.check("in a group with two coaches the freeze uses the longer window (the schedule's coach has none)", (await holdBeyond(two)) === 14, String(await holdBeyond(two)));
+
+      // ---- F3: a request stuck in 'applying' after a crash can be taken back or marked handled ----
+      const stuck = await scene(h, db, "F3");
+      await h.as(stuck.ann);
+      const stuckReq = (await tryQ(db, `select public.request_schedule_change($1, 'pause', $2, null, null) as id`, [stuck.annSeries, sPlus(0)])).rows[0].id;
+      await h.asService();
+      await tryQ(db, `select public.claim_schedule_request($1, true)`, [stuckReq]);
+      await h.asSuper();
+      await db.query(`update public.schedule_requests set claimed_at = now() - interval '11 minutes', attempts = 3 where id = $1`, [stuckReq]);
+      await h.as(stuck.coach);
+      const dismissStuck = await tryQ(db, `select public.dismiss_schedule_request($1)`, [stuckReq]);
+      h.check("a request stuck in 'applying' for over ten minutes can be marked handled by the coach", !dismissStuck.error, JSON.stringify(dismissStuck));
+      await h.as(stuck.ann);
+      const again2 = await tryQ(db, `select public.request_schedule_change($1, 'pause', $2, null, null) as id`, [stuck.annSeries, sPlus(0)]);
+      await h.asService();
+      await tryQ(db, `select public.claim_schedule_request($1, true)`, [again2.rows?.[0]?.id]);
+      await h.asSuper();
+      await db.query(`update public.schedule_requests set claimed_at = now() - interval '11 minutes' where id = $1`, [again2.rows[0].id]);
+      await h.as(stuck.ann);
+      const withdrawStuck = await tryQ(db, `select public.withdraw_schedule_request($1)`, [again2.rows[0].id]);
+      h.check("or taken back by the client", !withdrawStuck.error, JSON.stringify(withdrawStuck));
+
+      // ---- F4: a bad time zone never stops the daily run ----
+      const tz = await scene(h, db, "F4");
+      await h.asSuper();
+      await db.query(`update public.recurring_booking_series set timezone = 'Not/AZone' where id = $1`, [tz.annSeries]);
+      const tzToday = await h.one(`select public.schedule_local_today('Not/AZone', $1)::text as d`, [tz.coach]);
+      h.check("an unknown time zone falls back (to the coach's, then New York) instead of failing", /^\d{4}-\d{2}-\d{2}$/.test(tzToday.d), JSON.stringify(tzToday));
+      await h.as(tz.ann);
+      const tzReq = await tryQ(db, `select public.request_schedule_change($1, 'pause', $2, null, null) as id`, [tz.annSeries, sPlus(0)]);
+      h.check("a client of a schedule with a bad time zone can still ask", !tzReq.error, JSON.stringify(tzReq));
+      await h.asService();
+      const tzDue = await tryQ(db, `select * from public.claim_due_schedule_requests(50)`);
+      const tzFr = await tryQ(db, `select * from public.claim_due_freeze_resumes(50)`);
+      h.check("the daily claims still run with a bad time zone on one schedule", !tzDue.error && !tzFr.error, JSON.stringify({ tzDue, tzFr }));
+
+      // ---- F5: credits that are already overdue get no hold written ----
+      const over = await scene(h, db, "F5");
+      await withWindow(over, 8, 200);
+      await freezeNow(over, over.annSeries, 14);
+      h.check("credits already past their expiry get no hold and no ledger line from a short freeze", (await holdBeyond(over)) === null && (await h.rows(`select 1 from public.session_credit_ledger where athlete_id = $1 and kind = 'adjusted'`, [over.ann])).length === 0);
+
+      // ---- F6: the coach is told once when the third try fails ----
+      const once = await scene(h, db, "F6");
+      await h.as(once.ann);
+      const onceReq = (await tryQ(db, `select public.request_schedule_change($1, 'pause', $2, null, null) as id`, [once.annSeries, sPlus(0)])).rows[0].id;
+      await h.asService();
+      for (let i = 0; i < 4; i++) {
+        await tryQ(db, `select public.claim_schedule_request($1, true)`, [onceReq]);
+        await tryQ(db, `select public.finish_schedule_request($1, false, true, false, 'x')`, [onceReq]);
+      }
+      await h.asSuper();
+      const onceNotes = await h.rows(`select 1 from public.notifications where profile_id = $1 and type = 'schedule_applied'`, [once.coach]);
+      h.check("a coach pressing Done again and again after three failures is not sent the notice again", onceNotes.length === 1, String(onceNotes.length));
+
+      // ---- a freeze whose restart day has already passed freezes nothing ----
+      const pastFreeze = await scene(h, db, "F8");
+      await withWindow(pastFreeze);
+      await h.as(pastFreeze.ann);
+      const pfReq = (await tryQ(db, `select public.request_schedule_change($1, 'freeze', $2, $3, null) as id`, [pastFreeze.annSeries, sPlus(0), sPlus(3)])).rows[0].id;
+      await h.asSuper();
+      await db.query(`update public.schedule_requests set effective_on = effective_on - 6, resume_on = resume_on - 6 where id = $1`, [pfReq]);
+      await h.asService();
+      await tryQ(db, `select * from public.claim_due_schedule_requests(50)`);
+      await tryQ(db, `select public.finish_schedule_request($1, true, false, true, null)`, [pfReq]);
+      await h.asSuper();
+      const pfSeries = await h.one(`select frozen_from from public.recurring_booking_series where id = $1`, [pastFreeze.annSeries]);
+      const pfNote = await h.rows(`select body from public.notifications where profile_id = $1 and type = 'schedule_applied'`, [pastFreeze.ann]);
+      h.check("a freeze that had already ended when it was applied writes no freeze dates and tells the client so", pfSeries.frozen_from === null && pfNote.length === 1 && /had already ended/.test(pfNote[0].body), JSON.stringify({ pfSeries, pfNote }));
+      h.check("and moves no expiry", (await holdBeyond(pastFreeze)) === null);
     },
   },
 };

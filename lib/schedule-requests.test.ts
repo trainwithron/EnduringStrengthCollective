@@ -115,6 +115,29 @@ describe("applying a claimed schedule request", () => {
     expect(finishCall(calls)?.args).toMatchObject({ p_ok: false, p_error: "this schedule has already ended" });
   });
 
+  it("a freeze whose restart day has already come is not applied: the schedule keeps running", async () => {
+    const { store, series } = fakeStore(seriesRow());
+    const { db, calls } = fakeRpc();
+    await applyClaimedRequest(db, store, claim({ kind: "freeze", resume_on: "2026-10-13" }), { bySystem: true }, NOW);
+    expect(series.get("s1")?.status).toBe("active");
+    expect(finishCall(calls)?.args).toMatchObject({ p_ok: true });
+  });
+
+  it("what is stored on the request row (the client can read it) is a fixed sentence, never an engine message", async () => {
+    const missing = fakeStore(null);
+    const a = fakeRpc();
+    await applyClaimedRequest(a.db, missing.store, claim(), { bySystem: true }, NOW);
+    expect(finishCall(a.calls)?.args.p_error).toBe("this schedule was not found");
+    const failing = fakeStore(seriesRow());
+    const throwing: SeriesStore = { ...failing.store, async cancel() { return { ok: false as const, message: "raw engine text: connection refused" }; } };
+    const b = fakeRpc();
+    await applyClaimedRequest(b.db, throwing, claim(), { bySystem: true }, NOW);
+    const stored = finishCall(b.calls)?.args.p_error;
+    expect(stored === null || !/engine|connection|refused/.test(String(stored))).toBe(true);
+    const src = readFileSync(new URL("./schedule-requests.ts", import.meta.url), "utf8");
+    expect(src).not.toMatch(/p_error: short\(/);
+  });
+
   it("a schedule that no longer exists is reported, not crashed on", async () => {
     const { store } = fakeStore(null);
     const { db, calls } = fakeRpc();

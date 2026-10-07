@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { generateSlotsForDate, formatSlotTime, minimumNoticeBlockedRange, slotConflict, customStartOptions } from "@/lib/booking-slots";
 import { expiryWindowLine } from "@/lib/expiry-checkin";
-import { creditExpiryDate } from "@/lib/credit-expiration";
+import { creditExpiryWithHold } from "@/lib/credit-expiration";
 import { getBlockedRangesForDate } from "@/lib/availability-exceptions";
 import { zonedTimeToUtc, DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { addDaysToDateKey } from "@/lib/series-schedule";
@@ -318,12 +318,12 @@ export default async function DayDetailPage(
     if (viewingAsAthlete) {
       const { data: creditsRow } = await supabase
         .from("session_credits")
-        .select("balance, last_granted_at")
+        .select("balance, last_granted_at, expiry_hold_until")
         .eq("athlete_id", athleteId)
         .eq("group_id", params.groupId)
         .maybeSingle();
       creditBalance = creditsRow?.balance ?? 0;
-      creditExpiresAt = creditExpiryDate(creditsRow?.last_granted_at ?? null, policyRow?.credit_expiry_days ?? 0);
+      creditExpiresAt = creditExpiryWithHold(creditsRow?.last_granted_at ?? null, policyRow?.credit_expiry_days ?? 0, creditsRow?.expiry_hold_until ?? null);
       creditExpiryDaysForNote = policyRow?.credit_expiry_days ?? 0;
 
       const { data: waitlistRows } = await supabase

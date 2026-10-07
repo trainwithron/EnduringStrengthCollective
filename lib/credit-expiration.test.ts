@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isCreditBalanceExpired, creditExpiryDate } from "./credit-expiration";
+import { isCreditBalanceExpired, creditExpiryDate, creditExpiryWithHold } from "./credit-expiration";
 
 describe("isCreditBalanceExpired", () => {
   it("never expires when credit_expiry_days is 0 (the default)", () => {
@@ -56,5 +56,19 @@ describe("creditToExpire", () => {
   it("is never negative or above the balance, whatever it is given", () => {
     expect(creditToExpire(0, 0, 0)).toBe(0);
     expect(creditToExpire(4, -2, -1)).toBe(4);
+  });
+});
+
+describe("creditExpiryWithHold: the date the nightly job will really start from", () => {
+  const granted = "2026-01-01T00:00:00Z";
+  it("is the normal expiry with no hold, and the later of the two with one", () => {
+    const normal = new Date("2026-03-02T00:00:00Z"); // 60 days after the grant
+    expect(creditExpiryWithHold(granted, 60, null)?.getTime()).toBe(normal.getTime());
+    expect(creditExpiryWithHold(granted, 60, "2026-04-01T00:00:00Z")?.toISOString()).toBe("2026-04-01T00:00:00.000Z");
+    expect(creditExpiryWithHold(granted, 60, "2026-02-01T00:00:00Z")?.getTime()).toBe(normal.getTime()); // an old hold changes nothing
+  });
+  it("is nothing when the coach has no expiry window or the client has no grant", () => {
+    expect(creditExpiryWithHold(granted, 0, "2026-04-01T00:00:00Z")).toBeNull();
+    expect(creditExpiryWithHold(null, 60, "2026-04-01T00:00:00Z")).toBeNull();
   });
 });
