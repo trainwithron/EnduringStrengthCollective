@@ -49,11 +49,9 @@ The design's numbers are used as written: calories and protein within 10 percent
 
 All seven diets the old app declared are kept, including pescatarian (8 recipes), which was already in the old recipes. Pescatarian is also in the client's Preferences and the allergen and diet checks (phase 3). The old app's "no recipe for this diet and slot: show another slot's recipe" fallback is **not** carried over: it showed a lunch under "breakfast". Instead the gap is reported (section 4) and the builder fills it from the coach's own recipes or the AI top-up.
 
-### 2.7 Recipes that are switched off
+### 2.7 Recipes that were switched off, and are back
 
-**Six in all.** The first (below) was off from the start; the other five were switched off by the USDA corrections (section 5), each with its reason in `disabled.ts`: the two chuck roast meals, the two jerky snacks and the salmon, eggs and avocado breakfast.
-
-`s_jerky_eggs_carnivore` (Beef Jerky & Hard-Boiled Eggs): the formula caps the eggs at three and jerky has almost no fat, so the snack holds about 16 g of fat at most, while a keto or carnivore snack aims for 18 to 50 g. It misses at every size. It stays in the file (so it is easy to bring back) and is on the disabled list with this reason (`disabled.ts`).
+Six recipes were off after the USDA corrections (section 5): the two chuck roast meals, the two jerky snacks, Salmon, Eggs & Avocado, and the jerky and eggs snack. **All six were reworked on 2026-10-07 (Ron approved) and land on targets again; nothing is switched off now** (`disabled.ts` is empty). What changed in each is in section 7.
 
 ### 2.8 Things the recipes mention but do not count
 
@@ -80,8 +78,8 @@ The scaler records how far it had to move the aim from the slot's own target (`d
 
 ## 3. Checks that now run on every change (`lib/meal-templates/diagnostics.test.ts`)
 
-- 66 recipes, 20 / 19 / 19 / 8 by slot, unique ids, every recipe has a real diet, a name, keywords.
-- The food table: 150 foods, no food weighs more than itself per gram, every key in the diet and name tables is a real food.
+- 69 recipes (Ron's 66 plus 3 added), 21 / 19 / 19 / 10 by slot, unique ids, every recipe has a real diet, a name, keywords.
+- The food table: 151 foods, no food weighs more than itself per gram, every key in the diet and name tables is a real food.
 - Every recipe built at the old app's five extreme targets **and** across the whole spread: nothing throws, no NaN, every printed ingredient is a known food.
 - A scaled meal has no negative or empty line, its macros are the sum of **all** shown lines, and it is inside the tolerance.
 - Every enabled recipe lands on **at least one size** for some diet it declares, and a disabled one lands on none (with a written reason). Then, **per declared diet**, every (recipe, diet) pair landing on **fewer than three of the six sizes** is an exact list (6 pairs, section 4): a fix that widens one, or a change that narrows another, fails until the list is updated on purpose.
@@ -96,19 +94,16 @@ The scaler records how far it had to move the aim from the slot's own target (`d
 
 ## 4. What the starter library can and cannot fill
 
-71 of the diet / slot / target combinations have **no** recipe that lands (the exact list is in the test). It was 51 before the USDA corrections (section 5): the 20 new gaps are all **paleo and pescatarian snacks**, which the two jerky snacks used to cover. In plain words:
+After the recipe rework (section 7) **18** of the diet / slot / target combinations have no recipe that lands (it was 71; the exact list is in the test):
 
-- **Pescatarian breakfast**: nothing on a standard, high-carb, high-protein or light plan at any size (both pescatarian breakfasts are fatty fish, and their fat is too high for those targets); some on a low-carb plan.
-- **Pescatarian snack**: gaps at several sizes on every shape (the one pescatarian snack, tuna on rice cakes, now has the corrected rice cake).
-- **Paleo snack**: most sizes on the standard, high-carb, high-protein and light shapes (new: the two jerky snacks are switched off, 2.7).
-- **Carnivore snack** and **keto snack**: none at any size.
-- **Vegan breakfast on a high-protein plan**, the four smaller sizes.
+- **Vegan breakfast on a high-protein plan** (all six sizes) and **vegan snack on a high-protein plan, smallest size**.
+- **Pescatarian snack**: the one pescatarian snack (tuna on rice cakes) leaves gaps at the larger standard sizes, several low-carb and high-carb sizes, and two small high-protein and light sizes.
 
-**Narrow spots** (an enabled recipe landing on fewer than three of the six sizes for a diet it declares, 8 pairs, exact list in the test): the Salmon, Eggs & Avocado breakfast, the keto Ground Beef & Cabbage bowl as an omnivore meal, the Flank Steak with Butter dinner as keto, and now the **ribeye dinners (two), the Chuck Roast & Mash dinner** as omnivore and paleo meals (their fat now matches their protein, so they only fit the high-fat shapes).
+Closed by the rework: pescatarian breakfast (the new White Fish, Egg-White Scramble & Sourdough Toast, plus the reworked salmon plate, cover every plain shape), the keto snack, the carnivore snack, and every paleo and omnivore snack size. An everyday omnivore now has at least three meals at every size of every slot (the "thin" list is empty).
 
-An everyday omnivore has at least three meals at every size of every slot **except snacks**: 9 snack sizes have one or two (exact list in the test).
+**Narrow spots** (an enabled recipe landing on fewer than three of the six sizes for a diet it declares, 6 pairs, exact list in the test): the keto Ground Beef & Cabbage bowl as an omnivore meal, the two ribeye dinners as omnivore and paleo meals (a ribeye is about one gram of fat for every gram of protein, so they only fit the high-fat shapes, which is honest), and the Flank Steak with Butter dinner as keto.
 
-Counts of enabled recipes per diet and slot: omnivore 16 / 14 / 14 / 4, vegetarian 13 / 3 / 3 / 4, vegan 2 / 3 / 3 / 1, keto 1 / 3 / 5 / 0, paleo 3 / 6 / 7 / 1, pescatarian 1 / 3 / 2 / 1, carnivore 1 / 1 / 1 / 0 (breakfast / lunch / dinner / snack). This is what the Generate button (AI top-up) and the coach's own saved meals are for.
+Counts of enabled recipes per diet and slot: omnivore 18 / 15 / 15 / 6, vegetarian 13 / 3 / 3 / 4, vegan 2 / 3 / 3 / 1, keto 2 / 3 / 5 / 3, paleo 4 / 7 / 8 / 3, pescatarian 3 / 3 / 2 / 1, carnivore 1 / 1 / 1 / 1 (breakfast / lunch / dinner / snack). This is what the Generate button (AI top-up) and the coach's own saved meals are for.
 
 ## 5. The food table against real food data (USDA)
 
@@ -141,7 +136,7 @@ Counts of enabled recipes per diet and slot: omnivore 16 / 14 / 14 / 4, vegetari
 
 Notes on judgment calls: the **pork chop** uses the lean-only record (22.0 / 0 / 3.7, the same basis as the other lean cuts), so a chop with its fat on has more fat than the table says (the bone-in lean-and-fat record is 20.7 / 0 / 9.0). **Meats' carbs** under 0.5 g per 100 g are left at 0. **Ground beef 90/10, ground turkey 93/7, ribeye** are the newer Foundation records. The **beef jerky** is the USDA "chopped and formed" product, which is fatty (26 g per 100 g); a lean jerky product would need its own row. The **bran flakes** row is the branded POST Bran Flakes record.
 
-**What the corrections changed in the library** (recipes read the table, so every meal's grams and macros move with it):
+**What the corrections changed in the library at the time** (recipes read the table, so every meal's grams and macros move with it; the recipes switched off were reworked afterwards, section 7):
 
 - **Four recipes now cannot land on any target and are switched off** (2.7 and `disabled.ts`, each with its reason): Chuck Roast & Sweet Potato Bowl, Chuck Roast & Root Veggie Dinner, String Cheese, Beef Jerky & Apple, Cantaloupe & Beef Jerky. With USDA-accurate chuck (19 g protein, 19 g fat per 100 g) and jerky (33 / 11 / 26), the fat arrives with the protein and overshoots the fat target. They stay in the file, so they come back if Ron edits the formulas or adds a lean jerky row.
 - **Coverage shifted** (section 4): 72 gaps instead of 51, and more narrow spots for the beef dinners.
@@ -280,5 +275,30 @@ Notes on judgment calls: the **pork chop** uses the lean-only record (22.0 / 0 /
 
 1. **Keep the re-aiming engine (2.3)?** It leaves your 66 formulas exactly as written and makes the meals land on target. The alternative is rewriting formulas one by one.
 2. **Pescatarian breakfast.** Both recipes use fatty fish. Add a lean-fish breakfast (white fish or tuna with toast), or let the AI top-up and the coach's own recipes cover it?
-3. **Food-table numbers: DONE (Ron approved).** 22 rows corrected to USDA (section 5); four beef recipes switched off as a result. Ron may want a lean-jerky row, or edits to the chuck roast and jerky formulas, to bring them back.
+3. **Food-table numbers: DONE (Ron approved).** 22 rows corrected to USDA (section 5); four beef recipes switched off as a result, all since reworked and back (section 7).
 4. **Carnivore snack and large keto meals**: add a recipe or leave to the top-up.
+
+## 7. Reworked and added recipes (Ron approved, 2026-10-07)
+
+Ron's recipes keep their names and their idea; only the amounts and, where needed, one added food changed. Every recipe is still measured from **all** its printed lines, held to the same tolerance (protein within 10 percent and never under 90 percent of the slot), and listed in the allergen and diet tags and the prepared-text foods the same way as the rest. The sample amounts are what the builder prints at the recipe's own base target (protein / carbs / fat in grams); "lands on" is how many of the six sizes it fits on each target shape.
+
+**New food row (one):** `chuck_roast_trimmed`, USDA fdc 174051 (chuck arm pot roast, separable lean only, trimmed to 1/8 in fat, raw): 22.1 g protein, 0 carbs, 4.2 g fat per 100 g. The untrimmed chuck roast is 19 g protein and 19 g fat per 100 g, which no meal target allows once the protein is met. No lean jerky row was added: no turkey or lean jerky record exists in the stored USDA data, so the jerky snacks use less jerky (below).
+
+### Reworked (the six that were switched off, plus one that was narrow)
+
+1. **Chuck Roast & Sweet Potato Bowl** (lunch; omnivore, paleo). Now uses the trimmed chuck roast. Method: trim the visible fat, slow-cook and shred the roast, roast cubed sweet potato and asparagus, combine, olive oil for any fat still missing. Sample at 50 / 70 / 18: Trimmed Chuck Roast 199 g, Sweet Potato 348 g, Asparagus 100 g, Olive Oil 2.2 tsp (672 kcal). Lands on every everyday shape, 6 of 6 sizes.
+2. **Chuck Roast & Root Veggie Dinner** (dinner; omnivore, paleo). Trimmed chuck roast, russet potatoes, carrots and butter. Method: trim the fat, slow-cook with the potatoes and carrots until fork-tender, shred. Sample at 50 / 60 / 20: Trimmed Chuck Roast 195 g, Russet Potatoes 331 g, Carrots 80 g, Butter 2.7 tsp (640 kcal). Every everyday shape, 6 of 6; keto 3 of 6.
+3. **Slow-Braised Chuck Roast & Mash** (dinner; omnivore, keto, paleo). Was narrow (no omnivore or paleo size landed). Same change: trimmed chuck roast, braised in beef broth, over mashed potatoes with asparagus and butter. Sample at 50 / 60 / 20: Trimmed Chuck Roast 185 g, Russet Potatoes 310 g, Asparagus 100 g, Butter 2.9 tsp (609 kcal). Every shape including keto, 6 of 6.
+4. **String Cheese, Beef Jerky & Apple** (snack; omnivore, paleo). Beef jerky is about a quarter fat, so the jerky is limited to part of the protein and of the fat, and **hard-boiled egg whites carry the rest of the protein** (the one added food). Method: ready-to-eat pack of string cheese, jerky, egg whites, pumpkin seeds and apple slices. Sample at 25 / 25 / 8: 1 stick String Cheese, Beef Jerky 14 g, Egg Whites 135 g, Apple 152 g (282 kcal). Standard 6 of 6, low carb 6, high carb 5, high protein 4, light 4.
+5. **Cantaloupe & Beef Jerky** (snack; omnivore, paleo). Same idea: less jerky, hard-boiled egg whites for the rest of the protein. Sample at 25 / 25 / 8: Beef Jerky 21 g, Egg Whites 135 g, Cantaloupe 258 g, Pumpkin Seeds 5 g (278 kcal). Standard 6 of 6, low carb 6, high carb 5, high protein 6, light 6.
+6. **Beef Jerky & Hard-Boiled Eggs** (snack; **keto only now**: it was carnivore and keto). Jerky has about 11 g of carbs per 100 g, so a zero-carb plan cannot have it; the carbs cap the jerky, eggs carry the rest of the protein, macadamia nuts fill the fat. Sample at 25 / 4 / 28: 2 Hard-Boiled Eggs, Beef Jerky 29 g, Macadamia Nuts 15 g (372 kcal). Keto 6 of 6.
+7. **Salmon, Eggs & Avocado Plate** (breakfast; omnivore, pescatarian, keto, paleo). Salmon is 13 g fat per 100 g, so the plate keeps the salmon to part of the protein, adds egg whites for the rest, **and sourdough toast and berries when the target has carbs to fill** (two added foods; they stay out of the keto sizes, where they are not on Ron's keto list). Avocado is limited on low-carb targets (it brings carbs) and olive oil makes up the fat. Method: pan-sear the salmon, scramble the eggs with the whites, toast the sourdough, serve with avocado and berries. Sample at 40 / 60 / 15: Salmon 52 g, 1 Whole Egg, Egg Whites 129 g, Sourdough 2 slices, Berries 137 g, Avocado 9 g (541 kcal). Every shape, 5 or 6 of 6 sizes.
+
+### Added (three new recipes, the named gaps)
+
+8. **White Fish, Egg-White Scramble & Sourdough Toast** (breakfast; pescatarian, omnivore). A lean-fish breakfast for the pescatarian plans (the other two fish breakfasts are fatty salmon). Cod, egg whites, sourdough toast, berries for any carbs left, olive oil for the cooking fat. Method: pan-sear the cod in olive oil, scramble the egg whites, toast the sourdough, serve with berries. Sample at 40 / 60 / 15: White Fish (Cod, Raw) 124 g, Egg Whites 86 g, Sourdough 2 slices, Berries 149 g, Olive Oil 2.7 tsp (542 kcal). Every everyday shape, 6 of 6.
+9. **Cheese, Egg & Macadamia Snack Plate** (snack; keto). Hard-boiled eggs and string cheese for the protein, macadamia nuts for the rest of the fat, almost no carbs. Sample at 25 / 4 / 28: 2 Hard-Boiled Eggs, 2 sticks String Cheese, Macadamia 11 g (365 kcal). Keto 5 of 6.
+10. **Steak Bites & Hard-Boiled Eggs** (snack; carnivore, keto). Ribeye bites and eggs (protein and fat in about equal parts, no carbs), butter for any fat still missing. Method: sear ribeye bites in butter with sea salt, serve warm with hard-boiled eggs. Sample at 25 / 0 / 25 (carnivore): Ribeye 100 g, 1 Hard-Boiled Egg, Butter 1.2 tsp (about 348 kcal). Carnivore 6 of 6, keto 6 of 6.
+
+Two new name entries make the new lines resolve to foods: "Raw Macadamia Nuts" (the macadamia row, which no recipe used before) and "White Fish (Cod)" (the white-fish row, likewise). Counts are now 69 recipes (21 breakfast, 19 lunch, 19 dinner, 10 snack) and 151 foods; the tests say so.
+
