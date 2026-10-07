@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { redirectOneOnOneToAnchor } from "@/lib/coach-wide-redirect";
 import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
+import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { PackageManager, type CoachPackageRow, type LinkableProgramOption } from "@/components/coach/desktop/package-manager";
 
@@ -38,15 +39,21 @@ export default async function PackagesPage(
     .eq("id", params.groupId)
     .single();
 
+  // Every package this coach made in this organization, wherever they were standing when they made it (some were made inside a one-on-one client's group,
+  // which is no longer where this page opens). Each keeps its own group, which is what editing it must name.
+  const coachedGroups = await getCoachedGroups(supabase, user.id);
+  const orgGroupIds = Array.from(new Set([params.groupId, ...groupsInOrgOf(coachedGroups, params.groupId).map((g) => g.id)]));
+
   const { data: packageRows } = await supabase
     .from("coach_packages")
-    .select("id, name, sessions_per_week, billing_type, sessions_granted, rate_cents, is_active, is_public, default_program_id")
+    .select("id, group_id, name, sessions_per_week, billing_type, sessions_granted, rate_cents, is_active, is_public, default_program_id")
     .eq("coach_id", user.id)
-    .eq("group_id", params.groupId)
+    .in("group_id", orgGroupIds)
     .order("sessions_per_week", { ascending: true });
 
   const packages: CoachPackageRow[] = (packageRows ?? []).map((p) => ({
     id: p.id,
+    groupId: p.group_id,
     name: p.name,
     sessionsPerWeek: p.sessions_per_week,
     billingType: p.billing_type as "subscription" | "one_time",

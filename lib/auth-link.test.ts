@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseAuthLink } from "./auth-link";
+import { parseAuthLink, tokenSubject } from "./auth-link";
 
 describe("auth email links", () => {
   it("reads a session carried in the address fragment (server-made links)", () => {
@@ -28,5 +28,18 @@ describe("auth email links", () => {
   it("an ordinary address carries nothing", () => {
     expect(parseAuthLink({})).toEqual({ kind: "none" });
     expect(parseAuthLink({ hash: "", search: "?tab=forms" })).toEqual({ kind: "none" });
+  });
+});
+
+describe("tokenSubject", () => {
+  const b64 = (o: object) => Buffer.from(JSON.stringify(o)).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  it("reads who a session token is for", () => {
+    expect(tokenSubject(`h.${b64({ sub: "user-1", role: "authenticated" })}.s`)).toBe("user-1");
+  });
+  it("gives null for anything unreadable", () => {
+    expect(tokenSubject("nope")).toBeNull();
+    expect(tokenSubject("a.b.c")).toBeNull();
+    expect(tokenSubject(`h.${b64({ no: "sub" })}.s`)).toBeNull();
+    expect(tokenSubject("")).toBeNull();
   });
 });

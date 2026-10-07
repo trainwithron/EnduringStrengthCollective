@@ -30,3 +30,17 @@ export function parseAuthLink(input: { hash?: string; search?: string }): AuthLi
   if (code) return { kind: "code", code };
   return { kind: "none" };
 }
+
+// The person a session token is for (its "sub"), read WITHOUT trusting it: only to compare with who is already signed in, so a link for someone else is never
+// swapped in silently. Anything unreadable gives null.
+export function tokenSubject(accessToken: string): string | null {
+  try {
+    const part = accessToken.split(".")[1];
+    if (!part) return null;
+    const json = typeof atob === "function" ? atob(part.replace(/-/g, "+").replace(/_/g, "/")) : Buffer.from(part, "base64").toString("utf8");
+    const sub = (JSON.parse(json) as { sub?: unknown }).sub;
+    return typeof sub === "string" ? sub : null;
+  } catch {
+    return null;
+  }
+}
