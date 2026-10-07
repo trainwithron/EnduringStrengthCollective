@@ -49,10 +49,8 @@ export function ExerciseAthleteNote({
 }) {
   // A draft that never reached the server (a failed last save, the app killed) is kept on this phone and restored, so typed or dictated text is never lost.
   const draftKey = `note-draft:${sessionExerciseId}`;
-  const [draft, setDraft] = useState(() => {
-    const stored = readDraft(draftKey);
-    return stored != null && stored.trim() !== (initialNote ?? "").trim() ? stored : initialNote ?? "";
-  });
+  // (Restored in the mount effect below, not here: reading storage while rendering would make the first client render differ from the server's HTML.)
+  const [draft, setDraft] = useState(initialNote ?? "");
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [savedNote, setSavedNote] = useState(initialNote);
   const { registerPending } = useSetSave();
@@ -66,7 +64,8 @@ export function ExerciseAthleteNote({
         const { data, error } = await supabase.from("session_exercises").update({ athlete_note: trimmed }).eq("id", sessionExerciseId).select("id");
         if (!error && Array.isArray(data) && data.length === 1) {
           setSavedNote(trimmed);
-          clearDraft(draftKey);
+          // Clear the kept draft only if it is exactly what was just saved: if the person kept typing while the save was in flight, the newer text stays.
+          if ((readDraft(draftKey) ?? "").trim() === (trimmed ?? "")) clearDraft(draftKey);
           return true;
         }
         return false;
@@ -76,9 +75,14 @@ export function ExerciseAthleteNote({
   }
   const saver = saverRef.current;
 
-  // A restored draft is saved right away (it differs from what the server has).
+  // A draft kept on this phone that differs from what the server has is put back in the field and saved right away.
   useEffect(() => {
-    if (!readOnly && draft.trim() !== (initialNote ?? "").trim()) saver.change(draft);
+    if (readOnly) return;
+    const stored = readDraft(draftKey);
+    if (stored != null && stored.trim() !== (initialNote ?? "").trim()) {
+      setDraft(stored);
+      saver.change(stored);
+    }
     // only on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
