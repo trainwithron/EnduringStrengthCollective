@@ -4,6 +4,7 @@ import {
   ENCOURAGING_LINES,
   MAX_FUN_LINE_CHARS,
   RECENT_WINDOW,
+  RON_LINES,
   STAT_QUIPS,
   durationInWords,
   funLinePool,
@@ -154,10 +155,22 @@ describe("kindness: a small, short or empty session is never joked about", () =>
     }
   });
   it("no line is written in the client's own voice or about a body, food, skipping, age, a coach or guilt", () => {
-    for (const text of ABSURD_LINES) {
+    // Ron's own lines are exempt by exact text (see RON_LINES); everything else in the bank is held to the rules.
+    for (const text of ABSURD_LINES.filter((t) => !RON_LINES.includes(t))) {
       expect(text, text).not.toMatch(/\b(I|I'm|I'd|I'll|I've|my|me|mine|myself)\b/);
       expect(text.toLowerCase(), text).not.toMatch(/skip|burrito|abs\b|mirror|coach|diet|shorts|excuse|bank account|sit down|assistance|calorie|belly|waist/);
     }
+  });
+  it("Ron's lines are all in the bank exactly as written, fit the card, and stay clear of the body, shame and failure", () => {
+    expect(RON_LINES).toHaveLength(10);
+    for (const text of RON_LINES) {
+      expect(ABSURD_LINES, text).toContain(text);
+      expect(text.length, text).toBeLessThanOrEqual(110);
+      expect(text.toLowerCase(), text).not.toMatch(/\bfat\b|ugly|lazy|failure|you failed|disappoint|pathetic|skinny|obese|calorie|belly|waist|diet\b/);
+      expect(funLinePool(typical).map((l) => l.text), text).toContain(text);
+    }
+    // The Roosevelt quote is kept straight: nothing is added to it or changed.
+    expect(RON_LINES).toContain("The only thing we have to fear is fear itself. - Franklin D. Roosevelt");
   });
   it("no line mentions the body, weight loss, fat, shame or failure", () => {
     const all = [...ABSURD_LINES, ...ENCOURAGING_LINES, ...funLinePool({ ...typical, prCount: 1 }).map((l) => l.text)];
