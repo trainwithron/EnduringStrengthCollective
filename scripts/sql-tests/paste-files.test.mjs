@@ -316,6 +316,50 @@ for (const s of steps) {
   const err2 = await run(file);
   check("release-i: the bundle applies again after an undo" + (err2 ? ": " + err2 : ""), !err2);
 }
+// Release J (step 40): about you, baseline, phase of record. Applies on the live-shaped state, a second run is refused, the undo puts everything back (the notification
+// types exactly as they were, the required columns required again, guard_client_goal_update as 0284 had it), and it applies again.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-j");
+  const file = `apply/${bundle.file}`;
+  const st = steps.find((x) => x.n === "40");
+  const state = async () => (await db.query(`select
+      to_regclass('public.client_phase_plans') is not null as plans,
+      exists (select 1 from information_schema.columns where table_name = 'client_goals' and column_name = 'nutrition_phase') as goal_phase,
+      exists (select 1 from information_schema.columns where table_name = 'athlete_profile_details' and column_name = 'activity_level') as activity,
+      exists (select 1 from information_schema.columns where table_name = 'nutrition_checkin_suggestions' and column_name = 'kind') as kind,
+      (select is_nullable = 'NO' from information_schema.columns where table_name = 'nutrition_checkins' and column_name = 'prev_weight_lbs') as weight_required,
+      to_regprocedure('public.coach_set_body_profile(uuid, uuid, numeric, text, numeric, text, text, text, boolean)') is not null as fn,
+      (select md5(replace(replace(pg_get_functiondef(p.oid), chr(13), ''), 'new.nutrition_phase := null;', '')) from pg_proc p where p.oid = to_regprocedure('public.guard_client_goal_update()')) as guard_md5`)).rows[0];
+  const typeList = async () => {
+    const def = (await db.query(`select pg_get_constraintdef(oid) as d from pg_constraint where conname = 'notifications_type_check'`)).rows[0].d;
+    return [...def.matchAll(/'([^']+)'::text/g)].map((m) => m[1]).sort();
+  };
+  const widenedList = [...(await typeList()).filter((t) => t !== "Legacy_Type2"), "Legacy_Type2"];
+  await db.query("alter table public.notifications drop constraint notifications_type_check");
+  await db.query(`alter table public.notifications add constraint notifications_type_check check (type = any (array[${widenedList.map((t) => "'" + t + "'::text").join(", ")}]))`);
+  const eu = await run(`apply/undo-step${st.n}-${st.slug}.sql`);
+  check("release-j: undo-step40-0295.sql runs before the step (nothing to undo)" + (eu ? ": " + eu : ""), !eu);
+  const listBefore = await typeList();
+  const before = await state();
+  check("release-j: before it runs none of the new objects exist and a check-in still needs a previous weight", !before.plans && !before.goal_phase && !before.activity && !before.kind && before.weight_required && !before.fn, JSON.stringify(before));
+  const err = await run(file);
+  check("release-j bundle applies on the live-shaped state" + (err ? ": " + err : ""), !err);
+  const after = await state();
+  check("release-j: the table, columns and function exist and a baseline no longer needs a previous weight", after.plans && after.goal_phase && after.activity && after.kind && !after.weight_required && after.fn, JSON.stringify(after));
+  const listAfter = await typeList();
+  check("release-j: the full type list before is inside the list after, plus exactly the one new type", listBefore.every((t) => listAfter.includes(t)) && listAfter.length === listBefore.length + 1 && listAfter.includes("nutrition_baseline_ready") && listAfter.includes("Legacy_Type2"), JSON.stringify({ before: listBefore.length, after: listAfter.length }));
+  const again = await run(file);
+  check("release-j: a second run is refused, naming step 40 (" + again + ")", !!again && /step 40 \(0295\) cannot run/.test(again) && /already applied/.test(again));
+  const eu2 = await run(`apply/undo-step${st.n}-${st.slug}.sql`);
+  check("release-j: the undo runs after the step" + (eu2 ? ": " + eu2 : ""), !eu2);
+  const undone = await state();
+  check("release-j: after the undo the new objects are gone, a check-in needs a previous weight again, and the goal guard has its 0284 text", !undone.plans && !undone.goal_phase && !undone.activity && !undone.kind && undone.weight_required && !undone.fn && undone.guard_md5 === before.guard_md5, JSON.stringify({ undone, before }));
+  const listUndone = await typeList();
+  check("release-j: after the undo the type list is exactly what it was before the step", JSON.stringify(listUndone) === JSON.stringify(listBefore), JSON.stringify({ before: listBefore.length, undone: listUndone.length }));
+  const err2 = await run(file);
+  check("release-j: the bundle applies again after an undo" + (err2 ? ": " + err2 : ""), !err2);
+}
 // Steps 30 and 31: the copy matches the original, both groups are gone, and everything in them was saved first.
 {
   const gone = (await db.query("select count(*)::int as n from public.groups where id in ('b292055b-edc6-4171-ad2b-a89d65dcd8db', 'c368ab0b-ccab-442e-a42e-38fb22293182')")).rows[0].n;

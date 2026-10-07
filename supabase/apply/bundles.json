@@ -34,5 +34,13 @@
    "39"
   ],
   "file": "apply-release-i-all.sql"
+ },
+ {
+  "id": "release-j",
+  "name": "Release J (about you, baseline, phase of record)",
+  "steps": [
+   "40"
+  ],
+  "file": "apply-release-j-all.sql"
  }
 ]
