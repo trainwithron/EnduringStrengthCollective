@@ -48,7 +48,7 @@ describe("the coach's Another time", () => {
 describe("the wiring", () => {
   const read = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8");
   it("both client calendar pages offer the different-time control in request mode and say Booked for a slot another session overlaps", () => {
-    for (const p of ["../../app/groups/[groupId]/calendar/[date]/page.tsx", "../../app/groups/[groupId]/programs/[programId]/calendar/[date]/page.tsx"]) {
+    for (const p of ["../../app/(coach)/groups/[groupId]/calendar/[date]/page.tsx", "../../app/(coach)/groups/[groupId]/programs/[programId]/calendar/[date]/page.tsx"]) {
       const src = read(p);
       expect(src).toContain("<RequestDifferentTime");
       expect(src).toContain("customStartOptions(");
@@ -57,7 +57,7 @@ describe("the wiring", () => {
     }
   });
   it("the coach's day page and the drag-in scheduler have an Another time, and the scheduler marks overlapped slots as booked", () => {
-    expect(read("../../app/groups/[groupId]/calendar/[date]/page.tsx")).toContain("<AssignOtherTime");
+    expect(read("../../app/(coach)/groups/[groupId]/calendar/[date]/page.tsx")).toContain("<AssignOtherTime");
     const sched = read("../coach/desktop/expanded-day-scheduler.tsx");
     expect(sched).toContain("Another time");
     expect(sched).toContain("b.startMs < slotEndMs");

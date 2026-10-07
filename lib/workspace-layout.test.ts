@@ -9,6 +9,7 @@ import {
   readLayout,
   writeLayout,
   migrateLegacy,
+  clearWorkspaceStorage,
   MAX_DOCK_PANES,
   MAX_FLOATING,
   DOCK_MIN_WIDTH,
@@ -219,8 +220,30 @@ describe("moving over from the old panel and card stack", () => {
     expect(s.floating).toHaveLength(2);
     expect(s.floating[0]).toMatchObject({ x: 40, y: 60, w: 500, h: 600 });
     expect(s.floating[1].dest.path).toBe(`/groups/${G}/programs`);
+    expect(s.floating[1].dest.id).toBe(`page:programs:${G}`);
   });
   it("nothing set up before means nothing to move over", () => {
     expect(migrateLegacy({ panelView: null, panelWidth: null, panelCollapsed: null, layoutMode: null, cards: [] }, G, id)).toBeNull();
+  });
+});
+
+describe("sign-out", () => {
+  it("clears every saved workspace and nothing else", () => {
+    const data = new Map<string, string>([
+      ["esc.workspace.v1:coach1", "{}"],
+      ["esc.workspace.v1:coach2", "{}"],
+      ["esc.pendingBookingNotices.v2", "x"],
+      ["theme", "dark"],
+    ]);
+    const storage = {
+      get length() {
+        return data.size;
+      },
+      key: (i: number) => Array.from(data.keys())[i] ?? null,
+      removeItem: (k: string) => void data.delete(k),
+    };
+    clearWorkspaceStorage(storage);
+    expect(Array.from(data.keys())).toEqual(["esc.pendingBookingNotices.v2", "theme"]);
+    expect(() => clearWorkspaceStorage(null)).not.toThrow();
   });
 });

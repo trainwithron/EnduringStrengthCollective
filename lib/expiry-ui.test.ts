@@ -20,17 +20,17 @@ describe("credit expiry stays human", () => {
     expect(panel).not.toMatch(/auto-?send|sendMessage\(/);
   });
   it("the drafted note only opens in the coach's box and is capped, never sent by itself", () => {
-    const page = read("../app/groups/[groupId]/messages/[otherId]/page.tsx");
+    const page = read("../app/(coach)/groups/[groupId]/messages/[otherId]/page.tsx");
     expect(page).toContain('.slice(0, 600)');
     expect(page).toContain("initialDraft={viewerIsCoach ? initialDraft : \"\"}");
   });
   it("the panel is on the dashboard and the phone Home, and the heads-up days are a coach setting", () => {
-    expect(read("../app/dashboard/page.tsx")).toContain("<ExpiryCheckInPanel />");
+    expect(read("../app/(coach)/dashboard/page.tsx")).toContain("<ExpiryCheckInPanel />");
     expect(read("../components/coach/mobile/coach-mobile-home.tsx")).toContain("<ExpiryCheckInPanel />");
-    expect(read("../app/groups/[groupId]/availability/page.tsx")).toContain("ExpiryHeadsUpControl");
+    expect(read("../app/(coach)/groups/[groupId]/availability/page.tsx")).toContain("ExpiryHeadsUpControl");
   });
   it("a client is told the window where their balance is shown", () => {
-    for (const p of ["../app/groups/[groupId]/calendar/[date]/page.tsx", "../app/groups/[groupId]/programs/[programId]/calendar/[date]/page.tsx"]) {
+    for (const p of ["../app/(coach)/groups/[groupId]/calendar/[date]/page.tsx", "../app/(coach)/groups/[groupId]/programs/[programId]/calendar/[date]/page.tsx"]) {
       expect(read(p)).toContain("expiryWindowLine(creditExpiryDaysForNote)");
     }
   });

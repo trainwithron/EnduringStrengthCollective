@@ -212,7 +212,7 @@ function cleanDest(d: unknown): WorkspaceDestination | null {
   const o = d as Record<string, unknown>;
   if (typeof o.id !== "string" || typeof o.label !== "string" || typeof o.path !== "string") return null;
   if (!isAllowedWorkspacePath(o.path)) return null;
-  return { id: o.id.slice(0, 120), label: o.label.slice(0, 120), path: o.path, section: typeof o.section === "string" ? o.section.slice(0, 80) : "", keywords: Array.isArray(o.keywords) ? o.keywords.filter((k): k is string => typeof k === "string").slice(0, 10) : undefined };
+  return { id: o.id.slice(0, 120), label: o.label.slice(0, 120), path: o.path, section: typeof o.section === "string" ? o.section.slice(0, 80) : "", keywords: Array.isArray(o.keywords) ? o.keywords.filter((k): k is string => typeof k === "string").map((k) => k.slice(0, 40)).slice(0, 10) : undefined };
 }
 
 // Anything read back from storage is untrusted (an old version, a hand edit, a bug): keep what is valid, drop the rest, never throw.
@@ -302,7 +302,7 @@ export function migrateLegacy(legacy: LegacyWorkspace, groupId: string, newId: (
   const dest = (view: string): WorkspaceDestination | null => {
     const m = LEGACY_DEST[view];
     if (!m) return null;
-    const d: WorkspaceDestination = { id: `page:${m.page}`, label: m.label, section: m.section, path: m.path(groupId) };
+    const d: WorkspaceDestination = { id: m.page === "clients" ? `page:${m.page}` : `page:${m.page}:${groupId}`, label: m.label, section: m.section, path: m.path(groupId) };
     return isAllowedWorkspacePath(d.path) ? d : null;
   };
   let layout: WorkspaceLayout = EMPTY_LAYOUT;
@@ -330,4 +330,19 @@ export function migrateLegacy(legacy: LegacyWorkspace, groupId: string, newId: (
   // Nothing was set up before: start empty (the coach adds what they want).
   const anything = layout.dock.panes.length > 0 || layout.floating.length > 0;
   return anything ? layout : null;
+}
+
+// On sign-out the saved workspace goes too (its labels carry client names, and the next person on a shared computer must not see them).
+export function clearWorkspaceStorage(storage: Pick<Storage, "length" | "key" | "removeItem"> | null): void {
+  try {
+    if (!storage) return;
+    const keys: string[] = [];
+    for (let i = 0; i < storage.length; i++) {
+      const k = storage.key(i);
+      if (k && k.startsWith("esc.workspace.")) keys.push(k);
+    }
+    keys.forEach((k) => storage.removeItem(k));
+  } catch {
+    // Storage blocked: nothing was saved there.
+  }
 }

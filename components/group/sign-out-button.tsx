@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { clearWorkspaceStorage } from "@/lib/workspace-layout";
 
 export function SignOutButton() {
   const [signingOut, setSigningOut] = useState(false);
@@ -12,6 +13,7 @@ export function SignOutButton() {
     setSigningOut(true);
     const supabase = createBrowserClient();
     await supabase.auth.signOut();
+    clearWorkspaceStorage(window.localStorage);
     router.push("/login");
     router.refresh();
   }

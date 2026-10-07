@@ -20,8 +20,8 @@ describe("the hours editor shows the three numbers together", () => {
   });
   it("the gap is the coach's buffer: saved at once to the same setting as Booking rules, and the two fields stay in step", () => {
     expect(src).toContain('from("coach_booking_policies").upsert({ coach_id: coachId, buffer_minutes: n }');
-    expect(read("../../../app/groups/[groupId]/availability/page.tsx")).toContain("key={`policy-${policyRow?.buffer_minutes ?? 0}`}");
-    expect(read("../../../app/groups/[groupId]/availability/page.tsx")).toContain("initialBufferMinutes={policyRow?.buffer_minutes ?? 0}");
+    expect(read("../../../app/(coach)/groups/[groupId]/availability/page.tsx")).toContain("key={`policy-${policyRow?.buffer_minutes ?? 0}`}");
+    expect(read("../../../app/(coach)/groups/[groupId]/availability/page.tsx")).toContain("initialBufferMinutes={policyRow?.buffer_minutes ?? 0}");
   });
   it("a warning never stops the coach from saving", () => {
     expect(src).not.toMatch(/timingWarning\([^)]*\)[^;]*disabled/);
@@ -29,6 +29,6 @@ describe("the hours editor shows the three numbers together", () => {
   });
   it("the Calendar page's Availability tab shows the same three numbers", () => {
     expect(read("./calendar-page-tabs.tsx")).toContain("initialBufferMinutes={initialBufferMinutes}");
-    expect(read("../../../app/groups/[groupId]/calendar/page.tsx")).toContain("initialBufferMinutes={gapPolicy?.buffer_minutes ?? 0}");
+    expect(read("../../../app/(coach)/groups/[groupId]/calendar/page.tsx")).toContain("initialBufferMinutes={gapPolicy?.buffer_minutes ?? 0}");
   });
 });

@@ -65,21 +65,31 @@ const PAGES: PageDef[] = [
 // address can never make a pane load somewhere else.
 export function isAllowedWorkspacePath(path: string): boolean {
   if (typeof path !== "string" || path.length === 0 || path.length > 500) return false;
-  if (!path.startsWith("/") || path.startsWith("//") || path.includes("\\")) return false;
+  if (!path.startsWith("/") || path.startsWith("//") || path.includes("\\") || path.includes(";")) return false;
   if (/[\u0000-\u001f]/.test(path)) return false;
   // An encoded dot, slash or backslash is read by the browser as the real thing ("%2e%2e" is ".."): none is allowed.
   if (/%(2e|2f|5c)/i.test(path)) return false;
   const first = path.split(/[?#]/)[0];
   if (first.includes("..")) return false;
+  // Let the URL parser have the last word: what the browser would actually load must be the same address on the same site, with nothing collapsed or rewritten.
+  let parsed: URL;
+  try {
+    parsed = new URL(path, "http://workspace.invalid");
+  } catch {
+    return false;
+  }
+  if (parsed.origin !== "http://workspace.invalid" || parsed.pathname !== first) return false;
   return first === "/dashboard" || first === "/clients" || /^\/groups\/[0-9a-fA-F-]{8,40}(\/|$)/.test(first);
 }
 
 // The pages offered for one group. `isShared` is true inside a team or social group (the group-only pages are then offered).
-export function pageDestinations(groupId: string, isShared: boolean): WorkspaceDestination[] {
+// A page of a group belongs to THAT group: its id carries the group id (so Programs of two groups are two different views and neither brings the other forward),
+// and in a team or social group the group's name is in the section line.
+export function pageDestinations(groupId: string, isShared: boolean, groupName?: string): WorkspaceDestination[] {
   return PAGES.filter((p) => !p.groupOnly || isShared).map((p) => ({
-    id: `page:${p.key}`,
+    id: p.absolute ? `page:${p.key}` : `page:${p.key}:${groupId}`,
     label: p.label,
-    section: p.section,
+    section: !p.absolute && isShared && groupName ? `${p.section} · ${groupName}` : p.section,
     path: p.absolute ? p.path : `/groups/${groupId}/${p.path}`,
     keywords: p.keywords,
   }));

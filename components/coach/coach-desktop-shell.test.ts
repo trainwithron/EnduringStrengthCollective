@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 // The desktop rail is coach-level and short (Ron, Oct 6): Home keeps it, a client's group never becomes Home's anchor, the business name is a real menu,
 // and the advanced tools sit under More tools. Source-level guards so a later edit cannot bring the old behavior back.
 const shell = readFileSync(new URL("./coach-desktop-shell.tsx", import.meta.url), "utf8");
-const dashboard = readFileSync(new URL("../../app/dashboard/page.tsx", import.meta.url), "utf8");
+const dashboard = readFileSync(new URL("../../app/(coach)/dashboard/page.tsx", import.meta.url), "utf8");
 const finder = readFileSync(new URL("./desktop/client-finder.tsx", import.meta.url), "utf8");
 
 describe("coach desktop shell", () => {

@@ -60,7 +60,7 @@ describe("finishing a workout always ends on the card", () => {
     expect(src).toContain("if (postId) navHref = `/share/${postId}`;");
   });
   it("the client's Settings has the sharing control, for group members and not for a one-on-one client", () => {
-    const src = readFileSync(new URL("../app/groups/[groupId]/settings/page.tsx", import.meta.url), "utf8");
+    const src = readFileSync(new URL("../app/(coach)/groups/[groupId]/settings/page.tsx", import.meta.url), "utf8");
     expect(src).toContain("Sharing to the group feed");
     expect(src).toContain('client_tier?: string | null } | null)?.client_tier !== "one_on_one"');
     expect(readFileSync(new URL("../components/athlete/feed-broadcast-settings.tsx", import.meta.url), "utf8")).toContain("you still get your workout card to share");

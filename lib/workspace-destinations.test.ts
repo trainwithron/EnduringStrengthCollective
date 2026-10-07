@@ -14,9 +14,17 @@ describe("workspace destinations", () => {
   it("offers the group-only pages only inside a team or social group", () => {
     const solo = pageDestinations(G, false).map((d) => d.id);
     const shared = pageDestinations(G, true).map((d) => d.id);
-    expect(solo).not.toContain("page:team-performance");
-    expect(shared).toContain("page:team-performance");
-    expect(solo).toContain("page:calendar");
+    expect(solo).not.toContain(`page:team-performance:${G}`);
+    expect(shared).toContain(`page:team-performance:${G}`);
+    expect(solo).toContain(`page:calendar:${G}`);
+  });
+  it("a group's page has an id tied to that group, so two groups' Programs never count as one view", () => {
+    const a = pageDestinations(G, true, "Home Team").find((d) => d.label === "Programs")!;
+    const b = pageDestinations("1c2d3e4f-aaaa-4bbb-8ccc-123456789abc", true, "Alumni").find((d) => d.label === "Programs")!;
+    expect(a.id).not.toBe(b.id);
+    expect(a.section).toContain("Home Team");
+    // coach-wide pages stay one view whichever group you stand in
+    expect(pageDestinations(G, true).find((d) => d.label === "Clients")!.id).toBe(pageDestinations("1c2d3e4f-aaaa-4bbb-8ccc-123456789abc", true).find((d) => d.label === "Clients")!.id);
   });
   it("ids are unique", () => {
     const ids = pageDestinations(G, true).map((d) => d.id);
@@ -33,9 +41,9 @@ describe("workspace destinations", () => {
 describe("search", () => {
   const all = [...pageDestinations(G, true), ...clientDestinations({ athleteId: "11111111-2222-4333-8444-555555555555", name: "Maria Lopez", groupId: G })];
   it("finds a page by its name, by a prefix and by a related word", () => {
-    expect(searchDestinations(all, "calendar")[0].id).toBe("page:calendar");
+    expect(searchDestinations(all, "calendar")[0].id).toBe(`page:calendar:${G}`);
     expect(searchDestinations(all, "cal")[0].label.toLowerCase()).toContain("cal");
-    expect(searchDestinations(all, "money")[0].id).toBe("page:business");
+    expect(searchDestinations(all, "money")[0].id).toBe(`page:business:${G}`);
   });
   it("finds a client's pages by their name", () => {
     const r = searchDestinations(all, "maria");
@@ -61,7 +69,7 @@ describe("what a pane may load", () => {
     expect(isAllowedWorkspacePath(`/groups/${G}`)).toBe(true);
   });
   it("refuses outside addresses and tricks", () => {
-    for (const bad of ["https://evil.example/x", "//evil.example", "/\\evil.example", "javascript:alert(1)", "/admin/organizations", `/groups/${G}/../../admin`, "/groups/x/calendar", "", "groups/abc", "/api/clients/delete", `/groups/${G}/%2e%2e/admin`, `/groups/${G}/%2E%2E/%2e%2e/admin`, `/groups/${G}/a%2fb`, `/groups/${G}/a%5cb`]) {
+    for (const bad of ["/groups/aaaaaaaa/.%2e/x", "/groups/aaaaaaaa/%2e./x", "/groups/aaaaaaaa/%2e%2e/%2e%2e/api/x", "/groups/aaaaaaaa/x;y", "https://evil.example/x", "//evil.example", "/\\evil.example", "javascript:alert(1)", "/admin/organizations", `/groups/${G}/../../admin`, "/groups/x/calendar", "", "groups/abc", "/api/clients/delete", `/groups/${G}/%2e%2e/admin`, `/groups/${G}/%2E%2E/%2e%2e/admin`, `/groups/${G}/a%2fb`, `/groups/${G}/a%5cb`]) {
       expect(isAllowedWorkspacePath(bad), bad).toBe(false);
     }
     expect(isAllowedWorkspacePath("/groups/" + G + "/x\u0000y")).toBe(false);

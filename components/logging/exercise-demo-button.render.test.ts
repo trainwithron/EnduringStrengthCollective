@@ -43,6 +43,6 @@ describe("the logger shows the demo through the button, from the library, and ho
   });
   it("the session page gives the logger the library, and Settings has the hide control for clients", () => {
     expect(readFileSync(new URL("../../app/sessions/[sessionId]/page.tsx", import.meta.url), "utf8")).toContain("demoLibrary={demoLibrary}");
-    expect(readFileSync(new URL("../../app/groups/[groupId]/settings/page.tsx", import.meta.url), "utf8")).toContain("<HideDemosToggle />");
+    expect(readFileSync(new URL("../../app/(coach)/groups/[groupId]/settings/page.tsx", import.meta.url), "utf8")).toContain("<HideDemosToggle />");
   });
 });

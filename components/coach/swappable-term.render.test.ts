@@ -33,7 +33,7 @@ describe("a swapped word looks finished", () => {
     expect(html).toContain("<button");
     expect(html).toContain("Clients");
     expect(read("./desktop/terminology-settings-panel.tsx")).toContain("editable cap");
-    for (const f of ["../../app/groups/[groupId]/clients/page.tsx", "../../app/groups/[groupId]/business/page.tsx", "./coach-desktop-shell.tsx", "./desktop/dashboard-stat-tiles.tsx", "../../app/groups/[groupId]/programs/page.tsx"]) {
+    for (const f of ["../../app/(coach)/groups/[groupId]/clients/page.tsx", "../../app/(coach)/groups/[groupId]/business/page.tsx", "./coach-desktop-shell.tsx", "./desktop/dashboard-stat-tiles.tsx", "../../app/(coach)/groups/[groupId]/programs/page.tsx"]) {
       expect(read(f)).not.toMatch(/<SwappableTerm[^>]*\beditable\b/);
     }
   });
@@ -54,7 +54,7 @@ describe("the word is chosen once and changed in Settings", () => {
     expect(renderToStaticMarkup(createElement(TerminologyFirstRunCard, { groupId: "g" }))).toBe("");
   });
   it("Settings has the question for coaches, on desktop and the phone's Settings page, and the full list stays in Branding", () => {
-    const settings = read("../../app/groups/[groupId]/settings/page.tsx");
+    const settings = read("../../app/(coach)/groups/[groupId]/settings/page.tsx");
     expect(settings).toContain('label="What do you call your people?"');
     expect(settings).toContain("<TerminologyChooser");
     expect(read("./desktop/terminology-settings-panel.tsx")).toContain("What do you call your people?");
@@ -67,6 +67,6 @@ describe("the word is chosen once and changed in Settings", () => {
   it("the main buttons, headers and empty states use the chosen word", () => {
     expect(read("./desktop/add-client-button.tsx")).toContain('Add {t("client")}');
     expect(read("./desktop/pulse-tabs.tsx")).toContain('<SwappableTerm termKey="client" cap /> Pulse');
-    expect(read("../../app/groups/[groupId]/clients/page.tsx")).toContain('Only coaches can manage <SwappableTerm termKey="client" form="plural" />');
+    expect(read("../../app/(coach)/groups/[groupId]/clients/page.tsx")).toContain('Only coaches can manage <SwappableTerm termKey="client" form="plural" />');
   });
 });

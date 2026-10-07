@@ -39,7 +39,7 @@ describe("session types on hours", () => {
     expect(src).toContain("session_type_id: draft.sessionTypeId ?? null");
     expect(src).toContain("session_type_id: w.sessionTypeId");
     expect(src).toContain('(sessionTypeEnabled ? ", session_type_id" : "")');
-    expect(read("../../../app/groups/[groupId]/availability/page.tsx")).toContain("sessionTypeEnabled={sessionTypeEnabled}");
+    expect(read("../../../app/(coach)/groups/[groupId]/availability/page.tsx")).toContain("sessionTypeEnabled={sessionTypeEnabled}");
   });
 });
 
@@ -60,7 +60,7 @@ describe("the type shows where it is useful", () => {
     const html = renderToStaticMarkup(createElement(BookingTypeSelect, { bookingId: "b", types, current: "t1" }));
     expect(html).toContain("Session type");
     expect(html).toContain("No type");
-    expect(read("../../../app/groups/[groupId]/calendar/[date]/page.tsx")).toContain("<BookingTypeSelect");
+    expect(read("../../../app/(coach)/groups/[groupId]/calendar/[date]/page.tsx")).toContain("<BookingTypeSelect");
     expect(read("./calendar-spotter-panel.tsx")).toContain("sessionTypeName");
   });
   it("tagging never touches credits: only session_type_id is written", () => {

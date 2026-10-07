@@ -7,8 +7,9 @@ import { dedupeClients, type FinderClient } from "@/lib/client-finder";
 import { clientDestinations, pageDestinations, searchDestinations, type WorkspaceDestination } from "@/lib/workspace-destinations";
 import { useWorkspace } from "./workspace-context";
 
-// "Add a view": type what you want next to your page (Calendar, Business, a client's name, "maria messages") and pick it. Enter puts it in the panel; Shift+Enter
-// (or the Card button) floats it as a card. With nothing typed, the views you used last come first. There are no fixed presets.
+// "Add a view": type what you want next to your page (Calendar, Business, a client's name, "maria messages") and pick it. Enter on the search box puts the highlighted
+// one in the panel; Shift+Enter floats it as a card. Each row has a Panel and a Card button for the mouse and for Tab. With nothing typed, the views you used last
+// come first. There are no fixed presets.
 export function PanePicker() {
   const ws = useWorkspace();
   const open = !!ws?.pickerOpen;
@@ -16,6 +17,7 @@ export function PanePicker() {
   const [active, setActive] = useState(0);
   const [clients, setClients] = useState<FinderClient[] | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -61,7 +63,7 @@ export function PanePicker() {
 
   const all = useMemo<WorkspaceDestination[]>(() => {
     if (!ws) return [];
-    const pages = pageDestinations(ws.groupId, ws.isShared);
+    const pages = pageDestinations(ws.groupId, ws.isShared, ws.groupName);
     const people = (clients ?? []).flatMap((c) => clientDestinations({ athleteId: c.id, name: c.fullName, groupId: c.groupId }));
     return [...pages, ...people];
   }, [ws, clients]);
@@ -80,11 +82,10 @@ export function PanePicker() {
     ws!.openDest(dest, where);
     ws!.setPickerOpen(false);
   }
-  function onKey(e: React.KeyboardEvent) {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      ws!.setPickerOpen(false);
-    } else if (e.key === "ArrowDown") {
+
+  // Keys on the search box only: arrows move the highlight, Enter opens it. A key pressed on a button belongs to that button.
+  function onInputKey(e: React.KeyboardEvent) {
+    if (e.key === "ArrowDown") {
       e.preventDefault();
       setActive((a) => Math.min(results.length - 1, a + 1));
     } else if (e.key === "ArrowUp") {
@@ -95,44 +96,53 @@ export function PanePicker() {
       choose(results[active], e.shiftKey ? "floating" : "dock");
     }
   }
+  // Escape closes; Tab stays inside the dialog (the page behind is not reachable while it is open).
+  function onDialogKey(e: React.KeyboardEvent) {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      ws!.setPickerOpen(false);
+      return;
+    }
+    if (e.key !== "Tab") return;
+    const focusable = dialogRef.current?.querySelectorAll<HTMLElement>("input, button");
+    if (!focusable || focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-[90] flex items-start justify-center pt-[12vh] px-4 bg-black/50" onMouseDown={(e) => e.target === e.currentTarget && ws.setPickerOpen(false)}>
-      <div role="dialog" aria-modal="true" aria-label="Add a view to your workspace" className="w-full max-w-xl bg-surface border border-steel/30 shadow-xl" onKeyDown={onKey}>
+      <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Add a view to your workspace" className="w-full max-w-xl bg-surface border border-steel/30 shadow-xl" onKeyDown={onDialogKey}>
         <div className="flex items-center gap-2 px-3 border-b border-steel/20">
           <Search className="w-4 h-4 text-steel shrink-0" aria-hidden="true" />
           <input
             ref={inputRef}
-            role="combobox"
-            aria-expanded="true"
-            aria-controls="workspace-picker-list"
-            aria-activedescendant={results[active] ? `workspace-picker-${active}` : undefined}
             aria-label="Search pages and clients"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={onInputKey}
             placeholder="Calendar, Business, a client's name…"
             className="flex-1 h-12 bg-transparent text-chalk font-body text-sm focus:outline-none"
           />
         </div>
-        <p className="px-3 pt-2 font-body text-xs text-steel">{showingRecents ? "Recent" : results.length === 0 ? "" : "Matches"}. Enter puts it in the panel; Shift+Enter makes it a card.</p>
-        <ul id="workspace-picker-list" role="listbox" className="max-h-[50vh] overflow-y-auto py-1">
+        <p className="px-3 pt-2 font-body text-xs text-steel" aria-live="polite">
+          {showingRecents ? "Recent" : results.length === 0 ? "" : `${results.length} match${results.length === 1 ? "" : "es"}`}. Enter puts the highlighted one in the panel; Shift+Enter makes it a card.
+        </p>
+        <ul className="max-h-[50vh] overflow-y-auto py-1">
           {results.map((d, i) => (
-            <li
-              key={d.id}
-              id={`workspace-picker-${i}`}
-              role="option"
-              aria-selected={i === active}
-              onMouseEnter={() => setActive(i)}
-              className={`flex items-center gap-2 px-3 min-h-[44px] ${i === active ? "bg-rust/10" : ""}`}
-            >
-              <button type="button" onClick={() => choose(d, "dock")} className="flex-1 min-w-0 text-left py-2">
+            <li key={d.id} onMouseEnter={() => setActive(i)} className={`flex items-center gap-2 px-3 min-h-[44px] ${i === active ? "bg-rust/10" : ""}`}>
+              <button type="button" onClick={() => choose(d, "dock")} className="flex-1 min-w-0 text-left py-2" aria-label={`${d.label}, ${d.section}. Open in the panel`}>
                 <span className="block font-body text-sm text-chalk truncate">{d.label}</span>
                 <span className="block font-body text-xs text-steel truncate">{d.section}</span>
               </button>
-              <button type="button" onClick={() => choose(d, "dock")} className="h-9 px-3 border border-steel/40 text-chalk font-body text-xs shrink-0">
-                Panel
-              </button>
-              <button type="button" onClick={() => choose(d, "floating")} className="h-9 px-3 border border-steel/40 text-chalk font-body text-xs shrink-0">
+              <button type="button" onClick={() => choose(d, "floating")} className="h-9 px-3 border border-steel/40 text-chalk font-body text-xs shrink-0" aria-label={`${d.label}: open as a card`}>
                 Card
               </button>
             </li>

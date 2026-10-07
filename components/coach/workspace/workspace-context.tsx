@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useReducer,
 import { useRouter } from "next/navigation";
 import {
   EMPTY_LAYOUT,
+  LAYOUT_VERSION,
   effectiveLayout,
   migrateLegacy,
   readLayout,
@@ -15,10 +16,11 @@ import {
 } from "@/lib/workspace-layout";
 import type { WorkspaceDestination } from "@/lib/workspace-destinations";
 import { readCardStackLayout, readLayoutMode } from "@/lib/coach-shell-panel-storage";
-import { MUTATION_MESSAGE, debounce, installMutationReporter } from "@/lib/workspace-mutation";
+import { MUTATION_MESSAGE, REFRESH_MESSAGE, SIGNED_OUT_MESSAGE, createRefreshLimiter, debounce, installMutationReporter, paneActivity } from "@/lib/workspace-mutation";
 
 // The unified workspace's state for one coach in one browser: what is open in the right-hand panel and as floating cards (lib/workspace-layout.ts holds the rules),
-// kept in this browser, shared live between this coach's tabs, and a "something was saved" signal that makes every pane show the change.
+// kept in this browser, shared live between this coach's tabs, and a "something was saved" signal that refreshes the panes softly. It lives in the coach area's layout
+// (components/coach/workspace/workspace-host.tsx), ABOVE the pages, so panes keep their pages (and anything half-typed in them) while the main page navigates.
 // The rail's own left panel is NOT part of this: it stays the coach's navigator.
 
 // Where the rail ends and the floating area begins (the rail is 64 px wide plus its border).
@@ -34,17 +36,23 @@ interface WorkspaceApi {
   viewportWidth: number;
   // The space cards float in: right of the rail, under the toolbar.
   area: Bounds;
+  // The panel's width in pixels right now (0 when it is closed or there is no room).
+  dockWidth: number;
   dispatch: (action: WorkspaceAction) => void;
   openDest: (dest: WorkspaceDestination, where: "dock" | "floating") => void;
   pickerOpen: boolean;
   setPickerOpen: (open: boolean) => void;
   groupId: string;
+  groupName: string;
   isShared: boolean;
   registerFrame: (paneId: string, el: HTMLIFrameElement | null) => void;
-  reloadPane: (paneId: string) => void;
-  // Closes a pane without losing a half-finished edit: a field being edited is let go of first (the app saves a field when it loses focus), and the pane is removed a
-  // moment later so that save is not cut off.
+  // Closes a pane without losing work: waits for saves that are still going, and asks first if there is typed text that was never saved.
   requestClose: (paneId: string) => void;
+  // Automatic refreshes are limited (3 a minute); when the limit is hit they pause and this is true, until the coach refreshes by hand.
+  refreshPaused: boolean;
+  refreshNow: () => void;
+  // A pane found the session has ended.
+  signedOut: boolean;
 }
 
 const Ctx = createContext<WorkspaceApi | null>(null);
@@ -55,15 +63,32 @@ export function useWorkspace(): WorkspaceApi | null {
 
 const newId = () => (typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`);
 
-export function WorkspaceProvider({ coachId, groupId, isShared, children }: { coachId: string | null; groupId: string; isShared: boolean; children: React.ReactNode }) {
+type PaneWindow = Window & { __escPane?: typeof paneActivity };
+
+export function WorkspaceProvider({
+  coachId,
+  groupId,
+  groupName,
+  isShared,
+  children,
+}: {
+  coachId: string | null;
+  groupId: string;
+  groupName: string;
+  isShared: boolean;
+  children: React.ReactNode;
+}) {
   const router = useRouter();
   const [stored, dispatch] = useReducer(reduce, EMPTY_LAYOUT);
   const [ready, setReady] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [viewport, setViewport] = useState({ width: 1440, height: 900 });
+  const [refreshPaused, setRefreshPaused] = useState(false);
+  const [signedOut, setSignedOut] = useState(false);
   const frames = useRef(new Map<string, HTMLIFrameElement>());
-  const fromOtherTab = useRef(false);
   const tabId = useRef(newId());
+  // The layout a message from another tab carried: when our state becomes exactly that, it is not sent back out.
+  const echoOf = useRef<string | null>(null);
   const enabled = !!coachId;
 
   // Load once the coach is known: this browser's saved layout, else whatever the old floating card stack had open.
@@ -85,6 +110,7 @@ export function WorkspaceProvider({ coachId, groupId, isShared, children }: { co
   }, [coachId]);
 
   useEffect(() => {
+    // Make sure the page's fetch is wrapped before anything saves (see lib/workspace-mutation.ts).
     function measure() {
       setViewport({ width: window.innerWidth, height: window.innerHeight });
     }
@@ -100,92 +126,147 @@ export function WorkspaceProvider({ coachId, groupId, isShared, children }: { co
     const channel = new BroadcastChannel(`esc-workspace:${coachId}`);
     channelRef.current = channel;
     channel.onmessage = (e: MessageEvent) => {
-      if (e.data?.from === tabId.current || !e.data?.layout) return;
-      fromOtherTab.current = true;
-      dispatch({ type: "replace", layout: e.data.layout });
+      const incoming = e.data?.layout;
+      if (e.data?.from === tabId.current || !incoming) return;
+      // A tab running a different version of the app (during a deploy) must not overwrite this one's layout with what it understands.
+      if (incoming.version !== LAYOUT_VERSION) return;
+      echoOf.current = JSON.stringify(incoming);
+      setTimeout(() => {
+        echoOf.current = null;
+      }, 2000);
+      dispatch({ type: "replace", layout: incoming });
     };
     return () => {
       channel.close();
       channelRef.current = null;
     };
   }, [coachId]);
+  // Saved a moment after the last change (dragging a card changes the layout on every move: one save when it settles, not hundreds).
   useEffect(() => {
     if (!ready || !coachId) return;
-    writeLayout(coachId, stored, window.localStorage);
-    if (fromOtherTab.current) {
-      fromOtherTab.current = false;
-      return;
-    }
-    channelRef.current?.postMessage({ from: tabId.current, layout: stored });
+    const timer = setTimeout(() => {
+      writeLayout(coachId, stored, window.localStorage);
+      if (echoOf.current !== null && JSON.stringify(stored) === echoOf.current) {
+        echoOf.current = null;
+        return;
+      }
+      channelRef.current?.postMessage({ from: tabId.current, layout: stored });
+    }, 250);
+    return () => clearTimeout(timer);
   }, [stored, ready, coachId]);
 
-  // Cross-pane refresh: a save on this page reloads every pane; a save inside a pane reloads the OTHER panes and refreshes this page.
+  const layout = useMemo(() => effectiveLayout(stored, viewport.width), [stored, viewport.width]);
+
+  // The panel's width, and the room it takes from the page (the page keeps this much clear on its right: see the shell's main).
+  const dockWidth = useMemo(() => {
+    if (!enabled || !ready || viewport.width < 1024) return 0;
+    if (!layout.dock.open || layout.dock.panes.length === 0) return 0;
+    return Math.min(layout.dock.width, Math.max(300, viewport.width - RAIL_WIDTH - 360));
+  }, [enabled, ready, layout.dock.open, layout.dock.panes.length, layout.dock.width, viewport.width]);
+  useEffect(() => {
+    document.documentElement.style.setProperty("--ws-dock", `${dockWidth}px`);
+    return () => {
+      document.documentElement.style.removeProperty("--ws-dock");
+    };
+  }, [dockWidth]);
+
+  const area = useMemo<Bounds>(
+    () => ({ width: Math.max(320, viewport.width - RAIL_WIDTH - dockWidth), height: Math.max(240, viewport.height - TOP_OFFSET) }),
+    [dockWidth, viewport]
+  );
+
   const registerFrame = useCallback((paneId: string, el: HTMLIFrameElement | null) => {
     if (el) frames.current.set(paneId, el);
     else frames.current.delete(paneId);
   }, []);
-  const reloadPane = useCallback((paneId: string) => {
+
+  // Which panes the coach can see right now. A pane that is hidden (another tab, a closed panel, a minimized card) is not refreshed; it is refreshed when it is shown.
+  const visibleIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (layout.dock.open) {
+      const active = layout.dock.panes.find((p) => p.id === layout.dock.activeId) ?? layout.dock.panes[0];
+      if (active) ids.add(active.id);
+    }
+    for (const c of layout.floating) if (!c.minimized) ids.add(c.id);
+    return ids;
+  }, [layout]);
+  const visibleRef = useRef(visibleIds);
+  visibleRef.current = visibleIds;
+  const stale = useRef(new Set<string>());
+
+  // A SOFT refresh: the pane's page is asked to refresh its data (router.refresh inside the pane), which keeps what is typed in it. A hard reload is never used.
+  const softRefresh = useCallback((paneId: string) => {
     const el = frames.current.get(paneId);
-    if (!el) return;
     try {
-      el.contentWindow?.location.reload();
+      el?.contentWindow?.postMessage({ type: REFRESH_MESSAGE }, window.location.origin);
     } catch {
-      el.src = el.src;
+      // not ready yet: it will load fresh anyway
     }
   }, []);
-  const requestClose = useCallback((paneId: string) => {
-    const el = frames.current.get(paneId);
-    let waited = false;
-    try {
-      const active = el?.contentDocument?.activeElement as HTMLElement | null | undefined;
-      const editable = active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.tagName === "SELECT" || active.isContentEditable);
-      if (editable) {
-        active.blur();
-        waited = true;
+  useEffect(() => {
+    stale.current.forEach((id) => {
+      if (visibleIds.has(id)) {
+        stale.current.delete(id);
+        softRefresh(id);
       }
-    } catch {
-      // The page is not readable (still loading): just close it.
-    }
-    if (waited) setTimeout(() => dispatch({ type: "close", id: paneId }), 700);
-    else dispatch({ type: "close", id: paneId });
-  }, []);
+    });
+  }, [visibleIds, softRefresh]);
+
+  const refreshPanes = useCallback(
+    (except: Window | null) => {
+      frames.current.forEach((el, id) => {
+        if (except && el.contentWindow === except) return;
+        if (visibleRef.current.has(id)) softRefresh(id);
+        else stale.current.add(id);
+      });
+    },
+    [softRefresh]
+  );
+
+  // Automatic refreshes: at most three a minute, then they pause (and the toolbar says so) until the coach refreshes by hand. A page that saves on a timer could
+  // otherwise keep every pane refreshing forever.
+  const limiter = useRef(createRefreshLimiter(3, 60_000));
+  const quietUntil = useRef(0);
+  const attempt = useCallback(
+    (except: Window | null, alsoPage: boolean) => {
+      if (!limiter.current.allow()) {
+        setRefreshPaused(true);
+        console.warn("workspace: automatic refresh paused (more than 3 in a minute)");
+        return;
+      }
+      // A refresh makes pages load, and a page may save something while loading (a "last seen" mark): saves in the next few seconds are ignored, so a refresh can
+      // never set off another one.
+      quietUntil.current = Date.now() + 6000;
+      refreshPanes(except);
+      if (alsoPage) router.refresh();
+    },
+    [refreshPanes, router]
+  );
+  const refreshNow = useCallback(() => {
+    limiter.current.reset();
+    setRefreshPaused(false);
+    quietUntil.current = Date.now() + 6000;
+    refreshPanes(null);
+    router.refresh();
+  }, [refreshPanes, router]);
 
   useEffect(() => {
     if (!enabled) return;
-    const reloadAll = (except: Window | null) => {
-      frames.current.forEach((el) => {
-        if (except && el.contentWindow === except) return;
-        try {
-          el.contentWindow?.location.reload();
-        } catch {
-          el.src = el.src;
-        }
-      });
-    };
     let lastSource: Window | null = null;
-    // A reload or refresh makes pages load, and a page may save something while loading (a "last seen" mark). Saves in the few seconds after a refresh the workspace
-    // itself caused are ignored, so a refresh can never set off another one in a loop.
-    let quietUntil = 0;
-    const quiet = () => Date.now() < quietUntil;
-    const settle = () => {
-      quietUntil = Date.now() + 6000;
-    };
-    const fromPane = debounce(() => {
-      settle();
-      reloadAll(lastSource);
-      router.refresh();
-    }, 1500);
-    const fromPage = debounce(() => {
-      settle();
-      reloadAll(null);
-    }, 1500);
+    const fromPane = debounce(() => attempt(lastSource, true), 1500);
+    const fromPage = debounce(() => attempt(null, false), 1500);
     const undo = installMutationReporter(() => {
-      if (!quiet()) fromPage();
+      if (Date.now() >= quietUntil.current) fromPage();
     });
     function onMessage(e: MessageEvent) {
-      if (e.origin !== window.location.origin || e.data?.type !== MUTATION_MESSAGE) return;
+      if (e.origin !== window.location.origin) return;
       const known = Array.from(frames.current.values()).some((f) => f.contentWindow === e.source);
-      if (!known || quiet()) return;
+      if (!known) return;
+      if (e.data?.type === SIGNED_OUT_MESSAGE) {
+        setSignedOut(true);
+        return;
+      }
+      if (e.data?.type !== MUTATION_MESSAGE || Date.now() < quietUntil.current) return;
       lastSource = e.source as Window;
       fromPane();
     }
@@ -194,13 +275,32 @@ export function WorkspaceProvider({ coachId, groupId, isShared, children }: { co
       undo();
       window.removeEventListener("message", onMessage);
     };
-  }, [enabled, router]);
+  }, [enabled, attempt]);
 
-  const layout = useMemo(() => effectiveLayout(stored, viewport.width), [stored, viewport.width]);
-  const area = useMemo<Bounds>(() => {
-    const dockWidth = layout.dock.open && layout.dock.panes.length > 0 ? Math.min(layout.dock.width, Math.max(0, viewport.width - RAIL_WIDTH - 360)) : 0;
-    return { width: Math.max(320, viewport.width - RAIL_WIDTH - dockWidth), height: Math.max(240, viewport.height - TOP_OFFSET) };
-  }, [layout.dock.open, layout.dock.panes.length, layout.dock.width, viewport]);
+  const requestClose = useCallback((paneId: string) => {
+    void (async () => {
+      const el = frames.current.get(paneId);
+      const activityOf = () => {
+        try {
+          return (el?.contentWindow as PaneWindow | null | undefined)?.__escPane;
+        } catch {
+          return undefined;
+        }
+      };
+      try {
+        const active = el?.contentDocument?.activeElement as HTMLElement | null | undefined;
+        const editable = active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.tagName === "SELECT" || active.isContentEditable);
+        if (editable) active.blur(); // the app saves a field when it loses focus
+      } catch {
+        // the page is not readable (still loading): just close it
+      }
+      // Give a save that this started a moment to begin, then wait (up to 5 s) for saves still going: removing the pane would cancel them.
+      await new Promise((r) => setTimeout(r, 350));
+      for (let i = 0; i < 50 && (activityOf()?.inFlight ?? 0) > 0; i++) await new Promise((r) => setTimeout(r, 100));
+      if (activityOf()?.typed && !window.confirm("Close and discard what you typed? It has not been saved or sent.")) return;
+      dispatch({ type: "close", id: paneId });
+    })();
+  }, []);
 
   const openDest = useCallback(
     (dest: WorkspaceDestination, where: "dock" | "floating") => {
@@ -210,8 +310,8 @@ export function WorkspaceProvider({ coachId, groupId, isShared, children }: { co
   );
 
   const api = useMemo<WorkspaceApi>(
-    () => ({ ready, enabled, layout, viewportWidth: viewport.width, area, dispatch, openDest, pickerOpen, setPickerOpen, groupId, isShared, registerFrame, reloadPane, requestClose }),
-    [ready, enabled, layout, viewport.width, area, openDest, pickerOpen, groupId, isShared, registerFrame, reloadPane, requestClose]
+    () => ({ ready, enabled, layout, viewportWidth: viewport.width, area, dockWidth, dispatch, openDest, pickerOpen, setPickerOpen, groupId, groupName, isShared, registerFrame, requestClose, refreshPaused, refreshNow, signedOut }),
+    [ready, enabled, layout, viewport.width, area, dockWidth, openDest, pickerOpen, groupId, groupName, isShared, registerFrame, requestClose, refreshPaused, refreshNow, signedOut]
   );
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
 }

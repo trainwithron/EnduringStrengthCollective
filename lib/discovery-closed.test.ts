@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 // and the coach panel that suggested the link is gone. These guard against it being quietly reopened.
 const page = readFileSync(new URL("../app/book/[coachId]/page.tsx", import.meta.url), "utf8");
 const api = readFileSync(new URL("../app/api/discovery-availability/[coachId]/route.ts", import.meta.url), "utf8");
-const availability = readFileSync(new URL("../app/groups/[groupId]/availability/page.tsx", import.meta.url), "utf8");
+const availability = readFileSync(new URL("../app/(coach)/groups/[groupId]/availability/page.tsx", import.meta.url), "utf8");
 
 describe("old discovery-call page is closed", () => {
   it("the id link never renders the booking flow", () => {

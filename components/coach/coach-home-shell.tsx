@@ -1,6 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import { EmbeddedActivityReporter } from "@/components/coach/workspace/embedded-activity-reporter";
-import { isEmbeddedRequest } from "@/lib/embedded-request";
+import { useEmbedded } from "@/components/shared/embedded-context";
 import { Home } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
@@ -61,8 +63,8 @@ function CoachHomeShellFull({ orgName, children }: { orgName: string; children: 
 }
 
 // Shown inside a workspace pane: just the content (see components/shared/embedded-context.tsx).
-export async function CoachHomeShell(props: { orgName: string; children: React.ReactNode }) {
-  const embedded = await isEmbeddedRequest();
+export function CoachHomeShell(props: { orgName: string; children: React.ReactNode }) {
+  const embedded = useEmbedded();
   if (embedded) {
     return (
       <TerminologyProvider>

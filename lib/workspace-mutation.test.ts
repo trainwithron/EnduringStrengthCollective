@@ -1,29 +1,38 @@
 import { describe, it, expect, vi } from "vitest";
-import { isWriteRequest, debounce } from "./workspace-mutation";
+import { isWriteRequest, debounce, createRefreshLimiter } from "./workspace-mutation";
 
 const ORIGIN = "https://app.example.com";
 const SB = "https://abcd.supabase.co";
 
 describe("what counts as a save", () => {
-  it("a write to the app's own API or the database does", () => {
+  it("a save to one of the app's own saving routes or a table does", () => {
     expect(isWriteRequest("POST", "/api/clients/invite", ORIGIN, SB)).toBe(true);
-    expect(isWriteRequest("PATCH", `${SB}/rest/v1/session_credits?athlete_id=eq.1`, ORIGIN, SB)).toBe(true);
     expect(isWriteRequest("DELETE", `${ORIGIN}/api/coach/packages`, ORIGIN, SB)).toBe(true);
+    expect(isWriteRequest("POST", "/api/series/occurrence", ORIGIN, SB)).toBe(true);
+    expect(isWriteRequest("PATCH", `${SB}/rest/v1/session_credits?athlete_id=eq.1`, ORIGIN, SB)).toBe(true);
+    expect(isWriteRequest("POST", `${SB}/rest/v1/habit_logs`, ORIGIN, SB)).toBe(true);
+  });
+  it("a database function counts unless it is named like a read", () => {
     expect(isWriteRequest("POST", `${SB}/rest/v1/rpc/book_session`, ORIGIN, SB)).toBe(true);
+    expect(isWriteRequest("POST", `${SB}/rest/v1/rpc/cancel_booking_and_refund_credit`, ORIGIN, SB)).toBe(true);
+    expect(isWriteRequest("POST", `${SB}/rest/v1/rpc/get_last_workout_per_athlete`, ORIGIN, SB)).toBe(false);
+    expect(isWriteRequest("POST", `${SB}/rest/v1/rpc/coach_roster_activity`, ORIGIN, SB)).toBe(false);
+    expect(isWriteRequest("POST", `${SB}/rest/v1/rpc/booking_counts`, ORIGIN, SB)).toBe(false);
   });
   it("a read does not", () => {
     expect(isWriteRequest("GET", "/api/clients", ORIGIN, SB)).toBe(false);
     expect(isWriteRequest(undefined, `${SB}/rest/v1/profiles`, ORIGIN, SB)).toBe(false);
     expect(isWriteRequest("HEAD", "/api/x", ORIGIN, SB)).toBe(false);
   });
-  it("measuring and sign-in plumbing do not", () => {
-    expect(isWriteRequest("POST", "/api/health", ORIGIN, SB)).toBe(false);
-    expect(isWriteRequest("POST", "/api/push/subscribe", ORIGIN, SB)).toBe(false);
+  it("chat, AI, search, push and measuring requests are not saves even though they are POSTs", () => {
+    for (const p of ["/api/assistant/action", "/api/collective-intelligence/chat", "/api/ai/generate-program", "/api/food/search", "/api/push/subscribe", "/api/health", "/api/feedback", "/api/session-pattern-check"]) {
+      expect(isWriteRequest("POST", p, ORIGIN, SB), p).toBe(false);
+    }
     expect(isWriteRequest("POST", `${SB}/auth/v1/token?grant_type=refresh_token`, ORIGIN, SB)).toBe(false);
     expect(isWriteRequest("POST", `${SB}/storage/v1/object/x`, ORIGIN, SB)).toBe(false);
   });
   it("another site never does", () => {
-    expect(isWriteRequest("POST", "https://evil.example/api/x", ORIGIN, SB)).toBe(false);
+    expect(isWriteRequest("POST", "https://evil.example/api/clients/x", ORIGIN, SB)).toBe(false);
     expect(isWriteRequest("POST", "not a url at all ::", ORIGIN, undefined)).toBe(false);
   });
 });
@@ -41,5 +50,22 @@ describe("debounce", () => {
     vi.advanceTimersByTime(2);
     expect(run).toHaveBeenCalledTimes(1);
     vi.useRealTimers();
+  });
+});
+
+describe("the automatic refresh limit", () => {
+  it("allows three a minute, then stops until a minute has passed", () => {
+    const lim = createRefreshLimiter(3, 60_000);
+    expect([0, 1000, 2000].map((t) => lim.allow(t))).toEqual([true, true, true]);
+    expect(lim.allow(3000)).toBe(false);
+    expect(lim.allow(59_000)).toBe(false);
+    expect(lim.allow(60_001)).toBe(true);
+  });
+  it("can be reset by a manual refresh", () => {
+    const lim = createRefreshLimiter(1, 60_000);
+    expect(lim.allow(0)).toBe(true);
+    expect(lim.allow(10)).toBe(false);
+    lim.reset();
+    expect(lim.allow(20)).toBe(true);
   });
 });

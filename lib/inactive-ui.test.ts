@@ -7,7 +7,7 @@ const read = (p: string) => readFileSync(resolve(__dirname, p), "utf8");
 describe("inactive clients: wiring and safety", () => {
   const panel = read("../components/coach/inactive-clients-panel.tsx");
   it("the card is shown on the desktop dashboard and the phone home, next to the expiry check-in", () => {
-    expect(read("../app/dashboard/page.tsx")).toContain("<InactiveClientsPanel />");
+    expect(read("../app/(coach)/dashboard/page.tsx")).toContain("<InactiveClientsPanel />");
     expect(read("../components/coach/mobile/coach-mobile-home.tsx")).toContain("<InactiveClientsPanel />");
   });
   it("only the coach's own button sets a client aside, through the one function, and nothing is sent by the panel", () => {
@@ -26,7 +26,7 @@ describe("inactive clients: wiring and safety", () => {
   });
   it("a client set aside is left out of the dashboard counts and cards, and the profile has the control", () => {
     expect(read("../lib/dashboard-data.ts")).toContain("inactiveKeys.has(inactiveKey(row.group_id, row.profile_id))");
-    expect(read("../app/dashboard/page.tsx")).toContain("inactiveKeys.has(inactiveKey(row.group_id, row.profile_id))");
-    expect(read("../app/groups/[groupId]/athletes/[athleteId]/page.tsx")).toContain("<SetAsideControl");
+    expect(read("../app/(coach)/dashboard/page.tsx")).toContain("inactiveKeys.has(inactiveKey(row.group_id, row.profile_id))");
+    expect(read("../app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx")).toContain("<SetAsideControl");
   });
 });

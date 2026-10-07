@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 // everyone), and a late cancel or move is flagged for the coach, never taken automatically. The rules are enforced in the database (rehearsals
 // 0277, 0278 and 0279); these keep the screens honest.
 const read = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8");
-const dayPages = ["../app/groups/[groupId]/calendar/[date]/page.tsx", "../app/groups/[groupId]/programs/[programId]/calendar/[date]/page.tsx"];
+const dayPages = ["../app/(coach)/groups/[groupId]/calendar/[date]/page.tsx", "../app/(coach)/groups/[groupId]/programs/[programId]/calendar/[date]/page.tsx"];
 
 describe("client booking screens follow the coach's booking mode", () => {
   for (const p of dayPages) {
@@ -20,7 +20,7 @@ describe("client booking screens follow the coach's booking mode", () => {
     });
   }
   it("the coach picks the mode on the Availability page, with three plainly named options", () => {
-    expect(read("../app/groups/[groupId]/availability/page.tsx")).toContain("BookingModeSelect");
+    expect(read("../app/(coach)/groups/[groupId]/availability/page.tsx")).toContain("BookingModeSelect");
     const select = read("../components/coach/desktop/booking-mode-select.tsx");
     expect(select).toContain("Clients book on their own");
     expect(select).toContain("Clients request, I confirm");
@@ -55,7 +55,7 @@ describe("the coach decides flagged changes and requests", () => {
     expect(panel).toContain("resolve_late_change");
     expect(panel).toContain("resolve_booking_request");
     for (const word of ["Charge", "Waive", "Confirm", "Decline"]) expect(panel).toContain(word);
-    expect(read("../app/dashboard/page.tsx")).toContain("<LateChangesPanel />");
+    expect(read("../app/(coach)/dashboard/page.tsx")).toContain("<LateChangesPanel />");
     expect(read("../components/coach/mobile/coach-mobile-home.tsx")).toContain("<LateChangesPanel />");
   });
   it("a client's move asks through request_booking_move in request mode", () => {

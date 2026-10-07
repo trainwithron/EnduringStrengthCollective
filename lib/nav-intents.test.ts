@@ -8,7 +8,8 @@ const ROOT = path.resolve(__dirname, "..");
 
 function routeExists(template: string): boolean {
   const rel = template.replace("{groupId}", "[groupId]").replace("/messages/{athleteId}", "/messages/[otherId]").replace("{athleteId}", "[athleteId]").replace(/^\//, "");
-  return fs.existsSync(path.join(ROOT, "app", rel, "page.tsx"));
+  // The coach areas live in the (coach) route group, which is not part of the address.
+  return ["app", "app/(coach)"].some((base) => fs.existsSync(path.join(ROOT, base, rel, "page.tsx")));
 }
 
 describe("route table", () => {

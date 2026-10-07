@@ -4,17 +4,17 @@ import { useRef } from "react";
 import { ArrowUpRight, ExternalLink, X } from "lucide-react";
 import { DOCK_MAX_WIDTH, DOCK_MIN_WIDTH } from "@/lib/workspace-layout";
 import { PaneFrame } from "./pane-frame";
-import { RAIL_WIDTH, TOP_OFFSET, useWorkspace } from "./workspace-context";
+import { TOP_OFFSET, useWorkspace } from "./workspace-context";
 
-// The workspace's panel: beside the page, on the right. Each pane is a tab; the tab you are not looking at stays loaded (so a half-typed note or a scroll position
-// is still there when you come back). The edge between the page and the panel is a divider: drag it, or focus it and use the arrow keys.
+// The workspace's panel: beside the page, fixed to the right edge (the page keeps that much room clear: the shell's main reads --ws-dock). Each pane is a tab; the tab
+// you are not looking at stays loaded (so a half-typed note or a scroll position is still there when you come back), and a tab never opened yet loads nothing. The
+// edge between the page and the panel is a divider: drag it, or focus it and use the arrow keys. Left and Right move between tabs.
 export function WorkspaceDock() {
   const ws = useWorkspace();
   const dragRef = useRef<{ pointerId: number } | null>(null);
-  if (!ws || !ws.enabled || !ws.ready) return null;
+  if (!ws || !ws.enabled || !ws.ready || ws.dockWidth === 0) return null;
   const { dock } = ws.layout;
-  if (!dock.open || dock.panes.length === 0) return null;
-  const width = Math.min(dock.width, Math.max(DOCK_MIN_WIDTH, ws.viewportWidth - RAIL_WIDTH - 360));
+  const width = ws.dockWidth;
 
   function onDividerDown(e: React.PointerEvent<HTMLDivElement>) {
     e.preventDefault();
@@ -41,13 +41,25 @@ export function WorkspaceDock() {
   }
 
   const active = dock.panes.find((p) => p.id === dock.activeId) ?? dock.panes[0];
+  const activeIndex = dock.panes.findIndex((p) => p.id === active.id);
 
+  // Arrow keys move between tabs (roving focus): only the selected tab is in the tab order.
+  function onTabKey(e: React.KeyboardEvent) {
+    if (!ws) return;
+    let next = activeIndex;
+    if (e.key === "ArrowRight") next = (activeIndex + 1) % dock.panes.length;
+    else if (e.key === "ArrowLeft") next = (activeIndex - 1 + dock.panes.length) % dock.panes.length;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = dock.panes.length - 1;
+    else return;
+    e.preventDefault();
+    ws.dispatch({ type: "activate", id: dock.panes[next].id });
+    requestAnimationFrame(() => document.getElementById(`workspace-tab-${dock.panes[next].id}`)?.focus());
+  }
+
+  const small = "w-9 h-10 shrink-0 flex items-center justify-center text-steel hover:text-chalk";
   return (
-    <aside
-      aria-label="Workspace panel"
-      className="hidden lg:flex relative shrink-0 flex-col border-l border-steel/20 bg-graphite sticky self-start"
-      style={{ width, top: TOP_OFFSET, height: `calc(100vh - ${TOP_OFFSET}px)` }}
-    >
+    <aside aria-label="Workspace panel" className="hidden lg:flex fixed right-0 z-30 flex-col border-l border-steel/20 bg-graphite" style={{ width, top: TOP_OFFSET, height: `calc(100vh - ${TOP_OFFSET}px)` }}>
       <div
         role="separator"
         aria-orientation="vertical"
@@ -62,34 +74,38 @@ export function WorkspaceDock() {
         onKeyDown={onDividerKey}
         className="absolute left-0 top-0 bottom-0 w-2 -ml-1 z-10 cursor-col-resize hover:bg-rust/40 focus:bg-rust/60 focus:outline-none touch-none"
       />
-      <div role="tablist" aria-label="Open in the panel" className="flex items-end gap-1 overflow-x-auto border-b border-steel/20 px-2 pt-1 shrink-0">
-        {dock.panes.map((pane) => {
-          const selected = pane.id === active.id;
-          return (
-            <div key={pane.id} className={`flex items-center shrink-0 border-b-2 -mb-px ${selected ? "border-rust" : "border-transparent"}`}>
+      <div className="flex items-end border-b border-steel/20 pl-2 shrink-0">
+        <div role="tablist" aria-label="Open in the panel" onKeyDown={onTabKey} className="flex items-end gap-1 overflow-x-auto flex-1 min-w-0">
+          {dock.panes.map((pane) => {
+            const selected = pane.id === active.id;
+            return (
               <button
+                key={pane.id}
+                id={`workspace-tab-${pane.id}`}
                 type="button"
                 role="tab"
                 aria-selected={selected}
+                aria-controls="workspace-tabpanel"
+                tabIndex={selected ? 0 : -1}
                 onClick={() => ws.dispatch({ type: "activate", id: pane.id })}
-                className={`h-10 pl-3 pr-1 font-body text-[13px] max-w-[160px] truncate ${selected ? "text-chalk" : "text-steel hover:text-chalk"}`}
+                className={`h-10 px-3 shrink-0 max-w-[170px] truncate font-body text-[13px] border-b-2 -mb-px ${selected ? "border-rust text-chalk" : "border-transparent text-steel hover:text-chalk"}`}
               >
                 {pane.dest.label}
               </button>
-              <button type="button" onClick={() => ws.dispatch({ type: "toFloating", id: pane.id, bounds: ws.area })} aria-label={`Make ${pane.dest.label} a floating card`} title="Float as a card" className="w-7 h-10 flex items-center justify-center text-steel hover:text-chalk">
-                <ArrowUpRight className="w-3.5 h-3.5" aria-hidden="true" />
-              </button>
-              <button type="button" onClick={() => ws.requestClose(pane.id)} aria-label={`Close ${pane.dest.label}`} title="Close" className="w-7 h-10 flex items-center justify-center text-steel hover:text-rust">
-                <X className="w-3.5 h-3.5" aria-hidden="true" />
-              </button>
-            </div>
-          );
-        })}
-        <a href={active.dest.path} target="_blank" rel="noopener noreferrer" aria-label={`Open ${active.dest.label} as a full page`} title="Open as a full page" className="ml-auto w-9 h-10 shrink-0 flex items-center justify-center text-steel hover:text-chalk">
+            );
+          })}
+        </div>
+        <button type="button" onClick={() => ws.dispatch({ type: "toFloating", id: active.id, bounds: ws.area })} aria-label={`Make ${active.dest.label} a floating card`} title="Float as a card" className={small}>
+          <ArrowUpRight className="w-3.5 h-3.5" aria-hidden="true" />
+        </button>
+        <a href={active.dest.path} target="_blank" rel="noopener noreferrer" aria-label={`Open ${active.dest.label} as a full page`} title="Open as a full page" className={`${small} flex`}>
           <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
         </a>
+        <button type="button" onClick={() => ws.requestClose(active.id)} aria-label={`Close ${active.dest.label}`} title="Close" className="w-9 h-10 shrink-0 flex items-center justify-center text-steel hover:text-rust">
+          <X className="w-3.5 h-3.5" aria-hidden="true" />
+        </button>
       </div>
-      <div role="tabpanel" aria-label={active.dest.label} className="flex-1 min-h-0 flex flex-col">
+      <div id="workspace-tabpanel" role="tabpanel" aria-labelledby={`workspace-tab-${active.id}`} className="flex-1 min-h-0 flex flex-col">
         {dock.panes.map((pane) => (
           <PaneFrame key={pane.id} pane={pane} hidden={pane.id !== active.id} />
         ))}

@@ -7,13 +7,13 @@ const read = (p: string) => readFileSync(new URL(p, import.meta.url), "utf8");
 
 describe("client money prompts are hidden until Stripe is configured", () => {
   it("the re-up card on Home", () => {
-    expect(read("../app/groups/[groupId]/page.tsx")).toMatch(/isStripeConfigured\(\)\)\s*\{\s*\n\s*try \{\s*\n\s*reupState/);
+    expect(read("../app/(coach)/groups/[groupId]/page.tsx")).toMatch(/isStripeConfigured\(\)\)\s*\{\s*\n\s*try \{\s*\n\s*reupState/);
   });
   it("the Billing section in Settings", () => {
-    expect(read("../app/groups/[groupId]/settings/page.tsx")).toContain("!isCoach && isStripeConfigured() && (");
+    expect(read("../app/(coach)/groups/[groupId]/settings/page.tsx")).toContain("!isCoach && isStripeConfigured() && (");
   });
   it("the purchase prompt on both booking day pages", () => {
-    expect(read("../app/groups/[groupId]/calendar/[date]/page.tsx")).toContain("isStripeConfigured() && (");
-    expect(read("../app/groups/[groupId]/programs/[programId]/calendar/[date]/page.tsx")).toContain("isStripeConfigured() && (");
+    expect(read("../app/(coach)/groups/[groupId]/calendar/[date]/page.tsx")).toContain("isStripeConfigured() && (");
+    expect(read("../app/(coach)/groups/[groupId]/programs/[programId]/calendar/[date]/page.tsx")).toContain("isStripeConfigured() && (");
   });
 });

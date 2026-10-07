@@ -58,11 +58,7 @@ import { TeamRailWidget } from "@/components/coach/desktop/rail-widgets/team-rai
 import { BusinessRailWidget } from "@/components/coach/desktop/rail-widgets/business-rail-widget";
 import { ShellListPanel, type SectionSubLink } from "@/components/coach/desktop/shell-list-panel";
 import { CollectiveIntelligenceChat } from "@/components/coach/desktop/collective-intelligence-chat";
-import { WorkspaceProvider } from "@/components/coach/workspace/workspace-context";
-import { WorkspaceDock } from "@/components/coach/workspace/workspace-dock";
-import { WorkspaceFloating } from "@/components/coach/workspace/workspace-floating";
-import { WorkspaceToolbar } from "@/components/coach/workspace/workspace-toolbar";
-import { PanePicker } from "@/components/coach/workspace/pane-picker";
+import { useWorkspaceRegistration } from "@/components/coach/workspace/workspace-host";
 import { WorkspaceRailButton } from "@/components/coach/workspace/workspace-rail-button";
 import { EmbeddedActivityReporter } from "@/components/coach/workspace/embedded-activity-reporter";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
@@ -176,6 +172,7 @@ function CoachDesktopShellFull({
   // redesign.md) — the rail + list panel need the viewer's own id for
   // the pinned Needs Attention strip's fetch.
   const [coachId, setCoachId] = useState<string | null>(null);
+  const registerWorkspace = useWorkspaceRegistration();
 
   // Team (position groups/depth chart) is an opt-in feature for coaches
   // running an actual team sport — most individual-training coaches never
@@ -517,6 +514,14 @@ function CoachDesktopShellFull({
 
   const activeGroup = nav.find((entry): entry is NavGroup => isGroup(entry) && groupHasActiveChild(entry));
 
+  // Tell the workspace host (in the coach layout, above every page) who and where this page is: while a shell is on screen the workspace is available.
+  const isSharedGroup = coachLevel || groupKind === "team" || groupKind === "social";
+  useEffect(() => {
+    if (!coachId) return;
+    registerWorkspace({ coachId, groupId, groupName, isShared: isSharedGroup });
+    return () => registerWorkspace(null);
+  }, [coachId, groupId, groupName, isSharedGroup, registerWorkspace]);
+
   // Coach mobile tab bar (coach_mobile_app_redesign_plan.md) — the three
   // sections that are real bottom tabs light their own tab; everything
   // else reached through this shell (Dashboard, Build, Business, Engage)
@@ -535,7 +540,6 @@ function CoachDesktopShellFull({
 
   return (
     <TerminologyProvider groupId={groupId}>
-    <WorkspaceProvider coachId={coachId} groupId={groupId} isShared={coachLevel || groupKind === "team" || groupKind === "social"}>
     <div className="min-h-screen bg-graphite text-chalk font-body">
       {/* operational_resilience_oversight_check.md — WCAG 2.4.1 Bypass
           Blocks (AA): this shell's sidebar is a real keyboard-tab-through
@@ -711,16 +715,11 @@ function CoachDesktopShellFull({
           )}
         </div>
 
-        <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 px-4 pt-6 pb-24 md:px-10 md:pt-8 lg:pb-8 max-w-[1400px] focus:outline-none">
+        <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 px-4 pt-6 pb-24 md:px-10 md:pt-8 lg:pb-8 lg:mr-[var(--ws-dock,0px)] max-w-[1400px] focus:outline-none">
           <PendingNoticeFlusher />
           {children}
         </main>
-        {/* The workspace panel: beside the page, on the right (components/coach/workspace). */}
-        <WorkspaceDock />
       </div>
-      <WorkspaceFloating />
-      <WorkspaceToolbar />
-      <PanePicker />
       {/* Mounted once here so it's reachable from every one of this
           shell's ~50 routes, not just /dashboard (collective_intelligence
           audit gap — the component's own design intent was always
@@ -732,7 +731,6 @@ function CoachDesktopShellFull({
         <CollectiveIntelligenceChat />
       </div>
     </div>
-    </WorkspaceProvider>
     </TerminologyProvider>
   );
 }

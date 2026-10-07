@@ -1,6 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { shouldResumeClaim } from "@/lib/claim-resume";
+import { SIGNED_OUT_FRAME_HTML } from "@/lib/signed-out-frame";
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -131,6 +132,10 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/zapier/");
 
   if (!user && !isPublicPath) {
+    // A workspace pane whose session has ended: the sign-in page cannot be shown in a frame, so say so and tell the main window (see lib/signed-out-frame.ts).
+    if (request.headers.get("sec-fetch-dest") === "iframe") {
+      return new NextResponse(SIGNED_OUT_FRAME_HTML, { status: 401, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+    }
     const redirectUrl = new URL("/login", request.url);
     redirectUrl.searchParams.set("next", pathname);
     const redirectResponse = NextResponse.redirect(redirectUrl);

@@ -75,7 +75,7 @@ describe("the row on Home", () => {
   });
 
   it("is on the desktop and phone Home, behind a coach-only route that returns nothing unless the caller coaches", () => {
-    expect(readFileSync(new URL("../../app/dashboard/page.tsx", import.meta.url), "utf8")).toContain("<ProgressLookPanel />");
+    expect(readFileSync(new URL("../../app/(coach)/dashboard/page.tsx", import.meta.url), "utf8")).toContain("<ProgressLookPanel />");
     expect(readFileSync(new URL("./mobile/coach-mobile-home.tsx", import.meta.url), "utf8")).toContain("<ProgressLookPanel />");
     const route = readFileSync(new URL("../../app/api/progress-look/route.ts", import.meta.url), "utf8");
     expect(route).toContain('eq("role", "coach")');
@@ -91,7 +91,7 @@ describe("the row on Home", () => {
   });
 
   it("a client's profile shows what they said they need most help with, only to the coach, and can turn it into a suggested goal", () => {
-    const profile = readFileSync(new URL("../../app/groups/[groupId]/athletes/[athleteId]/page.tsx", import.meta.url), "utf8");
+    const profile = readFileSync(new URL("../../app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx", import.meta.url), "utf8");
     expect(profile).toContain("findHelpAnswer(");
     expect(profile).toContain("Turn this into a goal");
     expect(profile).toContain("fromWords={helpAnswer.answer}");
