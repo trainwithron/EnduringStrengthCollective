@@ -762,6 +762,21 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["0292 is not already applied (the error_class column is not there yet)", has.noCol("ai_usage_log", "error_class")],
     ],
   },
+  {
+    n: "38",
+    slug: "0293",
+    title: "0293 a signed-in coach can no longer refund their own meal-plan or program charge by claiming the generation failed: that refund becomes server-only, and the coach's own 'This was wrong' button keeps working",
+    migrations: ["0293"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for normal use. The coach's 'This was wrong' button still refunds the latest charge once. The automatic refund when an AI meal-plan generation delivered nothing is now decided by the server (code in the same release): until that code is live the old browser call is refused, so a failed generation is not auto-refunded. Run it together with the release's code deploy.",
+    undo: [fnFromMigration("0245", "refund_coach_credit"), "drop function if exists public.refund_coach_credit_for(uuid, text, text, text, text);"].join(String.fromCharCode(10)),
+    undoWhy: "Only if refunds misbehave after step 38. Puts refund_coach_credit back as it was (the browser can name either trigger again, which re-opens the self-refund) and removes the server-only refund function.",
+    rows: [
+      ["ai_charges, ai_output_refunds and coach_credits exist (0245 is applied)", `${has.table("ai_charges")} and ${has.table("ai_output_refunds")} and ${has.table("coach_credits")}`],
+      ["refund_coach_credit exists", has.fn("refund_coach_credit(text, text, text, text)")],
+      ["0293 is not already applied (the server-only refund function is not there yet)", `not ${has.fnName("refund_coach_credit_for")}`],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -838,6 +853,7 @@ for (const s of STEPS) {
 const BUNDLES = [
   { id: "release-d", name: "Release D", steps: ["32", "33", "34"] },
   { id: "release-f", name: "Release F", steps: ["35", "36", "37"] },
+  { id: "release-h", name: "Release H (refund fix)", steps: ["38"] },
 ];
 for (const b of BUNDLES) {
   const stepsIn = b.steps.map((n) => STEPS.find((x) => x.n === n));
@@ -1006,6 +1022,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0290", "exists (select 1 from pg_trigger where tgname = 'group_memberships_guard_identity')"),
     m("0291", has.fnName("expire_session_credit_balance")),
     m("0292", has.col("ai_usage_log", "error_class")),
+    m("0293", has.fnName("refund_coach_credit_for")),
     m("0285", has.table("rest_day_nudges")),
     m("0284", has.policy("client_goals", "client_goals_insert_coach")),
     m("0283", has.col("coach_availability_windows", "session_minutes")),

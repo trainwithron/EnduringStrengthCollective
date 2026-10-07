@@ -18,5 +18,13 @@
    "37"
   ],
   "file": "apply-release-f-all.sql"
+ },
+ {
+  "id": "release-h",
+  "name": "Release H (refund fix)",
+  "steps": [
+   "38"
+  ],
+  "file": "apply-release-h-all.sql"
  }
 ]

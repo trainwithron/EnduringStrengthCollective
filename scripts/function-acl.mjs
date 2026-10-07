@@ -27,7 +27,9 @@ export const RELEASE_F_SERVER_ONLY_SIGNATURES = [
   ["spend_ai_action", "uuid, text, integer, integer", false],
   ["expire_session_credit_balance", "uuid, uuid, integer, integer", false],
 ];
-export const SERVER_ONLY = [...SERVER_ONLY_SIGNATURES, ...RELEASE_F_SERVER_ONLY_SIGNATURES].map((s) => s[0]);
+// Closed by 0293: the refund logic (either trigger, for a named coach) is server-only; the signed-in refund_coach_credit now accepts only the coach's own "this was wrong".
+export const RELEASE_H_SERVER_ONLY_SIGNATURES = [["refund_coach_credit_for", "uuid, text, text, text, text", false]];
+export const SERVER_ONLY = [...SERVER_ONLY_SIGNATURES, ...RELEASE_F_SERVER_ONLY_SIGNATURES, ...RELEASE_H_SERVER_ONLY_SIGNATURES].map((s) => s[0]);
 export const AUDIT_WRITERS = SERVER_ONLY_SIGNATURES.filter((s) => s[2]).map((s) => s[0]);
 
 // Signed-in-callable SECURITY DEFINER functions with no caller check in their body that were reviewed and are meant to be (they answer about the

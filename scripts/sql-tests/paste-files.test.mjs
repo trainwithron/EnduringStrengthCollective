@@ -250,6 +250,30 @@ for (const s of steps) {
   const again = await run(file);
   check("release-f: a second run is refused, naming step 35 (" + again + ")", !!again && /step 35 \(0290\) cannot run/.test(again) && /already applied/.test(again));
 }
+// Release H (step 38): a signed-in coach can no longer name 'auto_validator_failure' for a refund; the logic moves to a server-only function. One all-or-nothing paste.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-h");
+  const file = `apply/${bundle.file}`;
+  const st = steps.find((x) => x.n === "38");
+  const state = async () => (await db.query(`select
+      to_regprocedure('public.refund_coach_credit_for(uuid, text, text, text, text)') is not null as has_for,
+      position('refund_coach_credit_for' in pg_get_functiondef('public.refund_coach_credit(text, text, text, text)'::regprocedure)) > 0 as only_flag,
+      has_function_privilege('authenticated', 'public.refund_coach_credit(text, text, text, text)', 'execute') as flag_auth,
+      has_function_privilege('anon', 'public.refund_coach_credit(text, text, text, text)', 'execute') as flag_anon,
+      coalesce(has_function_privilege('authenticated', to_regprocedure('public.refund_coach_credit_for(uuid, text, text, text, text)'), 'execute'), false) as for_auth`)).rows[0];
+  const eu = await run(`apply/undo-step${st.n}-${st.slug}.sql`);
+  check("release-h: undo-step38-0293.sql runs" + (eu ? ": " + eu : ""), !eu);
+  const before = await state();
+  check("release-h: before it runs the server-only refund function is absent and the signed-in refund does not insist on the coach flag", !before.has_for && !before.only_flag, JSON.stringify(before));
+  const err = await run(file);
+  check("release-h bundle applies on the live-shaped state" + (err ? ": " + err : ""), !err);
+  const after = await state();
+  check("release-h: the server-only function exists and is closed to signed-in users", after.has_for && !after.for_auth, JSON.stringify(after));
+  check("release-h: the signed-in refund keeps its grants (signed-in yes, public no) and now accepts only the coach flag", after.only_flag && after.flag_auth && !after.flag_anon, JSON.stringify(after));
+  const again = await run(file);
+  check("release-h: a second run is refused, naming step 38 (" + again + ")", !!again && /step 38 \(0293\) cannot run/.test(again) && /already applied/.test(again));
+}
 // Steps 30 and 31: the copy matches the original, both groups are gone, and everything in them was saved first.
 {
   const gone = (await db.query("select count(*)::int as n from public.groups where id in ('b292055b-edc6-4171-ad2b-a89d65dcd8db', 'c368ab0b-ccab-442e-a42e-38fb22293182')")).rows[0].n;

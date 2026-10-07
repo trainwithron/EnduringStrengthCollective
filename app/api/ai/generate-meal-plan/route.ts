@@ -3,6 +3,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError } from "@/lib/anthropic-client";
 import { AiRateLimitedError } from "@/lib/ai-usage";
 import { verifyMealOptions, type RawMealOption } from "@/lib/meal-option-verification";
+import { MEAL_SLOT_DELIVERED_FEATURE } from "@/lib/ai-refund-decision";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 // "The Nutrition Spot" (nutrition_spot_revamp_scoping_sept19.md,
 // retiring the old "Mix & Macros" name — AI is now the primary meal-
@@ -135,6 +137,18 @@ Favorite foods / requests: ${favoriteFoods || "none given"}`;
     // is dropped rather than surfaced as pickable with an unverified
     // number (nutrition_spot_revamp_scoping_sept19.md's own bar).
     const verifiedOptions = await verifyMealOptions(supabase, parsed.options as RawMealOption[]);
+
+    // The server's own record that the AI delivered something usable, so a later "the generation failed" refund can be checked against it instead of
+    // believing the browser (lib/ai-refund-decision.ts). Best effort: a failed write only means an automatic refund stays possible, never blocks the coach.
+    if (verifiedOptions.some((o) => o.confident)) {
+      try {
+        await createServiceRoleClient()
+          .from("ai_usage_log")
+          .insert({ user_id: user.id, coach_id: user.id, feature: MEAL_SLOT_DELIVERED_FEATURE, status: "ok", completed_at: new Date().toISOString() });
+      } catch {
+        // see above
+      }
+    }
 
     return NextResponse.json({ options: verifiedOptions });
   } catch (err) {

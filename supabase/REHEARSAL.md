@@ -63,3 +63,4 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0290 | yes | yes | 20 | 0290 Release F security closures |
 | 0291 | yes | yes | 15 | 0291 Release F booking closures |
 | 0292 | yes | yes | 4 | 0292 AI usage error class |
+| 0293 | yes | yes | 19 | 0293 refund: validator failure is server-only |
