@@ -1,3 +1,4 @@
+import { ChangeMyEmail } from "@/components/athlete/change-my-email";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
@@ -172,7 +173,10 @@ export default async function SettingsPage(
         <div className="flex-1">
           <EditDisplayName initialName={profile?.full_name ?? ""} profileId={athleteId} />
           {!effective.isActingAsOther && (
-            <p className="font-body text-xs text-steel mt-0.5">{user.email}</p>
+            <>
+              <p className="font-body text-xs text-steel mt-0.5">{user.email}</p>
+              {user.email && <ChangeMyEmail currentEmail={user.email} />}
+            </>
           )}
         </div>
       </section>

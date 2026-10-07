@@ -1,3 +1,4 @@
+import { isSendGridConfigured } from "@/lib/sendgrid";
 import { SendSignInLinkButton } from "@/components/coach/send-signin-link-button";
 import { ClientProfileTabs } from "@/components/coach/desktop/client-profile-tabs";
 import { ClientProgramsSection } from "@/components/coach/desktop/client-programs-section";
@@ -1042,11 +1043,17 @@ export default async function AthleteProfilePage(
           <div data-tab="overview">
           {signInStatus === "active" && (
             <>
-              <CorrectClientEmail
-                groupId={params.groupId}
-                athleteId={params.athleteId}
-                clientName={profile?.full_name ?? "Client"}
-              />
+              {/* Off until the email sender is set up (Oct 7): the safeguard for this tool is a notice to the OLD address, and mail is not on yet, so a coach
+                  could otherwise change a signed-in client's login with nobody told. The client changes their own email in their Settings. */}
+              {isSendGridConfigured() ? (
+                <CorrectClientEmail
+                  groupId={params.groupId}
+                  athleteId={params.athleteId}
+                  clientName={profile?.full_name ?? "Client"}
+                />
+              ) : (
+                <p className="font-body text-xs text-steel mt-4">To change their email, ask {profile?.full_name ?? "the client"} to change it in their own Settings.</p>
+              )}
               <SendSignInLinkButton groupId={params.groupId} athleteId={params.athleteId} clientName={profile?.full_name ?? "this client"} />
             </>
           )}
