@@ -217,3 +217,30 @@ describe("detectInjuredActiveDeficit", () => {
     expect(detectInjuredActiveDeficit(true, null).isFlagged).toBe(false);
   });
 });
+
+describe("detectProteinTooLow judges by the client's FLOOR", () => {
+  it("with no floor given it is 80% of the target, exactly the old behaviour", () => {
+    const old = detectProteinTooLow([100, 105, 95, 90, 100], 180);
+    expect(old.floorProtein).toBe(144);
+    expect(old.isLow).toBe(true);
+    expect(detectProteinTooLow([145, 150, 146, 160], 180).isLow).toBe(false);
+  });
+  it("a day between the floor and the target is a solid day, not a warning", () => {
+    // target 180, floor 144: these days are all above the floor but under the target
+    const r = detectProteinTooLow([150, 160, 170, 155, 165], 180, 144);
+    expect(r.isLow).toBe(false);
+    expect(r.daysBelowTarget).toBe(0);
+  });
+  it("only below the floor counts, and it follows the client's own floor", () => {
+    const days = [120, 125, 130, 140, 150];
+    // floor 144: four of five are below it
+    expect(detectProteinTooLow(days, 180, 144).isLow).toBe(true);
+    // a lower floor of 115: none are below it
+    expect(detectProteinTooLow(days, 180, 115).isLow).toBe(false);
+    expect(detectProteinTooLow(days, 180, 115).floorProtein).toBe(115);
+  });
+  it("a floor above the target is held at the target, and an empty week is never low", () => {
+    expect(detectProteinTooLow([100, 100, 100], 150, 400).floorProtein).toBe(150);
+    expect(detectProteinTooLow([], 180, 144)).toMatchObject({ isLow: false, daysWithData: 0 });
+  });
+});

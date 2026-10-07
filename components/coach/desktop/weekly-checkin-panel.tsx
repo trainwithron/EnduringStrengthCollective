@@ -59,6 +59,8 @@ export function WeeklyCheckinPanel({
   floorCalories = null,
   floorNote = null,
   clientName = "this client",
+  proteinGPerLb,
+  defaultDietaryRestrictions = "",
 }: {
   athleteId: string;
   groupId: string;
@@ -91,6 +93,10 @@ export function WeeklyCheckinPanel({
   floorCalories?: number | null;
   floorNote?: string | null;
   clientName?: string;
+  // This client's own protein target in g per pound (their preferences); without it the platform's 1 g per pound.
+  proteinGPerLb?: number;
+  // The client's own food rules as one line (from their preferences). It wins over the text of an older check-in, which may be out of date.
+  defaultDietaryRestrictions?: string;
 }) {
   const [phase, setPhase] = useState<NutritionPhase>(lastCheckin?.phase ?? defaultPhase ?? "fat_loss");
   const [adjustmentPct, setAdjustmentPct] = useState(lastCheckin?.adjustmentPct ?? DEFAULT_ADJUSTMENT_PCT);
@@ -108,7 +114,7 @@ export function WeeklyCheckinPanel({
     defaultRecoveryRating != null ? String(defaultRecoveryRating) : "3"
   );
   const [dietaryRestrictions, setDietaryRestrictions] = useState(
-    lastCheckin?.dietaryRestrictions ?? ""
+    defaultDietaryRestrictions || (lastCheckin?.dietaryRestrictions ?? "")
   );
   const [applyDate, setApplyDate] = useState(todayKey);
   // The standing target is always the default: a one-day target is the explicit exception.
@@ -147,7 +153,7 @@ export function WeeklyCheckinPanel({
     });
     setResult(engineResult);
     const archetype = detectDietArchetype(dietaryRestrictions);
-    const split = computeArchetypeMacros(engineResult.newCalories, Number(currWeight), archetype);
+    const split = computeArchetypeMacros(engineResult.newCalories, Number(currWeight), archetype, proteinGPerLb);
     setMacros({ proteinG: split.proteinG, carbsG: split.carbsG, fatG: split.fatG });
   }
 

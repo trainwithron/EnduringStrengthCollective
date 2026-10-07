@@ -5,6 +5,7 @@ import { MacroCalculator, type CalculatedMacros } from "@/components/tools/macro
 import { MealPlanGenerator, type ImportedMacros } from "@/components/coach/desktop/meal-plan-generator";
 import type { WeeklyWeightTrend } from "@/lib/weight-trend";
 import type { NutritionPhase } from "@/lib/nutrition-checkin";
+import type { FoodRules } from "@/lib/allergen-check";
 
 interface SavedPlanShape {
   archetype: string;
@@ -38,6 +39,8 @@ export function NutritionTools({
   injurySurplusPct,
   initialConsecutiveSurplusSpikes,
   defaultPhase,
+  proteinGPerLb,
+  foodRules,
 }: {
   athleteId: string;
   groupId: string;
@@ -56,6 +59,10 @@ export function NutritionTools({
   // — seeds both Step 1 and Step 2's own default, rather than each
   // opening on a hardcoded guess regardless of what's actually tagged.
   defaultPhase?: NutritionPhase | null;
+  // This client's own protein target in g per pound (their preferences).
+  proteinGPerLb?: number;
+  // This client's food rules; the generator never offers an option that breaks them.
+  foodRules?: FoodRules;
 }) {
   const [importedMacros, setImportedMacros] = useState<ImportedMacros | null>(null);
   const [calculatorExpanded, setCalculatorExpanded] = useState(true);
@@ -115,6 +122,8 @@ export function NutritionTools({
           injurySurplusPct={injurySurplusPct}
           initialConsecutiveSurplusSpikes={initialConsecutiveSurplusSpikes}
           initialPhase={defaultPhase}
+          proteinGPerLb={proteinGPerLb}
+          foodRules={foodRules}
         />
       </div>
     </div>

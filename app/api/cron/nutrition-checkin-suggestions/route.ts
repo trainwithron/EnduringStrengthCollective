@@ -73,6 +73,7 @@ async function handler(request: Request) {
       { data: injuryStatusRow },
       { data: profileDetails },
       { data: intake },
+      { data: prefsRow },
     ] = await Promise.all([
       supabase
         .from("body_weight_logs")
@@ -103,6 +104,8 @@ async function handler(request: Request) {
         .eq("athlete_id", athleteId)
         .maybeSingle(),
       supabase.from("client_intake").select("date_of_birth").eq("athlete_id", athleteId).maybeSingle(),
+      // The client's own protein target (a missing row, or a database without the table yet, just means the platform default).
+      supabase.from("client_nutrition_preferences").select("protein_g_per_lb").eq("athlete_id", athleteId).maybeSingle(),
     ]);
 
     const trend = computeWeeklyWeightTrend(
@@ -171,7 +174,8 @@ async function handler(request: Request) {
     }
 
     const archetype = detectDietArchetype(last.dietary_restrictions);
-    const macros = computeArchetypeMacros(engineResult.newCalories, trend.currentAvg, archetype);
+    const clientProteinGPerLb = prefsRow?.protein_g_per_lb != null ? Number(prefsRow.protein_g_per_lb) : undefined;
+    const macros = computeArchetypeMacros(engineResult.newCalories, trend.currentAvg, archetype, clientProteinGPerLb);
 
     await supabase.from("nutrition_checkin_suggestions").insert({
       athlete_id: athleteId,

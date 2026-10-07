@@ -179,6 +179,8 @@ export interface ProteinTooLowResult {
   isLow: boolean;
   avgLoggedProtein: number;
   targetProtein: number;
+  // The line below which a day is a shortfall (the client's success floor; by default 80% of the target).
+  floorProtein: number;
   daysBelowTarget: number;
   daysWithData: number;
 }
@@ -187,21 +189,25 @@ const PROTEIN_LOW_THRESHOLD_FRACTION = 0.8; // "meaningfully under" = >20% under
 const MIN_DAYS_FOR_SUSTAINED = 3; // needs at least this many logged days to judge a pattern
 const SUSTAINED_FRACTION = 0.7; // "sustained" = most (not necessarily every) day in the window
 
+// Judged against the FLOOR, not the target: a day between the floor and the target is a solid day, not a warning. With no floor given it is 80% of the target, which is
+// the default floor, so the default behaviour is exactly what it always was.
 export function detectProteinTooLow(
   loggedProteinByDay: number[],
-  targetProtein: number
+  targetProtein: number,
+  floorProtein?: number
 ): ProteinTooLowResult {
   const daysWithData = loggedProteinByDay.length;
+  const floor = floorProtein != null && floorProtein > 0 ? Math.min(floorProtein, targetProtein) : targetProtein * PROTEIN_LOW_THRESHOLD_FRACTION;
   if (daysWithData === 0 || targetProtein <= 0) {
-    return { isLow: false, avgLoggedProtein: 0, targetProtein, daysBelowTarget: 0, daysWithData };
+    return { isLow: false, avgLoggedProtein: 0, targetProtein, floorProtein: Math.round(floor), daysBelowTarget: 0, daysWithData };
   }
-  const threshold = targetProtein * PROTEIN_LOW_THRESHOLD_FRACTION;
+  const threshold = floor;
   const daysBelowTarget = loggedProteinByDay.filter((p) => p < threshold).length;
   const avgLoggedProtein = Math.round(
     loggedProteinByDay.reduce((sum, p) => sum + p, 0) / daysWithData
   );
   const isLow = daysWithData >= MIN_DAYS_FOR_SUSTAINED && daysBelowTarget / daysWithData >= SUSTAINED_FRACTION;
-  return { isLow, avgLoggedProtein, targetProtein, daysBelowTarget, daysWithData };
+  return { isLow, avgLoggedProtein, targetProtein, floorProtein: Math.round(floor), daysBelowTarget, daysWithData };
 }
 
 // Check #5 — coach_em_up_finley_funston_transcript.md's real client-

@@ -107,3 +107,21 @@ describe("computeArchetypeMacros", () => {
     expect(result.carbsG).toBeGreaterThanOrEqual(50);
   });
 });
+
+describe("a client's own protein target", () => {
+  it("estimateProteinFromBodyWeight defaults to 1 g per pound and takes the client's own g per pound", () => {
+    expect(estimateProteinFromBodyWeight(180)).toBe(180);
+    expect(estimateProteinFromBodyWeight(180, 1.1)).toBe(198);
+    expect(estimateProteinFromBodyWeight(173, 0.9)).toBe(156);
+  });
+  it("computeArchetypeMacros uses it for the protein line, and carbs and fat make up the rest", () => {
+    const base = computeArchetypeMacros(2400, 180, "standard");
+    const high = computeArchetypeMacros(2400, 180, "standard", 1.2);
+    expect(base.proteinG).toBe(180);
+    expect(high.proteinG).toBe(216);
+    expect(high.carbsG).toBeLessThan(base.carbsG);
+  });
+  it("without a client target the split is exactly what it always was", () => {
+    expect(computeArchetypeMacros(2400, 180, "carnivore")).toEqual(computeArchetypeMacros(2400, 180, "carnivore", 1));
+  });
+});

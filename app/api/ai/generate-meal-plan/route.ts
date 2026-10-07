@@ -5,6 +5,8 @@ import { AiRateLimitedError } from "@/lib/ai-usage";
 import { verifyMealOptions, type RawMealOption } from "@/lib/meal-option-verification";
 import { MEAL_SLOT_DELIVERED_FEATURE } from "@/lib/ai-refund-decision";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { rowToPreferences } from "@/lib/nutrition-preferences";
+import { filterOptionsByRules, rulesForPrompt } from "@/lib/plan-preference-check";
 
 // "The Nutrition Spot" (nutrition_spot_revamp_scoping_sept19.md,
 // retiring the old "Mix & Macros" name — AI is now the primary meal-
@@ -88,6 +90,7 @@ export async function POST(request: Request) {
     archetype,
     dietaryRestrictions,
     favoriteFoods,
+    athleteId,
   } = await request.json();
 
   if (
@@ -105,13 +108,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Keep restrictions and favorites under 500 characters." }, { status: 400 });
   }
 
+  // The client's own rules are read here, on the server, from the database (never from what the browser sent), through the coach's own session so row security decides
+  // whether this coach may see them. A missing row, or a client who is not theirs, simply means no structured rules.
+  let rules: { allergies: string[]; intolerances: string[]; dislikes: string[]; dietType: string } | null = null;
+  if (typeof athleteId === "string" && /^[0-9a-f-]{36}$/i.test(athleteId)) {
+    const { data: prefsRow } = await supabase.from("client_nutrition_preferences").select("*").eq("athlete_id", athleteId).maybeSingle();
+    if (prefsRow) {
+      const p = rowToPreferences(prefsRow as Record<string, unknown>);
+      rules = { allergies: p.allergies, intolerances: p.intolerances, dislikes: p.dislikes, dietType: p.dietType };
+    }
+  }
+  const rulesText = rules ? rulesForPrompt(rules) : "";
+
   const userText = `Meal slot: ${mealSlot}
 Diet archetype: ${archetype}
 Target protein: ${proteinTarget}g
 Target carbs: ${carbsTarget}g
 Target fat: ${fatTarget}g
 Dietary restrictions / dislikes: ${dietaryRestrictions || "none given"}
-Favorite foods / requests: ${favoriteFoods || "none given"}`;
+Favorite foods / requests: ${favoriteFoods || "none given"}${rulesText ? `\n${rulesText}` : ""}`;
 
   try {
     const text = await callClaude({ meta: { feature: "meal_plan_slot", userId: user.id }, system: SYSTEM_PROMPT, userText, maxTokens: 2048 });
@@ -136,7 +151,18 @@ Favorite foods / requests: ${favoriteFoods || "none given"}`;
     // own claimed numbers. An option that can't be confidently matched
     // is dropped rather than surfaced as pickable with an unverified
     // number (nutrition_spot_revamp_scoping_sept19.md's own bar).
-    const verifiedOptions = await verifyMealOptions(supabase, parsed.options as RawMealOption[]);
+    const allVerified = await verifyMealOptions(supabase, parsed.options as RawMealOption[]);
+    // The model is told the rules, and every option is ALSO checked against them here: an option that names an allergen, a food they dislike or breaks their diet is never
+    // returned, whatever the model did. (A line that says "may contain" is not modelled.)
+    // The text checked is the option's name, each ingredient line AND the real food each line was matched to, but what is returned is the original verified option.
+    const checked = allVerified.map((o) => ({
+      recipeName: o.recipeName,
+      ingredients: o.ingredients.flatMap((l) => [l.rawLine, ...(l.matchedDescription ? [l.matchedDescription] : [])]),
+      original: o,
+    }));
+    const { kept, dropped: droppedOptions } = rules ? filterOptionsByRules(checked, rules) : { kept: checked, dropped: [] as typeof checked };
+    const verifiedOptions = kept.map((k) => k.original);
+    const droppedForPreferences = droppedOptions.length;
 
     // The server's own record that the AI delivered something usable, so a later "the generation failed" refund can be checked against it instead of
     // believing the browser (lib/ai-refund-decision.ts). Best effort: a failed write only means an automatic refund stays possible, never blocks the coach.
@@ -152,7 +178,7 @@ Favorite foods / requests: ${favoriteFoods || "none given"}`;
       }
     }
 
-    return NextResponse.json({ options: verifiedOptions });
+    return NextResponse.json({ options: verifiedOptions, droppedForPreferences });
   } catch (err) {
     if (err instanceof AiRateLimitedError) {
       return NextResponse.json({ error: err.message }, { status: 429 });

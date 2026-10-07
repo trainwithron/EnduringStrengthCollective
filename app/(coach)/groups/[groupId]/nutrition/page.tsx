@@ -16,6 +16,9 @@ import { FoodLogSection } from "@/components/athlete/food-log-section";
 import type { GeneratedMeal } from "@/lib/meal-engine";
 import type { MealEntryPayload } from "@/lib/meal-plan-assignment";
 import { DayMealsView } from "@/components/athlete/day-meals-view";
+import { NutritionPreferencesCard } from "@/components/athlete/nutrition-preferences-card";
+import { rowToPreferences } from "@/lib/nutrition-preferences";
+import { filterPlanForClient } from "@/lib/plan-preference-check";
 import type { FoodLogEntry } from "@/components/athlete/meal-checkoff-list";
 import { computeTodaysMicronutrients } from "@/lib/todays-micronutrients";
 import { Key12NutrientGrid } from "@/components/athlete/key12-nutrient-grid";
@@ -289,6 +292,16 @@ export default async function NutritionPage(
       ? (todayMealPlan.meals as unknown as Record<string, MealEntryPayload[]>)
       : null;
 
+  // The client's own food preferences, and the saved plan with anything that breaks them left out (a missing row, or a database without the table yet, is no rules).
+  const { data: prefsRow } = await supabase.from("client_nutrition_preferences").select("*").eq("athlete_id", athleteId).maybeSingle();
+  const clientPrefs = rowToPreferences(prefsRow as Record<string, unknown> | null);
+  const clientPlan = filterPlanForClient(savedPlanMeals, {
+    allergies: clientPrefs.allergies,
+    intolerances: clientPrefs.intolerances,
+    dislikes: clientPrefs.dislikes,
+    dietType: clientPrefs.dietType,
+  });
+
   const recentFoodOptions = dedupeRecentFoodLogs(
     (recentFoodLogRows ?? []).map((r) => ({
       description: r.description ?? "",
@@ -411,6 +424,8 @@ export default async function NutritionPage(
             )}
           </section>
 
+          <NutritionPreferencesCard athleteId={athleteId} initial={clientPrefs} />
+
           {micronutrients.hasAnyData && (
             <Key12NutrientGrid
               totals={micronutrients.totals}
@@ -425,7 +440,7 @@ export default async function NutritionPage(
             </h2>
             {savedPlanMeals && (
               <div className="mb-3">
-                <DayMealsView meals={savedPlanMeals} />
+                <DayMealsView meals={clientPlan.meals} hiddenCount={clientPlan.hiddenCount} emptiedMeals={clientPlan.emptiedMeals} />
               </div>
             )}
             <FoodLogSection

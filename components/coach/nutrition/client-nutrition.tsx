@@ -8,6 +8,7 @@ import { StandingMacroTargetCard } from "@/components/coach/desktop/standing-mac
 import { NutritionPhaseControl } from "@/components/coach/nutrition-phase-control";
 import { CalorieFloorWarning } from "@/components/coach/nutrition/calorie-floor-warning";
 import { WhatTheyAte } from "@/components/coach/nutrition/what-they-ate";
+import { PreferencesSection } from "@/components/coach/nutrition/preferences-section";
 import { computeWeeklyWeightTrend } from "@/lib/weight-trend";
 import { computeReadinessAverage } from "@/lib/wellness";
 import type { NutritionPhase } from "@/lib/nutrition-checkin";
@@ -31,7 +32,9 @@ import {
   detectProteinTooLow,
   detectInjuredActiveDeficit,
 } from "@/lib/nutrition-spotter";
-import { estimateProteinFromBodyWeight } from "@/lib/macros";
+import { hasFoodRules, proteinGramsForWeight, restrictionsTextFromPreferences, rowToPreferences } from "@/lib/nutrition-preferences";
+import { checkPlanAgainstPreferences, describeFlagged, flaggedDays } from "@/lib/plan-preference-check";
+import { shortDateLabel } from "@/lib/apply-from";
 
 const PHASE_TAG_LABEL: Record<MilestonePhaseTag, string> = { reverse_diet: "Reverse diet", cut: "Cut", bulk: "Bulk" };
 
@@ -82,6 +85,8 @@ export async function ClientNutrition({
     { data: pendingSuggestionRows },
     { data: foodRows },
     { data: weekPlanRows },
+    { data: prefsRow },
+    { data: upcomingPlanRows },
     { data: injuryStatusRow },
     { data: bodyDetails },
     { data: intakeDob },
@@ -138,6 +143,10 @@ export async function ClientNutrition({
       .lte("log_date", todayKey),
     // Meal plans assigned in the last 7 days: a day's target is the client's own target, else the plan assigned to it, else the standing target (the order the client sees).
     supabase.from("meal_plans").select("log_date, macros, meals").eq("athlete_id", athleteId).gte("log_date", weekStartKey).lte("log_date", todayKey),
+    // The client's food preferences and protein rules (one row per CLIENT; a missing row, or a database without the table yet, is the defaults).
+    supabase.from("client_nutrition_preferences").select("*").eq("athlete_id", athleteId).maybeSingle(),
+    // The plans assigned for the next two weeks, checked again against those preferences (an allergy added after a plan was assigned).
+    supabase.from("meal_plans").select("log_date, meals").eq("athlete_id", athleteId).gte("log_date", todayKey).lte("log_date", addDaysToKey(todayKey, 13)).order("log_date", { ascending: true }),
     // A real client-safety input: the check-in engine floors an injured client's calories at maintenance whatever the phase.
     supabase.from("athlete_injury_status").select("is_injured, surplus_pct").eq("athlete_id", athleteId).maybeSingle(),
     supabase.from("athlete_profile_details").select("height_cm, biological_sex, body_fat_pct, birthday").eq("athlete_id", athleteId).maybeSingle(),
@@ -145,6 +154,15 @@ export async function ClientNutrition({
     supabase.from("nutrition_phases").select("phase, started_at").eq("athlete_id", athleteId).eq("group_id", groupId).maybeSingle(),
   ]);
 
+  const prefs = rowToPreferences(prefsRow as Record<string, unknown> | null);
+  const foodRules = { allergies: prefs.allergies, intolerances: prefs.intolerances, dislikes: prefs.dislikes, dietType: prefs.dietType };
+  const rulesText = hasFoodRules(prefs) ? restrictionsTextFromPreferences(prefs) : "";
+  let updatedByName: string | null = null;
+  if (prefs.updatedBy) {
+    const { data: who } = await supabase.from("profiles").select("full_name").eq("id", prefs.updatedBy).maybeSingle();
+    updatedByName = who?.full_name ?? null;
+  }
+  const flaggedAssigned = hasFoodRules(prefs) ? flaggedDays((upcomingPlanRows ?? []) as { log_date: string; meals: unknown }[], foodRules) : [];
   const weightTrend = computeWeeklyWeightTrend(
     (weightLogs ?? []).map((w) => ({ loggedDate: w.logged_date, weight: w.weight })),
     todayKey
@@ -265,7 +283,11 @@ export async function ClientNutrition({
         });
       }
     }
-    if (lastCheckinRow?.dietary_restrictions) {
+    if (hasFoodRules(prefs)) {
+      for (const f of checkPlanAgainstPreferences(existingPlan?.meals as Record<string, never[]> | null, foodRules).slice(0, 5)) {
+        findings.push({ id: `pref-${f.bucket}-${f.mealId}-${f.choiceIndex}`, message: `Today's plan: ${describeFlagged(f)}. ${f.safety ? "The client does not see it." : ""}`.trim() });
+      }
+    } else if (lastCheckinRow?.dietary_restrictions) {
       const all = [...(planMeals.daily ?? []), ...(planMeals.train ?? []), ...(planMeals.rest ?? [])] as any[];
       for (const slip of detectRestrictedIngredientSlips(all, lastCheckinRow.dietary_restrictions)) {
         findings.push({
@@ -276,12 +298,12 @@ export async function ClientNutrition({
     }
   }
   const proteinByDay = week.days.filter((d) => d.logged).map((d) => d.proteinG);
-  const targetProtein = weightLogs?.[0]?.weight ? estimateProteinFromBodyWeight(weightLogs[0].weight) : 0;
-  const proteinTooLow = detectProteinTooLow(proteinByDay, targetProtein);
+  const proteinGrams = weightLogs?.[0]?.weight ? proteinGramsForWeight(prefs, weightLogs[0].weight) : { targetG: 0, floorG: 0 };
+  const proteinTooLow = detectProteinTooLow(proteinByDay, proteinGrams.targetG, proteinGrams.floorG);
   if (proteinTooLow.isLow) {
     findings.push({
       id: "protein-too-low",
-      message: `Logged protein has averaged ${proteinTooLow.avgLoggedProtein}g/day over the last ${proteinTooLow.daysWithData} logged days, meaningfully under the ~${proteinTooLow.targetProtein}g/day baseline for their current body weight (${proteinTooLow.daysBelowTarget} of ${proteinTooLow.daysWithData} days under).`,
+      message: `Logged protein has averaged ${proteinTooLow.avgLoggedProtein}g/day over the last ${proteinTooLow.daysWithData} logged days. That is below their protein floor of ${proteinTooLow.floorProtein}g (the target is ${proteinTooLow.targetProtein}g): ${proteinTooLow.daysBelowTarget} of ${proteinTooLow.daysWithData} days were under the floor.`,
     });
   }
   if (detectInjuredActiveDeficit(isInjured, lastCheckinRow?.phase ?? null).isFlagged) {
@@ -423,6 +445,8 @@ export async function ClientNutrition({
                 floorCalories={floorCalories}
                 floorNote={floorNote}
                 clientName={firstName}
+                proteinGPerLb={prefs.proteinGPerLb}
+                defaultDietaryRestrictions={rulesText}
               />
             </div>
           </details>
@@ -431,14 +455,32 @@ export async function ClientNutrition({
 
       <section>
         <SectionHeading id="preferences" title="Preferences" />
-        <p className="font-body text-sm text-steel border border-steel/20 p-4 max-w-[70ch]">
-          Likes, dislikes, allergies and meals per day are coming here next. Until then, the dietary-restrictions note in the weekly check-in and the meal plan generator is
-          what the plan uses.
-        </p>
+        <PreferencesSection
+          athleteId={athleteId}
+          initial={prefs}
+          weightLbs={weightLogs?.[0]?.weight ?? null}
+          updatedByName={updatedByName}
+          updatedAtLabel={prefs.updatedAt ? shortDateLabel(prefs.updatedAt.slice(0, 10)) : null}
+          clientName={firstName}
+        />
       </section>
 
       <section>
         <SectionHeading id="meal-plan" title="Meal plan" note="Work out a target with the calculator if you need one, then build the plan from it." />
+        {flaggedAssigned.length > 0 && (
+          <div role="status" className="mb-4 border border-amber-400/40 bg-amber-400/5 p-3 space-y-1.5">
+            <p className="font-body text-sm text-amber-400 font-medium">
+              {firstName}&apos;s food preferences conflict with {flaggedAssigned.length === 1 ? "an assigned day" : `${flaggedAssigned.length} assigned days`}. They don&apos;t see the flagged options; build a new plan for these days.
+            </p>
+            {flaggedAssigned.slice(0, 4).map((d) => (
+              <p key={d.date} className="font-body text-xs text-chalk">
+                <span className="text-steel">{shortDateLabel(d.date)}:</span> {d.flagged.slice(0, 2).map(describeFlagged).join("; ")}
+                {d.flagged.length > 2 ? ` (and ${d.flagged.length - 2} more)` : ""}
+              </p>
+            ))}
+            {flaggedAssigned.length > 4 && <p className="font-body text-xs text-steel">…and {flaggedAssigned.length - 4} more days.</p>}
+          </div>
+        )}
         <NutritionTools
           athleteId={athleteId}
           groupId={groupId}
@@ -448,12 +490,14 @@ export async function ClientNutrition({
           existingPlan={existingPlan ?? null}
           defaultAdherenceDays={defaultAdherenceDays}
           defaultRecoveryRating={defaultRecoveryRating}
-          defaultDietaryRestrictions={lastCheckin?.dietaryRestrictions ?? null}
+          defaultDietaryRestrictions={rulesText || (lastCheckin?.dietaryRestrictions ?? null)}
           isInjured={isInjured}
           maintenanceCalories={maintenanceCalories}
           injurySurplusPct={injurySurplusPct}
           initialConsecutiveSurplusSpikes={lastCheckin?.consecutiveSurplusSpikes ?? 0}
           defaultPhase={milestoneTagToNutritionPhase(phaseTag)}
+          proteinGPerLb={prefs.proteinGPerLb}
+          foodRules={foodRules}
         />
       </section>
 

@@ -20,6 +20,8 @@ import {
 } from "@/lib/meal-engine";
 import { runCheckInEngine } from "@/lib/nutrition-checkin";
 import { computeArchetypeMacros, detectDietArchetype as detectMacroArchetype } from "@/lib/macros";
+import { filterOptionsByRules } from "@/lib/plan-preference-check";
+import type { FoodRules } from "@/lib/allergen-check";
 import { fetchCustomRecipes } from "@/lib/custom-recipes";
 import {
   getDatesForWeekdays,
@@ -74,6 +76,8 @@ export function MealPlanGenerator({
   injurySurplusPct,
   initialConsecutiveSurplusSpikes,
   initialPhase,
+  proteinGPerLb,
+  foodRules,
 }: {
   athleteId: string;
   groupId: string;
@@ -99,6 +103,10 @@ export function MealPlanGenerator({
   // when one is in view — falls back to "fat_loss" otherwise, same as
   // before this existed.
   initialPhase?: Phase | null;
+  // This client's own protein target in g per pound (their preferences); without it the platform's 1 g per pound.
+  proteinGPerLb?: number;
+  // This client's allergies, intolerances, dislikes and diet. An option that breaks any of them is never offered, whatever its source.
+  foodRules?: FoodRules;
 }) {
   const router = useRouter();
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -143,6 +151,19 @@ export function MealPlanGenerator({
   const [restMacros, setRestMacros] = useState<MacroTargets | null>(null);
   const [dayView, setDayView] = useState<DayView>("daily");
   const [mealsByView, setMealsByView] = useState<Record<DayView, GeneratedMeal[]>>({ daily: [], train: [], rest: [] });
+  // Options left out because they break this client's food rules (an allergy is never offered), counted so the coach is told rather than left to wonder.
+  const [leftOutForRules, setLeftOutForRules] = useState(0);
+  function keepSafe(meals: GeneratedMeal[]): GeneratedMeal[] {
+    if (!foodRules) return meals;
+    let dropped = 0;
+    const safe = meals.map((m) => {
+      const r = filterOptionsByRules(m.options, foodRules);
+      dropped += r.dropped.length;
+      return r.dropped.length > 0 ? { ...m, options: r.kept } : m;
+    });
+    setLeftOutForRules((n) => n + dropped);
+    return safe;
+  }
   // Which option indices are checked per meal slot — a slot can have
   // several recipes selected at once (e.g. two breakfast options a
   // client can alternate between), not just one.
@@ -227,7 +248,8 @@ export function MealPlanGenerator({
     const macroSplit = computeArchetypeMacros(
       engineResult.newCalories,
       currW,
-      detectMacroArchetype(dietaryRestrictions)
+      detectMacroArchetype(dietaryRestrictions),
+      proteinGPerLb
     );
     const dailyBaseline: MacroTargets = {
       calories: macroSplit.resolvedCalories,
@@ -258,6 +280,7 @@ export function MealPlanGenerator({
       favoriteFoods,
     };
 
+    setLeftOutForRules(0);
     const nMeals = parseInt(mealCount, 10) || 4;
     const isCycling = carbCycling && recipeArchetype !== "carnivore";
 
@@ -267,14 +290,14 @@ export function MealPlanGenerator({
       setRestMacros(restDay);
       setMealsByView({
         daily: [],
-        train: generateFullMealPlan(trainingDay, nMeals, includeSnack, context, customRecipes),
-        rest: generateFullMealPlan(restDay, nMeals, includeSnack, context, customRecipes),
+        train: keepSafe(generateFullMealPlan(trainingDay, nMeals, includeSnack, context, customRecipes)),
+        rest: keepSafe(generateFullMealPlan(restDay, nMeals, includeSnack, context, customRecipes)),
       });
       setDayView("train");
     } else {
       setTrainMacros(null);
       setRestMacros(null);
-      setMealsByView({ daily: generateFullMealPlan(dailyBaseline, nMeals, includeSnack, context, customRecipes), train: [], rest: [] });
+      setMealsByView({ daily: keepSafe(generateFullMealPlan(dailyBaseline, nMeals, includeSnack, context, customRecipes)), train: [], rest: [] });
       setDayView("daily");
     }
 
@@ -509,7 +532,10 @@ export function MealPlanGenerator({
     setAiSuggesting((prev) => ({ ...prev, [meal.spec.id]: true }));
     setAiError((prev) => ({ ...prev, [meal.spec.id]: null }));
 
-    function appendOptions(newOptions: MealOption[]) {
+    function appendOptions(offered: MealOption[]) {
+      // Anything that breaks the client's food rules is dropped here too (the AI route checks as well; the standard-options fallback does not know the rules).
+      const newOptions = foodRules ? filterOptionsByRules(offered, foodRules).kept : offered;
+      if (newOptions.length < offered.length) setLeftOutForRules((n) => n + offered.length - newOptions.length);
       setMealsByView((prev) => {
         const updated = prev[dayView].map((m) =>
           m.spec.id === meal.spec.id ? { ...m, options: [...m.options, ...newOptions] } : m
@@ -564,6 +590,8 @@ export function MealPlanGenerator({
           archetype,
           dietaryRestrictions,
           favoriteFoods,
+          // The server reads this client's food rules itself, from the database.
+          athleteId,
         }),
       });
       const data = await res.json();
@@ -588,10 +616,14 @@ export function MealPlanGenerator({
       if (verifiedOptions.length === 0) {
         setAiError((prev) => ({
           ...prev,
-          [meal.spec.id]: "Couldn't verify any of this suggestion's ingredients against real food data — try again.",
+          [meal.spec.id]:
+            (data.droppedForPreferences ?? 0) > 0
+              ? "Every suggestion broke this client's food preferences, so none is shown. Try again."
+              : "Couldn't verify any of this suggestion's ingredients against real food data — try again.",
         }));
         return false;
       }
+      if ((data.droppedForPreferences ?? 0) > 0) setLeftOutForRules((n) => n + (data.droppedForPreferences as number));
 
       const newOptions: MealOption[] = verifiedOptions.map((o, i) => ({
         recipeId: `ai-${Date.now()}-${i}`,
@@ -882,6 +914,11 @@ export function MealPlanGenerator({
       {macros && (
         <div ref={resultsRef} className="border-t border-steel/20 pt-4 space-y-4">
           {rationale && <p className="font-body text-sm text-steel bg-surface/40 p-3">{rationale}</p>}
+          {leftOutForRules > 0 && (
+            <p role="status" className="font-body text-xs text-amber-400 border border-amber-400/40 bg-amber-400/5 p-2.5">
+              {leftOutForRules === 1 ? "1 option was" : `${leftOutForRules} options were`} left out because {leftOutForRules === 1 ? "it breaks" : "they break"} this client&apos;s food preferences (an allergy is never offered). Use &ldquo;Ask the Nutrition Spot&rdquo; on a meal for more options.
+            </p>
+          )}
           {flexTreatText && (
             <p className="font-body text-xs text-chalk bg-rust/10 border border-rust/30 p-3">{flexTreatText}</p>
           )}

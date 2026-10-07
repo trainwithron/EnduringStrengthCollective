@@ -18,6 +18,8 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { TodayWidget } from "@/components/athlete/today-widget";
 import { DayMealsView } from "@/components/athlete/day-meals-view";
+import { rowToPreferences } from "@/lib/nutrition-preferences";
+import { filterPlanForClient } from "@/lib/plan-preference-check";
 import { computeScheduledDates } from "@/lib/program-schedule";
 import { isHabitDueOn } from "@/lib/habits";
 import { resolveDayMacros, standingForDate } from "@/lib/macro-resolution";
@@ -105,6 +107,7 @@ export default async function DayDetailPage(
   let dayMacros: { calories: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null } | null = null;
   let dayHabits: { id: string; title: string; completed: boolean }[] = [];
   let dayMeals: Record<string, any[]> | null = null;
+  let dayMealsView: ReturnType<typeof filterPlanForClient> = { meals: null, hiddenCount: 0, emptiedMeals: [] };
   let pinnedLinks: { id: string; title: string; url: string }[] = [];
 
   if (viewingAsAthlete) {
@@ -170,6 +173,10 @@ export default async function DayDetailPage(
         .eq("log_date", params.date)
         .maybeSingle();
       dayMeals = (mealPlanRow?.meals as any) ?? null;
+      // What the client is shown leaves out any option that breaks their food preferences (an allergy added after the plan was made).
+      const { data: dayPrefsRow } = await supabase.from("client_nutrition_preferences").select("*").eq("athlete_id", athleteId).maybeSingle();
+      const dayPrefs = rowToPreferences(dayPrefsRow as Record<string, unknown> | null);
+      dayMealsView = filterPlanForClient(dayMeals, { allergies: dayPrefs.allergies, intolerances: dayPrefs.intolerances, dislikes: dayPrefs.dislikes, dietType: dayPrefs.dietType });
 
       // A day's meal plan carries its own macros, computed for the exact
       // meals shown below — that target wins over daily_macros when both
@@ -480,7 +487,7 @@ export default async function DayDetailPage(
             </div>
           )}
           <TodayWidget todayDate={params.date} macros={dayMacros} habits={dayHabits} pinnedLinks={pinnedLinks} />
-          <DayMealsView meals={dayMeals} />
+          <DayMealsView meals={dayMealsView.meals} hiddenCount={dayMealsView.hiddenCount} emptiedMeals={dayMealsView.emptiedMeals} />
         </section>
       )}
 
