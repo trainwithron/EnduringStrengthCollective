@@ -65,7 +65,7 @@ describe("the food tables are consistent", () => {
     }
     for (const k of PER_UNIT_KEYS) expect(FOOD_DENSITY, k).toHaveProperty(k);
   });
-  it("a per-unit food cannot have more macros than the unit weighs (the rice cake is the one known exception, awaiting Ron's decision)", () => {
+  it("a per-unit food cannot have more macros than the unit weighs (no exceptions: the rice cake was corrected to USDA)", () => {
     // Unit weights: the table's own UNIT_WEIGHT_G, plus a plain bagel (about 100 g) and the three bread kinds (a slice).
     const unitG: Record<string, number> = {
       egg_whole_large: UNIT_WEIGHT_G.large,
@@ -76,14 +76,13 @@ describe("the food tables are consistent", () => {
       whole_wheat_wrap: UNIT_WEIGHT_G.wraps,
       rice_cake: UNIT_WEIGHT_G.cakes,
     };
-    const KNOWN_IMPOSSIBLE_UNITS = ["rice_cake"];
     const impossible: string[] = [];
     for (const k of PER_UNIT_KEYS) {
       const d = (FOOD_DENSITY as Record<string, { protein: number; carbs: number; fat: number }>)[k];
       expect(unitG[k], `${k} needs a unit weight`).toBeGreaterThan(0);
       if (d.protein + d.carbs + d.fat > unitG[k]) impossible.push(k);
     }
-    expect(impossible).toEqual(KNOWN_IMPOSSIBLE_UNITS);
+    expect(impossible).toEqual([]);
   });
   it("every diet-table and name-table key is a real food", () => {
     for (const k of Object.keys(FOOD_ARCHETYPES)) expect(FOOD_DENSITY, k).toHaveProperty(k);
@@ -157,7 +156,13 @@ const KNOWN_NARROW = [
   "b_salmon_eggs_avocado|keto|1",
   "b_salmon_eggs_avocado|paleo|0",
   "l_ground_beef_cabbage_bowl_keto|omnivore|0",
+  "d_ribeye_potatoes|omnivore|0",
+  "d_ribeye_potatoes|paleo|0",
   "d_flank_steak_butter_carnivore|keto|2",
+  "d_chuck_roast_mash|omnivore|0",
+  "d_chuck_roast_mash|paleo|0",
+  "d_ribeye_sweet_potato_steakhouse|omnivore|0",
+  "d_ribeye_sweet_potato_steakhouse|paleo|0",
 ];
 
 describe("what lands inside the tolerance (calories and protein 10 percent, protein never under 90 percent, carbs and fat 15 percent or a small allowance)", () => {
@@ -233,14 +238,14 @@ describe("what lands inside the tolerance (calories and protein 10 percent, prot
       expect(gridFor("light", slot)[2].fatG + gridFor("light", slot)[2].carbsG, slot).toBeLessThanOrEqual(std.fatG + std.carbsG + 10);
     }
   });
-  it("a fixed side can no longer hide: the string cheese snack counts its sticks as sticks", () => {
+  it("string cheese is counted as sticks, not grams: a stick is 24 g, whatever the snack is switched on or off", () => {
     const r = RECIPES.find((x) => x.id === "s_string_cheese_jerky_apple")!;
-    for (const t of gridFor("standard", "snack")) {
-      const meal = scaleTemplate(r, t);
-      expect(meal, JSON.stringify(t)).not.toBeNull();
-      expect(meal!.macros.proteinG).toBeGreaterThanOrEqual(0.9 * t.proteinG);
-      expect(meal!.macros.proteinG).toBeLessThanOrEqual(1.1 * t.proteinG);
-    }
+    const items = r.build(15, 15, 5);
+    const cheese = items.filter(isIngredient).find((i) => i.name === "String Cheese")!;
+    expect(cheese.unit).toBe("pieces");
+    const m = ingredientMacros(cheese)!;
+    expect(m.proteinG).toBeCloseTo(cheese.qty * UNIT_WEIGHT_G.pieces * FOOD_DENSITY.string_cheese.protein, 6);
+    expect(m.proteinG).toBeGreaterThan(0);
   });
 });
 
@@ -258,6 +263,26 @@ const KNOWN_GAPS = [
   "keto|snack|keto|1.25",
   "keto|snack|keto|1.6",
   "keto|snack|keto|2",
+  "paleo|snack|standard|0.6",
+  "paleo|snack|standard|1",
+  "paleo|snack|standard|1.25",
+  "paleo|snack|standard|1.6",
+  "paleo|snack|standard|2",
+  "paleo|snack|high_carb|0.6",
+  "paleo|snack|high_carb|0.8",
+  "paleo|snack|high_carb|1",
+  "paleo|snack|high_carb|1.25",
+  "paleo|snack|high_carb|1.6",
+  "paleo|snack|high_carb|2",
+  "paleo|snack|high_protein|0.6",
+  "paleo|snack|high_protein|0.8",
+  "paleo|snack|high_protein|1.6",
+  "paleo|snack|high_protein|2",
+  "paleo|snack|light|0.6",
+  "paleo|snack|light|0.8",
+  "paleo|snack|light|1",
+  "paleo|snack|light|1.6",
+  "paleo|snack|light|2",
   "pescatarian|breakfast|standard|0.6",
   "pescatarian|breakfast|standard|0.8",
   "pescatarian|breakfast|standard|1",
@@ -282,23 +307,39 @@ const KNOWN_GAPS = [
   "pescatarian|breakfast|light|1.25",
   "pescatarian|breakfast|light|1.6",
   "pescatarian|breakfast|light|2",
+  "pescatarian|snack|standard|1.6",
+  "pescatarian|snack|standard|2",
   "pescatarian|snack|low_carb|0.6",
-  "pescatarian|snack|low_carb|0.8",
   "pescatarian|snack|low_carb|1",
-  "pescatarian|snack|low_carb|1.25",
   "pescatarian|snack|low_carb|1.6",
-  "pescatarian|snack|high_carb|0.6",
   "pescatarian|snack|high_carb|1",
+  "pescatarian|snack|high_carb|1.25",
   "pescatarian|snack|high_carb|1.6",
   "pescatarian|snack|high_carb|2",
-  "pescatarian|snack|high_protein|0.6",
-  "pescatarian|snack|light|0.6",
+  "pescatarian|snack|high_protein|0.8",
+  "pescatarian|snack|high_protein|2",
+  "pescatarian|snack|light|0.8",
   "carnivore|snack|carnivore|0.6",
   "carnivore|snack|carnivore|0.8",
   "carnivore|snack|carnivore|1",
   "carnivore|snack|carnivore|1.25",
   "carnivore|snack|carnivore|1.6",
   "carnivore|snack|carnivore|2",
+];
+
+// (slot | shape | size | meals) where an everyday omnivore has fewer than three meals (two on the high-protein and light shapes). All are snacks: the jerky snacks no longer land
+// with USDA-accurate jerky.
+const KNOWN_OMNIVORE_THIN = [
+  "snack|standard|1.6|2",
+  "snack|standard|2|2",
+  "snack|low_carb|1|2",
+  "snack|low_carb|1.6|2",
+  "snack|high_carb|1|2",
+  "snack|high_carb|1.25|2",
+  "snack|high_carb|1.6|1",
+  "snack|high_carb|2|1",
+  "snack|high_protein|0.6|1",
+  "snack|high_protein|0.8|1",
 ];
 
 describe("coverage: which diets and slots the starter library can fill", () => {
@@ -317,14 +358,18 @@ describe("coverage: which diets and slots the starter library can fill", () => {
     }
     expect(gaps).toEqual(KNOWN_GAPS);
   });
-  it("an everyday omnivore always has at least three meals in every slot at every size of the three classic shapes, and at least two in the high-protein and light shapes", () => {
+  it("an everyday omnivore has at least three meals at every size of every slot except the exact thin spots listed (all snacks), and never fewer than one", () => {
+    const thin: string[] = [];
     for (const slot of SLOTS) {
       for (const fam of familiesOfDiet("omnivore")) {
-        gridFor(fam, slot).forEach((t) => {
-          expect(templatesFor(slot, "omnivore").filter((r) => scaleTemplate(r, t) !== null).length, `${slot} ${fam} ${JSON.stringify(t)}`).toBeGreaterThanOrEqual(fam === "high_protein" || fam === "light" ? 2 : 3);
+        gridFor(fam, slot).forEach((t, i) => {
+          const n = templatesFor(slot, "omnivore").filter((r) => scaleTemplate(r, t) !== null).length;
+          expect(n, `${slot} ${fam} ${SCALES[i]}`).toBeGreaterThanOrEqual(1);
+          if (n < (fam === "high_protein" || fam === "light" ? 2 : 3)) thin.push(`${slot}|${fam}|${SCALES[i]}|${n}`);
         });
       }
     }
+    expect(thin).toEqual(KNOWN_OMNIVORE_THIN);
   });
 });
 

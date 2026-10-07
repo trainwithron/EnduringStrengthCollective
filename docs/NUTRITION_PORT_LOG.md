@@ -49,7 +49,9 @@ The design's numbers are used as written: calories and protein within 10 percent
 
 All seven diets the old app declared are kept, including pescatarian (8 recipes), which was already in the old recipes. Pescatarian is also in the client's Preferences and the allergen and diet checks (phase 3). The old app's "no recipe for this diet and slot: show another slot's recipe" fallback is **not** carried over: it showed a lunch under "breakfast". Instead the gap is reported (section 4) and the builder fills it from the coach's own recipes or the AI top-up.
 
-### 2.7 One recipe is switched off
+### 2.7 Recipes that are switched off
+
+**Five in all.** The first (below) was off from the start; the other four were switched off by the USDA corrections (section 5), each with its reason in `disabled.ts`: the two chuck roast meals and the two jerky snacks.
 
 `s_jerky_eggs_carnivore` (Beef Jerky & Hard-Boiled Eggs): the formula caps the eggs at three and jerky has almost no fat, so the snack holds about 16 g of fat at most, while a keto or carnivore snack aims for 18 to 50 g. It misses at every size. It stays in the file (so it is easy to bring back) and is on the disabled list with this reason (`disabled.ts`).
 
@@ -88,58 +90,64 @@ The scaler records how far it had to move the aim from the slot's own target (`d
 
 ## 4. What the starter library can and cannot fill
 
-51 of the diet / slot / target combinations have **no** recipe that lands (the exact list is in the test). In plain words:
+72 of the diet / slot / target combinations have **no** recipe that lands (the exact list is in the test). It was 51 before the USDA corrections (section 5): the 21 new gaps are all **paleo and pescatarian snacks**, which the two jerky snacks used to cover. In plain words:
 
 - **Pescatarian breakfast**: nothing on a standard, high-carb, high-protein or light plan at any size (both pescatarian breakfasts are fatty fish, and their fat is too high for those targets); some on a low-carb plan.
-- **Pescatarian snack**: nothing on a low-carb plan, and gaps at several sizes on the high-carb, high-protein and light shapes.
-- **Carnivore snack**: none at any size (the one recipe is switched off, 2.7).
-- **Keto snack**: none at any size (the jerky snack is switched off and the string cheese snack no longer declares keto, 2.9). Keto breakfast and dinner have no gap.
+- **Pescatarian snack**: gaps at several sizes on every shape (the one pescatarian snack, tuna on rice cakes, now has the corrected rice cake).
+- **Paleo snack**: most sizes on the standard, high-carb, high-protein and light shapes (new: the two jerky snacks are switched off, 2.7).
+- **Carnivore snack** and **keto snack**: none at any size.
 - **Vegan breakfast on a high-protein plan**, the four smaller sizes.
 
-**Narrow spots (a recipe landing on fewer than three of the six sizes for a diet it declares):** the Salmon, Eggs & Avocado breakfast (omnivore, pescatarian and paleo: none; keto: one size), the keto Ground Beef & Cabbage bowl as an omnivore meal (none), and the Flank Steak with Butter dinner as keto (two sizes). They still appear when they land; they just cannot carry a diet alone.
+**Narrow spots** (an enabled recipe landing on fewer than three of the six sizes for a diet it declares, 12 pairs, exact list in the test): the Salmon, Eggs & Avocado breakfast, the keto Ground Beef & Cabbage bowl as an omnivore meal, the Flank Steak with Butter dinner as keto, and now the **ribeye dinners (two), the Chuck Roast & Mash dinner** as omnivore and paleo meals (their fat now matches their protein, so they only fit the high-fat shapes).
 
-Also thin (fewer than three meals): most vegan and vegetarian lunches, most keto slots, pescatarian dinners. This is what the Generate button (AI top-up, phase 5) and the coach's own saved meals are for; the library alone gives a three-option menu for omnivore and vegetarian breakfast, and for omnivore lunch, dinner and snack. In the two new shapes (high protein, light) an omnivore always has at least two meals at every size, three in the classic shapes.
+An everyday omnivore has at least three meals at every size of every slot **except snacks**: 10 snack sizes have one or two (exact list in the test).
 
-Counts of enabled recipes per diet and slot: omnivore 17 / 15 / 15 / 6, vegetarian 13 / 3 / 3 / 4, vegan 2 / 3 / 3 / 1, keto 2 / 3 / 5 / 0, paleo 4 / 7 / 8 / 3, pescatarian 2 / 3 / 2 / 1, carnivore 1 / 1 / 1 / 0 (breakfast / lunch / dinner / snack).
+Counts of enabled recipes per diet and slot: omnivore 17 / 14 / 14 / 4, vegetarian 13 / 3 / 3 / 4, vegan 2 / 3 / 3 / 1, keto 2 / 3 / 5 / 0, paleo 4 / 6 / 7 / 1, pescatarian 2 / 3 / 2 / 1, carnivore 1 / 1 / 1 / 0 (breakfast / lunch / dinner / snack). This is what the Generate button (AI top-up) and the coach's own saved meals are for.
 
-## 5. The food table against real food data (USDA, 150 foods)
+## 5. The food table against real food data (USDA)
 
-Each food was compared with the closest USDA record (per 100 g; foods counted in whole units were converted at the weights the old app uses: egg 50 g, sourdough slice 40 g, whole-wheat slice 28 g, white slice 25 g, bagel 100 g, wrap 50 g, rice cake 9 g). A number is listed when it is **more than 8 percent and more than 1.5 g per 100 g** away from USDA. **No value in the table was changed**: these are for you to accept or correct.
+**Ron approved correcting the table to USDA values (2026-10-07).** Twenty-two rows were changed by `scripts/apply-usda-corrections.cjs` (run once, recorded here); every other row, and every recipe formula, is as it was. Values are protein / carbs / fat, per gram for most foods (shown here per 100 g); the rice cake, whole-wheat bread and whole-wheat wrap are counted in whole units, so theirs are per unit (a 9 g cake, a 28 g slice, a 50 g wrap) computed from the USDA per-100-g record. The source is the USDA FoodData Central record stored in this project (fdc id and name below); each row in `food-table.ts` carries a comment with its fdc id and the old values.
 
-**UNCHECKED: no USDA record found in the stored data (about 12 foods, mostly supplements, powders and cuts the stored set lacks; their numbers are Ron's own and have not been compared with anything):** chicken breast, chicken tenderloin (no "meat only, raw" record), whey isolate, casein, pea protein, TVP, brown-rice pasta (supplements and some branded foods are not in the stored set). Chicken thigh and drumstick exist but are leaner in USDA (protein 19.7 and 19.4, fat 4.1 and 3.7) than the table (20 / 8 and 19 / 9): the table's chicken is fattier.
+| Food | Before (P / C / F) | After (P / C / F) | USDA record |
+|---|---|---|---|
+| `rice_cake` | 1 / 13 / 0.2 | 0.74 / 7.34 / 0.25 | 170250: Snacks, rice cakes, brown rice, plain, unsalted (8.2 / 81.5 / 2.8 per 100 g, x 9 g a cake) |
+| `beef_jerky` | 50 / 5 / 5 | 33.2 / 11 / 25.6 | 167536: Snacks, beef jerky, chopped and formed |
+| `ribeye_steak` | 24 / 0 / 18 | 18.7 / 0 / 18.4 | 173403: Beef, rib eye steak, boneless, lip off, separable lean and fat, trimmed to 0" fat, choice, raw |
+| `porterhouse` | 23 / 0 / 14 | 20.4 / 0 / 14.6 | 168715: Beef, short loin, porterhouse steak, separable lean and fat, trimmed to 1/8" fat, choice, raw |
+| `ground_beef_90_10` | 20 / 0 / 10 | 18.2 / 0 / 12.9 | 2514743: Beef, ground, 90% lean meat / 10% fat, raw |
+| `chuck_roast` | 20 / 0 / 16 | 19.1 / 0 / 18.6 | 168668: Beef, chuck, arm pot roast, separable lean and fat, trimmed to 1/8" fat, choice, raw |
+| `ground_turkey_93_7` | 20 / 0 / 7 | 17.3 / 0 / 9.6 | 2514747: Turkey, ground, 93% lean / 7% fat, raw |
+| `chicken_wing` | 18 / 0 / 16 | 17.5 / 0 / 12.9 | 172390: Chicken, broilers or fryers, wing, meat and skin, raw |
+| `pork_chop` | 22 / 0 / 7 | 22 / 0 / 3.7 | 167829: Pork, fresh, loin, center loin (chops), bone-in, separable lean only, raw (22.0 / 0 / 3.7) |
+| `shrimp_raw` | 23 / 0 / 1 | 20.1 / 0 / 0.5 | 175179: Crustaceans, shrimp, raw (20.1 / 0 / 0.5) |
+| `halibut` | 21 / 0 / 2 | 18.6 / 0 / 1.3 | 174200: Fish, halibut, Atlantic and Pacific, raw |
+| `scallops` | 21 / 2 / 1 | 12.1 / 3.2 / 0.5 | 174220: Mollusks, scallop, mixed species, raw |
+| `whole_wheat_bread` | 4 / 14 / 1 | 3.44 / 12.07 / 1.01 | 335240: Bread, whole-wheat, commercially prepared (12.3 / 43.1 / 3.6 per 100 g, x 28 g a slice) |
+| `whole_wheat_wrap` | 5 / 22 / 3 | 4.9 / 22.95 / 4.9 | 174081: Tortillas, ready-to-bake or -fry, whole wheat (9.8 / 45.9 / 9.8 per 100 g, x 50 g a wrap) |
+| `bran_flakes` | 11 / 65 / 3 | 9.9 / 80.5 / 2.1 | 173888: Cereals ready-to-eat, POST Bran Flakes |
+| `pumpkin_seeds` | 30 / 18 / 46 | 30.2 / 10.7 / 49.1 | 170556: Seeds, pumpkin and squash seed kernels, dried |
+| `walnuts_raw` | 15 / 14 / 65 | 14.6 / 10.9 / 69.7 | 2346394: Nuts, walnuts, English, halves, raw |
+| `kale_raw` | 4 / 9 / 0 | 2.9 / 4.4 / 1.5 | 323505: Kale, raw |
+| `grapefruit_raw` | 1 / 11 / 0 | 0.6 / 7.5 / 0.1 | 174675: Grapefruit, raw, pink and red, Florida |
+| `fennel_bulb_raw` | 1 / 7 / 0 | 0.9 / 5.5 / 0.1 | 2747655: Fennel, bulb, raw |
+| `nectarine_raw` | 1 / 11 / 0 | 1.1 / 9.2 / 0.3 | 327357: Nectarines, raw |
+| `applesauce_unsweet` | 1 / 15 / 0 | 0.3 / 12.3 / 0.2 | 2263892: Applesauce, unsweetened, with added vitamin C |
 
-**Looks like a real difference, worth a look (table vs USDA):**
+Notes on judgment calls: the **pork chop** uses the lean-only record (22.0 / 0 / 3.7, the same basis as the other lean cuts), so a chop with its fat on has more fat than the table says (the bone-in lean-and-fat record is 20.7 / 0 / 9.0). **Meats' carbs** under 0.5 g per 100 g are left at 0. **Ground beef 90/10, ground turkey 93/7, ribeye** are the newer Foundation records. The **beef jerky** is the USDA "chopped and formed" product, which is fatty (26 g per 100 g); a lean jerky product would need its own row. The **bran flakes** row is the branded POST Bran Flakes record.
 
-| Food | Table | USDA |
-|---|---|---|
-| Rice cake (per cake) | 13 g carbs | about 7 g carbs (80 g per 100 g at 9 g a cake) |
-| Scallops | 21 g protein | 12 g protein |
-| Halibut | 21 g protein | 18.6 g protein |
-| Shrimp, raw | 23 g protein | 20.1 g protein |
-| Beef jerky | 50 g protein, 5 g fat | 31 to 33 g protein (a product, so it varies) |
-| Ribeye (lean and fat) | 24 g protein | 18.7 g protein |
-| Porterhouse | 23 g protein | 20.4 g protein |
-| Ground beef 90/10 | 20 g protein, 10 g fat | 18.2 g protein, 12.9 g fat |
-| Ground turkey 93/7 | 20 g protein, 7 g fat | 17.3 g protein, 9.6 g fat |
-| Chicken wing (with skin) | 16 g fat | 12.9 g fat |
-| Chuck roast | 16 g fat | 18.6 g fat |
-| Pork chop (center loin) | 7 g fat | 3.7 g fat |
-| Whole-wheat bread (per 28 g slice) | 14 g carbs | 12.1 g carbs |
-| Whole-wheat wrap (per 50 g) | 3 g fat | 4.9 g fat |
-| Bran flakes | 65 g carbs | 80 g carbs (a branded cereal) |
-| Pumpkin seeds | 18 g carbs | 10.7 g carbs |
-| Kale | 9 g carbs, 4 g protein | 4.4 g carbs, 2.9 g protein |
-| Grapefruit | 11 g carbs | 7.5 g carbs |
-| Fennel bulb | 7 g carbs | 5.5 g carbs |
-| Nectarine | 11 g carbs | 9.2 g carbs |
-| Applesauce, unsweetened | 15 g carbs | 12.3 g carbs |
-| Walnuts | 14 g carbs, 65 g fat | 10.9 g carbs, 69.7 g fat |
+**What the corrections changed in the library** (recipes read the table, so every meal's grams and macros move with it):
 
-**Different food form, probably fine as written:** seitan (the table's 25 g protein is prepared seitan; USDA's record is dry vital wheat gluten at 75 g), plant protein powder (a blend at 75 g against soy isolate at 88 g), string cheese (24 / 3 / 18 against 23.7 / 4.4 / 20.4), oat milk (brand variation), macadamia (the stored USDA record disagrees with standard values), canned tuna (25 g matches USDA's drained, no-salt record), 2 percent cottage cheese, skim and 2 percent milk, honey, extra-firm tofu all match. About 95 of the 150 foods match USDA inside the threshold.
+- **Four recipes now cannot land on any target and are switched off** (2.7 and `disabled.ts`, each with its reason): Chuck Roast & Sweet Potato Bowl, Chuck Roast & Root Veggie Dinner, String Cheese, Beef Jerky & Apple, Cantaloupe & Beef Jerky. With USDA-accurate chuck (19 g protein, 19 g fat per 100 g) and jerky (33 / 11 / 26), the fat arrives with the protein and overshoots the fat target. They stay in the file, so they come back if Ron edits the formulas or adds a lean jerky row.
+- **Coverage shifted** (section 4): 72 gaps instead of 51, and more narrow spots for the beef dinners.
+- The corrected foods **make every meal that uses them more honest**: for example a ribeye dinner now has 18.7 g protein per 100 g instead of 24 g, so it needs about a quarter more meat for the same protein.
+
+**Still unchecked: no USDA record in the stored data** (about 12 foods, mostly supplements, powders and cuts the stored set lacks; their numbers are Ron's own and have not been compared with anything): chicken breast, chicken tenderloin, whey isolate, casein, pea protein, TVP, brown-rice pasta, canned tuna, 2% cottage cheese, skim and 2% milk. (Chicken thigh and drumstick exist in USDA but are leaner there, 19.7 / 4.1 and 19.4 / 3.7, than in the table, 20 / 8 and 19 / 9; they were not changed because they were not on Ron's list.)
+
+**Left as written, on purpose** (different food form, not an error): seitan (the table is prepared seitan, USDA's record is dry vital wheat gluten), plant protein powder (a blend against soy isolate), string cheese, oat milk (brand variation), macadamia (the stored record disagrees with standard values), peanut butter and extra-firm tofu (brand and preparation variation).
 
 ## 6. Decisions for Ron
 
 1. **Keep the re-aiming engine (2.3)?** It leaves your 66 formulas exactly as written and makes the meals land on target. The alternative is rewriting formulas one by one.
 2. **Pescatarian breakfast.** Both recipes use fatty fish. Add a lean-fish breakfast (white fish or tuna with toast), or let the AI top-up and the coach's own recipes cover it?
-3. **Which food-table numbers to correct** (nothing was changed; the rice cake is the one that is physically impossible as written: 14 g of macros in a 9 g cake, and the test lists it as the one known exception) from section 5 (the first nine rows are the ones most likely wrong, and the rice cake and scallop figures change real meals).
+3. **Food-table numbers: DONE (Ron approved).** 22 rows corrected to USDA (section 5); four beef recipes switched off as a result. Ron may want a lean-jerky row, or edits to the chuck roast and jerky formulas, to bring them back.
 4. **Carnivore snack and large keto meals**: add a recipe or leave to the top-up.
