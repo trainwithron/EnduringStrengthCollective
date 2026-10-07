@@ -22,6 +22,8 @@ import { loadLibraryContext, type LibraryContextData } from "@/lib/library-data"
 import { varietySettings, selectOptions, type SelectionContext } from "@/lib/library-selection";
 import { choiceFromOption, generateLibraryDay, generateLibraryWeek, optionFromScaled } from "@/lib/library-meal-plan";
 import { buildAiRecipeRows } from "@/lib/ai-recipe-save";
+import { describeTypedRules, mergeRules, newFromTyped, rulesFromTypedText } from "@/lib/typed-restrictions";
+import { dayList, LIBRARY_WEEK_RATIONALE, planWeekReplacement } from "@/lib/week-replace";
 import { DIET_TYPES, type DietType, type Slot } from "@/lib/meal-templates/types";
 import { specTarget } from "@/lib/library-meal-plan";
 import {
@@ -80,6 +82,7 @@ export function MealPlanGenerator({
   initialPhase,
   proteinGPerLb,
   foodRules,
+  rulesReadable = true,
 }: {
   athleteId: string;
   groupId: string;
@@ -109,6 +112,8 @@ export function MealPlanGenerator({
   proteinGPerLb?: number;
   // This client's allergies, intolerances, dislikes and diet. An option that breaks any of them is never offered, whatever its source.
   foodRules?: FoodRules;
+  // False when this client's saved food rules could not be READ. Nothing is built or saved then: a plan made without their allergies is how an allergen reaches a client.
+  rulesReadable?: boolean;
 }) {
   const router = useRouter();
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -210,9 +215,17 @@ export function MealPlanGenerator({
     };
   }, [athleteId, date]);
 
+  // The rules a build applies: the client's saved preferences PLUS what the coach typed in the restrictions note (an allergy named there is never offered, a food named there is
+  // avoided). Existing clients often have no saved preferences yet, so the note must count.
+  const typedRules = rulesFromTypedText(dietaryRestrictions);
+  const effectiveRules: FoodRules = mergeRules(foodRules, typedRules);
+  const typedUnderstood = describeTypedRules(typedRules);
+  const typedNotSaved = newFromTyped(foodRules, typedRules);
+  const RULES_UNREADABLE = "Couldn't read this client's food rules, so nothing can be built. Reload the page and try again.";
+
   // The diet the library is filtered by: the client's own diet type when they have one, else what the restrictions text says.
   function libraryDiet(recipeArchetype: string): DietType {
-    const own = foodRules?.dietType;
+    const own = effectiveRules.dietType;
     if (own && (DIET_TYPES as string[]).includes(own)) return own as DietType;
     return (DIET_TYPES as string[]).includes(recipeArchetype) ? (recipeArchetype as DietType) : "omnivore";
   }
@@ -220,9 +233,9 @@ export function MealPlanGenerator({
   function selectionCtx(recipeArchetype: string, excludeKeys?: Set<string>): SelectionContext {
     const v = varietySettings(libraryData?.variety);
     return {
-      rules: foodRules ?? {},
+      rules: effectiveRules,
       diet: libraryDiet(recipeArchetype),
-      likes: libraryData?.likes ?? [],
+      likes: [...(libraryData?.likes ?? []), ...favoriteFoods.split(/[,/]/).map((x) => x.trim()).filter(Boolean)],
       favorites: { ids: new Set(libraryData?.favorites.ids ?? []), names: new Set(libraryData?.favorites.names ?? []) },
       recentlyOffered: libraryData?.recentlyOffered ?? new Map(),
       mixItUp: v.mixItUp,
@@ -248,6 +261,10 @@ export function MealPlanGenerator({
 
   function handleGenerate() {
     setError(null);
+    if (!rulesReadable) {
+      setError(RULES_UNREADABLE);
+      return;
+    }
     if (!libraryData) {
       setError("Still loading this client's history and your recipes. Try again in a moment.");
       return;
@@ -351,7 +368,11 @@ export function MealPlanGenerator({
     setDayView("daily");
     setRationale("Calories & macros imported from the Macro Calculator.");
 
-    // The library's history has to be loaded first; the effect runs again when it is.
+    // The client's food rules have to be readable, and the library's history loaded first; the effect runs again when it is.
+    if (!rulesReadable) {
+      setError(RULES_UNREADABLE);
+      return;
+    }
     if (!libraryData) return;
     const nMeals = parseInt(mealCount, 10) || 4;
     setLeftOutForRules(0);
@@ -520,9 +541,14 @@ export function MealPlanGenerator({
   // meals varied from day to day, the client's favorites repeating, their food rules applied. Replaces what is already planned for those days (after a confirmation).
   const [weekBusy, setWeekBusy] = useState(false);
   const [weekMsg, setWeekMsg] = useState<string | null>(null);
+  const [replaceHandBuilt, setReplaceHandBuilt] = useState(false);
   async function handleBuildWeek() {
     setWeekMsg(null);
     setError(null);
+    if (!rulesReadable) {
+      setError(RULES_UNREADABLE);
+      return;
+    }
     if (!libraryData) {
       setError("Still loading this client's history and your recipes. Try again in a moment.");
       return;
@@ -548,13 +574,28 @@ export function MealPlanGenerator({
       const trainWeek = isCycling ? build(trainMacros) : null;
       const restWeek = isCycling ? build(restMacros) : null;
 
-      const { data: existingRows, error: existingError } = await supabase.from("meal_plans").select("log_date").eq("athlete_id", athleteId).in("log_date", dates);
+      const { data: existingRows, error: existingError } = await supabase.from("meal_plans").select("log_date, rationale").eq("athlete_id", athleteId).in("log_date", dates);
       if (existingError) {
         setError("Couldn't check what is already planned this week, so nothing was changed. Try again.");
         return;
       }
-      const existingCount = (existingRows ?? []).length;
-      if (existingCount > 0 && !window.confirm(`This replaces the meals already planned for ${existingCount} ${existingCount === 1 ? "day" : "days"} this week. Continue?`)) return;
+      // Days already past are never touched, and days a coach built by hand only when the coach ticked the box.
+      const replacement = planWeekReplacement({ dates, todayKey: date, existing: (existingRows ?? []) as { log_date: string; rationale: string | null }[], replaceHandBuilt });
+      if (replacement.write.length === 0) {
+        setWeekMsg(
+          `Nothing to build: ${replacement.skippedPast.length > 0 ? `${dayList(replacement.skippedPast)} already passed` : ""}${replacement.skippedPast.length > 0 && replacement.skippedHand.length > 0 ? "; " : ""}${replacement.skippedHand.length > 0 ? `${dayList(replacement.skippedHand)} you planned by hand (tick the box to replace those too)` : ""}.`
+        );
+        return;
+      }
+      const replaced = [...replacement.replacingLibrary, ...replacement.replacingHand].sort();
+      const confirmText =
+        `Build ${dayList(replacement.write)}.` +
+        (replaced.length > 0 ? `\n\nThis REPLACES the meals already planned for: ${dayList(replaced)}.` : "") +
+        (replacement.replacingHand.length > 0 ? `\n(${dayList(replacement.replacingHand)} ${replacement.replacingHand.length === 1 ? "was" : "were"} planned by hand.)` : "") +
+        (replacement.skippedPast.length > 0 ? `\n\nNot touched, already passed: ${dayList(replacement.skippedPast)}.` : "") +
+        (replacement.skippedHand.length > 0 ? `\nNot touched, planned by hand: ${dayList(replacement.skippedHand)}.` : "") +
+        "\n\nContinue?";
+      if (!window.confirm(confirmText)) return;
 
       const toEntries = (meals: GeneratedMeal[]) =>
         meals.map((m) => ({
@@ -566,7 +607,7 @@ export function MealPlanGenerator({
           recipes: m.options.map(choiceFromOption),
           ...((m.featuredIndex ?? 0) > 0 ? { featuredIndex: m.featuredIndex } : {}),
         }));
-      const rows = dates.map((d) => ({
+      const rows = replacement.write.map((d) => ({
         athlete_id: athleteId,
         group_id: groupId,
         log_date: d,
@@ -574,7 +615,7 @@ export function MealPlanGenerator({
         meal_count: nMeals,
         include_snack: includeSnack,
         carb_cycling: isCycling,
-        rationale: "Built from the recipe library for the week.",
+        rationale: LIBRARY_WEEK_RATIONALE,
         macros: isCycling ? { train: trainMacros, rest: restMacros } : { daily: dailyMacros },
         meals: isCycling ? { train: toEntries(trainWeek![d]), rest: toEntries(restWeek![d]) } : { daily: toEntries(dailyWeek![d]) },
         created_by: user.id,
@@ -584,13 +625,16 @@ export function MealPlanGenerator({
         setError("Couldn't save the week. Nothing was changed. Try again.");
         return;
       }
+      const writtenDays = replacement.write;
       const all = [dailyWeek, trainWeek, restWeek].filter((w): w is Record<string, GeneratedMeal[]> => !!w);
       const short = new Map<string, number>();
-      for (const w of all) for (const d of dates) for (const m of w[d] ?? []) if ((m.shortfall ?? 0) > 0) short.set(m.spec.title, (short.get(m.spec.title) ?? 0) + 1);
+      for (const w of all) for (const d of writtenDays) for (const m of w[d] ?? []) if ((m.shortfall ?? 0) > 0) short.set(m.spec.title, (short.get(m.spec.title) ?? 0) + 1);
+      const kept = [...replacement.skippedPast, ...replacement.skippedHand];
+      const keptNote = kept.length > 0 ? ` Left alone: ${dayList(kept)}.` : "";
       setWeekMsg(
-        short.size === 0
-          ? "Built the week: three library options for every meal."
-          : `Built the week. Fewer than three library options for: ${[...short].map(([t, n]) => `${t} (${n} ${n === 1 ? "day" : "days"})`).join(", ")}. Use "Ask the Nutrition Spot" on a meal to fill the rest.`
+        (short.size === 0
+          ? `Built ${dayList(writtenDays)}: three library options for every meal.`
+          : `Built ${dayList(writtenDays)}. Fewer than three library options for: ${[...short].map(([t, n]) => `${t} (${n} ${n === 1 ? "day" : "days"})`).join(", ")}. Use "Ask the Nutrition Spot" on a meal to fill the rest.`) + keptNote
       );
       router.refresh();
     } finally {
@@ -646,12 +690,16 @@ export function MealPlanGenerator({
   // button already ignores this return value, so it's a pure addition.
   async function handleAiSuggest(meal: GeneratedMeal): Promise<boolean> {
     if (aiSuggesting[meal.spec.id]) return false;
+    if (!rulesReadable) {
+      setAiError((prev) => ({ ...prev, [meal.spec.id]: RULES_UNREADABLE }));
+      return false;
+    }
     setAiSuggesting((prev) => ({ ...prev, [meal.spec.id]: true }));
     setAiError((prev) => ({ ...prev, [meal.spec.id]: null }));
 
     function appendOptions(offered: MealOption[]) {
       // Anything that breaks the client's food rules is dropped here too (the AI route checks as well; the standard-options fallback does not know the rules).
-      const newOptions = foodRules ? filterOptionsByRules(offered, foodRules).kept : offered;
+      const newOptions = filterOptionsByRules(offered, effectiveRules).kept;
       if (newOptions.length < offered.length) setLeftOutForRules((n) => n + offered.length - newOptions.length);
       setMealsByView((prev) => {
         const updated = prev[dayView].map((m) =>
@@ -774,6 +822,10 @@ export function MealPlanGenerator({
   async function handleAiSuggestAll() {
     const currentMeals = mealsByView[dayView];
     if (aiSuggestingAll || currentMeals.length === 0) return;
+    if (!rulesReadable) {
+      setAiSuggestAllError(RULES_UNREADABLE);
+      return;
+    }
     setAiSuggestingAll(true);
     setAiSuggestAllError(null);
     setLastChargeReferenceId(null);
@@ -983,6 +1035,12 @@ export function MealPlanGenerator({
           placeholder="e.g. Vegan, Keto, No eggs"
           className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm mt-1"
         />
+        {typedUnderstood && (
+          <span className="block font-body text-xs text-steel mt-1" role="status">
+            Applied from your note: {typedUnderstood}.
+            {typedNotSaved && " These are not saved as this client's food preferences yet: add them under Preferences so every plan and every coach respects them."}
+          </span>
+        )}
       </label>
 
       <label className="block">
@@ -1025,10 +1083,17 @@ export function MealPlanGenerator({
         </p>
       )}
 
+      {!rulesReadable && (
+        <p className="font-body text-xs text-rust border border-rust/40 p-2.5" role="alert">
+          {RULES_UNREADABLE}
+        </p>
+      )}
+
       <button
         type="button"
         onClick={handleGenerate}
-        className="h-10 px-5 bg-rust text-graphite font-body text-sm font-medium"
+        disabled={!rulesReadable}
+        className="h-10 px-5 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
       >
         Generate meal plan
       </button>
@@ -1086,7 +1151,7 @@ export function MealPlanGenerator({
           <div>
             <button
               type="button"
-              disabled={aiSuggestingAll || meals.length === 0}
+              disabled={aiSuggestingAll || meals.length === 0 || !rulesReadable}
               onClick={handleAiSuggestAll}
               className="h-9 px-4 border border-rust/40 text-rust font-body text-sm disabled:opacity-50"
             >
@@ -1111,12 +1176,16 @@ export function MealPlanGenerator({
             <p className="font-body text-sm text-chalk">Build the week from the library</p>
             <p className="font-body text-xs text-steel">
               Three options for every meal, every day this week, from Ron&apos;s recipes and your own. Meals change from day to day, this client&apos;s favorites repeat, and their
-              food preferences are applied. This replaces what is already planned for the week.
+              food preferences are applied. It builds today and the days after it, never a day that has passed, and asks before replacing a day that already has a plan.
             </p>
+            <label className="flex items-center gap-2 font-body text-xs text-steel">
+              <input type="checkbox" checked={replaceHandBuilt} onChange={(e) => setReplaceHandBuilt(e.target.checked)} className="w-4 h-4" />
+              Also replace days I planned by hand
+            </label>
             <button
               type="button"
               onClick={handleBuildWeek}
-              disabled={weekBusy || meals.length === 0}
+              disabled={weekBusy || meals.length === 0 || !rulesReadable}
               className="h-9 px-4 bg-positive text-graphite font-body text-sm font-medium disabled:opacity-40"
             >
               {weekBusy ? "Building the week…" : "Build the week"}
@@ -1229,7 +1298,7 @@ export function MealPlanGenerator({
                     <button
                       type="button"
                       onClick={() => handleAiSuggest(meal)}
-                      disabled={aiSuggesting[meal.spec.id]}
+                      disabled={aiSuggesting[meal.spec.id] || !rulesReadable}
                       className="h-7 px-3 font-body text-xs border border-rust/40 text-rust disabled:opacity-40"
                     >
                       {aiSuggesting[meal.spec.id] ? "Asking the Nutrition Spot…" : "Ask the Nutrition Spot"}

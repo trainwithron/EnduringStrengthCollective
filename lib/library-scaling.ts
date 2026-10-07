@@ -26,6 +26,8 @@ export interface LibraryLine {
   usdaFdcId: number | null;
   // The line's reference grams (the recipe's own amount). Null on a recipe saved before the builder scaled by role.
   gramsRef: number | null;
+  // The real food the line was matched to (the USDA description for usdaFdcId), filled in when the recipes are loaded. Only used to check the client's food rules.
+  matchedDescription?: string | null;
 }
 
 export interface LibraryRecipe {
@@ -38,6 +40,8 @@ export interface LibraryRecipe {
   lines: LibraryLine[];
   mainProtein: string | null;
   source: "coach" | "ai";
+  // The allergen groups the recipe was tagged with when it was saved.
+  allergens?: string[];
 }
 
 type Measured = Exclude<IngredientRole, "fixed">;
@@ -107,7 +111,12 @@ export function solveFactors(lines: LibraryLine[], target: SlotTarget): Record<M
 }
 
 function toMeal(recipe: LibraryRecipe, lines: LibraryLine[], gramsOf: (l: LibraryLine) => number | null, macros: Macros, displayLines: string[]): ScaledMeal {
-  const scaledLines: ScaledLine[] = lines.map((l) => ({ name: l.label, label: l.label, grams: l.role === "fixed" ? null : gramsOf(l) }));
+  const scaledLines: ScaledLine[] = lines.map((l) => ({
+    name: l.label,
+    label: l.label,
+    grams: l.role === "fixed" ? null : gramsOf(l),
+    ...(l.matchedDescription ? { matched: l.matchedDescription } : {}),
+  }));
   const weighted = lines
     .filter((l) => l.role !== "fixed")
     .map((l) => ({ name: l.label, proteinG: ((gramsOf(l) ?? 0) * l.proteinPer100g) / 100 }));
@@ -126,6 +135,7 @@ function toMeal(recipe: LibraryRecipe, lines: LibraryLine[], gramsOf: (l: Librar
     macros,
     mainProtein: recipe.mainProtein || mainProteinOf(weighted) || (weighted[0] ? proteinFamily(weighted[0].name) : null),
     drift: 0,
+    ...(recipe.allergens && recipe.allergens.length > 0 ? { allergenTags: recipe.allergens } : {}),
   };
 }
 
@@ -199,5 +209,6 @@ export function libraryRecipeFromRow(r: Record<string, unknown>): LibraryRecipe 
     lines,
     mainProtein: typeof r.main_protein === "string" && r.main_protein ? r.main_protein : null,
     source: r.source === "ai" ? "ai" : "coach",
+    allergens: Array.isArray(r.allergens) ? (r.allergens as string[]) : [],
   };
 }

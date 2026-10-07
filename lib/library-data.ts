@@ -55,6 +55,21 @@ export async function loadLibraryContext(supabase: SupabaseClient, args: { coach
     if (res.error) res = await supabase.from("recipes").select(RECIPE_SELECT(false)).eq("created_by", args.coachId);
     if (res.error) notes.push("Your saved recipes could not be read, so only the starter library is used.");
     else coachRecipes = ((res.data ?? []) as unknown as Record<string, unknown>[]).map(libraryRecipeFromRow).filter((r): r is LibraryRecipe => !!r);
+
+    // The real food each matched line stands for (its USDA description), so the client's food rules are checked against it as well as against the label the coach typed.
+    const ids = [...new Set(coachRecipes.flatMap((r) => r.lines.map((l) => l.usdaFdcId)).filter((id): id is number => typeof id === "number"))];
+    if (ids.length > 0) {
+      const { data: foods, error: foodsError } = await supabase.from("usda_foods").select("fdc_id, description").in("fdc_id", ids);
+      if (foodsError) {
+        // Fail closed: a recipe whose matched foods cannot be read cannot be checked against the client's rules, so it is left out of this build.
+        coachRecipes = coachRecipes.filter((r) => r.lines.every((l) => l.usdaFdcId === null));
+        notes.push("Saved recipes with matched foods were left out, because those foods could not be read to check them against the client's food rules.");
+      }
+      else {
+        const byId = new Map((foods ?? []).map((f) => [f.fdc_id as number, f.description as string]));
+        for (const r of coachRecipes) for (const l of r.lines) if (l.usdaFdcId !== null && byId.has(l.usdaFdcId)) l.matchedDescription = byId.get(l.usdaFdcId);
+      }
+    }
   }
 
   let likes: string[] = [];

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { IngredientLine } from "@/components/shared/ingredient-line";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { choicesFeaturedFirst, type MealEntryPayload, type MealPlanBucket, type MealRecipeChoice } from "@/lib/meal-plan-assignment";
@@ -34,13 +34,26 @@ export function TodaysMealCards({
   const [saving, setSaving] = useState<string | null>(null);
   const [modifying, setModifying] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Slots with a save in flight. A second tap before the first save returns would otherwise insert a second row and double count: the lock is a ref, so it holds even before a re-render.
+  const inFlight = useRef<Set<string>>(new Set());
+  const [dayType, setDayType] = useState<"train" | "rest" | null>(null);
+  // Read after mount (never during the server render), so the page and the browser agree on the first paint.
+  useEffect(() => {
+    setDayType(readDayType(athleteId, logDate));
+  }, [athleteId, logDate]);
   if (!meals) return null;
   const buckets = (Object.keys(meals) as MealPlanBucket[]).filter((b) => (meals[b] ?? []).length > 0);
   if (buckets.length === 0) return null;
+  // A carb-cycling plan has a training-day menu and a rest-day menu. The client sees only the one for today, chosen once; a slot logged under either counts for the day.
+  const bothDayTypes = buckets.includes("train") && buckets.includes("rest");
+  const shownBuckets = bothDayTypes ? (dayType ? buckets.filter((b) => b === dayType || b === "daily") : []) : buckets;
 
   const entryFor = (mealId: string) => entries.find((e) => e.mealSlot === mealId);
 
   async function log(meal: MealEntryPayload, choice: MealRecipeChoice | null, status: "ate_it" | "skipped") {
+    // Already logged (or being logged): ignore the tap.
+    if (inFlight.current.has(meal.mealId) || entryFor(meal.mealId)) return;
+    inFlight.current.add(meal.mealId);
     setError(null);
     setSaving(meal.mealId);
     const m = choice?.macros;
@@ -57,9 +70,11 @@ export function TodaysMealCards({
       .single();
     setSaving(null);
     if (insertError || !data) {
+      inFlight.current.delete(meal.mealId);
       setError("Couldn't save that. Try again.");
       return;
     }
+    // Kept locked: the slot now has an entry, so a later tap is ignored by the check above.
     onEntryLogged({ id: data.id, mealSlot: meal.mealId, status, description, calories, proteinG: protein, carbsG: carbs, fatG: fat });
   }
 
@@ -75,10 +90,30 @@ export function TodaysMealCards({
           {error}
         </p>
       )}
+      {bothDayTypes && (
+        <div className="mb-4">
+          <p className="font-body text-sm text-chalk mb-2">{dayType ? `Today is a ${dayType === "train" ? "training" : "rest"} day.` : "Is today a training day or a rest day?"}</p>
+          <div className="flex items-center gap-2">
+            {(["train", "rest"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => {
+                  setDayType(t);
+                  writeDayType(athleteId, logDate, t);
+                }}
+                className={`h-11 px-3 font-body text-xs border ${dayType === t ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"}`}
+              >
+                {t === "train" ? "Training day" : "Rest day"}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="space-y-5">
-        {buckets.map((bucket) => (
+        {shownBuckets.map((bucket) => (
           <div key={bucket}>
-            {buckets.length > 1 && <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5">{BUCKET_LABELS[bucket] ?? bucket}</p>}
+            {shownBuckets.length > 1 && <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5">{BUCKET_LABELS[bucket] ?? bucket}</p>}
             <div className="space-y-4">
               {meals[bucket].map((meal) => {
                 const choices = choicesFeaturedFirst(meal);
@@ -157,6 +192,24 @@ export function TodaysMealCards({
       </div>
     </div>
   );
+}
+
+// Which kind of day it is, remembered for the day on this device only (a convenience: the choice never leaves the browser).
+const dayTypeKey = (athleteId: string, logDate: string) => `meal-daytype-${athleteId}-${logDate}`;
+function readDayType(athleteId: string, logDate: string): "train" | "rest" | null {
+  try {
+    const v = typeof window === "undefined" ? null : window.localStorage.getItem(dayTypeKey(athleteId, logDate));
+    return v === "train" || v === "rest" ? v : null;
+  } catch {
+    return null;
+  }
+}
+function writeDayType(athleteId: string, logDate: string, v: "train" | "rest") {
+  try {
+    window.localStorage.setItem(dayTypeKey(athleteId, logDate), v);
+  } catch {
+    // Not remembered; the client is simply asked again next time.
+  }
 }
 
 function OptionCard({ choice, featured, busy, onAte }: { choice: MealRecipeChoice; featured: boolean; busy: boolean; onAte: () => void }) {

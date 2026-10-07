@@ -43,6 +43,7 @@ export function NutritionTools({
   defaultPhase,
   proteinGPerLb,
   foodRules,
+  rulesReadable = true,
   weightUnit = "lb",
   initialActivity = null,
 }: {
@@ -67,6 +68,8 @@ export function NutritionTools({
   proteinGPerLb?: number;
   // This client's food rules; the generator never offers an option that breaks them.
   foodRules?: FoodRules;
+  // False when the client's saved food rules could not be read: the planner builds nothing then.
+  rulesReadable?: boolean;
   // How the client sees weight, and the activity level they gave: the calculator starts from them.
   weightUnit?: WeightUnit;
   initialActivity?: ActivityLevel | null;
@@ -131,6 +134,7 @@ export function NutritionTools({
           initialPhase={defaultPhase}
           proteinGPerLb={proteinGPerLb}
           foodRules={foodRules}
+          rulesReadable={rulesReadable}
         />
       </div>
     </div>

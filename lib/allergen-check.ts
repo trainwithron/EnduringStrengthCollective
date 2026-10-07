@@ -168,6 +168,16 @@ function allergyTerms(item: string): { label: string; key: AllergenKey | null; t
   return key ? { label: key, key, terms: ALLERGEN_TERMS[key] } : { label: raw, key: null, terms: [raw] };
 }
 
+// The controlled allergen groups a client's allergy list covers (a typed alias such as "lactose" or "other: gluten" counts; free text that is no group does not).
+export function allergyKeysOf(allergies: string[] | undefined): Set<AllergenKey> {
+  const keys = new Set<AllergenKey>();
+  for (const item of allergies ?? []) {
+    const a = allergyTerms(item);
+    if (a?.key) keys.add(a.key);
+  }
+  return keys;
+}
+
 // An intolerance or dislike is whatever the person typed; a known word ("lactose", "gluten") also covers its group.
 function looseTerms(item: string): { label: string; key: AllergenKey | null; terms: string[] } | null {
   const raw = item.trim().toLowerCase();

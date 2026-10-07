@@ -97,7 +97,8 @@ export async function buildAiRecipeRows(option: MealOption, slot: Slot, now: Dat
   }
   if (!ingredients.some((i) => i.role !== "fixed")) return { ok: false, reason: "This option has no measured line to scale, so it cannot be saved." };
 
-  const text = [option.recipeName ?? "", ...ingredients.map((i) => i.label), ...ingredients.map((i) => i.fixed_display_text ?? "")].filter(Boolean);
+  // Tags are worked out from the name, the matched food AND the line as the AI wrote it, so a label that hides the food cannot hide an allergen.
+  const text = [option.recipeName ?? "", ...ingredients.map((i) => i.label), ...option.aiLines.map((l) => l.rawLine), ...ingredients.map((i) => i.fixed_display_text ?? "")].filter(Boolean);
   const allergens = ALLERGEN_KEYS.filter((k) => text.some((t) => textHasAllergen(t, k) !== null));
   // Diets the lines clearly fit. Omnivore always; the meat-free ones only when the same rules the client screens use find nothing in the lines.
   const diets: DietType[] = ["omnivore"];

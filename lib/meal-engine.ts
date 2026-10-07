@@ -1036,7 +1036,7 @@ export interface MealOption {
   // printed label, which the food-rule checks read), and the protein family. A key the same meal keeps across days.
   source?: "library" | "coach" | "ai";
   macros?: { proteinG: number; carbsG: number; fatG: number; calories: number };
-  lines?: { name: string; label: string; grams: number | null }[];
+  lines?: { name: string; label: string; grams: number | null; matched?: string }[];
   mainProtein?: string | null;
   key?: string;
   // Only on an AI option the coach may save to their library: the verified lines with the real food each was matched to.

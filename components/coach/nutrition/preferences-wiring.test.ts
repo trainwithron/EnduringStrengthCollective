@@ -71,8 +71,8 @@ describe("no unsafe option is ever created", () => {
     expect(generator).not.toMatch(/body: JSON\.stringify\(\{[^}]*allergies/);
     // Library options are chosen by the library-first selection, which checks the client's rules on what each meal really contains (lib/library-selection.ts).
     expect(generator).toContain("generateLibraryDay(");
-    expect(generator).toContain("rules: foodRules ?? {}");
-    expect(generator).toContain("filterOptionsByRules(offered, foodRules)");
+    expect(generator).toContain("rules: effectiveRules");
+    expect(generator).toContain("filterOptionsByRules(offered, effectiveRules)");
     expect(generator).toContain("left out because");
     expect(clientNutrition).toContain("foodRules={foodRules}");
   });

@@ -91,7 +91,7 @@ export async function ClientNutrition({
     { data: pendingSuggestionRows },
     { data: foodRows },
     { data: weekPlanRows },
-    { data: prefsRow },
+    { data: prefsRow, error: prefsReadError },
     { data: upcomingPlanRows },
     { data: injuryStatusRow },
     { data: bodyDetails },
@@ -167,6 +167,8 @@ export async function ClientNutrition({
   const bodyProfile = rowToBodyProfile(bodyDetails as Record<string, unknown> | null, intakeDob as Record<string, unknown> | null);
   const phasePlan = rowToPhasePlan(phasePlanRow as Record<string, unknown> | null);
 
+  // A client with no row simply has no saved rules. A row that could not be READ is different: the planner builds nothing then (it would be made without their allergies).
+  if (prefsReadError) console.error("[client-nutrition] could not read food rules:", prefsReadError.message);
   const prefs = rowToPreferences(prefsRow as Record<string, unknown> | null);
   const foodRules = { allergies: prefs.allergies, intolerances: prefs.intolerances, dislikes: prefs.dislikes, dietType: prefs.dietType };
   const rulesText = hasFoodRules(prefs) ? restrictionsTextFromPreferences(prefs) : "";
@@ -569,6 +571,7 @@ export async function ClientNutrition({
           defaultPhase={milestoneTagToNutritionPhase(phaseTag)}
           proteinGPerLb={prefs.proteinGPerLb}
           foodRules={foodRules}
+          rulesReadable={!prefsReadError}
           weightUnit={bodyProfile.weightUnit}
           initialActivity={bodyProfile.activity}
         />

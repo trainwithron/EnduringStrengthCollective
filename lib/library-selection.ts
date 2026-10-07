@@ -5,7 +5,7 @@
 //   3. favorites first, then foods the client likes, then closeness to the target; when the coach asks to "mix it up", meals offered recently are moved down (never a favorite);
 //   4. up to three, preferring different main proteins.
 // Fewer than three left is reported as a shortfall, so the screen says "2 from the library, 1 to generate" instead of quietly showing two.
-import { checkLines, type FoodRules } from "@/lib/allergen-check";
+import { allergyKeysOf, checkLines, type FoodRules } from "@/lib/allergen-check";
 import { normalizeName } from "@/lib/library-favorites";
 import { scaleLibraryRecipe, type LibraryRecipe } from "@/lib/library-scaling";
 import { templatesFor } from "@/lib/meal-templates";
@@ -95,7 +95,10 @@ export function rankScore(meal: ScaledMeal, target: SlotTarget, ctx: SelectionCo
 
 export function selectOptions(slot: Slot, target: SlotTarget, ctx: SelectionContext, count = OPTIONS_PER_SLOT): SlotSelection {
   const landed = scaledCandidates(slot, target, ctx).filter((m) => !ctx.excludeKeys?.has(m.key));
-  const safe = landed.filter((m) => checkLines(checkTextOf(m), ctx.rules).length === 0);
+  // Two nets: the rules are checked on what the meal really contains (names, labels, the matched real food, preparation text), AND a saved recipe whose own allergen tags
+  // name one of the client's allergies is never offered.
+  const allergyKeys = allergyKeysOf(ctx.rules.allergies);
+  const safe = landed.filter((m) => checkLines(checkTextOf(m), ctx.rules).length === 0 && !(m.allergenTags ?? []).some((t) => (allergyKeys as Set<string>).has(t)));
   const ranked = safe
     .map((m) => ({ m, s: rankScore(m, target, ctx) }))
     // Ties keep a stable order (by key), so the same inputs always give the same menu.

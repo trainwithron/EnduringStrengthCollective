@@ -23,7 +23,7 @@ const plain = (s: string) => s.replace(/<[^>]+>/g, " ");
 
 function linesOf(choice: MealRecipeChoice): string[] {
   // A library-first option also carries its structured lines: each food's name AND its printed label are checked, not only the printed text.
-  const structured = (choice.lines ?? []).flatMap((l) => (l.label && l.label !== l.name ? [l.name, l.label] : [l.name]));
+  const structured = (choice.lines ?? []).flatMap((l) => [l.name, ...(l.label && l.label !== l.name ? [l.label] : []), ...(l.matched && l.matched !== l.name && l.matched !== l.label ? [l.matched] : [])]);
   return [...(choice.recipeName ? [choice.recipeName] : []), ...choice.ingredients.map(plain), ...structured];
 }
 

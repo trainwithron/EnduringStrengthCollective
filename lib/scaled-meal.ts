@@ -14,6 +14,8 @@ export interface ScaledLine {
   name: string;
   label: string;
   grams: number | null;
+  // The real food a saved line was matched to (its USDA description), when it has one. The food rules are checked against this too, so a label that hides the food cannot pass.
+  matched?: string;
 }
 
 export interface ScaledMeal {
@@ -32,6 +34,8 @@ export interface ScaledMeal {
   mainProtein: string | null;
   // How far the formula was aimed from the slot's own target (a library meal), 0 for the others.
   drift: number;
+  // The allergen groups a saved recipe was tagged with when it was saved (a speed filter and a second net: a recipe tagged with one of the client's allergies is never offered).
+  allergenTags?: string[];
 }
 
 const plain = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
@@ -83,6 +87,7 @@ export function checkTextOf(meal: Pick<ScaledMeal, "name" | "lines" | "prepText"
   for (const l of meal.lines) {
     out.push(l.name);
     if (l.label && l.label !== l.name) out.push(l.label);
+    if (l.matched && l.matched !== l.name && l.matched !== l.label) out.push(l.matched);
   }
   if (meal.prepText) out.push(meal.prepText);
   return out;

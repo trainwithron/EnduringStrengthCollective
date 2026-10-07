@@ -10,7 +10,7 @@ What changed, what to know, and what needs a decision. Built on 4a (Ron's recipe
 - **Build the week** (`lib/week-build.ts`): seven days, each meal slot with its options, a **featured** option for the client's card (never the same one two days running; favorites stay among the options every day but are not the featured one while others can be), and no meal twice in one day. It asks before replacing days that already have a plan.
 - **The coach's own recipes** are scaled by one factor per role (protein sources together, carb sources together, fat sources together) solved against all three macros at once, kept within 0.4 to 2.5 times their reference grams, rounded to what a person can weigh, and measured from the printed amounts (`lib/library-scaling.ts`). A recipe saved before reference grams existed is scaled the old way and held to the same tolerance.
 - **The client's card** (`components/athlete/todays-meal-cards.tsx`): the featured option first with its grams and macros, the others one tap away, **"I ate this"** logs that option's name and its own macros. Eaten meals matched by name (three times in four weeks) become favorites.
-- **Save an AI option to the library** (`lib/ai-recipe-save.ts`): no AI call; a verified option becomes a private recipe with tags worked out from its lines, a fingerprint (the same lines saved twice is one recipe), a main protein and reference grams. Every measured line must be matched to a real food (the database also refuses it otherwise).
+- **Save an AI option to the library** (`lib/ai-recipe-save.ts`): no AI call; a verified option becomes a recipe in the coach's own library (visible only to the coach and the coach's clients) with tags worked out from its lines, a fingerprint (the same lines saved twice is one recipe), a main protein and reference grams. Every measured line must be matched to a real food (the database also refuses it otherwise).
 
 ## Database (one paste, Release K, step 41, migration 0296)
 
@@ -24,3 +24,11 @@ Columns on `recipes` and `recipe_ingredients` only (see `supabase/apply/README.m
 4. **Keto and carnivore snacks have no library recipe**, and pescatarian breakfast only exists on the low-carb shape. The builder falls through to "generate" for those (section 4 of the 4a port log lists every gap).
 5. **Carb cycling** builds both a training-day and a rest-day menu for every day of the week (the client sees both, as with a single-day save).
 6. A meal's **printed grams are what is measured**, so the macros on the card are the macros of what is on the plate.
+
+## After the Assistant's review (all fixed in the follow-up commit)
+
+- **Fail closed:** if the client's saved food rules cannot be READ, the planner builds nothing, saves nothing and asks the AI for nothing, and says so.
+- **The typed restrictions note counts:** it is parsed into rules (allergen words become allergies, other foods dislikes, a diet word the diet), merged with the saved preferences, shown under the field ("Applied from your note"), and the coach is told to save them under Preferences.
+- **Build the week** never writes a day that has passed, skips days the coach planned by hand unless the box is ticked, and the confirmation lists the actual days it replaces.
+- **Saved recipes** are checked against the real food each line was matched to (its USDA description) as well as the label, and a recipe whose saved allergen tags name one of the client's allergies is never offered. If those matched foods cannot be read, such recipes are left out.
+- **"I ate this"** logs once however fast it is tapped. **Carb-cycling** clients choose today's day type once and see only that menu.
