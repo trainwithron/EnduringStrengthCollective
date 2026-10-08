@@ -10,6 +10,8 @@ import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { loadCoachInbox } from "@/lib/coach-inbox-data";
 import { selectedConversation } from "@/lib/messages-list";
 import { MessagesTwoPane } from "@/components/messages/messages-two-pane";
+import { AwayReplyCard } from "@/components/coach/away-reply-card";
+import { loadAwayReply } from "@/lib/away-reply-data";
 
 interface ConversationRow {
   otherId: string;
@@ -95,6 +97,9 @@ export default async function MessagesPage(props: { params: Promise<{ groupId: s
     // One inbox for the coach: every client across the groups they coach in this organization (lib/coach-inbox-data.ts, shared with the floating panel).
     const { conversations, groupName, incomplete } = await loadCoachInbox(supabase, { coachId: user.id, groupId: params.groupId });
     const group = { name: groupName };
+    // The "I'm away" preset reply: shown to the coach on both layouts, hidden before the database update that adds it.
+    const away = await loadAwayReply(supabase, user.id);
+    const awayCard = away ? <AwayReplyCard coachId={user.id} initial={away.setting} today={away.today} /> : null;
 
     const list = (
       <div className={showMobileView ? "px-5 pt-4 space-y-1" : "max-w-[560px] space-y-1"}>
@@ -120,6 +125,7 @@ export default async function MessagesPage(props: { params: Promise<{ groupId: s
               Message all clients
             </Link>
           </div>
+          {awayCard}
           <MessagesTwoPane
             conversations={conversations}
             incomplete={incomplete}
@@ -146,6 +152,7 @@ export default async function MessagesPage(props: { params: Promise<{ groupId: s
                 Message all
               </Link>
             </header>
+            <div className="px-5 pt-4">{awayCard}</div>
             {list}
           </div>
         </CoachMobileShell>

@@ -10,6 +10,7 @@ interface MessageRow {
   sender_id: string;
   body: string;
   created_at: string;
+  auto_reply?: boolean;
 }
 
 // Coach<->Athlete DM thread — realtime message list + composer, same
@@ -133,6 +134,7 @@ export function DirectMessageThread({
                 }`}
               >
                 {m.body}
+                {m.auto_reply && <span className={`block text-[11px] mt-1 ${isOwn ? "text-graphite/70" : "text-steel"}`}>Auto-reply{isOwn ? " (sent because you are away)" : ""}</span>}
               </div>
             </div>
           );

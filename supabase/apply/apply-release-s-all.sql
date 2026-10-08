@@ -1,4 +1,4 @@
--- RELEASE S (BOOKING HOURS CHECK, GROUPED COUNTS, HIDE DEMOS PER PERSON): ONE paste. Steps 57, 58, 59 in order, all or nothing.
+-- RELEASE S (BOOKING HOURS CHECK, GROUPED COUNTS, HIDE DEMOS PER PERSON, THE AWAY PRESET REPLY): ONE paste. Steps 57, 58, 59, 60 in order, all or nothing.
 --
 -- Paste this whole file into the Supabase SQL editor and run it once. It replaces the separate precheck and apply files for these steps (they stay as the fallback).
 -- Every check from each step's precheck is built in as a guard in front of that step. If any check is false, the run stops with a message that names the step and the
@@ -8,11 +8,12 @@
 -- AFTER STEP 57: Nothing changes for normal use: the booking screens already only offer times inside the coach's hours. A direct call that tries to book or move a client's own session outside the coach's open hours, or onto time off, is now refused with 'that time is outside your coach's hours'. A coach scheduling a client is never refused.
 -- AFTER STEP 58: Nothing visible changes: the same numbers appear on the Clients page, client profile and calendar. With the code of the same release live they are counted inside the database instead of by reading every open session, which is what keeps them working for a gym with hundreds of clients.
 -- AFTER STEP 59: Nothing changes until the code of the same release is live. After that a client who turns off exercise demos in Settings has them off on every phone and computer they sign in on; a client who never touched it sees demos as before.
+-- AFTER STEP 60: Nothing changes until a coach turns it on in Messages. While it is on, each message a client sends gets the coach's reply (one reply per burst of messages within 5 minutes), the coach still gets the usual notice for the client's message, and the thread shows a small 'Auto-reply' note on each reply that went out. It stops after the last day if one was set, or when the coach turns it off.
 -- It contains no text searching, so editor re-indenting cannot break it.
 
 begin;
 
--- ===== Release S (booking hours check, grouped counts, hide demos per person), step 57: 0312 A client booking or moving their own session must stay inside the coach's open hours and clear of time off: book_session and reschedule_booking now refuse any other time (a coach booking for a client is never refused)
+-- ===== Release S (booking hours check, grouped counts, hide demos per person, the away preset reply), step 57: 0312 A client booking or moving their own session must stay inside the coach's open hours and clear of time off: book_session and reschedule_booking now refuse any other time (a coach booking for a client is never refused)
 do $g57$
 declare
   failed text;
@@ -24,7 +25,7 @@ begin
       ('0312 is not already applied (book_session does not check the hours yet)', coalesce((select position('coach_time_is_open' in pg_get_functiondef(p.oid)) = 0 from pg_proc p where p.proname = 'book_session' and p.pronamespace = 'public'::regnamespace limit 1), false))
   ) as checks(check_name, ok) where not ok;
   if failed is not null then
-    raise exception 'Release S (booking hours check, grouped counts, hide demos per person), step 57 (0312) cannot run: this step looks already applied, or the database is not in the state it expects. Failed checks: %. NOTHING was changed (the whole bundle is all or nothing). If an earlier step was applied by hand, use the single-step files for the rest, and send Spot this message.', failed;
+    raise exception 'Release S (booking hours check, grouped counts, hide demos per person, the away preset reply), step 57 (0312) cannot run: this step looks already applied, or the database is not in the state it expects. Failed checks: %. NOTHING was changed (the whole bundle is all or nothing). If an earlier step was applied by hand, use the single-step files for the rest, and send Spot this message.', failed;
   end if;
 end
 $g57$;
@@ -278,7 +279,7 @@ begin
 end
 $acl$;
 
--- ===== Release S (booking hours check, grouped counts, hide demos per person), step 58: 0313 Session counts worked out in the database for large rosters: one function (booking_counts) returns booked, to mark and prepaid-ahead per client and group, with a small index, so the pages that show "8 left · 4 booked · 2 to mark" stay fast and complete with 500+ clients
+-- ===== Release S (booking hours check, grouped counts, hide demos per person, the away preset reply), step 58: 0313 Session counts worked out in the database for large rosters: one function (booking_counts) returns booked, to mark and prepaid-ahead per client and group, with a small index, so the pages that show "8 left · 4 booked · 2 to mark" stay fast and complete with 500+ clients
 do $g58$
 declare
   failed text;
@@ -289,7 +290,7 @@ begin
       ('0313 is not already applied (booking_counts is not there yet)', not exists (select 1 from pg_proc where proname = 'booking_counts' and pronamespace = 'public'::regnamespace))
   ) as checks(check_name, ok) where not ok;
   if failed is not null then
-    raise exception 'Release S (booking hours check, grouped counts, hide demos per person), step 58 (0313) cannot run: this step looks already applied, or the database is not in the state it expects. Failed checks: %. NOTHING was changed (the whole bundle is all or nothing). If an earlier step was applied by hand, use the single-step files for the rest, and send Spot this message.', failed;
+    raise exception 'Release S (booking hours check, grouped counts, hide demos per person, the away preset reply), step 58 (0313) cannot run: this step looks already applied, or the database is not in the state it expects. Failed checks: %. NOTHING was changed (the whole bundle is all or nothing). If an earlier step was applied by hand, use the single-step files for the rest, and send Spot this message.', failed;
   end if;
 end
 $g58$;
@@ -374,7 +375,7 @@ $function$;
 revoke all on function public.booking_counts(uuid, uuid, uuid[], uuid) from public, anon;
 grant execute on function public.booking_counts(uuid, uuid, uuid[], uuid) to authenticated, service_role;
 
--- ===== Release S (booking hours check, grouped counts, hide demos per person), step 59: 0314 "Hide exercise demos" follows the person, not the device: one tiny private table (client_ui_settings, one row per client, only that client can read or change it)
+-- ===== Release S (booking hours check, grouped counts, hide demos per person, the away preset reply), step 59: 0314 "Hide exercise demos" follows the person, not the device: one tiny private table (client_ui_settings, one row per client, only that client can read or change it)
 do $g59$
 declare
   failed text;
@@ -385,7 +386,7 @@ begin
       ('0314 is not already applied (client_ui_settings is not there yet)', to_regclass('public.client_ui_settings') is null)
   ) as checks(check_name, ok) where not ok;
   if failed is not null then
-    raise exception 'Release S (booking hours check, grouped counts, hide demos per person), step 59 (0314) cannot run: this step looks already applied, or the database is not in the state it expects. Failed checks: %. NOTHING was changed (the whole bundle is all or nothing). If an earlier step was applied by hand, use the single-step files for the rest, and send Spot this message.', failed;
+    raise exception 'Release S (booking hours check, grouped counts, hide demos per person, the away preset reply), step 59 (0314) cannot run: this step looks already applied, or the database is not in the state it expects. Failed checks: %. NOTHING was changed (the whole bundle is all or nothing). If an earlier step was applied by hand, use the single-step files for the rest, and send Spot this message.', failed;
   end if;
 end
 $g59$;
@@ -423,6 +424,149 @@ revoke all on public.client_ui_settings from anon;
 -- Row policies do not govern TRUNCATE, REFERENCES or TRIGGER; no client path needs them.
 revoke truncate, references, trigger on public.client_ui_settings from authenticated;
 
+-- ===== Release S (booking hours check, grouped counts, hide demos per person, the away preset reply), step 60: 0315 The "I'm away" preset reply: a coach writes one reply, turns it on (optionally with a last day), and every message a client sends them gets that reply back in the thread (marked as an auto-reply). One tiny private table, one marker column, two trigger functions
+do $g60$
+declare
+  failed text;
+begin
+  select string_agg(check_name, '; ') into failed from (
+    values
+      ('direct_messages exists (0140 is applied)', to_regclass('public.direct_messages') is not null),
+      ('0315 is not already applied (coach_away_replies is not there yet)', to_regclass('public.coach_away_replies') is null)
+  ) as checks(check_name, ok) where not ok;
+  if failed is not null then
+    raise exception 'Release S (booking hours check, grouped counts, hide demos per person, the away preset reply), step 60 (0315) cannot run: this step looks already applied, or the database is not in the state it expects. Failed checks: %. NOTHING was changed (the whole bundle is all or nothing). If an earlier step was applied by hand, use the single-step files for the rest, and send Spot this message.', failed;
+  end if;
+end
+$g60$;
+
+-- ====================================================================================================
+-- migration 0315_away_reply.sql
+-- ====================================================================================================
+
+-- Release S, part 5: the "I'm away" preset reply (Ron, Oct 8: "a preset reply, not an automatic text").
+--
+-- The coach writes ONE reply, turns "I'm away" on (optionally with the last day), and while it is on every message a client sends them gets that reply back in the same thread.
+--   * coach_away_replies(coach_id, enabled, message, ends_on, updated_at): one row per coach, readable and writable only by that coach.
+--   * direct_messages.auto_reply: marks a message the database wrote from the preset (the thread shows it with a small "Auto-reply" note, so the coach can see which went out).
+--     A person cannot mark their own message as an auto-reply, and cannot change the mark afterwards: only the function below can set it.
+--   * send_away_reply(): after a CLIENT's message to their coach is added, writes the preset reply from the coach to that client, in the same group. It never reads the message.
+--     It does nothing when: the new message is itself an auto-reply (no loops), the sender is a coach, the recipient is not a coach of the group, the coach has it off or no
+--     reply text, the last day has passed (in the coach's time zone, New York when none is set), or this coach already auto-replied to this client in this group in the last
+--     5 minutes (a burst of messages gets one reply, not many). Every other message gets the reply: it is not limited to one per period.
+--   * The coach still gets the usual notice for the client's message (nothing about that changes), and the client gets the usual notice for the reply.
+-- New table, one new column, three functions (all closed to signed-in users: they only ever run as triggers). Re-runnable.
+
+create table if not exists public.coach_away_replies (
+  coach_id uuid primary key references public.profiles(id) on delete cascade,
+  enabled boolean not null default false,
+  message text not null default '' check (char_length(message) <= 1000),
+  ends_on date,
+  updated_at timestamptz not null default now()
+);
+alter table public.coach_away_replies enable row level security;
+drop policy if exists "coach_away_replies_select_own" on public.coach_away_replies;
+create policy "coach_away_replies_select_own" on public.coach_away_replies for select to authenticated using (coach_id = (select auth.uid()));
+drop policy if exists "coach_away_replies_insert_own" on public.coach_away_replies;
+create policy "coach_away_replies_insert_own" on public.coach_away_replies for insert to authenticated with check (coach_id = (select auth.uid()));
+drop policy if exists "coach_away_replies_update_own" on public.coach_away_replies;
+create policy "coach_away_replies_update_own" on public.coach_away_replies for update to authenticated
+  using (coach_id = (select auth.uid())) with check (coach_id = (select auth.uid()));
+drop policy if exists "coach_away_replies_delete_own" on public.coach_away_replies;
+create policy "coach_away_replies_delete_own" on public.coach_away_replies for delete to authenticated using (coach_id = (select auth.uid()));
+revoke all on public.coach_away_replies from anon;
+revoke truncate, references, trigger on public.coach_away_replies from authenticated;
+
+alter table public.direct_messages add column if not exists auto_reply boolean not null default false;
+
+-- Only send_away_reply() can set the mark (it flags the transaction first); anything a person sends or edits keeps it off / as it was.
+create or replace function public.guard_direct_message_auto_reply()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.role() in ('authenticated', 'anon') then
+    if tg_op = 'INSERT' then
+      if coalesce(current_setting('app.away_reply', true), '') <> '1' then
+        new.auto_reply := false;
+      end if;
+    else
+      new.auto_reply := old.auto_reply;
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists direct_messages_guard_auto_reply on public.direct_messages;
+create trigger direct_messages_guard_auto_reply
+  before insert or update on public.direct_messages
+  for each row execute function public.guard_direct_message_auto_reply();
+
+create or replace function public.send_away_reply()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_cfg public.coach_away_replies%rowtype;
+  v_tz text;
+begin
+  if new.auto_reply then
+    return new;
+  end if;
+  -- Only a client writing to their coach.
+  if not exists (select 1 from public.group_memberships gm where gm.group_id = new.group_id and gm.profile_id = new.recipient_id and gm.role = 'coach') then
+    return new;
+  end if;
+  if exists (select 1 from public.group_memberships gm where gm.group_id = new.group_id and gm.profile_id = new.sender_id and gm.role = 'coach') then
+    return new;
+  end if;
+
+  select * into v_cfg from public.coach_away_replies where coach_id = new.recipient_id and enabled;
+  if not found or btrim(v_cfg.message) = '' then
+    return new;
+  end if;
+
+  if v_cfg.ends_on is not null then
+    select timezone into v_tz from public.profiles where id = new.recipient_id;
+    if v_tz is null or not exists (select 1 from pg_timezone_names where name = v_tz) then
+      v_tz := 'America/New_York';
+    end if;
+    if (now() at time zone v_tz)::date > v_cfg.ends_on then
+      return new;
+    end if;
+  end if;
+
+  -- A burst of messages from the same client gets one reply.
+  if exists (
+    select 1 from public.direct_messages d
+    where d.group_id = new.group_id and d.sender_id = new.recipient_id and d.recipient_id = new.sender_id
+      and d.auto_reply and d.created_at > now() - interval '5 minutes'
+  ) then
+    return new;
+  end if;
+
+  perform set_config('app.away_reply', '1', true);
+  -- created_at is the clock, not the start of the transaction, so the reply always sorts after the message it answers (both would otherwise carry the same time).
+  insert into public.direct_messages (group_id, sender_id, recipient_id, body, auto_reply, created_at)
+  values (new.group_id, new.recipient_id, new.sender_id, v_cfg.message, true, clock_timestamp());
+  perform set_config('app.away_reply', '', true);
+  return new;
+end;
+$$;
+
+drop trigger if exists direct_messages_send_away_reply on public.direct_messages;
+create trigger direct_messages_send_away_reply
+  after insert on public.direct_messages
+  for each row execute function public.send_away_reply();
+
+revoke all on function public.guard_direct_message_auto_reply() from public, anon, authenticated;
+revoke all on function public.send_away_reply() from public, anon, authenticated;
+
 commit;
 
 -- Read-only result (after the commit): every row must say in_place = true.
@@ -432,4 +576,6 @@ select step, what, in_place from (
   select 'step 58 (0313)' as step, '0313 Session counts worked out in the database for large rosters: one function' as what, not ((not exists (select 1 from pg_proc where proname = 'booking_counts' and pronamespace = 'public'::regnamespace))) as in_place
   union all
   select 'step 59 (0314)' as step, '0314 "Hide exercise demos" follows the person' as what, not ((to_regclass('public.client_ui_settings') is null)) as in_place
+  union all
+  select 'step 60 (0315)' as step, '0315 The "I''m away" preset reply: a coach writes one reply' as what, not ((to_regclass('public.coach_away_replies') is null)) as in_place
 ) as result order by step;
