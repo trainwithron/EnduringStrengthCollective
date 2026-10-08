@@ -80,3 +80,5 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0307 | yes | yes | 3 | 0307 target change notice function closed |
 | 0308 | yes | yes | 12 | 0308 trigger functions closed |
 | 0309 | yes | yes | 9 | 0309 new training block notice |
+| 0310 | yes | yes | 12 | 0310 the coach's own name for an exercise |
+| 0311 | yes | yes | 36 | 0311 a client can ask for a different meal plan |

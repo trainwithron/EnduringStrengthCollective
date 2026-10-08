@@ -7,6 +7,17 @@ export const LIBRARY_WEEK_RATIONALE = "Built from the recipe library for the wee
 // What a library-built day says once a coach has changed it by hand (drag and drop, "Assign to days"). It is not the library's text, so the day counts as hand-built.
 export const EDITED_BY_HAND_RATIONALE = "Built from the recipe library, then edited by hand.";
 
+// What a day says once a CLIENT asked for a different plan and the library rebuilt it (try 1, 2 or 3 of 3). The database function that applies a try writes exactly this text and
+// counts tries by reading it back, so the two must match. A rebuilt day is still a library-built day: the coach's "Build the week" and a later try may replace it.
+export const clientTryRationale = (n: number): string => `Rebuilt at the client's request (try ${n} of 3).`;
+const CLIENT_TRY_RE = /^Rebuilt at the client's request \(try ([1-3]) of 3\)\.$/;
+export function clientTryNumber(rationale: string | null | undefined): number | null {
+  const m = CLIENT_TRY_RE.exec(rationale ?? "");
+  return m ? Number(m[1]) : null;
+}
+// A day the recipe library built: by "Build the week", or rebuilt at a client's request.
+export const isLibraryRationale = (rationale: string | null | undefined): boolean => rationale === LIBRARY_WEEK_RATIONALE || clientTryNumber(rationale) !== null;
+
 export interface ExistingDay {
   log_date: string;
   rationale: string | null;
@@ -36,7 +47,7 @@ export function planWeekReplacement(args: { dates: string[]; todayKey: string; e
       plan.write.push(d);
       continue;
     }
-    if (e.rationale === LIBRARY_WEEK_RATIONALE) {
+    if (isLibraryRationale(e.rationale)) {
       plan.write.push(d);
       plan.replacingLibrary.push(d);
     } else if (args.replaceHandBuilt) {

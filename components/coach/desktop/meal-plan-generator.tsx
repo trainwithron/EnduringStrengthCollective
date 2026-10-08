@@ -20,11 +20,11 @@ import { filterOptionsByRules } from "@/lib/plan-preference-check";
 import type { FoodRules } from "@/lib/allergen-check";
 import { loadLibraryContext, type LibraryContextData } from "@/lib/library-data";
 import { varietySettings, selectOptions, type SelectionContext } from "@/lib/library-selection";
-import { choiceFromOption, generateLibraryDay, generateLibraryWeek, optionFromScaled } from "@/lib/library-meal-plan";
+import { buildSelectionContext, choiceFromOption, entriesFromMeals, generateLibraryDay, generateLibraryWeek, libraryDietFor, optionFromScaled } from "@/lib/library-meal-plan";
 import { buildAiRecipeRows, clientWordsOf } from "@/lib/ai-recipe-save";
 import { describeTypedRules, mergeRules, newFromTyped, rulesFromTypedText } from "@/lib/typed-restrictions";
 import { dayList, LIBRARY_WEEK_RATIONALE, planWeekReplacement } from "@/lib/week-replace";
-import { DIET_TYPES, type DietType, type Slot } from "@/lib/meal-templates/types";
+import { type DietType, type Slot } from "@/lib/meal-templates/types";
 import { specTarget } from "@/lib/library-meal-plan";
 import { savePlanThenLibrary } from "@/lib/plan-save-flow";
 import { applySwap, ROLE_LABEL, safeSwapChoices, swappableRole } from "@/lib/meal-swap";
@@ -230,24 +230,17 @@ export function MealPlanGenerator({
 
   // The diet the library is filtered by: the client's own diet type when they have one, else what the restrictions text says.
   function libraryDiet(recipeArchetype: string): DietType {
-    const own = effectiveRules.dietType;
-    if (own && (DIET_TYPES as string[]).includes(own)) return own as DietType;
-    return (DIET_TYPES as string[]).includes(recipeArchetype) ? (recipeArchetype as DietType) : "omnivore";
+    return libraryDietFor(effectiveRules.dietType, recipeArchetype);
   }
 
   function selectionCtx(recipeArchetype: string, excludeKeys?: Set<string>): SelectionContext {
-    const v = varietySettings(libraryData?.variety);
-    return {
+    return buildSelectionContext({
+      libraryData,
       rules: effectiveRules,
-      diet: libraryDiet(recipeArchetype),
-      likes: [...(libraryData?.likes ?? []), ...typedRules.likes, ...favoriteFoods.split(/[,/]/).map((x) => x.trim()).filter(Boolean)],
-      favorites: { ids: new Set(libraryData?.favorites.ids ?? []), names: new Set(libraryData?.favorites.names ?? []) },
-      recentlyOffered: libraryData?.recentlyOffered ?? new Map(),
-      mixItUp: v.mixItUp,
-      recentDays: v.recentDays,
-      coachRecipes: libraryData?.coachRecipes ?? [],
+      archetype: recipeArchetype,
+      extraLikes: [...typedRules.likes, ...favoriteFoods.split(/[,/]/).map((x) => x.trim()).filter(Boolean)],
       excludeKeys,
-    };
+    });
   }
 
   // One day from the library; counts what the client's food rules removed, and checks every option by default (the client picks among what is saved).
@@ -629,16 +622,7 @@ export function MealPlanGenerator({
         "\n\nContinue?";
       if (!window.confirm(confirmText)) return;
 
-      const toEntries = (meals: GeneratedMeal[]) =>
-        meals.map((m) => ({
-          mealId: m.spec.id,
-          title: m.spec.title,
-          proteinTarget: m.spec.proteinTarget,
-          carbsTarget: m.spec.carbsTarget,
-          fatTarget: m.spec.fatTarget,
-          recipes: m.options.map(choiceFromOption),
-          ...((m.featuredIndex ?? 0) > 0 ? { featuredIndex: m.featuredIndex } : {}),
-        }));
+      const toEntries = entriesFromMeals;
       const rows = replacement.write.map((d) => ({
         athlete_id: athleteId,
         group_id: groupId,
