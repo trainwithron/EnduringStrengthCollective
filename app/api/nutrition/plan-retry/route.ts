@@ -5,6 +5,7 @@ import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { loadLibraryContext } from "@/lib/library-data";
 import { buildSelectionContext } from "@/lib/library-meal-plan";
 import { MAX_PLAN_TRIES, mergeTastes, planChanged, readRetryNote, rebuildRows, retryDays, rulesForRetry, triesUsed, type ExistingPlanRow } from "@/lib/meal-plan-retry";
+import { rateLimitResponse } from "@/lib/rate-limit";
 import { preferencesToRow, rowToPreferences } from "@/lib/nutrition-preferences";
 
 export const maxDuration = 60;
@@ -21,6 +22,10 @@ export async function POST(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return fail("Not authenticated", 401);
+
+  // Every failed request still costs a library load and a rebuild without spending a try, so the number of requests is limited too.
+  const limited = await rateLimitResponse("plan-retry", user.id, 20, 3600);
+  if (limited) return limited;
 
   let body: { groupId?: unknown; note?: unknown };
   try {

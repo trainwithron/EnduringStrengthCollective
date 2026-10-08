@@ -97,6 +97,9 @@ create index if not exists meal_plan_tries_group_idx on public.meal_plan_tries (
 create index if not exists meal_plan_tries_restored_by_idx on public.meal_plan_tries (restored_by);
 
 alter table public.meal_plan_tries enable row level security;
+-- Closed at the grant level too, not only by the missing policies: it holds the client's typed words and earlier plans, and a policy added by mistake later must not open it.
+revoke all on public.meal_plan_tries from anon;
+revoke insert, update, delete on public.meal_plan_tries from authenticated;
 
 drop policy if exists "meal_plan_tries_select" on public.meal_plan_tries;
 create policy "meal_plan_tries_select" on public.meal_plan_tries for select

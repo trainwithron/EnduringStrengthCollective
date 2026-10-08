@@ -95,6 +95,8 @@ export default {
       }
       h.check("nobody can write to the tries directly (not even the client)", (w1.rowCount ?? 0) === 0 && (w2.rowCount ?? 0) === 0 && inserted === false);
       await h.asSuper();
+      const grants = await h.one("select has_table_privilege('anon', 'public.meal_plan_tries', 'select') as asel, has_table_privilege('authenticated', 'public.meal_plan_tries', 'insert') as ains, has_table_privilege('authenticated', 'public.meal_plan_tries', 'update') as aupd, has_table_privilege('authenticated', 'public.meal_plan_tries', 'delete') as adel, has_table_privilege('authenticated', 'public.meal_plan_tries', 'select') as sel");
+      h.check("the tries table is closed at the grant level too: signed-out visitors have nothing, signed-in users can only read", grants.asel === false && grants.ains === false && grants.aupd === false && grants.adel === false && grants.sel === true, JSON.stringify(grants));
       await h.expectError("the signed-in client cannot call the apply function", async () => {
         await h.as(ann);
         await db.query("select public.apply_meal_plan_try($1, $2, current_date, $3::jsonb, '', '')", [ann, group, rowsFor([d.d1], "x")]);

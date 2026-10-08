@@ -58,6 +58,7 @@ export function PlanTriesPanel({ clientName, tries }: { clientName: string; trie
             </span>{" "}
             {t.note ? `“${t.note}”` : "(no note)"}
             {t.summary ? <span className="block text-xs text-steel">Understood as: {t.summary}</span> : null}
+            {/never offered/.test(t.summary) ? <span className="block text-xs text-steel">If this is a real allergy, add it in Preferences.</span> : null}
             {t.id === latestId && (
               <button type="button" disabled={busy} onClick={() => putBack(t.id)} className="mt-1 min-h-11 px-4 border border-steel/40 text-chalk font-body text-sm disabled:opacity-40">
                 {busy ? "Putting back…" : "Put back the plan from before"}
