@@ -80,6 +80,14 @@
   "file": "apply-release-o-all.sql"
  },
  {
+  "id": "release-p",
+  "name": "Release P (new training block notice)",
+  "steps": [
+   "54"
+  ],
+  "file": "apply-release-p-all.sql"
+ },
+ {
   "id": "release-n2",
   "name": "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)",
   "steps": [

@@ -76,3 +76,4 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0304 | yes | yes | 18 | 0303 client rates are coach-only |
 | 0305 | yes | yes | 11 | 0305 AI top-up draws |
 | 0306 | yes | yes | 11 | 0306 target change notice |
+| 0309 | yes | yes | 9 | 0309 new training block notice |
