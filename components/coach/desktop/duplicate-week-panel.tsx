@@ -153,6 +153,7 @@ export function DuplicateWeekPanel({
       dayTitle: string;
       itemOrder: number;
       exerciseName: string;
+      displayName: string | null;
       movementPatternId: string | null;
       trackedFields: TrackedField[];
       notes: string | null;
@@ -192,6 +193,7 @@ export function DuplicateWeekPanel({
       dayTitle: string;
       itemOrder: number;
       exerciseName: string;
+      displayName: string | null;
       movementPatternId: string | null;
       trackedFields: TrackedField[];
       notes: string | null;
@@ -232,6 +234,7 @@ export function DuplicateWeekPanel({
             dayTitle: day.title,
             itemOrder: item.order,
             exerciseName: item.exerciseName,
+            displayName: item.displayName,
             movementPatternId: item.movementPatternId,
             trackedFields: item.trackedFields,
             notes: item.notes,
@@ -314,6 +317,7 @@ export function DuplicateWeekPanel({
             dayTitle: day.title,
             itemOrder: item.order,
             exerciseName: item.exerciseName,
+            displayName: item.displayName,
             movementPatternId: item.movementPatternId,
             trackedFields: item.trackedFields,
             notes: item.notes,
@@ -412,6 +416,7 @@ export function DuplicateWeekPanel({
                 workout_id: workoutRow.id,
                 group_id: groupId,
                 exercise_name: intervalTrack.exerciseName,
+                display_name: intervalTrack.displayName,
                 exercise_order: itemOrder,
                 movement_pattern_id: intervalTrack.movementPatternId,
                 tracked_fields: intervalTrack.trackedFields,
@@ -447,6 +452,7 @@ export function DuplicateWeekPanel({
               id: exerciseRow.id,
               order: itemOrder,
               exerciseName: intervalTrack.exerciseName,
+              displayName: intervalTrack.displayName,
               movementPatternId: intervalTrack.movementPatternId,
               trackedFields: intervalTrack.trackedFields,
               notes: intervalTrack.notes,
@@ -467,6 +473,7 @@ export function DuplicateWeekPanel({
               workout_id: workoutRow.id,
               group_id: groupId,
               exercise_name: first.exerciseName,
+              display_name: first.displayName,
               exercise_order: itemOrder,
               movement_pattern_id: first.movementPatternId,
               tracked_fields: first.trackedFields,
@@ -532,6 +539,7 @@ export function DuplicateWeekPanel({
             id: exerciseRow.id,
             order: itemOrder,
             exerciseName: first.exerciseName,
+            displayName: first.displayName,
             movementPatternId: first.movementPatternId,
             trackedFields: first.trackedFields,
             notes: first.notes,

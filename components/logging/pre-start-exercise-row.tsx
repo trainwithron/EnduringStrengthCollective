@@ -59,7 +59,7 @@ export function PreStartExerciseRow({
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="font-body font-medium text-[15px] truncate">
-            {exercise.exerciseName}{" "}
+            {exercise.displayName ?? exercise.exerciseName}{" "}
             <span className="font-body text-steel font-normal">{summary}</span>
           </p>
           {exercise.notes && (
@@ -85,7 +85,7 @@ export function PreStartExerciseRow({
           {!demosHidden && (
             <ExerciseDemoButton
               compact
-              title={exercise.exerciseName}
+              title={exercise.displayName ?? exercise.exerciseName}
               youtubeUrl={exercise.youtubeUrl}
               videoUrl={videoUrl ?? null}
               videoPath={exercise.videoPath}

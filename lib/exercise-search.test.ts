@@ -141,6 +141,8 @@ describe("the name box", () => {
     expect(src).toContain("offerAdd");
   });
   it("picking fills the row the same way as before: change then commit with the name", () => {
-    expect(src).toContain("onChange(name);\n    onCommit?.(name);");
+    expect(src).toContain("onChange(alias ?? name);");
+    expect(src).toContain("if (alias) onCommit?.(name, alias);");
+    expect(src).toContain("else onCommit?.(name);");
   });
 });

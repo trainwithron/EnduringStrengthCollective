@@ -79,7 +79,7 @@ describe("the builder uses it", () => {
     expect(collapsedBlock).not.toContain("truncate");
     expect(collapsedBlock).toContain("min-h-11");
     expect(collapsedBlock).toContain("summarizeSets(exercise.sets, exercise.trackedFields)");
-    expect(collapsedBlock).toContain("title={exercise.exerciseName}");
+    expect(collapsedBlock).toContain("title={exercise.displayName ?")
   });
   it("drag handle, copy and delete are still on the controls row in the collapsed card", () => {
     const controls = card.slice(card.indexOf('<div className="flex items-center gap-1 mb-1">'), card.indexOf("The name has the card's full width"));

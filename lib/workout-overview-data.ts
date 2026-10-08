@@ -11,6 +11,8 @@ export interface WorkoutOverviewExercise {
   movementPatternId: string | null;
   isOverridden: boolean;
   exerciseName: string;
+  // The coach's own name for the exercise, shown instead of exerciseName (null when there is none, and always null for an exercise this athlete has swapped for another).
+  displayName: string | null;
   trackedFields: TrackedField[];
   notes: string | null;
   videoPath: string | null;
@@ -58,7 +60,7 @@ export async function getWorkoutOverviewData(
           `
       id, title, notes, program_id,
       group_workout_exercises (
-        id, exercise_name, exercise_order, movement_pattern_id, tracked_fields, notes,
+        id, exercise_name, display_name, exercise_order, movement_pattern_id, tracked_fields, notes,
         group_workout_exercise_sets ( id, set_order, target_reps, target_weight, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance )
       ),
       workout_notes ( id, body, position )
@@ -164,6 +166,7 @@ export async function getWorkoutOverviewData(
       movementPatternId: ex.movement_pattern_id,
       isOverridden: overrideNameBySlot.has(ex.id),
       exerciseName: resolvedName,
+      displayName: overrideNameBySlot.has(ex.id) ? null : ((ex.display_name as string | null) ?? null),
       trackedFields: (ex.tracked_fields ?? DEFAULT_TRACKED_FIELDS) as TrackedField[],
       notes: ex.notes as string | null,
       videoPath: media?.videoPath ?? null,

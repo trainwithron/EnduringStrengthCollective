@@ -155,7 +155,7 @@ export function ExerciseBuilderCard({
   onDuplicated: (newExercise: BuilderExercise) => void;
 }) {
   const { flashSaved, flashSaveError } = useSaveToastChannel();
-  const [nameDraft, setNameDraft] = useState(exercise.exerciseName);
+  const [nameDraft, setNameDraft] = useState(exercise.displayName ?? exercise.exerciseName);
   // The ladder picker below changes exercise.exerciseName from OUTSIDE
   // this input (a rung click, not typing) — without this, the same
   // "value changes out from under us" staleness TargetCell already
@@ -221,19 +221,24 @@ export function ExerciseBuilderCard({
   // while QA-testing this exact flow: 3 visible sets, 4 rows in the DB).
   const [setsBusy, setSetsBusy] = useState(false);
 
-  async function handleNameCommit(name: string) {
+  async function handleNameCommit(name: string, aliasUsed?: string) {
     const trimmed = name.trim();
-    if (!trimmed || trimmed === exercise.exerciseName) return;
+    if (!trimmed) return;
+    const display = aliasUsed?.trim() || null;
+    // Nothing to save when the real exercise and the shown name are both unchanged. (Text typed over an aliased row that equals what it already shows is that same row.)
+    if (trimmed === exercise.exerciseName && display === exercise.displayName) return;
+    if (!aliasUsed && exercise.displayName && trimmed === exercise.displayName) return;
     const supabase = createBrowserClient();
     const { error: updateError } = await supabase
       .from("group_workout_exercises")
-      .update({ exercise_name: trimmed })
+      .update({ exercise_name: trimmed, display_name: display })
       .eq("id", exercise.id);
     if (updateError) {
       flashSaveError("Couldn't rename that exercise — try again.");
       return;
     }
-    onUpdate({ exerciseName: trimmed });
+    onUpdate({ exerciseName: trimmed, displayName: display });
+    setNameDraft(display ?? trimmed);
     flashSaved();
 
     const { data: userData } = await supabase.auth.getUser();
@@ -612,6 +617,7 @@ export function ExerciseBuilderCard({
         workout_id: workoutId,
         group_id: groupId,
         exercise_name: exercise.exerciseName,
+        display_name: exercise.displayName,
         exercise_order: exercise.order,
         movement_pattern_id: exercise.movementPatternId,
         tracked_fields: exercise.trackedFields,
@@ -661,6 +667,7 @@ export function ExerciseBuilderCard({
       id: newRow.id,
       order: exercise.order + 1,
       exerciseName: exercise.exerciseName,
+      displayName: exercise.displayName,
       movementPatternId: exercise.movementPatternId,
       trackedFields: exercise.trackedFields,
       notes: exercise.notes,
@@ -751,8 +758,8 @@ export function ExerciseBuilderCard({
         <div className="flex-1 min-w-0 pt-0.5">
           {collapsed ? (
             // Collapsed: the whole name (it wraps, never cut off) and what is prescribed; tapping opens the card.
-            <button type="button" onClick={toggleCollapsed} aria-label={`Expand ${exercise.exerciseName || "exercise"}`} title={exercise.exerciseName} className="block w-full text-left min-h-11 py-1">
-              <span className="block font-body text-sm font-medium text-chalk break-words">{exercise.exerciseName || "Exercise"}</span>
+            <button type="button" onClick={toggleCollapsed} aria-label={`Expand ${exercise.displayName ?? (exercise.exerciseName || "exercise")}`} title={exercise.displayName ? `${exercise.displayName} (${exercise.exerciseName})` : exercise.exerciseName} className="block w-full text-left min-h-11 py-1">
+              <span className="block font-body text-sm font-medium text-chalk break-words">{exercise.displayName ?? (exercise.exerciseName || "Exercise")}</span>
               <span className="block font-body text-xs text-steel">{summarizeSets(exercise.sets, exercise.trackedFields)}</span>
             </button>
           ) : (

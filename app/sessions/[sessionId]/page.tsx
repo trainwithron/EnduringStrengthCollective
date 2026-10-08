@@ -67,7 +67,7 @@ export default async function SessionPage(
       .select(
         `
       id, exercise_name, exercise_order, is_swapped, is_added, movement_pattern_id, tracked_fields, group_workout_exercise_id, athlete_note,
-      group_workout_exercises ( notes ),
+      group_workout_exercises ( notes, exercise_name, display_name ),
       set_logs ( id, set_order, weight, reps, rpe, rir, tempo, time_seconds, height, distance, rest_seconds, pace, status, weight_confirmed )
     `
       )
@@ -313,6 +313,8 @@ export default async function SessionPage(
       return {
         id: se.id,
         exerciseName: se.exercise_name,
+        // the coach's name for it, only while the session exercise is still the program's exercise (a swap changes exercise_name, so a swapped one shows its own real name)
+        displayName: se.group_workout_exercises && se.group_workout_exercises.exercise_name === se.exercise_name ? (se.group_workout_exercises.display_name ?? null) : null,
         exerciseOrder: se.exercise_order,
         isSwapped: se.is_swapped,
         isAdded: se.is_added,

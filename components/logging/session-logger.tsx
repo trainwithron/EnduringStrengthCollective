@@ -167,7 +167,7 @@ export function SessionLogger({
   }
 
   function handleRenamed(exerciseId: string, name: string) {
-    updateExercise(exerciseId, (ex) => ({ ...ex, exerciseName: name, isSwapped: true }));
+    updateExercise(exerciseId, (ex) => ({ ...ex, exerciseName: name, displayName: null, isSwapped: true }));
   }
 
   function handleTrackedFieldsChange(exerciseId: string, fields: SessionExerciseEntry["trackedFields"]) {
