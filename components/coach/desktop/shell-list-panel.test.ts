@@ -34,10 +34,40 @@ describe("Add client in the left panel", () => {
   });
   it("the list shows the new client at once: it is read again when someone is added", () => {
     expect(button).toContain("onAdded?.();");
-    expect(panel).toContain("onAdded={() => setRosterVersion((v) => v + 1)}");
+    expect(panel).toContain("onAdded={() => {");
+    expect(panel).toContain("setRosterVersion((v) => v + 1);");
     expect(panel).toContain("<RosterMiniList key={rosterVersion}");
   });
   it("the shell hands the panel the group's name", () => {
     expect(shell).toContain("groupName={groupName}");
+  });
+});
+
+describe("the coach's groups are read again after someone is added", () => {
+  it("a cached lookup is reused, and forgetting it makes the next load ask again (so a new one-on-one client's own group is found)", async () => {
+    vi.resetModules();
+    let calls = 0;
+    vi.doMock("@/lib/supabase/client", () => ({ createBrowserClient: () => ({ auth: { getUser: async () => ({ data: { user: { id: "coach" } } }) } }) }));
+    vi.doMock("@/lib/coach-groups", () => ({
+      getCoachedGroups: async () => {
+        calls++;
+        return [{ id: "g1", name: "G", group_kind: "team", organization_id: "o1" }];
+      },
+      groupsInOrgOf: (all: unknown[]) => all,
+    }));
+    const mod = await import("@/lib/use-org-group-ids");
+    await mod.loadOrgGroups("g1");
+    await mod.loadOrgGroups("g1");
+    expect(calls).toBe(1);
+    mod.forgetOrgGroups();
+    await mod.loadOrgGroups("g1");
+    expect(calls).toBe(2);
+    vi.doUnmock("@/lib/supabase/client");
+    vi.doUnmock("@/lib/coach-groups");
+  });
+  it("the panel forgets them just before the list is read again", () => {
+    const at = panel.indexOf("forgetOrgGroups();");
+    expect(at).toBeGreaterThan(-1);
+    expect(at).toBeLessThan(panel.indexOf("setRosterVersion((v) => v + 1);"));
   });
 });

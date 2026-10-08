@@ -18,6 +18,7 @@ import {
 import { NeedsAttentionStrip } from "./needs-attention-strip";
 import { RosterMiniList } from "./roster-mini-list";
 import { AddClientButton } from "./add-client-button";
+import { forgetOrgGroups } from "@/lib/use-org-group-ids";
 import { BusinessMiniDashboard } from "./business-mini-dashboard";
 import { CalendarMiniView } from "./calendar-mini-view";
 import { EmbeddedProgramBuilder } from "./embedded-program-builder";
@@ -204,7 +205,11 @@ export function ShellListPanel({
           <>
             {/* One obvious click to add a client from anywhere in the coach app: the same Add client as on the Clients page, opening right here. Only in the open panel. */}
             <div className="mb-2">
-              <AddClientButton groupId={groupId} groupName={groupName} createdBy={coachId} onAdded={() => setRosterVersion((v) => v + 1)} />
+              <AddClientButton groupId={groupId} groupName={groupName} createdBy={coachId} onAdded={() => {
+                  // A new one-on-one client gets a group of their own: the cached list of the coach's groups must be read again or the list would not show them.
+                  forgetOrgGroups();
+                  setRosterVersion((v) => v + 1);
+                }} />
             </div>
             <RosterMiniList key={rosterVersion} groupId={groupId} />
           </>
