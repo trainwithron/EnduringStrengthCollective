@@ -40,10 +40,10 @@ describe("beta notice", () => {
   it("names everyone who can see a client's data, including the platform operator during the beta", () => {
     const data = BETA_NOTICE_PARAGRAPHS[3];
     expect(data).toContain("Your coach can see data in your group");
-    expect(data).toContain("people who run your coach's organization can see your training data and posts");
+    expect(data).toContain("people who run your coach's organization can see your training data, wearable readings and posts, and the scheduling and billing details your coach keeps for you");
     expect(data).toContain("platform operator");
     expect(data).toContain("training data, wearable readings and posts");
-    expect(data).toContain("Your coach can mark you private from both, which hides your training and wearable data but not posts");
+    expect(data).toContain("Your coach can mark you private from both, which hides your training and wearable data but not posts or scheduling and billing details");
     expect(data).toContain("keep the service running");
   });
 
