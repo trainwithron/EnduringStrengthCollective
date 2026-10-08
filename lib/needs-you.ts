@@ -9,7 +9,7 @@ export const SLOT_ORDER: NeedsYouSlot[] = ["waiting", "due", "slipping"];
 export const SLOT_TITLE: Record<NeedsYouSlot, string> = {
   waiting: "Someone is waiting on you",
   due: "Something is due soon",
-  slipping: "Someone may be slipping",
+  slipping: "Someone may need a check-in",
 };
 
 export const CAUGHT_UP = "You're caught up.";

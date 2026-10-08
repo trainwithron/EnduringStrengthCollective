@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { CAUGHT_UP, COULD_NOT_CHECK, moreLabel, type NeedsYouView } from "@/lib/needs-you";
 
-// "Needs you": at most three things at the top of Home, one per slot (someone is waiting on you, something is due soon, someone may be slipping), each the single most urgent of its
+// "Needs you": at most three things at the top of Home, one per slot (someone is waiting on you, something is due soon, someone may need a check-in), each the single most urgent of its
 // kind. A slot with nothing shows nothing. When nothing needs the coach it says so. "N more" jumps to the stack of panels below, which is unchanged.
 export function NeedsYouStrip({ view }: { view: NeedsYouView }) {
   const filled = view.slots.filter((s) => s.item);
