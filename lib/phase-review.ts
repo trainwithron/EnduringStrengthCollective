@@ -172,9 +172,9 @@ export function pathAssessment(args: { review: PhaseReview; target: NutritionPha
         return result("does_not_support");
       }
       if (r.verdict === "on_track") return result("supports");
-      if (bf === "at_or_above" && r.verdict !== "low_adherence" && r.verdict !== "not_enough_data") {
-        factors.push("Body fat is at or above the rule-of-thumb line, which usually means a longer deficit is reasonable.");
-        return result("supports");
+      // Body fat is a weak, self-reported rule of thumb: it never turns a result that is not working into a green light. "Supports" stays for a result that is on track.
+      if (bf === "at_or_above" && (r.verdict === "no_change" || r.verdict === "wrong_way")) {
+        factors.push("Body fat is at or above the rule-of-thumb line, which usually makes a longer deficit reasonable, but weight has not followed: check the calories and the logging before extending.");
       }
       return result("unclear");
     }

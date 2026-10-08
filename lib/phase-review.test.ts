@@ -156,7 +156,11 @@ describe("the stance on the planned next phase (decided by the numbers)", () => 
   it("continuing a deficit: supported while it works or when body fat is above the line, not when it is too fast or the floor applies without results", () => {
     expect(assess(review(), "fat_loss", 20).stance).toBe("supports");
     expect(assess(review({ latestAvgW: 195 }), "fat_loss", 20).stance).toBe("does_not_support");
-    expect(assess(review({ latestAvgW: 199.9 }), "fat_loss", 30).stance).toBe("supports");
+    // body fat above the line never turns a result that is not working into a green light
+    const flat = assess(review({ latestAvgW: 199.9 }), "fat_loss", 30);
+    expect(flat.stance).toBe("unclear");
+    expect(flat.factors.join(" ")).toMatch(/weight has not followed/);
+    expect(assess(review({ latestAvgW: 202 }), "fat_loss", 30).stance).toBe("unclear");
     expect(assess(review({ latestAvgW: 199.9 }), "fat_loss", 15).stance).toBe("unclear");
     expect(assess(review({ latestAvgW: 199.9, calories: 1400 }), "fat_loss", 15).stance).toBe("does_not_support");
     expect(assess(review({ daysLogged: 6 }), "fat_loss", 30).stance).toBe("unclear");

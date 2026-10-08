@@ -76,3 +76,13 @@ describe("the phase review card", () => {
     expect(render()).not.toContain("<textarea");
   });
 });
+
+describe("the message never goes in a web address", () => {
+  it("the card offers Copy message and a plain link to Messages, with no draft in the address", async () => {
+    const { readFileSync } = await import("node:fs");
+    const source = readFileSync(new URL("./phase-review-card.tsx", import.meta.url), "utf8");
+    expect(source).toContain("Copy message");
+    expect(source).not.toContain("?draft=");
+    expect(source).not.toContain("encodeURIComponent");
+  });
+});

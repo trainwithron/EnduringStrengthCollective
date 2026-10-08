@@ -49,6 +49,7 @@ export function PhaseReviewCard(p: PhaseReviewCardProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const moving = p.next != null && p.next !== p.phase;
   // One highlighted choice at most: the one the numbers point to.
@@ -59,6 +60,15 @@ export function PhaseReviewCard(p: PhaseReviewCardProps) {
     setAction(a);
     setError(null);
     setText(a === "continue" ? p.drafts.continue : a === "move" ? p.drafts.move ?? "" : p.drafts.extend);
+  }
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError("Couldn't copy. Select the message and copy it by hand.");
+    }
   }
   const reviewOn = () => (when === "custom" ? custom : addDaysToKey(p.todayKey, Number(when)));
 
@@ -164,8 +174,12 @@ export function PhaseReviewCard(p: PhaseReviewCardProps) {
             <button type="button" onClick={save} disabled={busy} className={primary}>
               {busy ? "Saving…" : action === "move" ? `Suggest to ${p.clientFirst}` : action === "continue" ? "Keep going" : "Extend the review"}
             </button>
-            <Link href={`/groups/${p.groupId}/messages/${p.athleteId}?draft=${encodeURIComponent(text.slice(0, 600))}`} className={`${quiet} inline-flex items-center`}>
-              Open in Messages
+            {/* The message holds the client's name and weight, so it is copied, never put in a web address (addresses end up in logs and browser history). */}
+            <button type="button" onClick={copy} className={quiet}>
+              {copied ? "Copied" : "Copy message"}
+            </button>
+            <Link href={`/groups/${p.groupId}/messages/${p.athleteId}`} className={`${quiet} inline-flex items-center`}>
+              Open Messages
             </Link>
           </div>
           {error && (
