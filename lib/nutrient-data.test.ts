@@ -60,9 +60,17 @@ describe("fetchNutrientLog reads the whole log, not just the first 1,000 rows", 
     expect(log.entries).toHaveLength(1200);
     expect(log.entries.every((e) => e.nutrients === null)).toBe(true);
   });
-  it("says so when a page cannot be read, instead of quietly using what it has", async () => {
-    const { supabase } = fakeLog(2500, { failAtPage: 1, noNutrientsColumn: false });
+  it("when a LATER page cannot be read it keeps the rows it has, with their nutrient detail, and says the log is partial", async () => {
+    const { supabase } = fakeLog(2500, { failAtPage: 1 });
     const log = await fetchNutrientLog(supabase, "a1", "2026-10-08");
+    expect(log.entries).toHaveLength(1000);
+    expect(log.entries.every((e) => e.nutrients?.iron_mg === 1)).toBe(true);
+    expect(log.truncated).toBe(true);
+  });
+  it("when the very first page cannot be read at all it says the log is partial rather than pretending it is empty", async () => {
+    const { supabase } = fakeLog(2500, { failAtPage: 0 });
+    const log = await fetchNutrientLog(supabase, "a1", "2026-10-08");
+    expect(log.entries).toHaveLength(0);
     expect(log.truncated).toBe(true);
   });
 });

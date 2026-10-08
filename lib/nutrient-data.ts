@@ -32,7 +32,10 @@ export async function fetchNutrientLog(supabase: SupabaseClient, athleteId: stri
     );
   const full = await read("log_date, status, description, calories, nutrients");
   if (!full.failed) return { entries: (full.rows as Row[]).map(toEntry), truncated: full.truncated };
-  // The detail column is not in the database yet (or a page failed): try without it. The calories still count, no nutrient is reported.
+  // A page failed AFTER some rows were read (a passing error on a later page): keep what was read, detail and all, and say it is partial. Dropping the detail of the whole log for one
+  // failed page would make every nutrient read "not reported".
+  if (full.rows.length > 0) return { entries: (full.rows as Row[]).map(toEntry), truncated: true };
+  // The very first page failed: the detail column is probably not in the database yet. Try without it; the calories still count, no nutrient is reported.
   const base = await read("log_date, status, description, calories");
   return { entries: (base.rows as Row[]).map((r) => toEntry({ ...r, nutrients: null })), truncated: base.truncated || base.failed };
 }
