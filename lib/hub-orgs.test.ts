@@ -55,6 +55,15 @@ describe("the hub is wired to it", () => {
   it("reads the organizations the first time the hub opens, not on every page", () => {
     expect(hub).toContain("if (!open || orgsRequested.current) return;");
   });
+  it("closing the hub before the read finishes does not lose the organizations, and a failed read is tried again on the next open", () => {
+    const start = hub.indexOf("if (!open || orgsRequested.current) return;");
+    const end = hub.indexOf("}, [open, groupId, initialAthleteId]);");
+    const effect = hub.slice(start, end);
+    expect(effect).not.toContain("let cancelled");
+    expect(effect).not.toContain("if (cancelled");
+    expect(effect).not.toMatch(/return () =>/);
+    expect(effect).toContain("orgsRequested.current = false");
+  });
   it("the Clients tile follows the hub: its own organization memory and tabs are off inside the hub", () => {
     expect(hub).toMatch(/<SpotClientsGroupsPanel[^>]*fromHub/);
     const tile = readFileSync(join(__dirname, "..", "components/coach/mobile/spot-clients-groups-panel.tsx"), "utf8").replace(/\r\n/g, "\n");

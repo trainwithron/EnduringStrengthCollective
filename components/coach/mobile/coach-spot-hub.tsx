@@ -67,17 +67,20 @@ export function CoachSpotHub({
     // Which organizations this coach has: read the first time the hub is opened (the dropdown is only visible then), not on every page.
     if (!open || orgsRequested.current) return;
     orgsRequested.current = true;
-    let cancelled = false;
+    // Not cancelled when the hub is closed again: the read finishes and fills the dropdown for the next open. If it fails, the next open tries again.
     (async () => {
-      const supabase = createBrowserClient();
-      const { data } = await supabase.auth.getUser();
-      if (cancelled || !data.user) return;
       try {
+        const supabase = createBrowserClient();
+        const { data } = await supabase.auth.getUser();
+        if (!data.user) {
+          orgsRequested.current = false;
+          return;
+        }
         const groups = await getCoachedGroups(supabase, data.user.id);
         const remembered = document.cookie.split("; ").find((c) => c.startsWith(`${LAST_WORKSPACE_GROUP_COOKIE}=`))?.split("=")[1];
         const rememberedId = remembered ? decodeURIComponent(remembered) : null;
         const list = hubOrgs(groups, rememberedId);
-        if (cancelled || list.length === 0) return;
+        if (list.length === 0) return;
         const start = hubStartOrgId(groups, rememberedId, groupId);
         setOrgs(list);
         setOrgId(start);
@@ -85,12 +88,10 @@ export function CoachSpotHub({
         const startOrg = list.find((o) => o.orgId === start);
         if (startOrg && !initialAthleteId) setActiveGroupId(startOrg.anchorGroupId);
       } catch {
-        // the hub keeps working on the page's own group
+        // the hub keeps working on the page's own group; the next open tries again
+        orgsRequested.current = false;
       }
     })();
-    return () => {
-      cancelled = true;
-    };
   }, [open, groupId, initialAthleteId]);
 
   function chooseOrg(nextOrgId: string) {
