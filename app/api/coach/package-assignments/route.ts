@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { duplicateProgram } from "@/lib/program-duplication";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { grantLinkedGroupAccess } from "@/lib/package-group-access";
 
 // Package-Program Linking (package_program_linking_scoping.md) — the
 // manual/comped enrollment path. package-assignment-control.tsx used to
@@ -70,5 +72,8 @@ export async function POST(request: Request) {
     programResult = result;
   }
 
-  return NextResponse.json({ ok: true, programId: programResult?.programId ?? null });
+  // Access to a group the package includes. Done by the server (a coach may not add someone to a group through the browser); the package's group is checked inside.
+  const access = await grantLinkedGroupAccess(createServiceRoleClient(), { coachPackageId: packageId, athleteId });
+
+  return NextResponse.json({ ok: true, programId: programResult?.programId ?? null, ...(access.error ? { groupAccessError: access.error } : {}) });
 }

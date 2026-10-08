@@ -1091,6 +1091,20 @@ alter table public.coach_availability_windows drop column if exists session_minu
     ],
   },
   {
+    n: "62",
+    slug: "0317",
+    title: "0317 A package can include access to a group: one optional column on packages (the group it opens) and one server-only record of the access a package gave, so it can end cleanly when a subscription lapses",
+    migrations: ["0317"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for existing packages (none has a group). A coach can now pick a group on a package; a client who buys or is given it joins that group and sees its programs. If a subscription ends, the group access ends; the program copy stays and sessions follow their own expiry rule.",
+    undo: ["drop table if exists public.package_group_access;", "alter table public.coach_packages drop column if exists group_access_group_id;"].join(String.fromCharCode(10)),
+    undoWhy: "Only if step 62 misbehaves. Removes the record and the column; clients already added to a group stay members of it.",
+    rows: [
+      ["coach_packages exists", has.table("coach_packages")],
+      ["0317 is not already applied (packages have no group_access_group_id yet)", `not ${has.col("coach_packages", "group_access_group_id")}`],
+    ],
+  },
+  {
     n: "61",
     slug: "0316",
     title: "0316 A program copy remembers which program it was copied from: one optional column (programs.source_program_id) and the copy function now stores it, so the builder can list the clients who hold a copy of a program",
@@ -1352,7 +1366,7 @@ const BUNDLES = [
   { id: "release-q", name: "Release Q (the coach's own name for an exercise)", steps: ["55"] },
   { id: "release-r", name: "Release R (a client can ask for a different meal plan)", steps: ["56"] },
   { id: "release-s", name: "Release S (booking hours check, grouped counts, hide demos per person, the away preset reply)", steps: ["57", "58", "59", "60"] },
-  { id: "release-t", name: "Release T (a program copy remembers its source)", steps: ["61"] },
+  { id: "release-t", name: "Release T (a program copy remembers its source; a package can open a group)", steps: ["61", "62"] },
   { id: "release-n2", name: "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)", steps: ["49", "50"] },
   { id: "release-m", name: "Release M (acceptance record is append-only)", steps: ["44"] },
 ];
@@ -1528,6 +1542,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0295", has.table("client_phase_plans")),
     m("0296", has.col("recipes", "content_hash")),
     m("0297", has.table("schedule_requests")),
+    m("0317", has.table("package_group_access")),
     m("0316", has.col("programs", "source_program_id")),
     m("0315", has.table("coach_away_replies")),
     m("0314", has.table("client_ui_settings")),

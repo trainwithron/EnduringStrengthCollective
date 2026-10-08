@@ -46,7 +46,7 @@ export default async function PackagesPage(
 
   const { data: packageRows } = await supabase
     .from("coach_packages")
-    .select("id, group_id, name, sessions_per_week, billing_type, sessions_granted, rate_cents, is_active, is_public, default_program_id")
+    .select("id, group_id, name, sessions_per_week, billing_type, sessions_granted, rate_cents, is_active, is_public, default_program_id, group_access_group_id")
     .eq("coach_id", user.id)
     .in("group_id", orgGroupIds)
     .order("sessions_per_week", { ascending: true });
@@ -62,6 +62,7 @@ export default async function PackagesPage(
     rateCents: p.rate_cents,
     isActive: p.is_active,
     defaultProgramId: p.default_program_id,
+    groupAccessGroupId: p.group_access_group_id ?? null,
   }));
 
   // Same "shared, not-yet-personalized programs only" query the existing
@@ -76,6 +77,11 @@ export default async function PackagesPage(
     .order("name");
   const linkablePrograms: LinkableProgramOption[] = (programRows ?? []).map((p) => ({ id: p.id, name: p.name }));
 
+  // The groups a package can open: the coach's own team and social groups in this organization (never a client's one-on-one space).
+  const accessGroups = groupsInOrgOf(coachedGroups, params.groupId)
+    .filter((g) => g.kind !== "one_on_one")
+    .map((g) => ({ id: g.id, name: g.name }));
+
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="packages">
       <div className="pb-6 border-b border-steel/20 mb-6">
@@ -86,7 +92,7 @@ export default async function PackagesPage(
         </p>
       </div>
 
-      <PackageManager groupId={params.groupId} initialPackages={packages} linkablePrograms={linkablePrograms} />
+      <PackageManager groupId={params.groupId} initialPackages={packages} linkablePrograms={linkablePrograms} accessGroups={accessGroups} />
     </CoachDesktopShell>
   );
 }

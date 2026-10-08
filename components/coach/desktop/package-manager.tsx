@@ -15,6 +15,12 @@ export interface CoachPackageRow {
   isActive: boolean;
   isPublic: boolean;
   defaultProgramId: string | null;
+  groupAccessGroupId?: string | null;
+}
+
+export interface AccessGroupOption {
+  id: string;
+  name: string;
 }
 
 export interface LinkableProgramOption {
@@ -30,10 +36,12 @@ export function PackageManager({
   groupId,
   initialPackages,
   linkablePrograms,
+  accessGroups = [],
 }: {
   groupId: string;
   initialPackages: CoachPackageRow[];
   linkablePrograms: LinkableProgramOption[];
+  accessGroups?: AccessGroupOption[];
 }) {
   const [packages, setPackages] = useState(initialPackages);
   const [name, setName] = useState("");
@@ -43,6 +51,7 @@ export function PackageManager({
   const [ratePerSession, setRatePerSession] = useState("95");
   const [isPublic, setIsPublic] = useState(false);
   const [defaultProgramId, setDefaultProgramId] = useState("");
+  const [groupAccessGroupId, setGroupAccessGroupId] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -73,6 +82,7 @@ export function PackageManager({
           rateCents,
           isPublic,
           defaultProgramId: defaultProgramId || null,
+          groupAccessGroupId: groupAccessGroupId || null,
         }),
       });
       const data = await res.json();
@@ -91,12 +101,14 @@ export function PackageManager({
             isActive: true,
             isPublic,
             defaultProgramId: defaultProgramId || null,
+            groupAccessGroupId: groupAccessGroupId || null,
           },
         ].sort((a, b) => a.sessionsPerWeek - b.sessionsPerWeek || a.billingType.localeCompare(b.billingType))
       );
       setName("");
       setIsPublic(false);
       setDefaultProgramId("");
+      setGroupAccessGroupId("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't create the package.");
     } finally {
@@ -158,6 +170,7 @@ export function PackageManager({
                 <th className="text-left font-body text-xs text-steel uppercase tracking-wide font-medium py-2">Total</th>
                 <th className="text-left font-body text-xs text-steel uppercase tracking-wide font-medium py-2">Visibility</th>
                 <th className="text-left font-body text-xs text-steel uppercase tracking-wide font-medium py-2">Program</th>
+                <th className="text-left font-body text-xs text-steel uppercase tracking-wide font-medium py-2">Group</th>
                 <th className="py-2" />
               </tr>
             </thead>
@@ -193,6 +206,9 @@ export function PackageManager({
                   </td>
                   <td className="py-3 font-body text-xs text-steel">
                     {p.defaultProgramId ? linkablePrograms.find((prog) => prog.id === p.defaultProgramId)?.name ?? "Linked" : "—"}
+                  </td>
+                  <td className="py-3 font-body text-xs text-steel">
+                    {p.groupAccessGroupId ? accessGroups.find((g) => g.id === p.groupAccessGroupId)?.name ?? "Linked" : "—"}
                   </td>
                   <td className="py-3 text-right">
                     <button
@@ -301,6 +317,26 @@ export function PackageManager({
             A client who buys or is assigned this package gets their own personal copy of this program automatically.
           </span>
         </label>
+        {accessGroups.length > 0 && (
+          <label className="flex flex-col gap-1">
+            <span className="font-body text-xs text-steel uppercase tracking-wide">Group access (optional)</span>
+            <select
+              value={groupAccessGroupId}
+              onChange={(e) => setGroupAccessGroupId(e.target.value)}
+              className="h-9 px-2 bg-surface border border-steel/30 text-chalk font-body text-xs"
+            >
+              <option value="">No group access</option>
+              {accessGroups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+            <span className="font-body text-xs text-steel">
+              A client who buys or is assigned this package joins this group and sees its programs. If a subscription ends, the group access ends; their program copy stays.
+            </span>
+          </label>
+        )}
         <label className="flex items-center gap-2">
           <input
             type="checkbox"

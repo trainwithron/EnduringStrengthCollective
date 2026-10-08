@@ -87,3 +87,4 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0314 | yes | yes | 8 | 0314 client_ui_settings (hide demos follows the person) |
 | 0315 | yes | yes | 22 | 0315 away reply (preset reply to a client's message) |
 | 0316 | yes | yes | 12 | 0316 a program copy remembers its source |
+| 0317 | yes | yes | 9 | 0317 package group access |

@@ -125,9 +125,10 @@
  },
  {
   "id": "release-t",
-  "name": "Release T (a program copy remembers its source)",
+  "name": "Release T (a program copy remembers its source; a package can open a group)",
   "steps": [
-   "61"
+   "61",
+   "62"
   ],
   "file": "apply-release-t-all.sql"
  },

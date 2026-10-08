@@ -61,6 +61,7 @@ from (
     ('2026100600295', 'about_you_baseline_phase_of_record', '0295_about_you_baseline_phase_of_record.sql', to_regclass('public.client_phase_plans') is not null),
     ('2026100600296', 'recipe_library_columns', '0296_recipe_library_columns.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'recipes' and column_name = 'content_hash')),
     ('2026100600297', 'schedule_requests', '0297_schedule_requests.sql', to_regclass('public.schedule_requests') is not null),
+    ('2026100600317', 'package_group_access', '0317_package_group_access.sql', to_regclass('public.package_group_access') is not null),
     ('2026100600316', 'program_source_link', '0316_program_source_link.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'source_program_id')),
     ('2026100600315', 'away_reply', '0315_away_reply.sql', to_regclass('public.coach_away_replies') is not null),
     ('2026100600314', 'client_ui_settings', '0314_client_ui_settings.sql', to_regclass('public.client_ui_settings') is not null),

@@ -9,6 +9,7 @@ import {
 } from "@/lib/revenue-splits";
 import { duplicateProgram } from "@/lib/program-duplication";
 import { programBelongsToCoach } from "@/lib/package-program-access";
+import { grantLinkedGroupAccess, revokeLinkedGroupAccess } from "@/lib/package-group-access";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatch";
 import { LIFT_OFF_MONTHLY_CREDITS } from "@/lib/coach-credits";
 import { recordAiTopUp } from "@/lib/ai-topup";
@@ -502,6 +503,8 @@ export async function POST(request: Request) {
             groupId,
             alreadyEnrolled: (priorPurchaseCount ?? 0) > 0,
           });
+          // Access to a group the package includes (a no-op for a package without one, and for someone already in the group).
+          await grantLinkedGroupAccess(supabase, { coachPackageId, athleteId });
           await dispatchPackagePurchasedEvent(supabase, {
             groupId,
             coachPackageId,
@@ -544,6 +547,7 @@ export async function POST(request: Request) {
             groupId,
             alreadyEnrolled: !!existingSubscription,
           });
+          await grantLinkedGroupAccess(supabase, { coachPackageId, athleteId });
           await dispatchPackagePurchasedEvent(supabase, {
             groupId,
             coachPackageId,
@@ -754,6 +758,10 @@ export async function POST(request: Request) {
           },
           { onConflict: "athlete_id,group_id" }
         );
+        // A subscription that has ended ends the group access it gave. The program copy stays; the sessions follow their own expiry rule.
+        if (status === "canceled") {
+          await revokeLinkedGroupAccess(supabase, { coachPackageId: subscription.metadata?.coach_package_id ?? null, athleteId });
+        }
         break;
       }
 

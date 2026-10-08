@@ -1,4 +1,4 @@
--- RELEASE T (A PROGRAM COPY REMEMBERS ITS SOURCE): ONE paste. Steps 61 in order, all or nothing.
+-- RELEASE T (A PROGRAM COPY REMEMBERS ITS SOURCE; A PACKAGE CAN OPEN A GROUP): ONE paste. Steps 61, 62 in order, all or nothing.
 --
 -- Paste this whole file into the Supabase SQL editor and run it once. It replaces the separate precheck and apply files for these steps (they stay as the fallback).
 -- Every check from each step's precheck is built in as a guard in front of that step. If any check is false, the run stops with a message that names the step and the
@@ -6,11 +6,12 @@
 -- WHAT YOU SHOULD SEE: first "Success" for the transaction, then a result table with one row per step and in_place = true on every row.
 -- ON ERROR: run   rollback;   once, copy the red text, send it to Spot. Do not run it again.
 -- AFTER STEP 61: Nothing visible changes. Programs made before this keep no link (nothing is matched or renamed). From now on every copy (Assign to client, Duplicate, a package that carries a program) records the program it came from, and the program's label at the top of the builder lists the clients assigned to it.
+-- AFTER STEP 62: Nothing changes for existing packages (none has a group). A coach can now pick a group on a package; a client who buys or is given it joins that group and sees its programs. If a subscription ends, the group access ends; the program copy stays and sessions follow their own expiry rule.
 -- It contains no text searching, so editor re-indenting cannot break it.
 
 begin;
 
--- ===== Release T (a program copy remembers its source), step 61: 0316 A program copy remembers which program it was copied from: one optional column (programs.source_program_id) and the copy function now stores it, so the builder can list the clients who hold a copy of a program
+-- ===== Release T (a program copy remembers its source; a package can open a group), step 61: 0316 A program copy remembers which program it was copied from: one optional column (programs.source_program_id) and the copy function now stores it, so the builder can list the clients who hold a copy of a program
 do $g61$
 declare
   failed text;
@@ -21,7 +22,7 @@ begin
       ('0316 is not already applied (programs has no source_program_id yet)', not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'source_program_id'))
   ) as checks(check_name, ok) where not ok;
   if failed is not null then
-    raise exception 'Release T (a program copy remembers its source), step 61 (0316) cannot run: this step looks already applied, or the database is not in the state it expects. Failed checks: %. NOTHING was changed (the whole bundle is all or nothing). If an earlier step was applied by hand, use the single-step files for the rest, and send Spot this message.', failed;
+    raise exception 'Release T (a program copy remembers its source; a package can open a group), step 61 (0316) cannot run: this step looks already applied, or the database is not in the state it expects. Failed checks: %. NOTHING was changed (the whole bundle is all or nothing). If an earlier step was applied by hand, use the single-step files for the rest, and send Spot this message.', failed;
   end if;
 end
 $g61$;
@@ -153,9 +154,53 @@ $$;
 revoke execute on function public.duplicate_program(uuid, uuid, uuid, uuid, text, date) from public, anon;
 grant execute on function public.duplicate_program(uuid, uuid, uuid, uuid, text, date) to authenticated, service_role;
 
+-- ===== Release T (a program copy remembers its source; a package can open a group), step 62: 0317 A package can include access to a group: one optional column on packages (the group it opens) and one server-only record of the access a package gave, so it can end cleanly when a subscription lapses
+do $g62$
+declare
+  failed text;
+begin
+  select string_agg(check_name, '; ') into failed from (
+    values
+      ('coach_packages exists', to_regclass('public.coach_packages') is not null),
+      ('0317 is not already applied (packages have no group_access_group_id yet)', not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_packages' and column_name = 'group_access_group_id'))
+  ) as checks(check_name, ok) where not ok;
+  if failed is not null then
+    raise exception 'Release T (a program copy remembers its source; a package can open a group), step 62 (0317) cannot run: this step looks already applied, or the database is not in the state it expects. Failed checks: %. NOTHING was changed (the whole bundle is all or nothing). If an earlier step was applied by hand, use the single-step files for the rest, and send Spot this message.', failed;
+  end if;
+end
+$g62$;
+
+-- ====================================================================================================
+-- migration 0317_package_group_access.sql
+-- ====================================================================================================
+
+-- Release T, part 2: a package can include ACCESS TO A GROUP (Ron). Buying or being given the package makes the client a member of that group, so they see its programs.
+--
+--   * coach_packages.group_access_group_id: nullable, the group the package opens (a group the coach coaches; checked by the server). Existing packages have none and behave as before.
+--     Set to null if that group is ever deleted.
+--   * package_group_access: one row per (client, group, package) recording the access a package gave, and whether the package is what made them a member (created_membership). It is how
+--     the access can end cleanly when a subscription lapses without removing anyone who was already in the group by other means. Server only: no signed-in user can read or write it.
+-- Nothing else changes. Re-runnable.
+
+alter table public.coach_packages add column if not exists group_access_group_id uuid references public.groups(id) on delete set null;
+
+create table if not exists public.package_group_access (
+  athlete_id uuid not null references public.profiles(id) on delete cascade,
+  group_id uuid not null references public.groups(id) on delete cascade,
+  coach_package_id uuid not null references public.coach_packages(id) on delete cascade,
+  created_membership boolean not null default false,
+  granted_at timestamptz not null default now(),
+  primary key (athlete_id, group_id, coach_package_id)
+);
+create index if not exists package_group_access_package_idx on public.package_group_access (coach_package_id);
+alter table public.package_group_access enable row level security;
+revoke all on public.package_group_access from anon, authenticated;
+
 commit;
 
 -- Read-only result (after the commit): every row must say in_place = true.
 select step, what, in_place from (
   select 'step 61 (0316)' as step, '0316 A program copy remembers which program it was copied from: one optional column' as what, not ((not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'source_program_id'))) as in_place
+  union all
+  select 'step 62 (0317)' as step, '0317 A package can include access to a group: one optional column on packages' as what, not ((not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_packages' and column_name = 'group_access_group_id'))) as in_place
 ) as result order by step;

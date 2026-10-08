@@ -662,18 +662,22 @@ for (const s of steps) {
   const bundle = bundles.find((b) => b.id === "release-t");
   check("release-t: ONE bundle starts with step 61", !!bundle && bundle.steps[0] === "61");
   const st61 = steps.find((x) => x.n === "61");
+  const st62 = steps.find((x) => x.n === "62");
+  const hasAccess = async () => (await db.query("select to_regclass('public.package_group_access') is not null as ok")).rows[0].ok === true;
   const hasCol = async () => (await db.query("select exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'source_program_id') as ok")).rows[0].ok === true;
   const storesSource = async () => (await db.query("select position('ai_sequencing_notes, source_program_id' in pg_get_functiondef(p.oid)) > 0 as ok from pg_proc p where p.proname = 'duplicate_program' and p.pronamespace = 'public'::regnamespace")).rows[0].ok === true;
+  const eu0b = await run(`apply/undo-step${st62.n}-${st62.slug}.sql`);
   const eu0 = await run(`apply/undo-step${st61.n}-${st61.slug}.sql`);
-  check("release-t: before the bundle runs there is no source column" + (eu0 ? ": " + eu0 : ""), !eu0 && !(await hasCol()) && !(await storesSource()));
+  check("release-t: before the bundle runs there is no source column and no group access" + (eu0 ? ": " + eu0 : ""), !eu0 && !eu0b && !(await hasCol()) && !(await storesSource()) && !(await hasAccess()));
   const errT = await run(`apply/${bundle.file}`);
-  check("release-t bundle applies on the live-shaped state" + (errT ? ": " + errT : ""), !errT && (await hasCol()) && (await storesSource()));
+  check("release-t bundle applies on the live-shaped state" + (errT ? ": " + errT : ""), !errT && (await hasCol()) && (await storesSource()) && (await hasAccess()));
   const againT = await run(`apply/${bundle.file}`);
   check("release-t: a second run is refused, naming step 61 (" + againT + ")", !!againT && againT.includes("step 61 (0316) cannot run") && againT.includes("already applied"));
+  const euT2 = await run(`apply/undo-step${st62.n}-${st62.slug}.sql`);
   const euT = await run(`apply/undo-step${st61.n}-${st61.slug}.sql`);
-  check("release-t: the undo removes the column and puts the copy function back" + (euT ? ": " + euT : ""), !euT && !(await hasCol()) && !(await storesSource()));
+  check("release-t: the undo (62 then 61) removes the columns and the record and puts the copy function back" + (euT || euT2 ? ": " + (euT || euT2) : ""), !euT && !euT2 && !(await hasCol()) && !(await storesSource()) && !(await hasAccess()));
   const errT2 = await run(`apply/${bundle.file}`);
-  check("release-t: the bundle applies again after an undo" + (errT2 ? ": " + errT2 : ""), !errT2 && (await hasCol()) && (await storesSource()));
+  check("release-t: the bundle applies again after an undo" + (errT2 ? ": " + errT2 : ""), !errT2 && (await hasCol()) && (await storesSource()) && (await hasAccess()));
 }
 // The paste channel garbles non-ASCII characters (a typed em dash became three odd characters in a live function), so no line of SQL in a paste file may contain one (comments are fine:
 // they are never run). Steps already applied are listed and left alone.

@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getStripeClient, isStripeConfigured } from "@/lib/stripe";
 import { programBelongsToCoach } from "@/lib/package-program-access";
+import { groupBelongsToCoach } from "@/lib/package-group-access";
 
 // Package create/edit/delete has a real Stripe side effect (a Product +
 // Price per package), so this can't be a plain client-side
@@ -40,7 +41,7 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json();
-  const { groupId, name, sessionsPerWeek, billingType, sessionsGranted, rateCents, isPublic, defaultProgramId } = body;
+  const { groupId, name, sessionsPerWeek, billingType, sessionsGranted, rateCents, isPublic, defaultProgramId, groupAccessGroupId } = body;
 
   if (
     !groupId ||
@@ -66,6 +67,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "That program is not one of yours." }, { status: 400 });
   }
 
+  if (groupAccessGroupId && !(await groupBelongsToCoach(serviceRole, authCheck.userId, groupAccessGroupId))) {
+    return NextResponse.json({ error: "That group is not one of yours." }, { status: 400 });
+  }
+
   // Insert first (without Stripe ids) to get a stable id before creating
   // the Stripe objects — avoids an orphaned Stripe Product/Price if the
   // DB insert itself fails. Defaults to private (is_public: false) —
@@ -84,6 +89,7 @@ export async function POST(request: Request) {
       rate_cents: rateCents,
       is_public: isPublic === true,
       default_program_id: defaultProgramId ?? null,
+      group_access_group_id: groupAccessGroupId ?? null,
     })
     .select("id")
     .single();
@@ -124,7 +130,7 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   const body = await request.json();
-  const { packageId, groupId, name, sessionsPerWeek, billingType, sessionsGranted, rateCents, isActive, isPublic, defaultProgramId } =
+  const { packageId, groupId, name, sessionsPerWeek, billingType, sessionsGranted, rateCents, isActive, isPublic, defaultProgramId, groupAccessGroupId } =
     body;
   if (!packageId || !groupId) {
     return NextResponse.json({ error: "Missing packageId or groupId." }, { status: 400 });
@@ -136,6 +142,9 @@ export async function PATCH(request: Request) {
   const serviceRole = createServiceRoleClient();
   if (defaultProgramId && !(await programBelongsToCoach(serviceRole, authCheck.userId, defaultProgramId))) {
     return NextResponse.json({ error: "That program is not one of yours." }, { status: 400 });
+  }
+  if (groupAccessGroupId && !(await groupBelongsToCoach(serviceRole, authCheck.userId, groupAccessGroupId))) {
+    return NextResponse.json({ error: "That group is not one of yours." }, { status: 400 });
   }
   const { data: existing } = await serviceRole
     .from("coach_packages")
@@ -161,6 +170,7 @@ export async function PATCH(request: Request) {
   if (isActive != null) updates.is_active = isActive;
   if (isPublic != null) updates.is_public = isPublic;
   if (defaultProgramId !== undefined) updates.default_program_id = defaultProgramId;
+  if (groupAccessGroupId !== undefined) updates.group_access_group_id = groupAccessGroupId;
 
   // Stripe is only actually touched for a price/name-affecting change or
   // a deactivation that archives a Price — a pure isPublic/isActive-true
