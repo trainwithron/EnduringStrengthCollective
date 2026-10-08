@@ -1091,6 +1091,23 @@ alter table public.coach_availability_windows drop column if exists session_minu
     ],
   },
   {
+    n: "55",
+    slug: "0310",
+    title: "0310 The coach's own name for an exercise: one new optional column on the program's exercises (display_name), set only when a coach picks an exercise through their own alias. The real exercise name is untouched, so history, personal records and progression keep matching; only what is shown uses the coach's name",
+    migrations: ["0310"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes until the code of the same release is live. After that, when a coach picks an exercise through one of their aliases (for example RFESS for the Bulgarian split squat) their program, the client's workout page and the logger show the coach's name, and every record and history lookup still uses the real exercise. Every existing exercise keeps showing exactly what it shows now.",
+    undo: [
+      "alter table public.group_workout_exercises drop constraint if exists group_workout_exercises_display_name_len;",
+      "alter table public.group_workout_exercises drop column if exists display_name;",
+    ].join(String.fromCharCode(10)),
+    undoWhy: "Only if step 55 misbehaves. Removes the column and any coach names already saved in it (the exercises themselves and all history are untouched; they simply show their real names again).",
+    rows: [
+      ["group_workout_exercises exists", has.table("group_workout_exercises")],
+      ["0310 is not already applied (the display_name column is not there yet)", has.noCol("group_workout_exercises", "display_name")],
+    ],
+  },
+  {
     n: "54",
     slug: "0309",
     title: "0309 New training block notice: when a coach moves a client to a new phase the client sees one plain line in their bell, with no phase words (adds one notification type to the list the database already has)",
@@ -1228,6 +1245,7 @@ const BUNDLES = [
   { id: "release-o", name: "Release O (recalculation notice)", steps: ["51"] },
   { id: "release-o2", name: "Release O fix (close the notice function and the trigger functions; run any time after Release O)", steps: ["52", "53"] },
   { id: "release-p", name: "Release P (new training block notice)", steps: ["54"] },
+  { id: "release-q", name: "Release Q (the coach's own name for an exercise)", steps: ["55"] },
   { id: "release-n2", name: "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)", steps: ["49", "50"] },
   { id: "release-m", name: "Release M (acceptance record is append-only)", steps: ["44"] },
 ];
@@ -1403,6 +1421,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0295", has.table("client_phase_plans")),
     m("0296", has.col("recipes", "content_hash")),
     m("0297", has.table("schedule_requests")),
+    m("0310", has.col("group_workout_exercises", "display_name")),
     m("0309", "exists (select 1 from pg_proc where proname = 'notify_on_new_training_block' and pronamespace = 'public'::regnamespace)"),
     m("0308", "not exists (select 1 from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prorettype = 'trigger'::regtype and p.proname = any (array[" + TRIGGER_SWEEP.map((n) => "'" + n + "'").join(", ") + "]) and has_function_privilege('authenticated', p.oid, 'execute'))"),
     m("0307","exists (select 1 from pg_proc where proname = 'notify_on_target_change' and pronamespace = 'public'::regnamespace and not has_function_privilege('authenticated', oid, 'execute'))"),
