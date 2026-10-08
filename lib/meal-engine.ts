@@ -6,6 +6,7 @@
 // the coach's existing deterministic rules engine, wired in as-is.
 
 import type { NutritionPhase } from "./nutrition-checkin";
+import type { MealLine, MealSwap } from "./meal-line";
 
 export type Archetype = "omnivore" | "vegetarian" | "vegan" | "carnivore" | "keto" | "paleo";
 export type MealSlot = "breakfast" | "lunch" | "dinner" | "snack" | "any";
@@ -1036,7 +1037,9 @@ export interface MealOption {
   // printed label, which the food-rule checks read), and the protein family. A key the same meal keeps across days.
   source?: "library" | "coach" | "ai";
   macros?: { proteinG: number; carbsG: number; fatG: number; calories: number };
-  lines?: { name: string; label: string; grams: number | null; matched?: string }[];
+  lines?: MealLine[];
+  // Ingredient swaps made on this option (the coach changed one food for another of the same kind).
+  swaps?: MealSwap[];
   mainProtein?: string | null;
   key?: string;
   // Only on an AI option the coach may save to their library: the verified lines with the real food each was matched to.

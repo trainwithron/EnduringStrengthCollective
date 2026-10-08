@@ -5,6 +5,7 @@
 // so it's directly testable.
 
 import { EDITED_BY_HAND_RATIONALE, LIBRARY_WEEK_RATIONALE } from "@/lib/week-replace";
+import type { MealLine, MealSwap } from "@/lib/meal-line";
 
 export interface MealRecipeChoice {
   recipeId: string | null;
@@ -18,7 +19,9 @@ export interface MealRecipeChoice {
   // What the library-first builder adds (all optional: a plan saved before it reads exactly as it did). The structured lines are what the checks read (the food's name AND the
   // label that is printed), the macros are what this option really contains at the printed amounts, and source says where it came from.
   source?: "library" | "coach" | "ai";
-  lines?: { name: string; label: string; grams: number | null; matched?: string }[];
+  lines?: MealLine[];
+  // Ingredient swaps made on this option, kept with the plan.
+  swaps?: MealSwap[];
   macros?: { proteinG: number; carbsG: number; fatG: number; calories: number };
   mainProtein?: string | null;
   // The meal's stable key ("t:<template id>" or "r:<recipe id>"), so a later build knows what was offered before.

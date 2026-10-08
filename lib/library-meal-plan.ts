@@ -78,6 +78,7 @@ export function choiceFromOption(opt: MealOption): MealRecipeChoice {
     isAi: opt.isAi,
     ...(opt.source ? { source: opt.source } : opt.isAi ? { source: "ai" as const } : {}),
     ...(opt.lines ? { lines: opt.lines } : {}),
+    ...(opt.swaps && opt.swaps.length > 0 ? { swaps: opt.swaps } : {}),
     ...(macros ? { macros: roundMacros(macros) } : {}),
     ...(opt.mainProtein !== undefined ? { mainProtein: opt.mainProtein } : {}),
     ...(opt.key ? { key: opt.key } : {}),

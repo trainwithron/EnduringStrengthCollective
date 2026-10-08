@@ -8,6 +8,7 @@ import { StandingMacroTargetCard } from "@/components/coach/desktop/standing-mac
 import { CalorieFloorWarning } from "@/components/coach/nutrition/calorie-floor-warning";
 import { WhatTheyAte } from "@/components/coach/nutrition/what-they-ate";
 import { NutrientsSection } from "@/components/nutrition/nutrients-section";
+import { GroceryListSection } from "@/components/coach/nutrition/grocery-list-section";
 import { FoodTrackingSwitch } from "@/components/coach/nutrition/food-tracking-switch";
 import { PreferencesSection } from "@/components/coach/nutrition/preferences-section";
 import { computeWeeklyWeightTrend } from "@/lib/weight-trend";
@@ -580,6 +581,10 @@ export async function ClientNutrition({
           weightUnit={bodyProfile.weightUnit}
           initialActivity={bodyProfile.activity}
         />
+        <div className="mt-8">
+          <h3 id="grocery-list" className="font-display font-bold text-lg uppercase leading-none mb-2 scroll-mt-24">Grocery list</h3>
+          <GroceryListSection athleteId={athleteId} todayKey={todayKey} clientName={firstName} metric={bodyProfile.weightUnit === "kg"} />
+        </div>
       </section>
 
       <section>

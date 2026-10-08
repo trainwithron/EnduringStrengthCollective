@@ -271,6 +271,14 @@ describe("the before / after report", () => {
   it("lists the biggest changes to the four macros in foods already there", () => {
     expect(r.largestMacroChanges[0]).toMatchObject({ fdc_id: 1, key: "kcal", before: 165, after: 120, relPct: 27.3, description: "Chicken breast, raw" });
   });
+  it("warns, in add mode, when foods already have a different niacin value that would be left behind", () => {
+    const withNiacin = { ...existing, nutrients: new Map([...existing.nutrients, ["1|niacin_mg", 5]]) };
+    const rows2 = [...rows, { fdc_id: 1, nutrient_key: "niacin_mg", amount_per_100g: 11 }];
+    const r2 = compareWithExisting(foods, rows2, [], withNiacin);
+    expect(formatReport(r2, "add", [])).toContain("WARNING: 1 foods already have a niacin_mg value that differs");
+    expect(formatReport(r2, "add", ["niacin_mg"])).not.toContain("WARNING");
+    expect(formatReport(r, "add", [])).not.toContain("WARNING");
+  });
   it("the report says what WOULD be rewritten in each mode", () => {
     expect(formatReport(r, "add", [])).toContain("Different values that WOULD be rewritten in this mode: **0**");
     expect(formatReport(r, "refresh", [])).toContain("Different values that WOULD be rewritten in this mode: **1**");

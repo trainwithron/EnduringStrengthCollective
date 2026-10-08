@@ -188,6 +188,9 @@ export function formatReport(report, mode, refreshKeys = []) {
     `- In the files: ${n.total}. New values: ${n.new}. Already there and the same: ${n.same}. Already there and DIFFERENT: ${n.changed}.`,
     `- Different values that WOULD be rewritten in this mode: **${willChange}**.`,
     `- Keys that are new to the database: ${n.newKeys.length ? n.newKeys.join(", ") : "none"}.`,
+    ...(n.byKey.niacin_mg && n.byKey.niacin_mg.changed > 0 && !refreshKeys.includes("niacin_mg") && mode === "add"
+      ? [`- **WARNING: ${n.byKey.niacin_mg.changed} foods already have a niacin_mg value that differs.** Niacin is imported as niacin EQUIVALENTS; in add mode those older values stay as they are, so the table would mix two meanings. Add niacin_mg to --refresh-keys.`]
+      : []),
     "",
     "| key | new | same | different |",
     "|---|---|---|---|",

@@ -5,18 +5,14 @@ import { isIngredient, type Slot, type TemplateRecipe } from "@/lib/meal-templat
 import type { ScaledTemplateMeal } from "@/lib/meal-templates/scale";
 import { renderLines } from "@/lib/meal-templates/render";
 import { mainProteinOf } from "@/lib/main-protein";
+import type { MealLine } from "@/lib/meal-line";
+import { foodKeyOf } from "@/lib/meal-templates/macros";
 
 export type MealSource = "library" | "coach" | "ai";
 
 // One counted line of a meal. name is the food (what the checks and the macros use); label is the line as it is printed (a recipe may print its own label), so a rule is
 // checked against BOTH.
-export interface ScaledLine {
-  name: string;
-  label: string;
-  grams: number | null;
-  // The real food a saved line was matched to (its USDA description), when it has one. The food rules are checked against this too, so a label that hides the food cannot pass.
-  matched?: string;
-}
+export type ScaledLine = MealLine;
 
 export interface ScaledMeal {
   // Stable across days and clients: "t:<template id>" (starter library), "r:<recipe id>" (a coach's own) or "ai:<fingerprint>".
@@ -51,7 +47,7 @@ export function fromTemplateMeal(meal: ScaledTemplateMeal, recipe: TemplateRecip
   const lines: ScaledLine[] = [];
   const weighted: { name: string; proteinG: number }[] = [];
   for (const ing of meal.ingredients) {
-    lines.push({ name: ing.name, label: printedLabel(ing.text, ing.name), grams: ingredientGrams(ing) });
+    lines.push({ name: ing.name, label: printedLabel(ing.text, ing.name), grams: ingredientGrams(ing), text: ing.text, foodKey: foodKeyOf(ing.name) ?? undefined, category: ing.category, qty: ing.qty, unit: ing.unit });
     weighted.push({ name: ing.name, proteinG: ingredientMacros(ing)?.proteinG ?? 0 });
   }
   const prepText = meal.items

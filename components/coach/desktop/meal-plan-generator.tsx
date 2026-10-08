@@ -26,6 +26,7 @@ import { describeTypedRules, mergeRules, newFromTyped, rulesFromTypedText } from
 import { dayList, LIBRARY_WEEK_RATIONALE, planWeekReplacement } from "@/lib/week-replace";
 import { DIET_TYPES, type DietType, type Slot } from "@/lib/meal-templates/types";
 import { specTarget } from "@/lib/library-meal-plan";
+import { applySwap, ROLE_LABEL, safeSwapChoices, swappableRole } from "@/lib/meal-swap";
 import {
   getDatesForWeekdays,
   getWeekDates,
@@ -643,6 +644,21 @@ export function MealPlanGenerator({
   }
 
   // Saves an approved AI option into this coach's private library (the option was already generated and verified; nothing is asked of the AI here).
+  // Ingredient swap ("change this"): which line has its picker open, and why a swap was refused. A swap only changes the option on screen; it is saved with the plan when the coach saves or assigns it.
+  const [swapOpen, setSwapOpen] = useState<{ mealId: string; optIdx: number; lineIdx: number } | null>(null);
+  const [swapError, setSwapError] = useState<string | null>(null);
+  function handleSwap(meal: GeneratedMeal, optIdx: number, lineIdx: number, newKey: string) {
+    const opt = meal.options[optIdx];
+    const res = applySwap(opt, lineIdx, newKey, { diet: libraryDiet(archetype), trainingDay: dayView === "train", rules: rulesReadable ? effectiveRules : null });
+    if (!res.ok) {
+      setSwapError(res.reason);
+      return;
+    }
+    setSwapError(null);
+    setSwapOpen(null);
+    setMealsByView((prev) => ({ ...prev, [dayView]: prev[dayView].map((m) => (m.spec.id === meal.spec.id ? { ...m, options: m.options.map((o, i) => (i === optIdx ? res.option : o)) } : m)) }));
+  }
+
   const [libraryMsg, setLibraryMsg] = useState<Record<string, string>>({});
   async function handleSaveToLibrary(meal: GeneratedMeal, opt: MealOption) {
     if (!coachId) return;
@@ -1270,13 +1286,53 @@ export function MealPlanGenerator({
                         <ul className="space-y-0.5 pl-6">
                           {
                             // Always text (only an exact <strong> shows bold), never HTML.
-                            opt.ingredients.map((ing, i) => (
-                              <li key={i} className="font-body text-xs text-steel">
-                                <IngredientLine text={ing} />
-                              </li>
-                            ))
+                            opt.ingredients.map((ing, i) => {
+                              const lineIdx = (opt.lines ?? []).findIndex((l) => l.text === ing);
+                              const role = lineIdx >= 0 ? swappableRole(opt.lines![lineIdx]) : null;
+                              const open = role && swapOpen?.mealId === meal.spec.id && swapOpen.optIdx === idx && swapOpen.lineIdx === lineIdx;
+                              return (
+                                <li key={i} className="font-body text-xs text-steel">
+                                  <span className="inline-flex items-center gap-2">
+                                    <IngredientLine text={ing} />
+                                    {role && rulesReadable && (
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          setSwapError(null);
+                                          setSwapOpen(open ? null : { mealId: meal.spec.id, optIdx: idx, lineIdx });
+                                        }}
+                                        className="px-1.5 py-0.5 border border-steel/40 text-[11px] text-chalk"
+                                        aria-label={`Swap ${opt.lines![lineIdx].name}`}
+                                      >
+                                        Swap
+                                      </button>
+                                    )}
+                                  </span>
+                                  {open && role && (
+                                    <div className="mt-1 mb-1.5 border border-steel/30 p-2" onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+                                      <p className="text-[11px] uppercase tracking-wide text-steel mb-1">{ROLE_LABEL[role]} that fits this client{dayView !== "train" && role === "carbs" ? " (honey and juice are for training days)" : ""}</p>
+                                      <div className="flex flex-wrap gap-1">
+                                        {safeSwapChoices(role, libraryDiet(archetype), dayView === "train", effectiveRules).filter((c) => c.key !== opt.lines![lineIdx].foodKey).map((c) => (
+                                          <button key={c.key} type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleSwap(meal, idx, lineIdx, c.key); }} className="px-2 py-1 border border-steel/40 text-chalk text-xs hover:border-rust">
+                                            {c.name}{c.trainingDayOnly ? " 🏋️" : ""}
+                                          </button>
+                                        ))}
+                                      </div>
+                                      {swapError && <p className="text-rust mt-1" role="alert">{swapError}</p>}
+                                    </div>
+                                  )}
+                                </li>
+                              );
+                            })
                           }
                         </ul>
+                        {opt.swaps && opt.swaps.length > 0 && (
+                          <p className="font-body text-xs text-steel pl-6 mt-1" data-testid="swaps-note">
+                            Swapped: {opt.swaps.map((s) => `${s.from} → ${s.to}`).join(", ")}
+                          </p>
+                        )}
                         {opt.isAi && opt.aiLines && (
                           <div className="pl-6 mt-1.5" onClick={(e) => e.stopPropagation()}>
                             <button
