@@ -37,7 +37,17 @@ export interface NutrientRow {
   seenRecently: boolean;
 }
 
+export interface PlanEstimate {
+  // Today's nutrients added up from the planned meals' ingredients (key -> amount), and how many ingredients could be matched to nutrition data.
+  totals: Record<string, number>;
+  coveredIngredientCount: number;
+  totalIngredientCount: number;
+}
+
 export interface Overview {
+  // "logged" = added up from foods the person logged; "plan" = ONLY an estimate from today's meal plan, used when none of today's logged foods carries vitamin and mineral detail.
+  source: "logged" | "plan";
+  planCoverage: { covered: number; total: number } | null;
   rows: NutrientRow[];
   gaps: NutrientRow[];
   todayCalories: number;
@@ -47,14 +57,21 @@ export interface Overview {
   assumption: string | null;
 }
 
-export function buildOverview(args: { entries: LoggedEntry[]; todayKey: string; age: number | null; sex: Sex | null }): Overview {
+export function buildOverview(args: { entries: LoggedEntry[]; todayKey: string; age: number | null; sex: Sex | null; plan?: PlanEstimate | null }): Overview {
   const { entries, todayKey, age, sex } = args;
   const today = dayTotals(todayKey, entries, KEYS);
   const window = windowTotals(datesEndingOn(todayKey, GAP_WINDOW_DAYS), entries, KEYS);
   const month = windowTotals(datesEndingOn(todayKey, 30), entries, KEYS);
+  // With no logged detail today, a meal plan's estimate (when there is one with data) stands in for today's figures, clearly labelled; it never feeds the "worth a look" view.
+  const detail = detailShare(entries, todayKey);
+  const planHasData = !!args.plan && Object.keys(args.plan.totals).some((k) => typeof args.plan!.totals[k] === "number");
+  const usePlan = detail.detailed === 0 && planHasData;
+  const planCoveragePct = usePlan && args.plan!.totalIngredientCount > 0 ? Math.round((args.plan!.coveredIngredientCount / args.plan!.totalIngredientCount) * 1000) / 10 : 0;
   const rows: NutrientRow[] = NUTRIENT_CATALOG.map((nutrient) => {
     const ref = referenceFor(nutrient.key, age, sex);
-    const t = today.byKey[nutrient.key];
+    const logged = today.byKey[nutrient.key];
+    const planAmount = usePlan ? args.plan!.totals[nutrient.key] : undefined;
+    const t = usePlan ? { total: typeof planAmount === "number" ? planAmount : null, coveragePct: typeof planAmount === "number" ? planCoveragePct : 0, reportingEntries: 0, entries: 0 } : logged;
     const target = nutrient.role === "target" ? ref?.target ?? null : null;
     return {
       nutrient,
@@ -70,9 +87,11 @@ export function buildOverview(args: { entries: LoggedEntry[]; todayKey: string; 
   return {
     rows,
     gaps: topGaps(rows.map((r) => r.summary), 3).map((s) => rows.find((r) => r.nutrient.key === s.key) as NutrientRow),
+    source: usePlan ? "plan" : "logged",
+    planCoverage: usePlan ? { covered: args.plan!.coveredIngredientCount, total: args.plan!.totalIngredientCount } : null,
     todayCalories: today.calories,
     todayEntries: today.entries,
-    detail: detailShare(entries, todayKey),
+    detail,
     assumption: firstRef ? assumptionNote(firstRef) : null,
   };
 }

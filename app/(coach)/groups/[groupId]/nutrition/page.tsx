@@ -22,7 +22,6 @@ import { filterGeneratedMealsForClient, filterPlanForClient, hidePlanRecipes } f
 import { asWeightUnit, displayWeightValue } from "@/lib/units";
 import type { FoodLogEntry } from "@/components/athlete/meal-checkoff-list";
 import { computeTodaysMicronutrients } from "@/lib/todays-micronutrients";
-import { Key12NutrientGrid } from "@/components/athlete/key12-nutrient-grid";
 import { NutrientsSection } from "@/components/nutrition/nutrients-section";
 import { NutritionYouthModeToggle } from "@/components/coach/desktop/nutrition-youth-mode-toggle";
 import { dedupeRecentFoodLogs } from "@/lib/recent-food-logs";
@@ -441,14 +440,6 @@ export default async function NutritionPage(
 
           {macrosEnabled && <NutritionPreferencesCard athleteId={athleteId} initial={clientPrefs} />}
 
-          {micronutrients.hasAnyData && (
-            <Key12NutrientGrid
-              totals={micronutrients.totals}
-              coveredIngredientCount={micronutrients.coveredIngredientCount}
-              totalIngredientCount={micronutrients.totalIngredientCount}
-            />
-          )}
-
           <section>
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
               Today&apos;s food
@@ -472,7 +463,7 @@ export default async function NutritionPage(
             )}
           </section>
 
-          {trackingOn && (
+          {(trackingOn || micronutrients.hasAnyData) && (
             <section>
               <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">Vitamins and minerals</h2>
               <NutrientsSection
@@ -480,6 +471,7 @@ export default async function NutritionPage(
                 todayKey={todayKey}
                 audience="client"
                 detailHref={(key) => `/groups/${params.groupId}/nutrition/nutrients/${key}`}
+                planEstimate={micronutrients.hasAnyData ? { totals: micronutrients.totals, coveredIngredientCount: micronutrients.coveredIngredientCount, totalIngredientCount: micronutrients.totalIngredientCount } : null}
               />
             </section>
           )}

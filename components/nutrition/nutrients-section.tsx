@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createServerClient } from "@/lib/supabase/server";
 import { HEADLINE_KEYS } from "@/lib/nutrient-catalog";
-import { buildOverview, completenessLine, GAP_WINDOW_DAYS, type NutrientRow, type Overview } from "@/lib/nutrient-view";
+import { buildOverview, completenessLine, GAP_WINDOW_DAYS, type NutrientRow, type Overview, type PlanEstimate } from "@/lib/nutrient-view";
 import { fetchAgeAndSex, fetchNutrientLog } from "@/lib/nutrient-data";
 import { formatNutrientAmount } from "@/lib/nutrient-panel";
 import { gapMessage, gapMessageForCoach } from "@/lib/nutrient-gaps";
@@ -19,6 +19,7 @@ export async function NutrientsSection({
   audience,
   clientName,
   detailHref,
+  planEstimate,
 }: {
   athleteId: string;
   todayKey: string;
@@ -26,10 +27,12 @@ export async function NutrientsSection({
   clientName?: string;
   // Builds the link to one nutrient's page.
   detailHref: (key: string) => string;
+  // Today's planned meals added up from their ingredients, used (clearly labelled) only when none of today's logged foods has vitamin and mineral detail.
+  planEstimate?: PlanEstimate | null;
 }) {
   const supabase = await createServerClient();
   const [entries, { age, sex }] = await Promise.all([fetchNutrientLog(supabase, athleteId, todayKey), fetchAgeAndSex(supabase, athleteId, todayKey)]);
-  const o = buildOverview({ entries, todayKey, age, sex });
+  const o = buildOverview({ entries, todayKey, age, sex, plan: planEstimate });
   return <NutrientsView overview={o} audience={audience} clientName={clientName} detailHref={detailHref} />;
 }
 
@@ -48,7 +51,12 @@ export function NutrientsView({ overview: o, audience, clientName, detailHref }:
         &ldquo;not reported&rdquo;, never as zero, so a low figure can just mean less of the day was counted.
       </p>
 
-      {o.todayEntries === 0 ? (
+      {o.source === "plan" ? (
+        <p className="font-body text-xs text-amber-400 border-l-2 border-amber-400/60 pl-2 max-w-[70ch]" data-testid="plan-estimate-note">
+          These figures are an ESTIMATE from today's meal plan, not from food {audience === "coach" ? "logged" : "you logged"}.
+          {o.planCoverage && o.planCoverage.total > 0 ? ` ${o.planCoverage.covered} of ${o.planCoverage.total} planned ingredients could be matched to nutrition data, so the totals may be partial.` : ""} Once {audience === "coach" ? "they log" : "you log"} foods with vitamin and mineral detail, this shows what was actually eaten.
+        </p>
+      ) : o.todayEntries === 0 ? (
         <p className="font-body text-sm text-steel border border-steel/20 p-4">{audience === "coach" ? `${who} hasn't logged any food today.` : "Log some food today and your vitamins and minerals will show up here."}</p>
       ) : (
         <p className="font-body text-xs text-steel" data-testid="detail-share">
@@ -77,10 +85,10 @@ export function NutrientsView({ overview: o, audience, clientName, detailHref }:
 
       <ul className="border border-steel/20 divide-y divide-steel/15">
         {shown.map((r) => (
-          <NutrientListRow key={r.nutrient.key} row={r} href={detailHref(r.nutrient.key)} />
+          <NutrientListRow key={r.nutrient.key} row={r} href={detailHref(r.nutrient.key)} fromPlan={o.source === "plan"} />
         ))}
         {info.map((r) => (
-          <NutrientListRow key={r.nutrient.key} row={r} href={detailHref(r.nutrient.key)} />
+          <NutrientListRow key={r.nutrient.key} row={r} href={detailHref(r.nutrient.key)} fromPlan={o.source === "plan"} />
         ))}
       </ul>
 
@@ -89,7 +97,7 @@ export function NutrientsView({ overview: o, audience, clientName, detailHref }:
           <summary className="min-h-[44px] flex items-center px-3 font-body text-xs text-steel cursor-pointer">Other vitamins and minerals ({hidden.length}) with no logged data yet</summary>
           <ul className="divide-y divide-steel/15">
             {hidden.map((r) => (
-              <NutrientListRow key={r.nutrient.key} row={r} href={detailHref(r.nutrient.key)} />
+              <NutrientListRow key={r.nutrient.key} row={r} href={detailHref(r.nutrient.key)} fromPlan={o.source === "plan"} />
             ))}
           </ul>
         </details>
@@ -103,7 +111,7 @@ export function NutrientsView({ overview: o, audience, clientName, detailHref }:
   );
 }
 
-function NutrientListRow({ row, href }: { row: NutrientRow; href: string }) {
+function NutrientListRow({ row, href, fromPlan = false }: { row: NutrientRow; href: string; fromPlan?: boolean }) {
   const { nutrient: n, ref, total, pct, coveragePct } = row;
   const reported = total != null;
   const kind = ref?.kind ? KIND_LABEL[ref.kind] : null;
@@ -122,14 +130,14 @@ function NutrientListRow({ row, href }: { row: NutrientRow; href: string }) {
             <p className="font-body text-xs text-steel mt-1 [font-variant-numeric:tabular-nums]">
               {reported ? `${pct}% of ` : "Reference: "}
               {formatNutrientAmount(ref.target)} {n.unit} {kind ? `(${ref.kind})` : ""}
-              {reported && coveragePct < 99.5 ? ` · counted from foods making up about ${Math.round(coveragePct)}% of today's calories` : ""}
+              {reported && (fromPlan || coveragePct < 99.5) ? ` · ${fromPlan ? `estimated from the meal plan, about ${Math.round(coveragePct)}% of its ingredients matched` : `counted from foods making up about ${Math.round(coveragePct)}% of today's calories`}` : ""}
             </p>
           </>
         )}
         {n.role === "limit" && ref?.ul != null && reported && (
           <p className="font-body text-xs text-steel mt-1 [font-variant-numeric:tabular-nums]">
             For information: the level health authorities suggest staying under is {formatNutrientAmount(ref.ul)} {n.unit} a day
-            {coveragePct < 99.5 ? ` · counted from foods making up about ${Math.round(coveragePct)}% of today's calories` : ""}
+            {fromPlan ? " · estimated from the meal plan" : coveragePct < 99.5 ? ` · counted from foods making up about ${Math.round(coveragePct)}% of today's calories` : ""}
           </p>
         )}
       </Link>

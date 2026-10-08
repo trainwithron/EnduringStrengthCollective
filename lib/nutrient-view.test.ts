@@ -76,6 +76,32 @@ describe("buildOverview", () => {
   });
 });
 
+describe("the meal-plan estimate stands in only when nothing logged has detail, and says so", () => {
+  const plan = { totals: { calcium_mg: 600, iron_mg: 9 }, coveredIngredientCount: 7, totalIngredientCount: 10 };
+  it("uses the plan when today has no logged detail", () => {
+    const o = buildOverview({ entries: [], todayKey: TODAY, age: 30, sex: "male", plan });
+    expect(o.source).toBe("plan");
+    expect(o.planCoverage).toEqual({ covered: 7, total: 10 });
+    const calcium = o.rows.find((r) => r.nutrient.key === "calcium_mg")!;
+    expect(calcium).toMatchObject({ total: 600, pct: 60, coveragePct: 70 });
+    expect(o.rows.find((r) => r.nutrient.key === "zinc_mg")!.total).toBeNull();
+  });
+  it("also when foods are logged but none carries detail (a quick calorie entry)", () => {
+    expect(buildOverview({ entries: [entry(TODAY, null)], todayKey: TODAY, age: 30, sex: "male", plan }).source).toBe("plan");
+  });
+  it("never when logged food has detail: what was eaten wins over what was planned", () => {
+    const o = buildOverview({ entries: richDay(TODAY, 500), todayKey: TODAY, age: 30, sex: "male", plan });
+    expect(o.source).toBe("logged");
+    expect(o.rows.find((r) => r.nutrient.key === "calcium_mg")!.total).toBe(500);
+    expect(o.planCoverage).toBeNull();
+  });
+  it("not when there is no plan data, and it never feeds the 'worth a look' view", () => {
+    expect(buildOverview({ entries: [], todayKey: TODAY, age: 30, sex: "male", plan: { totals: {}, coveredIngredientCount: 0, totalIngredientCount: 0 } }).source).toBe("logged");
+    expect(buildOverview({ entries: [], todayKey: TODAY, age: 30, sex: "male", plan: { totals: { calcium_mg: 1 }, coveredIngredientCount: 1, totalIngredientCount: 1 } }).gaps).toHaveLength(0);
+    expect(buildOverview({ entries: [], todayKey: TODAY, age: 30, sex: "male", plan: null }).source).toBe("logged");
+  });
+});
+
 describe("safeIdeas: foods that could help, checked against the person's rules", () => {
   const vitD = catalogNutrient("vitamin_d_mcg")!;
   it("removes foods that break an allergy", () => {

@@ -37,6 +37,19 @@ describe("NutrientsView", () => {
     expect(render([])).toContain("Log some food today");
     expect(render([], "coach")).toContain("Sam hasn&#x27;t logged any food today.");
   });
+  it("labels a meal-plan estimate plainly, with how many ingredients were matched, and never as logged food", () => {
+    const html = renderToStaticMarkup(
+      createElement(NutrientsView, {
+        overview: buildOverview({ entries: [], todayKey: TODAY, age: 30, sex: "male", plan: { totals: { calcium_mg: 600 }, coveredIngredientCount: 7, totalIngredientCount: 10 } }),
+        audience: "client",
+        detailHref: (k: string) => `/n/${k}`,
+      })
+    );
+    expect(html).toContain("an ESTIMATE from today&#x27;s meal plan, not from food you logged");
+    expect(html).toContain("7 of 10 planned ingredients could be matched");
+    expect(html).toContain("estimated from the meal plan");
+    expect(html).not.toContain("Log some food today");
+  });
   it("shows the assumption note only when age or sex is missing", () => {
     expect(render(day(TODAY, 500), "client", null, null)).toContain("adult average");
     expect(render(day(TODAY, 500), "client", 30, "male")).not.toContain("adult average");
