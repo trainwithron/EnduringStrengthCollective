@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { PHASE_LABELS } from "@/lib/phase-plan";
 import type { BaselineOutcome } from "@/lib/nutrition-baseline";
+import { createBaselineSuggestion } from "@/lib/baseline-suggestion";
 
 // "Suggest a starting target": worked out from the client's own numbers (About you) by the calculator, shown here before anything is made. Creating it adds an ordinary
 // pending suggestion the coach reviews and applies like any other; nothing applies by itself.
@@ -39,24 +40,9 @@ export function BaselinePrompt({
     setBusy(true);
     setError(null);
     const supabase = createBrowserClient();
-    const { error: insertError } = await supabase.from("nutrition_checkin_suggestions").insert({
-      athlete_id: athleteId,
-      group_id: groupId,
-      phase: outcome.phase,
-      new_calories: outcome.calories,
-      rationale: outcome.rationale,
-      protein_g: outcome.proteinG,
-      carbs_g: outcome.carbsG,
-      fat_g: outcome.fatG,
-      diet_archetype: archetype,
-      dietary_restrictions: "",
-      status: "pending",
-      kind: "baseline",
-      below_floor: outcome.belowFloor,
-      consecutive_surplus_spikes: 0,
-    });
+    const made = await createBaselineSuggestion(supabase, { athleteId, groupId, outcome, archetype });
     setBusy(false);
-    if (insertError) return setError("Couldn't make the suggestion. Try again.");
+    if (!made.ok) return setError("Couldn't make the suggestion. Try again.");
     router.refresh();
   }
 

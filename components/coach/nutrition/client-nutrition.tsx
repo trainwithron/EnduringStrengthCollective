@@ -44,8 +44,12 @@ import { BaselinePrompt } from "@/components/coach/nutrition/baseline-prompt";
 import { PhaseOfRecordCard } from "@/components/coach/nutrition/phase-of-record-card";
 import { readDateOfBirth, rowToBodyProfile } from "@/lib/client-body-profile";
 import { minorSafetyLine } from "@/lib/minor-safety";
-import { rowToPhasePlan, resolvePhaseOfRecord } from "@/lib/phase-plan";
+import { rowToPhasePlan, resolvePhaseOfRecord, reviewIsDue } from "@/lib/phase-plan";
 import { chooseBaselinePhase, computeBaseline } from "@/lib/nutrition-baseline";
+import { PhaseReviewCard, type PhaseReviewCardProps } from "@/components/coach/nutrition/phase-review-card";
+import { buildPhaseReview, pathAssessment, reviewWindowStart } from "@/lib/phase-review";
+import { factsFromReview, draftsFor } from "@/lib/phase-review-drafts";
+import { resultLines, stanceLine, verdictLine } from "@/lib/phase-review-view";
 
 const PHASE_TAG_LABEL: Record<MilestonePhaseTag, string> = { reverse_diet: "Reverse diet", cut: "Cut", bulk: "Bulk" };
 
@@ -405,6 +409,65 @@ export async function ClientNutrition({
   const minorLine = minorSafetyLine({ ageYears, phase: phasePlan?.phase ?? derivedPhase?.phase ?? milestoneTagToNutritionPhase(phaseTag), clientName: firstName });
   const dobLabel = readDateOfBirth(bodyProfile) ? shortDateLabel(readDateOfBirth(bodyProfile) as string) : null;
 
+  // The phase review: on the review date the coach sees what actually happened over the phase. It only raises a prompt; nothing changes until the coach picks a choice.
+  let reviewCard: PhaseReviewCardProps | null = null;
+  if (phasePlan && reviewIsDue(phasePlan, todayKey)) {
+    const lastReviewedOn = phasePlan.lastReviewedAt ? phasePlan.lastReviewedAt.slice(0, 10) : null;
+    const windowStart = reviewWindowStart(phasePlan.startedOn, lastReviewedOn, todayKey);
+    const { data: loggedRows } = await supabase.from("food_log_entries").select("log_date").eq("athlete_id", athleteId).neq("status", "skipped").gte("log_date", windowStart).lte("log_date", todayKey);
+    const review = buildPhaseReview({
+      phase: phasePlan.phase,
+      startedOn: phasePlan.startedOn,
+      lastReviewedOn,
+      todayKey,
+      weights: (weightLogs ?? []).map((w) => ({ loggedDate: w.logged_date as string, weight: Number(w.weight) })),
+      daysLogged: new Set((loggedRows ?? []).map((r) => r.log_date as string)).size,
+      calories: currentCalories,
+      floorCalories,
+    });
+    const next = phasePlan.plannedNextPhase;
+    const assessment = next ? pathAssessment({ review, target: next, bodyFatPct: bodyProfile.bodyFatPct, sex: asBiologicalSex(bodyProfile.sex) }) : null;
+    const facts = factsFromReview(review, firstName, bodyProfile.weightUnit);
+    reviewCard = {
+      athleteId,
+      groupId,
+      coachId,
+      clientFirst: firstName,
+      todayKey,
+      phase: phasePlan.phase,
+      plan: phasePlan,
+      headline: `Review ${phasePlan.reviewOn && phasePlan.reviewOn < todayKey ? "was due" : "is due"} ${shortDateLabel(phasePlan.reviewOn as string)}`,
+      results: resultLines(review, bodyProfile.weightUnit),
+      verdictLine: verdictLine(review, firstName),
+      verdict: review.verdict,
+      next,
+      stance: assessment?.stance ?? null,
+      stanceLine: assessment && next ? stanceLine(assessment, phasePlan.phase, next) : null,
+      factors: assessment?.factors ?? [],
+      // The starting target for the NEXT phase, worked out the way the Starting target card does it, so moving can prepare it for the coach to review.
+      nextBaseline: (() => {
+        if (!next || next === phasePlan.phase) return null;
+        const outcome = computeBaseline({
+          weightLbs: weightLogs?.[0]?.weight != null ? Number(weightLogs[0].weight) : null,
+          heightCm: bodyProfile.heightCm,
+          sex: bodyProfile.sex,
+          dateOfBirth: readDateOfBirth(bodyProfile),
+          bodyFatPct: bodyProfile.bodyFatPct,
+          activity: bodyProfile.activity,
+          phase: next,
+          todayKey,
+          proteinGPerLb: prefs.proteinGPerLb,
+          carbSplit: prefs.carbSplit,
+          dietType: prefs.dietType,
+        });
+        return outcome.ok ? outcome : null;
+      })(),
+      nextArchetype: baselineArchetype,
+      pendingBaselinePhase: (pendingSuggestions.find((x) => x.kind === "baseline")?.phase as NutritionPhase | undefined) ?? null,
+      drafts: draftsFor(review, facts, assessment?.stance ?? null, next),
+    };
+  }
+
   return (
     <div className="space-y-10">
       <div className={variant === "hub" ? "sticky top-0 z-10 bg-graphite/95 backdrop-blur border-b border-steel/20 -mx-1 px-1 pb-3 pt-1" : "border-b border-steel/20 pb-3"}>
@@ -456,6 +519,7 @@ export async function ClientNutrition({
       <section>
         <SectionHeading id="targets" title="Targets" note="What they should eat each day, what the weekly check-in suggests, and where it came from." />
         <div className="space-y-6">
+          {reviewCard && <PhaseReviewCard {...reviewCard} />}
           <NutritionSpotterPanel findings={findings} />
           <BodyProfileEditor
             athleteId={athleteId}
