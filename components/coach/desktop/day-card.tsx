@@ -1,6 +1,7 @@
 "use client";
 
 import type { DemoRow } from "@/lib/exercise-demo";
+import { ClientPreviewButton } from "@/components/coach/desktop/client-preview";
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -404,6 +405,7 @@ export function DayCard({
         <span className="font-body text-xs text-steel shrink-0">
           {itemCount} {itemCount === 1 ? "exercise" : "exercises"}
         </span>
+        <ClientPreviewButton days={[day]} heading={day.title || `Day ${day.dayIndex + 1}`} label="Preview" demoLibrary={demoLibrary} />
         <Link
           href={`/groups/${groupId}/workouts/${day.id}/clients`}
           className="font-body text-xs text-steel active:text-rust transition-colors shrink-0"
