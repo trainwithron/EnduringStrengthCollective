@@ -113,7 +113,7 @@ export function clientDestinations(client: ClientRef): WorkspaceDestination[] {
   });
   return [
     mk("profile", "profile", `${base}/athletes/${client.athleteId}`, ["overview"]),
-    mk("messages", "messages", `${base}/messages/${client.athleteId}`, ["chat", "dm"]),
+    mk("messages", "messages", `${base}/athletes/${client.athleteId}?tab=messages`, ["chat", "dm"]),
     mk("calendar", "calendar", `${base}/athletes/${client.athleteId}/calendar`, ["schedule", "habits", "macros"]),
     mk("programs", "programs", `${base}/athletes/${client.athleteId}?tab=program`, ["training", "workouts"]),
     mk("nutrition", "nutrition", `${base}/athletes/${client.athleteId}?tab=nutrition`, ["macros", "food"]),
