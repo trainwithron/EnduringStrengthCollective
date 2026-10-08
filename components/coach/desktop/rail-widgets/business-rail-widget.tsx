@@ -18,6 +18,7 @@ import {
   type BusinessMetricKey,
 } from "@/lib/business-rail-metrics";
 import { RailWidgetHeader, RailWidgetDeeperLink, RailWidgetLoading } from "./rail-widget-shell";
+import { ratesByMembership } from "@/lib/client-rates";
 
 function dateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -99,7 +100,7 @@ export function BusinessRailWidget({ groupId }: { groupId: string }) {
           status: s.status as "active" | "past_due" | "canceled" | "incomplete" | "paused",
         }))
       );
-      const rateByMembership = new Map((rateRows ?? []).map((r) => [r.membership_id as string, Number(r.monthly_rate)]));
+      const rateByMembership = ratesByMembership(rateRows);
       const estimatedMRR = computeEstimatedMRR((memberRows ?? []).map((m) => ({ monthlyRate: rateByMembership.get(m.id as string) ?? null })));
       const athleteIdsWithPurchase = new Set((purchaseRows ?? []).map((p) => p.athlete_id));
       const athleteIdsWithActiveSub = new Set(

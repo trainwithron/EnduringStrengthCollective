@@ -15,6 +15,7 @@ import { computeEngagement, computeEstimatedMRR } from "./business-metrics";
 import { computeHabitCompliance, computeCompliancePct } from "./habits";
 import { formatInTimezone, timezoneForProfiles } from "@/lib/format-in-timezone";
 import { fetchInactiveKeys, inactiveKey } from "@/lib/inactive-ids";
+import { ratesByMembership } from "@/lib/client-rates";
 
 export interface DashboardGroupInfo {
   id: string;
@@ -344,7 +345,7 @@ export async function getCoachDashboardData(
   >();
   // A client the coach has set aside as inactive (0281) is left out of every count and flag below; their data is untouched.
   const inactiveKeys = await fetchInactiveKeys(supabase, allGroupIds);
-  const rateByMembership = new Map((rateRows ?? []).map((r) => [r.membership_id as string, Number(r.monthly_rate)]));
+  const rateByMembership = ratesByMembership(rateRows);
   for (const row of athleteRows ?? []) {
     if (athleteByProfileId.has(row.profile_id)) continue;
     if (inactiveKeys.has(inactiveKey(row.group_id, row.profile_id))) continue;

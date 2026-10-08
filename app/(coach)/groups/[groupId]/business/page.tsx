@@ -9,6 +9,7 @@ import { SwappableTerm } from "@/components/coach/swappable-term";
 import { getCoachDashboardData } from "@/lib/dashboard-data";
 import { DashboardHero } from "@/components/coach/desktop/dashboard-hero";
 import { StatHeroTile } from "@/components/coach/desktop/stat-hero-tile";
+import { ratesByMembership } from "@/lib/client-rates";
 import {
   computeEstimatedMRR,
   computeEngagement,
@@ -84,7 +85,7 @@ export default async function BusinessDashboardPage(
     .from("client_billing_rates")
     .select("membership_id, monthly_rate")
     .in("group_id", groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"]);
-  const rateByMembership = new Map((rateRows ?? []).map((r) => [r.membership_id as string, Number(r.monthly_rate)]));
+  const rateByMembership = ratesByMembership(rateRows);
 
   const clients = (memberRows ?? []).map((m) => ({
     membershipId: m.id,

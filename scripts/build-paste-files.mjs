@@ -1009,21 +1009,38 @@ alter table public.coach_availability_windows drop column if exists session_minu
   {
     n: "48",
     slug: "0303",
-    title: "0303 What a client pays becomes coach-only: the coach's manual monthly rate moves off the roster table (which every member of a group could read) into its own table that only the group's coaches can read or write; the existing values are copied across and the old column is dropped",
-    warn: "Run this right before the code of the same release is deployed: the code that is live today still reads the old column, so the Business estimate shows empty between this paste and the deploy (nothing else is affected).",
+    title: "0303 What a client pays becomes coach-only (part one): the coach's manual monthly rate moves off the roster table (which every member of a group could read) into its own table that only the group's coaches can read or write (the organization's owner and admins can read it); the existing rates are copied across and the old column is emptied, so the leak is closed at once",
     migrations: ["0303"],
     sees: "Success. No rows returned.",
-    afterwards: "Clients can no longer see what any client pays. The coach sees and edits the same monthly rates as before on the Business page once the code in the same release is live.",
+    afterwards: "Clients can no longer see what any client pays. The code that is live today still finds the old rate column (now empty) and carries on; the Business estimate shows nothing until the code in the same release is live, then shows the same rates as before. Step 49 (after the deploy) removes the old column.",
     undo: [
       "alter table public.group_memberships add column if not exists monthly_rate numeric check (monthly_rate is null or monthly_rate >= 0);",
       "update public.group_memberships gm set monthly_rate = r.monthly_rate from public.client_billing_rates r where r.membership_id = gm.id;",
       "drop table if exists public.client_billing_rates;",
     ].join(String.fromCharCode(10)),
-    undoWhy: "Only if step 48 misbehaves. Puts the rate column back on the roster table with the current values. Note this makes the rates readable by every member of a group again (the problem step 48 fixes).",
+    undoWhy: "Only if step 48 misbehaves. Puts the rates back on the roster table (the old column) and removes the new table. Note this makes the rates readable by every member of a group again (the problem step 48 fixes).",
     rows: [
-      ["group_memberships, groups and is_group_coach exist", `${has.table("group_memberships")} and ${has.table("groups")} and ${has.fnName("is_group_coach")}`],
+      ["group_memberships, groups, is_group_coach and is_org_admin_of_group exist", `${has.table("group_memberships")} and ${has.table("groups")} and ${has.fnName("is_group_coach")} and ${has.fnName("is_org_admin_of_group")}`],
       ["0303 is not already applied (client_billing_rates is not there yet)", has.noTable("client_billing_rates")],
       ["the old rate column is still on group_memberships", has.col("group_memberships", "monthly_rate")],
+    ],
+  },
+  {
+    n: "49",
+    slug: "0304",
+    title: "0304 What a client pays (part two): drops the old, now empty, rate column from the roster table (anything the old code wrote there since step 48 is copied across first)",
+    warn: "Run this ONLY AFTER the release's code is deployed and live: code that still selects the old column in the same query as the roster would stop showing the roster. Step 48 must already be applied.",
+    migrations: ["0304"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing visible changes. The old rate column is gone; the rates live only in the coach-only table.",
+    undo: [
+      "alter table public.group_memberships add column if not exists monthly_rate numeric check (monthly_rate is null or monthly_rate >= 0);",
+      "update public.group_memberships gm set monthly_rate = r.monthly_rate from public.client_billing_rates r where r.membership_id = gm.id;",
+    ].join(String.fromCharCode(10)),
+    undoWhy: "Only if step 49 misbehaves. Puts the old rate column back with the current rates (which makes them readable by every group member again, so follow it with step 48's undo only if you mean to go all the way back).",
+    rows: [
+      ["step 48 is applied (client_billing_rates exists)", has.table("client_billing_rates")],
+      ["0304 is not already applied (the old rate column is still on group_memberships)", has.col("group_memberships", "monthly_rate")],
     ],
   },
 ];
@@ -1108,6 +1125,7 @@ const BUNDLES = [
   { id: "release-k", name: "Release K (recipe library)", steps: ["41"] },
   { id: "release-l", name: "Release L (schedule requests, Read during rest)", steps: ["42", "43"] },
   { id: "release-n", name: "Release N (nutrition tracking: food search, custom foods, nutrient detail)", steps: ["45", "46", "47", "48"] },
+  { id: "release-n2", name: "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)", steps: ["49"] },
 ];
 for (const b of BUNDLES) {
   const stepsIn = b.steps.map((n) => STEPS.find((x) => x.n === n));
@@ -1281,6 +1299,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0295", has.table("client_phase_plans")),
     m("0296", has.col("recipes", "content_hash")),
     m("0297", has.table("schedule_requests")),
+    m("0304", has.noCol("group_memberships", "monthly_rate")),
     m("0303", has.table("client_billing_rates")),
     m("0302", has.table("custom_foods")),
     m("0301", has.table("ai_budget_notices")),

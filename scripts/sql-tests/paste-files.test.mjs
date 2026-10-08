@@ -447,8 +447,10 @@ for (const s of steps) {
   const st46 = steps.find((x) => x.n === "46");
   const st47 = steps.find((x) => x.n === "47");
   const st48 = steps.find((x) => x.n === "48");
+  const st49 = steps.find((x) => x.n === "49");
+  const bundle2 = bundles.find((b) => b.id === "release-n2");
   const undoBoth = async () =>
-    (await run(`apply/undo-step${st48.n}-${st48.slug}.sql`)) || (await run(`apply/undo-step${st47.n}-${st47.slug}.sql`)) || (await run(`apply/undo-step${st46.n}-${st46.slug}.sql`)) || (await run(`apply/undo-step${st45.n}-${st45.slug}.sql`));
+    (await run(`apply/undo-step${st49.n}-${st49.slug}.sql`)) || (await run(`apply/undo-step${st48.n}-${st48.slug}.sql`)) || (await run(`apply/undo-step${st47.n}-${st47.slug}.sql`)) || (await run(`apply/undo-step${st46.n}-${st46.slug}.sql`)) || (await run(`apply/undo-step${st45.n}-${st45.slug}.sql`));
   const state = async () => (await db.query(`select
       to_regclass('public.usda_food_portions') is not null as portions,
       to_regclass('public.usda_load_batches') is not null as batches,
@@ -471,17 +473,32 @@ for (const s of steps) {
   const err = await run(file);
   check("release-n bundle applies on the live-shaped state" + (err ? ": " + err : ""), !err);
   const after = await state();
-  check("release-n: every new table, column and function exists and no food log or membership was lost", after.portions && after.batches && after.fdc && after.snapshot && after.switch && after.notices && after.fn && after.custom && after.meals && after.rates && !after.ratecol && after.logs === before.logs && after.memberships === before.memberships, JSON.stringify(after));
+  check("release-n: every new table, column and function exists and no food log or membership was lost", after.portions && after.batches && after.fdc && after.snapshot && after.switch && after.notices && after.fn && after.custom && after.meals && after.rates && after.ratecol && after.logs === before.logs && after.memberships === before.memberships, JSON.stringify(after));
   const movedRate = (await db.query("select count(*)::int as n, coalesce(sum(monthly_rate), 0)::numeric as total from public.client_billing_rates")).rows[0];
   check("release-n: the rate set on a client moved to the coach-only table and nothing else came with it", movedRate.n === 1 && Number(movedRate.total) === 120, JSON.stringify(movedRate));
+  const leftInOld = (await db.query("select count(*)::int as n from public.group_memberships where monthly_rate is not null")).rows[0].n;
+  check("release-n: the old rate column is kept but emptied (the code live today still selects it and carries on; the rates are no longer readable there)", after.ratecol && leftInOld === 0, leftInOld);
   const again = await run(file);
   check("release-n: a second run is refused, naming step 45 (" + again + ")", !!again && again.includes("step 45 (0300) cannot run") && again.includes("already applied"));
+  // Part two, after the deploy: anything the old code wrote into the old column in the meantime is copied across, then the column goes.
+  await db.exec("update public.group_memberships set monthly_rate = 77 where id = (select id from public.group_memberships where role = 'athlete' order by id offset 1 limit 1)");
+  const errN2 = await run(`apply/${bundle2.file}`);
+  check("release-n part 2 (after the deploy) applies" + (errN2 ? ": " + errN2 : ""), !errN2);
+  const afterN2 = await state();
+  const rateRowsN2 = (await db.query("select count(*)::int as n, coalesce(sum(monthly_rate), 0)::numeric as total from public.client_billing_rates")).rows[0];
+  check("release-n part 2: the old column is gone and a rate written there in the gap was copied across first", !afterN2.ratecol && afterN2.rates && rateRowsN2.n === 2 && Number(rateRowsN2.total) === 197, JSON.stringify({ afterN2, rateRowsN2 }));
+  const againN2 = await run(`apply/${bundle2.file}`);
+  check("release-n part 2: a second run is refused (" + againN2 + ")", !!againN2 && againN2.includes("already applied"));
+  const eN2 = await run(`apply/undo-step${st49.n}-${st49.slug}.sql`);
+  const backN2 = (await db.query("select count(*)::int as n from public.group_memberships where monthly_rate is not null")).rows[0].n;
+  check("release-n part 2: its undo puts the column back with the rates" + (eN2 ? ": " + eN2 : ""), !eN2 && backN2 === 2, backN2);
+  await db.exec("update public.group_memberships set monthly_rate = null");
   const eu2 = await undoBoth();
   check("release-n: the undo files run after the steps" + (eu2 ? ": " + eu2 : ""), !eu2);
   const undone = await state();
   check("release-n: after the undo the new objects are gone and every food log and membership is still there", !undone.portions && !undone.batches && !undone.fdc && !undone.snapshot && !undone.switch && !undone.notices && !undone.fn && !undone.custom && !undone.meals && !undone.rates && undone.ratecol && undone.logs === before.logs && undone.memberships === before.memberships, JSON.stringify(undone));
-  const restoredRate = (await db.query("select count(*)::int as n from public.group_memberships where monthly_rate = 120")).rows[0].n;
-  check("release-n: the undo puts the client's rate back on the roster row", restoredRate === 1, restoredRate);
+  const restoredRate = (await db.query("select count(*)::int as n, coalesce(sum(monthly_rate), 0)::numeric as total from public.group_memberships where monthly_rate is not null")).rows[0];
+  check("release-n: the undo puts the clients' rates back on the roster rows", restoredRate.n === 2 && Number(restoredRate.total) === 197, JSON.stringify(restoredRate));
   const err2 = await run(file);
   check("release-n: the bundle applies again after an undo" + (err2 ? ": " + err2 : ""), !err2);
 }

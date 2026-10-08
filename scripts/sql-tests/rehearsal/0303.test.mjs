@@ -6,7 +6,7 @@ const tryQ = async (db, sql, params) => {
 
 export default {
   name: "0303 client rates are coach-only",
-  migrations: ["0303"],
+  migrations: ["0303", "0304"],
   phases: {
     async "0302"({ db, h }) {
       const coach = await h.user("CR Coach");
@@ -31,8 +31,16 @@ export default {
     async "0303"({ db, h }) {
       const { coach, ann, bob, other, group } = globalThis.__cr;
       await h.asSuper();
-      const col = await h.one(`select count(*)::int as n from information_schema.columns where table_schema = 'public' and table_name = 'group_memberships' and column_name = 'monthly_rate'`);
-      h.check("the rate column is gone from the roster table", col.n === 0, JSON.stringify(col));
+      const col = await h.one(`select count(*)::int as n, (select count(*)::int from public.group_memberships where monthly_rate is not null) as left_over from information_schema.columns where table_schema = 'public' and table_name = 'group_memberships' and column_name = 'monthly_rate'`);
+      h.check("part one keeps the old column (the live code still selects it) but empties it", col.n === 1 && col.left_over === 0, JSON.stringify(col));
+      await h.as(bob);
+      const stillLeaks = await tryQ(db, `select monthly_rate from public.group_memberships where group_id = $1 and profile_id = $2`, [group, ann]);
+      h.check("another client in the group now reads an empty rate on the roster row (the leak is closed at once)", !stillLeaks.error && stillLeaks.rows?.[0]?.monthly_rate === null, JSON.stringify(stillLeaks));
+      await h.asSuper();
+      const grants = await h.one(`select has_table_privilege('anon', 'public.client_billing_rates', 'select') as anon_read, has_table_privilege('authenticated', 'public.client_billing_rates', 'truncate') as auth_truncate`);
+      h.check("the new table is closed to signed-out users and cannot be truncated by signed-in ones", grants.anon_read === false && grants.auth_truncate === false, JSON.stringify(grants));
+      const tooBig = await tryQ(db, `insert into public.client_billing_rates (membership_id, group_id, profile_id, monthly_rate) select id, group_id, profile_id, 100001 from public.group_memberships where group_id = $1 and profile_id = $2`, [group, bob]);
+      h.check("a rate above 100,000 is refused", !!tooBig.error, JSON.stringify(tooBig));
       const copied = await h.rows(`select profile_id, monthly_rate::int as r from public.client_billing_rates where group_id = $1`, [group]);
       h.check("the existing rate was copied across, and only members that had one", copied.length === 1 && copied[0].profile_id === ann && copied[0].r === 150, JSON.stringify(copied));
 
@@ -67,6 +75,14 @@ export default {
       const negative = await tryQ(db, `update public.client_billing_rates set monthly_rate = -5 where group_id = $1 and profile_id = $2`, [group, bob]);
       h.check("a negative rate is refused", !!negative.error, JSON.stringify(negative));
       void other;
+    },
+
+    async "0304"({ db, h }) {
+      await h.asSuper();
+      const col = await h.one(`select count(*)::int as n from information_schema.columns where table_schema = 'public' and table_name = 'group_memberships' and column_name = 'monthly_rate'`);
+      h.check("part two drops the old rate column from the roster table", col.n === 0, JSON.stringify(col));
+      const rows = await h.one(`select count(*)::int as n from public.client_billing_rates`);
+      h.check("...and the rates are all still in the coach-only table", rows.n === 2, JSON.stringify(rows));
     },
   },
 };

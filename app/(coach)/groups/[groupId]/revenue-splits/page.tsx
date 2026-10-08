@@ -110,6 +110,7 @@ export default async function RevenueSplitsPage(
 
   const totalRevenueCents = monthlyRateCents + challengeRevenueCents;
   const isOwner = orgMembership.role === "owner";
+  const seesWholeOrg = orgMembership.role === "owner" || orgMembership.role === "admin";
 
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="branding">
@@ -119,6 +120,11 @@ export default async function RevenueSplitsPage(
           How estimated revenue would divide between the platform and each coach in your
           organization. Built to plug straight into Stripe Connect transfers later — no payment
           processor is connected yet.
+        </p>
+        <p className="font-body text-xs text-steel mt-1 max-w-[70ch]">
+          {seesWholeOrg
+            ? "The total is built from the monthly rates of every client in the organization."
+            : "The total is built from the monthly rates of your own clients only; the organization's owner and admins see the whole organization."}
         </p>
       </div>
       <RevenueSplitEditor

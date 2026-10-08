@@ -25,6 +25,8 @@ as $function$
     )
   end;
 $function$;
+-- NOTE: leave execute open (the default). It is used inside check constraints, and a row written by a signed-in person is refused with "permission denied for function" if
+-- they cannot execute it (the rehearsal proves this). It is a pure function of its two arguments and reads nothing.
 
 create table if not exists public.custom_foods (
   id uuid primary key default uuid_generate_v4(),

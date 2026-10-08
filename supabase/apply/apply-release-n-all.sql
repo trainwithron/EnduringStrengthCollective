@@ -8,7 +8,7 @@
 -- AFTER STEP 45: Nothing changes for anyone until the code in the same release is live. After that: any client can search the USDA foods, pick a serving (grams, ounces, household measures once the USDA portions are loaded), see the nutrients and log it, then edit or delete the entry. Existing food logs are untouched.
 -- AFTER STEP 46: Nothing changes for anyone until the code in the same release is live. After that: each organization (a solo coach, or a gym's trainers together) has one monthly AI budget measured in real cost; the app tells the owner and the coach plainly at about 80 percent and when it is used up, and pauses AI features until the 1st, unless a paid top-up (when payments are on) adds to that month. Food search, barcode and saved meals are never limited. A top-up that is refunded in Stripe does NOT take its dollars back out of the budget; remove that row from ai_budget_topups by hand if a refund is ever given.
 -- AFTER STEP 47: Nothing changes for anyone until the code in the same release is live. After that: a client can add a food that is not in the USDA data (a bar, a restaurant dish, a family recipe), scan a barcode that is not found and create it, and save a meal to log again in one tap. Their coach can see these.
--- AFTER STEP 48: Clients can no longer see what any client pays. The coach sees and edits the same monthly rates as before on the Business page once the code in the same release is live.
+-- AFTER STEP 48: Clients can no longer see what any client pays. The code that is live today still finds the old rate column (now empty) and carries on; the Business estimate shows nothing until the code in the same release is live, then shows the same rates as before. Step 49 (after the deploy) removes the old column.
 -- It contains no text searching, so editor re-indenting cannot break it.
 
 begin;
@@ -306,6 +306,8 @@ as $function$
     )
   end;
 $function$;
+-- NOTE: leave execute open (the default). It is used inside check constraints, and a row written by a signed-in person is refused with "permission denied for function" if
+-- they cannot execute it (the rehearsal proves this). It is a pure function of its two arguments and reads nothing.
 
 create table if not exists public.custom_foods (
   id uuid primary key default uuid_generate_v4(),
@@ -433,14 +435,14 @@ create trigger custom_foods_touch before update on public.custom_foods for each 
 drop trigger if exists saved_meals_touch on public.saved_meals;
 create trigger saved_meals_touch before update on public.saved_meals for each row execute function public.food_library_touch_updated_at();
 
--- ===== Release N (nutrition tracking: food search, custom foods, nutrient detail), step 48: 0303 What a client pays becomes coach-only: the coach's manual monthly rate moves off the roster table (which every member of a group could read) into its own table that only the group's coaches can read or write; the existing values are copied across and the old column is dropped
+-- ===== Release N (nutrition tracking: food search, custom foods, nutrient detail), step 48: 0303 What a client pays becomes coach-only (part one): the coach's manual monthly rate moves off the roster table (which every member of a group could read) into its own table that only the group's coaches can read or write (the organization's owner and admins can read it); the existing rates are copied across and the old column is emptied, so the leak is closed at once
 do $g48$
 declare
   failed text;
 begin
   select string_agg(check_name, '; ') into failed from (
     values
-      ('group_memberships, groups and is_group_coach exist', to_regclass('public.group_memberships') is not null and to_regclass('public.groups') is not null and exists (select 1 from pg_proc where proname = 'is_group_coach' and pronamespace = 'public'::regnamespace)),
+      ('group_memberships, groups, is_group_coach and is_org_admin_of_group exist', to_regclass('public.group_memberships') is not null and to_regclass('public.groups') is not null and exists (select 1 from pg_proc where proname = 'is_group_coach' and pronamespace = 'public'::regnamespace) and exists (select 1 from pg_proc where proname = 'is_org_admin_of_group' and pronamespace = 'public'::regnamespace)),
       ('0303 is not already applied (client_billing_rates is not there yet)', to_regclass('public.client_billing_rates') is null),
       ('the old rate column is still on group_memberships', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_memberships' and column_name = 'monthly_rate'))
   ) as checks(check_name, ok) where not ok;
@@ -456,23 +458,26 @@ $g48$;
 
 -- What a client pays (the coach's manual "$/mo" estimate) must be seen by the coach only. It lived on group_memberships.monthly_rate (0045), and the roster policy
 -- memberships_select_same_group lets EVERY member of a group read EVERY column of every membership row in it, so any client could read what each other client pays.
--- A row policy cannot hide one column, so the rate moves to its own table that only the group's coaches can read or write; the values are copied across, then the column is dropped.
+-- A row policy cannot hide one column, so the rate moves to its own table that only the group's coaches can read or write.
 --
---  * client_billing_rates: one row per membership that has a rate. Coaches of the group read and write it; nobody else (not the client, not another client) can see it at all.
--- Re-runnable: the copy only runs while the old column still exists, and the column is dropped only after the copy.
--- ORDER: the app code that reads the new table ships in the same release. Run this paste right before deploying that code (the old code reads the old column, so the Business
--- estimate is empty between the paste and the deploy; nothing else is affected).
+--  * client_billing_rates: one row per membership that has a rate. Coaches of the group read and write it; the organization's owner and admins may read it (the Revenue splits
+--    total adds it up across the organization); nobody else (not the client, not another client) can see it at all.
+-- This is part ONE of two: it creates the table, copies the rates across and EMPTIES the old column (so the leak is closed at once). The old column itself is dropped by 0304 after
+-- the code that reads the new table is live; until then the code that is live today still reads the column, finds it empty, and carries on (the Business estimate shows nothing
+-- for those minutes, nothing else is affected). Re-runnable: the copy and the emptying only run while the old column exists.
 
 create table if not exists public.client_billing_rates (
   membership_id uuid primary key references public.group_memberships(id) on delete cascade,
   group_id uuid not null references public.groups(id) on delete cascade,
   profile_id uuid not null references public.profiles(id) on delete cascade,
-  monthly_rate numeric not null check (monthly_rate >= 0),
+  monthly_rate numeric not null check (monthly_rate >= 0 and monthly_rate <= 100000),
   updated_at timestamptz not null default now()
 );
 create index if not exists client_billing_rates_group_idx on public.client_billing_rates (group_id);
 
 alter table public.client_billing_rates enable row level security;
+revoke all on public.client_billing_rates from anon;
+revoke truncate, references, trigger on public.client_billing_rates from authenticated;
 
 drop policy if exists "client_billing_rates_coach_all" on public.client_billing_rates;
 create policy "client_billing_rates_coach_all" on public.client_billing_rates for all
@@ -483,7 +488,7 @@ create policy "client_billing_rates_coach_all" on public.client_billing_rates fo
     and exists (select 1 from public.group_memberships gm where gm.id = membership_id and gm.group_id = client_billing_rates.group_id and gm.profile_id = client_billing_rates.profile_id)
   );
 
--- The organization's owner and admins may READ the rates of every group in the organization (the Revenue splits page adds them up across the organization); they cannot write them.
+-- The organization's owner and admins may READ the rates of every group in the organization; they cannot write them.
 drop policy if exists "client_billing_rates_org_admin_select" on public.client_billing_rates;
 create policy "client_billing_rates_org_admin_select" on public.client_billing_rates for select
   to authenticated
@@ -492,12 +497,13 @@ create policy "client_billing_rates_org_admin_select" on public.client_billing_r
 do $copy$
 begin
   if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_memberships' and column_name = 'monthly_rate') then
+    -- a rate that is not a sensible amount is not carried over (the old column allowed any number); it stays on the old row until 0304 drops it
     insert into public.client_billing_rates (membership_id, group_id, profile_id, monthly_rate)
     select gm.id, gm.group_id, gm.profile_id, gm.monthly_rate
     from public.group_memberships gm
-    where gm.monthly_rate is not null
+    where gm.monthly_rate is not null and gm.monthly_rate <= 100000
     on conflict (membership_id) do nothing;
-    alter table public.group_memberships drop column monthly_rate;
+    update public.group_memberships set monthly_rate = null where monthly_rate is not null;
   end if;
 end
 $copy$;
@@ -512,5 +518,5 @@ select step, what, in_place from (
   union all
   select 'step 47 (0302)' as step, '0302 Custom foods and saved meals: a client''s own foods' as what, not ((to_regclass('public.custom_foods') is null) and (to_regclass('public.saved_meals') is null)) as in_place
   union all
-  select 'step 48 (0303)' as step, '0303 What a client pays becomes coach-only: the coach''s manual monthly rate moves off the roster table' as what, not ((to_regclass('public.client_billing_rates') is null)) as in_place
+  select 'step 48 (0303)' as step, '0303 What a client pays becomes coach-only' as what, not ((to_regclass('public.client_billing_rates') is null)) as in_place
 ) as result order by step;
