@@ -23,6 +23,7 @@ describe("how long someone has waited", () => {
     expect(waitedLabel(30_000)).toBe("just now");
     expect(waitedLabel(60_000)).toBe("1 minute");
     expect(waitedLabel(25 * 60_000)).toBe("25 minutes");
+    expect(waitedLabel(59.5 * 60_000)).toBe("59 minutes");
     expect(waitedLabel(H)).toBe("1 hour");
     expect(waitedLabel(5 * H)).toBe("5 hours");
     expect(waitedLabel(24 * H)).toBe("1 day");
@@ -67,9 +68,19 @@ describe("the messages summary (no AI)", () => {
     expect(messagesSynopsis([conv({ otherId: "ann", lastAt: null, lastBody: null, lastFromOther: false })], NOW).line).toBe("No messages yet.");
     expect(messagesSynopsis([], NOW).line).toBe("No messages yet.");
   });
+  it("when some messages could not be read it never says nobody is waiting or no messages, and it still lists who it found", () => {
+    const none = messagesSynopsis([conv({ otherId: "ann", lastFromOther: false })], NOW, { incomplete: true });
+    expect(none.line).toBe("I couldn't read every message just now, so this list may miss someone.");
+    expect(messagesSynopsis([], NOW, { incomplete: true }).line).toBe("I couldn't read every message just now, so this list may miss someone.");
+    const some = messagesSynopsis([conv({ otherId: "bo", fullName: "Bo", lastAt: ago(3 * H) })], NOW, { incomplete: true });
+    expect(some.waiting).toHaveLength(1);
+    expect(some.incomplete).toBe(true);
+    expect(messagesSynopsis([], NOW).incomplete).toBe(false);
+  });
   it("is on the coach's All messages list, above the search, and uses no AI", () => {
     const pane = readFileSync(join(__dirname, "..", "components/messages/messages-two-pane.tsx"), "utf8").replace(/\r\n/g, "\n");
     expect(pane.indexOf("<MessagesSynopsisCard")).toBeGreaterThan(-1);
+    expect(pane).toContain("incomplete={incomplete}");
     expect(pane.indexOf("<MessagesSynopsisCard")).toBeLessThan(pane.indexOf('type="search"'));
     const lib = readFileSync(join(__dirname, "messages-synopsis.ts"), "utf8");
     expect(lib).not.toMatch(/anthropic|callClaude|\/api\/ai\//i);

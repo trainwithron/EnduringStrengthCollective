@@ -2,18 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { InboxConversation } from "@/lib/coach-inbox";
-import { messagesSynopsis } from "@/lib/messages-synopsis";
+import { INCOMPLETE_LINE, messagesSynopsis } from "@/lib/messages-synopsis";
 
 const SHOWN = 5;
 
 // A plain summary above the conversation list: who is waiting for a reply, the longest wait, and the first line of what each wrote. Counts and times only; nothing reads the
 // messages with an AI. The clock is read after the page loads (never during the server render) so the page and the browser agree on the first paint.
-export function MessagesSynopsisCard({ conversations, onPick }: { conversations: InboxConversation[]; onPick: (otherId: string) => void }) {
+export function MessagesSynopsisCard({ conversations, onPick, incomplete = false }: { conversations: InboxConversation[]; onPick: (otherId: string) => void; incomplete?: boolean }) {
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => {
     setNow(new Date());
   }, [conversations]);
-  const synopsis = useMemo(() => (now ? messagesSynopsis(conversations, now) : null), [conversations, now]);
+  const synopsis = useMemo(() => (now ? messagesSynopsis(conversations, now, { incomplete }) : null), [conversations, now, incomplete]);
   if (!synopsis) return null;
   const shown = synopsis.waiting.slice(0, SHOWN);
   return (
@@ -31,6 +31,7 @@ export function MessagesSynopsisCard({ conversations, onPick }: { conversations:
           ))}
         </ul>
       )}
+      {synopsis.incomplete && synopsis.waitingCount > 0 && <p className="font-body text-xs text-steel mt-1">{INCOMPLETE_LINE}</p>}
       {synopsis.waitingCount > SHOWN && <p className="font-body text-xs text-steel">and {synopsis.waitingCount - SHOWN} more</p>}
     </section>
   );

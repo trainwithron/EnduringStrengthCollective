@@ -58,7 +58,7 @@ export function MessagesTwoPane({
   return (
     <div className="flex border border-steel/20 h-[calc(100vh-14rem)] min-h-[420px]">
       <div className="w-72 shrink-0 border-r border-steel/20 flex flex-col">
-        <MessagesSynopsisCard conversations={conversations} onPick={select} />
+        <MessagesSynopsisCard conversations={conversations} onPick={select} incomplete={incomplete} />
         <div className="p-2 border-b border-steel/15">
           <input
             type="search"

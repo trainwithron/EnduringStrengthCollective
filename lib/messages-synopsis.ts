@@ -20,6 +20,8 @@ export interface MessagesSynopsis {
   unreadTotal: number;
   // One sentence for the top of the list.
   line: string;
+  // Some messages could not be read, so the list may miss someone.
+  incomplete: boolean;
 }
 
 const HOUR = 3_600_000;
@@ -28,8 +30,9 @@ const FIRST_LINE_MAX = 80;
 
 export function waitedLabel(ms: number): string {
   if (ms < HOUR) {
-    const m = Math.max(1, Math.round(ms / 60_000));
-    return ms < 60_000 ? "just now" : `${m} ${m === 1 ? "minute" : "minutes"}`;
+    if (ms < 60_000) return "just now";
+    const m = Math.floor(ms / 60_000);
+    return `${m} ${m === 1 ? "minute" : "minutes"}`;
   }
   if (ms < DAY) {
     const h = Math.round(ms / HOUR);
@@ -48,7 +51,10 @@ export function firstLineOf(body: string | null | undefined): string {
   return `${(lastSpace > 40 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
 }
 
-export function messagesSynopsis(conversations: InboxConversation[], now: Date): MessagesSynopsis {
+export const INCOMPLETE_LINE = "I couldn't read every message just now, so this list may miss someone.";
+
+export function messagesSynopsis(conversations: InboxConversation[], now: Date, opts: { incomplete?: boolean } = {}): MessagesSynopsis {
+  const incomplete = !!opts.incomplete;
   const waiting: SynopsisItem[] = conversations
     .filter((c) => c.lastFromOther && !!c.lastAt)
     .map((c) => {
@@ -59,8 +65,9 @@ export function messagesSynopsis(conversations: InboxConversation[], now: Date):
   const unreadTotal = conversations.reduce((n, c) => n + c.unreadCount, 0);
   const hasAny = conversations.some((c) => !!c.lastAt);
   let line: string;
-  if (waiting.length === 0) line = hasAny ? "Nobody is waiting for a reply." : "No messages yet.";
+  // When some messages could not be read, "nobody is waiting" or "no messages" may not be true: say so instead.
+  if (waiting.length === 0) line = incomplete ? INCOMPLETE_LINE : hasAny ? "Nobody is waiting for a reply." : "No messages yet.";
   else if (waiting.length === 1) line = `${waiting[0].fullName} is waiting for a reply (${waiting[0].waited}).`;
   else line = `${waiting.length} are waiting for a reply. The longest wait is ${waiting[0].fullName} (${waiting[0].waited}).`;
-  return { waiting, waitingCount: waiting.length, unreadTotal, line };
+  return { waiting, waitingCount: waiting.length, unreadTotal, line, incomplete };
 }
