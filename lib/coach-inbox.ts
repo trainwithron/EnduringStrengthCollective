@@ -29,6 +29,8 @@ export interface InboxConversation {
   lastBody: string | null;
   lastAt: string | null;
   unreadCount: number;
+  // True when the newest message is the client's, so a read one that the coach has not answered yet is a client waiting on a reply.
+  lastFromOther: boolean;
 }
 
 const KIND_RANK: Record<GroupKind, number> = { one_on_one: 0, team: 1, social: 2 };
@@ -46,6 +48,7 @@ export function buildCoachInbox(people: InboxPerson[], messages: InboxMessage[],
         lastBody: null,
         lastAt: null,
         unreadCount: 0,
+        lastFromOther: false,
         _rank: KIND_RANK[p.groupKind],
         _groups: new Set([p.groupId]),
       });
@@ -66,6 +69,7 @@ export function buildCoachInbox(people: InboxPerson[], messages: InboxMessage[],
       row.lastAt = m.created_at;
       row.lastBody = m.body;
       row.groupId = m.group_id;
+      row.lastFromOther = m.sender_id !== viewerId;
     }
     if (m.recipient_id === viewerId && !m.read_at) row.unreadCount++;
   }

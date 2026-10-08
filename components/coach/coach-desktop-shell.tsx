@@ -720,7 +720,7 @@ function CoachDesktopShellFull({
       {/* Desktop-only edge tab: on phones the Spotlight hub is the single entry,
           so hide this one below lg (position:fixed still hides with its wrapper). */}
       <div className="hidden lg:block">
-        <CollectiveIntelligenceChat />
+        <CollectiveIntelligenceChat groupId={groupId} unread={messagesUnread} />
       </div>
     </div>
     </TerminologyProvider>
