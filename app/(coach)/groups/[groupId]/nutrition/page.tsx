@@ -17,6 +17,8 @@ import { FoodLogSection } from "@/components/athlete/food-log-section";
 import type { GeneratedMeal } from "@/lib/meal-engine";
 import type { MealEntryPayload } from "@/lib/meal-plan-assignment";
 import { NutritionPreferencesCard } from "@/components/athlete/nutrition-preferences-card";
+import { RecalcPromptCard } from "@/components/athlete/recalc-prompt-card";
+import { recalcPromptFor } from "@/lib/recalc-prompt";
 import { rowToPreferences } from "@/lib/nutrition-preferences";
 import { filterGeneratedMealsForClient, filterPlanForClient, hidePlanRecipes } from "@/lib/plan-preference-check";
 import { asWeightUnit, displayWeightValue } from "@/lib/units";
@@ -327,6 +329,17 @@ export default async function NutritionPage(
 
   const standingHistory = macrosEnabled ? await fetchStandingHistory(supabase, athleteId, params.groupId) : [];
   const todayKeyForMacros = todayKey;
+  // "Are you happy with your meal plan?": only for the client themself (a coach acting as them cannot answer for them), only after a real change of target, and only until it is answered.
+  let recalcPrompt: ReturnType<typeof recalcPromptFor> = null;
+  if (macrosEnabled && !isActingAsOther) {
+    const { data: answeredRows, error: answeredError } = await supabase
+      .from("client_nutrition_feedback")
+      .select("target_effective_from")
+      .eq("athlete_id", athleteId)
+      .eq("group_id", params.groupId);
+    if (answeredError) console.error("[nutrition] could not read earlier answers:", answeredError.message);
+    else recalcPrompt = recalcPromptFor(standingHistory, (answeredRows ?? []).map((r) => r.target_effective_from as string), todayKey);
+  }
   const todayMacros = macrosEnabled
     ? resolveDayMacros(
         todayMacroRow ?? null,
@@ -386,6 +399,9 @@ export default async function NutritionPage(
       {/* Every client can track what they eat here, whatever their tier and whether or not a coach has set a target. Targets, meal plans, food rules and the weekly
           check-in are a coach-run feature and show only for clients on a tier that has them. */}
       <div className="px-5 pt-6 space-y-6">
+          {recalcPrompt && (
+            <RecalcPromptCard athleteId={athleteId} groupId={params.groupId} effectiveFrom={recalcPrompt.effectiveFrom} calories={recalcPrompt.calories} showCalories={!youthMode} />
+          )}
           {macrosEnabled && (
           <section className="border border-steel/20 p-4">
             <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">

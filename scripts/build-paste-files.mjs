@@ -1044,6 +1044,25 @@ alter table public.coach_availability_windows drop column if exists session_minu
     ],
   },
   {
+    n: "51",
+    slug: "0306",
+    title: "0306 Target-change notice: when a coach applies a new daily calorie target the client is told, with fixed wording and a link to their Nutrition page, so they can answer 'are you happy with your meal plan?' (adds one notification type to the list the database already has)",
+    migrations: ["0306"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes until the code of the same release is live. After that, when a coach applies a new target the client gets a bell notice and a card asking if they are happy with their meal plan; the coach sees the answer in Preferences.",
+    undo: [
+      "drop trigger if exists client_macro_target_history_notify on public.client_macro_target_history;",
+      "drop function if exists public.notify_on_target_change();",
+      "delete from public.notifications where type = 'nutrition_target_changed';",
+      "do $undo$ declare v_def text; v_types text[]; begin select pg_get_constraintdef(c.oid) into v_def from pg_constraint c where c.conname = 'notifications_type_check' and c.conrelid = 'public.notifications'::regclass; select array_agg(m[1] order by m[1]) into v_types from regexp_matches(v_def, '''([^'']+)''::text', 'g') as m where m[1] <> 'nutrition_target_changed'; alter table public.notifications drop constraint notifications_type_check; execute format('alter table public.notifications add constraint notifications_type_check check (type = any (array[%s]))', (select string_agg(quote_literal(t) || '::text', ', ') from unnest(v_types) as t)); end $undo$;",
+    ].join(String.fromCharCode(10)),
+    undoWhy: "Only if step 51 misbehaves. Removes the trigger, the function, any target-change notices already sent, and the notification type.",
+    rows: [
+      ["client_macro_target_history and notifications exist", `${has.table("client_macro_target_history")} and ${has.table("notifications")}`],
+      ["0306 is not already applied (the notice function is not there yet)", "not exists (select 1 from pg_proc where proname = 'notify_on_target_change' and pronamespace = 'public'::regnamespace)"],
+    ],
+  },
+  {
     n: "50",
     slug: "0305",
     title: "0305 AI top-up balance that carries over: a small server-only record of how much of the top-up balance each month used, so a paid top-up is spent after the month's included AI and the rest carries into the next month",
@@ -1140,6 +1159,7 @@ const BUNDLES = [
   { id: "release-k", name: "Release K (recipe library)", steps: ["41"] },
   { id: "release-l", name: "Release L (schedule requests, Read during rest)", steps: ["42", "43"] },
   { id: "release-n", name: "Release N (nutrition tracking: food search, custom foods, nutrient detail)", steps: ["45", "46", "47", "48"] },
+  { id: "release-o", name: "Release O (recalculation notice)", steps: ["51"] },
   { id: "release-n2", name: "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)", steps: ["49", "50"] },
 ];
 for (const b of BUNDLES) {
@@ -1314,6 +1334,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0295", has.table("client_phase_plans")),
     m("0296", has.col("recipes", "content_hash")),
     m("0297", has.table("schedule_requests")),
+    m("0306", "exists (select 1 from pg_proc where proname = 'notify_on_target_change' and pronamespace = 'public'::regnamespace)"),
     m("0305", has.table("ai_topup_draws")),
     m("0304", has.noCol("group_memberships", "monthly_rate")),
     m("0303", has.table("client_billing_rates")),

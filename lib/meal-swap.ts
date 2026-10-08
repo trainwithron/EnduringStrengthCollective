@@ -57,10 +57,17 @@ export function safeSwapChoices(role: SwapRole, diet: DietType, trainingDay: boo
 
 export type SwapResult = { ok: true; option: MealOption } | { ok: false; reason: string };
 
+// The line as it is printed on the plan: "<strong>Name:</strong> 120g (~4.2 oz)" or "<strong>Name:</strong> 3 large". Metric clients get no ounce hint.
+export function printLine(name: string, qty: number, unit: ItemUnit, metric = false): string {
+  const qtyLabel = unit === "g" ? `${qty}g` : `${qty} ${unit}`;
+  const raw = `<strong>${name}:</strong> ${qtyLabel}${unit === "g" ? ` ${toOz(qty)}` : ""}`;
+  return metric ? stripOunceHints(raw) : raw;
+}
+
 const plain = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 
 // The macros one structured line carries (null when its food is not in the table).
-function lineMacros(line: MealLine) {
+export function lineMacros(line: MealLine) {
   if (!isStructuredLine(line)) return null;
   return ingredientMacros({ name: line.name, category: line.category, qty: line.qty, unit: line.unit, text: line.text });
 }
@@ -109,9 +116,7 @@ export function applySwap(option: MealOption, lineIndex: number, newKey: string,
   const rawQty = macroTarget / newDensity[field];
   const newQty = role === "veggie" ? Math.min(Math.max(1, Math.round(rawQty)), MAX_VEGGIE_SWAP_G) : Math.max(1, Math.round(rawQty));
   const unit: ItemUnit = UNIT_OF_KEY[newKey] ?? "g";
-  const qtyLabel = unit === "g" ? `${newQty}g` : `${newQty} ${unit}`;
-  const rawText = `<strong>${offered.name}:</strong> ${qtyLabel}${unit === "g" ? ` ${toOz(newQty)}` : ""}`;
-  const text = ctx.metric ? stripOunceHints(rawText) : rawText;
+  const text = printLine(offered.name, newQty, unit, !!ctx.metric);
   const grams = PER_UNIT_KEYS.has(newKey as never) ? null : unit === "g" ? newQty : unit === "pieces" ? newQty * UNIT_WEIGHT_G.pieces : null;
   const newLine: MealLine = { name: offered.name, label: offered.name, grams, text, foodKey: newKey, category: newDensity.category, qty: newQty, unit };
 

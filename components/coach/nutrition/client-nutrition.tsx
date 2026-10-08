@@ -11,6 +11,8 @@ import { NutrientsSection } from "@/components/nutrition/nutrients-section";
 import { GroceryListSection } from "@/components/coach/nutrition/grocery-list-section";
 import { FoodTrackingSwitch } from "@/components/coach/nutrition/food-tracking-switch";
 import { PreferencesSection } from "@/components/coach/nutrition/preferences-section";
+import { ClientAnswersPanel } from "@/components/coach/nutrition/client-answers-panel";
+import type { RecalcAnswer } from "@/lib/recalc-prompt";
 import { computeWeeklyWeightTrend } from "@/lib/weight-trend";
 import { computeReadinessAverage } from "@/lib/wellness";
 import type { NutritionPhase } from "@/lib/nutrition-checkin";
@@ -167,6 +169,30 @@ export async function ClientNutrition({
     supabase.from("client_phase_plans").select("*").eq("athlete_id", athleteId).eq("group_id", groupId).maybeSingle(),
     supabase.from("client_goals").select("goal_type, status, nutrition_phase, created_at").eq("athlete_id", athleteId).eq("group_id", groupId),
   ]);
+  // What the client answered to "are you happy with your meal plan?" after a new target (newest first; a failed read is no answers, never a failed page).
+  const { data: answerRows, error: answersError } = await supabase
+    .from("client_nutrition_feedback")
+    .select("id, target_effective_from, happy, change_text, requests_text, boring, status, created_at")
+    .eq("athlete_id", athleteId)
+    .eq("group_id", groupId)
+    .order("created_at", { ascending: false })
+    .limit(10);
+  if (answersError) console.error("[client-nutrition] could not read the client's answers:", answersError.message);
+  const answers: RecalcAnswer[] = (answerRows ?? []).map((r) => ({
+    id: r.id as string,
+    happy: !!r.happy,
+    changeText: (r.change_text as string | null) ?? "",
+    requestsText: (r.requests_text as string | null) ?? "",
+    boring: !!r.boring,
+    status: r.status === "handled" ? "handled" : "new",
+    targetEffectiveFrom: r.target_effective_from as string,
+    createdAt: r.created_at as string,
+  }));
+  // The target in force today as whole numbers, when all four are set (scaling a plan needs every one).
+  const scaleTarget =
+    standingTarget && standingTarget.calories != null && standingTarget.protein_g != null && standingTarget.carbs_g != null && standingTarget.fat_g != null
+      ? { calories: Math.round(standingTarget.calories), protein: Math.round(standingTarget.protein_g), carbs: Math.round(standingTarget.carbs_g), fats: Math.round(standingTarget.fat_g) }
+      : null;
   const bodyProfile = rowToBodyProfile(bodyDetails as Record<string, unknown> | null, intakeDob as Record<string, unknown> | null);
   const phasePlan = rowToPhasePlan(phasePlanRow as Record<string, unknown> | null);
 
@@ -533,6 +559,19 @@ export async function ClientNutrition({
 
       <section>
         <SectionHeading id="preferences" title="Preferences" />
+        {answers.length > 0 && (
+          <div className="mb-4">
+            <ClientAnswersPanel
+              athleteId={athleteId}
+              clientName={firstName}
+              answers={answers}
+              variety={prefs.variety}
+              currentTarget={scaleTarget}
+              todayKey={todayKey}
+              metric={bodyProfile.weightUnit === "kg"}
+            />
+          </div>
+        )}
         <PreferencesSection
           athleteId={athleteId}
           initial={prefs}

@@ -61,6 +61,7 @@ from (
     ('2026100600295', 'about_you_baseline_phase_of_record', '0295_about_you_baseline_phase_of_record.sql', to_regclass('public.client_phase_plans') is not null),
     ('2026100600296', 'recipe_library_columns', '0296_recipe_library_columns.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'recipes' and column_name = 'content_hash')),
     ('2026100600297', 'schedule_requests', '0297_schedule_requests.sql', to_regclass('public.schedule_requests') is not null),
+    ('2026100600306', 'target_change_notice', '0306_target_change_notice.sql', exists (select 1 from pg_proc where proname = 'notify_on_target_change' and pronamespace = 'public'::regnamespace)),
     ('2026100600305', 'ai_topup_draws', '0305_ai_topup_draws.sql', to_regclass('public.ai_topup_draws') is not null),
     ('2026100600304', 'drop_roster_monthly_rate', '0304_drop_roster_monthly_rate.sql', not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_memberships' and column_name = 'monthly_rate')),
     ('2026100600303', 'client_rates_coach_only', '0303_client_rates_coach_only.sql', to_regclass('public.client_billing_rates') is not null),
