@@ -22,13 +22,19 @@ describe("ReadSlot", () => {
 
   it("explains itself the first time, with a way to turn it off", () => {
     const html = render(false);
-    expect(html).toContain("A short passage to read while you rest. Turn it off any time.");
+    expect(html).toContain("A short Bible passage (King James) to read while you rest. Turn it off any time.");
     expect(html).toContain("Turn this off");
+  });
+
+  it("keeps every control at least 44px tall", () => {
+    const html = render(false);
+    expect(html).not.toContain("h-9");
+    expect((html.match(/min-h-\[44px\]/g) ?? []).length).toBe(3);
   });
 
   it("does not repeat the explanation once it has been seen", () => {
     const html = render(true);
-    expect(html).not.toContain("A short passage to read while you rest");
+    expect(html).not.toContain("to read while you rest. Turn it off");
     expect(html).toContain("Turn this off");
   });
 });

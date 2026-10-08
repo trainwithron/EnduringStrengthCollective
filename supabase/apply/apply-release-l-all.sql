@@ -904,6 +904,8 @@ create policy "read_settings_update_own" on public.read_settings for update to a
 drop policy if exists "read_settings_delete_own" on public.read_settings;
 create policy "read_settings_delete_own" on public.read_settings for delete to authenticated using (athlete_id = (select auth.uid()));
 revoke all on public.read_settings from anon;
+-- Row policies do not govern TRUNCATE, REFERENCES or TRIGGER; no client path needs them.
+revoke truncate, references, trigger on public.read_settings from authenticated;
 
 create table if not exists public.read_passage_overrides (
   id uuid primary key default uuid_generate_v4(),
@@ -918,6 +920,7 @@ drop policy if exists "read_passage_overrides_own" on public.read_passage_overri
 create policy "read_passage_overrides_own" on public.read_passage_overrides for all to authenticated
   using (coach_id = (select auth.uid())) with check (coach_id = (select auth.uid()));
 revoke all on public.read_passage_overrides from anon;
+revoke truncate, references, trigger on public.read_passage_overrides from authenticated;
 
 create or replace function public.read_track_for_me(p_group_id uuid, p_date date default null)
 returns jsonb

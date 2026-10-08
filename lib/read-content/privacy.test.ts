@@ -33,4 +33,16 @@ describe("read_settings stays private to the client", () => {
       .sort();
     expect(touching).toEqual([...ALLOWED].sort());
   });
+
+  // read_track_for_me is the other way the switch's value can leave the database, so only the one helper that serves the signed-in client's own screen may call it.
+  it("is read through the database function only by the Read lookup for the signed-in client", () => {
+    const root = process.cwd();
+    const files: string[] = [];
+    for (const top of ["app", "components", "lib"]) walk(join(root, top), files);
+    const calling = files
+      .filter((f) => readFileSync(f, "utf8").includes("read_track_for_me"))
+      .map((f) => relative(root, f).split("\\").join("/"))
+      .sort();
+    expect(calling).toEqual(["lib/read-content/for-viewer.ts"]);
+  });
 });

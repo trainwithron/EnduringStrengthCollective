@@ -56,8 +56,13 @@ export function ReadSlot({
     <div className="mt-3 border border-steel/30 bg-surface p-4" data-testid="read-slot">
       {showNote && (
         <div className="mb-3 flex items-start justify-between gap-3 border-b border-steel/20 pb-3">
-          <p className="font-body text-xs text-steel">A short passage to read while you rest. Turn it off any time.</p>
-          <button type="button" onClick={() => setShowNote(false)} aria-label="Dismiss note" className="font-body text-xs text-steel">
+          <p className="font-body text-xs text-steel">A short Bible passage (King James) to read while you rest. Turn it off any time.</p>
+          <button
+            type="button"
+            onClick={() => setShowNote(false)}
+            aria-label="Dismiss note"
+            className="min-h-[44px] min-w-[44px] -mt-3 -mr-3 flex items-center justify-center font-body text-xs text-steel"
+          >
             ✕
           </button>
         </div>
@@ -65,10 +70,10 @@ export function ReadSlot({
       <p className="font-body text-sm text-chalk leading-relaxed">{text}</p>
       <p className="font-display text-sm text-rust mt-2 tracking-wide">{reference} (KJV)</p>
       <div className="flex items-center gap-3 mt-3">
-        <button type="button" onClick={onClose} className="h-9 px-3 border border-steel/30 text-steel font-body text-xs">
+        <button type="button" onClick={onClose} className="min-h-[44px] px-4 border border-steel/30 text-steel font-body text-xs">
           Close
         </button>
-        <button type="button" onClick={turnOff} disabled={busy} className="h-9 px-3 font-body text-xs text-steel underline disabled:opacity-40">
+        <button type="button" onClick={turnOff} disabled={busy} className="min-h-[44px] px-3 font-body text-xs text-steel underline disabled:opacity-40">
           {busy ? "Turning off…" : "Turn this off"}
         </button>
         {failed && <span className="font-body text-xs text-rust">Could not save. Try again.</span>}
