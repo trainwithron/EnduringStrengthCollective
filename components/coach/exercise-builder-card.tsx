@@ -670,7 +670,7 @@ export function ExerciseBuilderCard({
             onClick={onMoveUp}
             disabled={!canMoveUp}
             aria-label="Move exercise up"
-            className="w-9 h-9 flex items-center justify-center text-steel disabled:opacity-30"
+            className="w-11 h-11 flex items-center justify-center text-steel disabled:opacity-30"
           >
             <ChevronUp className="w-3.5 h-3.5" />
           </button>
@@ -679,7 +679,7 @@ export function ExerciseBuilderCard({
             onClick={onMoveDown}
             disabled={!canMoveDown}
             aria-label="Move exercise down"
-            className="w-9 h-9 flex items-center justify-center text-steel disabled:opacity-30"
+            className="w-11 h-11 flex items-center justify-center text-steel disabled:opacity-30"
           >
             <ChevronDown className="w-3.5 h-3.5" />
           </button>
@@ -697,7 +697,7 @@ export function ExerciseBuilderCard({
           type="button"
           onClick={() => setCollapsed((v) => !v)}
           aria-label={collapsed ? "Expand exercise" : "Collapse exercise"}
-          className="w-9 h-9 sm:w-7 sm:h-7 flex items-center justify-center text-steel shrink-0"
+          className="w-11 h-11 sm:w-7 sm:h-7 flex items-center justify-center text-steel shrink-0"
         >
           {collapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
         </button>
@@ -706,7 +706,7 @@ export function ExerciseBuilderCard({
           onClick={handleDuplicate}
           disabled={busy}
           aria-label="Duplicate exercise"
-          className="w-9 h-9 sm:w-7 sm:h-7 flex items-center justify-center text-steel active:text-rust transition-colors shrink-0 disabled:opacity-40"
+          className="w-11 h-11 sm:w-7 sm:h-7 flex items-center justify-center text-steel active:text-rust transition-colors shrink-0 disabled:opacity-40"
         >
           <Copy className="w-3.5 h-3.5" />
         </button>
@@ -715,7 +715,7 @@ export function ExerciseBuilderCard({
           onClick={handleDelete}
           disabled={busy}
           aria-label="Delete exercise"
-          className="w-9 h-9 sm:w-7 sm:h-7 flex items-center justify-center text-steel active:text-rust transition-colors shrink-0 disabled:opacity-40"
+          className="w-11 h-11 sm:w-7 sm:h-7 flex items-center justify-center text-steel active:text-rust transition-colors shrink-0 disabled:opacity-40"
         >
           <Trash2 className="w-3.5 h-3.5" />
         </button>

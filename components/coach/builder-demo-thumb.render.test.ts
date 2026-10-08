@@ -113,7 +113,7 @@ describe("the name box and the card", () => {
     expect(card).toContain("<BuilderDemoThumb");
     expect(card).toContain("showCaption={!collapsed}");
     expect(card.indexOf('aria-label="Delete exercise"')).toBeLessThan(card.indexOf("<ExerciseNameInput"));
-    expect(card).toContain("w-9 h-9 sm:w-7 sm:h-7");
+    expect(card).toContain("w-11 h-11 sm:w-7 sm:h-7");
   });
   it("the demo is looked up from the exercise's current name, not the snapshot taken when the page loaded", () => {
     expect(card).toContain("builderDemoFor(demoLibrary, exercise.exerciseName)");
@@ -121,5 +121,21 @@ describe("the name box and the card", () => {
   });
   it("the old separate Demo button is gone (the picture opens the same sheet)", () => {
     expect(card).not.toContain("<ExerciseDemoButton");
+  });
+});
+
+describe("the lookup is kept per library and name (speed)", () => {
+  it("the same inputs give the same answer, and the same object, without scanning the library again", () => {
+    const lib: DemoRow[] = [{ name: "Barbell Row", videoPath: null, youtubeUrl: "https://youtu.be/rowrowrow11" }];
+    const first = builderDemoFor(lib, "Barbell Row");
+    expect(builderDemoFor(lib, "  barbell row ")).toBe(first);
+    expect(builderDemoFor(lib, "Zercher Squat")).toBeNull();
+    expect(builderDemoFor(lib, "Zercher Squat")).toBeNull();
+  });
+  it("a different library (a reload) does not reuse the old answers", () => {
+    const a: DemoRow[] = [{ name: "Barbell Row", videoPath: null, youtubeUrl: "https://youtu.be/rowrowrow11" }];
+    const b: DemoRow[] = [{ name: "Barbell Row", videoPath: null, youtubeUrl: "https://youtu.be/newnewnew11" }];
+    expect(builderDemoFor(a, "Barbell Row")?.demo.youtubeUrl).toBe("https://youtu.be/rowrowrow11");
+    expect(builderDemoFor(b, "Barbell Row")?.demo.youtubeUrl).toBe("https://youtu.be/newnewnew11");
   });
 });
