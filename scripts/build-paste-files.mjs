@@ -1091,6 +1091,21 @@ alter table public.coach_availability_windows drop column if exists session_minu
     ],
   },
   {
+    n: "57",
+    slug: "0312",
+    title: "0312 A client booking or moving their own session must stay inside the coach's open hours and clear of time off: book_session and reschedule_booking now refuse any other time (a coach booking for a client is never refused)",
+    migrations: ["0312"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for normal use: the booking screens already only offer times inside the coach's hours. A direct call that tries to book or move a client's own session outside the coach's open hours, or onto time off, is now refused with 'that time is outside your coach's hours'. A coach scheduling a client is never refused.",
+    undo: [fnFromMigration("0291", "book_session"), fnFromMigration("0291", "reschedule_booking")].join("\n"),
+    undoWhy: "Only if booking misbehaves after step 57. Puts the two booking functions back as they were (without the open-hours check).",
+    rows: [
+      ["coach_time_is_open exists (0279 is applied)", has.fnName("coach_time_is_open")],
+      ["0291 is applied (book_session checks that the coach coaches the group)", `coalesce((select position('that coach does not coach this group' in pg_get_functiondef(p.oid)) > 0 from pg_proc p where p.proname = 'book_session' and p.pronamespace = 'public'::regnamespace limit 1), false)`],
+      ["0312 is not already applied (book_session does not check the hours yet)", `coalesce((select position('coach_time_is_open' in pg_get_functiondef(p.oid)) = 0 from pg_proc p where p.proname = 'book_session' and p.pronamespace = 'public'::regnamespace limit 1), false)`],
+    ],
+  },
+  {
     n: "56",
     slug: "0311",
     title: "0311 A client can ask for a different meal plan (up to 3 times per plan): a table of the tries with a copy of the plan from before each one, the server-only function that applies a try (counts the tries, refuses a 4th, never touches a day the coach built by hand, tells the coach in fixed wording), the coach's one-tap put-back function, and one notification type added to the list the database already has",
@@ -1273,6 +1288,7 @@ const BUNDLES = [
   { id: "release-p", name: "Release P (new training block notice)", steps: ["54"] },
   { id: "release-q", name: "Release Q (the coach's own name for an exercise)", steps: ["55"] },
   { id: "release-r", name: "Release R (a client can ask for a different meal plan)", steps: ["56"] },
+  { id: "release-s", name: "Release S (booking hours check, grouped counts, hide demos per person)", steps: ["57"] },
   { id: "release-n2", name: "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)", steps: ["49", "50"] },
   { id: "release-m", name: "Release M (acceptance record is append-only)", steps: ["44"] },
 ];
@@ -1448,6 +1464,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0295", has.table("client_phase_plans")),
     m("0296", has.col("recipes", "content_hash")),
     m("0297", has.table("schedule_requests")),
+    m("0312", "coalesce((select position('coach_time_is_open' in pg_get_functiondef(p.oid)) > 0 from pg_proc p where p.proname = 'book_session' and p.pronamespace = 'public'::regnamespace limit 1), false)"),
     m("0311", has.table("meal_plan_tries")),
     m("0310", has.col("group_workout_exercises", "display_name")),
     m("0309", "exists (select 1 from pg_proc where proname = 'notify_on_new_training_block' and pronamespace = 'public'::regnamespace)"),

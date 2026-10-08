@@ -25,6 +25,6 @@ The database never required a start time to sit on a slot grid: `book_session` c
 
 Unchanged: the slot grid, where the coach chooses the step (15 or 30 now one tap). Letting a self-booking client pick "any time inside my hours" is a possible later setting.
 
-## Queued, not built (before outside coaches arrive, mid-Nov)
+## Server hours check (Release S, migration 0312)
 
-A server hours check inside `book_session` and `reschedule_booking` for self-bookers (`coach_time_is_open`). Today the server does not check weekly hours or time off for a direct booking; it was left out deliberately in 0086 because of an old time-zone problem. It is a migration, with a paste file, precheck, undo, rehearsal and Assistant's review.
+`book_session` and `reschedule_booking` now refuse a client booking or moving their OWN session outside the coach's open hours or onto time off ('that time is outside your coach's hours'), using `coach_time_is_open`. A coach booking a client, a coach who is their own client, and the server's own routines are never refused. A weekly schedule a client starts books each week through `book_session`, so a week outside the hours simply does not book.

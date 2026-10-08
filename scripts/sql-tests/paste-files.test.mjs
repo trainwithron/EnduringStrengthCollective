@@ -624,6 +624,24 @@ for (const s of steps) {
   const errR2 = await run(`apply/${bundle.file}`);
   check("release-r: the bundle applies again after an undo" + (errR2 ? ": " + errR2 : ""), !errR2 && (await hasTable()));
 }
+// Release S (steps so far: 57): ONE paste. The booking functions do not check the hours before, the bundle adds the check, a second run is refused naming step 57, the undo takes it out again, and it applies again.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-s");
+  check("release-s: ONE bundle exists and starts with step 57", !!bundle && bundle.steps[0] === "57");
+  const st57 = steps.find((x) => x.n === "57");
+  const checksHours = async () => (await db.query("select position('coach_time_is_open' in pg_get_functiondef(p.oid)) > 0 as ok from pg_proc p where p.proname = 'book_session' and p.pronamespace = 'public'::regnamespace")).rows[0].ok === true;
+  const eu0 = await run(`apply/undo-step${st57.n}-${st57.slug}.sql`);
+  check("release-s: before the bundle runs, book_session does not check the hours" + (eu0 ? ": " + eu0 : ""), !eu0 && !(await checksHours()));
+  const errS = await run(`apply/${bundle.file}`);
+  check("release-s bundle applies on the live-shaped state" + (errS ? ": " + errS : ""), !errS && (await checksHours()));
+  const againS = await run(`apply/${bundle.file}`);
+  check("release-s: a second run is refused, naming step 57 (" + againS + ")", !!againS && againS.includes("step 57 (0312) cannot run") && againS.includes("already applied"));
+  const euS = await run(`apply/undo-step${st57.n}-${st57.slug}.sql`);
+  check("release-s: the undo puts book_session back without the hours check" + (euS ? ": " + euS : ""), !euS && !(await checksHours()));
+  const errS2 = await run(`apply/${bundle.file}`);
+  check("release-s: the bundle applies again after an undo" + (errS2 ? ": " + errS2 : ""), !errS2 && (await checksHours()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.
