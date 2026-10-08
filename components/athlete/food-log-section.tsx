@@ -12,6 +12,10 @@ import { FoodSearchLog } from "./food-search-log";
 import { FoodLogEntries } from "./food-log-entries";
 import { MyFoodsPanel } from "./my-foods-panel";
 import type { RecentFoodLogOption } from "@/lib/recent-food-logs";
+import { LogNutrients } from "@/components/nutrition/log-nutrients";
+import type { DayTotals, LoggedEntry } from "@/lib/nutrient-day";
+import type { PlanEstimate } from "@/lib/nutrient-view";
+import type { Sex } from "@/lib/dri-data";
 import { COACH_CAN_SEE_LINE, hasTarget, noTargetLine, sumLoggedFood, type DayTargetLike } from "@/lib/nutrition-tracking";
 
 // Wires the checkoff list + quick-log entry point + a running "logged so
@@ -28,6 +32,7 @@ export function FoodLogSection({
   plan,
   target,
   coachProgramming = true,
+  nutrients,
 }: {
   athleteId: string;
   groupId: string;
@@ -41,12 +46,16 @@ export function FoodLogSection({
   target?: DayTargetLike | null;
   // False for a client on a tier with no targets or meal plans (the group tier): the no-target line then does not promise a target.
   coachProgramming?: boolean;
+  // Vitamins and minerals shown with the log: the 29 days before today added up on the server, the person's age and sex for their reference intake, and (optionally) an estimate from the meal plan.
+  nutrients?: { pastDays: DayTotals[]; age: number | null; sex: Sex | null; planEstimate: PlanEstimate | null; partialLog?: boolean } | null;
 }) {
   const planHasMeals = !!plan?.meals && Object.values(plan.meals).some((entries) => (entries ?? []).length > 0);
   const [allEntries, setAllEntries] = useState(initialEntries);
 
   const loggedTotals = sumLoggedFood(allEntries);
   const withTarget = hasTarget(target);
+  // Today's entries in the shape the nutrient totals read; they follow every food as it is logged, edited or deleted.
+  const loggedToday: LoggedEntry[] = allEntries.map((e) => ({ logDate, status: e.status, description: e.description, calories: e.calories, nutrients: e.nutrients ?? null }));
   const of = (value: number | null | undefined) => (value != null ? ` / ${Math.round(value)}` : "");
 
   function handleQuickLogged(entry: FoodLogEntry) {
@@ -86,6 +95,21 @@ export function FoodLogSection({
         {!withTarget && <p className="font-body text-xs text-steel mt-2">{noTargetLine(coachProgramming)}</p>}
         <p className="font-body text-xs text-steel mt-1">{COACH_CAN_SEE_LINE}</p>
       </div>
+
+      {nutrients && (
+        <LogNutrients
+          groupId={groupId}
+          athleteId={athleteId}
+          todayKey={logDate}
+          pastDays={nutrients.pastDays}
+          age={nutrients.age}
+          sex={nutrients.sex}
+          entries={loggedToday}
+          audience="client"
+          planEstimate={nutrients.planEstimate}
+          partialLog={nutrients.partialLog}
+        />
+      )}
 
       {planHasMeals ? (
         <TodaysMealCards

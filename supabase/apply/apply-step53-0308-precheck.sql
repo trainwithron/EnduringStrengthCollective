@@ -1,0 +1,12 @@
+-- STEP 53 (PRECHECK, run first, changes nothing): 0308 Release O fix: every trigger function that signed-in users could run by default is closed to the public and signed-in users, like the other internal functions (46 functions; they can only ever run as triggers, and no trigger stops firing)
+--
+-- Paste into the Supabase SQL editor and run. Every row must say ok = true.
+-- If any row says false: do NOT run the apply file. Copy the result table and send it back.
+select check_name, ok
+from (
+  values
+    ('the trigger functions exist (the database has its triggers)',
+      exists (select 1 from pg_proc where proname = 'guard_post_columns' and pronamespace = 'public'::regnamespace)),
+    ('0308 is not already applied (signed-in users can still run at least one of the trigger functions)',
+      exists (select 1 from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prorettype = 'trigger'::regtype and p.proname = any (array['audit_log_refuse_changes', 'audit_watch', 'backfill_placeholder_group_name', 'block_athlete_edits_to_completed_session', 'clear_client_goal_phase_on_insert', 'default_client_tier_for_one_on_one', 'enforce_one_on_one_athlete_limit', 'guard_ai_recipe_ingredient', 'guard_athlete_session_columns', 'guard_athlete_session_insert', 'guard_client_goal_update', 'guard_client_nutrition_feedback', 'guard_client_nutrition_preferences', 'guard_direct_message_columns', 'guard_group_columns', 'guard_group_session_bookings', 'guard_membership_identity', 'guard_organization_columns', 'guard_partner_request_columns', 'guard_post_columns', 'guard_profile_sensitive_columns', 'guard_workout_log_columns', 'limit_food_favorites', 'note_series_session_skipped', 'notify_on_client_goal', 'notify_on_comment', 'notify_on_direct_message', 'notify_on_gym_visitor_lead', 'notify_on_macros_assigned', 'notify_on_mention', 'notify_on_nutrition_baseline', 'notify_on_nutrition_feedback', 'notify_on_nutrition_preferences', 'notify_on_partner_request', 'notify_on_post_mention', 'notify_on_program_assigned', 'notify_on_video_comment', 'notify_on_video_upload', 'phase_follows_confirmed_goal', 'prevent_platform_admin_self_escalation', 'recompute_training_max', 'recompute_workout_log', 'resurface_inactive_client', 'set_gwe_athlete_id', 'set_workout_athlete_id', 'set_workout_notes_athlete_id']) and has_function_privilege('authenticated', p.oid, 'execute')))
+) as checks(check_name, ok);

@@ -26,12 +26,15 @@ export function AddClientButton({
   groupName,
   createdBy,
   defaultOpen = false,
+  onAdded,
 }: {
   // The group the coach is standing in (only a starting point for "Add to a group").
   groupId: string;
   groupName: string;
   createdBy: string;
   defaultOpen?: boolean;
+  // Called once someone has been added (the left panel uses it to show them in its list at once).
+  onAdded?: () => void;
 }) {
   void createdBy;
   const t = useTerm();
@@ -134,6 +137,7 @@ export function AddClientButton({
       setFullName("");
       setEmail("");
       router.refresh();
+      onAdded?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : `Couldn't add this ${t("client")}.`);
     } finally {

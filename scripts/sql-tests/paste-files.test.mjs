@@ -3,7 +3,7 @@
 //   node scripts/sql-tests/paste-files.test.mjs   (also part of npm run test:sql)
 import { readFileSync } from "node:fs";
 import { createDb, applyLiveEquivalent } from "./harness.mjs";
-import { undoSql as functionAclOpenSql } from "../function-acl.mjs";
+import { undoSql as functionAclOpenSql, TRIGGER_SWEEP } from "../function-acl.mjs";
 
 const read = (f) => readFileSync(new URL(`../../supabase/${f}`, import.meta.url), "utf8").split(String.fromCharCode(13, 10)).join(String.fromCharCode(10)).replace(/create extension[^;]*;/gi, "");
 const db = await createDb();
@@ -560,10 +560,38 @@ for (const s of steps) {
     const moved = (await db.query("select organization_id from public.groups where id = '060017b5-e613-4204-a101-c6a14c3a9630'")).rows[0];
     check("step 26: The Home Team is in Coast2Coast Fitness and keeps its program and Ron as coach", moved.organization_id === "e369f4a7-c53a-4532-95d3-f7bd14e40e48" && (await db.query("select count(*)::int as n from public.programs where group_id = '060017b5-e613-4204-a101-c6a14c3a9630'")).rows[0].n >= 1 && (await db.query("select count(*)::int as n from public.group_memberships where group_id = '060017b5-e613-4204-a101-c6a14c3a9630' and role = 'coach'")).rows[0].n === 1);
   }
+// Release O fix (steps 52 and 53): ONE paste. From the state the live database is in (the notice function and the 46 trigger functions open to signed-in users) it closes all of
+// them, a second run is refused naming step 52, the undo files (53 then 52) open them again exactly, and it applies again.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-o2");
+  check("release-o2: ONE bundle holds steps 52 and 53 in that order", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["52", "53"]) && !bundles.some((b) => b.id === "release-o3"));
+  const st52 = steps.find((x) => x.n === "52");
+  const st53 = steps.find((x) => x.n === "53");
+  const names = ["notify_on_target_change", ...TRIGGER_SWEEP];
+  const openCount = async () => (await db.query("select count(*)::int as n from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prorettype = 'trigger'::regtype and p.proname = any ($1) and has_function_privilege('authenticated', p.oid, 'execute')", [names])).rows[0].n;
+  for (const n of names) await db.exec(`do $o$ begin if to_regprocedure('public.${n}()') is not null then grant execute on function public.${n}() to authenticated; end if; end $o$`);
+  const before = await openCount();
+  check("release-o2: before it runs, the notice function and the trigger functions are open to signed-in users (" + before + ")", before > 40);
+  const err = await run(`apply/${bundle.file}`);
+  check("release-o2 bundle applies on the live-shaped state" + (err ? ": " + err : ""), !err);
+  check("release-o2: afterwards none of them can be run by a signed-in user", (await openCount()) === 0);
+  const again = await run(`apply/${bundle.file}`);
+  check("release-o2: a second run is refused, naming step 52 (" + again + ")", !!again && again.includes("step 52 (0307) cannot run") && again.includes("already applied"));
+  const e53 = await run(`apply/undo-step${st53.n}-${st53.slug}.sql`);
+  const e52 = await run(`apply/undo-step${st52.n}-${st52.slug}.sql`);
+  check("release-o2: the undo files (53 then 52) run" + (e53 || e52 ? ": " + (e53 || e52) : ""), !e53 && !e52);
+  check("release-o2: after the undo they are open to signed-in users again, exactly as before (" + before + ")", (await openCount()) === before);
+  const err2 = await run(`apply/${bundle.file}`);
+  check("release-o2: the bundle applies again after an undo" + (err2 ? ": " + err2 : ""), !err2 && (await openCount()) === 0);
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
+  // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.
+  await db.exec(read("migrations/0307_close_target_change_notice_function.sql"));
+  await db.exec(read("migrations/0308_close_trigger_functions.sql"));
   const rows = (await db.query(read("apply/check-function-acl.sql"))).rows;
-  check("check-function-acl.sql after step 24: " + rows.length + " rows, all true" + (rows.some((r) => !r.ok) ? " (FALSE: " + rows.filter((r) => !r.ok).map((r) => r.check_name).join("; ") + ")" : ""), rows.length === 4 && rows.every((r) => r.ok));
+  check("check-function-acl.sql after step 24: " + rows.length + " rows, all true" + (rows.some((r) => !r.ok) ? " (FALSE: " + rows.filter((r) => !r.ok).map((r) => r.check_name).join("; ") + ")" : ""), rows.length === 5 && rows.every((r) => r.ok));
   await db.exec("create function public.zz_new_internal(p_id uuid) returns void language plpgsql security definer set search_path = public as $f$ begin delete from public.profiles where id = p_id; end $f$; grant execute on function public.zz_new_internal(uuid) to authenticated");
   const caught = (await db.query(read("apply/check-function-acl.sql"))).rows;
   check("check-function-acl.sql catches a new SECURITY DEFINER function with no caller check that signed-in users can run", caught.some((r) => !r.ok && /zz_new_internal/.test(r.check_name)));

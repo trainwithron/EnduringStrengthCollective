@@ -11,7 +11,7 @@ import { getCoachedGroups, groupsInOrgOf, type CoachedGroup } from "@/lib/coach-
 // (page group), shared by every component that asks.
 const cache = new Map<string, Promise<CoachedGroup[]>>();
 
-function load(groupId: string): Promise<CoachedGroup[]> {
+export function loadOrgGroups(groupId: string): Promise<CoachedGroup[]> {
   let p = cache.get(groupId);
   if (!p) {
     p = (async () => {
@@ -31,12 +31,17 @@ function load(groupId: string): Promise<CoachedGroup[]> {
   return p;
 }
 
+// Forget what was looked up. Called when the coach's groups change in this page (a new one-on-one client gets a new group of their own), so the lists built from them read the groups again.
+export function forgetOrgGroups(): void {
+  cache.clear();
+}
+
 // null while loading; [] only if the coach doesn't coach this group.
 export function useOrgGroups(groupId: string): CoachedGroup[] | null {
   const [groups, setGroups] = useState<CoachedGroup[] | null>(null);
   useEffect(() => {
     let cancelled = false;
-    load(groupId).then((g) => {
+    loadOrgGroups(groupId).then((g) => {
       if (!cancelled) setGroups(g);
     });
     return () => {

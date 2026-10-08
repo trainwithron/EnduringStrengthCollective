@@ -8,6 +8,7 @@ import { DirectMessageThread } from "@/components/messages/direct-message-thread
 import { CoachProfilePopup } from "@/components/shared/coach-profile-popup";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
+import { loadDirectThread } from "@/lib/direct-thread";
 
 export default async function MessageThreadPage(
   props: { params: Promise<{ groupId: string; otherId: string }>; searchParams: Promise<{ draft?: string }> }
@@ -57,38 +58,13 @@ export default async function MessageThreadPage(
   const otherProfile = otherMembership.profiles as unknown as { full_name: string } | null;
   const otherName = otherProfile?.full_name ?? (viewerIsCoach ? "Athlete" : "Coach");
 
-  const [{ data: viewerProfile }, { data: messages }] = await Promise.all([
+  const [{ data: viewerProfile }, messages] = await Promise.all([
     supabase.from("profiles").select("full_name").eq("id", viewerId).maybeSingle(),
-    supabase
-      .from("direct_messages")
-      .select("id, sender_id, body, created_at")
-      .eq("group_id", params.groupId)
-      .or(
-        `and(sender_id.eq.${viewerId},recipient_id.eq.${params.otherId}),and(sender_id.eq.${params.otherId},recipient_id.eq.${viewerId})`
-      )
-      .order("created_at", { ascending: true }),
+    // Opening the thread is the "seen it" moment: what the other person sent is marked read, and so is the bell's line for it (see lib/direct-thread.ts, shared with the
+    // Messages tab on a client's profile).
+    loadDirectThread(supabase, { groupId: params.groupId, viewerId, otherId: params.otherId }),
   ]);
   const viewerName = viewerProfile?.full_name ?? "You";
-
-  // Opening the thread is the "seen it" moment — mark anything the other
-  // party sent as read now.
-  await supabase
-    .from("direct_messages")
-    .update({ read_at: new Date().toISOString() })
-    .eq("group_id", params.groupId)
-    .eq("recipient_id", viewerId)
-    .eq("sender_id", params.otherId)
-    .is("read_at", null);
-
-  // The bell's "sent you a message" line for this conversation is seen too (it is written by the database when the message arrives,
-  // migration 0276; until that is applied there is nothing to mark and this changes no rows).
-  await supabase
-    .from("notifications")
-    .update({ read_at: new Date().toISOString() })
-    .eq("profile_id", viewerId)
-    .eq("type", "direct_message")
-    .eq("link_path", `/groups/${params.groupId}/messages/${params.otherId}`)
-    .is("read_at", null);
 
   let actingAsFullName: string | null = null;
   if (isActingAsOther) {
@@ -115,7 +91,7 @@ export default async function MessageThreadPage(
             viewerName={viewerName}
             otherId={params.otherId}
             otherName={otherName}
-            initialMessages={messages ?? []}
+            initialMessages={messages}
             initialDraft={viewerIsCoach ? initialDraft : ""}
           />
         </div>
@@ -152,7 +128,7 @@ export default async function MessageThreadPage(
           viewerName={viewerName}
           otherId={params.otherId}
           otherName={otherName}
-          initialMessages={messages ?? []}
+          initialMessages={messages}
           initialDraft={viewerIsCoach ? initialDraft : ""}
           fixedComposer
         />

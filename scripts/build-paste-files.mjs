@@ -3,7 +3,7 @@
 //   node scripts/build-paste-files.mjs
 // scripts/sql-tests/paste-files.test.mjs applies every step in order on the live-equivalent schema and checks each precheck is true first.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { checkSql as functionAclCheckSql, undoSql as functionAclUndoSql } from "./function-acl.mjs";
+import { checkSql as functionAclCheckSql, undoSql as functionAclUndoSql, TRIGGER_SWEEP, triggerSweepUndoSql } from "./function-acl.mjs";
 import { probeSql as step23ProbeSql } from "./step23-probe.mjs";
 
 const root = new URL("../supabase/", import.meta.url);
@@ -1063,6 +1063,34 @@ alter table public.coach_availability_windows drop column if exists session_minu
     ],
   },
   {
+    n: "52",
+    slug: "0307",
+    title: "0307 Release O fix: the target-change notice function is closed to the public and signed-in users like the other internal functions (it was left open by default; it is a trigger function so nobody could call it, but internal functions are server-only on purpose)",
+    migrations: ["0307"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing visible changes: the notice still goes out when a coach applies a new target (the right to run a trigger function is checked when the trigger is made, not when it fires). Then run check-function-acl.sql: every row must say ok = true.",
+    undo: "grant execute on function public.notify_on_target_change() to public;",
+    undoWhy: "Only to diagnose. Puts back the default (anyone could run it, which does nothing useful since it only works as a trigger).",
+    rows: [
+      ["step 51 is applied (the notice function exists)", "exists (select 1 from pg_proc where proname = 'notify_on_target_change' and pronamespace = 'public'::regnamespace)"],
+      ["0307 is not already applied (signed-in users can still run the notice function)", "coalesce((select has_function_privilege('authenticated', p.oid, 'execute') from pg_proc p where p.proname = 'notify_on_target_change' and p.pronamespace = 'public'::regnamespace), false)"],
+    ],
+  },
+  {
+    n: "53",
+    slug: "0308",
+    title: "0308 Release O fix: every trigger function that signed-in users could run by default is closed to the public and signed-in users, like the other internal functions (" + TRIGGER_SWEEP.length + " functions; they can only ever run as triggers, and no trigger stops firing)",
+    migrations: ["0308"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing visible changes: every notice, guard and calculation that runs when something is saved still runs (the right to run a trigger function is checked when the trigger is made, not when it fires). Then run check-function-acl.sql: every row must say ok = true (it now has a row for trigger functions).",
+    undo: triggerSweepUndoSql(),
+    undoWhy: "Only to diagnose. Gives signed-in users back the right to run each of them, exactly as it was before (the owner, signed-in users and the server).",
+    rows: [
+      ["the trigger functions exist (the database has its triggers)", "exists (select 1 from pg_proc where proname = 'guard_post_columns' and pronamespace = 'public'::regnamespace)"],
+      ["0308 is not already applied (signed-in users can still run at least one of the trigger functions)", "exists (select 1 from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prorettype = 'trigger'::regtype and p.proname = any (array[" + TRIGGER_SWEEP.map((n) => "'" + n + "'").join(", ") + "]) and has_function_privilege('authenticated', p.oid, 'execute'))"],
+    ],
+  },
+  {
     n: "50",
     slug: "0305",
     title: "0305 AI top-up balance that carries over: a small server-only record of how much of the top-up balance each month used, so a paid top-up is spent after the month's included AI and the rest carries into the next month",
@@ -1179,6 +1207,7 @@ const BUNDLES = [
   { id: "release-l", name: "Release L (schedule requests, Read during rest)", steps: ["42", "43"] },
   { id: "release-n", name: "Release N (nutrition tracking: food search, custom foods, nutrient detail)", steps: ["45", "46", "47", "48"] },
   { id: "release-o", name: "Release O (recalculation notice)", steps: ["51"] },
+  { id: "release-o2", name: "Release O fix (close the notice function and the trigger functions; run any time after Release O)", steps: ["52", "53"] },
   { id: "release-n2", name: "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)", steps: ["49", "50"] },
   { id: "release-m", name: "Release M (acceptance record is append-only)", steps: ["44"] },
 ];
@@ -1354,6 +1383,8 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0295", has.table("client_phase_plans")),
     m("0296", has.col("recipes", "content_hash")),
     m("0297", has.table("schedule_requests")),
+    m("0308", "not exists (select 1 from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prorettype = 'trigger'::regtype and p.proname = any (array[" + TRIGGER_SWEEP.map((n) => "'" + n + "'").join(", ") + "]) and has_function_privilege('authenticated', p.oid, 'execute'))"),
+    m("0307","exists (select 1 from pg_proc where proname = 'notify_on_target_change' and pronamespace = 'public'::regnamespace and not has_function_privilege('authenticated', oid, 'execute'))"),
     m("0306", "exists (select 1 from pg_proc where proname = 'notify_on_target_change' and pronamespace = 'public'::regnamespace)"),
     m("0305", has.table("ai_topup_draws")),
     m("0304", has.noCol("group_memberships", "monthly_rate")),

@@ -23,7 +23,6 @@ import { SessionLedgerList } from "@/components/coach/session-ledger-list";
 import { ClientSeriesPanel, type SeriesView } from "@/components/coach/client-series-panel";
 import { getGroupCoachTimezone } from "@/lib/timezone";
 import type { LedgerEntry } from "@/lib/session-ledger";
-import { SwipeDirectionSetting } from "@/components/athlete/swipe-direction-setting";
 import { GoalConfirmationControl } from "@/components/coach/goal-confirmation-control";
 import { GoalWaitingOnClient } from "@/components/coach/goal-waiting-on-client";
 import { GoalProposalForm } from "@/components/athlete/goal-proposal-form";
@@ -35,6 +34,8 @@ import { DeleteClientControl } from "@/components/coach/delete-client-control";
 import { SetAsideControl } from "@/components/coach/set-aside-control";
 import { AddSocialOnlyMembershipControl } from "@/components/coach/add-social-only-membership-control";
 import { ClientProgrammingMenu } from "@/components/coach/client-programming-menu";
+import { ClientMessagesSection } from "@/components/coach/desktop/client-messages-section";
+import { ClientCalendarSection } from "@/components/coach/desktop/client-calendar-section";
 import { MinorConsentControl } from "@/components/coach/minor-consent-control";
 import { ClientSignInPanel } from "@/components/coach/client-signin-panel";
 import { CorrectClientEmail } from "@/components/coach/correct-client-email";
@@ -74,11 +75,13 @@ function last7DatesForTargets(startKey: string, endKey: string): string[] {
 export default async function AthleteProfilePage(
   props: {
     params: Promise<{ groupId: string; athleteId: string }>;
-    searchParams?: Promise<{ tab?: string }>;
+    searchParams?: Promise<{ tab?: string; month?: string }>;
   }
 ) {
   const params = await props.params;
-  const tabParam = (await props.searchParams)?.tab;
+  const searchParamsResolved = await props.searchParams;
+  const tabParam = searchParamsResolved?.tab;
+  const monthParam = searchParamsResolved?.month;
   const initialTab = isClientProfileTab(tabParam) ? tabParam : "overview";
   const supabase = await createServerClient();
   const {
@@ -133,7 +136,7 @@ export default async function AthleteProfilePage(
     supabase
       .from("group_memberships")
       .select(
-        "joined_at, client_tier, private_from_org, profiles ( id, full_name, avatar_url, exercise_swipe_direction, claimed_at )"
+        "joined_at, client_tier, private_from_org, profiles ( id, full_name, avatar_url, claimed_at )"
       )
       .eq("group_id", params.groupId)
       .eq("profile_id", params.athleteId)
@@ -846,6 +849,14 @@ export default async function AthleteProfilePage(
             </h1>
             <p className="font-body text-xs text-steel mt-1">
               Joined {new Date(athleteMembership.joined_at).toLocaleDateString()}
+              {activeProgram && (
+                <>
+                  {" · "}
+                  <Link href={`/groups/${params.groupId}/programs/${activeProgram.id}`} className="hover:text-chalk underline underline-offset-2">
+                    {activeProgram.name}
+                  </Link>
+                </>
+              )}
             </p>
           </div>
         </div>
@@ -855,32 +866,6 @@ export default async function AthleteProfilePage(
           </p>
         )}
         <div className="flex flex-wrap items-center gap-2 mt-4">
-          {activeProgram && (
-            <Link
-              href={`/groups/${params.groupId}/programs/${activeProgram.id}`}
-              className="inline-flex items-center h-9 font-body text-xs text-rust border border-rust px-3"
-            >
-              Current program: {activeProgram.name}
-            </Link>
-          )}
-          <Link
-            href={`/groups/${params.groupId}/athletes/${params.athleteId}/log`}
-            className="inline-flex items-center h-9 font-body text-xs text-graphite bg-rust px-3 font-medium"
-          >
-            Log in-person session
-          </Link>
-          <ClientProgrammingMenu
-            groupId={params.groupId}
-            athleteId={params.athleteId}
-            athleteFullName={profile?.full_name ?? "Client"}
-          />
-          <Link
-            href={`/groups/${params.groupId}/athletes/${params.athleteId}/calendar`}
-            className="inline-flex items-center h-9 font-body text-xs text-rust border border-rust px-3"
-            title="This client's own calendar — habits, macros, and workout-schedule overrides, separate from the group-wide booking calendar"
-          >
-            This client&apos;s calendar
-          </Link>
           <Link
             href={`/groups/${params.groupId}/athletes/${params.athleteId}/history`}
             className="inline-flex items-center h-9 font-body text-xs text-rust border border-rust px-3"
@@ -889,25 +874,43 @@ export default async function AthleteProfilePage(
             Upload exercise history
           </Link>
           <VideoCheckinRecorder athleteId={params.athleteId} groupId={params.groupId} coachId={user.id} />
-          <Link
-            href={`/groups/${params.groupId}/calendar?client=${params.athleteId}&scheduleFor=${params.athleteId}`}
-            className="inline-flex items-center h-11 font-body text-xs text-graphite bg-rust px-3 font-medium"
-          >
-            Schedule session
-          </Link>
-          <Link
-            href={`/groups/${params.groupId}/messages/${params.athleteId}`}
-            className="inline-flex items-center h-11 font-body text-xs text-chalk border border-steel/40 px-3 font-medium"
-          >
-            Message
-          </Link>
         </div>
       </div>
 
       <div id="client-profile-body" data-active-tab={initialTab}>
         <ClientProfileTabs groupId={params.groupId} athleteId={params.athleteId} initial={initialTab} />
+        <div data-tab="messages" className="mb-8">
+          {initialTab === "messages" && <ClientMessagesSection groupId={params.groupId} athleteId={params.athleteId} viewerId={user.id} clientName={profile?.full_name ?? "Client"} />}
+        </div>
+        <div data-tab="calendar" className="mb-8">
+          {initialTab === "calendar" && (
+            <ClientCalendarSection
+              groupId={params.groupId}
+              athleteId={params.athleteId}
+              coachId={user.id}
+              athleteName={profile?.full_name ?? "Client"}
+              macrosEnabled={athleteMembership.client_tier !== "group"}
+              monthParam={monthParam}
+              monthHref={(key) => `/groups/${params.groupId}/athletes/${params.athleteId}?tab=calendar&month=${key}`}
+            />
+          )}
+        </div>
         <div data-tab="program" className="mb-8 max-w-3xl">
-          <ClientProgramsSection groupId={params.groupId} athleteId={params.athleteId} />
+          <ClientProgramsSection
+            groupId={params.groupId}
+            athleteId={params.athleteId}
+            actions={
+              <div className="flex flex-wrap items-center gap-2 mb-4">
+                <ClientProgrammingMenu groupId={params.groupId} athleteId={params.athleteId} athleteFullName={profile?.full_name ?? "Client"} />
+                <Link
+                  href={`/groups/${params.groupId}/athletes/${params.athleteId}/log`}
+                  className="inline-flex items-center h-9 font-body text-xs text-chalk border border-steel/40 px-3 font-medium"
+                >
+                  Log an in-person session
+                </Link>
+              </div>
+            }
+          />
         </div>
 
       <div className="profile-grid grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6 lg:gap-10 items-start">
@@ -1393,19 +1396,6 @@ export default async function AthleteProfilePage(
             <div data-tab="settings">
             <SettingsGroup label="Session ledger">
               <SessionLedgerList balance={creditsRow?.balance ?? 0} entries={ledgerEntries.slice(0, 10)} />
-            </SettingsGroup>
-            </div>
-
-            <div data-tab="program">
-            <SettingsGroup label="Workout Logging">
-              <SwipeDirectionSetting
-                athleteId={params.athleteId}
-                label="Swipe direction — set on their behalf"
-                mode="coach"
-                initialDirection={
-                  (profile?.exercise_swipe_direction as "vertical" | "horizontal" | null) ?? null
-                }
-              />
             </SettingsGroup>
             </div>
 

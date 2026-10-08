@@ -305,6 +305,12 @@ body::before {
 #client-profile-body[data-active-tab="settings"] [data-tab]:not([data-tab~="settings"]) {
   display: none;
 }
+#client-profile-body[data-active-tab="messages"] [data-tab]:not([data-tab~="messages"]) {
+  display: none;
+}
+#client-profile-body[data-active-tab="calendar"] [data-tab]:not([data-tab~="calendar"]) {
+  display: none;
+}
 #client-profile-body:not([data-active-tab="overview"]) .profile-grid {
   grid-template-columns: minmax(0, 1fr);
 }
