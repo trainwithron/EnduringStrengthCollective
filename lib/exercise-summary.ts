@@ -4,7 +4,8 @@
 import type { TrackedField } from "@/lib/exercise-fields";
 import type { ExerciseSetTarget } from "@/lib/types";
 
-type SummarySet = Pick<ExerciseSetTarget, "targetReps" | "targetWeight" | "targetTimeSeconds" | "targetDistance" | "targetHeight" | "targetRestSeconds">;
+type SummarySet = Pick<ExerciseSetTarget, "targetReps" | "targetWeight" | "targetTimeSeconds" | "targetDistance" | "targetHeight" | "targetRestSeconds"> &
+  Partial<Pick<ExerciseSetTarget, "targetRpe" | "targetRir" | "targetTempo" | "targetPace">>;
 
 const numberOf = (text: string | null): number | null => {
   if (text == null) return null;
@@ -52,9 +53,17 @@ function primary(sets: SummarySet[], tracked: TrackedField[]): { values: string[
   return null;
 }
 
+const rangeOf = (ns: number[]): string => {
+  const lo = Math.min(...ns);
+  const hi = Math.max(...ns);
+  return lo === hi ? clean(lo) : `${clean(lo)}-${clean(hi)}`;
+};
+
 export interface SummaryOptions {
   // Adds the rest ("rest 90s") when the sets carry one: the client preview shows it, the compact collapsed card does not.
   withRest?: boolean;
+  // Adds the effort and style the sets carry (RPE, RIR, tempo, pace), for the client preview; the compact collapsed card leaves them out.
+  withExtras?: boolean;
   weightUnit?: "lb" | "kg";
 }
 
@@ -81,6 +90,17 @@ export function summarizeSets(sets: SummarySet[], tracked: TrackedField[], optio
       const hi = Math.max(...w);
       text += lo === hi ? ` @ ${clean(lo)} ${unit}` : ` @ ${clean(lo)}-${clean(hi)} ${unit}`;
     }
+  }
+
+  if (options.withExtras) {
+    const rpe = sets.map((x) => x.targetRpe).filter((v): v is number => v != null);
+    if (tracked.includes("rpe") && rpe.length === n) text += ` · RPE ${rangeOf(rpe)}`;
+    const rir = sets.map((x) => x.targetRir).filter((v): v is number => v != null);
+    if (tracked.includes("rir") && rir.length === n) text += ` · RIR ${rangeOf(rir)}`;
+    const tempo = sets.map((x) => x.targetTempo?.trim() ?? "").filter(Boolean);
+    if (tracked.includes("tempo") && tempo.length === n) text += ` · tempo ${Array.from(new Set(tempo)).join(" / ")}`;
+    const pace = sets.map((x) => x.targetPace?.trim() ?? "").filter(Boolean);
+    if (tracked.includes("pace") && pace.length === n) text += ` · pace ${Array.from(new Set(pace)).join(" / ")}`;
   }
 
   if (options.withRest && tracked.includes("rest")) {

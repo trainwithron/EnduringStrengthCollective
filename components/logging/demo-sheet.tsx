@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, Info } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { demoThumbPath, youtubeEmbedUrl } from "@/lib/exercise-demo";
+import { releaseScrollLock } from "@/lib/modal-stack";
 
 export interface DemoNeighbour {
   name: string;
@@ -44,11 +45,10 @@ export function DemoSheet({
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
+      releaseScrollLock();
     };
   }, [onClose]);
 

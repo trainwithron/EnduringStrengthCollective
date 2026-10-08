@@ -7,6 +7,7 @@ import { summarizeSets } from "@/lib/exercise-summary";
 import { renderNoteBody } from "@/lib/text-note-format";
 import type { DemoRow } from "@/lib/exercise-demo";
 import type { BuilderDay, BuilderExercise, BuilderNote } from "@/lib/types";
+import { anotherModalIsOpen, releaseScrollLock } from "@/lib/modal-stack";
 
 // "Preview as my client sees it": a read-only list of a day's (or a week's) exercises the way the client's workout page shows them: the name, what is prescribed (sets, reps, load, rest),
 // the coach's note, and the demo picture that opens the same demo the client gets. It reads the builder's own state, so it shows what is on the screen right now, and it saves nothing.
@@ -15,15 +16,15 @@ export function ClientPreviewSheet({ days, heading, demoLibrary, onClose }: { da
 
   useEffect(() => {
     closeRef.current?.focus();
+    // With a demo open on top of this sheet, Esc is for the demo alone (it is the top dialog); this one closes only when it is the only dialog.
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !anotherModalIsOpen()) onClose();
     };
     window.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
+      releaseScrollLock();
     };
   }, [onClose]);
 
@@ -81,7 +82,7 @@ function PreviewRow({ exercise, demoLibrary }: { exercise: BuilderExercise; demo
     <div className="py-3 flex items-start gap-3">
       <div className="min-w-0 flex-1">
         <p className="font-body font-medium text-[15px] break-words">{exercise.exerciseName || "Exercise"}</p>
-        <p className="font-body text-sm text-steel">{summarizeSets(exercise.sets, exercise.trackedFields, { withRest: true })}</p>
+        <p className="font-body text-sm text-steel">{summarizeSets(exercise.sets, exercise.trackedFields, { withRest: true, withExtras: true })}</p>
         {exercise.notes && <p className="font-body text-xs text-steel mt-0.5 whitespace-pre-wrap">{exercise.notes}</p>}
       </div>
       {demo && <BuilderDemoThumb exerciseName={exercise.exerciseName} demo={demo} notes={exercise.notes} showCaption={false} />}
