@@ -13,12 +13,13 @@ function seriesRow(patch: Partial<SeriesRow> = {}): SeriesRow {
 }
 
 // A small in-memory stand-in for the schedule store: two future sessions to remove, and a record of what was cancelled and booked.
-function fakeStore(initial: SeriesRow | null, opts: { cancelFails?: boolean } = {}) {
+function fakeStore(initial: SeriesRow | null, opts: { cancelFails?: boolean; sessions?: string[] } = {}) {
   const series = new Map<string, SeriesRow>();
   if (initial) series.set(initial.id, initial);
   const bookings = new Map<string, BookingRow>();
-  for (const [i, day] of ["2026-10-20", "2026-10-27"].entries()) {
-    bookings.set(`b${i}`, { id: `b${i}`, seriesId: "s1", coachId: "c1", athleteId: "a1", groupId: "g1", startAt: `${day}T10:00:00.000Z`, endAt: `${day}T11:00:00.000Z`, status: "confirmed", attendedAt: null, creditState: "unsettled" });
+  for (const [i, start] of (opts.sessions ?? ["2026-10-20T10:00:00.000Z", "2026-10-27T10:00:00.000Z"]).entries()) {
+    const end = new Date(new Date(start).getTime() + 3600000).toISOString();
+    bookings.set(`b${i}`, { id: `b${i}`, seriesId: "s1", coachId: "c1", athleteId: "a1", groupId: "g1", startAt: start, endAt: end, status: "confirmed", attendedAt: null, creditState: "unsettled" });
   }
   let n = 100;
   const context: CoachContext = { timezone: "America/New_York", bufferMinutes: 0, windows: [], exceptions: [] };
@@ -113,6 +114,31 @@ describe("applying a claimed schedule request", () => {
     const r = await applyClaimedRequest(db, store, claim(), { bySystem: true }, NOW);
     expect(r.ok).toBe(false);
     expect(finishCall(calls)?.args).toMatchObject({ p_ok: false, p_error: "this schedule has already ended" });
+  });
+
+  it("an early Done keeps the sessions through the chosen day: a later session that same day stays, the next day's goes (pause and cancel)", async () => {
+    // It is 8 AM on Oct 13 in New York. The client asked to pause after Oct 13: the 6 PM session today stays, the 6 AM session on Oct 14 is removed.
+    const sessions = ["2026-10-13T22:00:00.000Z", "2026-10-14T10:00:00.000Z"];
+    const pause = fakeStore(seriesRow(), { sessions });
+    await applyClaimedRequest(fakeRpc().db, pause.store, claim({ effective_on: "2026-10-13", early: true }), { bySystem: false }, NOW);
+    expect(pause.bookings.get("b0")?.status).toBe("confirmed");
+    expect(pause.bookings.get("b1")?.status).toBe("cancelled");
+    expect(pause.series.get("s1")?.status).toBe("paused");
+
+    const end = fakeStore(seriesRow(), { sessions });
+    await applyClaimedRequest(fakeRpc().db, end.store, claim({ kind: "cancel", effective_on: "2026-10-13", early: true }), { bySystem: false }, NOW);
+    expect(end.bookings.get("b0")?.status).toBe("confirmed");
+    expect(end.bookings.get("b1")?.status).toBe("cancelled");
+    expect(end.series.get("s1")?.status).toBe("ended");
+    expect(end.series.get("s1")?.endsOn).toBe("2026-10-13");
+  });
+
+  it("the daily run (the day after) removes everything still to come, as before", async () => {
+    const sessions = ["2026-10-14T10:00:00.000Z", "2026-10-21T10:00:00.000Z"];
+    const run = fakeStore(seriesRow(), { sessions });
+    const next = new Date("2026-10-14T08:00:00Z"); // 4 AM Oct 14 in New York: the chosen day (Oct 13) has ended
+    await applyClaimedRequest(fakeRpc().db, run.store, claim({ effective_on: "2026-10-13" }), { bySystem: true }, next);
+    expect([...run.bookings.values()].every((b) => b.status === "cancelled")).toBe(true);
   });
 
   it("a freeze whose restart day has already come is not applied: the schedule keeps running", async () => {

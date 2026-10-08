@@ -104,7 +104,11 @@ export function requestStatusLine(r: RequestForUi, sentOn: string, now: Date = n
         : `Request sent ${sentOn}: ${KIND_PHRASE[r.kind]} after ${through}. Your coach will reach out.`;
     case "applied":
       if (r.kind === "pause") return "Your weekly schedule is paused. Your coach will be in touch about starting again.";
-      if (r.kind === "freeze") return r.resumeOn ? `Your weekly schedule is frozen. It starts again ${dayLabel(r.resumeOn)}.` : "Your weekly schedule is frozen.";
+      if (r.kind === "freeze") {
+        // A freeze whose restart day had already passed when it was applied froze nothing.
+        if (r.resumeOn && r.appliedAt && r.resumeOn <= r.appliedAt.slice(0, 10)) return "The freeze you asked for had already ended, so your weekly schedule was left as it is.";
+        return r.resumeOn ? `Your weekly schedule is frozen. It starts again ${dayLabel(r.resumeOn)}.` : "Your weekly schedule is frozen.";
+      }
       return "Your weekly schedule has ended. Thank you for training with us.";
     case "dismissed":
       return "Your coach has handled this request.";

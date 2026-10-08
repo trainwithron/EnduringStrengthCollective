@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -127,6 +127,15 @@ function RequestSheet({ kind, series, onClose, onSent }: { kind: RequestKind; se
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Escape closes the sheet.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   async function send() {
     setBusy(true);
     setError(null);
@@ -148,7 +157,7 @@ function RequestSheet({ kind, series, onClose, onSent }: { kind: RequestKind; se
       <div className="max-h-[92dvh] w-full overflow-y-auto border-t border-steel/30 bg-graphite p-5 pb-8">
         <div className="flex items-start justify-between gap-4">
           <h2 className="font-display font-bold text-2xl uppercase leading-tight">{copy.title}</h2>
-          <button type="button" onClick={onClose} className="h-11 w-11 shrink-0 font-body text-steel" aria-label="Close">
+          <button type="button" onClick={onClose} autoFocus className="h-11 w-11 shrink-0 font-body text-steel" aria-label="Close">
             ✕
           </button>
         </div>
@@ -207,7 +216,7 @@ function RequestSheet({ kind, series, onClose, onSent }: { kind: RequestKind; se
             className="mt-1 block w-full border border-steel/40 bg-transparent px-3 py-2 font-body text-chalk"
           />
         </label>
-        <p className="font-body text-xs text-steel mt-1">Only your coach can read this.</p>
+        <p className="font-body text-xs text-steel mt-1">Only your coach (and your gym&apos;s owner or admins, if you train with a gym) can read this.</p>
 
         {error && <p className="mt-3 font-body text-sm text-chalk" role="alert">{error}</p>}
         <button type="button" onClick={send} disabled={busy || !effectiveOn || (kind === "freeze" && !resumeOn)} className="mt-5 h-12 w-full bg-rust font-display text-base font-bold uppercase tracking-wide text-chalk disabled:opacity-50">

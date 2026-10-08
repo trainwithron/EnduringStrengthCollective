@@ -21,6 +21,19 @@ export function matchScheduleRequestQuestion(message: string): ScheduleRequestQu
   return asks ? { text } : null;
 }
 
+// The clients the message names: the whole first name (at least three letters) or the whole full name, as a whole word, so "Ed" is not "asked" and "Al" is not "all".
+export function namedClients<T extends { fullName: string }>(message: string, roster: T[]): T[] {
+  const text = message.toLowerCase();
+  const escape = (w: string) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return roster.filter((r) => {
+    const full = r.fullName.trim().toLowerCase();
+    if (!full) return false;
+    const first = full.split(/\s+/)[0];
+    const whole = (w: string) => new RegExp(`(^|[^a-z])${escape(w)}(?:'s)?([^a-z]|$)`).test(text);
+    return whole(full) || (first.length >= 3 && whole(first));
+  });
+}
+
 export interface ScheduleRequestLine {
   clientName: string;
   kind: "pause" | "freeze" | "cancel";
@@ -31,8 +44,8 @@ export interface ScheduleRequestLine {
 const PHRASE = { pause: "pause", freeze: "freeze", cancel: "end" } as const;
 
 // "2 schedule requests are waiting: Sam Lee asked to pause (sessions stay through Nov 3); Kim Wu asked to freeze until Dec 1 (sessions stay through Nov 10)."
-export function describeScheduleRequests(items: ScheduleRequestLine[]): string {
-  if (items.length === 0) return "No schedule requests are waiting.";
+export function describeScheduleRequests(items: ScheduleRequestLine[], forNames: string[] = []): string {
+  if (items.length === 0) return forNames.length > 0 ? `No schedule requests from ${forNames.join(" or ")}.` : "No schedule requests are waiting.";
   const lines = items.slice(0, 8).map((r) => {
     const until = r.kind === "freeze" && r.resumeOn ? ` until ${dayLabel(r.resumeOn)}` : "";
     return `${r.clientName} asked to ${PHRASE[r.kind]}${until} (sessions stay through ${dayLabel(r.effectiveOn)})`;

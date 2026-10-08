@@ -1,3 +1,4 @@
+import { zonedTimeToUtc } from "@/lib/timezone";
 import {
   MAX_FIXED_WEEKS,
   DEFAULT_ONGOING_WINDOW_WEEKS,
@@ -337,12 +338,23 @@ export interface ActionResult {
   seriesId?: string;
 }
 
-// Stops new sessions and takes the future ones off the calendar. Resume puts back the same number of weeks.
-export async function pauseSeries(store: SeriesStore, seriesId: string, now: Date = new Date()): Promise<ActionResult> {
+// The first instant AFTER a calendar day in a time zone: sessions on or before the day are kept, later ones go.
+async function startOfDayAfter(store: SeriesStore, series: SeriesRow, dateKey: string): Promise<string> {
+  const ctx = await store.coachContext(series.coachId);
+  const tz = series.timezone ?? ctx.timezone;
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const next = new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+  return zonedTimeToUtc(next, "00:00", tz).toISOString();
+}
+
+// Stops new sessions and takes the future ones off the calendar. Resume puts back the same number of weeks. `keepThrough` ("YYYY-MM-DD", the schedule's own day) keeps every
+// session on or before that day: a client who asked to pause "after Nov 3" keeps their Nov 3 session even when the coach applies it that morning.
+export async function pauseSeries(store: SeriesStore, seriesId: string, now: Date = new Date(), options: { keepThrough?: string } = {}): Promise<ActionResult> {
   const series = await store.getSeries(seriesId);
   if (!series) return { ok: false, message: "That schedule was not found." };
   if (series.status !== "active") return { ok: false, message: "Only a running schedule can be paused." };
-  const { cancelled, failed } = await cancelFuture(store, seriesId, now);
+  const fromIso = options.keepThrough ? await startOfDayAfter(store, series, options.keepThrough) : undefined;
+  const { cancelled, failed } = await cancelFuture(store, seriesId, now, fromIso);
   await store.updateSeries(seriesId, { status: "paused", pausedAt: now.toISOString(), pausedRemaining: cancelled.length });
   return {
     ok: true,
@@ -400,7 +412,7 @@ export async function endSeries(
   store: SeriesStore,
   seriesId: string,
   now: Date = new Date(),
-  options: { cancelUpcoming?: boolean } = {}
+  options: { cancelUpcoming?: boolean; keepThrough?: string } = {}
 ): Promise<ActionResult> {
   const series = await store.getSeries(seriesId);
   if (!series) return { ok: false, message: "That schedule was not found." };
@@ -408,8 +420,10 @@ export async function endSeries(
   const cancelUpcoming = options.cancelUpcoming ?? true;
   const tz = series.timezone ?? "UTC";
   let cancelled = 0;
-  if (cancelUpcoming) cancelled = (await cancelFuture(store, seriesId, now)).cancelled.length;
-  await store.updateSeries(seriesId, { status: "ended", endsOn: wallClockOf(now, tz).dateKey });
+  const fromIso = options.keepThrough ? await startOfDayAfter(store, series, options.keepThrough) : undefined;
+  if (cancelUpcoming) cancelled = (await cancelFuture(store, seriesId, now, fromIso)).cancelled.length;
+  const today = wallClockOf(now, tz).dateKey;
+  await store.updateSeries(seriesId, { status: "ended", endsOn: options.keepThrough && options.keepThrough > today ? options.keepThrough : today });
   return { ok: true, cancelled, message: cancelUpcoming ? `Ended. ${cancelled} upcoming sessions were removed.` : "Ended. Sessions already booked stay on the calendar." };
 }
 

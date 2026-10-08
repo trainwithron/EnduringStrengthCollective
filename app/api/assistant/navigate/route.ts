@@ -1,4 +1,4 @@
-import { describeScheduleRequests, matchScheduleRequestQuestion } from "@/lib/schedule-requests-chat";
+import { describeScheduleRequests, matchScheduleRequestQuestion, namedClients } from "@/lib/schedule-requests-chat";
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -84,12 +84,11 @@ export async function POST(request: Request) {
         .limit(40);
       if (!requestError) {
         const nameById = new Map(roster.map((r) => [r.id, r.fullName]));
-        const asked = message.toLowerCase();
-        const named = roster.filter((r) => r.fullName.length > 2 && asked.includes(r.fullName.toLowerCase().split(" ")[0]));
+        const named = namedClients(message, roster);
         const lines = ((requestRows ?? []) as { athlete_id: string; kind: "pause" | "freeze" | "cancel"; effective_on: string; resume_on: string | null }[])
           .filter((r) => named.length === 0 || named.some((n) => n.id === r.athlete_id))
           .map((r) => ({ clientName: nameById.get(r.athlete_id) ?? "A client", kind: r.kind, effectiveOn: r.effective_on, resumeOn: r.resume_on }));
-        return NextResponse.json({ kind: "navigate", text: describeScheduleRequests(lines), chips: [{ label: "Open my dashboard", href: "/dashboard" }], confirm: null, preview: null });
+        return NextResponse.json({ kind: "navigate", text: describeScheduleRequests(lines, named.map((n) => n.fullName)), chips: [{ label: "Open my dashboard", href: "/dashboard" }], confirm: null, preview: null });
       }
     } catch {
       // Not set up yet, or it failed: fall through to the usual answers.

@@ -66,7 +66,8 @@ export async function applyClaimedRequest(db: Rpc, store: SeriesStore, claim: Cl
   }
 
   if (claim.kind === "cancel") {
-    const r = await endSeries(store, claim.series_id, now, { cancelUpcoming: true });
+    // Sessions through the day the client chose stay (they were told so), even when the coach applies it that same day.
+    const r = await endSeries(store, claim.series_id, now, { cancelUpcoming: true, keepThrough: claim.effective_on });
     if (!r.ok) console.error(`schedule request ${claim.request_id}: ${r.message}`);
     return r.ok ? finish(true, null) : finish(false, WHY.failed);
   }
@@ -79,7 +80,8 @@ export async function applyClaimedRequest(db: Rpc, store: SeriesStore, claim: Cl
 
   // Pause and freeze both pause the schedule now; a freeze is given its dates by the database when the result is recorded.
   if (series.status === "paused") return finish(true, null);
-  const r = await pauseSeries(store, claim.series_id, now);
+  // Sessions through the day the client chose stay (they were told so), even when the coach applies it that same day.
+  const r = await pauseSeries(store, claim.series_id, now, { keepThrough: claim.effective_on });
   if (!r.ok) console.error(`schedule request ${claim.request_id}: ${r.message}`);
   return r.ok ? finish(true, null) : finish(false, WHY.failed);
 }

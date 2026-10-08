@@ -69,6 +69,7 @@ describe("the status of a request", () => {
     expect(requestStatusLine(req({ status: "applied" }), "Oct 12", NOW)).toMatch(/paused/);
     expect(requestStatusLine(req({ status: "applied", kind: "freeze", resumeOn: "2026-12-01" }), "Oct 12", NOW)).toBe("Your weekly schedule is frozen. It starts again Dec 1.");
     expect(requestStatusLine(req({ status: "applied", kind: "cancel" }), "Oct 12", NOW)).toContain("has ended");
+    expect(requestStatusLine(req({ status: "applied", kind: "freeze", resumeOn: "2026-10-05", appliedAt: "2026-10-13T08:00:00Z" }), "Oct 12", NOW)).toContain("had already ended");
     expect(requestStatusLine(req({ status: "withdrawn" }), "Oct 12", NOW)).toBe("You took this request back.");
     expect(requestStatusLine(req({ status: "dismissed" }), "Oct 12", NOW)).toBe("Your coach has handled this request.");
   });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { describeScheduleRequests, matchScheduleRequestQuestion } from "./schedule-requests-chat";
+import { describeScheduleRequests, matchScheduleRequestQuestion, namedClients } from "./schedule-requests-chat";
 
 describe("Ask Spot can show schedule requests, read-only", () => {
   it("recognises a plain question about them", () => {
@@ -26,6 +26,18 @@ describe("Ask Spot can show schedule requests, read-only", () => {
     expect(t).not.toMatch(/credit|refund|owe|pay|\$/i);
     expect(describeScheduleRequests([])).toBe("No schedule requests are waiting.");
     expect(describeScheduleRequests([{ clientName: "Sam Lee", kind: "pause", effectiveOn: "2026-11-03", resumeOn: null }])).toContain("1 schedule request is waiting");
+  });
+  it("names a client only as a whole word: a client called Ed is not matched by 'asked', Al is not 'all'", () => {
+    const roster = [{ fullName: "Ed Park" }, { fullName: "Al Roe" }, { fullName: "Sam Lee" }, { fullName: "Jo Kim" }, { fullName: "Ann Wu" }];
+    expect(namedClients("who asked to pause?", roster)).toEqual([]);
+    expect(namedClients("show all pause requests", roster)).toEqual([]);
+    expect(namedClients("show Sam's pause requests", roster).map((r) => r.fullName)).toEqual(["Sam Lee"]);
+    expect(namedClients("any requests from Sam Lee and Ann?", roster).map((r) => r.fullName)).toEqual(["Sam Lee", "Ann Wu"]);
+    expect(namedClients("did Ed Park ask to pause", roster).map((r) => r.fullName)).toEqual(["Ed Park"]); // the whole name works for a short first name
+  });
+  it("a named client with nothing waiting gets a sentence about that client, not the general one", () => {
+    expect(describeScheduleRequests([], ["Sam Lee"])).toBe("No schedule requests from Sam Lee.");
+    expect(describeScheduleRequests([])).toBe("No schedule requests are waiting.");
   });
   it("shows at most eight and says how many more", () => {
     const many = Array.from({ length: 11 }, (_, i) => ({ clientName: `C${i}`, kind: "pause" as const, effectiveOn: "2026-11-03", resumeOn: null }));
