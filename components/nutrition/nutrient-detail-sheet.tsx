@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { NutrientDetailView, type NutrientDetailFacts } from "@/components/nutrition/nutrient-detail-view";
+import { attachModal } from "@/lib/modal-behaviour";
 
 // One nutrient in depth, opened OVER the food log (a panel from the side on a computer, a sheet from the bottom on a phone) instead of taking the person to another page. It asks the
 // server for the facts when it opens (today's figures are already saved by then), and shows the same body as the nutrient's own page. Esc, the Close button, or a tap outside closes it.
@@ -23,6 +24,10 @@ export function NutrientDetailSheet({
   const [facts, setFacts] = useState<NutrientDetailFacts | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  // The latest close function, read when Esc is pressed: the focus and keyboard behaviour below starts ONCE, so a parent that passes a new function on every render cannot pull focus back to Close.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     let cancelled = false;
@@ -46,19 +51,17 @@ export function NutrientDetailSheet({
     };
   }, [groupId, athleteId, audience, nutrientKey]);
 
+  // A real modal: focus goes to Close, Tab stays inside, Esc closes, the page behind does not scroll, and focus returns to the nutrient that was tapped when this closes (lib/modal-behaviour.ts).
   useEffect(() => {
-    closeRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+    if (!dialogRef.current) return;
+    return attachModal({ doc: document, dialog: dialogRef.current, getOnClose: () => onCloseRef.current, initialFocus: closeRef.current });
+  }, []);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-stretch md:justify-end" data-testid="nutrient-sheet">
       <button type="button" aria-label="Close" tabIndex={-1} onClick={onClose} className="absolute inset-0 bg-graphite/70" />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="nutrient-sheet-title"
