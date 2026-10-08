@@ -55,6 +55,8 @@ export type AiFeature =
   | "program_generation"
   | "program_chat"
   | "program_import_photo"
+  | "program_import_text"
+  | "program_import_pdf"
   | "session_nl"
   | "recipe_parse"
   | "food_log_parse"
@@ -99,7 +101,10 @@ const POLICY: Record<AiFeature, FeaturePolicy> = {
   // included generations (per step, scaled like the allowance) stops failed attempts from being unlimited free spend.
   program_generation: { enforce: true, monthlyCeiling: 150 },
   program_chat: { enforce: true },
-  program_import_photo: { enforce: true },
+  // Reading a program from a picture, a PDF or pasted text: no credit is charged, so a monthly ceiling keeps repeated reads from being unlimited spend.
+  program_import_photo: { enforce: true, monthlyCeiling: 100 },
+  program_import_text: { enforce: true, monthlyCeiling: 100 },
+  program_import_pdf: { enforce: true, monthlyCeiling: 100 },
   session_nl: { enforce: true },
   recipe_parse: { enforce: true },
   food_log_parse: { enforce: true },

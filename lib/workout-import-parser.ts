@@ -13,7 +13,7 @@ export type ImportColumn =
   | "rest"
   | "prescription";
 
-const HEADER_ALIASES: Record<ImportColumn, string[]> = {
+export const HEADER_ALIASES: Record<ImportColumn, string[]> = {
   week: ["week", "macrocycle week", "phase week"],
   day: ["day", "workout day", "session", "week day"],
   exercise: ["exercise", "exercise name", "movement", "lift", "exercises"],

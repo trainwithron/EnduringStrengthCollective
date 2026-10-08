@@ -2,47 +2,13 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError } from "@/lib/anthropic-client";
 import { AiRateLimitedError } from "@/lib/ai-usage";
-import type { ParsedImportRow } from "@/lib/workout-import-parser";
+import { PROGRAM_IMPORT_SYSTEM_PROMPT, planImportRequest, normalizeRows, noRowsMessage } from "@/lib/program-import-request";
 
-const SYSTEM_PROMPT = `You read a photo, screenshot, or PDF page of a workout program — it might be
-from another training platform (TrainHeroic, TrueCoach, Trainerize), a spreadsheet screenshot, or a
-handwritten/typed sheet — and extract every exercise into a flat JSON array.
+// A scanned PDF with an 8192-token answer can run well past a default function limit; the other AI routes allow the same.
+export const maxDuration = 120;
 
-Each array element is one exercise entry for one day, shaped exactly like this:
-{
-  "week": string,        // e.g. "Week 1" — if the image shows no week grouping, use "Week 1" for everything
-  "day": string,          // e.g. "Day 1" or "Monday" — whatever label the source uses; default "Day 1" if none
-  "exerciseName": string, // the exercise's name as written
-  "sets": number,         // total prescribed sets for this exercise (integer, minimum 1)
-  "reps": string | null,  // e.g. "8", "8-10", "AMRAP" — as text, preserving ranges/notes; null if not shown
-  "weight": number | null,     // a plain number in whatever unit is shown (lbs or kg), null if not shown
-  "rpe": number | null,        // null if not shown
-  "rest": string | null,       // e.g. "90s", "2 min", null if not shown
-  "timeSeconds": number | null // for timed work (planks, carries) instead of reps; null otherwise
-}
-
-Rules:
-- One element per exercise per day — not one element per individual set. If an exercise has 4 sets of 8
-  reps, that is ONE element with sets=4, reps="8".
-- If different sets within one exercise have different rep targets (e.g. a pyramid), use the most common
-  or first-listed target and put the full scheme in "rest" is wrong — instead just pick the first set's
-  target for reps/weight; the coach can adjust individual sets after import.
-- Preserve the exercise names and day/week labels exactly as written — do not rename, translate, or
-  "correct" an exercise name.
-- Respond with ONLY the JSON array. No markdown code fences, no explanation, no leading or trailing text.
-- If the image contains no readable workout data at all, respond with exactly: []`;
-
-function isValidRow(row: any): row is ParsedImportRow {
-  return (
-    row &&
-    typeof row.week === "string" &&
-    typeof row.day === "string" &&
-    typeof row.exerciseName === "string" &&
-    row.exerciseName.trim().length > 0 &&
-    typeof row.sets === "number"
-  );
-}
-
+// Reads a program the coach dropped into the one Build-with-AI box: a photo or screenshot ({ imageBase64, mediaType }), a PDF ({ pdfBase64 }), or pasted text ({ text }). Spreadsheets never
+// come here (they are read free in the browser). Every call is metered under its own feature name.
 export async function POST(request: Request) {
   const supabase = await createServerClient();
   const {
@@ -50,57 +16,41 @@ export async function POST(request: Request) {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
+  // Only a coach can import a program. A client's call would be billed to their coach's budget.
+  const { data: coachRow } = await supabase.from("group_memberships").select("group_id").eq("profile_id", user.id).eq("role", "coach").limit(1).maybeSingle();
+  if (!coachRow) return NextResponse.json({ error: "Only coaches can import programs." }, { status: 403 });
+
   if (!isAiConfigured()) {
-    return NextResponse.json(
-      { error: "The AI photo importer isn't available yet." },
-      { status: 503 }
-    );
+    return NextResponse.json({ error: "The AI program reader isn't available yet." }, { status: 503 });
   }
 
-  const { imageBase64, mediaType } = await request.json();
-  if (!imageBase64 || !mediaType) {
-    return NextResponse.json({ error: "Missing imageBase64 or mediaType" }, { status: 400 });
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "That request couldn't be read." }, { status: 400 });
   }
-  const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-  if (!allowedTypes.includes(mediaType)) {
-    return NextResponse.json(
-      { error: "Unsupported image type — use a JPEG, PNG, WebP, or GIF (convert a PDF page to an image first)." },
-      { status: 400 }
-    );
-  }
+
+  const plan = await planImportRequest(body);
+  if (!plan.ok) return NextResponse.json({ error: plan.error }, { status: plan.status });
 
   try {
     const text = await callClaude({
-      meta: { feature: "program_import_photo", userId: user.id },
-      system: SYSTEM_PROMPT,
-      userText: "Extract the workout program from this image as the JSON array described.",
-      image: { mediaType, base64Data: imageBase64 },
+      meta: { feature: plan.feature, userId: user.id },
+      system: PROGRAM_IMPORT_SYSTEM_PROMPT,
+      userText: plan.userText,
+      image: plan.feature === "program_import_photo" ? plan.image : undefined,
+      document: plan.feature === "program_import_pdf" ? plan.document : undefined,
       maxTokens: 8192,
     });
 
     const parsed = JSON.parse(extractJson(text));
     if (!Array.isArray(parsed)) {
-      return NextResponse.json({ error: "AI response wasn't a JSON array — try a clearer photo." }, { status: 502 });
+      return NextResponse.json({ error: "The reader's answer wasn't a program list. Try again, or try a clearer copy." }, { status: 502 });
     }
 
-    const rows: ParsedImportRow[] = parsed.filter(isValidRow).map((r: any) => ({
-      week: r.week,
-      day: r.day,
-      exerciseName: r.exerciseName,
-      sets: Math.max(1, Math.round(r.sets)),
-      reps: r.reps != null ? String(r.reps) : null,
-      weight: typeof r.weight === "number" ? r.weight : null,
-      rpe: typeof r.rpe === "number" ? r.rpe : null,
-      rest: r.rest != null ? String(r.rest) : null,
-      timeSeconds: typeof r.timeSeconds === "number" ? r.timeSeconds : null,
-    }));
-
-    if (rows.length === 0) {
-      return NextResponse.json(
-        { error: "Couldn't find any exercises in that image — try a clearer or better-lit photo." },
-        { status: 422 }
-      );
-    }
+    const rows = normalizeRows(parsed);
+    if (rows.length === 0) return NextResponse.json({ error: noRowsMessage(plan.feature) }, { status: 422 });
 
     return NextResponse.json({ rows });
   } catch (err) {
@@ -110,7 +60,8 @@ export async function POST(request: Request) {
     if (err instanceof AiNotConfiguredError) {
       return NextResponse.json({ error: err.message }, { status: 503 });
     }
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: `Couldn't parse that image: ${message}` }, { status: 502 });
+    // The provider's own message (billing, overload) is for the log, not for the coach.
+    console.error("parse-workout failed", err);
+    return NextResponse.json({ error: "Couldn't read that right now. Try again, or paste the program as text." }, { status: 502 });
   }
 }
