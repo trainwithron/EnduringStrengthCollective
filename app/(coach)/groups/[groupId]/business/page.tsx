@@ -75,10 +75,16 @@ export default async function BusinessDashboardPage(
 
   const { data: memberRows } = await supabase
     .from("group_memberships")
-    .select("id, group_id, profile_id, joined_at, client_tier, monthly_rate, profiles ( full_name )")
+    .select("id, group_id, profile_id, joined_at, client_tier, profiles ( full_name )")
     .in("group_id", groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"])
     .eq("role", "athlete")
     .order("joined_at", { ascending: false });
+  // What each client pays is coach-only (client_billing_rates, 0303).
+  const { data: rateRows } = await supabase
+    .from("client_billing_rates")
+    .select("membership_id, monthly_rate")
+    .in("group_id", groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"]);
+  const rateByMembership = new Map((rateRows ?? []).map((r) => [r.membership_id as string, Number(r.monthly_rate)]));
 
   const clients = (memberRows ?? []).map((m) => ({
     membershipId: m.id,
@@ -87,7 +93,7 @@ export default async function BusinessDashboardPage(
     fullName: (m.profiles as any)?.full_name ?? "Unknown",
     joinedAt: m.joined_at as string,
     clientTier: m.client_tier as string | null,
-    monthlyRate: m.monthly_rate as number | null,
+    monthlyRate: rateByMembership.get(m.id as string) ?? null,
   }));
 
   const uniqueAthleteIds = new Set(clients.map((c) => c.athleteId));
@@ -377,7 +383,7 @@ export default async function BusinessDashboardPage(
                     Joined {new Date(c.joinedAt).toLocaleDateString()}
                   </p>
                 </div>
-                <ClientRateEditor membershipId={c.membershipId} initialRate={c.monthlyRate} />
+                <ClientRateEditor membershipId={c.membershipId} groupId={c.groupId} athleteId={c.athleteId} initialRate={c.monthlyRate} />
               </div>
             ))
           )}

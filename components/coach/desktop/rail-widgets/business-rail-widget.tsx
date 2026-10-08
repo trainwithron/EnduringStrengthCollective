@@ -69,12 +69,13 @@ export function BusinessRailWidget({ groupId }: { groupId: string }) {
       const safeGroupIds = groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"];
       const resolvedPicks = resolveTopBusinessMetrics(layoutRow?.business_widget_metrics ?? []);
 
-      const [{ data: memberRows }, { data: logRows }, { data: purchaseRows }, { data: subRows }] = await Promise.all([
+      const [{ data: memberRows }, { data: rateRows }, { data: logRows }, { data: purchaseRows }, { data: subRows }] = await Promise.all([
         supabase
           .from("group_memberships")
-          .select("profile_id, joined_at, monthly_rate")
+          .select("id, profile_id, joined_at")
           .in("group_id", safeGroupIds)
           .eq("role", "athlete"),
+        supabase.from("client_billing_rates").select("membership_id, monthly_rate").in("group_id", safeGroupIds),
         supabase.from("workout_logs").select("athlete_id, created_at").in("group_id", safeGroupIds),
         supabase.from("credit_purchases").select("athlete_id, amount_cents, created_at").in("group_id", safeGroupIds),
         supabase.from("membership_subscriptions").select("athlete_id, price_cents, status").in("group_id", safeGroupIds),
@@ -98,7 +99,8 @@ export function BusinessRailWidget({ groupId }: { groupId: string }) {
           status: s.status as "active" | "past_due" | "canceled" | "incomplete" | "paused",
         }))
       );
-      const estimatedMRR = computeEstimatedMRR((memberRows ?? []).map((m) => ({ monthlyRate: m.monthly_rate })));
+      const rateByMembership = new Map((rateRows ?? []).map((r) => [r.membership_id as string, Number(r.monthly_rate)]));
+      const estimatedMRR = computeEstimatedMRR((memberRows ?? []).map((m) => ({ monthlyRate: rateByMembership.get(m.id as string) ?? null })));
       const athleteIdsWithPurchase = new Set((purchaseRows ?? []).map((p) => p.athlete_id));
       const athleteIdsWithActiveSub = new Set(
         (subRows ?? []).filter((s) => s.status === "active").map((s) => s.athlete_id)

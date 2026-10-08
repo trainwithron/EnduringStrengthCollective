@@ -70,5 +70,6 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0297 | yes | yes | 103 | 0297 schedule requests |
 | 0298 | yes | yes | 27 | 0298 read during rest |
 | 0300 | yes | yes | 27 | 0300 food search and logging |
-| 0301 | yes | yes | 29 | 0301 AI budget |
-| 0302 | yes | yes | 23 | 0302 custom foods and saved meals |
+| 0301 | yes | yes | 31 | 0301 AI budget |
+| 0302 | yes | yes | 30 | 0302 custom foods and saved meals |
+| 0303 | yes | yes | 13 | 0303 client rates are coach-only |

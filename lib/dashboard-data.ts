@@ -142,6 +142,7 @@ export async function getCoachDashboardData(
 
   const [
     { data: athleteRows },
+    { data: rateRows },
     { data: logRows },
     { data: programRows },
     { data: wellnessTodayRows },
@@ -153,9 +154,11 @@ export async function getCoachDashboardData(
   ] = await Promise.all([
     supabase
       .from("group_memberships")
-      .select("group_id, profile_id, monthly_rate, joined_at, profiles ( full_name, claimed_at )")
+      .select("id, group_id, profile_id, joined_at, profiles ( full_name, claimed_at )")
       .in("group_id", allGroupIds)
       .eq("role", "athlete"),
+    // What each client pays is coach-only (client_billing_rates, 0303).
+    supabase.from("client_billing_rates").select("membership_id, monthly_rate").in("group_id", allGroupIds),
     supabase
       .from("workout_logs")
       .select("athlete_id, group_id, created_at, new_prs")
@@ -341,6 +344,7 @@ export async function getCoachDashboardData(
   >();
   // A client the coach has set aside as inactive (0281) is left out of every count and flag below; their data is untouched.
   const inactiveKeys = await fetchInactiveKeys(supabase, allGroupIds);
+  const rateByMembership = new Map((rateRows ?? []).map((r) => [r.membership_id as string, Number(r.monthly_rate)]));
   for (const row of athleteRows ?? []) {
     if (athleteByProfileId.has(row.profile_id)) continue;
     if (inactiveKeys.has(inactiveKey(row.group_id, row.profile_id))) continue;
@@ -350,7 +354,7 @@ export async function getCoachDashboardData(
       groupId: row.group_id,
       groupName: groupNameById.get(row.group_id) ?? "Group",
       fullName: profile?.full_name ?? "Client",
-      monthlyRate: row.monthly_rate,
+      monthlyRate: rateByMembership.get(row.id as string) ?? null,
       joinedAt: row.joined_at,
       signedIn: !!profile?.claimed_at,
     });

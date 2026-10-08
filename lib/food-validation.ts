@@ -46,6 +46,17 @@ export function checkMacros(input: MacroInput): MacroCheck {
   return { errors, warnings };
 }
 
+// For a row built by multiplying servings: names the first number that is more than one entry can sensibly be, in plain words, or null when it all fits. The same ceilings as
+// checkMacros; the database's outer limits are looser, so without this a very large number of servings fails the whole save with no explanation.
+export function entryTooBigProblem(m: { calories: number | null; proteinG: number | null; carbsG: number | null; fatG: number | null }): string | null {
+  const n = (v: number) => Math.round(v).toLocaleString("en-US");
+  if ((m.calories ?? 0) > MAX_ENTRY_CALORIES) return `That comes to ${n(m.calories ?? 0)} calories for one entry. Check the servings.`;
+  if ((m.proteinG ?? 0) > MAX_ENTRY_PROTEIN_G) return `That comes to ${n(m.proteinG ?? 0)} g of protein for one entry. Check the servings.`;
+  if ((m.carbsG ?? 0) > MAX_ENTRY_CARBS_G) return `That comes to ${n(m.carbsG ?? 0)} g of carbs for one entry. Check the servings.`;
+  if ((m.fatG ?? 0) > MAX_ENTRY_FAT_G) return `That comes to ${n(m.fatG ?? 0)} g of fat for one entry. Check the servings.`;
+  return null;
+}
+
 // Parses what a person typed into a number, or null for empty. NaN for text that is not a number.
 export function parseNumberField(text: string): number | null {
   const t = text.trim().replace(/,/g, "");

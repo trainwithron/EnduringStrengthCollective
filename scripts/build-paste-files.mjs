@@ -969,7 +969,7 @@ alter table public.coach_availability_windows drop column if exists session_minu
     title: "0301 AI budget: one pool per organization (its size, and this month's AI use summed by model, both server-only), paid top-up packs added to a month's budget, and a record that the owner and coach were told the AI is running low or used up, once per month",
     migrations: ["0301"],
     sees: "Success. No rows returned.",
-    afterwards: "Nothing changes for anyone until the code in the same release is live. After that: each coach has one monthly AI budget measured in real cost; the app tells the coach plainly at about 80 percent and when it is used up, and pauses AI features until the 1st. Food search, barcode and saved meals are never limited.",
+    afterwards: "Nothing changes for anyone until the code in the same release is live. After that: each organization (a solo coach, or a gym's trainers together) has one monthly AI budget measured in real cost; the app tells the owner and the coach plainly at about 80 percent and when it is used up, and pauses AI features until the 1st, unless a paid top-up (when payments are on) adds to that month. Food search, barcode and saved meals are never limited. A top-up that is refunded in Stripe does NOT take its dollars back out of the budget; remove that row from ai_budget_topups by hand if a refund is ever given.",
     undo: [
       "drop table if exists public.ai_budget_notices;",
       "drop table if exists public.ai_budget_topups;",
@@ -996,12 +996,34 @@ alter table public.coach_availability_windows drop column if exists session_minu
       "drop table if exists public.saved_meals;",
       "drop table if exists public.custom_foods;",
       "drop function if exists public.guard_food_library_limits();",
+      "drop function if exists public.food_library_touch_updated_at();",
+      "drop function if exists public.nutrients_are_numbers(jsonb, numeric);",
     ].join(String.fromCharCode(10)),
     undoWhy: "Only if step 47 misbehaves. Removes the custom foods and saved meals people created since (what they logged from them stays in their food log).",
     rows: [
       ["profiles, usda_foods and is_coach_of_athlete exist", `${has.table("profiles")} and ${has.table("usda_foods")} and ${has.fnName("is_coach_of_athlete")}`],
       ["0302 is not already applied (custom_foods is not there yet)", has.noTable("custom_foods")],
       ["0302 is not already applied (saved_meals is not there yet)", has.noTable("saved_meals")],
+    ],
+  },
+  {
+    n: "48",
+    slug: "0303",
+    title: "0303 What a client pays becomes coach-only: the coach's manual monthly rate moves off the roster table (which every member of a group could read) into its own table that only the group's coaches can read or write; the existing values are copied across and the old column is dropped",
+    warn: "Run this right before the code of the same release is deployed: the code that is live today still reads the old column, so the Business estimate shows empty between this paste and the deploy (nothing else is affected).",
+    migrations: ["0303"],
+    sees: "Success. No rows returned.",
+    afterwards: "Clients can no longer see what any client pays. The coach sees and edits the same monthly rates as before on the Business page once the code in the same release is live.",
+    undo: [
+      "alter table public.group_memberships add column if not exists monthly_rate numeric check (monthly_rate is null or monthly_rate >= 0);",
+      "update public.group_memberships gm set monthly_rate = r.monthly_rate from public.client_billing_rates r where r.membership_id = gm.id;",
+      "drop table if exists public.client_billing_rates;",
+    ].join(String.fromCharCode(10)),
+    undoWhy: "Only if step 48 misbehaves. Puts the rate column back on the roster table with the current values. Note this makes the rates readable by every member of a group again (the problem step 48 fixes).",
+    rows: [
+      ["group_memberships, groups and is_group_coach exist", `${has.table("group_memberships")} and ${has.table("groups")} and ${has.fnName("is_group_coach")}`],
+      ["0303 is not already applied (client_billing_rates is not there yet)", has.noTable("client_billing_rates")],
+      ["the old rate column is still on group_memberships", has.col("group_memberships", "monthly_rate")],
     ],
   },
 ];
@@ -1085,7 +1107,7 @@ const BUNDLES = [
   { id: "release-j", name: "Release J (about you, baseline, phase of record)", steps: ["40"] },
   { id: "release-k", name: "Release K (recipe library)", steps: ["41"] },
   { id: "release-l", name: "Release L (schedule requests, Read during rest)", steps: ["42", "43"] },
-  { id: "release-n", name: "Release N (nutrition tracking: food search, custom foods, nutrient detail)", steps: ["45", "46", "47"] },
+  { id: "release-n", name: "Release N (nutrition tracking: food search, custom foods, nutrient detail)", steps: ["45", "46", "47", "48"] },
 ];
 for (const b of BUNDLES) {
   const stepsIn = b.steps.map((n) => STEPS.find((x) => x.n === n));
@@ -1259,6 +1281,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0295", has.table("client_phase_plans")),
     m("0296", has.col("recipes", "content_hash")),
     m("0297", has.table("schedule_requests")),
+    m("0303", has.table("client_billing_rates")),
     m("0302", has.table("custom_foods")),
     m("0301", has.table("ai_budget_notices")),
     m("0300", has.table("usda_food_portions")),

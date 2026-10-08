@@ -127,6 +127,10 @@ export interface TopUpInfo {
   // True only when a coach can really buy more right now: payments are switched on AND a purchase adds to the budget (it does, through the payment webhook). While billing is off
   // there is no buy option and the message says AI resumes on the 1st.
   available: boolean;
+  // The packs that can really be bought right now AND would lift the pause (what the message names and the buttons offer). Empty when none can.
+  packs: TopUpPack[];
+  // A pack can be bought but none is big enough to cover this month's overspend: the message says so instead of pretending top-ups are not open.
+  wouldNotCover: boolean;
   supportEmail: string | null;
   resetsOn: string; // "November 1"
 }
@@ -135,7 +139,7 @@ const money = (cents: number): string => `$${(cents / 100).toFixed(cents % 100 =
 const usd = (n: number): string => `$${n.toFixed(Number.isInteger(n) ? 0 : 2)}`;
 
 // "A $5 top-up adds $3.50 of AI for this month; a $10 top-up adds $7."
-export const topUpPackLine = (): string => TOP_UP_PACKS.map((p, i) => `${i === 0 ? "A" : "a"} ${money(p.cents)} top-up adds ${usd(p.addUsd)} of AI for this month`).join("; ") + ".";
+export const topUpPackLine = (packs: TopUpPack[] = TOP_UP_PACKS): string => packs.map((p, i) => `${i === 0 ? "A" : "a"} ${money(p.cents)} top-up adds ${usd(p.addUsd)} of AI for this month`).join("; ") + ".";
 
 // The coach hears it plainly, in Ron's own voice. A price is only ever mentioned when a purchase really lifts the pause (top.available); otherwise the message says what will happen
 // and when, and never points at a button that does not exist.
@@ -143,13 +147,16 @@ export function coachBudgetMessage(level: "low" | "out", top: TopUpInfo): string
   const free = "Food search, barcode and saved meals stay free.";
   const help = top.supportEmail ? ` Questions: ${top.supportEmail}.` : "";
   const cost = "Every AI request costs real money, and I'm running a small business";
+  if (level === "out" && top.wouldNotCover) {
+    return `Your AI for this month is used up, so AI features are paused. ${cost}. A top-up wouldn't cover this month's use; AI resumes on ${top.resetsOn}. ${free}${help}`;
+  }
   if (level === "low") {
     return top.available
-      ? `Heads up: your AI for this month is almost used up. ${cost}: if it keeps going past what's included I lose money, so extra AI use is a paid top-up. ${topUpPackLine()} ${free}`
+      ? `Heads up: your AI for this month is almost used up. ${cost}: if it keeps going past what's included I lose money, so extra AI use is a paid top-up. ${topUpPackLine(top.packs)} ${free}`
       : `Heads up: your AI for this month is almost used up. ${cost}: AI use beyond what's included will become a paid top-up, which isn't open yet. If it runs out, AI features pause until ${top.resetsOn}. ${free}${help}`;
   }
   return top.available
-    ? `Your AI for this month is used up, so AI features are paused. ${cost}: extra AI use is a paid top-up. ${topUpPackLine()} ${free}`
+    ? `Your AI for this month is used up, so AI features are paused. ${cost}: extra AI use is a paid top-up. ${topUpPackLine(top.packs)} ${free}`
     : `Your AI for this month is used up, so AI features are paused until ${top.resetsOn}. ${cost}: AI use beyond what's included will become a paid top-up, which isn't open yet. ${free}${help}`;
 }
 

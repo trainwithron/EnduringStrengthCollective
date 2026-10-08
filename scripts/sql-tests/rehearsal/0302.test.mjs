@@ -52,6 +52,19 @@ export default {
       }
       const notObj = await tryQ(db, `insert into public.custom_foods (athlete_id, name, serving_label, calories, nutrients) values ($1, 'x', '1', 1, '[1]'::jsonb)`, [ann]);
       h.check("a label must be an object", !!notObj.error, JSON.stringify(notObj));
+      for (const [label, json] of [["a text value", `{"fiber_g": "lots"}`], ["a negative value", `{"fiber_g": -2}`], ["an absurd value", `{"fiber_g": 99999999}`], ["a nested object", `{"fiber_g": {"a": 1}}`], ["a null value", `{"fiber_g": null}`]]) {
+        const r = await tryQ(db, `insert into public.custom_foods (athlete_id, name, serving_label, calories, nutrients) values ($1, 'x', '1', 1, $2::jsonb)`, [ann, json]);
+        h.check(`a label with ${label} is refused (every value must be a number from 0 to 1,000,000)`, !!r.error, JSON.stringify(r));
+      }
+      const goodLabel = await tryQ(db, `insert into public.custom_foods (athlete_id, name, serving_label, calories, nutrients) values ($1, 'ok label', '1', 1, '{"fiber_g": 0, "sodium_mg": 190.5}'::jsonb) returning id`, [ann]);
+      h.check("a label of plain numbers is accepted", !goodLabel.error && goodLabel.rows?.length === 1, JSON.stringify(goodLabel));
+      await tryQ(db, `delete from public.custom_foods where id = $1`, [goodLabel.rows?.[0]?.id]);
+      // updated_at is stamped by the database on any change
+      await h.asSuper();
+      await db.query(`update public.custom_foods set updated_at = '2020-01-01' where athlete_id = $1 and name = 'Peanut crunch bar'`, [ann]);
+      await h.as(ann);
+      const touched = await tryQ(db, `update public.custom_foods set calories = 231 where athlete_id = $1 and name = 'Peanut crunch bar' returning updated_at > '2025-01-01' as fresh`, [ann]);
+      h.check("changing a custom food stamps updated_at in the database", touched.rows?.[0]?.fresh === true, JSON.stringify(touched));
 
       // ---- who can see them ----
       await h.as(bob);

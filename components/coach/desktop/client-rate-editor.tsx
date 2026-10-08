@@ -10,22 +10,33 @@ import { createBrowserClient } from "@/lib/supabase/client";
 // the dashboard's Estimated MRR figure sums these.
 export function ClientRateEditor({
   membershipId,
+  groupId,
+  athleteId,
   initialRate,
 }: {
   membershipId: string;
+  groupId: string;
+  athleteId: string;
   initialRate: number | null;
 }) {
   const [value, setValue] = useState(initialRate?.toString() ?? "");
   const [saving, setSaving] = useState(false);
 
+  // The rate lives in client_billing_rates (coach-only, 0303); an empty box removes the row.
   async function persist() {
     setSaving(true);
     const supabase = createBrowserClient();
     const parsed = value.trim() === "" ? null : parseFloat(value);
-    await supabase
-      .from("group_memberships")
-      .update({ monthly_rate: Number.isFinite(parsed as number) ? parsed : null })
-      .eq("id", membershipId);
+    if (parsed === null || !Number.isFinite(parsed) || parsed < 0) {
+      await supabase.from("client_billing_rates").delete().eq("membership_id", membershipId);
+    } else {
+      await supabase
+        .from("client_billing_rates")
+        .upsert(
+          { membership_id: membershipId, group_id: groupId, profile_id: athleteId, monthly_rate: parsed, updated_at: new Date().toISOString() },
+          { onConflict: "membership_id" }
+        );
+    }
     setSaving(false);
   }
 

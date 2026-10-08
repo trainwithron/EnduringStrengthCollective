@@ -3,7 +3,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getAiUsage } from "@/lib/coach-credits";
 import { coachBudgetMessage, meterLine, type BudgetStatus, type TopUpPack } from "@/lib/ai-budget";
-import { getCoachBudgetStatus, purchasablePacks, topUpInfo } from "@/lib/ai-budget-server";
+import { getCoachBudgetStatus, topUpInfo } from "@/lib/ai-budget-server";
 
 // Feeds the coach-facing usage meter: how much of this month's included
 // AI generations (per 100-client step) a coach has used, and the one simple
@@ -37,8 +37,8 @@ export async function GET() {
     const status = await getCoachBudgetStatus(createServiceRoleClient(), user.id);
     if (status) {
       // Only packs that are really for sale AND would lift the pause count: a coach who is out is offered a pack only if it brings the month back under budget.
-      const packs = purchasablePacks().filter((p) => status.level !== "out" || status.spentUsd < status.budgetUsd + p.addUsd);
-      const top = { ...topUpInfo(), available: packs.length > 0 };
+      const top = topUpInfo(new Date(), status);
+      const packs = top.packs;
       budget = {
         status,
         line: meterLine(status),

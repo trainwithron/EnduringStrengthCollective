@@ -7,7 +7,7 @@ describe("checkCustomFood", () => {
   it("accepts a normal label and builds the food to save", () => {
     const r = checkCustomFood(form({ label: { fiber_g: "5", sodium_mg: "190" }, barcode: "0123456789012" }));
     expect(r.errors).toEqual([]);
-    expect(r.value).toMatchObject({ name: "Peanut crunch bar", brand: "Acme", servingLabel: "1 bar", servingG: 60, calories: 230, proteinG: 20, carbsG: 22, fatG: 8, nutrients: { fiber_g: 5, sodium_mg: 190 }, barcode: "0123456789012" });
+    expect(r.value).toMatchObject({ name: "Peanut crunch bar", brand: "Acme", servingLabel: "1 bar", servingG: 60, calories: 230, proteinG: 20, carbsG: 22, fatG: 8, nutrients: { fiber_g: 5, sodium_mg: 190 }, barcode: "123456789012" });
   });
   it("needs a name, a serving and calories", () => {
     expect(checkCustomFood(form({ name: " " })).errors).toContain("Give the food a name.");
@@ -38,6 +38,9 @@ describe("checkCustomFood", () => {
   it("a barcode is digits only", () => {
     expect(checkCustomFood(form({ barcode: "12ab" })).errors[0]).toContain("numbers only");
     expect(checkCustomFood(form({ barcode: "" })).value?.barcode).toBeNull();
+    expect(checkCustomFood(form({ barcode: "012345678905" })).value?.barcode).toBe("12345678905");
+    expect(checkCustomFood(form({ barcode: "0012345678905" })).value?.barcode).toBe("12345678905");
+    expect(checkCustomFood(form({ barcode: "12345" })).errors[0]).toContain("6 to 32");
   });
 });
 

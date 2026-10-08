@@ -31,7 +31,7 @@ vi.mock("@/lib/ai-budget-server", () => ({
     noted.push(level);
     return true;
   },
-  topUpInfo: () => ({ available: false, supportEmail: "help@enduringstrengthco.com", resetsOn: "November 1" }),
+  topUpInfo: () => ({ available: false, packs: [], wouldNotCover: false, supportEmail: "help@enduringstrengthco.com", resetsOn: "November 1" }),
 }));
 
 import { reserveAiCall } from "@/lib/ai-usage-server";

@@ -137,8 +137,9 @@ describe("budgetStatus", () => {
 });
 
 describe("the words", () => {
-  const live = { available: true, supportEmail: "help@enduringstrengthco.com", resetsOn: "November 1" };
-  const off = { available: false, supportEmail: "help@enduringstrengthco.com", resetsOn: "November 1" };
+  const live = { available: true, packs: TOP_UP_PACKS, wouldNotCover: false, supportEmail: "help@enduringstrengthco.com", resetsOn: "November 1" };
+  const off = { available: false, packs: [], wouldNotCover: false, supportEmail: "help@enduringstrengthco.com", resetsOn: "November 1" };
+  const tooBig = { available: false, packs: [], wouldNotCover: true, supportEmail: "help@enduringstrengthco.com", resetsOn: "November 1" };
   it("tells the coach plainly at about 80 percent, with what a top-up really buys, when a purchase is possible", () => {
     const m = coachBudgetMessage("low", live);
     expect(m).toContain("Heads up: your AI for this month is almost used up.");
@@ -157,6 +158,19 @@ describe("the words", () => {
       // no contradiction: it never says extra use "is" a paid top-up while also saying top-ups are not open
       expect(m).not.toContain("so extra AI use is a paid top-up");
     }
+  });
+  it("names only the packs that can really be bought and would lift the pause", () => {
+    const one = { ...live, packs: [TOP_UP_PACKS[1]] };
+    const m = coachBudgetMessage("out", one);
+    expect(m).toContain("A $10 top-up adds $7 of AI for this month.");
+    expect(m).not.toContain("$5");
+    expect(topUpPackLine([TOP_UP_PACKS[0]])).toBe("A $5 top-up adds $3.50 of AI for this month.");
+  });
+  it("when a pack exists but is too small for this month's overspend it says so, and never says top-ups are not open", () => {
+    const m = coachBudgetMessage("out", tooBig);
+    expect(m).toContain("A top-up wouldn't cover this month's use; AI resumes on November 1.");
+    expect(m).not.toContain("isn't open yet");
+    expect(m).not.toMatch(/buy|purchase|checkout|\$/i);
   });
   it("says AI features are paused when it is used up", () => {
     expect(coachBudgetMessage("out", live)).toContain("used up, so AI features are paused");

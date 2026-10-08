@@ -2,7 +2,7 @@
 --
 -- Run apply-precheck first (every row ok = true). Then paste THIS file and run it once.
 -- WHAT YOU SHOULD SEE: "Success. No rows returned."
--- AFTERWARDS: Nothing changes for anyone until the code in the same release is live. After that: each coach has one monthly AI budget measured in real cost; the app tells the coach plainly at about 80 percent and when it is used up, and pauses AI features until the 1st. Food search, barcode and saved meals are never limited.
+-- AFTERWARDS: Nothing changes for anyone until the code in the same release is live. After that: each organization (a solo coach, or a gym's trainers together) has one monthly AI budget measured in real cost; the app tells the owner and the coach plainly at about 80 percent and when it is used up, and pauses AI features until the 1st, unless a paid top-up (when payments are on) adds to that month. Food search, barcode and saved meals are never limited. A top-up that is refunded in Stripe does NOT take its dollars back out of the budget; remove that row from ai_budget_topups by hand if a refund is ever given.
 -- ON ERROR: it is all or nothing, so nothing was applied. Run   rollback;   once, copy the red error text, and send it back. Do not run the file again.
 -- It contains no text searching, so editor re-indenting cannot break it.
 

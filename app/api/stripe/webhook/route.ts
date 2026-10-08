@@ -365,8 +365,11 @@ export async function POST(request: Request) {
           if (session.payment_status === "paid") {
             await recordAiTopUp(supabase, {
               eventId: event.id,
+              sessionId: session.id,
               organizationId: session.metadata?.organization_id,
-              amountPaidCents: session.amount_total,
+              subtotalCents: session.amount_subtotal,
+              currency: session.currency,
+              metadataPackCents: session.metadata?.pack_cents,
               eventCreatedSeconds: event.created,
             });
           }

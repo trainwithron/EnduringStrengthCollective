@@ -1,6 +1,7 @@
 import type { FoodLogEntry } from "@/components/athlete/meal-checkoff-list";
 import type { MealSlot } from "@/lib/food-entry";
 import { trimDescription } from "@/lib/food-entry";
+import { entryTooBigProblem } from "@/lib/food-validation";
 import type { NutrientMap } from "@/lib/food-serving";
 
 // A saved meal: a named group of foods the client logs again in one tap, at any number of servings. Each food is saved with its amount and the numbers FOR that amount, so logging
@@ -113,6 +114,15 @@ export function mealServingsProblem(m: number): string | null {
 export function mealTotals(items: SavedMealItem[], servings = 1): { calories: number; proteinG: number; carbsG: number; fatG: number } {
   const t = items.reduce((a, i) => ({ calories: a.calories + i.calories, proteinG: a.proteinG + i.proteinG, carbsG: a.carbsG + i.carbsG, fatG: a.fatG + i.fatG }), { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 });
   return { calories: Math.round(t.calories * servings), proteinG: r1(t.proteinG * servings), carbsG: r1(t.carbsG * servings), fatG: r1(t.fatG * servings) };
+}
+
+// Checks every food of the meal at this number of servings BEFORE anything is saved (the rows go in as one batch, so one too-big food would fail them all). Names the food.
+export function mealEntryProblem(meal: SavedMeal, servings: number): string | null {
+  for (const i of meal.items) {
+    const p = entryTooBigProblem({ calories: i.calories * servings, proteinG: i.proteinG * servings, carbsG: i.carbsG * servings, fatG: i.fatG * servings });
+    if (p) return `${i.name}: ${p}`;
+  }
+  return null;
 }
 
 // One food log row per food in the meal, scaled by the number of servings. Calories are whole numbers; every nutrient keeps its fraction.

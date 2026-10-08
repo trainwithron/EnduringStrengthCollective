@@ -27,8 +27,15 @@ export function purchasablePacks(): TopUpPack[] {
   return TOP_UP_PACKS.filter((p) => !!(p.cents === 500 ? process.env.STRIPE_PRICE_AI_TOPUP_5 : process.env.STRIPE_PRICE_AI_TOPUP_10));
 }
 
-export function topUpInfo(now: Date = new Date()): TopUpInfo {
-  return { available: aiTopUpPurchasable(), supportEmail: supportEmail(), resetsOn: resetsOnText(now) };
+// Packs that would bring a used-up month back under budget (every purchasable pack counts while the coach is not used up yet).
+export const liftingPacks = (packs: TopUpPack[], status?: BudgetStatus | null): TopUpPack[] =>
+  packs.filter((p) => !status || status.level !== "out" || status.spentUsd < status.budgetUsd + p.addUsd);
+
+// What the coach is told about top-ups right now. Pass the budget status so the packs named (and offered) are only ones that really lift the pause.
+export function topUpInfo(now: Date = new Date(), status?: BudgetStatus | null): TopUpInfo {
+  const purchasable = purchasablePacks();
+  const packs = liftingPacks(purchasable, status);
+  return { available: packs.length > 0, packs, wouldNotCover: purchasable.length > 0 && packs.length === 0, supportEmail: supportEmail(), resetsOn: resetsOnText(now) };
 }
 
 // The coach an AI call lands on: the coach themselves, or the first coach of any group the person is in (the same rule reserve_ai_call uses).
@@ -119,7 +126,7 @@ export async function getCoachBudgetStatus(db: SupabaseClient, coachId: string, 
 
 // Tells the organization ONCE per month and level (the record's primary key makes a repeat a no-op): the organization's owner and the coach whose use crossed the line, by push; the
 // meter shows it when they open the app. Best effort: never throws.
-export async function noteBudgetLevel(db: SupabaseClient, crossingCoachId: string, level: "low" | "out", now: Date = new Date()): Promise<boolean> {
+export async function noteBudgetLevel(db: SupabaseClient, crossingCoachId: string, level: "low" | "out", now: Date = new Date(), status?: BudgetStatus | null): Promise<boolean> {
   try {
     const orgId = await resolveOrg(db, crossingCoachId);
     if (!orgId) return false;
@@ -128,7 +135,7 @@ export async function noteBudgetLevel(db: SupabaseClient, crossingCoachId: strin
     const { data: org } = await db.from("organizations").select("owner_id").eq("id", orgId).maybeSingle();
     const recipients = [...new Set([(org?.owner_id as string | undefined) ?? null, crossingCoachId].filter((x): x is string => !!x))];
     const title = level === "low" ? "Your AI is almost used up this month" : "Your AI is used up this month";
-    const body = coachBudgetMessage(level, topUpInfo(now));
+    const body = coachBudgetMessage(level, topUpInfo(now, status));
     for (const to of recipients) await sendPushToProfile(db, to, title, body, "/dashboard");
     return true;
   } catch {

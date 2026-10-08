@@ -3,7 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { FoodLogEntry } from "./meal-checkoff-list";
+import { CustomFoodFormPanel } from "./custom-food-form";
+import { CUSTOM_FOOD_SELECT, customFoodEntryProblem, customFoodEntryRow, customFoodFromRow, customFoodTitle, servingsProblem, type CustomFood, type CustomFoodRow } from "@/lib/custom-food";
+import { FOOD_LOG_DETAIL_SELECT, entryFromRow, type FoodLogRow } from "@/lib/food-entry";
+import { normalizeBarcode } from "@/lib/food-barcode";
 
+// A scan looks in the client's OWN foods first (so a bar they created is found again), then the product database; when neither knows the code the client can create the food with
+// the code already filled in and log it. Codes are compared without leading zeros (UPC-A and EAN-13 of the same product match).
+//
 // V2 #1 from calorie_tracking_ux_research_and_plan.md. Uses the native
 // BarcodeDetector API (Chrome/Android — no library needed) when
 // available; always offers manual barcode-number entry too, since
@@ -76,6 +83,11 @@ function BarcodeScanPanel({
     fatG: number;
   } | null>(null);
   const [saving, setSaving] = useState(false);
+  // A food of the client's own that matches the code, and the code nobody knew (so the client can create the food).
+  const [ownFood, setOwnFood] = useState<CustomFood | null>(null);
+  const [missCode, setMissCode] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [servings, setServings] = useState("1");
 
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -127,7 +139,19 @@ function BarcodeScanPanel({
   async function lookup(code: string) {
     setLooking(true);
     setError(null);
+    setMissCode(null);
     try {
+      // 1. The client's own foods, by the code without leading zeros. If this read fails we carry on to the product database.
+      const normalized = normalizeBarcode(code);
+      if (normalized !== "") {
+        const own = await createBrowserClient().from("custom_foods").select(CUSTOM_FOOD_SELECT).eq("athlete_id", athleteId).eq("barcode", normalized).limit(1);
+        const found = ((own.data ?? []) as unknown as CustomFoodRow[])[0];
+        if (!own.error && found) {
+          setOwnFood(customFoodFromRow(found));
+          return;
+        }
+      }
+      // 2. The product database.
       const res = await fetch("/api/food/barcode", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -135,6 +159,11 @@ function BarcodeScanPanel({
       });
       const data = await res.json();
       if (!res.ok) {
+        // Nobody knows this code: offer to create the food.
+        if (res.status === 404 && normalized !== "") {
+          setMissCode(code.replace(/\D/g, ""));
+          return;
+        }
         setError(data.error ?? "Couldn't find that barcode.");
         return;
       }
@@ -142,6 +171,29 @@ function BarcodeScanPanel({
     } finally {
       setLooking(false);
     }
+  }
+
+  async function logOwnFood() {
+    if (!ownFood || saving) return;
+    const qty = Number(servings);
+    const problem = servingsProblem(qty) ?? customFoodEntryProblem(ownFood, qty);
+    if (problem) {
+      setError(problem);
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    const { data, error: e } = await createBrowserClient()
+      .from("food_log_entries")
+      .insert(customFoodEntryRow({ athleteId, groupId, logDate, mealSlot: null, food: ownFood, qty }))
+      .select(FOOD_LOG_DETAIL_SELECT)
+      .single();
+    setSaving(false);
+    if (e || !data) {
+      setError("That didn't save. Try again.");
+      return;
+    }
+    onLogged(entryFromRow(data as unknown as FoodLogRow));
   }
 
   async function handleConfirm() {
@@ -177,6 +229,44 @@ function BarcodeScanPanel({
         fatG: result.fatG,
       });
     }
+  }
+
+  if (creating && missCode) {
+    return (
+      <CustomFoodFormPanel
+        athleteId={athleteId}
+        barcode={missCode}
+        onSaved={(food) => {
+          setOwnFood(food);
+          setCreating(false);
+          setMissCode(null);
+        }}
+        onCancel={() => setCreating(false)}
+      />
+    );
+  }
+
+  if (ownFood) {
+    const qty = Number(servings);
+    return (
+      <div className="border border-rust/40 bg-rust/5 p-3" data-testid="barcode-own-food">
+        <p className="font-body text-sm text-chalk">{customFoodTitle(ownFood)}</p>
+        <p className="font-body text-xs text-steel mt-1 [font-variant-numeric:tabular-nums]">
+          Per {ownFood.servingLabel}: {Math.round(ownFood.calories)} kcal · {ownFood.proteinG}p / {ownFood.carbsG}c / {ownFood.fatG}f
+        </p>
+        <p className="font-body text-xs text-steel mt-1">One of your own foods.</p>
+        <div className="flex flex-wrap items-center gap-2 mt-2">
+          <input type="number" inputMode="decimal" min="0" step="any" value={servings} onChange={(e) => setServings(e.target.value)} aria-label="Servings" className="w-20 min-h-[44px] bg-surface border border-steel/30 px-2 font-body text-sm text-chalk" />
+          <button type="button" onClick={logOwnFood} disabled={saving} className="min-h-[44px] px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40">
+            {saving ? "Saving…" : `Log ${servings || "0"} ${qty === 1 ? "serving" : "servings"}`}
+          </button>
+          <button type="button" onClick={onCancel} disabled={saving} className="min-h-[44px] px-2 font-body text-xs text-steel disabled:opacity-40">
+            Cancel
+          </button>
+        </div>
+        {error && <p className="font-body text-xs text-rust mt-2" role="alert">{error}</p>}
+      </div>
+    );
   }
 
   if (result) {
@@ -217,6 +307,15 @@ function BarcodeScanPanel({
       )}
       {looking && <p className="font-body text-xs text-steel">Looking that up…</p>}
       {error && <p className="font-body text-xs text-rust">{error}</p>}
+      {missCode && (
+        <div className="border border-steel/20 p-2.5" data-testid="barcode-not-found">
+          <p className="font-body text-sm text-chalk">We couldn&apos;t find that barcode.</p>
+          <p className="font-body text-xs text-steel mt-0.5">You can add it yourself with the numbers from the label. Next time you scan it, it will be found.</p>
+          <button type="button" onClick={() => setCreating(true)} className="min-h-[44px] mt-1.5 px-3 bg-rust text-graphite font-body text-xs font-medium">
+            Create this food
+          </button>
+        </div>
+      )}
 
       <div className="flex items-center gap-2">
         <input

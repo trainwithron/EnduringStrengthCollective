@@ -1,9 +1,9 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/send-push", () => ({ sendPushToProfile: async () => 1 }));
 vi.mock("@/lib/stripe", () => ({ isStripeConfigured: () => true }));
 
-import { recordAiTopUp } from "@/lib/ai-topup";
+import { recordAiTopUp, type AiTopUpInput } from "@/lib/ai-topup";
 
 function fakeDb(seen: Set<string> = new Set()) {
   const rows: Record<string, unknown>[] = [];
@@ -21,35 +21,60 @@ function fakeDb(seen: Set<string> = new Set()) {
   return { db: db as never, rows };
 }
 
+const base = (over: Partial<AiTopUpInput> = {}): AiTopUpInput => ({
+  eventId: "evt_1",
+  sessionId: "cs_1",
+  organizationId: "org1",
+  subtotalCents: 500,
+  currency: "usd",
+  metadataPackCents: "500",
+  ...over,
+});
+
+afterEach(() => vi.restoreAllMocks());
+
 describe("recordAiTopUp", () => {
-  it("adds the dollars of the pack that was paid, to the month of the event", async () => {
+  it("adds the dollars of the pack that was bought, to the month of the event", async () => {
     const { db, rows } = fakeDb();
-    const r = await recordAiTopUp(db, { eventId: "evt_1", organizationId: "org1", amountPaidCents: 500, eventCreatedSeconds: Date.UTC(2026, 9, 20) / 1000 });
-    expect(r).toBe("added");
+    expect(await recordAiTopUp(db, base({ eventCreatedSeconds: Date.UTC(2026, 9, 20) / 1000 }))).toBe("added");
     expect(rows[0]).toMatchObject({ organization_id: "org1", month: "2026-10-01", usd_added: 3.5, pack_cents: 500, stripe_event_id: "evt_1" });
-    const r2 = await recordAiTopUp(db, { eventId: "evt_2", organizationId: "org1", amountPaidCents: 1000, eventCreatedSeconds: Date.UTC(2026, 10, 1, 0, 0, 5) / 1000 });
-    expect(r2).toBe("added");
+    expect(await recordAiTopUp(db, base({ eventId: "evt_2", subtotalCents: 1000, metadataPackCents: "1000", eventCreatedSeconds: Date.UTC(2026, 10, 1, 0, 0, 5) / 1000 }))).toBe("added");
     expect(rows[1]).toMatchObject({ month: "2026-11-01", usd_added: 7 });
+  });
+  it("tax on top of the pack, or a discount code, does not stop the top-up from being credited (it matches the price before tax and discounts)", async () => {
+    const { db, rows } = fakeDb();
+    // the session total would be 540 with tax or 400 with a discount, but the subtotal is still the pack's 500
+    expect(await recordAiTopUp(db, base({ eventId: "evt_tax" }))).toBe("added");
+    expect(await recordAiTopUp(db, base({ eventId: "evt_disc" }))).toBe("added");
+    expect(rows).toHaveLength(2);
+    expect(rows.every((r) => r.usd_added === 3.5)).toBe(true);
   });
   it("the same event sent twice adds the money once", async () => {
     const seen = new Set<string>();
     const first = fakeDb(seen);
-    expect(await recordAiTopUp(first.db, { eventId: "evt_9", organizationId: "o", amountPaidCents: 500 })).toBe("added");
+    expect(await recordAiTopUp(first.db, base({ eventId: "evt_9" }))).toBe("added");
     const again = fakeDb(seen);
-    expect(await recordAiTopUp(again.db, { eventId: "evt_9", organizationId: "o", amountPaidCents: 500 })).toBe("duplicate");
+    expect(await recordAiTopUp(again.db, base({ eventId: "evt_9" }))).toBe("duplicate");
     expect(first.rows).toHaveLength(1);
     expect(again.rows).toHaveLength(0);
   });
-  it("a payment that matches no pack, or has no organization, adds nothing", async () => {
+  it("a wrong currency, an unknown price, a missing organization, or a pack that disagrees with the metadata adds nothing and is logged loudly with the event id", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
     const { db, rows } = fakeDb();
-    expect(await recordAiTopUp(db, { eventId: "a", organizationId: "o", amountPaidCents: 750 })).toBe("ignored");
-    expect(await recordAiTopUp(db, { eventId: "b", organizationId: "o", amountPaidCents: 100000 })).toBe("ignored");
-    expect(await recordAiTopUp(db, { eventId: "c", organizationId: "", amountPaidCents: 500 })).toBe("ignored");
-    expect(await recordAiTopUp(db, { eventId: "d", organizationId: "o", amountPaidCents: null })).toBe("ignored");
+    expect(await recordAiTopUp(db, base({ eventId: "e_eur", currency: "eur" }))).toBe("ignored");
+    expect(await recordAiTopUp(db, base({ eventId: "e_750", subtotalCents: 750, metadataPackCents: "750" }))).toBe("ignored");
+    expect(await recordAiTopUp(db, base({ eventId: "e_big", subtotalCents: 100000, metadataPackCents: "100000" }))).toBe("ignored");
+    expect(await recordAiTopUp(db, base({ eventId: "e_org", organizationId: "" }))).toBe("ignored");
+    expect(await recordAiTopUp(db, base({ eventId: "e_null", subtotalCents: null }))).toBe("ignored");
+    expect(await recordAiTopUp(db, base({ eventId: "e_meta", subtotalCents: 500, metadataPackCents: "1000" }))).toBe("ignored");
+    expect(await recordAiTopUp(db, base({ eventId: "e_nometa", metadataPackCents: undefined }))).toBe("ignored");
     expect(rows).toHaveLength(0);
+    expect(spy).toHaveBeenCalledTimes(7);
+    expect(String(spy.mock.calls[0][0])).toContain("e_eur");
+    expect(String(spy.mock.calls[0][0])).toContain("NOT CREDITED");
   });
   it("any other database failure is raised so Stripe retries the event", async () => {
     const db = { from: () => ({ insert: async () => ({ error: { code: "08006", message: "connection" } }) }) } as never;
-    await expect(recordAiTopUp(db, { eventId: "e", organizationId: "o", amountPaidCents: 500 })).rejects.toBeTruthy();
+    await expect(recordAiTopUp(db, base({ eventId: "e" }))).rejects.toBeTruthy();
   });
 });

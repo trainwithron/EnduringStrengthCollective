@@ -4,9 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { FoodLogEntry } from "./meal-checkoff-list";
 import { CustomFoodFormPanel } from "./custom-food-form";
-import { CUSTOM_FOOD_SELECT, customFoodEntryRow, customFoodFromRow, customFoodTitle, servingsProblem, type CustomFood, type CustomFoodRow } from "@/lib/custom-food";
+import { CUSTOM_FOOD_SELECT, customFoodEntryProblem, customFoodEntryRow, customFoodFromRow, customFoodTitle, servingsProblem, type CustomFood, type CustomFoodRow } from "@/lib/custom-food";
 import { MEAL_SLOTS, MEAL_SLOT_LABEL, FOOD_LOG_DETAIL_SELECT, defaultMealSlot, entryFromRow, insertCopies, type FoodLogRow, type MealSlot } from "@/lib/food-entry";
-import { SAVED_MEAL_ITEM_SELECT, itemFromRow, mealEntryRows, mealServingsProblem, mealTotals, type SavedMeal, type SavedMealItemRow } from "@/lib/saved-meal";
+import { SAVED_MEAL_ITEM_SELECT, itemFromRow, mealEntryProblem, mealEntryRows, mealServingsProblem, mealTotals, type SavedMeal, type SavedMealItemRow } from "@/lib/saved-meal";
 
 // "My foods": the foods the client made themselves and the meals they saved, each logged in one tap at any number of servings. Free, instant, no AI.
 export function MyFoodsPanel({ athleteId, groupId, logDate, onLogged }: { athleteId: string; groupId: string; logDate: string; onLogged: (entries: FoodLogEntry[]) => void }) {
@@ -147,6 +147,11 @@ function CustomFoodRowItem({ food, athleteId, groupId, logDate, slot, onLogged, 
 
   async function log() {
     if (busy || problem) return;
+    const tooBig = customFoodEntryProblem(food, n);
+    if (tooBig) {
+      setError(tooBig);
+      return;
+    }
     setBusy(true);
     setError(null);
     const { data, error: e } = await createBrowserClient().from("food_log_entries").insert(customFoodEntryRow({ athleteId, groupId, logDate, mealSlot: slot, food, qty: n })).select(FOOD_LOG_DETAIL_SELECT).single();
@@ -199,6 +204,11 @@ function SavedMealRowItem({ meal, athleteId, groupId, logDate, slot, onLogged, o
 
   async function log() {
     if (busy || problem) return;
+    const tooBig = mealEntryProblem(meal, n);
+    if (tooBig) {
+      setError(tooBig);
+      return;
+    }
     setBusy(true);
     setError(null);
     const added = await insertCopies(createBrowserClient(), mealEntryRows({ athleteId, groupId, logDate, mealSlot: slot, meal, servings: n }));

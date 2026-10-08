@@ -8,6 +8,24 @@
 --    their coaches.
 -- Nothing here changes any existing table. Re-runnable.
 
+-- A label or a food's nutrient snapshot is a small object of numbers: every value must be a number between 0 and the given maximum, so nothing that reads these later (the daily
+-- totals, the nutrient pages) has to defend against text or negatives. Immutable, so it can sit in a check.
+create or replace function public.nutrients_are_numbers(j jsonb, max_value numeric)
+returns boolean
+language sql
+immutable
+set search_path = public
+as $function$
+  select case
+    when j is null then true
+    when jsonb_typeof(j) <> 'object' then false
+    else not exists (
+      select 1 from jsonb_each(j) e
+      where case when jsonb_typeof(e.value) = 'number' then not ((e.value #>> '{}')::numeric between 0 and max_value) else true end
+    )
+  end;
+$function$;
+
 create table if not exists public.custom_foods (
   id uuid primary key default uuid_generate_v4(),
   athlete_id uuid not null references public.profiles(id) on delete cascade,
@@ -19,7 +37,7 @@ create table if not exists public.custom_foods (
   protein_g numeric not null default 0 check (protein_g >= 0 and protein_g <= 500),
   carbs_g numeric not null default 0 check (carbs_g >= 0 and carbs_g <= 1000),
   fat_g numeric not null default 0 check (fat_g >= 0 and fat_g <= 500),
-  nutrients jsonb check (nutrients is null or (jsonb_typeof(nutrients) = 'object' and pg_column_size(nutrients) <= 6000)),
+  nutrients jsonb check (nutrients is null or (jsonb_typeof(nutrients) = 'object' and pg_column_size(nutrients) <= 6000 and public.nutrients_are_numbers(nutrients, 1000000))),
   barcode text check (barcode is null or char_length(barcode) <= 32),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -58,7 +76,7 @@ create table if not exists public.saved_meal_items (
   protein_g numeric not null default 0 check (protein_g >= 0 and protein_g <= 2000),
   carbs_g numeric not null default 0 check (carbs_g >= 0 and carbs_g <= 5000),
   fat_g numeric not null default 0 check (fat_g >= 0 and fat_g <= 2000),
-  nutrients jsonb check (nutrients is null or (jsonb_typeof(nutrients) = 'object' and pg_column_size(nutrients) <= 12000)),
+  nutrients jsonb check (nutrients is null or (jsonb_typeof(nutrients) = 'object' and pg_column_size(nutrients) <= 12000 and public.nutrients_are_numbers(nutrients, 1000000))),
   food_source text check (food_source is null or food_source in ('usda', 'custom', 'saved_meal', 'barcode', 'ai', 'plan')),
   fdc_id integer references public.usda_foods(fdc_id) on delete set null
 );
@@ -115,3 +133,21 @@ drop trigger if exists saved_meals_limit on public.saved_meals;
 create trigger saved_meals_limit before insert on public.saved_meals for each row execute function public.guard_food_library_limits();
 drop trigger if exists saved_meal_items_limit on public.saved_meal_items;
 create trigger saved_meal_items_limit before insert on public.saved_meal_items for each row execute function public.guard_food_library_limits();
+
+-- updated_at is kept by the database, not the app: any change stamps it.
+create or replace function public.food_library_touch_updated_at()
+returns trigger
+language plpgsql
+set search_path = public
+as $function$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$function$;
+revoke all on function public.food_library_touch_updated_at() from public, anon, authenticated;
+
+drop trigger if exists custom_foods_touch on public.custom_foods;
+create trigger custom_foods_touch before update on public.custom_foods for each row execute function public.food_library_touch_updated_at();
+drop trigger if exists saved_meals_touch on public.saved_meals;
+create trigger saved_meals_touch before update on public.saved_meals for each row execute function public.food_library_touch_updated_at();

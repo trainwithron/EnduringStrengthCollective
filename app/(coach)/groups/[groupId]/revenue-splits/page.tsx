@@ -80,10 +80,9 @@ export default async function RevenueSplitsPage(
   const orgGroupIds = (orgGroups ?? []).map((g) => g.id);
 
   const { data: rateRows } = await supabase
-    .from("group_memberships")
+    .from("client_billing_rates")
     .select("monthly_rate")
-    .in("group_id", orgGroupIds.length > 0 ? orgGroupIds : ["00000000-0000-0000-0000-000000000000"])
-    .eq("role", "athlete");
+    .in("group_id", orgGroupIds.length > 0 ? orgGroupIds : ["00000000-0000-0000-0000-000000000000"]);
   const monthlyRateCents = (rateRows ?? []).reduce((sum, r) => sum + Math.round((r.monthly_rate ?? 0) * 100), 0);
 
   const coachIds = coaches.map((c) => c.profileId);

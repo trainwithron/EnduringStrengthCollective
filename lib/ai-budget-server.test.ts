@@ -207,3 +207,32 @@ describe("whether a top-up can really be bought", () => {
     expect(topUpInfo().available).toBe(true);
   });
 });
+
+describe("topUpInfo names only the packs that can really be bought and would lift the pause", () => {
+  const status = (level: "ok" | "low" | "out", spentUsd: number, budgetUsd: number) => ({ level, spentUsd, budgetUsd, pct: 0, unlimited: false, organizationId: "o", topUpsUsd: 0 });
+  it("nothing is offered while payments are off", () => {
+    expect(topUpInfo(new Date(), status("out", 25, 25))).toMatchObject({ available: false, packs: [], wouldNotCover: false });
+  });
+  it("only a pack whose price is set is named", () => {
+    stripeOn = true;
+    process.env.STRIPE_PRICE_AI_TOPUP_10 = "price_10";
+    const info = topUpInfo(new Date(), status("low", 21, 25));
+    expect(info.packs.map((p) => p.cents)).toEqual([1000]);
+    expect(info.available).toBe(true);
+  });
+  it("a used-up coach is offered only the packs that bring the month back under budget", () => {
+    stripeOn = true;
+    process.env.STRIPE_PRICE_AI_TOPUP_5 = "price_5";
+    process.env.STRIPE_PRICE_AI_TOPUP_10 = "price_10";
+    // spent 25.00 of 25: both lift it
+    expect(topUpInfo(new Date(), status("out", 25, 25)).packs.map((p) => p.cents)).toEqual([500, 1000]);
+    // spent 29.00 of 25: the $3.50 pack (to 28.50) is not enough, the $7 pack (to 32) is
+    expect(topUpInfo(new Date(), status("out", 29, 25)).packs.map((p) => p.cents)).toEqual([1000]);
+  });
+  it("when no pack is big enough it says so instead of claiming top-ups are not open", () => {
+    stripeOn = true;
+    process.env.STRIPE_PRICE_AI_TOPUP_5 = "price_5";
+    process.env.STRIPE_PRICE_AI_TOPUP_10 = "price_10";
+    expect(topUpInfo(new Date(), status("out", 40, 25))).toMatchObject({ available: false, packs: [], wouldNotCover: true });
+  });
+});

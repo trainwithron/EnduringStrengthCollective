@@ -5,4 +5,6 @@ drop table if exists public.saved_meal_items;
 drop table if exists public.saved_meals;
 drop table if exists public.custom_foods;
 drop function if exists public.guard_food_library_limits();
+drop function if exists public.food_library_touch_updated_at();
+drop function if exists public.nutrients_are_numbers(jsonb, numeric);
 commit;

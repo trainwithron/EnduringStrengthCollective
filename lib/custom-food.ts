@@ -1,4 +1,5 @@
-import { checkMacros, parseNumberField, type MacroCheck } from "@/lib/food-validation";
+import { checkMacros, entryTooBigProblem, parseNumberField, type MacroCheck } from "@/lib/food-validation";
+import { isValidBarcodeText, normalizeBarcode } from "@/lib/food-barcode";
 import { macrosOf, MAX_AMOUNT_G, type NutrientMap } from "@/lib/food-serving";
 import { trimDescription, type MealSlot } from "@/lib/food-entry";
 
@@ -106,7 +107,7 @@ export function checkCustomFood(form: CustomFoodForm): CustomFoodCheck {
   }
 
   const barcode = form.barcode.trim();
-  if (barcode !== "" && !/^\d{6,32}$/.test(barcode)) errors.push("A barcode is numbers only, 6 to 32 digits.");
+  if (barcode !== "" && !isValidBarcodeText(barcode)) errors.push("A barcode is numbers only, 6 to 32 digits.");
 
   if (errors.length > 0) return { errors, warnings, value: null };
   const nutrients: NutrientMap = { ...label };
@@ -123,7 +124,8 @@ export function checkCustomFood(form: CustomFoodForm): CustomFoodCheck {
       carbsG: carbs ?? 0,
       fatG: fat ?? 0,
       nutrients: Object.keys(nutrients).length > 0 ? nutrients : null,
-      barcode: barcode || null,
+      // Stored without leading zeros so a UPC-A and an EAN-13 scan of the same product find the same food.
+      barcode: barcode ? normalizeBarcode(barcode) : null,
     },
   };
 }
@@ -186,6 +188,11 @@ export function servingsProblem(qty: number): string | null {
   if (!Number.isFinite(qty) || qty <= 0) return "Enter an amount greater than zero.";
   if (qty > 100) return "That is more than 100 servings. Check the amount.";
   return null;
+}
+
+// Whether `qty` servings of this food are more than one entry can sensibly hold (a plain-words message), or null.
+export function customFoodEntryProblem(food: CustomFood, qty: number): string | null {
+  return entryTooBigProblem({ calories: food.calories * qty, proteinG: food.proteinG * qty, carbsG: food.carbsG * qty, fatG: food.fatG * qty });
 }
 
 // The food log row for logging `qty` servings of a custom food.

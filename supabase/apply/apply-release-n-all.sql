@@ -1,4 +1,4 @@
--- RELEASE N (NUTRITION TRACKING: FOOD SEARCH, CUSTOM FOODS, NUTRIENT DETAIL): ONE paste. Steps 45, 46, 47 in order, all or nothing.
+-- RELEASE N (NUTRITION TRACKING: FOOD SEARCH, CUSTOM FOODS, NUTRIENT DETAIL): ONE paste. Steps 45, 46, 47, 48 in order, all or nothing.
 --
 -- Paste this whole file into the Supabase SQL editor and run it once. It replaces the separate precheck and apply files for these steps (they stay as the fallback).
 -- Every check from each step's precheck is built in as a guard in front of that step. If any check is false, the run stops with a message that names the step and the
@@ -6,8 +6,9 @@
 -- WHAT YOU SHOULD SEE: first "Success" for the transaction, then a result table with one row per step and in_place = true on every row.
 -- ON ERROR: run   rollback;   once, copy the red text, send it to Spot. Do not run it again.
 -- AFTER STEP 45: Nothing changes for anyone until the code in the same release is live. After that: any client can search the USDA foods, pick a serving (grams, ounces, household measures once the USDA portions are loaded), see the nutrients and log it, then edit or delete the entry. Existing food logs are untouched.
--- AFTER STEP 46: Nothing changes for anyone until the code in the same release is live. After that: each coach has one monthly AI budget measured in real cost; the app tells the coach plainly at about 80 percent and when it is used up, and pauses AI features until the 1st. Food search, barcode and saved meals are never limited.
+-- AFTER STEP 46: Nothing changes for anyone until the code in the same release is live. After that: each organization (a solo coach, or a gym's trainers together) has one monthly AI budget measured in real cost; the app tells the owner and the coach plainly at about 80 percent and when it is used up, and pauses AI features until the 1st, unless a paid top-up (when payments are on) adds to that month. Food search, barcode and saved meals are never limited. A top-up that is refunded in Stripe does NOT take its dollars back out of the budget; remove that row from ai_budget_topups by hand if a refund is ever given.
 -- AFTER STEP 47: Nothing changes for anyone until the code in the same release is live. After that: a client can add a food that is not in the USDA data (a bar, a restaurant dish, a family recipe), scan a barcode that is not found and create it, and save a meal to log again in one tap. Their coach can see these.
+-- AFTER STEP 48: Clients can no longer see what any client pays. The coach sees and edits the same monthly rates as before on the Business page once the code in the same release is live.
 -- It contains no text searching, so editor re-indenting cannot break it.
 
 begin;
@@ -288,6 +289,24 @@ $g47$;
 --    their coaches.
 -- Nothing here changes any existing table. Re-runnable.
 
+-- A label or a food's nutrient snapshot is a small object of numbers: every value must be a number between 0 and the given maximum, so nothing that reads these later (the daily
+-- totals, the nutrient pages) has to defend against text or negatives. Immutable, so it can sit in a check.
+create or replace function public.nutrients_are_numbers(j jsonb, max_value numeric)
+returns boolean
+language sql
+immutable
+set search_path = public
+as $function$
+  select case
+    when j is null then true
+    when jsonb_typeof(j) <> 'object' then false
+    else not exists (
+      select 1 from jsonb_each(j) e
+      where case when jsonb_typeof(e.value) = 'number' then not ((e.value #>> '{}')::numeric between 0 and max_value) else true end
+    )
+  end;
+$function$;
+
 create table if not exists public.custom_foods (
   id uuid primary key default uuid_generate_v4(),
   athlete_id uuid not null references public.profiles(id) on delete cascade,
@@ -299,7 +318,7 @@ create table if not exists public.custom_foods (
   protein_g numeric not null default 0 check (protein_g >= 0 and protein_g <= 500),
   carbs_g numeric not null default 0 check (carbs_g >= 0 and carbs_g <= 1000),
   fat_g numeric not null default 0 check (fat_g >= 0 and fat_g <= 500),
-  nutrients jsonb check (nutrients is null or (jsonb_typeof(nutrients) = 'object' and pg_column_size(nutrients) <= 6000)),
+  nutrients jsonb check (nutrients is null or (jsonb_typeof(nutrients) = 'object' and pg_column_size(nutrients) <= 6000 and public.nutrients_are_numbers(nutrients, 1000000))),
   barcode text check (barcode is null or char_length(barcode) <= 32),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -338,7 +357,7 @@ create table if not exists public.saved_meal_items (
   protein_g numeric not null default 0 check (protein_g >= 0 and protein_g <= 2000),
   carbs_g numeric not null default 0 check (carbs_g >= 0 and carbs_g <= 5000),
   fat_g numeric not null default 0 check (fat_g >= 0 and fat_g <= 2000),
-  nutrients jsonb check (nutrients is null or (jsonb_typeof(nutrients) = 'object' and pg_column_size(nutrients) <= 12000)),
+  nutrients jsonb check (nutrients is null or (jsonb_typeof(nutrients) = 'object' and pg_column_size(nutrients) <= 12000 and public.nutrients_are_numbers(nutrients, 1000000))),
   food_source text check (food_source is null or food_source in ('usda', 'custom', 'saved_meal', 'barcode', 'ai', 'plan')),
   fdc_id integer references public.usda_foods(fdc_id) on delete set null
 );
@@ -396,6 +415,93 @@ create trigger saved_meals_limit before insert on public.saved_meals for each ro
 drop trigger if exists saved_meal_items_limit on public.saved_meal_items;
 create trigger saved_meal_items_limit before insert on public.saved_meal_items for each row execute function public.guard_food_library_limits();
 
+-- updated_at is kept by the database, not the app: any change stamps it.
+create or replace function public.food_library_touch_updated_at()
+returns trigger
+language plpgsql
+set search_path = public
+as $function$
+begin
+  new.updated_at := now();
+  return new;
+end;
+$function$;
+revoke all on function public.food_library_touch_updated_at() from public, anon, authenticated;
+
+drop trigger if exists custom_foods_touch on public.custom_foods;
+create trigger custom_foods_touch before update on public.custom_foods for each row execute function public.food_library_touch_updated_at();
+drop trigger if exists saved_meals_touch on public.saved_meals;
+create trigger saved_meals_touch before update on public.saved_meals for each row execute function public.food_library_touch_updated_at();
+
+-- ===== Release N (nutrition tracking: food search, custom foods, nutrient detail), step 48: 0303 What a client pays becomes coach-only: the coach's manual monthly rate moves off the roster table (which every member of a group could read) into its own table that only the group's coaches can read or write; the existing values are copied across and the old column is dropped
+do $g48$
+declare
+  failed text;
+begin
+  select string_agg(check_name, '; ') into failed from (
+    values
+      ('group_memberships, groups and is_group_coach exist', to_regclass('public.group_memberships') is not null and to_regclass('public.groups') is not null and exists (select 1 from pg_proc where proname = 'is_group_coach' and pronamespace = 'public'::regnamespace)),
+      ('0303 is not already applied (client_billing_rates is not there yet)', to_regclass('public.client_billing_rates') is null),
+      ('the old rate column is still on group_memberships', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_memberships' and column_name = 'monthly_rate'))
+  ) as checks(check_name, ok) where not ok;
+  if failed is not null then
+    raise exception 'Release N (nutrition tracking: food search, custom foods, nutrient detail), step 48 (0303) cannot run: this step looks already applied, or the database is not in the state it expects. Failed checks: %. NOTHING was changed (the whole bundle is all or nothing). If an earlier step was applied by hand, use the single-step files for the rest, and send Spot this message.', failed;
+  end if;
+end
+$g48$;
+
+-- ====================================================================================================
+-- migration 0303_client_rates_coach_only.sql
+-- ====================================================================================================
+
+-- What a client pays (the coach's manual "$/mo" estimate) must be seen by the coach only. It lived on group_memberships.monthly_rate (0045), and the roster policy
+-- memberships_select_same_group lets EVERY member of a group read EVERY column of every membership row in it, so any client could read what each other client pays.
+-- A row policy cannot hide one column, so the rate moves to its own table that only the group's coaches can read or write; the values are copied across, then the column is dropped.
+--
+--  * client_billing_rates: one row per membership that has a rate. Coaches of the group read and write it; nobody else (not the client, not another client) can see it at all.
+-- Re-runnable: the copy only runs while the old column still exists, and the column is dropped only after the copy.
+-- ORDER: the app code that reads the new table ships in the same release. Run this paste right before deploying that code (the old code reads the old column, so the Business
+-- estimate is empty between the paste and the deploy; nothing else is affected).
+
+create table if not exists public.client_billing_rates (
+  membership_id uuid primary key references public.group_memberships(id) on delete cascade,
+  group_id uuid not null references public.groups(id) on delete cascade,
+  profile_id uuid not null references public.profiles(id) on delete cascade,
+  monthly_rate numeric not null check (monthly_rate >= 0),
+  updated_at timestamptz not null default now()
+);
+create index if not exists client_billing_rates_group_idx on public.client_billing_rates (group_id);
+
+alter table public.client_billing_rates enable row level security;
+
+drop policy if exists "client_billing_rates_coach_all" on public.client_billing_rates;
+create policy "client_billing_rates_coach_all" on public.client_billing_rates for all
+  to authenticated
+  using (public.is_group_coach(group_id))
+  with check (
+    public.is_group_coach(group_id)
+    and exists (select 1 from public.group_memberships gm where gm.id = membership_id and gm.group_id = client_billing_rates.group_id and gm.profile_id = client_billing_rates.profile_id)
+  );
+
+-- The organization's owner and admins may READ the rates of every group in the organization (the Revenue splits page adds them up across the organization); they cannot write them.
+drop policy if exists "client_billing_rates_org_admin_select" on public.client_billing_rates;
+create policy "client_billing_rates_org_admin_select" on public.client_billing_rates for select
+  to authenticated
+  using (public.is_org_admin_of_group(group_id));
+
+do $copy$
+begin
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_memberships' and column_name = 'monthly_rate') then
+    insert into public.client_billing_rates (membership_id, group_id, profile_id, monthly_rate)
+    select gm.id, gm.group_id, gm.profile_id, gm.monthly_rate
+    from public.group_memberships gm
+    where gm.monthly_rate is not null
+    on conflict (membership_id) do nothing;
+    alter table public.group_memberships drop column monthly_rate;
+  end if;
+end
+$copy$;
+
 commit;
 
 -- Read-only result (after the commit): every row must say in_place = true.
@@ -405,4 +511,6 @@ select step, what, in_place from (
   select 'step 46 (0301)' as step, '0301 AI budget: one pool per organization' as what, not ((not exists (select 1 from pg_proc where proname = 'ai_org_summary' and pronamespace = 'public'::regnamespace)) and (to_regclass('public.ai_budget_notices') is null)) as in_place
   union all
   select 'step 47 (0302)' as step, '0302 Custom foods and saved meals: a client''s own foods' as what, not ((to_regclass('public.custom_foods') is null) and (to_regclass('public.saved_meals') is null)) as in_place
+  union all
+  select 'step 48 (0303)' as step, '0303 What a client pays becomes coach-only: the coach''s manual monthly rate moves off the roster table' as what, not ((to_regclass('public.client_billing_rates') is null)) as in_place
 ) as result order by step;
