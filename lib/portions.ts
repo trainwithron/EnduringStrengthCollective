@@ -32,12 +32,15 @@ const TABLE: Entry[] = [
 
   // grains and starches
   { id: "cream_of_rice", match: /cream of rice/, cupG: 180, spoons: true },
+  // Cooked brown rice is 195 g a cup, heavier than white (158): its own entry before the general cooked rice
+  { id: "brown_rice_cooked", match: /brown rice.*cooked|cooked.*brown rice/, cupG: 195 },
   { id: "rice_cooked", match: /\brice\b.*\bcooked\b|\bcooked\b.*\brice\b/, exclude: /cream of rice|rice cake/, cupG: 158 },
   { id: "rice_dry", match: /\brice\b.*\b(dry|raw|uncooked)\b|\b(dry|raw|uncooked)\b.*\brice\b/, exclude: /cream of rice|rice cake/, cupG: 185, spoons: true },
   { id: "quinoa_cooked", match: /quinoa.*cooked|cooked.*quinoa/, cupG: 185 },
   { id: "quinoa_dry", match: /quinoa/, cupG: 170, spoons: true },
   { id: "oatmeal_cooked", match: /(oatmeal|oats).*cooked|cooked.*(oatmeal|oats)|^oatmeal$/, cupG: 234 },
-  { id: "oats_dry", match: /rolled oats|oats|oat flakes/, exclude: /cooked|milk|flour|bar/, cupG: 81, spoons: true },
+  // Dry oats only when the line says it is the dry form. Overnight, baked, protein or bare "Oats" could be soaked or cooked (about 230 g a cup), so they get grams.
+  { id: "oats_dry", match: /rolled oats|old[- ]fashioned|quick oats|steel[- ]cut|oats (dry)|dry oats|oat flakes/, exclude: /cooked|milk|flour|bar|overnight|baked|protein|bran|porridge/, cupG: 81, spoons: true },
   { id: "corn_flakes", match: /corn flakes|cornflakes/, cupG: 28 },
   { id: "pasta_cooked", match: /(pasta|spaghetti|penne|macaroni|noodles?).*cooked|cooked.*(pasta|spaghetti|penne|macaroni|noodles?)/, cupG: 140 },
   { id: "black_beans", match: /black beans/, cupG: 172 },

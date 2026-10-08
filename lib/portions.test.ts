@@ -24,6 +24,21 @@ describe("householdMeasure", () => {
     expect(householdMeasure("Cream of Rice", 90)).toBe("1/2 cup");
     expect(householdMeasure("Black Beans (Cooked)", 172)).toBe("1 cup");
   });
+  it("cooked brown rice is heavier than white: 195 g is a cup, not 1 1/4", () => {
+    expect(householdMeasure("Brown Rice (Cooked)", 195)).toBe("1 cup");
+    expect(householdMeasure("Cooked Brown Rice", 195)).toBe("1 cup");
+    expect(householdMeasure("Cooked White Rice", 158)).toBe("1 cup");
+    expect(householdMeasure("Brown Rice", 150)).toBeNull();
+  });
+  it("oats get the dry weight only when the line says dry: overnight, baked, protein and bare oats are not guessed", () => {
+    expect(householdMeasure("Rolled Oats (Dry)", 40)).toBe("1/2 cup");
+    expect(householdMeasure("Old-Fashioned Oats", 81)).toBe("1 cup");
+    expect(householdMeasure("Oats", 240)).toBeNull();
+    expect(householdMeasure("Baked Oats", 240)).toBeNull();
+    expect(householdMeasure("Protein Oats", 120)).toBeNull();
+    expect(householdMeasure("Overnight Oats", 240)).toBeNull();
+    expect(householdMeasure("Cooked Oatmeal", 234)).toBe("1 cup");
+  });
   it("a small amount of a dry food or spread is spoons, not a fraction of a cup", () => {
     expect(householdMeasure("Chia Seeds", 26)).toBe("2 tbsp");
     expect(householdMeasure("Nut Butter", 32)).toBe("2 tbsp");
