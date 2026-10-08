@@ -55,7 +55,10 @@ async function getCurrentOrgId(supabase: ReturnType<typeof createBrowserClient>,
   return data?.organization_id ?? null;
 }
 
-export function SpotClientsGroupsPanel({ groupId, onNavigated }: { groupId: string; onNavigated: () => void }) {
+// fromHub: the Spotlight hub has its own organization dropdown and gives this panel the group of the organization it chose. The panel then follows that group's organization, ignores
+// its own remembered one, hides its own organization tabs (one selector, one answer) and does not write its memory, so clients are never listed or created in a different
+// organization from the one the hub's header names.
+export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }: { groupId: string; onNavigated: () => void; fromHub?: boolean }) {
   const router = useRouter();
   const [clients, setClients] = useState<ClientOption[] | null>(null);
   const [groups, setGroups] = useState<CoachedGroupOption[] | null>(null);
@@ -113,7 +116,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated }: { groupId: stri
       } catch {
         // Storage can be unavailable (private mode) — fall back to the current group's org.
       }
-      const preferred = [remembered, currentOrgId].find((id) => id && orgById.has(id)) ?? orgList[0]?.id ?? null;
+      const preferred = (fromHub ? [currentOrgId] : [remembered, currentOrgId]).find((id) => id && orgById.has(id)) ?? orgList[0]?.id ?? null;
       if (!cancelled) {
         setOrgs(orgList);
         setSelectedOrgId(preferred);
@@ -171,7 +174,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated }: { groupId: stri
     return () => {
       cancelled = true;
     };
-  }, [groupId]);
+  }, [groupId, fromHub]);
 
   function requestActAsClient(client: ClientOption) {
     if (busy) return;
@@ -295,6 +298,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated }: { groupId: stri
 
   function selectOrg(id: string) {
     setSelectedOrgId(id);
+    if (fromHub) return;
     try {
       window.localStorage.setItem(SELECTED_ORG_KEY, id);
     } catch {
@@ -368,7 +372,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated }: { groupId: stri
         </p>
       )}
 
-      {orgs.length >= 2 && (
+      {orgs.length >= 2 && !fromHub && (
         <div className="flex gap-1.5 overflow-x-auto" role="tablist" aria-label="Organization">
           {orgs.map((o) => (
             <button
