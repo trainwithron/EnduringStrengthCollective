@@ -8,10 +8,17 @@ export function documentsNeedingAcceptance(accepted: { document: string; version
   return SIGNUP_DOCUMENTS.filter((d) => !have.has(`${d}@${LEGAL_VERSIONS[d]}`));
 }
 
-// What the accept screen says. When only the beta notice changed it says exactly that (the terms and privacy policy were not touched); otherwise the general line.
+// What the accept screen says. When what changed is the beta notice, the privacy policy or both (the terms were not touched) it names exactly those; otherwise the general line.
+const GATE_NAMES: Partial<Record<LegalDocument, string>> = { beta_notice: "beta notice", privacy: "privacy policy" };
 export function gateCopy(needs: LegalDocument[]): { heading: string; body: string } {
-  if (needs.length === 1 && needs[0] === "beta_notice") {
-    return { heading: "The beta notice was updated", body: "Please read and accept it to continue. You will only be asked again if it changes." };
+  const named = needs.filter((d) => GATE_NAMES[d]);
+  if (needs.length > 0 && named.length === needs.length && needs.length <= 2) {
+    const many = needs.length > 1;
+    const names = needs.map((d) => GATE_NAMES[d]).join(" and ");
+    return {
+      heading: `The ${names} ${many ? "were" : "was"} updated`,
+      body: `Please read and accept ${many ? "them" : "it"} to continue. You will only be asked again if ${many ? "they change" : "it changes"}.`,
+    };
   }
   return { heading: "One quick thing", body: "Please read and accept our terms before you continue. You will only be asked again if they change." };
 }

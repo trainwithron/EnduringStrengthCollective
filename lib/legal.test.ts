@@ -33,22 +33,24 @@ describe("beta notice", () => {
     expect(ai).toContain("injury or health concern");
     expect(ai).toContain("wearable readings");
     expect(ai).toContain("food allergies or dislikes");
-    expect(ai).toContain("Your messages, email, phone number, date of birth, body weight and progress photos are not sent.");
+    expect(ai).toContain("Messages between you and your coach, email, phone number, date of birth, body weight and progress photos are not sent.");
     expect(ai).toContain("draft for the coach to review");
   });
 
   it("names everyone who can see a client's data, including the platform operator during the beta", () => {
     const data = BETA_NOTICE_PARAGRAPHS[3];
     expect(data).toContain("Your coach can see data in your group");
-    expect(data).toContain("people who run your coach's organization");
+    expect(data).toContain("people who run your coach's organization can see your training data and posts");
     expect(data).toContain("platform operator");
-    expect(data).toContain("unless a client has been marked private");
+    expect(data).toContain("training data, wearable readings and posts");
+    expect(data).toContain("Your coach can mark you private from both, which hides your training and wearable data but not posts");
+    expect(data).toContain("keep the service running");
   });
 
   it("says that unanswered help-search questions are kept, with names removed", () => {
     const help = BETA_NOTICE_PARAGRAPHS[4];
     expect(help).toContain("can't answer a question");
-    expect(help).toContain("names, email addresses, links and numbers removed");
+    expect(help).toContain("names, email addresses, links and long numbers removed");
     expect(help).toContain("not linked to your account");
   });
 
@@ -117,6 +119,8 @@ describe("the AI paragraph covers every route that calls the AI", () => {
     "lib/spotter-cornerstone-synthesis.ts",
     "lib/spotter-overarching-synthesis.ts",
   ];
+  // The helper libraries those routes build their requests from: the "not sent" promise is checked here too.
+  const HELPERS = ["lib/collective-intelligence-lookups.ts", "lib/coach-briefing-gather.ts", "lib/spotter-tier1-sync.ts"];
   function walk(dir: string, out: string[]) {
     for (const name of readdirSync(dir)) {
       if (name === "node_modules" || name === ".next" || name === ".git") continue;
@@ -141,7 +145,7 @@ describe("the AI paragraph covers every route that calls the AI", () => {
   // What the notice promises is not sent. None of the AI-calling files reads these.
   it("keeps the promise that messages, phone, date of birth, body weight and progress photos are not sent", () => {
     const banned = /direct_messages|\bphone\b|date_of_birth|\bbirthday\b|body_weight|progress_photo/i;
-    for (const f of COVERED) {
+    for (const f of [...COVERED, ...HELPERS]) {
       expect(readFileSync(join(root, f), "utf8"), f).not.toMatch(banned);
     }
   });

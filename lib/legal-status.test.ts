@@ -45,6 +45,11 @@ describe("gateCopy", () => {
     expect(c.heading).toBe("The beta notice was updated");
     expect(c.body).toContain("only be asked again if it changes");
   });
+  it("names both when the beta notice and the privacy policy changed (what the 2026-10-08 versions ask for)", () => {
+    const c = gateCopy(["beta_notice", "privacy"]);
+    expect(c.heading).toBe("The beta notice and privacy policy were updated");
+    expect(c.body).toBe("Please read and accept them to continue. You will only be asked again if they change.");
+  });
   it("uses the general line for anything else", () => {
     expect(gateCopy(["beta_notice", "terms", "privacy"]).heading).toBe("One quick thing");
     expect(gateCopy(["terms"]).heading).toBe("One quick thing");
