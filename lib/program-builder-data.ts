@@ -1,3 +1,4 @@
+import { sortByUsage } from "@/lib/exercise-search";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEFAULT_TRACKED_FIELDS, mapSetRow } from "./exercise-fields";
 import { findDemo, type DemoRow } from "./exercise-demo";
@@ -90,7 +91,14 @@ export async function getProgramBuilderData(
     .eq("created_by", coachId);
 
   const demoRows: DemoRow[] = (libraryRows ?? []).map((row: any) => ({ name: row.name, videoPath: row.video_path, youtubeUrl: row.youtube_url }));
-  const exerciseLibrary = Array.from(new Set(demoRows.map((r) => r.name))).sort();
+  // Most-used first (counted across this program's own exercises), then A to Z, so the name box's dropdown puts the coach's usual exercises ahead of rarely used ones.
+  const usage = new Map<string, number>();
+  for (const w of workoutRows ?? []) {
+    for (const ex of (w as { group_workout_exercises?: { exercise_name: string }[] }).group_workout_exercises ?? []) {
+      usage.set(ex.exercise_name, (usage.get(ex.exercise_name) ?? 0) + 1);
+    }
+  }
+  const exerciseLibrary = sortByUsage(Array.from(new Set(demoRows.map((r) => r.name))), usage);
 
   const { data: aliasRows } = await supabase
     .from("exercise_aliases")

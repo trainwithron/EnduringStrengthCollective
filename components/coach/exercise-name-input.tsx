@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { clampedLeft, clampedWidth } from "@/lib/viewport-clamp";
-import { matchTopN, type AliasEntry } from "@/lib/exercise-matching";
+import type { AliasEntry } from "@/lib/exercise-matching";
+import { isExistingExercise, nextActiveIndex, searchExercises } from "@/lib/exercise-search";
 
 export function ExerciseNameInput({
   value,
@@ -16,49 +17,35 @@ export function ExerciseNameInput({
   value: string;
   onChange: (value: string) => void;
   onCommit?: (value: string) => void;
+  // The coach's library, most-used first (the page sorts it that way).
   suggestions: string[];
-  // Learned raw-name -> real-name aliases (the same self-learning table the
-  // CSV/photo importer already writes to) — optional so existing callers
-  // that don't have this loaded yet still work, just without alias-aware
-  // ranking until they thread it through.
+  // Learned raw-name -> real-name aliases (the same self-learning table the CSV/photo importer already writes to). A typed alias lists the real exercise.
   aliases?: AliasEntry[];
-  // Same A/B/C movement-pattern-ladder tier every exercise row already
-  // resolves by name elsewhere — search and tier-picking become one
-  // moment instead of two: a coach sees a suggestion is already a known
-  // Tier-A lift without leaving the search field. Optional/undefined for
-  // callers (the ladder-editing screen itself) that don't need it.
+  // Same A/B/C movement-pattern-ladder tier every exercise row already resolves by name elsewhere — search and tier-picking become one moment instead of two. Optional/undefined
+  // for callers (the ladder-editing screen itself) that don't need it.
   tierByName?: Record<string, "A" | "B" | "C" | null>;
 }) {
-  const [focused, setFocused] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
   const [position, setPosition] = useState<{ top: number; left: number; width: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  // Guards against the input's own onBlur re-committing a stale closure
-  // value right after a suggestion click already committed the new one —
-  // both fire in the same tick, before this component re-renders.
+  const listId = useId();
+  // Guards against the input's own onBlur re-committing a stale closure value right after a row click already committed the new one — both fire in the same tick, before this
+  // component re-renders. Cleared on a short timer so it can never swallow a later blur.
   const suggestionClickedRef = useRef(false);
 
   const trimmed = value.trim();
-  // With real input, rank by the same order-invariant/synonym-aware matcher
-  // the CSV/photo importer already uses — "ipsilateral lunge" or "alt
-  // lunge" now finds the real candidates instead of requiring the exact
-  // substring/word-order the library entry happens to use. Empty input
-  // keeps the plain alphabetical browse-everything list, unrelated to
-  // ranking.
-  const library = suggestions.map((name) => ({ name }));
-  const filtered = trimmed
-    ? matchTopN(trimmed, library, aliases, 3).map((r) => r.exerciseName)
-    : suggestions.slice(0, 6);
+  // With text, a live list of every library exercise whose name or alias matches it anywhere (best matches first). Empty input keeps the plain browse-everything list.
+  const rows = trimmed
+    ? searchExercises(trimmed, suggestions, aliases).map((r) => ({ name: r.name, viaAlias: r.viaAlias }))
+    : suggestions.slice(0, 6).map((name) => ({ name, viaAlias: null as string | null }));
+  // When what was typed is not already an exercise, the last row adds it as a new one.
+  const offerAdd = trimmed !== "" && !isExistingExercise(trimmed, suggestions);
+  const rowCount = rows.length + (offerAdd ? 1 : 0);
+  const showDropdown = open && rowCount > 0;
 
-  const showDropdown = focused && filtered.length > 0;
-
-  // Rendered through a portal to <body>, positioned from the input's real
-  // screen coordinates — this input sits inside the Program Builder's
-  // horizontally-scrolling week row (week-grid.tsx's overflow-x-auto) and
-  // each day card, both of which were clipping/garbling a plain
-  // absolutely-positioned dropdown against whatever sat below it (the
-  // tracked-fields grid). Same fix already proven for program-card-menu.tsx
-  // hitting the identical overflow-hidden clipping class of bug.
+  // Rendered through a portal to <body>, positioned from the input's real screen coordinates — this input sits inside the Program Builder's horizontally-scrolling week row
+  // and each day card, both of which were clipping/garbling a plain absolutely-positioned dropdown. Same fix already proven for program-card-menu.tsx.
   useEffect(() => {
     if (!showDropdown) return;
     function updatePosition() {
@@ -77,18 +64,75 @@ export function ExerciseNameInput({
     };
   }, [showDropdown]);
 
+  function pick(name: string) {
+    suggestionClickedRef.current = true;
+    setTimeout(() => {
+      suggestionClickedRef.current = false;
+    }, 300);
+    onChange(name);
+    onCommit?.(name);
+    setOpen(false);
+    setActive(-1);
+  }
+
+  function pickRow(index: number) {
+    if (index < rows.length) pick(rows[index].name);
+    else pick(trimmed);
+  }
+
+  const optionId = (i: number) => `${listId}-opt-${i}`;
+
   return (
     <div className="relative">
       <input
         ref={inputRef}
         type="text"
+        role="combobox"
+        aria-expanded={showDropdown}
+        aria-controls={listId}
+        aria-autocomplete="list"
+        aria-activedescendant={showDropdown && active >= 0 ? optionId(active) : undefined}
+        autoComplete="off"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onFocus={() => setFocused(true)}
-        // Delayed so a suggestion's onMouseDown fires before this closes
-        // the dropdown — the standard fix for the combobox blur race.
+        onChange={(e) => {
+          onChange(e.target.value);
+          setOpen(true);
+          setActive(-1);
+        }}
+        onFocus={() => setOpen(true)}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            if (!showDropdown) {
+              setOpen(true);
+              return;
+            }
+            e.preventDefault();
+            setActive((a) => nextActiveIndex(e.key as "ArrowDown" | "ArrowUp", a, rowCount));
+          } else if (e.key === "Enter") {
+            if (showDropdown && active >= 0) {
+              e.preventDefault();
+              pickRow(active);
+            } else {
+              // nothing highlighted: Enter keeps what was typed
+              e.preventDefault();
+              setOpen(false);
+              onCommit?.(value);
+              suggestionClickedRef.current = true;
+              setTimeout(() => {
+                suggestionClickedRef.current = false;
+              }, 300);
+            }
+          } else if (e.key === "Escape") {
+            if (showDropdown) {
+              e.preventDefault();
+              setOpen(false);
+              setActive(-1);
+            }
+          }
+        }}
+        // Delayed so a row's mouse-down fires before this closes the list — the standard fix for the combobox blur race.
         onBlur={() => {
-          setTimeout(() => setFocused(false), 150);
+          setTimeout(() => setOpen(false), 150);
           if (suggestionClickedRef.current) {
             suggestionClickedRef.current = false;
             return;
@@ -102,33 +146,55 @@ export function ExerciseNameInput({
       {showDropdown && position && typeof document !== "undefined" &&
         createPortal(
           <div
-            ref={dropdownRef}
+            id={listId}
+            role="listbox"
+            aria-label="Matching exercises"
             style={{ position: "fixed", top: position.top, left: position.left, width: position.width }}
-            className="z-50 bg-surface border border-steel/30 max-h-48 overflow-y-auto shadow-lg"
+            className="z-50 bg-surface border border-steel/30 max-h-72 overflow-y-auto shadow-lg"
           >
-            {filtered.map((name) => {
-              const tier = tierByName?.[name];
+            {rows.map((row, i) => {
+              const tier = tierByName?.[row.name];
               return (
-                <button
-                  key={name}
-                  type="button"
-                  onMouseDown={() => {
-                    suggestionClickedRef.current = true;
-                    onChange(name);
-                    onCommit?.(name);
-                    setFocused(false);
+                <div
+                  key={row.name}
+                  id={optionId(i)}
+                  role="option"
+                  aria-selected={active === i}
+                  // keeps the focus in the input, so typing and the arrow keys keep working
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    pickRow(i);
                   }}
-                  className="w-full flex items-center justify-between gap-2 text-left px-3 h-9 font-body text-sm text-chalk active:bg-graphite"
+                  onMouseEnter={() => setActive(i)}
+                  className={`w-full flex items-center justify-between gap-2 text-left px-3 min-h-11 sm:min-h-9 py-1 font-body text-sm text-chalk cursor-pointer ${active === i ? "bg-graphite" : ""}`}
                 >
-                  <span className="truncate">{name}</span>
+                  <span className="min-w-0">
+                    <span className="block break-words">{row.name}</span>
+                    {row.viaAlias && <span className="block text-xs text-steel">also called {row.viaAlias}</span>}
+                  </span>
                   {tier && (
                     <span className="shrink-0 w-4 h-4 flex items-center justify-center border border-steel/40 text-steel text-xs font-bold">
                       {tier}
                     </span>
                   )}
-                </button>
+                </div>
               );
             })}
+            {offerAdd && (
+              <div
+                id={optionId(rows.length)}
+                role="option"
+                aria-selected={active === rows.length}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  pickRow(rows.length);
+                }}
+                onMouseEnter={() => setActive(rows.length)}
+                className={`w-full flex items-center px-3 min-h-11 sm:min-h-9 py-1 font-body text-sm text-rust cursor-pointer border-t border-steel/20 ${active === rows.length ? "bg-graphite" : ""}`}
+              >
+                <span className="break-words">Add &ldquo;{trimmed}&rdquo; as a new exercise</span>
+              </div>
+            )}
           </div>,
           document.body
         )}
