@@ -61,13 +61,28 @@ export interface Overview {
   skippedNote: string | null;
 }
 
+export const NUTRIENT_KEYS = KEYS;
+
+// The 29 days BEFORE today, added up (oldest first). The page does this on the server once; the food log then adds today's entries as they are logged, in the browser, without
+// asking the server again (buildOverviewFromDays).
+export function pastDaysFor(entries: LoggedEntry[], todayKey: string): DayTotals[] {
+  return windowTotals(datesEndingOn(todayKey, 30).slice(0, 29), entries, KEYS);
+}
+
 export function buildOverview(args: { entries: LoggedEntry[]; todayKey: string; age: number | null; sex: Sex | null; plan?: PlanEstimate | null }): Overview {
-  const { entries, todayKey, age, sex } = args;
-  const today = dayTotals(todayKey, entries, KEYS);
-  const window = windowTotals(datesEndingOn(todayKey, GAP_WINDOW_DAYS), entries, KEYS);
-  const month = windowTotals(datesEndingOn(todayKey, 30), entries, KEYS);
+  const { entries, todayKey } = args;
+  const days30 = windowTotals(datesEndingOn(todayKey, 30), entries, KEYS);
+  return buildOverviewFromDays({ days30, todayEntries: entries.filter((e) => e.logDate === todayKey), todayKey, age: args.age, sex: args.sex, plan: args.plan });
+}
+
+// The same overview from days already added up: `days30` is the 30 days ending today, oldest first (today last), and `todayEntries` are today's entries (for how many carry detail).
+export function buildOverviewFromDays(args: { days30: DayTotals[]; todayEntries: LoggedEntry[]; todayKey: string; age: number | null; sex: Sex | null; plan?: PlanEstimate | null }): Overview {
+  const { days30, todayEntries, todayKey, age, sex } = args;
+  const today = days30[days30.length - 1];
+  const window = days30.slice(-GAP_WINDOW_DAYS);
+  const month = days30;
   // With no logged detail today, a meal plan's estimate (when there is one with data) stands in for today's figures, clearly labelled; it never feeds the "worth a look" view.
-  const detail = detailShare(entries, todayKey);
+  const detail = detailShare(todayEntries, todayKey);
   const planHasData = !!args.plan && Object.keys(args.plan.totals).some((k) => typeof args.plan!.totals[k] === "number");
   const usePlan = detail.detailed === 0 && planHasData;
   const planCoveragePct = usePlan && args.plan!.totalIngredientCount > 0 ? Math.round((args.plan!.coveredIngredientCount / args.plan!.totalIngredientCount) * 1000) / 10 : 0;

@@ -7,7 +7,7 @@ import { NutritionSpotterPanel, type NutritionSpotterFinding } from "@/component
 import { StandingMacroTargetCard } from "@/components/coach/desktop/standing-macro-target-card";
 import { CalorieFloorWarning } from "@/components/coach/nutrition/calorie-floor-warning";
 import { WhatTheyAte } from "@/components/coach/nutrition/what-they-ate";
-import { NutrientsSection } from "@/components/nutrition/nutrients-section";
+import { CoachLogNutrients } from "@/components/coach/nutrition/coach-log-nutrients";
 import { GroceryListSection } from "@/components/coach/nutrition/grocery-list-section";
 import { FoodTrackingSwitch } from "@/components/coach/nutrition/food-tracking-switch";
 import { PreferencesSection } from "@/components/coach/nutrition/preferences-section";
@@ -447,7 +447,6 @@ export async function ClientNutrition({
           <a href="#preferences" className="hover:text-chalk">Preferences</a>
           <a href="#meal-plan" className="hover:text-chalk">Meal plan</a>
           <a href="#what-they-ate" className="hover:text-chalk">What they ate</a>
-          <a href="#nutrients" className="hover:text-chalk">Nutrients</a>
           <a href="#macro-calculator" className="hover:text-chalk">Calculator</a>
         </nav>
       </div>
@@ -628,20 +627,13 @@ export async function ClientNutrition({
       </section>
 
       <section>
-        <SectionHeading id="what-they-ate" title="What they ate" note="The last 7 days of their food log against their target." />
+        <SectionHeading id="what-they-ate" title="What they ate" note="The last 7 days of their food log against their target, and today's vitamins and minerals from the foods they logged." />
         <WhatTheyAte week={week} weightTrend={weightTrend} clientName={firstName} weightUnit={bodyProfile.weightUnit} />
+        <div className="mt-6 max-w-[760px]">
+          <CoachLogNutrients groupId={groupId} athleteId={athleteId} todayKey={todayKey} clientName={firstName} />
+        </div>
       </section>
 
-      <section>
-        <SectionHeading id="nutrients" title="Nutrients" note="Vitamins and minerals from the foods they logged, against their reference intake." />
-        <NutrientsSection
-          athleteId={athleteId}
-          todayKey={todayKey}
-          audience="coach"
-          clientName={firstName}
-          detailHref={(key) => `/groups/${groupId}/nutrition/nutrients/${key}?athleteId=${athleteId}`}
-        />
-      </section>
     </div>
   );
 }

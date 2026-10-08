@@ -16,6 +16,7 @@ import {
   type MealSlot,
 } from "@/lib/food-entry";
 import { servingText } from "@/lib/food-serving";
+import { FoodNutrientPanel } from "@/components/nutrition/food-nutrient-panel";
 import { itemInsertRow, itemsFromEntries } from "@/lib/saved-meal";
 import { checkMacros, parseNumberField } from "@/lib/food-validation";
 import { addDaysToKey } from "@/lib/date-key";
@@ -321,6 +322,7 @@ function EntryRow({
       <p className="font-body text-xs text-steel mt-0.5 [font-variant-numeric:tabular-nums]">
         {entry.calories ?? 0} kcal · {entry.proteinG ?? 0}p / {entry.carbsG ?? 0}c / {entry.fatG ?? 0}f
       </p>
+      <FoodNutrientPanel nutrients={entry.nutrients} />
       <div className="flex flex-wrap items-center gap-1 mt-1">
         <FavoriteStar profileId={athleteId} entry={entry} />
         <button type="button" onClick={() => setEditing(true)} className="min-h-[44px] px-2 font-body text-xs text-steel underline">

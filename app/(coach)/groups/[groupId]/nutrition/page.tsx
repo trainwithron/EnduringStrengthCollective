@@ -24,7 +24,9 @@ import { filterGeneratedMealsForClient, filterPlanForClient, hidePlanRecipes } f
 import { asWeightUnit, displayWeightValue } from "@/lib/units";
 import type { FoodLogEntry } from "@/components/athlete/meal-checkoff-list";
 import { computeTodaysMicronutrients } from "@/lib/todays-micronutrients";
-import { NutrientsSection } from "@/components/nutrition/nutrients-section";
+import { LogNutrients } from "@/components/nutrition/log-nutrients";
+import { fetchAgeAndSex, fetchNutrientLog } from "@/lib/nutrient-data";
+import { pastDaysFor, type PlanEstimate } from "@/lib/nutrient-view";
 import { NutritionYouthModeToggle } from "@/components/coach/desktop/nutrition-youth-mode-toggle";
 import { dedupeRecentFoodLogs } from "@/lib/recent-food-logs";
 import { getCoachClients } from "@/lib/coach-clients";
@@ -352,6 +354,18 @@ export default async function NutritionPage(
   const micronutrients = macrosEnabled
     ? await computeTodaysMicronutrients(supabase, todayMeals)
     : { totals: {}, coveredIngredientCount: 0, totalIngredientCount: 0, hasAnyData: false };
+  // Vitamins and minerals live WITH the food log: the 29 days before today are added up here once; today is added up in the browser as foods are logged.
+  const planEstimate: PlanEstimate | null = micronutrients.hasAnyData ? { totals: micronutrients.totals, coveredIngredientCount: micronutrients.coveredIngredientCount, totalIngredientCount: micronutrients.totalIngredientCount } : null;
+  const nutrientData =
+    trackingOn || planEstimate
+      ? await Promise.all([fetchNutrientLog(supabase, athleteId, todayKey), fetchAgeAndSex(supabase, athleteId, todayKey)]).then(([log, who]) => ({
+          pastDays: pastDaysFor(log.entries, todayKey),
+          age: who.age,
+          sex: who.sex,
+          planEstimate,
+          partialLog: log.truncated,
+        }))
+      : null;
 
   // The client's own unit: stored pounds are only converted for display.
   const { data: unitRow } = await supabase.from("athlete_profile_details").select("weight_unit").eq("athlete_id", athleteId).maybeSingle();
@@ -464,6 +478,7 @@ export default async function NutritionPage(
               <FoodLogSection
                 target={todayMacros}
                 coachProgramming={macrosEnabled}
+                nutrients={nutrientData}
                 plan={savedPlanMeals ? { meals: clientPlan.meals, hiddenCount: clientPlan.hiddenCount, emptiedMeals: clientPlan.emptiedMeals } : null}
                 athleteId={athleteId}
                 groupId={params.groupId}
@@ -479,19 +494,20 @@ export default async function NutritionPage(
             )}
           </section>
 
-          {(trackingOn || micronutrients.hasAnyData) && (
-            <section>
-              <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">Vitamins and minerals</h2>
-              <NutrientsSection
-                athleteId={athleteId}
-                todayKey={todayKey}
-                audience="client"
-                detailHref={(key) => `/groups/${params.groupId}/nutrition/nutrients/${key}`}
-                planEstimate={micronutrients.hasAnyData ? { totals: micronutrients.totals, coveredIngredientCount: micronutrients.coveredIngredientCount, totalIngredientCount: micronutrients.totalIngredientCount } : null}
-              />
-            </section>
+          {!trackingOn && nutrientData && planEstimate && (
+            <LogNutrients
+              groupId={params.groupId}
+              athleteId={athleteId}
+              todayKey={todayKey}
+              pastDays={nutrientData.pastDays}
+              age={nutrientData.age}
+              sex={nutrientData.sex}
+              entries={[]}
+              audience="client"
+              planEstimate={planEstimate}
+              partialLog={nutrientData.partialLog}
+            />
           )}
-
           {macrosEnabled && (
           <section>
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
