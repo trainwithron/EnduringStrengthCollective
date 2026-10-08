@@ -311,7 +311,7 @@ export function ExerciseCard({
         ) : (
           <>
             <h2 className="font-body font-medium text-[15px]">
-              {exercise.exerciseName || "Untitled exercise"}
+              {exercise.displayName ?? (exercise.exerciseName || "Untitled exercise")}
               {exercise.isSwapped && (
                 <span className="font-body text-xs text-steel ml-2 align-middle">
                   swapped
@@ -353,7 +353,7 @@ export function ExerciseCard({
       {((demo && !demosHidden) || lastTime || (exercise.volumeHistory && exercise.volumeHistory.length > 0)) && (
         <div className="flex flex-col min-[380px]:flex-row items-start gap-3 mb-2">
           {demo && !demosHidden && openDemo && (
-            <DemoThumb title={exercise.exerciseName || "Exercise"} youtubeUrl={demo.youtubeUrl} onOpen={() => openDemo(exercise.id)} />
+            <DemoThumb title={exercise.displayName ?? (exercise.exerciseName || "Exercise")} youtubeUrl={demo.youtubeUrl} onOpen={() => openDemo(exercise.id)} />
           )}
           {demo && !demosHidden && !openDemo && (
             <ExerciseDemoButton

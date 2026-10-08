@@ -1,4 +1,5 @@
 import { sortByUsage } from "@/lib/exercise-search";
+import { mergeAliases } from "@/lib/exercise-alias-seed";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEFAULT_TRACKED_FIELDS, mapSetRow } from "./exercise-fields";
 import { findDemo, type DemoRow } from "./exercise-demo";
@@ -77,7 +78,7 @@ export async function getProgramBuilderData(
       `
       id, title, week_number, day_index, scheduled_date,
       group_workout_exercises (
-        id, exercise_name, exercise_order, movement_pattern_id, tracked_fields, notes,
+        id, exercise_name, display_name, exercise_order, movement_pattern_id, tracked_fields, notes,
         group_workout_exercise_sets ( id, set_order, target_reps, target_weight, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance, rep_min, rep_max )
       ),
       workout_notes ( id, body, position )
@@ -150,6 +151,7 @@ export async function getProgramBuilderData(
         id: ex.id,
         order: ex.exercise_order,
         exerciseName: ex.exercise_name,
+        displayName: ex.display_name ?? null,
         movementPatternId: ex.movement_pattern_id,
         trackedFields: ex.tracked_fields ?? DEFAULT_TRACKED_FIELDS,
         notes: ex.notes,
@@ -219,7 +221,7 @@ export async function getProgramBuilderData(
     aiSequencingNotes: program.ai_sequencing_notes,
     initialDays: days,
     exerciseLibrary,
-    exerciseAliases,
+    exerciseAliases: mergeAliases(exerciseAliases, exerciseLibrary),
     exerciseTierByName: Object.fromEntries(tierByName),
     demoLibrary: demoRows,
     movementPatterns,

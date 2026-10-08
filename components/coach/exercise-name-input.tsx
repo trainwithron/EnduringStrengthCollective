@@ -8,6 +8,7 @@ import type { DemoRow } from "@/lib/exercise-demo";
 import { builderDemoFor } from "@/lib/builder-demo";
 import { BuilderDemoThumb } from "@/components/coach/builder-demo-thumb";
 import { isExistingExercise, nextActiveIndex, searchExercises } from "@/lib/exercise-search";
+import { resolveTypedAlias } from "@/lib/exercise-alias-seed";
 
 export function ExerciseNameInput({
   value,
@@ -20,7 +21,9 @@ export function ExerciseNameInput({
 }: {
   value: string;
   onChange: (value: string) => void;
-  onCommit?: (value: string) => void;
+  // Called with the name to save. When the coach picked an exercise through one of their aliases (or typed an alias), the first argument is the REAL exercise and the second is the alias they used
+  // (to be shown as the row's name); otherwise the second is undefined.
+  onCommit?: (value: string, displayName?: string) => void;
   // The coach's library, most-used first (the page sorts it that way).
   suggestions: string[];
   // Learned raw-name -> real-name aliases (the same self-learning table the CSV/photo importer already writes to). A typed alias lists the real exercise.
@@ -70,19 +73,28 @@ export function ExerciseNameInput({
     };
   }, [showDropdown]);
 
-  function pick(name: string) {
+  function pick(name: string, alias?: string | null) {
     suggestionClickedRef.current = true;
     setTimeout(() => {
       suggestionClickedRef.current = false;
     }, 300);
-    onChange(name);
-    onCommit?.(name);
+    // the box shows the name the coach chose (their alias when they picked through one); what is saved is the real exercise plus that alias
+    onChange(alias ?? name);
+    if (alias) onCommit?.(name, alias);
+    else onCommit?.(name);
     setOpen(false);
     setActive(-1);
   }
 
+  // Typed text and left (Enter or leaving the box): if it is one of the coach's aliases it is saved as that alias of the real exercise, else exactly as typed.
+  function commitTyped(text: string) {
+    const alias = resolveTypedAlias(text, suggestions, aliases);
+    if (alias) onCommit?.(alias.exerciseName, alias.displayName);
+    else onCommit?.(text);
+  }
+
   function pickRow(index: number) {
-    if (index < rows.length) pick(rows[index].name);
+    if (index < rows.length) pick(rows[index].name, rows[index].viaAlias);
     else pick(trimmed);
   }
 
@@ -122,7 +134,7 @@ export function ExerciseNameInput({
               // nothing highlighted: Enter keeps what was typed
               e.preventDefault();
               setOpen(false);
-              onCommit?.(value);
+              commitTyped(value);
               suggestionClickedRef.current = true;
               setTimeout(() => {
                 suggestionClickedRef.current = false;
@@ -143,7 +155,7 @@ export function ExerciseNameInput({
             suggestionClickedRef.current = false;
             return;
           }
-          onCommit?.(value);
+          commitTyped(value);
         }}
         placeholder="Exercise name"
         aria-label="Exercise name"

@@ -81,7 +81,7 @@ function PreviewRow({ exercise, demoLibrary }: { exercise: BuilderExercise; demo
   return (
     <div className="py-3 flex items-start gap-3">
       <div className="min-w-0 flex-1">
-        <p className="font-body font-medium text-[15px] break-words">{exercise.exerciseName || "Exercise"}</p>
+        <p className="font-body font-medium text-[15px] break-words">{exercise.displayName ?? (exercise.exerciseName || "Exercise")}</p>
         <p className="font-body text-sm text-steel">{summarizeSets(exercise.sets, exercise.trackedFields, { withRest: true, withExtras: true })}</p>
         {exercise.notes && <p className="font-body text-xs text-steel mt-0.5 whitespace-pre-wrap">{exercise.notes}</p>}
       </div>

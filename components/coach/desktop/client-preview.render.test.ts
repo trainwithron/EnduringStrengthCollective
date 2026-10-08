@@ -34,6 +34,7 @@ const exercise = (id: string, order: number, name: string, tracked: TrackedField
   id,
   order,
   exerciseName: name,
+  displayName: null,
   movementPatternId: null,
   trackedFields: tracked,
   notes,

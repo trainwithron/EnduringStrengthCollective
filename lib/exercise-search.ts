@@ -36,7 +36,7 @@ function jaccard(a: string, b: string): number {
 }
 
 // How well one piece of text (an exercise name or an alias) matches the typed text, or null for no match.
-function tierOf(typed: string, text: string): 0 | 1 | 2 | 3 | 4 | null {
+function tierOfOne(typed: string, text: string): 0 | 1 | 2 | 3 | 4 | null {
   const t = plain(text);
   if (!t) return null;
   if (t === typed) return 0;
@@ -49,9 +49,30 @@ function tierOf(typed: string, text: string): 0 | 1 | 2 | 3 | 4 | null {
   return null;
 }
 
+// Equipment shorthand a coach types ("DB bench", "BB row", "KB swing", "OHP"): also searched as the full words. Only unambiguous abbreviations.
+const SHORTHAND: Record<string, string> = { db: "dumbbell", dbs: "dumbbell", bb: "barbell", kb: "kettlebell", kbs: "kettlebell", ohp: "overhead press", rdl: "romanian deadlift" };
+
+export function expandShorthand(typed: string): string {
+  return typed
+    .split(" ")
+    .map((w) => SHORTHAND[w] ?? w)
+    .join(" ");
+}
+
 export function searchExercises(query: string, library: string[], aliases: AliasEntry[], limit: number = DROPDOWN_LIMIT): ExerciseSearchResult[] {
   const typed = plain(query);
   if (!typed) return [];
+  const expanded = expandShorthand(typed);
+  const variants = expanded === typed ? [typed] : [typed, expanded];
+  // the best (lowest) tier over what was typed and its expansion
+  const tierOf = (_unused: string, text: string): 0 | 1 | 2 | 3 | 4 | null => {
+    let best: 0 | 1 | 2 | 3 | 4 | null = null;
+    for (const v of variants) {
+      const t = tierOfOne(v, text);
+      if (t !== null && (best === null || t < best)) best = t;
+    }
+    return best;
+  };
 
   const inLibrary = new Set(library);
   const aliasesByName = new Map<string, string[]>();

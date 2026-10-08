@@ -89,6 +89,8 @@ export interface SetLogEntry {
 export interface SessionExerciseEntry {
   id: string;
   exerciseName: string;
+  // The coach's own name for the exercise, shown instead of exerciseName while it is still the program's exercise (cleared when the athlete swaps it for another).
+  displayName?: string | null;
   exerciseOrder: number;
   isSwapped: boolean;
   isAdded: boolean;
@@ -157,7 +159,10 @@ export interface BuilderExercise {
   kind: "exercise";
   id: string;
   order: number;
+  // The REAL exercise: every lookup (history, records, progression, the library) uses this.
   exerciseName: string;
+  // The coach's own name for it, set only when they picked the exercise through one of their aliases (group_workout_exercises.display_name). What is SHOWN uses this when there is one.
+  displayName: string | null;
   movementPatternId: string | null;
   trackedFields: TrackedField[];
   notes: string | null;
