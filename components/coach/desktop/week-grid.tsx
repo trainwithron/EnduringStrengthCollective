@@ -22,7 +22,6 @@ export function WeekGrid({
   programId,
   groupId,
   athleteId,
-  showDayClients = false,
   exerciseLibrary,
   exerciseAliases,
   exerciseTierByName,
@@ -43,7 +42,6 @@ export function WeekGrid({
   programId: string;
   groupId: string;
   athleteId: string | null;
-  showDayClients?: boolean;
   exerciseLibrary: string[];
   exerciseAliases: AliasEntry[];
   exerciseTierByName: Record<string, "A" | "B" | "C" | null>;
@@ -288,7 +286,6 @@ export function WeekGrid({
                   day={day}
                   scheduledDate={scheduledDateByDayId?.get(day.id)}
                   groupId={groupId}
-                  showClients={showDayClients}
                   exerciseLibrary={exerciseLibrary}
                   exerciseAliases={exerciseAliases}
                   exerciseTierByName={exerciseTierByName}

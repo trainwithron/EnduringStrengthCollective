@@ -59,7 +59,6 @@ export function DayCard({
   onUpdate,
   onItemsChange,
   onDeleted,
-  showClients = false,
 }: {
   day: BuilderDay;
   scheduledDate?: Date;
@@ -82,8 +81,6 @@ export function DayCard({
   onUpdate: (patch: Partial<Pick<BuilderDay, "title">>) => void;
   onItemsChange: (items: BuilderItem[]) => void;
   onDeleted: () => void;
-  // The day-level Clients link: only on the general Programs tab.
-  showClients?: boolean;
 }) {
   const { flashSaved, flashSaveError } = useSaveToastChannel();
   const [titleDraft, setTitleDraft] = useState(day.title);
@@ -422,14 +419,12 @@ export function DayCard({
           </button>
         )}
         <ClientPreviewButton days={[day]} heading={day.title || `Day ${day.dayIndex + 1}`} label="Preview" demoLibrary={demoLibrary} />
-        {showClients && (
-          <Link
-            href={`/groups/${groupId}/workouts/${day.id}/clients`}
-            className="font-body text-xs text-steel active:text-rust transition-colors shrink-0"
-          >
-            Clients
-          </Link>
-        )}
+        <Link
+          href={`/groups/${groupId}/workouts/${day.id}/clients`}
+          className="font-body text-xs text-steel active:text-rust transition-colors shrink-0"
+        >
+          Clients
+        </Link>
         <button
           type="button"
           onClick={handleDeleteDay}
