@@ -1,9 +1,10 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { createServerClient } from "@/lib/supabase/server";
 
 // The Programs tab of one client's profile: the programs made for this client (their own copies), the active one first, each opening the builder. Assigning one
 // is the "Programming" menu at the top of the profile.
-export async function ClientProgramsSection({ groupId, athleteId }: { groupId: string; athleteId: string }) {
+export async function ClientProgramsSection({ groupId, athleteId, actions }: { groupId: string; athleteId: string; actions?: ReactNode }) {
   const supabase = await createServerClient();
   const { data } = await supabase
     .from("programs")
@@ -29,6 +30,7 @@ export async function ClientProgramsSection({ groupId, athleteId }: { groupId: s
   return (
     <section>
       <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">Programs</h2>
+      {actions}
       {shared && (
         <Link href={`/groups/${groupId}/programs/${shared.id}`} className="flex items-center justify-between gap-3 py-2.5 px-1 mb-2 border-y border-steel/15 hover:bg-surface/60">
           <span className="font-body text-sm text-chalk truncate">{shared.name}</span>
@@ -36,7 +38,7 @@ export async function ClientProgramsSection({ groupId, athleteId }: { groupId: s
         </Link>
       )}
       {programs.length === 0 ? (
-        shared ? null : <p className="font-body text-sm text-steel">No program made for them yet. Use Programming at the top to assign one.</p>
+        shared ? null : <p className="font-body text-sm text-steel">No program made for them yet. Use the Programming menu above to assign one.</p>
       ) : (
         <ul className="divide-y divide-steel/15 border-y border-steel/15">
           {programs.map((p) => (
