@@ -1091,6 +1091,20 @@ alter table public.coach_availability_windows drop column if exists session_minu
     ],
   },
   {
+    n: "61",
+    slug: "0316",
+    title: "0316 A program copy remembers which program it was copied from: one optional column (programs.source_program_id) and the copy function now stores it, so the builder can list the clients who hold a copy of a program",
+    migrations: ["0316"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing visible changes. Programs made before this keep no link (nothing is matched or renamed). From now on every copy (Assign to client, Duplicate, a package that carries a program) records the program it came from, and the program's label at the top of the builder lists the clients assigned to it.",
+    undo: ["drop index if exists public.programs_source_program_id_idx;", "alter table public.programs drop column if exists source_program_id;", fnFromMigration("0310", "duplicate_program"), "revoke execute on function public.duplicate_program(uuid, uuid, uuid, uuid, text, date) from public, anon;", "grant execute on function public.duplicate_program(uuid, uuid, uuid, uuid, text, date) to authenticated, service_role;"].join(String.fromCharCode(10)),
+    undoWhy: "Only if step 61 misbehaves. Puts the copy function back exactly as it was (without storing the source) and removes the column; every program and copy stays.",
+    rows: [
+      ["the program copy function exists", has.fn("duplicate_program(uuid, uuid, uuid, uuid, text, date)")],
+      ["0316 is not already applied (programs has no source_program_id yet)", `not ${has.col("programs", "source_program_id")}`],
+    ],
+  },
+  {
     n: "60",
     slug: "0315",
     title: "0315 The \"I'm away\" preset reply: a coach writes one reply, turns it on (optionally with a last day), and every message a client sends them gets that reply back in the thread (marked as an auto-reply). One tiny private table, one marker column, two trigger functions",
@@ -1338,6 +1352,7 @@ const BUNDLES = [
   { id: "release-q", name: "Release Q (the coach's own name for an exercise)", steps: ["55"] },
   { id: "release-r", name: "Release R (a client can ask for a different meal plan)", steps: ["56"] },
   { id: "release-s", name: "Release S (booking hours check, grouped counts, hide demos per person, the away preset reply)", steps: ["57", "58", "59", "60"] },
+  { id: "release-t", name: "Release T (a program copy remembers its source)", steps: ["61"] },
   { id: "release-n2", name: "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)", steps: ["49", "50"] },
   { id: "release-m", name: "Release M (acceptance record is append-only)", steps: ["44"] },
 ];
@@ -1513,6 +1528,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0295", has.table("client_phase_plans")),
     m("0296", has.col("recipes", "content_hash")),
     m("0297", has.table("schedule_requests")),
+    m("0316", has.col("programs", "source_program_id")),
     m("0315", has.table("coach_away_replies")),
     m("0314", has.table("client_ui_settings")),
     m("0313", has.fnName("booking_counts")),

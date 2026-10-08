@@ -655,6 +655,26 @@ for (const s of steps) {
   const errS2 = await run(`apply/${bundle.file}`);
   check("release-s: the bundle applies again after an undo" + (errS2 ? ": " + errS2 : ""), !errS2 && (await checksHours()) && (await hasCounts()) && (await hasUi()) && (await hasAway()));
 }
+// Release T (step 61): ONE paste. The source column is not there before, the bundle adds it and the copy function stores it, a second run is refused naming step 61, the undo removes the column
+// and puts the copy function back, and it applies again.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-t");
+  check("release-t: ONE bundle starts with step 61", !!bundle && bundle.steps[0] === "61");
+  const st61 = steps.find((x) => x.n === "61");
+  const hasCol = async () => (await db.query("select exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'source_program_id') as ok")).rows[0].ok === true;
+  const storesSource = async () => (await db.query("select position('ai_sequencing_notes, source_program_id' in pg_get_functiondef(p.oid)) > 0 as ok from pg_proc p where p.proname = 'duplicate_program' and p.pronamespace = 'public'::regnamespace")).rows[0].ok === true;
+  const eu0 = await run(`apply/undo-step${st61.n}-${st61.slug}.sql`);
+  check("release-t: before the bundle runs there is no source column" + (eu0 ? ": " + eu0 : ""), !eu0 && !(await hasCol()) && !(await storesSource()));
+  const errT = await run(`apply/${bundle.file}`);
+  check("release-t bundle applies on the live-shaped state" + (errT ? ": " + errT : ""), !errT && (await hasCol()) && (await storesSource()));
+  const againT = await run(`apply/${bundle.file}`);
+  check("release-t: a second run is refused, naming step 61 (" + againT + ")", !!againT && againT.includes("step 61 (0316) cannot run") && againT.includes("already applied"));
+  const euT = await run(`apply/undo-step${st61.n}-${st61.slug}.sql`);
+  check("release-t: the undo removes the column and puts the copy function back" + (euT ? ": " + euT : ""), !euT && !(await hasCol()) && !(await storesSource()));
+  const errT2 = await run(`apply/${bundle.file}`);
+  check("release-t: the bundle applies again after an undo" + (errT2 ? ": " + errT2 : ""), !errT2 && (await hasCol()) && (await storesSource()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.

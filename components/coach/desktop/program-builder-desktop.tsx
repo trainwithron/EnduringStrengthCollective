@@ -10,6 +10,7 @@ import { WeekGrid } from "./week-grid";
 import { ProgramScheduleSettings } from "../program-schedule-settings";
 import { computeScheduledDates, type VisibilityWindow } from "@/lib/program-schedule";
 import type { MovementPatternOption } from "../exercise-builder-card";
+import { ProgramAssignedClients } from "@/components/coach/desktop/program-assigned-clients";
 import { ProgramCardMenu } from "./program-card-menu";
 import { SaveToast } from "./save-toast";
 import { SaveStatusBar } from "./save-status-bar";
@@ -235,6 +236,7 @@ export function ProgramBuilderDesktop({
             hideAssignAndDuplicate={embedded}
           />
         </div>
+        <ProgramAssignedClients programId={programId} groupId={groupId} athleteId={athleteId} />
         <div className="mt-2">
           <SaveStatusBar />
         </div>
