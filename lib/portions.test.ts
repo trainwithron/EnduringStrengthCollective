@@ -33,6 +33,7 @@ describe("householdMeasure", () => {
   it("oats get the dry weight only when the line says dry: overnight, baked, protein and bare oats are not guessed", () => {
     expect(householdMeasure("Rolled Oats (Dry)", 40)).toBe("1/2 cup");
     expect(householdMeasure("Old-Fashioned Oats", 81)).toBe("1 cup");
+    expect(householdMeasure("Oats (Dry)", 40)).toBe("1/2 cup");
     expect(householdMeasure("Oats", 240)).toBeNull();
     expect(householdMeasure("Baked Oats", 240)).toBeNull();
     expect(householdMeasure("Protein Oats", 120)).toBeNull();
