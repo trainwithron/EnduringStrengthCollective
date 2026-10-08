@@ -1,5 +1,6 @@
 "use client";
 
+import type { DemoRow } from "@/lib/exercise-demo";
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { BuilderDay, BuilderExercise } from "@/lib/types";
@@ -22,6 +23,7 @@ export function WeekGrid({
   exerciseLibrary,
   exerciseAliases,
   exerciseTierByName,
+  demoLibrary,
   movementPatterns,
   laddersByPattern,
   restSuggestions,
@@ -41,6 +43,7 @@ export function WeekGrid({
   exerciseLibrary: string[];
   exerciseAliases: AliasEntry[];
   exerciseTierByName: Record<string, "A" | "B" | "C" | null>;
+  demoLibrary: DemoRow[];
   movementPatterns: MovementPatternOption[];
   laddersByPattern: Record<string, { exerciseName: string }[]>;
   restSuggestions?: RestTempoSuggestion[];
@@ -290,6 +293,7 @@ export function WeekGrid({
                   exerciseLibrary={exerciseLibrary}
                   exerciseAliases={exerciseAliases}
                   exerciseTierByName={exerciseTierByName}
+                  demoLibrary={demoLibrary}
                   movementPatterns={movementPatterns}
                   laddersByPattern={laddersByPattern}
                   restSuggestions={restSuggestions}

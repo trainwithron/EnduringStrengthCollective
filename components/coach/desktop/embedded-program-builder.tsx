@@ -113,6 +113,7 @@ export function EmbeddedProgramBuilder({ groupId }: { groupId: string }) {
         exerciseLibrary={data.exerciseLibrary}
         exerciseAliases={data.exerciseAliases}
         exerciseTierByName={data.exerciseTierByName}
+        demoLibrary={data.demoLibrary}
         movementPatterns={data.movementPatterns}
         laddersByPattern={data.laddersByPattern}
         initialStartDate={data.initialStartDate}

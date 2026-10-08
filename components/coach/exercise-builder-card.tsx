@@ -1,10 +1,12 @@
 "use client";
 
+import type { DemoRow } from "@/lib/exercise-demo";
 import { useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { formatRest, parseRestInput } from "@/lib/rest-time";
 import { ExerciseNameInput } from "./exercise-name-input";
-import { ExerciseDemoButton } from "@/components/logging/exercise-demo-button";
+import { BuilderDemoThumb } from "@/components/coach/builder-demo-thumb";
+import { builderDemoFor, type BuilderDemo } from "@/lib/builder-demo";
 import type { AliasEntry } from "@/lib/exercise-matching";
 import { ExerciseMediaPicker } from "./exercise-media-picker";
 import type { BuilderExercise, ExerciseSetTarget } from "@/lib/types";
@@ -96,6 +98,7 @@ export function ExerciseBuilderCard({
   exerciseLibrary,
   exerciseAliases,
   exerciseTierByName,
+  demoLibrary,
   movementPatterns,
   laddersByPattern,
   restSuggestions,
@@ -115,6 +118,7 @@ export function ExerciseBuilderCard({
   exerciseLibrary: string[];
   exerciseAliases: AliasEntry[];
   exerciseTierByName?: Record<string, "A" | "B" | "C" | null>;
+  demoLibrary?: DemoRow[];
   movementPatterns: MovementPatternOption[];
   // exercise_tier_template_system_assessment_task.md — every ladder rung
   // for every pattern this coach owns, keyed by movement_pattern_id. A
@@ -156,6 +160,19 @@ export function ExerciseBuilderCard({
   }, [exercise.exerciseName]);
   const [collapsed, setCollapsed] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  // The demo for the name this exercise has NOW, from the coach's library (the client gets the same one). A video the coach just added or removed here is remembered for this name until
+  // the page loads again.
+  const [mediaOverride, setMediaOverride] = useState<{ name: string; videoPath: string | null; youtubeUrl: string | null } | null>(null);
+  const liveDemo: BuilderDemo | null =
+    mediaOverride && mediaOverride.name === exercise.exerciseName
+      ? mediaOverride.videoPath || mediaOverride.youtubeUrl
+        ? { demo: { videoPath: mediaOverride.videoPath, youtubeUrl: mediaOverride.youtubeUrl, foundAs: exercise.exerciseName }, storedUnder: null }
+        : null
+      : demoLibrary
+        ? builderDemoFor(demoLibrary, exercise.exerciseName)
+        : exercise.videoPath || exercise.youtubeUrl
+          ? { demo: { videoPath: exercise.videoPath, youtubeUrl: exercise.youtubeUrl, foundAs: exercise.exerciseName }, storedUnder: null }
+          : null;
   const [addFieldOpen, setAddFieldOpen] = useState(false);
   const [presetMenuOpen, setPresetMenuOpen] = useState(false);
   const [restMenuOpen, setRestMenuOpen] = useState(false);
@@ -231,6 +248,11 @@ export function ExerciseBuilderCard({
 
   function handleMediaChange(patch: { videoPath?: string | null; youtubeUrl?: string | null }) {
     onUpdate(patch);
+    setMediaOverride({
+      name: exercise.exerciseName,
+      videoPath: patch.videoPath !== undefined ? patch.videoPath : (liveDemo?.demo.videoPath ?? null),
+      youtubeUrl: patch.youtubeUrl !== undefined ? patch.youtubeUrl : (liveDemo?.demo.youtubeUrl ?? null),
+    });
   }
 
   async function persistNotes(next: string) {
@@ -640,7 +662,7 @@ export function ExerciseBuilderCard({
 
   return (
     <div className="border border-steel/20 p-3 bg-surface/40">
-      <div className="flex items-center gap-2 mb-2">
+      <div className="flex items-center gap-1 mb-1">
         <GripVertical className="w-4 h-4 text-steel shrink-0 hidden sm:block" aria-hidden="true" />
         <div className="flex items-center gap-0.5 shrink-0 sm:hidden" aria-label="Reorder exercise">
           <button
@@ -648,7 +670,7 @@ export function ExerciseBuilderCard({
             onClick={onMoveUp}
             disabled={!canMoveUp}
             aria-label="Move exercise up"
-            className="w-6 h-7 flex items-center justify-center text-steel disabled:opacity-30"
+            className="w-11 h-11 flex items-center justify-center text-steel disabled:opacity-30"
           >
             <ChevronUp className="w-3.5 h-3.5" />
           </button>
@@ -657,7 +679,7 @@ export function ExerciseBuilderCard({
             onClick={onMoveDown}
             disabled={!canMoveDown}
             aria-label="Move exercise down"
-            className="w-6 h-7 flex items-center justify-center text-steel disabled:opacity-30"
+            className="w-11 h-11 flex items-center justify-center text-steel disabled:opacity-30"
           >
             <ChevronDown className="w-3.5 h-3.5" />
           </button>
@@ -670,21 +692,12 @@ export function ExerciseBuilderCard({
             {exercise.tier}
           </span>
         )}
-        <div className="flex-1 min-w-0">
-          <ExerciseNameInput
-            value={collapsed ? exercise.exerciseName : nameDraft}
-            onChange={setNameDraft}
-            onCommit={handleNameCommit}
-            suggestions={exerciseLibrary}
-            aliases={exerciseAliases}
-            tierByName={exerciseTierByName}
-          />
-        </div>
+        <span className="flex-1" />
         <button
           type="button"
           onClick={() => setCollapsed((v) => !v)}
           aria-label={collapsed ? "Expand exercise" : "Collapse exercise"}
-          className="w-7 h-7 flex items-center justify-center text-steel shrink-0"
+          className="w-11 h-11 sm:w-7 sm:h-7 flex items-center justify-center text-steel shrink-0"
         >
           {collapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
         </button>
@@ -693,7 +706,7 @@ export function ExerciseBuilderCard({
           onClick={handleDuplicate}
           disabled={busy}
           aria-label="Duplicate exercise"
-          className="w-7 h-7 flex items-center justify-center text-steel active:text-rust transition-colors shrink-0 disabled:opacity-40"
+          className="w-11 h-11 sm:w-7 sm:h-7 flex items-center justify-center text-steel active:text-rust transition-colors shrink-0 disabled:opacity-40"
         >
           <Copy className="w-3.5 h-3.5" />
         </button>
@@ -702,10 +715,34 @@ export function ExerciseBuilderCard({
           onClick={handleDelete}
           disabled={busy}
           aria-label="Delete exercise"
-          className="w-7 h-7 flex items-center justify-center text-steel active:text-rust transition-colors shrink-0 disabled:opacity-40"
+          className="w-11 h-11 sm:w-7 sm:h-7 flex items-center justify-center text-steel active:text-rust transition-colors shrink-0 disabled:opacity-40"
         >
           <Trash2 className="w-3.5 h-3.5" />
         </button>
+      </div>
+      {/* The name has the card's full width on its own row; the demo picture sits beside it, in both the open and the collapsed card. */}
+      <div className="flex items-start gap-2 mb-2">
+        <BuilderDemoThumb
+          exerciseName={exercise.exerciseName}
+          demo={liveDemo}
+          notes={exercise.notes}
+          showCaption={!collapsed}
+          onAddVideo={() => {
+            setCollapsed(false);
+            setShowDetails(true);
+          }}
+        />
+        <div className="flex-1 min-w-0 pt-0.5">
+          <ExerciseNameInput
+            value={collapsed ? exercise.exerciseName : nameDraft}
+            onChange={setNameDraft}
+            onCommit={handleNameCommit}
+            suggestions={exerciseLibrary}
+            aliases={exerciseAliases}
+            tierByName={exerciseTierByName}
+            demoLibrary={demoLibrary}
+          />
+        </div>
       </div>
 
       {!collapsed && (
@@ -926,7 +963,6 @@ export function ExerciseBuilderCard({
             >
               {showDetails ? "Hide details" : "Edit details"}
             </button>
-            <ExerciseDemoButton compact title={exercise.exerciseName || "Exercise"} youtubeUrl={exercise.youtubeUrl} videoPath={exercise.videoPath} />
           </div>
 
           {showDetails && (
@@ -967,8 +1003,8 @@ export function ExerciseBuilderCard({
               />
               <ExerciseMediaPicker
                 exerciseName={exercise.exerciseName}
-                videoPath={exercise.videoPath}
-                youtubeUrl={exercise.youtubeUrl}
+                videoPath={liveDemo && !liveDemo.storedUnder ? liveDemo.demo.videoPath : null}
+                youtubeUrl={liveDemo && !liveDemo.storedUnder ? liveDemo.demo.youtubeUrl : null}
                 onChange={handleMediaChange}
               />
             </div>

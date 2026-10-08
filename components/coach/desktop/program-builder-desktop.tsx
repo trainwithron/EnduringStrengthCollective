@@ -1,5 +1,6 @@
 "use client";
 
+import type { DemoRow } from "@/lib/exercise-demo";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -29,6 +30,7 @@ export function ProgramBuilderDesktop({
   exerciseLibrary,
   exerciseAliases,
   exerciseTierByName,
+  demoLibrary,
   movementPatterns,
   laddersByPattern,
   initialStartDate,
@@ -60,6 +62,7 @@ export function ProgramBuilderDesktop({
   // dropdown too, so picking a suggested name and seeing its tier are the
   // same moment instead of two separate lookups.
   exerciseTierByName: Record<string, "A" | "B" | "C" | null>;
+  demoLibrary: DemoRow[];
   movementPatterns: MovementPatternOption[];
   // exercise_tier_template_system_assessment_task.md — every ladder rung
   // for every pattern this coach owns, keyed by movement_pattern_id, so
@@ -298,6 +301,7 @@ export function ProgramBuilderDesktop({
             exerciseLibrary={exerciseLibrary}
             exerciseAliases={exerciseAliases}
             exerciseTierByName={exerciseTierByName}
+            demoLibrary={demoLibrary}
             movementPatterns={movementPatterns}
             laddersByPattern={laddersByPattern}
             restSuggestions={restSuggestions}
