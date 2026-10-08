@@ -28,7 +28,8 @@ const MAX_CANDIDATES = 60;
 // A quiet suggestion for the coach, never a decision: "Probably inactive: Sam. Door open or set aside?" Nothing is sent, archived or changed until the
 // coach picks. Setting aside is reversible and deletes nothing. Needs the 0281 database update; before it is applied the lookup fails quietly and
 // nothing shows.
-export function InactiveClientsPanel() {
+export function InactiveClientsPanel({ groupIds: scopeGroupIds }: { groupIds?: string[] } = {}) {
+  const scopeKey = scopeGroupIds ? scopeGroupIds.join(",") : "";
   const [coachId, setCoachId] = useState<string | null>(null);
   const [items, setItems] = useState<Item[]>([]);
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -46,7 +47,7 @@ export function InactiveClientsPanel() {
       const now = new Date();
 
       const { data: coached } = await supabase.from("group_memberships").select("group_id").eq("profile_id", user.id).eq("role", "coach");
-      const groupIds = (coached ?? []).map((r: any) => r.group_id as string);
+      const groupIds = (coached ?? []).map((r: any) => r.group_id as string).filter((id: string) => !scopeGroupIds || scopeGroupIds.includes(id));
       if (groupIds.length === 0) return;
 
       // Active clients only. If the column is not there yet this errors and the panel stays empty.
@@ -143,7 +144,8 @@ export function InactiveClientsPanel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeKey]);
 
   const remove = (i: Item) => setItems((p) => p.filter((x) => !(x.athleteId === i.athleteId && x.groupId === i.groupId)));
 

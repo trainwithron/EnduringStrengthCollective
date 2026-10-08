@@ -7,8 +7,8 @@ const read = (p: string) => readFileSync(resolve(__dirname, p), "utf8");
 describe("inactive clients: wiring and safety", () => {
   const panel = read("../components/coach/inactive-clients-panel.tsx");
   it("the card is shown on the desktop dashboard and the phone home, next to the expiry check-in", () => {
-    expect(read("../app/(coach)/dashboard/page.tsx")).toContain("<InactiveClientsPanel />");
-    expect(read("../components/coach/mobile/coach-mobile-home.tsx")).toContain("<InactiveClientsPanel />");
+    expect(read("../app/(coach)/dashboard/page.tsx")).toContain("<InactiveClientsPanel groupIds=");
+    expect(read("../components/coach/mobile/coach-mobile-home.tsx")).toContain("<InactiveClientsPanel groupIds=");
   });
   it("only the coach's own button sets a client aside, through the one function, and nothing is sent by the panel", () => {
     expect(panel).toContain("set_client_inactive");

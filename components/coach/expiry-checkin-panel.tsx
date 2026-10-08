@@ -32,7 +32,8 @@ const fmtDate = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day
 //    this client, and Not now (which stays away for two weeks);
 //  * when a client returns after some sessions already expired: "Back after 9 months. 9 sessions expired on Jan 10", with Reinstate.
 // Everything lives behind the 0280 database update; before it is applied the lookups fail quietly and nothing shows.
-export function ExpiryCheckInPanel() {
+export function ExpiryCheckInPanel({ groupIds: scopeGroupIds }: { groupIds?: string[] } = {}) {
+  const scopeKey = scopeGroupIds ? scopeGroupIds.join(",") : "";
   const [coachId, setCoachId] = useState<string | null>(null);
   const [soon, setSoon] = useState<SoonItem[]>([]);
   const [returning, setReturning] = useState<ReturnItem[]>([]);
@@ -65,7 +66,7 @@ export function ExpiryCheckInPanel() {
       const headsUp = (policy?.expiry_heads_up_days as number | undefined) ?? DEFAULT_HEADS_UP_DAYS;
 
       const { data: coached } = await supabase.from("group_memberships").select("group_id").eq("profile_id", user.id).eq("role", "coach");
-      const groupIds = (coached ?? []).map((r: any) => r.group_id as string);
+      const groupIds = (coached ?? []).map((r: any) => r.group_id as string).filter((id: string) => !scopeGroupIds || scopeGroupIds.includes(id));
       if (groupIds.length === 0) return;
 
       const { data: credits, error: creditsError } = await supabase
@@ -165,7 +166,8 @@ export function ExpiryCheckInPanel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeKey]);
 
   async function notNow(athleteId: string, groupId: string, kind: "soon" | "returning", summary: string) {
     if (!coachId) return;

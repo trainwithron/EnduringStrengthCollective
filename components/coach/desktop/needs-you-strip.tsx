@@ -22,7 +22,14 @@ export function NeedsYouStrip({ view }: { view: NeedsYouView }) {
               <li key={slot} className="border border-rust/40 p-3 flex flex-col gap-2" data-testid={`needs-you-${slot}`}>
                 <p className="font-display uppercase text-xs tracking-wide text-steel">{title}</p>
                 <p className="font-body text-sm text-chalk">
-                  <span className="font-medium">{item!.name}</span> {item!.sentence}
+                  {item!.profileHref ? (
+                    <Link href={item!.profileHref} className="font-medium underline-offset-2 hover:underline">
+                      {item!.name}
+                    </Link>
+                  ) : (
+                    <span className="font-medium">{item!.name}</span>
+                  )}{" "}
+                  {item!.sentence}
                 </p>
                 <Link href={item!.href} className="mt-auto inline-flex items-center justify-center h-11 px-5 bg-rust text-graphite font-body text-sm font-medium self-start">
                   {item!.button}

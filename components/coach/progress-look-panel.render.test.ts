@@ -75,8 +75,8 @@ describe("the row on Home", () => {
   });
 
   it("is on the desktop and phone Home, behind a coach-only route that returns nothing unless the caller coaches", () => {
-    expect(readFileSync(new URL("../../app/(coach)/dashboard/page.tsx", import.meta.url), "utf8")).toContain("<ProgressLookPanel />");
-    expect(readFileSync(new URL("./mobile/coach-mobile-home.tsx", import.meta.url), "utf8")).toContain("<ProgressLookPanel />");
+    expect(readFileSync(new URL("../../app/(coach)/dashboard/page.tsx", import.meta.url), "utf8")).toContain("<ProgressLookPanel groupIds=");
+    expect(readFileSync(new URL("./mobile/coach-mobile-home.tsx", import.meta.url), "utf8")).toContain("<ProgressLookPanel groupIds=");
     const route = readFileSync(new URL("../../app/api/progress-look/route.ts", import.meta.url), "utf8");
     expect(route).toContain('eq("role", "coach")');
     expect(route).toContain("groupIds.length === 0");

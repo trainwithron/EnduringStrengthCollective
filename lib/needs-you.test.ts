@@ -282,7 +282,7 @@ describe("Home is wired as designed", () => {
   it("the strip sits above everything else and the stack below keeps all its panels", () => {
     expect(page.indexOf("<NeedsYouStrip")).toBeGreaterThan(-1);
     expect(page.indexOf("<NeedsYouStrip")).toBeLessThan(page.indexOf("<YourDayPanel"));
-    for (const p of ["<CollectiveIntelligencePanel", "<OrgNotificationsPanel", "<NeedsReplyPanel", "<LateChangesPanel", "<ScheduleRequestsPanel", "<ExpiryCheckInPanel", "<InactiveClientsPanel", "<ProgressLookPanel", "<NeedsPaymentPanel"]) {
+    for (const p of ["<OrgNotificationsPanel", "<NeedsReplyPanel", "<LateChangesPanel", "<ScheduleRequestsPanel", "<ExpiryCheckInPanel", "<InactiveClientsPanel", "<ProgressLookPanel", "<NeedsPaymentPanel"]) {
       expect(page.indexOf(p)).toBeGreaterThan(page.indexOf('id="needs-stack"'));
     }
   });
@@ -298,5 +298,42 @@ describe("Home is wired as designed", () => {
     expect(page).toMatch(/try \{\s*const needsYou = await loadNeedsYouItems\(/);
     expect(page).toContain("pickNeedsYou([], { incomplete: true })");
     expect(page).toContain("incomplete: needsYou.failed.length > 0");
+  });
+});
+
+describe("the strip stays inside the active organization and links to the client", () => {
+  it("every read of the coach's requests, messages, late changes and injuries is limited to the active organization's groups", async () => {
+    const seen: Record<string, string[][]> = {};
+    const db = {
+      from: (t: string) => {
+        const self: any = new Proxy({}, {
+          get(_x, prop) {
+            if (prop === "then") return (resolve: (v: unknown) => void) => resolve({ data: [], error: null });
+            if (prop === "in") return (col: string, vals: string[]) => ((seen[`${t}.${col}`] ??= []).push(vals), self);
+            if (prop === "maybeSingle") return () => Promise.resolve({ data: null, error: null });
+            return () => self;
+          },
+        });
+        return self;
+      },
+    } as never;
+    await loadNeedsYouItems(db, { ...base, groupIds: ["orgA-g1", "orgA-g2"] });
+    for (const t of ["schedule_requests", "booking_requests", "direct_messages", "bookings", "athlete_injury_status", "group_memberships"]) {
+      expect(seen[`${t}.group_id`]?.[0], t).toEqual(["orgA-g1", "orgA-g2"]);
+    }
+  });
+  it("a client's name links to their page, whatever the button does", async () => {
+    const { items } = await loadNeedsYouItems(
+      fakeDb({
+        schedule_requests: [{ id: "r1", athlete_id: "a1", group_id: "g1", kind: "pause", created_at: "2026-10-07T10:00:00Z" }],
+        direct_messages: [{ id: "m1", sender_id: "a3", group_id: "g1", created_at: "2026-10-06T10:00:00Z" }],
+        profiles: [{ id: "a1", full_name: "Ann", claimed_at: "x" }, { id: "a3", full_name: "Cy", claimed_at: "x" }],
+      }),
+      { ...base, needsPayment: [{ athleteId: "a2", groupId: "g1", name: "Bo", balance: 0 }] }
+    );
+    expect(items.find((i) => i.kind === "schedule_request")?.profileHref).toBe("/groups/g1/athletes/a1");
+    expect(items.find((i) => i.kind === "client_message")?.profileHref).toBe("/groups/g1/athletes/a3");
+    expect(items.find((i) => i.kind === "payment")?.profileHref).toBe("/groups/g1/athletes/a2");
+    expect(readFileSync(join(__dirname, "..", "components/coach/desktop/needs-you-strip.tsx"), "utf8")).toContain("item!.profileHref");
   });
 });

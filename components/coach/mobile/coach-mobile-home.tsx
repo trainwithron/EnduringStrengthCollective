@@ -16,6 +16,7 @@ import { TodayWidget, type TodayMacros } from "@/components/athlete/today-widget
 import { CoachHomeComplications } from "./coach-home-complications";
 import { CoachMobileShell } from "./coach-mobile-shell";
 import { getNeedsAttentionItems } from "@/lib/needs-attention-data";
+import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
 
 // The coach mobile Home (coach_mobile_app_redesign_plan.md, locked
 // 2026-09-14) — replaces the old pattern of a coach on mobile seeing
@@ -34,6 +35,8 @@ export async function CoachMobileHome({
 }) {
   const supabase = await createServerClient();
   const timezone = await getGroupCoachTimezone(supabase, groupId);
+  // The panels below read for the whole coach; on a phone Home they stay inside this group's organization (another one appears only after switching to it).
+  const orgGroupIds = groupsInOrgOf(await getCoachedGroups(supabase, coachId), groupId).map((g) => g.id);
   const todayKey = dateKeyInZone(timezone);
   const weekAgoKey = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
@@ -127,11 +130,11 @@ export async function CoachMobileHome({
         </div>
 
         <div className="px-5">
-          <LateChangesPanel />
-          <ScheduleRequestsPanel />
-          <ExpiryCheckInPanel />
-          <InactiveClientsPanel />
-          <ProgressLookPanel />
+          <LateChangesPanel groupIds={orgGroupIds} />
+          <ScheduleRequestsPanel groupIds={orgGroupIds} />
+          <ExpiryCheckInPanel groupIds={orgGroupIds} />
+          <InactiveClientsPanel groupIds={orgGroupIds} />
+          <ProgressLookPanel groupIds={orgGroupIds} />
         </div>
 
         {/* Priority 1: a workout is due right now — the single most

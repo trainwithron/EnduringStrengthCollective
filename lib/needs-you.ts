@@ -85,6 +85,8 @@ export interface NeedsYouItem {
   // The one button: its words and where it goes.
   button: string;
   href: string;
+  // The client's own page, when the item is about one client: the card's name links to it, so "view profile" is always one tap away whatever the button does.
+  profileHref?: string;
   // Within a kind, lower comes first (the one waiting longest, the one starting soonest). A millisecond time or any number.
   order: number;
 }

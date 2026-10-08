@@ -33,7 +33,8 @@ const btn = "h-11 px-4 border font-body text-sm disabled:opacity-50";
 // "Time to progress?" for a coach's Home (docs/TIME_TO_PROGRESS_DESIGN.md). One collapsed row ("4 need a look") that opens to at most three cards, oldest
 // evidence first. Everything is a suggestion to the coach: nothing is sent to a client, and nothing in a program changes until the coach taps Apply on a
 // draft they may have edited. The coach's answers are kept in their own feedback rows; no database change.
-export function ProgressLookPanel() {
+export function ProgressLookPanel({ groupIds: scopeGroupIds }: { groupIds?: string[] } = {}) {
+  const scopeKey = scopeGroupIds ? scopeGroupIds.join(",") : "";
   const [data, setData] = useState<Loaded | null>(null);
   const [coachId, setCoachId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -54,7 +55,7 @@ export function ProgressLookPanel() {
         const json = (await res.json()) as Loaded;
         if (cancelled) return;
         setCoachId(user.id);
-        setData(json);
+        setData(scopeGroupIds ? { ...json, cards: json.cards.filter((c) => scopeGroupIds.includes(c.groupId)) } : json);
         setThresholdDraft(String(json.threshold));
       } catch {
         // A suggestion never breaks Home: show nothing.
@@ -63,7 +64,8 @@ export function ProgressLookPanel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeKey]);
 
   async function record(key: string, action: "confirmed" | "denied" | "edited", summary: string, detail?: string) {
     if (!coachId) return false;

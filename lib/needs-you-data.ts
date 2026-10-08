@@ -109,20 +109,20 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
   const [scheduleRequests, bookingRequests, unreadMessages, lateChanges, expiring, injured, athleteRows] = await Promise.all([
     soft(
       "schedule requests",
-      () => supabase.from("schedule_requests").select("id, athlete_id, group_id, kind, created_at").eq("coach_id", coachId).in("status", ["pending", "applying"]).order("created_at", { ascending: true }).limit(50) as never,
+      () => supabase.from("schedule_requests").select("id, athlete_id, group_id, kind, created_at").eq("coach_id", coachId).in("group_id", groupIds).in("status", ["pending", "applying"]).order("created_at", { ascending: true }).limit(50) as never,
       [] as { id: string; athlete_id: string; group_id: string; kind: string; created_at: string }[]
     ),
     soft(
       "booking requests",
-      () => supabase.from("booking_requests").select("id, athlete_id, group_id, created_at").eq("coach_id", coachId).eq("status", "pending").order("created_at", { ascending: true }).limit(50) as never,
+      () => supabase.from("booking_requests").select("id, athlete_id, group_id, created_at").eq("coach_id", coachId).in("group_id", groupIds).eq("status", "pending").order("created_at", { ascending: true }).limit(50) as never,
       [] as { id: string; athlete_id: string; group_id: string; created_at: string }[]
     ),
     paged<{ id: string; sender_id: string; group_id: string; created_at: string }>("unread messages", (from, to) =>
-      supabase.from("direct_messages").select("id, sender_id, group_id, created_at").eq("recipient_id", coachId).is("read_at", null).order("created_at", { ascending: true }).order("id", { ascending: true }).range(from, to)
+      supabase.from("direct_messages").select("id, sender_id, group_id, created_at").eq("recipient_id", coachId).in("group_id", groupIds).is("read_at", null).order("created_at", { ascending: true }).order("id", { ascending: true }).range(from, to)
     ),
     soft(
       "late changes",
-      () => supabase.from("bookings").select("id, athlete_id, group_id, start_at").eq("coach_id", coachId).eq("late_charge_state", "flagged").order("start_at", { ascending: true }).limit(50) as never,
+      () => supabase.from("bookings").select("id, athlete_id, group_id, start_at").eq("coach_id", coachId).in("group_id", groupIds).eq("late_charge_state", "flagged").order("start_at", { ascending: true }).limit(50) as never,
       [] as { id: string; athlete_id: string; group_id: string; start_at: string }[]
     ),
     (async () => {
@@ -168,7 +168,7 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
     })(),
     soft(
       "injuries",
-      () => supabase.from("athlete_injury_status").select("athlete_id, marked_at").eq("is_injured", true).gte("marked_at", new Date(nowMs - INJURY_RECENT_DAYS * 86_400_000).toISOString()).limit(200) as never,
+      () => supabase.from("athlete_injury_status").select("athlete_id, marked_at").in("group_id", groupIds).eq("is_injured", true).gte("marked_at", new Date(nowMs - INJURY_RECENT_DAYS * 86_400_000).toISOString()).limit(200) as never,
       [] as { athlete_id: string; marked_at: string }[]
     ).then((rows) => rows.map((r) => r.athlete_id)),
     paged<{ group_id: string; profile_id: string }>("roster", (from, to) =>
@@ -204,10 +204,10 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
   const nameOf = (id: string) => nameById.get(id) ?? "A client";
 
   for (const r of scheduleRequests) {
-    items.push({ id: `schedule:${r.id}`, kind: "schedule_request", name: nameOf(r.athlete_id), sentence: sentences.scheduleRequest(r.kind), button: BUTTON.review, href: "/dashboard#schedule-requests", order: new Date(r.created_at).getTime() });
+    items.push({ id: `schedule:${r.id}`, kind: "schedule_request", name: nameOf(r.athlete_id), sentence: sentences.scheduleRequest(r.kind), button: BUTTON.review, href: "/dashboard#schedule-requests", profileHref: clientPath(r.group_id, r.athlete_id), order: new Date(r.created_at).getTime() });
   }
   for (const r of bookingRequests) {
-    items.push({ id: `request:${r.id}`, kind: "booking_request", name: nameOf(r.athlete_id), sentence: sentences.bookingRequest(), button: BUTTON.decide, href: "/dashboard#late-changes", order: new Date(r.created_at).getTime() });
+    items.push({ id: `request:${r.id}`, kind: "booking_request", name: nameOf(r.athlete_id), sentence: sentences.bookingRequest(), button: BUTTON.decide, href: "/dashboard#late-changes", profileHref: clientPath(r.group_id, r.athlete_id), order: new Date(r.created_at).getTime() });
   }
   // One entry per client who has unread messages: how many, and the oldest first.
   const byClient = new Map<string, { groupId: string; count: number; oldest: number }>();
@@ -219,10 +219,10 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
     items.push({ id: `message:${senderId}`, kind: "client_message", name: nameOf(senderId), sentence: sentences.clientMessage(v.count), button: BUTTON.reply, href: `/groups/${v.groupId}/messages/${senderId}`, order: v.oldest });
   }
   for (const l of lateChanges) {
-    items.push({ id: `late:${l.id}`, kind: "late_change", name: nameOf(l.athlete_id), sentence: sentences.lateChange(), button: BUTTON.decide, href: "/dashboard#late-changes", order: new Date(l.start_at).getTime() });
+    items.push({ id: `late:${l.id}`, kind: "late_change", name: nameOf(l.athlete_id), sentence: sentences.lateChange(), button: BUTTON.decide, href: "/dashboard#late-changes", profileHref: clientPath(l.group_id, l.athlete_id), order: new Date(l.start_at).getTime() });
   }
   for (const e of expiring) {
-    items.push({ id: `expiring:${e.athleteId}:${e.groupId}`, kind: "expiring_credits", name: nameOf(e.athleteId), sentence: sentences.expiringCredits(e.daysLeft), button: BUTTON.open, href: "/dashboard#expiring", order: e.expiresOn.getTime() });
+    items.push({ id: `expiring:${e.athleteId}:${e.groupId}`, kind: "expiring_credits", name: nameOf(e.athleteId), sentence: sentences.expiringCredits(e.daysLeft), button: BUTTON.open, href: "/dashboard#expiring", profileHref: clientPath(e.groupId, e.athleteId), order: e.expiresOn.getTime() });
   }
   for (const id of injuredHere) {
     items.push({ id: `injury:${id}`, kind: "injury", name: nameOf(id), sentence: sentences.injury(), button: BUTTON.open, href: clientPath(groupOf.get(id)!, id), order: 0 });
@@ -258,6 +258,12 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
     } else {
       for (const it of items) if (it.id === `readiness:${hero.athleteId}:${hero.groupId}` || it.id === `quiet:${hero.athleteId}`) it.order = -1;
     }
+  }
+  // An item whose button already goes to the client's page or to their messages gets the client's page as its profile link.
+  for (const it of items) {
+    if (it.profileHref) continue;
+    const m = /^\/groups\/([^/]+)\/(?:athletes|messages)\/([^/?]+)/.exec(it.href);
+    if (m) it.profileHref = clientPath(m[1], m[2]);
   }
   return { items, failed };
 }

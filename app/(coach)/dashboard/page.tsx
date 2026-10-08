@@ -13,8 +13,9 @@ import { NeedsReplyPanel, type NeedsReplyThread } from "@/components/coach/deskt
 import { OrgNotificationsPanel, type OrgNotification } from "@/components/coach/desktop/org-notifications-panel";
 import { MarkAllSeenButton } from "@/components/coach/desktop/mark-all-seen-button";
 import { findThreadsNeedingReply } from "@/lib/notification-priority";
+import { getCoachedGroups, LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-groups";
+import { activeOrgId, inActiveOrg } from "@/lib/active-org";
 import { getCoachDashboardData } from "@/lib/dashboard-data";
-import { DashboardHero } from "@/components/coach/desktop/dashboard-hero";
 import { PulseTabs } from "@/components/coach/desktop/pulse-tabs";
 import { DashboardStatTiles } from "@/components/coach/desktop/dashboard-stat-tiles";
 import { YourDayPanel } from "@/components/coach/desktop/your-day-panel";
@@ -32,7 +33,6 @@ import { DashboardWeekNarrative } from "@/components/coach/desktop/dashboard-wee
 import { DashboardAutoRefresh } from "@/components/coach/desktop/dashboard-auto-refresh";
 import { DashboardTileGrid } from "@/components/coach/desktop/dashboard-tile-grid";
 import {
-  CollectiveIntelligencePanel,
   type CollectiveIntelligenceItem,
 } from "@/components/coach/desktop/collective-intelligence-panel";
 import { StuckDesktopModeBanner } from "@/components/coach/desktop/stuck-desktop-mode-banner";
@@ -132,7 +132,11 @@ export default async function CoachHomePage() {
     .select("organization_id, role")
     .eq("profile_id", user.id);
 
-  const primaryOrgMembership = orgMemberships?.[0] ?? null;
+  // Home belongs to ONE organization at a time: the one the coach chose with the organization switcher (else their first). Everything on it, and every count, is that
+  // organization's; another one appears only after switching to it.
+  const coachedForOrg = await getCoachedGroups(supabase, user.id);
+  const homeOrgId = activeOrgId(coachedForOrg, (await cookies()).get(LAST_WORKSPACE_GROUP_COOKIE)?.value ?? null);
+  const primaryOrgMembership = (homeOrgId ? orgMemberships?.find((m) => m.organization_id === homeOrgId) : null) ?? orgMemberships?.[0] ?? null;
   const { data: viewerProfile } = await supabase.from("profiles").select("full_name, timezone").eq("id", user.id).maybeSingle();
   // The coach's own time zone: "today" on this page is their day, not the server's.
   const coachTimezone = isValidTimeZone(viewerProfile?.timezone) ? (viewerProfile!.timezone as string) : DEFAULT_COACH_TIMEZONE;
@@ -171,7 +175,8 @@ export default async function CoachHomePage() {
 
   const adminOrgIds = (orgMemberships ?? [])
     .filter((m) => m.role === "owner" || m.role === "admin")
-    .map((m) => m.organization_id);
+    .map((m) => m.organization_id)
+    .filter((id) => !homeOrgId || id === homeOrgId);
   if (adminOrgIds.length > 0) {
     const { data: allGroupRows } = await supabase
       .from("groups")
@@ -180,6 +185,9 @@ export default async function CoachHomePage() {
       .order("name");
     for (const g of allGroupRows ?? []) byId.set(g.id, g as GroupRow);
   }
+
+  // Only the active organization's groups from here on (the coached groups above may span several organizations).
+  for (const g of [...byId.values()]) if (inActiveOrg([g], homeOrgId).length === 0) byId.delete(g.id);
 
   // A coach who administers more than one organization needs each group's
   // items on Home labeled with which org they're from — otherwise a
@@ -267,6 +275,8 @@ export default async function CoachHomePage() {
   }
 
   const allGroupIds = allGroups.map((g) => g.id);
+  // The briefing's items name a group: only this organization's are shown.
+  collectiveIntelligenceItems = collectiveIntelligenceItems.filter((i) => !i.groupId || allGroupIds.includes(i.groupId));
   const unseenByGroup = new Map<string, boolean>();
   if (allGroupIds.length > 0) {
     const { data: viewStateRows } = await supabase
@@ -586,10 +596,6 @@ export default async function CoachHomePage() {
 
       <YourDayPanel schedule={yourDaySchedule} attention={yourDayAttention} timezone={coachTimezone} />
 
-      <div className="mb-6">
-        <DashboardHero flag={dashboardData.heroFlag} emptyState={dashboardData.heroEmptyState} />
-      </div>
-
       {/* Replaces the old team-mode-only Team Pulse side column
           (home_dashboard_merge_and_pulse_tabs_redesign.md) — every
           relationship type gets the same pulse treatment now, not just
@@ -608,23 +614,21 @@ export default async function CoachHomePage() {
 
       {/* The stack below is what the strip's "N more" opens; the strip's buttons also jump to the panel that handles the request. Nothing in it changed. */}
       <div id="needs-stack">
-        <CollectiveIntelligencePanel items={collectiveIntelligenceItems} hasRunToday={!!todaysBriefing} />
-
         <OrgNotificationsPanel initialNotifications={orgNotifications} />
 
         <NeedsReplyPanel coachId={user.id} threads={needsReplyThreads} />
 
         <div id="late-changes">
-          <LateChangesPanel />
+          <LateChangesPanel groupIds={allGroupIds} />
         </div>
         <div id="schedule-requests">
-          <ScheduleRequestsPanel />
+          <ScheduleRequestsPanel groupIds={allGroupIds} />
         </div>
         <div id="expiring">
-          <ExpiryCheckInPanel />
+          <ExpiryCheckInPanel groupIds={allGroupIds} />
         </div>
-        <InactiveClientsPanel />
-        <ProgressLookPanel />
+        <InactiveClientsPanel groupIds={allGroupIds} />
+        <ProgressLookPanel groupIds={allGroupIds} />
         <NeedsPaymentPanel rows={dashboardData.needsPayment} />
       </div>
 

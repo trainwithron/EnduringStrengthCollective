@@ -112,7 +112,8 @@ export function ScheduleRequestCard({
 
 // Client requests to pause, freeze or cancel their weekly schedule (migration 0297), shown with the other things that need the coach's decision. Shows nothing when there is
 // none, and before the database update is applied the lookup fails quietly and the panel stays empty.
-export function ScheduleRequestsPanel() {
+export function ScheduleRequestsPanel({ groupIds: scopeGroupIds }: { groupIds?: string[] } = {}) {
+  const scopeKey = scopeGroupIds ? scopeGroupIds.join(",") : "";
   const [items, setItems] = useState<ScheduleRequestCardData[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -120,7 +121,7 @@ export function ScheduleRequestsPanel() {
 
   async function load() {
     const supabase = createBrowserClient();
-    const { data, error } = await supabase
+    let requestsQuery: any = supabase
       .from("schedule_requests")
       .select(
         "id, kind, effective_on, resume_on, status, created_at, athlete_id, group_id, profiles!schedule_requests_athlete_id_fkey ( full_name ), recurring_booking_series ( weekday, start_time, duration_minutes, timezone )"
@@ -128,6 +129,8 @@ export function ScheduleRequestsPanel() {
       .in("status", ["pending", "applying"])
       .order("created_at", { ascending: true })
       .limit(30);
+      if (scopeGroupIds) requestsQuery = requestsQuery.in("group_id", scopeGroupIds);
+      const { data, error } = (await requestsQuery) as { data: any[] | null; error: unknown };
     if (error || !data) return;
     const rows = data as any[];
     const noteById = new Map<string, string>();
@@ -160,7 +163,7 @@ export function ScheduleRequestsPanel() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [scopeKey]);
 
   async function act(id: string, action: "done" | "handled") {
     setBusyId(id);

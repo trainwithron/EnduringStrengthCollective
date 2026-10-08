@@ -32,7 +32,8 @@ interface FlaggedChange {
 // A client who cancels or moves a session inside your cancellation window is flagged here for YOU to decide: Charge takes one session, Waive
 // takes nothing. Nothing is taken automatically. Shows nothing at all when no change is waiting (and before the database update that adds the
 // flag is applied, the lookup fails quietly and the panel stays empty).
-export function LateChangesPanel() {
+export function LateChangesPanel({ groupIds: scopeGroupIds }: { groupIds?: string[] } = {}) {
+  const scopeKey = scopeGroupIds ? scopeGroupIds.join(",") : "";
   const [items, setItems] = useState<FlaggedChange[]>([]);
   const [moves, setMoves] = useState<MoveRequest[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -50,15 +51,17 @@ export function LateChangesPanel() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
-      const { data, error: loadError } = await supabase
+      let bookingsQuery: any = supabase
         .from("bookings")
         .select("id, start_at, late_change_kind, athlete_id, group_id, profiles!bookings_athlete_id_fkey ( full_name )")
         .eq("coach_id", user.id)
         .eq("late_charge_state", "flagged")
         .order("start_at", { ascending: true })
         .limit(20);
+      if (scopeGroupIds) bookingsQuery = bookingsQuery.in("group_id", scopeGroupIds);
+      const { data, error: loadError } = (await bookingsQuery) as { data: any[] | null; error: { message: string } | null };
       // Booking requests, new and move (needs the database update that adds them; until then the lookup fails quietly and nothing shows).
-      const { data: moveData, error: moveError } = await supabase
+      let movesQuery: any = supabase
         .from("booking_requests")
         .select("id, kind, from_start_at, new_start_at, new_end_at, athlete_id, group_id, profiles!booking_requests_athlete_id_fkey ( full_name )")
         .eq("coach_id", user.id)
@@ -66,6 +69,8 @@ export function LateChangesPanel() {
         .gt("new_start_at", new Date().toISOString())
         .order("new_start_at", { ascending: true })
         .limit(20);
+      if (scopeGroupIds) movesQuery = movesQuery.in("group_id", scopeGroupIds);
+      const { data: moveData, error: moveError } = (await movesQuery) as { data: any[] | null; error: { message: string } | null };
       if (!cancelled && !moveError) {
         // The coach's clock and open hours, to say where a requested time sits (a session can be asked for at any minute).
         const { data: coachProfile } = await supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle();
@@ -156,7 +161,8 @@ export function LateChangesPanel() {
     return () => {
       cancelled = true;
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopeKey]);
 
   async function decide(id: string, charge: boolean) {
     setBusyId(id);
