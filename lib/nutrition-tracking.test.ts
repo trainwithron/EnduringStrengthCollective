@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NO_TARGET_LINE, dailyCaloriesFromLog, hasTarget, sumLoggedFood } from "@/lib/nutrition-tracking";
+import { NO_TARGET_LINE, dailyCaloriesFromLog, hasTarget, noTargetLine, sumLoggedFood } from "@/lib/nutrition-tracking";
 
 describe("sumLoggedFood", () => {
   it("adds calories and macros of what was eaten", () => {
@@ -39,6 +39,13 @@ describe("hasTarget", () => {
     expect(hasTarget({ proteinG: 150 })).toBe(true);
     expect(hasTarget({ calories: null, proteinG: null, carbsG: 200 })).toBe(false);
     expect(hasTarget(null)).toBe(false);
+  });
+});
+
+describe("noTargetLine", () => {
+  it("promises a target only to clients on a tier that has them", () => {
+    expect(noTargetLine(true)).toBe(NO_TARGET_LINE);
+    expect(noTargetLine(false)).toBe("Track what you eat. Targets are not part of your plan.");
   });
 });
 

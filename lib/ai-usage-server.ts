@@ -4,6 +4,8 @@ import {
   burstBucketFor,
   burstLimitFor,
   monthlyCeilingFor,
+  userMonthlyCeilingFor,
+  currentAllowancePeriod,
   isEnforced,
   type AiCallMeta,
 } from "@/lib/ai-usage";
@@ -34,6 +36,19 @@ export async function reserveAiCall(meta: AiCallMeta): Promise<UsageHandle> {
     return NOOP_HANDLE;
   }
   try {
+    // A per-person monthly ceiling (food photos and typed estimates): counted from the person's own log this month, every attempt included. Checked before the call is
+    // reserved, so a person at their ceiling never reaches the model. If it cannot be counted the call is refused (fail closed), like the other metered limits.
+    const personCeiling = userMonthlyCeilingFor(meta.feature);
+    if (personCeiling != null && meta.userId) {
+      const { count, error: countError } = await supabase
+        .from("ai_usage_log")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", meta.userId)
+        .eq("feature", meta.feature)
+        .gte("created_at", `${currentAllowancePeriod()}T00:00:00Z`);
+      if (countError) throw new AiRateLimitedError("unavailable");
+      if ((count ?? 0) >= personCeiling) throw new AiRateLimitedError("user_monthly", meta.feature);
+    }
     const { data, error } = await supabase.rpc("reserve_ai_call", {
       p_user_id: meta.userId ?? null,
       p_coach_id: meta.coachId ?? null,

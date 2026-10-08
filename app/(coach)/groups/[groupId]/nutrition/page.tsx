@@ -27,6 +27,7 @@ import { NutritionYouthModeToggle } from "@/components/coach/desktop/nutrition-y
 import { dedupeRecentFoodLogs } from "@/lib/recent-food-logs";
 import { getCoachClients } from "@/lib/coach-clients";
 import { dailyCaloriesFromLog } from "@/lib/nutrition-tracking";
+import { addDaysToKey } from "@/lib/date-key";
 
 export default async function NutritionPage(
   props: {
@@ -187,7 +188,8 @@ export default async function NutritionPage(
 
   const timezone = await getGroupCoachTimezone(supabase, params.groupId);
   const todayKey = dateKeyInZone(timezone);
-  const thirtyDaysAgoKey = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  // The same calendar day the rest of the page uses (the coach's time zone), not the UTC date, so an evening in the US does not lose or gain a day at the edge.
+  const thirtyDaysAgoKey = addDaysToKey(todayKey, -30);
 
   const { data: viewerMembership } = await supabase
     .from("group_memberships")
@@ -320,7 +322,7 @@ export default async function NutritionPage(
   );
 
   const standingHistory = macrosEnabled ? await fetchStandingHistory(supabase, athleteId, params.groupId) : [];
-  const todayKeyForMacros = new Date().toISOString().slice(0, 10);
+  const todayKeyForMacros = todayKey;
   const todayMacros = macrosEnabled
     ? resolveDayMacros(
         todayMacroRow ?? null,
@@ -448,6 +450,7 @@ export default async function NutritionPage(
             </h2>
             <FoodLogSection
               target={todayMacros}
+              coachProgramming={macrosEnabled}
               plan={savedPlanMeals ? { meals: clientPlan.meals, hiddenCount: clientPlan.hiddenCount, emptiedMeals: clientPlan.emptiedMeals } : null}
               athleteId={athleteId}
               groupId={params.groupId}

@@ -29,6 +29,19 @@ describe("FoodLogSection for a client with no target (any tier)", () => {
   });
 });
 
+describe("FoodLogSection for a group-tier client (no targets in their plan)", () => {
+  it("does not promise a target and says what the coach can see", () => {
+    const html = renderToStaticMarkup(createElement(FoodLogSection, { ...base, initialEntries: [], coachProgramming: false }));
+    expect(html).toContain("Track what you eat. Targets are not part of your plan.");
+    expect(html).not.toContain("hasn&#x27;t set a target yet");
+    expect(html).toContain("Your coach can see what you log here.");
+  });
+  it("every client is told their coach can see what they log", () => {
+    const html = renderToStaticMarkup(createElement(FoodLogSection, { ...base, initialEntries: [entry], target: { calories: 2200 } }));
+    expect(html).toContain("Your coach can see what you log here.");
+  });
+});
+
 describe("FoodLogSection for a client with a target", () => {
   it("shows the totals against the target and not the no-target line", () => {
     const html = renderToStaticMarkup(createElement(FoodLogSection, { ...base, initialEntries: [entry], target: { calories: 2200, proteinG: 180, carbsG: 220, fatG: 70 } }));

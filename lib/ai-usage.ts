@@ -125,11 +125,28 @@ export interface AiCallMeta {
   coachId?: string | null; // billing coach; resolved server-side from userId when omitted
 }
 
+// Per-PERSON monthly ceilings for the AI features every client can reach (logging food by photo or by typing a description). The cost of these lands on the billing coach, and a
+// coach with a large class would otherwise see it grow with every member and no cap. Generous on purpose (a photo for every meal for a month is about 90), and the free ways
+// to log (searching the USDA foods, scanning a barcode, saved meals, recents) are never limited. Tune here.
+export const USER_MONTHLY_CEILING: Partial<Record<AiFeature, number>> = {
+  food_photo_parse: 90,
+  food_log_parse: 300,
+};
+export function userMonthlyCeilingFor(feature: AiFeature): number | null {
+  return USER_MONTHLY_CEILING[feature] ?? null;
+}
+const USER_MONTHLY_MESSAGE: Partial<Record<AiFeature, string>> = {
+  food_photo_parse: "You've used this month's photo logs. You can still search foods, scan a barcode or use your saved meals.",
+  food_log_parse: "You've used this month's typed-meal estimates. You can still search foods, scan a barcode or use your saved meals.",
+};
+
 export class AiRateLimitedError extends Error {
-  reason: "burst" | "monthly_ceiling" | "unavailable";
-  constructor(reason: "burst" | "monthly_ceiling" | "unavailable") {
+  reason: "burst" | "monthly_ceiling" | "user_monthly" | "unavailable";
+  constructor(reason: "burst" | "monthly_ceiling" | "user_monthly" | "unavailable", feature?: AiFeature) {
     super(
-      reason === "burst"
+      reason === "user_monthly"
+        ? (feature && USER_MONTHLY_MESSAGE[feature]) || "You've reached this month's limit for this feature. It resets on the 1st of next month."
+        : reason === "burst"
         ? "You're sending AI requests too quickly — wait a minute and try again."
         : reason === "unavailable"
           ? "AI is briefly unavailable. Try again in a moment."

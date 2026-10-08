@@ -2,6 +2,11 @@
 // coach-run feature (not for the "group" tier); logging what you eat is not. These are the small pure pieces the client's Nutrition page and the coach's views share.
 
 export const NO_TARGET_LINE = "Your coach hasn't set a target yet. You can still track what you eat.";
+// The group tier has no targets at all, so promising one would be wrong.
+export const GROUP_TIER_NO_TARGET_LINE = "Track what you eat. Targets are not part of your plan.";
+// Shown on the client's own log: their coach can read it (it is part of the data the beta notice says the coach can see).
+export const COACH_CAN_SEE_LINE = "Your coach can see what you log here.";
+export const noTargetLine = (coachProgramming: boolean): string => (coachProgramming ? NO_TARGET_LINE : GROUP_TIER_NO_TARGET_LINE);
 
 // Shown to a coach looking at a client whose tier has no targets or meal plans: logging still works and is visible.
 export const GROUP_TIER_COACH_NOTE = "This client is on the group tier, so targets and meal plans are not part of their plan. They can still log what they eat, and you can see it here.";

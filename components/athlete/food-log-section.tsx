@@ -10,7 +10,7 @@ import { BarcodeScanButton } from "./barcode-scan-button";
 import { PhotoLogFoodButton } from "./photo-log-food-button";
 import { FavoriteStar } from "./favorite-star";
 import type { RecentFoodLogOption } from "@/lib/recent-food-logs";
-import { NO_TARGET_LINE, hasTarget, sumLoggedFood, type DayTargetLike } from "@/lib/nutrition-tracking";
+import { COACH_CAN_SEE_LINE, hasTarget, noTargetLine, sumLoggedFood, type DayTargetLike } from "@/lib/nutrition-tracking";
 
 // Wires the checkoff list + quick-log entry point + a running "logged so
 // far today" total into one section for the athlete's Nutrition page
@@ -25,6 +25,7 @@ export function FoodLogSection({
   recents,
   plan,
   target,
+  coachProgramming = true,
 }: {
   athleteId: string;
   groupId: string;
@@ -36,6 +37,8 @@ export function FoodLogSection({
   plan?: { meals: Record<string, MealEntryPayload[]> | null; hiddenCount: number; emptiedMeals: { bucket: string; mealId: string }[] } | null;
   // Today's target when a coach has set one. Without it the totals still show, with a friendly line instead of a comparison.
   target?: DayTargetLike | null;
+  // False for a client on a tier with no targets or meal plans (the group tier): the no-target line then does not promise a target.
+  coachProgramming?: boolean;
 }) {
   const planHasMeals = !!plan?.meals && Object.values(plan.meals).some((entries) => (entries ?? []).length > 0);
   const [quickLogEntries, setQuickLogEntries] = useState(initialEntries.filter((e) => !e.mealSlot));
@@ -68,7 +71,8 @@ export function FoodLogSection({
           {withTarget ? of(target?.carbsG) : ""}c / {Math.round(loggedTotals.fatG)}
           {withTarget ? of(target?.fatG) : ""}f
         </p>
-        {!withTarget && <p className="font-body text-xs text-steel mt-2">{NO_TARGET_LINE}</p>}
+        {!withTarget && <p className="font-body text-xs text-steel mt-2">{noTargetLine(coachProgramming)}</p>}
+        <p className="font-body text-xs text-steel mt-1">{COACH_CAN_SEE_LINE}</p>
       </div>
 
       {planHasMeals ? (
