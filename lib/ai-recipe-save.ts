@@ -67,6 +67,14 @@ export async function contentHashOf(lines: { label: string; grams: number | null
 // A word as a name would be matched: lower case, with surrounding punctuation and a possessive 's taken off.
 const core = (w: string): string => w.toLowerCase().replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "").replace(/'s$/, "");
 const nameSet = (words: string[]): Set<string> => new Set(words.map(core).filter((w) => w.length >= 3));
+// The words of a client's name to keep out of a library meal: split on spaces and hyphens ("Mary-Ann Lee" gives Mary, Ann, Lee), words under 3 letters dropped.
+export function clientWordsOf(name: string | null | undefined): string[] {
+  return (name ?? "")
+    .split(/[\s-]+/)
+    .map((w) => w.trim())
+    .filter((w) => w.length >= 3);
+}
+
 export function mentionsAny(text: string, words: string[]): boolean {
   const names = nameSet(words);
   return names.size > 0 && text.split(/[ \t\n,;:()/]+/).some((tok) => names.has(core(tok)));

@@ -21,7 +21,7 @@ import type { FoodRules } from "@/lib/allergen-check";
 import { loadLibraryContext, type LibraryContextData } from "@/lib/library-data";
 import { varietySettings, selectOptions, type SelectionContext } from "@/lib/library-selection";
 import { choiceFromOption, generateLibraryDay, generateLibraryWeek, optionFromScaled } from "@/lib/library-meal-plan";
-import { buildAiRecipeRows } from "@/lib/ai-recipe-save";
+import { buildAiRecipeRows, clientWordsOf } from "@/lib/ai-recipe-save";
 import { describeTypedRules, mergeRules, newFromTyped, rulesFromTypedText } from "@/lib/typed-restrictions";
 import { dayList, LIBRARY_WEEK_RATIONALE, planWeekReplacement } from "@/lib/week-replace";
 import { DIET_TYPES, type DietType, type Slot } from "@/lib/meal-templates/types";
@@ -696,7 +696,7 @@ export function MealPlanGenerator({
   async function saveAiOptionToLibrary(slotIn: GeneratedMeal["spec"]["slot"], opt: MealOption): Promise<{ result: "saved" | "exists" | "unsupported" | "failed"; reason?: string }> {
     if (!coachId) return { result: "failed" };
     const slot: Slot = slotIn === "any" ? "lunch" : slotIn;
-    const built = await buildAiRecipeRows(opt, slot, new Date(), { clientWords: (clientName ?? "").split(/s+/).filter(Boolean) });
+    const built = await buildAiRecipeRows(opt, slot, new Date(), { clientWords: clientWordsOf(clientName) });
     if (!built.ok) return { result: "unsupported", reason: built.reason };
     const supabase = createBrowserClient();
     const { data: recipe, error } = await supabase

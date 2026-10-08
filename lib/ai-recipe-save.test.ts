@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildAiRecipeRows, contentHashOf } from "./ai-recipe-save";
+import { buildAiRecipeRows, clientWordsOf, contentHashOf } from "./ai-recipe-save";
 import type { MealOption } from "./meal-engine";
 
 const option = (over: Partial<MealOption> = {}): MealOption => ({
@@ -14,6 +14,21 @@ const option = (over: Partial<MealOption> = {}): MealOption => ({
     { rawLine: "1 cup spinach", name: "Spinach, raw", grams: 30, fdcId: 168462, proteinG: 0.9, carbsG: 1.1, fatG: 0.1 },
   ],
   ...over,
+});
+
+describe("the words of a client's name", () => {
+  it("splits on spaces AND hyphens and keeps words of 3 letters or more (the real path the generator uses)", () => {
+    expect(clientWordsOf("Sarah Jones")).toEqual(["Sarah", "Jones"]);
+    expect(clientWordsOf("Marissa Reyes")).toEqual(["Marissa", "Reyes"]);
+    expect(clientWordsOf("Mary-Ann Lee")).toEqual(["Mary", "Ann", "Lee"]);
+    expect(clientWordsOf("Al   Bo")).toEqual([]);
+    expect(clientWordsOf(null)).toEqual([]);
+    expect(clientWordsOf("  Sam\tO'Neil ")).toEqual(["Sam", "O'Neil"]);
+  });
+  it("a hyphenated name is scrubbed from a recipe name through the same path", async () => {
+    const r = await buildAiRecipeRows(option({ recipeName: "Mary bowl for Ann" }), "dinner", new Date(), { clientWords: clientWordsOf("Mary-Ann Lee") });
+    expect(r.ok && r.rows.recipe.name).toBe("bowl for");
+  });
 });
 
 describe("a client's name never travels with a library meal", () => {
