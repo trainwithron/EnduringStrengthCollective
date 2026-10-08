@@ -389,9 +389,9 @@ export function DayCard({
 
   return (
     <div className="border border-steel/20 bg-surface/40 rounded-token-lg flex flex-col">
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-steel/20 bg-surface">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 py-3 border-b border-steel/20 bg-surface">
         <GripVertical className="w-4 h-4 text-steel shrink-0 cursor-grab" aria-hidden="true" />
-        <div className="flex-1 min-w-0 flex flex-col">
+        <div className="flex-1 min-w-[6rem] flex flex-col">
           <input
             type="text"
             aria-label="Day title"
@@ -466,7 +466,7 @@ export function DayCard({
               }
             }}
             disabled={addItemBusy}
-            placeholder='Quick add — "Bench 3x5 @7", "Plank 60s", Enter'
+            placeholder='Quick add: "Bench 3x5 @7"'
             className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust disabled:opacity-50"
           />
           {quickEntryError && (
