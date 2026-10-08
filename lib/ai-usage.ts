@@ -55,6 +55,8 @@ export type AiFeature =
   | "program_generation"
   | "program_chat"
   | "program_import_photo"
+  | "program_import_text"
+  | "program_import_pdf"
   | "session_nl"
   | "recipe_parse"
   | "food_log_parse"
@@ -100,6 +102,8 @@ const POLICY: Record<AiFeature, FeaturePolicy> = {
   program_generation: { enforce: true, monthlyCeiling: 150 },
   program_chat: { enforce: true },
   program_import_photo: { enforce: true },
+  program_import_text: { enforce: true },
+  program_import_pdf: { enforce: true },
   session_nl: { enforce: true },
   recipe_parse: { enforce: true },
   food_log_parse: { enforce: true },

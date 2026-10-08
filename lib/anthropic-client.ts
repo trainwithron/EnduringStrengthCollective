@@ -30,10 +30,17 @@ export interface ClaudeImageInput {
   base64Data: string;
 }
 
+// A whole PDF handed to Claude to read (text and pictures). Used only for a scanned PDF that has no text to extract.
+export interface ClaudeDocumentInput {
+  mediaType: "application/pdf";
+  base64Data: string;
+}
+
 export interface ClaudeCallOptions {
   system: string;
   userText: string;
   image?: ClaudeImageInput;
+  document?: ClaudeDocumentInput;
   maxTokens?: number;
   // Who/what this call is for — drives usage logging (model + tokens per
   // call, for per-coach cost) and the burst limit (lib/ai-usage.ts).
@@ -43,6 +50,7 @@ export interface ClaudeCallOptions {
 
 export const MAX_INPUT_CHARS = 150_000;
 export const MAX_IMAGE_BASE64_CHARS = 8_000_000; // about 6 MB of image
+export const MAX_DOCUMENT_BASE64_CHARS = 14_000_000; // about 10 MB of PDF
 export const MAX_OUTPUT_TOKENS = 32_000;
 
 export class AiNotConfiguredError extends Error {
@@ -74,6 +82,7 @@ export async function callClaude({
   system,
   userText,
   image,
+  document,
   maxTokens = 4096,
   meta,
 }: ClaudeCallOptions): Promise<string> {
@@ -88,9 +97,18 @@ export async function callClaude({
   if (image && image.base64Data.length > MAX_IMAGE_BASE64_CHARS) {
     throw new Error("That image is too large. Try a smaller one.");
   }
+  if (document && document.base64Data.length > MAX_DOCUMENT_BASE64_CHARS) {
+    throw new Error("That PDF is too large. Try a smaller one.");
+  }
   maxTokens = Math.min(Math.max(1, maxTokens), MAX_OUTPUT_TOKENS);
 
   const content: Record<string, unknown>[] = [];
+  if (document) {
+    content.push({
+      type: "document",
+      source: { type: "base64", media_type: document.mediaType, data: document.base64Data },
+    });
+  }
   if (image) {
     content.push({
       type: "image",
