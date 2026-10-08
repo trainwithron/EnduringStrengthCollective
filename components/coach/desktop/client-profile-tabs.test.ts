@@ -68,7 +68,7 @@ describe("the profile page", () => {
     expect(calendarPage).toContain("<ClientCalendarSection");
     expect(messagesPage).toContain("loadDirectThread(");
     expect(src("./client-messages-section.tsx")).toContain("loadDirectThread(");
-    expect(src("./client-messages-section.tsx")).toContain("Open on its own page");
+    expect(src("./client-messages-section.tsx")).not.toContain("Open on its own page"); // the coach on a computer has no separate message page any more
   });
 });
 

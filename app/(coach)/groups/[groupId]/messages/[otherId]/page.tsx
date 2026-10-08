@@ -3,7 +3,6 @@ import { redirect, notFound } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
-import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { DirectMessageThread } from "@/components/messages/direct-message-thread";
 import { CoachProfilePopup } from "@/components/shared/coach-profile-popup";
 import { getEffectiveAthlete } from "@/lib/acting-as";
@@ -55,6 +54,13 @@ export default async function MessageThreadPage(
     notFound();
   }
 
+  // A coach on a computer has no separate message page: the conversation is the Messages tab of that client's profile, so Back goes back to where they were. This address stays as a
+  // redirect for old bell, text and link targets; a drafted note rides along. (On a phone the page below is still used.)
+  if (viewerIsCoach && !showMobileView) {
+    const draft = initialDraft ? `&draft=${encodeURIComponent(initialDraft)}` : "";
+    redirect(`/groups/${params.groupId}/athletes/${params.otherId}?tab=messages${draft}`);
+  }
+
   const otherProfile = otherMembership.profiles as unknown as { full_name: string } | null;
   const otherName = otherProfile?.full_name ?? (viewerIsCoach ? "Athlete" : "Coach");
 
@@ -69,34 +75,6 @@ export default async function MessageThreadPage(
   let actingAsFullName: string | null = null;
   if (isActingAsOther) {
     actingAsFullName = viewerName;
-  }
-
-  if (viewerIsCoach && !showMobileView) {
-    const { data: group } = await supabase.from("groups").select("name").eq("id", params.groupId).single();
-    return (
-      <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="messages">
-        <div className="pb-6 border-b border-steel/20 mb-6">
-          <Link
-            href={`/groups/${params.groupId}/messages`}
-            className="font-body text-xs text-steel uppercase tracking-wide"
-          >
-            &larr; All messages
-          </Link>
-          <h1 className="font-display font-bold text-3xl uppercase leading-none mt-1">{otherName}</h1>
-        </div>
-        <div className="max-w-[560px] h-[65vh] border border-steel/20">
-          <DirectMessageThread
-            groupId={params.groupId}
-            viewerId={viewerId}
-            viewerName={viewerName}
-            otherId={params.otherId}
-            otherName={otherName}
-            initialMessages={messages}
-            initialDraft={viewerIsCoach ? initialDraft : ""}
-          />
-        </div>
-      </CoachDesktopShell>
-    );
   }
 
   return (

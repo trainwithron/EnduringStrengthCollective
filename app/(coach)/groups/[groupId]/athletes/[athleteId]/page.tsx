@@ -75,13 +75,15 @@ function last7DatesForTargets(startKey: string, endKey: string): string[] {
 export default async function AthleteProfilePage(
   props: {
     params: Promise<{ groupId: string; athleteId: string }>;
-    searchParams?: Promise<{ tab?: string; month?: string }>;
+    searchParams?: Promise<{ tab?: string; month?: string; draft?: string }>;
   }
 ) {
   const params = await props.params;
   const searchParamsResolved = await props.searchParams;
   const tabParam = searchParamsResolved?.tab;
   const monthParam = searchParamsResolved?.month;
+  // A drafted note (an expiry check-in, a come-back note) opens in the Messages box for the coach to edit; capped.
+  const draftParam = (searchParamsResolved?.draft ?? "").slice(0, 600);
   const initialTab = isClientProfileTab(tabParam) ? tabParam : "overview";
   const supabase = await createServerClient();
   const {
@@ -880,7 +882,7 @@ export default async function AthleteProfilePage(
       <div id="client-profile-body" data-active-tab={initialTab}>
         <ClientProfileTabs groupId={params.groupId} athleteId={params.athleteId} initial={initialTab} />
         <div data-tab="messages" className="mb-8">
-          {initialTab === "messages" && <ClientMessagesSection groupId={params.groupId} athleteId={params.athleteId} viewerId={user.id} clientName={profile?.full_name ?? "Client"} />}
+          {initialTab === "messages" && <ClientMessagesSection groupId={params.groupId} athleteId={params.athleteId} viewerId={user.id} clientName={profile?.full_name ?? "Client"} initialDraft={draftParam} />}
         </div>
         <div data-tab="calendar" className="mb-8">
           {initialTab === "calendar" && (
