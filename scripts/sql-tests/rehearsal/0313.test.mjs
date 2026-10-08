@@ -40,6 +40,25 @@ export default {
       await add(coach, ann, group, 72, 73, { state: "prepaid" });
       await add(coach, ann, group, -120, -119, { state: "prepaid" });
       await add(coach, ann, group, 96, 97, { status: "cancelled" });
+      // Group classes: Ann joined a coming class herself (charged at join: prepaid ahead); the coach added Bo to a coming class (charged when marked: booked) and to a finished one he is
+      // not marked for (to mark); a cancelled class, a waiting-list place and a finished class Ann paid for are not counted.
+      let classNo = 0;
+      const cls = async (startH, endH, status = "scheduled") =>
+        (await db.query("insert into public.group_sessions (coach_id, title, start_at, end_at, capacity, status) values ($1, $2, $3, $4, 10, $5) returning id", [coach, "Class " + ++classNo, hrs(startH + classNo * 0.01), hrs(endH + classNo * 0.01), status])).rows[0].id;
+      const att = (classId, athlete, status, taken) =>
+        db.query("insert into public.group_session_attendees (group_session_id, athlete_id, group_id, status, credit_taken, added_by_coach) values ($1,$2,$3,$4,$5,$6)", [classId, athlete, group, status, taken, !taken]);
+      const comingClass = await cls(20, 21);
+      await att(comingClass, ann, "joined", true);
+      await att(comingClass, bo, "joined", false);
+      const pastClass = await cls(-30, -29);
+      await att(pastClass, bo, "joined", false);
+      await att(pastClass, ann, "joined", true);
+      const cancelledClass = await cls(40, 41, "cancelled");
+      await att(cancelledClass, ann, "joined", true);
+      const waitClass = await cls(50, 51);
+      await att(waitClass, bo, "waitlisted", false);
+      const doneClass = await cls(-60, -59);
+      await att(doneClass, bo, "attended", true);
       // Bo: one future unsettled
       await add(coach, bo, group, 30, 31);
       // Ann with ANOTHER coach in another organization: one future unsettled
@@ -51,8 +70,8 @@ export default {
       // as the coach (their own bookings only)
       await h.as(coach);
       const mine = await counts([coach, null, null, null]);
-      h.check("Ann's counts with this coach: 3 booked (two ahead and one in progress), 1 to mark, 1 prepaid ahead", JSON.stringify(at(mine, ann, group)) === JSON.stringify({ athlete_id: ann, group_id: group, booked: 3, to_mark: 1, prepaid_ahead: 1 }), JSON.stringify(at(mine, ann, group)));
-      h.check("Bo's counts: 1 booked", at(mine, bo, group)?.booked === 1 && at(mine, bo, group)?.to_mark === 0 && at(mine, bo, group)?.prepaid_ahead === 0, JSON.stringify(at(mine, bo, group)));
+      h.check("Ann's counts with this coach: 3 booked (two ahead and one in progress), 1 to mark, 2 prepaid ahead (a prepaid session and the class she joined)", JSON.stringify(at(mine, ann, group)) === JSON.stringify({ athlete_id: ann, group_id: group, booked: 3, to_mark: 1, prepaid_ahead: 2 }), JSON.stringify(at(mine, ann, group)));
+      h.check("Bo's counts: 1 session + the class the coach added him to = 2 booked, and the finished class he was not marked for = 1 to mark; his waiting-list place and attended class are not counted", at(mine, bo, group)?.booked === 2 && at(mine, bo, group)?.to_mark === 1 && at(mine, bo, group)?.prepaid_ahead === 0, JSON.stringify(at(mine, bo, group)));
       h.check("the coach does not count another coach's bookings, and a cancelled or finished session is not counted", mine.length === 2, JSON.stringify(mine));
       h.check("rows come back in a fixed order (client, then group)", mine.every((r, i, a) => i === 0 || a[i - 1].athlete_id <= r.athlete_id), JSON.stringify(mine.map((r) => r.athlete_id)));
 
