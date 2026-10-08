@@ -19,6 +19,8 @@ export interface NeedsYouHomeInputs {
   lowReadiness: { athleteId: string; groupId: string; name: string }[];
   quietTierByAthlete: Map<string, QuietTier>;
   needsReplyThreads: { postId: string; groupId: string; groupName: string; channel: string; authorName: string }[];
+  // The one client the "Right now" box names. The strip puts that same client first among its own kind, so the two never name different people for the same reason.
+  heroFlag?: { kind: string; athleteId: string; athleteName: string; groupId: string; direction?: string; exerciseName?: string; missedCount?: number } | null;
 }
 
 // A session that starts within this long is "starting soon".
@@ -189,10 +191,15 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
     ...quiet.map((q) => q.id),
   ]);
   const nameById = new Map<string, string>();
+  // Whether each client has signed in (their account is claimed). A client who has not is never "gone quiet": they have not started.
+  const claimedById = new Map<string, boolean>();
   if (needNames.size > 0) {
     // A name that cannot be read just says "A client": the item itself is still shown.
-    const names = await soft("names", () => supabase.from("profiles").select("id, full_name").in("id", [...needNames]) as never, [] as { id: string; full_name: string | null }[]);
-    for (const n of names) nameById.set(n.id, n.full_name?.trim() || "A client");
+    const names = await soft("names", () => supabase.from("profiles").select("id, full_name, claimed_at").in("id", [...needNames]) as never, [] as { id: string; full_name: string | null; claimed_at: string | null }[]);
+    for (const n of names) {
+      nameById.set(n.id, n.full_name?.trim() || "A client");
+      claimedById.set(n.id, !!n.claimed_at);
+    }
   }
   const nameOf = (id: string) => nameById.get(id) ?? "A client";
 
@@ -223,6 +230,13 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
   for (const q of quiet) {
     const g = groupOf.get(q.id);
     if (!g) continue;
+    const claimed = claimedById.get(q.id);
+    // Not known (their profile could not be read): say nothing rather than the wrong thing.
+    if (claimed === undefined) continue;
+    if (!claimed) {
+      items.push({ id: `notsignedin:${q.id}`, kind: "not_signed_in", name: nameOf(q.id), sentence: sentences.notSignedIn(), button: BUTTON.sendLink, href: clientPath(g, q.id), order: 0 });
+      continue;
+    }
     items.push({
       id: `quiet:${q.id}`,
       kind: q.tier === "strong" ? "quiet_strong" : "quiet_mild",
@@ -232,6 +246,18 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
       href: `/groups/${g}/messages/${q.id}`,
       order: 0,
     });
+  }
+  // The client the "Right now" box names goes first among its own kind (the box's tie-break is the order it first saw them in; this follows it).
+  const hero = input.heroFlag;
+  if (hero) {
+    const heroItem = (kind: NeedsYouItem["kind"], sentence: string, id: string, button: string, href: string): NeedsYouItem => ({ id, kind, name: hero.athleteName, sentence, button, href, order: -1 });
+    if (hero.kind === "matched_load_trend" && hero.direction === "fatigue") {
+      items.push(heroItem("load_fatigue", sentences.loadFatigue(hero.exerciseName ?? "a lift"), `fatigue:${hero.athleteId}`, BUTTON.open, clientPath(hero.groupId, hero.athleteId)));
+    } else if (hero.kind === "missed_habits") {
+      items.push(heroItem("missed_habits", sentences.missedHabits(hero.missedCount ?? 1), `habits:${hero.athleteId}`, BUTTON.open, clientPath(hero.groupId, hero.athleteId)));
+    } else {
+      for (const it of items) if (it.id === `readiness:${hero.athleteId}:${hero.groupId}` || it.id === `quiet:${hero.athleteId}`) it.order = -1;
+    }
   }
   return { items, failed };
 }

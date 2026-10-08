@@ -480,15 +480,18 @@ export async function getCoachDashboardData(
       needsAttentionCount++;
       if (tier === "mild") mildTierCount++;
       if (tier === "strong") strongTierCount++;
-      heroFlags.push({
-        kind: "quiet_client",
-        athleteId: athlete.profileId,
-        athleteName: athlete.fullName,
-        groupId: athlete.groupId,
-        groupName: athlete.groupName,
-        tier,
-        href,
-      });
+      // A client who has not signed in yet has not "gone quiet" (the client's own page says the same): "Right now" does not name them. The count above still includes them.
+      if (athlete.signedIn) {
+        heroFlags.push({
+          kind: "quiet_client",
+          athleteId: athlete.profileId,
+          athleteName: athlete.fullName,
+          groupId: athlete.groupId,
+          groupName: athlete.groupName,
+          tier,
+          href,
+        });
+      }
     }
 
     const compliance = habitComplianceFor(athlete.profileId);

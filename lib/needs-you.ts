@@ -30,8 +30,11 @@ export type NeedsYouKind =
   // slipping
   | "injury"
   | "low_readiness"
+  | "load_fatigue"
   | "quiet_strong"
-  | "quiet_mild";
+  | "quiet_mild"
+  | "missed_habits"
+  | "not_signed_in";
 
 export const KIND_SLOT: Record<NeedsYouKind, NeedsYouSlot> = {
   schedule_request: "waiting",
@@ -44,8 +47,11 @@ export const KIND_SLOT: Record<NeedsYouKind, NeedsYouSlot> = {
   expiring_credits: "due",
   injury: "slipping",
   low_readiness: "slipping",
+  load_fatigue: "slipping",
   quiet_strong: "slipping",
   quiet_mild: "slipping",
+  missed_habits: "slipping",
+  not_signed_in: "slipping",
 };
 
 export const KIND_ORDER: NeedsYouKind[] = [
@@ -58,9 +64,14 @@ export const KIND_ORDER: NeedsYouKind[] = [
   "expiring_credits",
   "payment",
   "injury",
+  // The "Right now" box on Home ranks readiness, then load fatigue, then a quiet client (strong before mild), then missed habits; the strip follows the same order and adds what that box
+  // does not have. A client who has not signed in yet comes last: they have not gone quiet, they need the sign-in link.
   "low_readiness",
+  "load_fatigue",
   "quiet_strong",
   "quiet_mild",
+  "missed_habits",
+  "not_signed_in",
 ];
 
 export interface NeedsYouItem {
@@ -114,19 +125,23 @@ export const moreLabel = (n: number): string => `${n} more`;
 
 const SCHEDULE_VERB: Record<string, string> = { pause: "pause", freeze: "freeze", cancel: "cancel" };
 
+// Every sentence follows the client's name on the card ("Sam has gone quiet."), so none starts with a capital letter.
 export const sentences = {
-  scheduleRequest: (kind: string) => `Asked to ${SCHEDULE_VERB[kind] ?? "change"} their recurring sessions.`,
-  bookingRequest: () => "Asked to move a session.",
-  clientMessage: (count: number) => (count > 1 ? `Sent you ${count} messages you haven't read.` : "Sent you a message you haven't read."),
-  groupReply: (groupName: string) => `Is waiting for a reply in ${groupName}.`,
-  sessionSoon: (timeLabel: string) => `Session starts at ${timeLabel}.`,
-  lateChange: () => "Changed a session late. Decide whether to charge it.",
-  payment: (balance: number) => (balance < 0 ? `Is out of sessions (owed ${Math.abs(balance)}).` : "Is out of sessions."),
-  expiringCredits: (daysLeft: number) => (daysLeft <= 0 ? "Has sessions that expire today." : daysLeft === 1 ? "Has sessions that expire tomorrow." : `Has sessions that expire in ${daysLeft} days.`),
-  injury: () => "Is marked injured.",
-  lowReadiness: () => "Checked in low on readiness today.",
-  quietStrong: () => "Has gone quiet. Worth a personal check-in.",
-  quietMild: () => "Hasn't logged in a while.",
+  scheduleRequest: (kind: string) => `asked to ${SCHEDULE_VERB[kind] ?? "change"} their recurring sessions.`,
+  bookingRequest: () => "asked to move a session.",
+  clientMessage: (count: number) => (count > 1 ? `sent you ${count} messages you haven't read.` : "sent you a message you haven't read."),
+  groupReply: (groupName: string) => `is waiting for a reply in ${groupName}.`,
+  sessionSoon: (timeLabel: string) => `has a session at ${timeLabel}.`,
+  lateChange: () => "changed a session late. Decide whether to charge it.",
+  payment: (balance: number) => (balance < 0 ? `is out of sessions (owed ${Math.abs(balance)}).` : "is out of sessions."),
+  expiringCredits: (daysLeft: number) => (daysLeft <= 0 ? "has sessions that expire today." : daysLeft === 1 ? "has sessions that expire tomorrow." : `has sessions that expire in ${daysLeft} days.`),
+  injury: () => "is marked injured.",
+  lowReadiness: () => "checked in low on readiness today.",
+  loadFatigue: (exercise: string) => `is showing fatigue on ${exercise}.`,
+  quietStrong: () => "has gone quiet. Worth a personal check-in.",
+  quietMild: () => "hasn't logged in a while.",
+  missedHabits: (n: number) => `missed ${n} ${n === 1 ? "habit" : "habits"} this week.`,
+  notSignedIn: () => "hasn't signed in yet. Send the sign-in link.",
 };
 
 export const BUTTON = {
@@ -135,4 +150,5 @@ export const BUTTON = {
   open: "Open",
   decide: "Decide",
   checkIn: "Check in",
+  sendLink: "Send link",
 } as const;

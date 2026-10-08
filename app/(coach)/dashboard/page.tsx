@@ -546,6 +546,7 @@ export default async function CoachHomePage() {
         lowReadiness,
         quietTierByAthlete: dashboardData.quietTierByAthlete,
         needsReplyThreads,
+        heroFlag: dashboardData.heroFlag,
     });
     needsYouView = pickNeedsYou(needsYou.items, { incomplete: needsYou.failed.length > 0 });
   } catch (e) {

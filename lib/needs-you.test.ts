@@ -60,11 +60,11 @@ describe("the three slots", () => {
   });
   it("words the 'N more' link and the sentences plainly", () => {
     expect(moreLabel(4)).toBe("4 more");
-    expect(sentences.scheduleRequest("freeze")).toBe("Asked to freeze their recurring sessions.");
-    expect(sentences.clientMessage(1)).toBe("Sent you a message you haven't read.");
-    expect(sentences.clientMessage(3)).toBe("Sent you 3 messages you haven't read.");
-    expect(sentences.payment(-2)).toBe("Is out of sessions (owed 2).");
-    expect(sentences.expiringCredits(1)).toBe("Has sessions that expire tomorrow.");
+    expect(sentences.scheduleRequest("freeze")).toBe("asked to freeze their recurring sessions.");
+    expect(sentences.clientMessage(1)).toBe("sent you a message you haven't read.");
+    expect(sentences.clientMessage(3)).toBe("sent you 3 messages you haven't read.");
+    expect(sentences.payment(-2)).toBe("is out of sessions (owed 2).");
+    expect(sentences.expiringCredits(1)).toBe("has sessions that expire tomorrow.");
   });
 });
 
@@ -114,7 +114,7 @@ describe("gathering what needs the coach", () => {
       ],
     });
     expect(items.filter((i) => i.kind === "session_soon").map((i) => i.id)).toEqual(["session:soon", "session:edge"]);
-    expect(items[0].sentence).toMatch(/^Session starts at /);
+    expect(items[0].sentence).toMatch(/^has a session at /);
   });
   it("brings in clients out of sessions, low readiness and a group reply from what Home already has", async () => {
     const { items } = await loadNeedsYouItems(fakeDb({}), {
@@ -152,10 +152,10 @@ describe("gathering what needs the coach", () => {
       base
     );
     const by = (k: string) => items.filter((i) => i.kind === k);
-    expect(by("schedule_request")[0]).toMatchObject({ name: "Ann", sentence: "Asked to pause their recurring sessions." });
+    expect(by("schedule_request")[0]).toMatchObject({ name: "Ann", sentence: "asked to pause their recurring sessions." });
     expect(by("booking_request")).toHaveLength(1);
     expect(by("client_message")).toHaveLength(1);
-    expect(by("client_message")[0]).toMatchObject({ name: "Cy", sentence: "Sent you 2 messages you haven't read.", href: "/groups/g1/messages/a3" });
+    expect(by("client_message")[0]).toMatchObject({ name: "Cy", sentence: "sent you 2 messages you haven't read.", href: "/groups/g1/messages/a3" });
     expect(by("late_change")[0].name).toBe("Di");
     // an injury only counts for a client of this coach
     expect(by("injury").map((i) => i.name)).toEqual(["Ed"]);
@@ -169,8 +169,8 @@ describe("gathering what needs the coach", () => {
           { group_id: "g1", profile_id: "a3" },
         ],
         profiles: [
-          { id: "a1", full_name: "Ann" },
-          { id: "a2", full_name: "Bo" },
+          { id: "a1", full_name: "Ann", claimed_at: "2026-09-01T00:00:00Z" },
+          { id: "a2", full_name: "Bo", claimed_at: "2026-09-01T00:00:00Z" },
         ],
       }),
       { ...base, quietTierByAthlete: new Map([["a1", "strong"], ["a2", "mild"], ["a3", "none"]]) as never }
@@ -178,6 +178,48 @@ describe("gathering what needs the coach", () => {
     expect(items.filter((i) => i.kind === "quiet_strong").map((i) => i.name)).toEqual(["Ann"]);
     expect(items.filter((i) => i.kind === "quiet_mild").map((i) => i.name)).toEqual(["Bo"]);
     expect(items.some((i) => i.id === "quiet:a3")).toBe(false);
+  });
+  it("a client who has never signed in is not 'gone quiet': they are told to be sent the sign-in link, whatever their quiet tier", async () => {
+    const { items } = await loadNeedsYouItems(
+      fakeDb({
+        group_memberships: [
+          { group_id: "g1", profile_id: "a1" },
+          { group_id: "g1", profile_id: "a2" },
+        ],
+        profiles: [
+          { id: "a1", full_name: "Jeff Ziegler", claimed_at: null },
+          { id: "a2", full_name: "Bo", claimed_at: "2026-09-01T00:00:00Z" },
+        ],
+      }),
+      { ...base, quietTierByAthlete: new Map([["a1", "strong"], ["a2", "strong"]]) as never }
+    );
+    const jeff = items.filter((i) => i.name === "Jeff Ziegler");
+    expect(jeff.map((i) => i.kind)).toEqual(["not_signed_in"]);
+    expect(jeff[0]).toMatchObject({ sentence: "hasn't signed in yet. Send the sign-in link.", button: "Send link", href: "/groups/g1/athletes/a1" });
+    expect(items.some((i) => i.kind === "quiet_strong" && i.name === "Bo")).toBe(true);
+    expect(items.some((i) => i.kind === "quiet_strong" && i.name === "Jeff Ziegler")).toBe(false);
+  });
+  it("when the profile could not be read, a quiet client is left out rather than called quiet by mistake", async () => {
+    const out = await loadNeedsYouItems(fakeDb({ group_memberships: [{ group_id: "g1", profile_id: "a1" }] }, ["profiles"]), { ...base, quietTierByAthlete: new Map([["a1", "strong"]]) as never });
+    expect(out.items).toEqual([]);
+    expect(out.failed).toContain("names");
+  });
+  it("the client the Right now box names goes first among its own kind, so the strip and the box agree", async () => {
+    const roster = { group_memberships: [{ group_id: "g1", profile_id: "a1" }, { group_id: "g1", profile_id: "a2" }], profiles: [{ id: "a1", full_name: "Alan", claimed_at: "x" }, { id: "a2", full_name: "Karina", claimed_at: "x" }] };
+    const tiers = new Map([["a1", "strong"], ["a2", "strong"]]) as never;
+    const without = await loadNeedsYouItems(fakeDb(roster), { ...base, quietTierByAthlete: tiers });
+    expect(pickNeedsYou(without.items).slots[2].item?.name).toBe("Alan");
+    const hero = { kind: "quiet_client", athleteId: "a2", athleteName: "Karina", groupId: "g1" };
+    const withHero = await loadNeedsYouItems(fakeDb(roster), { ...base, quietTierByAthlete: tiers, heroFlag: hero });
+    expect(pickNeedsYou(withHero.items).slots[2].item?.name).toBe("Karina");
+  });
+  it("a load-fatigue or missed-habits box is shown in the strip too, and a celebration is not", async () => {
+    const fat = await loadNeedsYouItems(fakeDb({}), { ...base, heroFlag: { kind: "matched_load_trend", direction: "fatigue", exerciseName: "Back Squat", athleteId: "a1", athleteName: "Ann", groupId: "g1" } });
+    expect(fat.items[0]).toMatchObject({ kind: "load_fatigue", name: "Ann", sentence: "is showing fatigue on Back Squat." });
+    const habits = await loadNeedsYouItems(fakeDb({}), { ...base, heroFlag: { kind: "missed_habits", missedCount: 3, athleteId: "a1", athleteName: "Ann", groupId: "g1" } });
+    expect(habits.items[0]).toMatchObject({ kind: "missed_habits", sentence: "missed 3 habits this week." });
+    const gain = await loadNeedsYouItems(fakeDb({}), { ...base, heroFlag: { kind: "matched_load_trend", direction: "strength_gain", exerciseName: "Squat", athleteId: "a1", athleteName: "Ann", groupId: "g1" } });
+    expect(gain.items).toEqual([]);
   });
   it("a read that fails leaves only its own kind out", async () => {
     const { items } = await loadNeedsYouItems(
@@ -219,6 +261,22 @@ describe("gathering what needs the coach", () => {
   });
 });
 
+describe("the wording", () => {
+  it("no sentence starts with a capital letter, because each follows the client's name", () => {
+    const all = [
+      sentences.scheduleRequest("pause"), sentences.bookingRequest(), sentences.clientMessage(1), sentences.clientMessage(4), sentences.groupReply("Team"), sentences.sessionSoon("3:30 PM"),
+      sentences.lateChange(), sentences.payment(0), sentences.payment(-1), sentences.expiringCredits(0), sentences.expiringCredits(1), sentences.expiringCredits(5), sentences.injury(),
+      sentences.lowReadiness(), sentences.loadFatigue("Back Squat"), sentences.quietStrong(), sentences.quietMild(), sentences.missedHabits(1), sentences.missedHabits(2), sentences.notSignedIn(),
+    ];
+    for (const t of all) expect(t).toMatch(/^[a-z]/);
+    expect(SLOT_TITLE.slipping).toBe("Someone may need a check-in");
+  });
+  it("a client who has not signed in ranks after every real signal", () => {
+    expect(pickNeedsYou([item("n", "not_signed_in"), item("m", "quiet_mild")]).slots[2].item?.id).toBe("m");
+    expect(pickNeedsYou([item("n", "not_signed_in")]).slots[2].item?.id).toBe("n");
+  });
+});
+
 describe("Home is wired as designed", () => {
   const page = readFileSync(join(__dirname, "..", "app/(coach)/dashboard/page.tsx"), "utf8").replace(/\r\n/g, "\n");
   it("the strip sits above everything else and the stack below keeps all its panels", () => {
@@ -230,6 +288,11 @@ describe("Home is wired as designed", () => {
   });
   it("the strip's buttons and 'N more' land on anchors that exist", () => {
     for (const id of ["needs-stack", "late-changes", "schedule-requests", "expiring"]) expect(page).toContain(`id="${id}"`);
+  });
+  it("the Right now box does not name a client who has not signed in as gone quiet, and the strip is given the same box", () => {
+    const data = readFileSync(join(__dirname, "..", "lib/dashboard-data.ts"), "utf8").replace(/\r\n/g, "\n");
+    expect(data).toMatch(/if \(athlete\.signedIn\) \{\s*heroFlags\.push\(\{\s*kind: "quiet_client"/);
+    expect(page).toContain("heroFlag: dashboardData.heroFlag");
   });
   it("a failure gathering the strip never fails the page", () => {
     expect(page).toMatch(/try \{\s*const needsYou = await loadNeedsYouItems\(/);
