@@ -22,7 +22,7 @@ export const TRACKED_FIELD_DEFS: { key: TrackedField; label: string; kind: "numb
   { key: "rpe", label: "RPE", kind: "number" },
   { key: "rir", label: "RIR", kind: "number" },
   { key: "tempo", label: "Tempo", kind: "text" },
-  { key: "time", label: "Time", kind: "number" },
+  { key: "time", label: "Time (s)", kind: "number" },
   { key: "height", label: "Height", kind: "number" },
   { key: "distance", label: "Distance", kind: "number" },
   { key: "rest", label: "Rest (s)", kind: "number" },

@@ -84,6 +84,11 @@ function TargetCell({
   );
 }
 
+// The coach's builder shows Time and Rest short because their cells take m:ss; the shared label keeps the unit ("Time (s)") for the client's logger, whose box is plain seconds.
+function builderLabel(field: TrackedField, label: string): string {
+  return field === "rest" ? "Rest" : field === "time" ? "Time" : label;
+}
+
 function targetValue(set: ExerciseSetTarget, field: TrackedField): string {
   const prop = TARGET_PROP[field] as keyof ExerciseSetTarget;
   const v = set[prop];
@@ -853,14 +858,14 @@ export function ExerciseBuilderCard({
                 return (
                   <div key={field} className="flex items-center gap-1.5">
                     <span className="w-14 shrink-0 font-body text-xs text-steel uppercase tracking-wide">
-                      {def.label}
+                      {builderLabel(field, def.label)}
                     </span>
                     {exercise.sets.map((set, i) => (
                       <TargetCell
                         key={set.id}
                         value={targetValue(set, field)}
                         kind={field === "rest" || field === "time" ? "text" : def.kind}
-                        label={field === "rest" || field === "time" ? `${def.label} (m:ss), set ${i + 1}` : `${def.label}, set ${i + 1}`}
+                        label={field === "rest" || field === "time" ? `${builderLabel(field, def.label)} (m:ss), set ${i + 1}` : `${def.label}, set ${i + 1}`}
                         onCommit={(typed) => {
                           let raw = typed;
                           if (field === "rest" || field === "time") {
@@ -869,7 +874,7 @@ export function ExerciseBuilderCard({
                               flashSaveError(field === "time" ? "Time looks like 3:00, 3 min, 90s or 180 (up to 4:00:00)." : "Rest looks like 5:00, 3m or 90s (up to 30:00).");
                               return false;
                             }
-                            if (parsed.bare && !window.confirm(`${parsed.seconds} means ${parsed.seconds} seconds. For minutes type ${parsed.seconds}:00 or ${parsed.seconds}m. Save ${parsed.seconds} seconds?`)) return false;
+                            if (parsed.bare && field !== "time" && !window.confirm(`${parsed.seconds} means ${parsed.seconds} seconds. For minutes type ${parsed.seconds}:00 or ${parsed.seconds}m. Save ${parsed.seconds} seconds?`)) return false;
                             raw = parsed.seconds === null ? "" : String(parsed.seconds);
                           }
                           return set.id === firstSetId && exercise.sets.length > 1
@@ -881,7 +886,7 @@ export function ExerciseBuilderCard({
                     <button
                       type="button"
                       onClick={() => handleRemoveField(field)}
-                      aria-label={`Stop tracking ${def.label}`}
+                      aria-label={`Stop tracking ${builderLabel(field, def.label)}`}
                       className="w-6 h-9 flex items-center justify-center text-steel active:text-rust shrink-0"
                     >
                       ×
@@ -911,7 +916,7 @@ export function ExerciseBuilderCard({
                       onClick={() => handleAddField(f)}
                       className="h-7 px-2 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust"
                     >
-                      {fieldDef(f).label}
+                      {builderLabel(f, fieldDef(f).label)}
                     </button>
                   ))}
                 </div>

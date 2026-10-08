@@ -113,3 +113,11 @@ describe("the Time field takes the same typing as rest, with a longer limit", ()
     expect(secs("")).toBeNull();
   });
 });
+
+describe("the Time label keeps its unit where a client types seconds", () => {
+  it("the shared label says seconds, the coach's builder row says Time", async () => {
+    const { fieldDef } = await import("@/lib/exercise-fields");
+    expect(fieldDef("time").label).toBe("Time (s)");
+    expect(fieldDef("rest").label).toBe("Rest (s)");
+  });
+});
