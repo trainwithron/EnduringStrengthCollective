@@ -1,0 +1,228 @@
+// Gathers the things that need a coach for the "Needs you" strip on Home. Read-only: it uses what Home already works out (today's sessions, clients out of sessions, low readiness,
+// who is quiet, threads waiting for a reply) and adds a few small reads for the rest (requests, unread messages, late changes, sessions about to expire, injuries). Every extra read
+// is soft: one that fails just leaves its kind out, never the strip and never the page. The ranking and the sentences are lib/needs-you.ts.
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { formatInTimezone } from "@/lib/format-in-timezone";
+import { DEFAULT_HEADS_UP_DAYS, expiringSoon, expiryDismissalKey, isSnoozed } from "@/lib/expiry-checkin";
+import { BUTTON, sentences, type NeedsYouItem } from "@/lib/needs-you";
+import type { QuietTier } from "@/lib/quiet-client-tier";
+
+export interface NeedsYouHomeInputs {
+  coachId: string;
+  timezone: string;
+  now: Date;
+  // The groups this coach coaches (every kind).
+  groupIds: string[];
+  todayBookings: { id: string; athleteId: string; groupId: string; athleteName: string; startAt: string }[];
+  needsPayment: { athleteId: string; groupId: string; name: string; balance: number }[];
+  lowReadiness: { athleteId: string; groupId: string; name: string }[];
+  quietTierByAthlete: Map<string, QuietTier>;
+  needsReplyThreads: { postId: string; groupId: string; groupName: string; channel: string; authorName: string }[];
+}
+
+// A session that starts within this long is "starting soon".
+export const SESSION_SOON_MINUTES = 120;
+
+const clientPath = (groupId: string, athleteId: string) => `/groups/${groupId}/athletes/${athleteId}`;
+
+async function soft<T>(label: string, run: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await run();
+  } catch (e) {
+    console.error(`[needs-you] ${label} failed:`, e instanceof Error ? e.message : e);
+    return fallback;
+  }
+}
+
+export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYouHomeInputs): Promise<NeedsYouItem[]> {
+  const { coachId, now, groupIds } = input;
+  const items: NeedsYouItem[] = [];
+  if (groupIds.length === 0) return items;
+  const nowMs = now.getTime();
+
+  // ---- what Home already knows -------------------------------------------------------------------------------------------------
+  for (const b of input.todayBookings) {
+    const startMs = new Date(b.startAt).getTime();
+    if (b.athleteId === coachId || startMs < nowMs || startMs - nowMs > SESSION_SOON_MINUTES * 60_000) continue;
+    items.push({
+      id: `session:${b.id}`,
+      kind: "session_soon",
+      name: b.athleteName,
+      sentence: sentences.sessionSoon(formatInTimezone(b.startAt, input.timezone, "time")),
+      button: BUTTON.open,
+      href: clientPath(b.groupId, b.athleteId),
+      order: startMs,
+    });
+  }
+  for (const p of input.needsPayment) {
+    items.push({ id: `payment:${p.athleteId}:${p.groupId}`, kind: "payment", name: p.name, sentence: sentences.payment(p.balance), button: BUTTON.open, href: clientPath(p.groupId, p.athleteId), order: p.balance });
+  }
+  for (const r of input.lowReadiness) {
+    items.push({ id: `readiness:${r.athleteId}:${r.groupId}`, kind: "low_readiness", name: r.name, sentence: sentences.lowReadiness(), button: BUTTON.open, href: clientPath(r.groupId, r.athleteId), order: 0 });
+  }
+  for (const t of input.needsReplyThreads) {
+    items.push({
+      id: `reply:${t.postId}`,
+      kind: "group_reply",
+      name: t.authorName,
+      sentence: sentences.groupReply(t.groupName),
+      button: BUTTON.reply,
+      href: `/groups/${t.groupId}/feed?channel=${t.channel}&highlight=${t.postId}`,
+      order: 0,
+    });
+  }
+
+  // ---- the small extra reads, all in parallel and all soft ------------------------------------------------------------------------
+  const [scheduleRequests, bookingRequests, unreadMessages, lateChanges, expiring, injured, athleteRows] = await Promise.all([
+    soft(
+      "schedule requests",
+      async () => {
+        const { data } = await supabase.from("schedule_requests").select("id, athlete_id, group_id, kind, created_at").eq("coach_id", coachId).in("status", ["pending", "applying"]).order("created_at", { ascending: true }).limit(50);
+        return (data ?? []) as { id: string; athlete_id: string; group_id: string; kind: string; created_at: string }[];
+      },
+      []
+    ),
+    soft(
+      "booking requests",
+      async () => {
+        const { data } = await supabase.from("booking_requests").select("id, athlete_id, group_id, created_at").eq("coach_id", coachId).eq("status", "pending").order("created_at", { ascending: true }).limit(50);
+        return (data ?? []) as { id: string; athlete_id: string; group_id: string; created_at: string }[];
+      },
+      []
+    ),
+    soft(
+      "unread messages",
+      async () => {
+        const { data } = await supabase.from("direct_messages").select("sender_id, group_id, created_at").eq("recipient_id", coachId).is("read_at", null).order("created_at", { ascending: true }).limit(500);
+        return (data ?? []) as { sender_id: string; group_id: string; created_at: string }[];
+      },
+      []
+    ),
+    soft(
+      "late changes",
+      async () => {
+        const { data } = await supabase.from("bookings").select("id, athlete_id, group_id, start_at").eq("coach_id", coachId).eq("late_charge_state", "flagged").order("start_at", { ascending: true }).limit(50);
+        return (data ?? []) as { id: string; athlete_id: string; group_id: string; start_at: string }[];
+      },
+      []
+    ),
+    soft(
+      "expiring sessions",
+      async () => {
+        const { data: policy } = await supabase.from("coach_booking_policies").select("credit_expiry_days, expiry_heads_up_days").eq("coach_id", coachId).maybeSingle();
+        const expiryDays = (policy?.credit_expiry_days as number | undefined) ?? 0;
+        if (expiryDays <= 0) return [];
+        const headsUp = (policy?.expiry_heads_up_days as number | undefined) ?? DEFAULT_HEADS_UP_DAYS;
+        const { data: credits } = await supabase.from("session_credits").select("athlete_id, group_id, balance, last_granted_at, expiry_hold_until").in("group_id", groupIds);
+        const soon = expiringSoon(
+          ((credits ?? []) as { athlete_id: string; group_id: string; balance: number; last_granted_at: string | null; expiry_hold_until: string | null }[]).map((r) => ({
+            athleteId: r.athlete_id,
+            groupId: r.group_id,
+            balance: r.balance,
+            lastGrantedAt: r.last_granted_at,
+            holdUntil: r.expiry_hold_until,
+          })),
+          expiryDays,
+          headsUp,
+          now
+        );
+        if (soon.length === 0) return [];
+        // "Not now" on the check-in card stays away for two weeks: it stays away here too.
+        const { data: feedback } = await supabase
+          .from("spotter_recommendation_feedback")
+          .select("dismissal_key, created_at")
+          .eq("coach_id", coachId)
+          .eq("spotter_kind", "expiry")
+          .order("created_at", { ascending: false })
+          .limit(200);
+        const lastDenied = new Map<string, string>();
+        for (const f of (feedback ?? []) as { dismissal_key: string; created_at: string }[]) if (!lastDenied.has(f.dismissal_key)) lastDenied.set(f.dismissal_key, f.created_at);
+        return soon.filter((u) => !isSnoozed(lastDenied.get(expiryDismissalKey(u.athleteId, u.groupId, "soon")) ?? null, now));
+      },
+      []
+    ),
+    soft(
+      "injuries",
+      async () => {
+        const { data } = await supabase.from("athlete_injury_status").select("athlete_id").eq("is_injured", true).limit(200);
+        return ((data ?? []) as { athlete_id: string }[]).map((r) => r.athlete_id);
+      },
+      [] as string[]
+    ),
+    soft(
+      "roster",
+      async () => {
+        const { data } = await supabase.from("group_memberships").select("group_id, profile_id").in("group_id", groupIds).eq("role", "athlete");
+        return (data ?? []) as { group_id: string; profile_id: string }[];
+      },
+      []
+    ),
+  ]);
+
+  // The first group each client is in (for where a button goes), and every name needed, read once.
+  const groupOf = new Map<string, string>();
+  for (const r of athleteRows) if (!groupOf.has(r.profile_id)) groupOf.set(r.profile_id, r.group_id);
+  const quiet = [...input.quietTierByAthlete.entries()].filter(([, tier]) => tier === "mild" || tier === "strong").map(([id, tier]) => ({ id, tier }));
+  const injuredHere = injured.filter((id) => groupOf.has(id));
+  const needNames = new Set<string>([
+    ...scheduleRequests.map((r) => r.athlete_id),
+    ...bookingRequests.map((r) => r.athlete_id),
+    ...unreadMessages.map((m) => m.sender_id),
+    ...lateChanges.map((l) => l.athlete_id),
+    ...expiring.map((e) => e.athleteId),
+    ...injuredHere,
+    ...quiet.map((q) => q.id),
+  ]);
+  const nameById = new Map<string, string>();
+  if (needNames.size > 0) {
+    const names = await soft(
+      "names",
+      async () => {
+        const { data } = await supabase.from("profiles").select("id, full_name").in("id", [...needNames]);
+        return (data ?? []) as { id: string; full_name: string | null }[];
+      },
+      []
+    );
+    for (const n of names) nameById.set(n.id, n.full_name?.trim() || "A client");
+  }
+  const nameOf = (id: string) => nameById.get(id) ?? "A client";
+
+  for (const r of scheduleRequests) {
+    items.push({ id: `schedule:${r.id}`, kind: "schedule_request", name: nameOf(r.athlete_id), sentence: sentences.scheduleRequest(r.kind), button: BUTTON.review, href: "/dashboard#schedule-requests", order: new Date(r.created_at).getTime() });
+  }
+  for (const r of bookingRequests) {
+    items.push({ id: `request:${r.id}`, kind: "booking_request", name: nameOf(r.athlete_id), sentence: sentences.bookingRequest(), button: BUTTON.decide, href: "/dashboard#late-changes", order: new Date(r.created_at).getTime() });
+  }
+  // One entry per client who has unread messages: how many, and the oldest first.
+  const byClient = new Map<string, { groupId: string; count: number; oldest: number }>();
+  for (const m of unreadMessages) {
+    const prev = byClient.get(m.sender_id);
+    byClient.set(m.sender_id, { groupId: prev?.groupId ?? m.group_id, count: (prev?.count ?? 0) + 1, oldest: Math.min(prev?.oldest ?? Infinity, new Date(m.created_at).getTime()) });
+  }
+  for (const [senderId, v] of byClient) {
+    items.push({ id: `message:${senderId}`, kind: "client_message", name: nameOf(senderId), sentence: sentences.clientMessage(v.count), button: BUTTON.reply, href: `/groups/${v.groupId}/messages/${senderId}`, order: v.oldest });
+  }
+  for (const l of lateChanges) {
+    items.push({ id: `late:${l.id}`, kind: "late_change", name: nameOf(l.athlete_id), sentence: sentences.lateChange(), button: BUTTON.decide, href: "/dashboard#late-changes", order: new Date(l.start_at).getTime() });
+  }
+  for (const e of expiring) {
+    items.push({ id: `expiring:${e.athleteId}:${e.groupId}`, kind: "expiring_credits", name: nameOf(e.athleteId), sentence: sentences.expiringCredits(e.daysLeft), button: BUTTON.open, href: "/dashboard#expiring", order: e.expiresOn.getTime() });
+  }
+  for (const id of injuredHere) {
+    items.push({ id: `injury:${id}`, kind: "injury", name: nameOf(id), sentence: sentences.injury(), button: BUTTON.open, href: clientPath(groupOf.get(id)!, id), order: 0 });
+  }
+  for (const q of quiet) {
+    const g = groupOf.get(q.id);
+    if (!g) continue;
+    items.push({
+      id: `quiet:${q.id}`,
+      kind: q.tier === "strong" ? "quiet_strong" : "quiet_mild",
+      name: nameOf(q.id),
+      sentence: q.tier === "strong" ? sentences.quietStrong() : sentences.quietMild(),
+      button: BUTTON.checkIn,
+      href: `/groups/${g}/messages/${q.id}`,
+      order: 0,
+    });
+  }
+  return items;
+}
