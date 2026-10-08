@@ -50,7 +50,9 @@ export const RELEASE_N_SERVER_ONLY_SIGNATURES = [
   ["ai_org_summary", "uuid", false],
   ["ai_org_month_usage", "uuid, timestamptz", false],
 ];
-export const SERVER_ONLY = [...SERVER_ONLY_SIGNATURES, ...RELEASE_F_SERVER_ONLY_SIGNATURES, ...RELEASE_H_SERVER_ONLY_SIGNATURES, ...RELEASE_L_SERVER_ONLY_SIGNATURES, ...RELEASE_N_SERVER_ONLY_SIGNATURES].map((s) => s[0]);
+// Closed by 0306 / 0307: the target-change notice trigger function (a trigger function nobody can call as a function, but internal functions are closed on purpose).
+export const RELEASE_O_SERVER_ONLY_SIGNATURES = [["notify_on_target_change", "", false]];
+export const SERVER_ONLY = [...SERVER_ONLY_SIGNATURES, ...RELEASE_F_SERVER_ONLY_SIGNATURES, ...RELEASE_H_SERVER_ONLY_SIGNATURES, ...RELEASE_L_SERVER_ONLY_SIGNATURES, ...RELEASE_N_SERVER_ONLY_SIGNATURES, ...RELEASE_O_SERVER_ONLY_SIGNATURES].map((s) => s[0]);
 export const AUDIT_WRITERS = SERVER_ONLY_SIGNATURES.filter((s) => s[2]).map((s) => s[0]);
 
 // Signed-in-callable SECURITY DEFINER functions with no caller check in their body that were reviewed and are meant to be (they answer about the
