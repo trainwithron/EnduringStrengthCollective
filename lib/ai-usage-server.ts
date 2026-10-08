@@ -50,6 +50,8 @@ export async function reserveAiCall(meta: AiCallMeta): Promise<UsageHandle> {
         throw new AiRateLimitedError("budget_out", meta.feature, budgetOutMessage(actorIsCoach, topUpInfo(new Date(), status)));
       }
       if (status?.level === "low") await noteBudgetLevel(supabase, billingCoach, "low", new Date(), status);
+      // The included AI is used up but the top-up balance is paying: nothing is paused, the owner and coach are told once.
+      if (status?.level === "balance") await noteBudgetLevel(supabase, billingCoach, "balance", new Date(), status);
     }
     // A per-person monthly ceiling (food photos and typed estimates): counted from the person's own log this month, every attempt included. Checked before the call is
     // reserved, so a person at their ceiling never reaches the model. If it cannot be counted the call is refused (fail closed), like the other metered limits.

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getAiUsage } from "@/lib/coach-credits";
-import { coachBudgetMessage, meterLine, type BudgetStatus, type TopUpPack } from "@/lib/ai-budget";
+import { balanceLine, coachBudgetMessage, meterLine, type BudgetStatus, type TopUpPack } from "@/lib/ai-budget";
 import { getCoachBudgetStatus, topUpInfo } from "@/lib/ai-budget-server";
 
 // Feeds the coach-facing usage meter: how much of this month's included
@@ -13,6 +13,8 @@ import { getCoachBudgetStatus, topUpInfo } from "@/lib/ai-budget-server";
 export interface AiBudgetView {
   status: BudgetStatus;
   line: string;
+  // "Top-up balance: $3.50" (carries over month to month), or null when the organization never bought a top-up.
+  balanceLine: string | null;
   // Null while the coach is under about 80 percent (nothing to say yet).
   message: string | null;
   // False while billing is off: the screen then shows no buy button.
@@ -42,7 +44,8 @@ export async function GET() {
       budget = {
         status,
         line: meterLine(status),
-        message: status.level === "low" || status.level === "out" ? coachBudgetMessage(status.level, top) : null,
+        balanceLine: balanceLine(status),
+        message: status.level === "low" || status.level === "out" || status.level === "balance" ? coachBudgetMessage(status.level, top) : null,
         canBuy: top.available,
         packs,
       };

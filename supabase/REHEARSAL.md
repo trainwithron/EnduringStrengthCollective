@@ -74,3 +74,4 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0302 | yes | yes | 30 | 0302 custom foods and saved meals |
 | 0303 | yes | yes | 18 | 0303 client rates are coach-only |
 | 0304 | yes | yes | 18 | 0303 client rates are coach-only |
+| 0305 | yes | yes | 10 | 0305 AI top-up draws |

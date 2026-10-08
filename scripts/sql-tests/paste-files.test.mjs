@@ -448,9 +448,10 @@ for (const s of steps) {
   const st47 = steps.find((x) => x.n === "47");
   const st48 = steps.find((x) => x.n === "48");
   const st49 = steps.find((x) => x.n === "49");
+  const st50 = steps.find((x) => x.n === "50");
   const bundle2 = bundles.find((b) => b.id === "release-n2");
   const undoBoth = async () =>
-    (await run(`apply/undo-step${st49.n}-${st49.slug}.sql`)) || (await run(`apply/undo-step${st48.n}-${st48.slug}.sql`)) || (await run(`apply/undo-step${st47.n}-${st47.slug}.sql`)) || (await run(`apply/undo-step${st46.n}-${st46.slug}.sql`)) || (await run(`apply/undo-step${st45.n}-${st45.slug}.sql`));
+    (await run(`apply/undo-step${st50.n}-${st50.slug}.sql`)) || (await run(`apply/undo-step${st49.n}-${st49.slug}.sql`)) || (await run(`apply/undo-step${st48.n}-${st48.slug}.sql`)) || (await run(`apply/undo-step${st47.n}-${st47.slug}.sql`)) || (await run(`apply/undo-step${st46.n}-${st46.slug}.sql`)) || (await run(`apply/undo-step${st45.n}-${st45.slug}.sql`));
   const state = async () => (await db.query(`select
       to_regclass('public.usda_food_portions') is not null as portions,
       to_regclass('public.usda_load_batches') is not null as batches,
@@ -488,6 +489,9 @@ for (const s of steps) {
   const afterN2 = await state();
   const rateRowsN2 = (await db.query("select count(*)::int as n, coalesce(sum(monthly_rate), 0)::numeric as total from public.client_billing_rates")).rows[0];
   check("release-n part 2: the old column is gone and a rate written there in the gap was copied across first (a newer edit wins over the row step 48 made)", !afterN2.ratecol && afterN2.rates && rateRowsN2.n === 2 && Number(rateRowsN2.total) === 207, JSON.stringify({ afterN2, rateRowsN2 }));
+  const drawsTable = (await db.query("select to_regclass('public.ai_topup_draws') is not null as present")).rows[0].present;
+  const drawsLocked = (await db.query("select has_table_privilege('authenticated', 'public.ai_topup_draws', 'select') as auth_read, has_table_privilege('anon', 'public.ai_topup_draws', 'select') as anon_read")).rows[0];
+  check("release-n part 2: the top-up balance record (step 50) is created and closed to signed-in and signed-out users", drawsTable && !drawsLocked.auth_read && !drawsLocked.anon_read, JSON.stringify({ drawsTable, drawsLocked }));
   const againN2 = await run(`apply/${bundle2.file}`);
   check("release-n part 2: a second run is refused (" + againN2 + ")", !!againN2 && againN2.includes("already applied"));
   const eN2 = await run(`apply/undo-step${st49.n}-${st49.slug}.sql`);

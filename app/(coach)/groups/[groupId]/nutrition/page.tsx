@@ -23,6 +23,7 @@ import { asWeightUnit, displayWeightValue } from "@/lib/units";
 import type { FoodLogEntry } from "@/components/athlete/meal-checkoff-list";
 import { computeTodaysMicronutrients } from "@/lib/todays-micronutrients";
 import { Key12NutrientGrid } from "@/components/athlete/key12-nutrient-grid";
+import { NutrientsSection } from "@/components/nutrition/nutrients-section";
 import { NutritionYouthModeToggle } from "@/components/coach/desktop/nutrition-youth-mode-toggle";
 import { dedupeRecentFoodLogs } from "@/lib/recent-food-logs";
 import { getCoachClients } from "@/lib/coach-clients";
@@ -470,6 +471,18 @@ export default async function NutritionPage(
               </p>
             )}
           </section>
+
+          {trackingOn && (
+            <section>
+              <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">Vitamins and minerals</h2>
+              <NutrientsSection
+                athleteId={athleteId}
+                todayKey={todayKey}
+                audience="client"
+                detailHref={(key) => `/groups/${params.groupId}/nutrition/nutrients/${key}`}
+              />
+            </section>
+          )}
 
           {macrosEnabled && (
           <section>

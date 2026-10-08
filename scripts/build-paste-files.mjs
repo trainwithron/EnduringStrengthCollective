@@ -966,10 +966,10 @@ alter table public.coach_availability_windows drop column if exists session_minu
   {
     n: "46",
     slug: "0301",
-    title: "0301 AI budget: one pool per organization (its size, and this month's AI use summed by model, both server-only), paid top-up packs added to a month's budget, and a record that the owner and coach were told the AI is running low or used up, once per month",
+    title: "0301 AI budget: one pool per organization (its size, and this month's AI use summed by model, both server-only), paid top-up packs (a balance that carries over from month to month; the small step 50 record after the deploy keeps what each month used), and a record that the owner and coach were told the AI is running low or used up, once per month",
     migrations: ["0301"],
     sees: "Success. No rows returned.",
-    afterwards: "Nothing changes for anyone until the code in the same release is live. After that: each organization (a solo coach, or a gym's trainers together) has one monthly AI budget measured in real cost; the app tells the owner and the coach plainly at about 80 percent and when it is used up, and pauses AI features until the 1st, unless a paid top-up (when payments are on) adds to that month. Food search, barcode and saved meals are never limited. A top-up that is refunded in Stripe does NOT take its dollars back out of the budget; remove that row from ai_budget_topups by hand if a refund is ever given.",
+    afterwards: "Nothing changes for anyone until the code in the same release is live. After that: each organization (a solo coach, or a gym's trainers together) has one monthly AI budget measured in real cost; the app tells the owner and the coach plainly at about 80 percent and when it is used up, and pauses AI features until the 1st, unless a paid top-up balance (when payments are on) takes over; a top-up balance is spent only after the month's included AI is used up and carries over from month to month with no expiry, while the included AI refreshes on the 1st. Food search, barcode and saved meals are never limited. A top-up that is refunded in Stripe does NOT take its dollars back out of the balance; delete that row from ai_budget_topups by hand if a refund is ever given (the balance falls by that amount, but only down to what is unspent).",
     undo: [
       "drop table if exists public.ai_budget_notices;",
       "drop table if exists public.ai_budget_topups;",
@@ -1041,6 +1041,21 @@ alter table public.coach_availability_windows drop column if exists session_minu
     rows: [
       ["step 48 is applied (client_billing_rates exists)", has.table("client_billing_rates")],
       ["0304 is not already applied (the old rate column is still on group_memberships)", has.col("group_memberships", "monthly_rate")],
+    ],
+  },
+  {
+    n: "50",
+    slug: "0305",
+    title: "0305 AI top-up balance that carries over: a small server-only record of how much of the top-up balance each month used, so a paid top-up is spent after the month's included AI and the rest carries into the next month",
+    migrations: ["0305"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing visible changes by itself. Once payments are on, a coach who buys an AI top-up keeps the unused part from one month to the next; the included monthly AI still refreshes on the 1st. Until this step is run the app uses the bought total and records nothing, so it is safe to run any time after Release N.",
+    undo: ["drop table if exists public.ai_topup_draws;"].join(String.fromCharCode(10)),
+    undoWhy: "Only if step 50 misbehaves. Removes the record of what past months drew from the top-up balance (the balance then reads as everything ever bought).",
+    rows: [
+      ["organizations exists", has.table("organizations")],
+      ["step 46 is applied (ai_budget_topups exists)", has.table("ai_budget_topups")],
+      ["0305 is not already applied (ai_topup_draws is not there yet)", has.noTable("ai_topup_draws")],
     ],
   },
 ];
@@ -1125,7 +1140,7 @@ const BUNDLES = [
   { id: "release-k", name: "Release K (recipe library)", steps: ["41"] },
   { id: "release-l", name: "Release L (schedule requests, Read during rest)", steps: ["42", "43"] },
   { id: "release-n", name: "Release N (nutrition tracking: food search, custom foods, nutrient detail)", steps: ["45", "46", "47", "48"] },
-  { id: "release-n2", name: "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)", steps: ["49"] },
+  { id: "release-n2", name: "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)", steps: ["49", "50"] },
 ];
 for (const b of BUNDLES) {
   const stepsIn = b.steps.map((n) => STEPS.find((x) => x.n === n));
@@ -1299,6 +1314,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0295", has.table("client_phase_plans")),
     m("0296", has.col("recipes", "content_hash")),
     m("0297", has.table("schedule_requests")),
+    m("0305", has.table("ai_topup_draws")),
     m("0304", has.noCol("group_memberships", "monthly_rate")),
     m("0303", has.table("client_billing_rates")),
     m("0302", has.table("custom_foods")),

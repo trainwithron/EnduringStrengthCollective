@@ -22,8 +22,24 @@ export const NUTRIENT_SOURCES = {
   zinc_mg: { numbers: ["309"], unit: "MG" },
   b12_mcg: { numbers: ["418"], unit: "UG" },
   vitamin_c_mg: { numbers: ["401"], unit: "MG" },
-  folate_mcg: { numbers: ["417"], unit: "UG" },
+  // Folate in dietary folate equivalents (DFE, nutrient 435) is the unit the reference intake is set in; total folate (417) is the fallback.
+  folate_mcg: { numbers: ["435", "417"], unit: "UG" },
   sat_fat_g: { numbers: ["606"], unit: "G" },
+  // The vitamins and minerals beyond the first twelve feed the fuller nutrient screens. A food USDA does not report one for simply has no row for it, which the app shows as
+  // "not reported" (never zero).
+  vitamin_a_mcg: { numbers: ["320"], unit: "UG" }, // retinol activity equivalents (RAE)
+  vitamin_e_mg: { numbers: ["323"], unit: "MG" }, // alpha-tocopherol
+  vitamin_k_mcg: { numbers: ["430"], unit: "UG" },
+  thiamin_mg: { numbers: ["404"], unit: "MG" },
+  riboflavin_mg: { numbers: ["405"], unit: "MG" },
+  niacin_mg: { numbers: ["406"], unit: "MG" },
+  b6_mg: { numbers: ["415"], unit: "MG" },
+  choline_mg: { numbers: ["421"], unit: "MG" },
+  phosphorus_mg: { numbers: ["305"], unit: "MG" },
+  copper_mcg: { numbers: ["312"], unit: "MG", factor: 1000 }, // USDA reports copper in mg; the app uses mcg
+  manganese_mg: { numbers: ["315"], unit: "MG" },
+  selenium_mcg: { numbers: ["317"], unit: "UG" },
+  iodine_mcg: { numbers: ["314"], unit: "UG" },
 };
 
 export const DATA_TYPES = { foundation_food: "Foundation", sr_legacy_food: "SR Legacy" };
@@ -83,7 +99,7 @@ export function buildFoods(foodRows, categoryRows) {
 export function buildNutrientIndex(nutrientRows, warn = () => {}) {
   const byNumber = new Map();
   for (const [key, def] of Object.entries(NUTRIENT_SOURCES)) {
-    def.numbers.forEach((n, rank) => byNumber.set(n, { key, rank, unit: def.unit }));
+    def.numbers.forEach((n, rank) => byNumber.set(n, { key, rank, unit: def.unit, factor: def.factor ?? 1 }));
   }
   const index = new Map();
   for (const r of nutrientRows) {
@@ -93,7 +109,7 @@ export function buildNutrientIndex(nutrientRows, warn = () => {}) {
       warn(`nutrient ${r.nutrient_nbr} (${r.name}) has unit ${r.unit_name}, expected ${hit.unit}: skipped`);
       continue;
     }
-    index.set(String(r.id), { key: hit.key, rank: hit.rank });
+    index.set(String(r.id), { key: hit.key, rank: hit.rank, factor: hit.factor });
   }
   return index;
 }
@@ -108,8 +124,9 @@ export function createNutrientCollector(foods, nutrientIndex) {
       if (!foods.has(fdcId)) return;
       const n = nutrientIndex.get(String(row.nutrient_id));
       if (!n) return;
-      const amount = Number(row.amount);
-      if (!Number.isFinite(amount) || amount < 0) return;
+      const raw = Number(row.amount);
+      if (!Number.isFinite(raw) || raw < 0) return;
+      const amount = raw * (n.factor ?? 1);
       const k = `${fdcId}|${n.key}`;
       const cur = best.get(k);
       if (!cur || n.rank < cur.rank) best.set(k, { rank: n.rank, amount });
@@ -125,7 +142,7 @@ export function createNutrientCollector(foods, nutrientIndex) {
   };
 }
 
-function sqlText(s) {
+export function sqlText(s) {
   return s === null || s === undefined ? "null" : `'${String(s).replace(/'/g, "''")}'`;
 }
 

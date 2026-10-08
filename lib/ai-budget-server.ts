@@ -28,14 +28,13 @@ export function purchasablePacks(): TopUpPack[] {
 }
 
 // Packs that would bring a used-up month back under budget (every purchasable pack counts while the coach is not used up yet).
-export const liftingPacks = (packs: TopUpPack[], status?: BudgetStatus | null): TopUpPack[] =>
-  packs.filter((p) => !status || status.level !== "out" || status.spentUsd < status.budgetUsd + p.addUsd);
+export const liftingPacks = (packs: TopUpPack[], status?: BudgetStatus | null): TopUpPack[] => packs.filter((p) => !status || status.level !== "out" || p.addUsd > status.shortfallUsd);
 
 // What the coach is told about top-ups right now. Pass the budget status so the packs named (and offered) are only ones that really lift the pause.
 export function topUpInfo(now: Date = new Date(), status?: BudgetStatus | null): TopUpInfo {
   const purchasable = purchasablePacks();
   const packs = liftingPacks(purchasable, status);
-  return { available: packs.length > 0, packs, wouldNotCover: purchasable.length > 0 && packs.length === 0, supportEmail: supportEmail(), resetsOn: resetsOnText(now) };
+  return { available: packs.length > 0, packs, wouldNotCover: purchasable.length > 0 && packs.length === 0, balanceUsd: status?.balanceUsd ?? 0, supportEmail: supportEmail(), resetsOn: resetsOnText(now) };
 }
 
 // The coach an AI call lands on: the coach themselves, or the first coach of any group the person is in (the same rule reserve_ai_call uses).
@@ -76,9 +75,21 @@ const isMissingFunction = (error: { code?: string; message?: string } | null | u
 
 export interface OrgBudgetStatus extends BudgetStatus {
   organizationId: string;
+  // Everything the organization has ever bought in top-ups.
   topUpsUsd: number;
 }
 
+// The balance table (0305) is not in the database until its small paste: reading it then fails with "relation does not exist", which is expected and means no draws recorded yet.
+const isMissingDrawsTable = (error: { code?: string; message?: string } | null | undefined): boolean =>
+  !!error && (error.code === "42P01" || error.code === "PGRST205" || /ai_topup_draws/.test(error.message ?? ""));
+
+const round2 = (n: number): number => Math.round(n * 100) / 100;
+
+// The organization's AI picture right now. Two pots, spent in this order: the INCLUDED monthly budget (resets on the 1st, use it or lose it), then the TOP-UP BALANCE (everything ever
+// bought, minus what earlier months drew from it; it carries over with no expiry). The pause happens only when both are used up.
+//
+// What a month drew from the balance is the part of its AI cost beyond the included budget. Earlier months' draws are final and kept in ai_topup_draws, written here as the month's
+// use passes the included budget; this month's draw is worked out live, so the balance is always: bought - earlier months' draws - this month's use beyond the included budget.
 export async function getOrgBudgetStatus(db: SupabaseClient, orgId: string, now: Date = new Date()): Promise<OrgBudgetStatus | null> {
   try {
     const { data: summaryRows, error: summaryError } = await db.rpc("ai_org_summary", { p_org_id: orgId });
@@ -90,23 +101,49 @@ export async function getOrgBudgetStatus(db: SupabaseClient, orgId: string, now:
     if (!summary) return null;
     if (summary.owner_unlimited) return { ...budgetStatus(0, 0, true), organizationId: orgId, topUpsUsd: 0 };
 
-    const [{ data: usage, error: usageError }, { data: topUps }] = await Promise.all([
+    const month = monthStartDate(now);
+    const [{ data: usage, error: usageError }, { data: topUps, error: topUpsError }, { data: draws, error: drawsError }] = await Promise.all([
       db.rpc("ai_org_month_usage", { p_org_id: orgId, p_since: monthStartIso(now) }),
-      db.from("ai_budget_topups").select("usd_added").eq("organization_id", orgId).eq("month", monthStartDate(now)),
+      db.from("ai_budget_topups").select("usd_added").eq("organization_id", orgId),
+      db.from("ai_topup_draws").select("month, usd_drawn").eq("organization_id", orgId),
     ]);
     if (usageError) {
       if (!isMissingFunction(usageError)) logBudgetProblem(orgId, "usage", usageError.message ?? "no answer", now.getTime());
       return null;
     }
-    const topUpsUsd = ((topUps ?? []) as { usd_added: number | string }[]).reduce((s, r) => s + Number(r.usd_added), 0);
-    const budget = orgBudgetUsd({
+    // If the balance cannot be read the budget is unknown (fail open), never a pause that ignores money the organization paid.
+    if (topUpsError) {
+      logBudgetProblem(orgId, "top-ups", topUpsError.message ?? "no answer", now.getTime());
+      return null;
+    }
+    const drawsKnown = !drawsError;
+    if (drawsError && !isMissingDrawsTable(drawsError)) logBudgetProblem(orgId, "top-up draws", drawsError.message ?? "no answer", now.getTime());
+    const drawRows = drawsKnown ? ((draws ?? []) as { month: string; usd_drawn: number | string }[]) : [];
+
+    const boughtUsd = ((topUps ?? []) as { usd_added: number | string }[]).reduce((sum, r) => sum + Number(r.usd_added), 0);
+    const earlierDrawsUsd = drawRows.filter((d) => String(d.month).slice(0, 10) < month).reduce((sum, d) => sum + Number(d.usd_drawn), 0);
+    const recordedThisMonth = Number(drawRows.find((d) => String(d.month).slice(0, 10) === month)?.usd_drawn ?? 0);
+    const availableUsd = Math.max(0, boughtUsd - earlierDrawsUsd);
+
+    const included = orgBudgetUsd({
       clients: Number(summary.clients),
       coaches: Number(summary.coaches),
       exempt: !!summary.billing_exempt,
       scale: summary.ai_scale == null ? null : Number(summary.ai_scale),
-      topUpsUsd,
     });
-    return { ...budgetStatus(totalCostUsd((usage ?? []) as ModelUsage[]), budget), organizationId: orgId, topUpsUsd };
+    const spentUsd = totalCostUsd((usage ?? []) as ModelUsage[]);
+    const status = budgetStatus(spentUsd, included, false, { availableUsd, everBought: boughtUsd > 0 });
+
+    // Record this month's draw once it grows (it can only grow within a month), so next month starts from the right balance. Best effort: a failed write only means the next check redoes it.
+    const drawNow = round2(Math.min(Math.max(0, spentUsd - included), availableUsd));
+    if (drawsKnown && drawNow > recordedThisMonth + 0.004) {
+      try {
+        await db.from("ai_topup_draws").upsert({ organization_id: orgId, month, usd_drawn: drawNow, updated_at: now.toISOString() }, { onConflict: "organization_id,month" });
+      } catch {
+        // ignored on purpose
+      }
+    }
+    return { ...status, organizationId: orgId, topUpsUsd: round2(boughtUsd) };
   } catch (e) {
     logBudgetProblem(orgId, "exception", e instanceof Error ? e.message : String(e), now.getTime());
     return null;
@@ -126,15 +163,15 @@ export async function getCoachBudgetStatus(db: SupabaseClient, coachId: string, 
 
 // Tells the organization ONCE per month and level (the record's primary key makes a repeat a no-op): the organization's owner and the coach whose use crossed the line, by push; the
 // meter shows it when they open the app. Best effort: never throws.
-export async function noteBudgetLevel(db: SupabaseClient, crossingCoachId: string, level: "low" | "out", now: Date = new Date(), status?: BudgetStatus | null): Promise<boolean> {
+export async function noteBudgetLevel(db: SupabaseClient, crossingCoachId: string, level: "low" | "out" | "balance", now: Date = new Date(), status?: BudgetStatus | null): Promise<boolean> {
   try {
     const orgId = await resolveOrg(db, crossingCoachId);
     if (!orgId) return false;
-    const { data, error } = await db.from("ai_budget_notices").upsert({ organization_id: orgId, month: monthStartDate(now), level }, { onConflict: "organization_id,month,level", ignoreDuplicates: true }).select("level");
+    const { data, error } = await db.from("ai_budget_notices").upsert({ organization_id: orgId, month: monthStartDate(now), level: level === "balance" ? "low" : level }, { onConflict: "organization_id,month,level", ignoreDuplicates: true }).select("level");
     if (error || !data || data.length === 0) return false;
     const { data: org } = await db.from("organizations").select("owner_id").eq("id", orgId).maybeSingle();
     const recipients = [...new Set([(org?.owner_id as string | undefined) ?? null, crossingCoachId].filter((x): x is string => !!x))];
-    const title = level === "low" ? "Your AI is almost used up this month" : "Your AI is used up this month";
+    const title = level === "low" ? "Your AI is almost used up this month" : level === "balance" ? "You're now using your AI top-up balance" : "Your AI is used up this month";
     const body = coachBudgetMessage(level, topUpInfo(now, status));
     for (const to of recipients) await sendPushToProfile(db, to, title, body, "/dashboard");
     return true;

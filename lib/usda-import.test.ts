@@ -104,3 +104,100 @@ describe("sql", () => {
     expect(chunk([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
   });
 });
+
+describe("the fuller nutrient panel", () => {
+  const rows = [
+    { id: "1", name: "Folate, DFE", unit_name: "UG", nutrient_nbr: "435" },
+    { id: "2", name: "Folate, total", unit_name: "UG", nutrient_nbr: "417" },
+    { id: "3", name: "Copper, Cu", unit_name: "MG", nutrient_nbr: "312" },
+    { id: "4", name: "Vitamin A, RAE", unit_name: "UG", nutrient_nbr: "320" },
+    { id: "5", name: "Selenium, Se", unit_name: "UG", nutrient_nbr: "317" },
+    { id: "6", name: "Thiamin", unit_name: "MG", nutrient_nbr: "404" },
+  ];
+  it("covers every key the nutrient screens show", () => {
+    const keys = Object.keys(NUTRIENT_SOURCES);
+    for (const k of ["vitamin_a_mcg", "vitamin_e_mg", "vitamin_k_mcg", "thiamin_mg", "riboflavin_mg", "niacin_mg", "b6_mg", "choline_mg", "phosphorus_mg", "copper_mcg", "manganese_mg", "selenium_mcg", "iodine_mcg"]) expect(keys).toContain(k);
+  });
+  it("prefers folate in DFE (the unit the reference intake is set in) and falls back to total folate", () => {
+    const index = buildNutrientIndex(rows);
+    const c = createNutrientCollector(new Map([[1, {}], [2, {}]]), index);
+    c.add({ fdc_id: "1", nutrient_id: "2", amount: "100" });
+    c.add({ fdc_id: "1", nutrient_id: "1", amount: "170" });
+    c.add({ fdc_id: "2", nutrient_id: "2", amount: "60" });
+    const out = c.rows();
+    expect(out.find((r: any) => r.fdc_id === 1 && r.nutrient_key === "folate_mcg").amount_per_100g).toBe(170);
+    expect(out.find((r: any) => r.fdc_id === 2 && r.nutrient_key === "folate_mcg").amount_per_100g).toBe(60);
+  });
+  it("converts copper from mg to mcg", () => {
+    const c = createNutrientCollector(new Map([[1, {}]]), buildNutrientIndex(rows));
+    c.add({ fdc_id: "1", nutrient_id: "3", amount: "0.25" });
+    expect(c.rows().find((r: any) => r.nutrient_key === "copper_mcg").amount_per_100g).toBe(250);
+  });
+  it("a food USDA does not report a nutrient for simply has no row (never a zero)", () => {
+    const c = createNutrientCollector(new Map([[1, {}]]), buildNutrientIndex(rows));
+    c.add({ fdc_id: "1", nutrient_id: "4", amount: "500" });
+    expect(c.rows().map((r: any) => r.nutrient_key)).toEqual(["vitamin_a_mcg"]);
+  });
+});
+
+describe("household portions", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const batch = require("../scripts/usda-batch-lib.mjs");
+  const foods = new Map([[10, { fdc_id: 10, description: "Onions, raw", data_type: "SR Legacy", food_category: null }]]);
+  const units = [
+    { id: "1", name: "cup" },
+    { id: "9", name: "undetermined" },
+  ];
+  it("reads like people say it: amount, unit and modifier, or USDA's own words", () => {
+    const rows = batch.buildPortions(
+      [
+        { fdc_id: "10", seq_num: "1", amount: "1.0", measure_unit_id: "1", modifier: "chopped", portion_description: "", gram_weight: "160" },
+        { fdc_id: "10", seq_num: "2", amount: "1", measure_unit_id: "9", modifier: "medium (2-1/2\" dia)", portion_description: "", gram_weight: "110" },
+        { fdc_id: "10", seq_num: "3", amount: "1", measure_unit_id: "9", modifier: "", portion_description: "1 slice", gram_weight: "28.35" },
+        { fdc_id: "10", seq_num: "4", amount: "2", measure_unit_id: "1", modifier: "", portion_description: "", gram_weight: "320" },
+      ],
+      units,
+      foods
+    );
+    expect(rows.map((r: any) => r.description)).toEqual(["1 cup, chopped", '1 medium (2-1/2" dia)', "1 slice", "2 cup"]);
+    expect(rows[2].gram_weight).toBe(28.35);
+  });
+  it("drops foods not kept, unusable weights and rows with no words, and fixes repeated or missing sequence numbers", () => {
+    const rows = batch.buildPortions(
+      [
+        { fdc_id: "99", seq_num: "1", amount: "1", measure_unit_id: "1", modifier: "", portion_description: "", gram_weight: "100" },
+        { fdc_id: "10", seq_num: "1", amount: "1", measure_unit_id: "1", modifier: "", portion_description: "", gram_weight: "0" },
+        { fdc_id: "10", seq_num: "1", amount: "1", measure_unit_id: "9", modifier: "", portion_description: "", gram_weight: "50" },
+        { fdc_id: "10", seq_num: "1", amount: "1", measure_unit_id: "1", modifier: "", portion_description: "", gram_weight: "240" },
+        { fdc_id: "10", seq_num: "", amount: "0.5", measure_unit_id: "1", modifier: "", portion_description: "", gram_weight: "120" },
+        { fdc_id: "10", seq_num: "1", amount: "1", measure_unit_id: "1", modifier: "sliced", portion_description: "", gram_weight: "100000" },
+      ],
+      units,
+      foods
+    );
+    expect(rows).toEqual([
+      { fdc_id: 10, seq: 1, description: "1 cup", gram_weight: 240 },
+      { fdc_id: 10, seq: 2, description: "0.5 cup", gram_weight: 120 },
+    ]);
+  });
+});
+
+describe("batches are atomic and resumable", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { toBatchSql } = require("../scripts/usda-batch-lib.mjs");
+  const foods = new Map([[7, { fdc_id: 7, description: "Cook's rice", data_type: "SR Legacy", food_category: null }]]);
+  const sql = toBatchSql("fdc-2026-04-001", foods, [{ fdc_id: 7, nutrient_key: "protein_g", amount_per_100g: 2.7 }], [{ fdc_id: 7, seq: 1, description: "1 cup", gram_weight: 158 }]);
+  it("is one statement that does nothing if its marker exists, and writes its marker last", () => {
+    expect(sql.match(/do \$load\$/g)).toHaveLength(1);
+    expect(sql).toContain("if exists (select 1 from public.usda_load_batches where name = 'fdc-2026-04-001') then");
+    expect(sql.indexOf("return;")).toBeLessThan(sql.indexOf("insert into public.usda_foods"));
+    expect(sql.indexOf("insert into public.usda_load_batches")).toBeGreaterThan(sql.indexOf("insert into public.usda_food_portions"));
+    expect(sql.trim().endsWith("$load$;")).toBe(true);
+  });
+  it("upserts foods, nutrients and portions and counts the rows in the marker", () => {
+    expect(sql).toContain("(7, 'Cook''s rice', 'SR Legacy', null)");
+    expect(sql).toContain("on conflict (fdc_id, nutrient_key) do update");
+    expect(sql).toContain("on conflict (fdc_id, seq) do update");
+    expect(sql).toContain("values ('fdc-2026-04-001', 3)");
+  });
+});

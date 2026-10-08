@@ -18,6 +18,10 @@ interface Fake {
   usage?: { model: string | null; input_tokens: number | string; output_tokens: number | string; calls?: number }[];
   usageError?: { code?: string; message: string };
   topups?: { usd_added: number | string }[];
+  topupsError?: { message: string };
+  // what earlier months (and this one) already drew from the top-up balance
+  draws?: { month: string; usd_drawn: number | string }[];
+  drawsError?: { code?: string; message: string };
   org?: string | null;
   owner?: string | null;
   noticeRows?: unknown[];
@@ -28,6 +32,7 @@ interface Fake {
 function fakeDb(f: Fake) {
   const rpcCalls: { fn: string; args: Record<string, unknown> }[] = [];
   const upserts: Record<string, unknown>[] = [];
+  const drawUpserts: Record<string, unknown>[] = [];
   const db = {
     rpc: async (fn: string, args: Record<string, unknown>) => {
       rpcCalls.push({ fn, args });
@@ -49,16 +54,27 @@ function fakeDb(f: Fake) {
       };
       chain.maybeSingle = () => Promise.resolve({ data: table === "organizations" ? (f.owner ? { owner_id: f.owner } : null) : null, error: null });
       chain.upsert = (row: Record<string, unknown>) => {
+        if (table === "ai_topup_draws") {
+          drawUpserts.push(row);
+          return Promise.resolve({ data: null, error: null });
+        }
         upserts.push(row);
         const res = { data: f.noticeError ? null : (f.noticeRows ?? [{ level: row.level }]), error: f.noticeError ? { message: "x" } : null };
         return { select: () => Promise.resolve(res) };
       };
-      // ai_budget_topups is read with select().eq().eq() and awaited
-      chain.then = (resolve: (v: unknown) => unknown) => Promise.resolve({ data: table === "ai_budget_topups" ? (f.topups ?? []) : [], error: null }).then(resolve);
+      // ai_budget_topups and ai_topup_draws are read with select().eq() and awaited
+      chain.then = (resolve: (v: unknown) => unknown) =>
+        Promise.resolve(
+          table === "ai_budget_topups"
+            ? f.topupsError ? { data: null, error: f.topupsError } : { data: f.topups ?? [], error: null }
+            : table === "ai_topup_draws"
+              ? f.drawsError ? { data: null, error: f.drawsError } : { data: f.draws ?? [], error: null }
+              : { data: [], error: null }
+        ).then(resolve);
       return chain;
     },
   };
-  return { db: db as never, rpcCalls, upserts };
+  return { db: db as never, rpcCalls, upserts, drawUpserts };
 }
 
 beforeEach(() => {
@@ -85,12 +101,12 @@ describe("getOrgBudgetStatus: one pool per organization", () => {
     expect((await getOrgBudgetStatus(fakeDb({ summary: { clients: 500, coaches: 1, billing_exempt: true } }).db, "o"))?.budgetUsd).toBe(7.5);
     expect((await getOrgBudgetStatus(fakeDb({ summary: { clients: 100, coaches: 1, billing_exempt: true, ai_scale: 1 } }).db, "o"))?.budgetUsd).toBe(25);
   });
-  it("this month's paid top-ups raise the budget and can lift a pause", async () => {
-    const usage = [sonnet(0, 2.5)]; // $25 of $25: out
+  it("a paid top-up lifts a pause: it is a balance spent after the included budget", async () => {
+    const usage = [sonnet(0, 2.5)]; // $25 of the $25 included: out
     expect((await getOrgBudgetStatus(fakeDb({ usage }).db, "o"))?.level).toBe("out");
     const lifted = await getOrgBudgetStatus(fakeDb({ usage, topups: [{ usd_added: "3.5" }] }).db, "o");
-    expect(lifted).toMatchObject({ budgetUsd: 28.5, level: "low", topUpsUsd: 3.5 });
-    expect((await getOrgBudgetStatus(fakeDb({ usage, topups: [{ usd_added: 3.5 }, { usd_added: 7 }] }).db, "o"))?.budgetUsd).toBe(35.5);
+    expect(lifted).toMatchObject({ budgetUsd: 25, level: "balance", balanceUsd: 3.5, topUpsUsd: 3.5, hasTopUps: true });
+    expect((await getOrgBudgetStatus(fakeDb({ usage, topups: [{ usd_added: 3.5 }, { usd_added: 7 }] }).db, "o"))?.balanceUsd).toBe(10.5);
   });
   it("is low at 80 percent and out at 100", async () => {
     expect((await getOrgBudgetStatus(fakeDb({ usage: [sonnet(0, 2)] }).db, "o"))?.level).toBe("low");
@@ -114,6 +130,93 @@ describe("getOrgBudgetStatus: one pool per organization", () => {
   it("an internal unlimited owner means the whole organization is unlimited", async () => {
     const s = await getOrgBudgetStatus(fakeDb({ summary: { clients: 1, coaches: 1, owner_unlimited: true } }).db, "o");
     expect(s?.level).toBe("unlimited");
+  });
+});
+
+describe("the top-up balance rolls over; the included budget does not", () => {
+  const NOW = new Date("2026-10-15T12:00:00Z");
+  const SEPT = "2026-09-01";
+  const OCTM = "2026-10-01";
+
+  it("the included budget is spent first, and the balance is untouched while it lasts", async () => {
+    const { db, drawUpserts } = fakeDb({ usage: [sonnet(0, 1)], topups: [{ usd_added: 7 }] });
+    const s = await getOrgBudgetStatus(db, "o", NOW);
+    expect(s).toMatchObject({ level: "ok", spentUsd: 10, budgetUsd: 25, balanceUsd: 7 });
+    expect(drawUpserts).toHaveLength(0);
+  });
+
+  it("use beyond the included budget is taken from the balance, in order, and the draw is recorded for the month", async () => {
+    const { db, drawUpserts } = fakeDb({ usage: [sonnet(0, 2.7)], topups: [{ usd_added: 7 }] }); // $27 of $25 included
+    const s = await getOrgBudgetStatus(db, "o", NOW);
+    expect(s).toMatchObject({ level: "balance", balanceUsd: 5, shortfallUsd: 0 });
+    expect(drawUpserts).toHaveLength(1);
+    expect(drawUpserts[0]).toMatchObject({ organization_id: "o", month: OCTM, usd_drawn: 2 });
+  });
+
+  it("the pause happens only when both are used up", async () => {
+    const { db } = fakeDb({ usage: [sonnet(0, 3.4)], topups: [{ usd_added: 7 }] }); // $34: $9 over, $7 in the balance
+    const s = await getOrgBudgetStatus(db, "o", NOW);
+    expect(s).toMatchObject({ level: "out", balanceUsd: 0, shortfallUsd: 2 });
+  });
+
+  it("an unused balance carries into the next month, and the included budget starts fresh", async () => {
+    // bought $7 in September; September went $4 past its included budget, so $4 was drawn. October has used $5 of its fresh $25.
+    const { db, drawUpserts } = fakeDb({ usage: [sonnet(0, 0.5)], topups: [{ usd_added: 7 }], draws: [{ month: SEPT, usd_drawn: 4 }] });
+    const s = await getOrgBudgetStatus(db, "o", NOW);
+    expect(s).toMatchObject({ level: "ok", spentUsd: 5, budgetUsd: 25, balanceUsd: 3, hasTopUps: true });
+    expect(drawUpserts).toHaveLength(0);
+  });
+
+  it("October's use beyond the included budget comes out of what September left", async () => {
+    const { db, drawUpserts } = fakeDb({ usage: [sonnet(0, 2.6)], topups: [{ usd_added: 7 }], draws: [{ month: SEPT, usd_drawn: 4 }] }); // $26: $1 over, $3 carried in
+    const s = await getOrgBudgetStatus(db, "o", NOW);
+    expect(s).toMatchObject({ level: "balance", balanceUsd: 2 });
+    expect(drawUpserts[0]).toMatchObject({ month: OCTM, usd_drawn: 1 });
+  });
+
+  it("the balance never expires: a top-up bought months ago is still there", async () => {
+    const s = await getOrgBudgetStatus(fakeDb({ usage: [], topups: [{ usd_added: 3.5 }], draws: [] }).db, "o", new Date("2027-03-20T00:00:00Z"));
+    expect(s).toMatchObject({ balanceUsd: 3.5, level: "ok" });
+  });
+
+  it("a draw already recorded this month is not written again, and it only grows", async () => {
+    const same = fakeDb({ usage: [sonnet(0, 2.7)], topups: [{ usd_added: 7 }], draws: [{ month: OCTM, usd_drawn: 2 }] });
+    await getOrgBudgetStatus(same.db, "o", NOW);
+    expect(same.drawUpserts).toHaveLength(0);
+    const grew = fakeDb({ usage: [sonnet(0, 2.9)], topups: [{ usd_added: 7 }], draws: [{ month: OCTM, usd_drawn: 2 }] });
+    await getOrgBudgetStatus(grew.db, "o", NOW);
+    expect(grew.drawUpserts[0]).toMatchObject({ usd_drawn: 4 });
+  });
+
+  it("this month's recorded draw is not counted twice (this month's use is worked out live)", async () => {
+    const s = await getOrgBudgetStatus(fakeDb({ usage: [sonnet(0, 2.7)], topups: [{ usd_added: 7 }], draws: [{ month: OCTM, usd_drawn: 2 }] }).db, "o", NOW);
+    expect(s?.balanceUsd).toBe(5);
+  });
+
+  it("before the balance table is pasted it carries on with the bought total and writes nothing", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { db, drawUpserts } = fakeDb({ usage: [sonnet(0, 2.7)], topups: [{ usd_added: 7 }], drawsError: { code: "42P01", message: 'relation "public.ai_topup_draws" does not exist' } });
+    const s = await getOrgBudgetStatus(db, "o", NOW);
+    expect(s).toMatchObject({ level: "balance", balanceUsd: 5 });
+    expect(drawUpserts).toHaveLength(0);
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it("if the bought total cannot be read the budget is unknown (carry on), never a pause that ignores what was paid", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const s = await getOrgBudgetStatus(fakeDb({ usage: [sonnet(0, 9)], topupsError: { message: "boom" } }).db, "o", NOW);
+    expect(s).toBeNull();
+    expect(spy).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+
+  it("noteBudgetLevel tells the owner once when the balance starts paying, recorded as the 'low' notice", async () => {
+    const { db, upserts } = fakeDb({ org: "org1", owner: "owner1" });
+    await noteBudgetLevel(db, "coach1", "balance", NOW);
+    expect(upserts[0]).toMatchObject({ organization_id: "org1", level: "low" });
+    expect(sent.map((x) => x.profileId).sort()).toEqual(["coach1", "owner1"]);
+    expect(sent[0].title).toContain("top-up balance");
   });
 });
 
@@ -209,7 +312,7 @@ describe("whether a top-up can really be bought", () => {
 });
 
 describe("topUpInfo names only the packs that can really be bought and would lift the pause", () => {
-  const status = (level: "ok" | "low" | "out", spentUsd: number, budgetUsd: number) => ({ level, spentUsd, budgetUsd, pct: 0, unlimited: false, organizationId: "o", topUpsUsd: 0 });
+  const status = (level: "ok" | "low" | "balance" | "out", spentUsd: number, budgetUsd: number) => ({ level, spentUsd, budgetUsd, pct: 0, unlimited: false, balanceUsd: 0, shortfallUsd: Math.max(0, spentUsd - budgetUsd), hasTopUps: false, organizationId: "o", topUpsUsd: 0 });
   it("nothing is offered while payments are off", () => {
     expect(topUpInfo(new Date(), status("out", 25, 25))).toMatchObject({ available: false, packs: [], wouldNotCover: false });
   });

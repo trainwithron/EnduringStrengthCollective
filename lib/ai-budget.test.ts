@@ -9,6 +9,7 @@ import {
   packFor,
   topUpPackLine,
   budgetStatus,
+  balanceLine,
   budgetUsd,
   callCostUsd,
   coachBudgetMessage,
@@ -87,9 +88,8 @@ describe("the budget scales like every other AI limit", () => {
     expect(orgBudgetUsd({ clients: 100, coaches: 1, exempt: true, scale: 1 })).toBe(25);
     expect(orgBudgetUsd({ clients: 100, coaches: 2, exempt: true, scale: 1 })).toBe(30);
   });
-  it("paid top-ups add to the month and are never scaled", () => {
-    expect(orgBudgetUsd({ clients: 100, coaches: 1, topUpsUsd: 3.5 })).toBe(28.5);
-    expect(orgBudgetUsd({ clients: 500, coaches: 1, exempt: true, topUpsUsd: 7 })).toBe(Math.round((25 * BETA_ALLOWANCE_SCALE + 7) * 100) / 100);
+  it("the included budget has nothing to do with top-ups (they are a separate balance that carries over)", () => {
+    expect(orgBudgetUsd({ clients: 100, coaches: 1 })).toBe(25);
   });
 });
 
@@ -111,7 +111,7 @@ describe("top-up packs", () => {
     expect(packFor(100000)).toBeNull();
   });
   it("says what a pack buys in plain words", () => {
-    expect(topUpPackLine()).toBe("A $5 top-up adds $3.50 of AI for this month; a $10 top-up adds $7 of AI for this month.");
+    expect(topUpPackLine()).toBe("A $5 top-up adds $3.50 of AI that carries over from month to month until it's used; a $10 top-up adds $7 of AI.");
   });
 });
 
@@ -137,15 +137,15 @@ describe("budgetStatus", () => {
 });
 
 describe("the words", () => {
-  const live = { available: true, packs: TOP_UP_PACKS, wouldNotCover: false, supportEmail: "help@enduringstrengthco.com", resetsOn: "November 1" };
-  const off = { available: false, packs: [], wouldNotCover: false, supportEmail: "help@enduringstrengthco.com", resetsOn: "November 1" };
-  const tooBig = { available: false, packs: [], wouldNotCover: true, supportEmail: "help@enduringstrengthco.com", resetsOn: "November 1" };
+  const live = { available: true, packs: TOP_UP_PACKS, wouldNotCover: false, balanceUsd: 0, supportEmail: "help@enduringstrengthco.com", resetsOn: "November 1" };
+  const off = { available: false, packs: [], wouldNotCover: false, balanceUsd: 0, supportEmail: "help@enduringstrengthco.com", resetsOn: "November 1" };
+  const tooBig = { available: false, packs: [], wouldNotCover: true, balanceUsd: 0, supportEmail: "help@enduringstrengthco.com", resetsOn: "November 1" };
   it("tells the coach plainly at about 80 percent, with what a top-up really buys, when a purchase is possible", () => {
     const m = coachBudgetMessage("low", live);
     expect(m).toContain("Heads up: your AI for this month is almost used up.");
     expect(m).toContain("Every AI request costs real money, and I'm running a small business");
     expect(m).toContain("so extra AI use is a paid top-up");
-    expect(m).toContain("A $5 top-up adds $3.50 of AI for this month; a $10 top-up adds $7 of AI for this month.");
+    expect(m).toContain("A $5 top-up adds $3.50 of AI that carries over from month to month until it's used; a $10 top-up adds $7 of AI.");
     expect(m).toContain("Food search, barcode and saved meals stay free.");
   });
   it("while a purchase is not possible there is NO price and no buy wording: it says what will happen and when, and how to reach help", () => {
@@ -162,9 +162,9 @@ describe("the words", () => {
   it("names only the packs that can really be bought and would lift the pause", () => {
     const one = { ...live, packs: [TOP_UP_PACKS[1]] };
     const m = coachBudgetMessage("out", one);
-    expect(m).toContain("A $10 top-up adds $7 of AI for this month.");
+    expect(m).toContain("A $10 top-up adds $7 of AI that carries over from month to month until it's used.");
     expect(m).not.toContain("$5");
-    expect(topUpPackLine([TOP_UP_PACKS[0]])).toBe("A $5 top-up adds $3.50 of AI for this month.");
+    expect(topUpPackLine([TOP_UP_PACKS[0]])).toBe("A $5 top-up adds $3.50 of AI that carries over from month to month until it's used.");
   });
   it("when a pack exists but is too small for this month's overspend it says so, and never says top-ups are not open", () => {
     const m = coachBudgetMessage("out", tooBig);
@@ -181,7 +181,47 @@ describe("the words", () => {
     expect(CLIENT_AI_PAUSED_MESSAGE).not.toMatch(/money|business|top-up|\$/i);
   });
   it("the meter line is one short sentence", () => {
-    expect(meterLine(budgetStatus(15.5, 25))).toBe("AI this month: 62% used");
+    expect(meterLine(budgetStatus(15.5, 25))).toBe("This month's included AI: 62% used");
     expect(meterLine(budgetStatus(1, 25, true))).toBe("AI this month: no limit on your account.");
+  });
+});
+
+describe("the top-up balance: spent after the included month, carried over", () => {
+  it("under the included budget the balance is untouched", () => {
+    const s = budgetStatus(10, 25, false, { availableUsd: 7 });
+    expect(s).toMatchObject({ level: "ok", balanceUsd: 7, shortfallUsd: 0, hasTopUps: true });
+  });
+  it("past the included budget the balance pays and the level is 'balance', not out", () => {
+    const s = budgetStatus(27, 25, false, { availableUsd: 7 });
+    expect(s).toMatchObject({ level: "balance", balanceUsd: 5, shortfallUsd: 0 });
+    expect(s.pct).toBe(108);
+  });
+  it("only when both are used up is it out, and it says how far past the balance the use is", () => {
+    expect(budgetStatus(32, 25, false, { availableUsd: 7 })).toMatchObject({ level: "out", balanceUsd: 0, shortfallUsd: 0 });
+    expect(budgetStatus(34, 25, false, { availableUsd: 7 })).toMatchObject({ level: "out", balanceUsd: 0, shortfallUsd: 2 });
+    expect(budgetStatus(25, 25)).toMatchObject({ level: "out", shortfallUsd: 0 });
+  });
+  it("80 percent of the included budget is 'low' even when there is a balance", () => {
+    expect(budgetStatus(20, 25, false, { availableUsd: 7 }).level).toBe("low");
+  });
+  it("an unlimited account has no balance", () => {
+    expect(budgetStatus(1, 25, true, { availableUsd: 7 })).toMatchObject({ level: "unlimited", balanceUsd: 0, hasTopUps: false });
+  });
+  it("the meter shows a balance line once anything was ever bought, and none before", () => {
+    expect(balanceLine(budgetStatus(10, 25))).toBeNull();
+    expect(balanceLine(budgetStatus(10, 25, false, { availableUsd: 3.5 }))).toBe("Top-up balance: $3.50");
+    expect(balanceLine(budgetStatus(40, 25, false, { availableUsd: 7, everBought: true }))).toBe("Top-up balance: $0.00");
+    expect(balanceLine(budgetStatus(1, 25, true))).toBeNull();
+  });
+  it("the words: using the balance is not a pause, and says the balance carries over", () => {
+    const top = { available: true, packs: TOP_UP_PACKS, wouldNotCover: false, balanceUsd: 5, supportEmail: null, resetsOn: "November 1" };
+    const m = coachBudgetMessage("balance", top);
+    expect(m).toContain("Your included AI for this month is used up, so you're now using your top-up balance: $5.00 left");
+    expect(m).toContain("carries over from month to month");
+    expect(m).toContain("refreshes on November 1");
+    expect(m).not.toContain("paused");
+    const low = coachBudgetMessage("low", { ...top, balanceUsd: 3.5 });
+    expect(low).toContain("$3.50 of top-up balance, which takes over");
+    expect(low).not.toContain("paid top-up");
   });
 });

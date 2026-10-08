@@ -58,11 +58,12 @@ export function AiBudgetMeter({ variant = "meter", groupId }: { variant?: "meter
   const width = Math.min(100, status.pct);
   return (
     <div className={`border p-4 ${view.message ? (out ? "border-rust/60" : "border-amber-400/50") : "border-steel/20"}`} data-testid="ai-budget-meter">
-      <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">AI this month</p>
+      <p className="font-body text-xs text-steel uppercase tracking-wide mb-1">AI</p>
       <p className="font-body text-sm text-chalk [font-variant-numeric:tabular-nums]">{view.line}</p>
       <div className="mt-2 h-1.5 bg-steel/20" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.min(100, status.pct)} aria-label="AI used this month">
-        <div className={`h-full ${out ? "bg-rust" : status.level === "low" ? "bg-amber-400" : "bg-steel"}`} style={{ width: `${width}%` }} />
+        <div className={`h-full ${out ? "bg-rust" : status.level === "low" || status.level === "balance" ? "bg-amber-400" : "bg-steel"}`} style={{ width: `${width}%` }} />
       </div>
+      {view.balanceLine && <p className="font-body text-sm text-chalk mt-2 [font-variant-numeric:tabular-nums]" data-testid="ai-balance-line">{view.balanceLine}</p>}
       {view.message && <p className="font-body text-xs text-chalk mt-3 leading-relaxed">{view.message}</p>}
       {view.message && view.canBuy && groupId && (
         <div className="flex flex-wrap gap-2 mt-3">

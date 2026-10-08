@@ -59,13 +59,15 @@ export function totalCostUsd(rows: ModelUsage[]): number {
 // US dollars of AI per 100-client step per month, for the whole ORGANIZATION: a solo coach's organization is just them; a gym with several trainers shares one pool. Change these
 // numbers to change every budget. It is scaled exactly like the other AI limits (aiMultiplier): an organization with fewer than 25 clients gets a prorated share (never below a
 // quarter), 100 clients = one step, 150 = two. Each coach beyond the first adds a little (they are real people using it). A free-access (beta) organization gets BETA_ALLOWANCE_SCALE of
-// all that unless the platform admin sets the organization's own scale (Admin > Organizations). Paid top-up packs add to ONE month's budget (TOP_UP_PACKS).
+// all that unless the platform admin sets the organization's own scale (Admin > Organizations). The included budget resets every calendar month (use it or lose it, so the cost stays
+// bounded). Paid top-up packs (TOP_UP_PACKS) are different: they go into a BALANCE that is spent only after the month's included budget is used up, and whatever is left carries over to the
+// next month, with no expiry.
 export const AI_BUDGET_USD_PER_STEP = 25;
 export const AI_BUDGET_USD_PER_EXTRA_COACH = 5;
 export { CLIENT_STEP_SIZE };
 
-// A top-up pack: what the coach pays and the dollars of AI it adds to THIS month's budget. Priced so a pack is profitable after Stripe's fees: $5 buys $3.50 of AI, $10 buys $7.
-// A pack only ever adds to the month it was bought in.
+// A top-up pack: what the coach pays and the dollars of AI it adds to the organization's top-up BALANCE. Priced so a pack is profitable after Stripe's fees: $5 buys $3.50 of AI,
+// $10 buys $7. The balance carries over from month to month until it is used.
 export interface TopUpPack {
   cents: number;
   addUsd: number;
@@ -81,20 +83,18 @@ export interface OrgBudgetInput {
   coaches: number;
   exempt?: boolean;
   scale?: number | null;
-  // Dollars added to this month by paid top-ups.
-  topUpsUsd?: number;
 }
 
 const roundCents = (n: number): number => Math.round(n * 100) / 100;
 
-// The organization's budget for the month: steps by total clients, plus a little for each coach beyond the first, both scaled for a free-access or specially-scaled organization,
-// plus this month's paid top-ups (which are never scaled).
+// The organization's INCLUDED budget for the month: steps by total clients, plus a little for each coach beyond the first, both scaled for a free-access or specially-scaled
+// organization. Paid top-ups are not part of it (they are a separate balance that carries over).
 export function orgBudgetUsd(input: OrgBudgetInput): number {
   const opts: AllowanceScaleInput = { exempt: input.exempt, scale: input.scale };
   const steps = AI_BUDGET_USD_PER_STEP * aiMultiplier(input.clients, opts);
   const factor = input.scale != null ? input.scale : input.exempt ? BETA_ALLOWANCE_SCALE : 1;
   const extras = AI_BUDGET_USD_PER_EXTRA_COACH * Math.max(0, input.coaches - 1) * factor;
-  return roundCents(steps + extras + (input.topUpsUsd ?? 0));
+  return roundCents(steps + extras);
 }
 
 // A solo coach with no top-ups (the common case), for the simple callers and tests.
@@ -104,22 +104,36 @@ export function budgetUsd(clientCount: number, opts: AllowanceScaleInput = {}): 
 
 export const LOW_AT = 0.8;
 
-export type BudgetLevel = "ok" | "low" | "out" | "unlimited";
+// ok = under 80 percent of the included budget; low = 80 percent or more of it; balance = the included budget is used up and the top-up balance is paying; out = both are used up.
+export type BudgetLevel = "ok" | "low" | "balance" | "out" | "unlimited";
 
 export interface BudgetStatus {
   level: BudgetLevel;
+  // This month's AI cost so far, and the INCLUDED budget it is measured against.
   spentUsd: number;
   budgetUsd: number;
-  // Whole percent of the budget used (can pass 100).
+  // Whole percent of the included budget used (can pass 100).
   pct: number;
   unlimited: boolean;
+  // The top-up balance left after this month's use beyond the included budget (carries over).
+  balanceUsd: number;
+  // How far this month's use beyond the included budget is past the whole top-up balance (0 unless out): a pack must add more than this to lift the pause.
+  shortfallUsd: number;
+  // Everything ever bought and not yet used up by earlier months, before this month's draw (so the meter can show a balance line even when it is $0.00 now).
+  hasTopUps: boolean;
 }
 
-export function budgetStatus(spentUsd: number, budget: number, unlimited = false): BudgetStatus {
-  if (unlimited) return { level: "unlimited", spentUsd, budgetUsd: budget, pct: 0, unlimited: true };
+// `topUps.availableUsd` is the balance carried into this month plus anything bought this month (before this month's use beyond the included budget is taken from it).
+export function budgetStatus(spentUsd: number, budget: number, unlimited = false, topUps: { availableUsd: number; everBought?: boolean } = { availableUsd: 0 }): BudgetStatus {
+  if (unlimited) return { level: "unlimited", spentUsd, budgetUsd: budget, pct: 0, unlimited: true, balanceUsd: 0, shortfallUsd: 0, hasTopUps: false };
   const ratio = budget > 0 ? spentUsd / budget : 1;
   const pct = Math.floor(ratio * 100 + 1e-9);
-  return { level: ratio >= 1 ? "out" : ratio >= LOW_AT ? "low" : "ok", spentUsd, budgetUsd: budget, pct, unlimited: false };
+  const over = Math.max(0, spentUsd - budget);
+  const available = Math.max(0, topUps.availableUsd);
+  const balanceUsd = roundCents(Math.max(0, available - over));
+  const shortfallUsd = roundCents(Math.max(0, over - available));
+  const level: BudgetLevel = ratio >= 1 ? (balanceUsd > 0 ? "balance" : "out") : ratio >= LOW_AT ? "low" : "ok";
+  return { level, spentUsd, budgetUsd: budget, pct, unlimited: false, balanceUsd, shortfallUsd, hasTopUps: topUps.everBought ?? available > 0 };
 }
 
 // ---- words -----------------------------------------------------------------------------------------------------------------------------------------
@@ -131,6 +145,8 @@ export interface TopUpInfo {
   packs: TopUpPack[];
   // A pack can be bought but none is big enough to cover this month's overspend: the message says so instead of pretending top-ups are not open.
   wouldNotCover: boolean;
+  // The top-up balance left (carries over), for the messages.
+  balanceUsd: number;
   supportEmail: string | null;
   resetsOn: string; // "November 1"
 }
@@ -138,19 +154,28 @@ export interface TopUpInfo {
 const money = (cents: number): string => `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`;
 const usd = (n: number): string => `$${n.toFixed(Number.isInteger(n) ? 0 : 2)}`;
 
-// "A $5 top-up adds $3.50 of AI for this month; a $10 top-up adds $7."
-export const topUpPackLine = (packs: TopUpPack[] = TOP_UP_PACKS): string => packs.map((p, i) => `${i === 0 ? "A" : "a"} ${money(p.cents)} top-up adds ${usd(p.addUsd)} of AI for this month`).join("; ") + ".";
+// "A $5 top-up adds $3.50 of AI that carries over until it's used; a $10 top-up adds $7."
+export const topUpPackLine = (packs: TopUpPack[] = TOP_UP_PACKS): string =>
+  packs.map((p, i) => `${i === 0 ? "A" : "a"} ${money(p.cents)} top-up adds ${usd(p.addUsd)} of AI${i === 0 ? " that carries over from month to month until it's used" : ""}`).join("; ") + ".";
+
+export const balanceText = (n: number): string => `$${n.toFixed(2)}`;
 
 // The coach hears it plainly, in Ron's own voice. A price is only ever mentioned when a purchase really lifts the pause (top.available); otherwise the message says what will happen
-// and when, and never points at a button that does not exist.
-export function coachBudgetMessage(level: "low" | "out", top: TopUpInfo): string {
+// and when, and never points at a button that does not exist. The included AI refreshes on the 1st; a top-up balance (when there is one) is spent after it and carries over.
+export function coachBudgetMessage(level: "low" | "out" | "balance", top: TopUpInfo): string {
   const free = "Food search, barcode and saved meals stay free.";
   const help = top.supportEmail ? ` Questions: ${top.supportEmail}.` : "";
   const cost = "Every AI request costs real money, and I'm running a small business";
+  if (level === "balance") {
+    return `Your included AI for this month is used up, so you're now using your top-up balance: ${balanceText(top.balanceUsd)} left. It carries over from month to month, and your included AI refreshes on ${top.resetsOn}. ${top.available ? `${topUpPackLine(top.packs)} ` : ""}${free}`;
+  }
   if (level === "out" && top.wouldNotCover) {
     return `Your AI for this month is used up, so AI features are paused. ${cost}. A top-up wouldn't cover this month's use; AI resumes on ${top.resetsOn}. ${free}${help}`;
   }
   if (level === "low") {
+    if (top.balanceUsd > 0) {
+      return `Heads up: your included AI for this month is almost used up. You also have ${balanceText(top.balanceUsd)} of top-up balance, which takes over when it runs out and carries over from month to month. ${free}`;
+    }
     return top.available
       ? `Heads up: your AI for this month is almost used up. ${cost}: if it keeps going past what's included I lose money, so extra AI use is a paid top-up. ${topUpPackLine(top.packs)} ${free}`
       : `Heads up: your AI for this month is almost used up. ${cost}: AI use beyond what's included will become a paid top-up, which isn't open yet. If it runs out, AI features pause until ${top.resetsOn}. ${free}${help}`;
@@ -173,7 +198,10 @@ export function budgetOutMessage(actorIsCoach: boolean, top: TopUpInfo): string 
   return actorIsCoach ? coachPausedMessage(top) : CLIENT_AI_PAUSED_MESSAGE;
 }
 
-export const meterLine = (status: BudgetStatus): string => (status.unlimited ? "AI this month: no limit on your account." : `AI this month: ${Math.min(status.pct, 999)}% used`);
+export const meterLine = (status: BudgetStatus): string => (status.unlimited ? "AI this month: no limit on your account." : `This month's included AI: ${Math.min(status.pct, 999)}% used`);
+
+// The second line of the meter: the top-up balance that carries over. Null when there never was one (and for an unlimited account).
+export const balanceLine = (status: BudgetStatus): string | null => (status.unlimited || (!status.hasTopUps && status.balanceUsd <= 0) ? null : `Top-up balance: ${balanceText(status.balanceUsd)}`);
 
 // Internal accounts (coach_credits.ai_access_mode = 'unlimited') have no budget.
 export const isUnlimitedMode = (mode: string | null | undefined): boolean => mode === "unlimited";
