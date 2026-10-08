@@ -36,6 +36,17 @@ describe("the three slots", () => {
     expect(v.slots[2].item).toBeNull();
     expect(v.moreCount).toBe(0);
   });
+  it("never says you're caught up when some check could not be made", () => {
+    const v = pickNeedsYou([], { incomplete: true });
+    expect(v.caughtUp).toBe(false);
+    expect(v.incomplete).toBe(true);
+    expect(pickNeedsYou([item("a", "payment")], { incomplete: true }).incomplete).toBe(true);
+    expect(pickNeedsYou([]).incomplete).toBe(false);
+  });
+  it("a standing state ranks below an event: sessions about to expire come before a client who is simply out of sessions", () => {
+    expect(pickNeedsYou([item("p", "payment"), item("e", "expiring_credits")]).slots[1].item?.id).toBe("e");
+    expect(pickNeedsYou([item("p", "payment"), item("l", "late_change")]).slots[1].item?.id).toBe("l");
+  });
   it("says you're caught up when nothing needs you", () => {
     const v = pickNeedsYou([]);
     expect(v.caughtUp).toBe(true);
@@ -88,11 +99,11 @@ const base = {
 
 describe("gathering what needs the coach", () => {
   it("finds nothing for a coach with no groups, and never reads anything", async () => {
-    expect(await loadNeedsYouItems(fakeDb({}), { ...base, groupIds: [] })).toEqual([]);
+    expect(await loadNeedsYouItems(fakeDb({}), { ...base, groupIds: [] })).toEqual({ items: [], failed: [] });
   });
   it("a session starting within two hours counts; later, already started, or the coach's own does not", async () => {
     const at = (min: number) => new Date(NOW.getTime() + min * 60_000).toISOString();
-    const items = await loadNeedsYouItems(fakeDb({}), {
+    const { items } = await loadNeedsYouItems(fakeDb({}), {
       ...base,
       todayBookings: [
         { id: "soon", athleteId: "a1", groupId: "g1", athleteName: "Ann", startAt: at(45) },
@@ -106,7 +117,7 @@ describe("gathering what needs the coach", () => {
     expect(items[0].sentence).toMatch(/^Session starts at /);
   });
   it("brings in clients out of sessions, low readiness and a group reply from what Home already has", async () => {
-    const items = await loadNeedsYouItems(fakeDb({}), {
+    const { items } = await loadNeedsYouItems(fakeDb({}), {
       ...base,
       needsPayment: [{ athleteId: "a1", groupId: "g1", name: "Ann", balance: 0 }],
       lowReadiness: [{ athleteId: "a2", groupId: "g1", name: "Bo" }],
@@ -116,7 +127,7 @@ describe("gathering what needs the coach", () => {
     expect(items.find((i) => i.kind === "group_reply")?.href).toBe("/groups/g1/feed?channel=general&highlight=p1");
   });
   it("turns requests, unread messages, late changes and injuries into items, with names and one entry per client for messages", async () => {
-    const items = await loadNeedsYouItems(
+    const { items } = await loadNeedsYouItems(
       fakeDb({
         schedule_requests: [{ id: "r1", athlete_id: "a1", group_id: "g1", kind: "pause", created_at: "2026-10-07T10:00:00Z" }],
         booking_requests: [{ id: "b1", athlete_id: "a2", group_id: "g1", created_at: "2026-10-07T11:00:00Z" }],
@@ -150,7 +161,7 @@ describe("gathering what needs the coach", () => {
     expect(by("injury").map((i) => i.name)).toEqual(["Ed"]);
   });
   it("quiet clients: a strong tier and a mild tier both count; 'none' does not", async () => {
-    const items = await loadNeedsYouItems(
+    const { items } = await loadNeedsYouItems(
       fakeDb({
         group_memberships: [
           { group_id: "g1", profile_id: "a1" },
@@ -169,11 +180,42 @@ describe("gathering what needs the coach", () => {
     expect(items.some((i) => i.id === "quiet:a3")).toBe(false);
   });
   it("a read that fails leaves only its own kind out", async () => {
-    const items = await loadNeedsYouItems(
+    const { items } = await loadNeedsYouItems(
       fakeDb({ schedule_requests: [{ id: "r1", athlete_id: "a1", group_id: "g1", kind: "cancel", created_at: "2026-10-07T10:00:00Z" }], profiles: [{ id: "a1", full_name: "Ann" }], direct_messages: [{ sender_id: "a2", group_id: "g1", created_at: "2026-10-07T10:00:00Z" }] }, ["direct_messages"]),
       base
     );
     expect(items.map((i) => i.kind)).toEqual(["schedule_request"]);
+  });
+  it("a read that returns an error answer (the database client does not throw) is reported as failed, never as 'nothing'", async () => {
+    const out = await loadNeedsYouItems(fakeDb({}, ["schedule_requests", "direct_messages", "bookings"]), base);
+    expect(out.items).toEqual([]);
+    expect(out.failed.sort()).toEqual(["late changes", "schedule requests", "unread messages"]);
+    expect(pickNeedsYou(out.items, { incomplete: out.failed.length > 0 }).caughtUp).toBe(false);
+  });
+  it("when every read worked and there is nothing, nothing failed", async () => {
+    const out = await loadNeedsYouItems(fakeDb({}), base);
+    expect(out).toEqual({ items: [], failed: [] });
+  });
+  it("only an injury marked lately counts (the query is limited to the last 14 days)", async () => {
+    const seen: string[] = [];
+    const db = {
+      from: (t: string) => {
+        const self: any = new Proxy({}, {
+          get(_x, prop) {
+            if (prop === "then") return (resolve: (v: unknown) => void) => resolve({ data: [], error: null });
+            if (prop === "gte") return (col: string, val: string) => (seen.push(t + "." + col + ">=" + val), self);
+            if (prop === "maybeSingle") return () => Promise.resolve({ data: null, error: null });
+            return () => self;
+          },
+        });
+        return self;
+      },
+    } as never;
+    await loadNeedsYouItems(db, base);
+    const inj = seen.find((x) => x.startsWith("athlete_injury_status.marked_at>="));
+    expect(inj).toBeDefined();
+    const cutoff = new Date(inj!.split(">=")[1]).getTime();
+    expect(Math.round((NOW.getTime() - cutoff) / 86_400_000)).toBe(14);
   });
 });
 
@@ -190,6 +232,8 @@ describe("Home is wired as designed", () => {
     for (const id of ["needs-stack", "late-changes", "schedule-requests", "expiring"]) expect(page).toContain(`id="${id}"`);
   });
   it("a failure gathering the strip never fails the page", () => {
-    expect(page).toMatch(/try \{\s*needsYouView = pickNeedsYou\(/);
+    expect(page).toMatch(/try \{\s*const needsYou = await loadNeedsYouItems\(/);
+    expect(page).toContain("pickNeedsYou([], { incomplete: true })");
+    expect(page).toContain("incomplete: needsYou.failed.length > 0");
   });
 });

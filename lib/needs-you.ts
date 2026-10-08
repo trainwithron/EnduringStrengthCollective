@@ -13,6 +13,7 @@ export const SLOT_TITLE: Record<NeedsYouSlot, string> = {
 };
 
 export const CAUGHT_UP = "You're caught up.";
+export const COULD_NOT_CHECK = "I couldn't check everything just now. The panels below are still there.";
 
 // What each kind of thing is, in the order it matters within its slot (first = most urgent).
 export type NeedsYouKind =
@@ -54,8 +55,8 @@ export const KIND_ORDER: NeedsYouKind[] = [
   "group_reply",
   "session_soon",
   "late_change",
-  "payment",
   "expiring_credits",
+  "payment",
   "injury",
   "low_readiness",
   "quiet_strong",
@@ -87,19 +88,23 @@ export interface NeedsYouView {
   slots: SlotView[];
   // Items beyond the ones shown (the "N more" link). Zero when every slot shows its only item or nothing.
   moreCount: number;
+  // True only when nothing needs the coach AND every check was made.
   caughtUp: boolean;
+  // Some check could not be made, so "nothing" may not be the whole truth: the strip says so instead of "You're caught up."
+  incomplete: boolean;
 }
 
 const rankOf = (k: NeedsYouKind) => KIND_ORDER.indexOf(k);
 
-export function pickNeedsYou(items: NeedsYouItem[]): NeedsYouView {
+export function pickNeedsYou(items: NeedsYouItem[], opts: { incomplete?: boolean } = {}): NeedsYouView {
   // The same thing never appears twice.
   const seen = new Set<string>();
   const unique = items.filter((i) => (seen.has(i.id) ? false : (seen.add(i.id), true)));
   const sorted = [...unique].sort((a, b) => rankOf(a.kind) - rankOf(b.kind) || a.order - b.order || a.id.localeCompare(b.id));
   const slots: SlotView[] = SLOT_ORDER.map((slot) => ({ slot, title: SLOT_TITLE[slot], item: sorted.find((i) => KIND_SLOT[i.kind] === slot) ?? null }));
   const shown = slots.filter((s) => s.item).length;
-  return { slots, moreCount: Math.max(0, unique.length - shown), caughtUp: unique.length === 0 };
+  const incomplete = !!opts.incomplete;
+  return { slots, moreCount: Math.max(0, unique.length - shown), caughtUp: unique.length === 0 && !incomplete, incomplete };
 }
 
 // "N more" wording.

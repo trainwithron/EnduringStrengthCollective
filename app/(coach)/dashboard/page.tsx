@@ -533,10 +533,10 @@ export default async function CoachHomePage() {
   });
 
   // "Needs you": the single most urgent item of each of three kinds, from what is already loaded above plus a few small soft reads. A failure leaves that kind out, never the page.
-  let needsYouView = pickNeedsYou([]);
+  // A strip that could not be built, or built from checks that did not all succeed, never says "You're caught up."
+  let needsYouView = pickNeedsYou([], { incomplete: true });
   try {
-    needsYouView = pickNeedsYou(
-      await loadNeedsYouItems(supabase, {
+    const needsYou = await loadNeedsYouItems(supabase, {
         coachId: user.id,
         timezone: coachTimezone,
         now: new Date(),
@@ -546,8 +546,8 @@ export default async function CoachHomePage() {
         lowReadiness,
         quietTierByAthlete: dashboardData.quietTierByAthlete,
         needsReplyThreads,
-      })
-    );
+    });
+    needsYouView = pickNeedsYou(needsYou.items, { incomplete: needsYou.failed.length > 0 });
   } catch (e) {
     console.error("[dashboard] needs-you failed:", e instanceof Error ? e.message : e);
   }

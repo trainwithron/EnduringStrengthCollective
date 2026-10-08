@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CAUGHT_UP, moreLabel, type NeedsYouView } from "@/lib/needs-you";
+import { CAUGHT_UP, COULD_NOT_CHECK, moreLabel, type NeedsYouView } from "@/lib/needs-you";
 
 // "Needs you": at most three things at the top of Home, one per slot (someone is waiting on you, something is due soon, someone may be slipping), each the single most urgent of its
 // kind. A slot with nothing shows nothing. When nothing needs the coach it says so. "N more" jumps to the stack of panels below, which is unchanged.
@@ -10,6 +10,10 @@ export function NeedsYouStrip({ view }: { view: NeedsYouView }) {
       {view.caughtUp ? (
         <p className="font-body text-sm text-chalk border border-steel/20 p-4" role="status">
           {CAUGHT_UP}
+        </p>
+      ) : filled.length === 0 ? (
+        <p className="font-body text-sm text-chalk border border-steel/20 p-4" role="status">
+          {COULD_NOT_CHECK}
         </p>
       ) : (
         <div className="space-y-2">
@@ -26,6 +30,11 @@ export function NeedsYouStrip({ view }: { view: NeedsYouView }) {
               </li>
             ))}
           </ul>
+          {view.incomplete && (
+            <p className="font-body text-xs text-steel" role="status">
+              {COULD_NOT_CHECK}
+            </p>
+          )}
           {view.moreCount > 0 && (
             <Link href="#needs-stack" className="inline-block font-body text-sm text-steel hover:text-chalk underline underline-offset-2 min-h-11 leading-[2.75rem]">
               {moreLabel(view.moreCount)}

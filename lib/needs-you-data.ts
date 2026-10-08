@@ -3,6 +3,7 @@
 // is soft: one that fails just leaves its kind out, never the strip and never the page. The ranking and the sentences are lib/needs-you.ts.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatInTimezone } from "@/lib/format-in-timezone";
+import { pageAll } from "@/lib/page-all";
 import { DEFAULT_HEADS_UP_DAYS, expiringSoon, expiryDismissalKey, isSnoozed } from "@/lib/expiry-checkin";
 import { BUTTON, sentences, type NeedsYouItem } from "@/lib/needs-you";
 import type { QuietTier } from "@/lib/quiet-client-tier";
@@ -25,19 +26,49 @@ export const SESSION_SOON_MINUTES = 120;
 
 const clientPath = (groupId: string, athleteId: string) => `/groups/${groupId}/athletes/${athleteId}`;
 
-async function soft<T>(label: string, run: () => Promise<T>, fallback: T): Promise<T> {
-  try {
-    return await run();
-  } catch (e) {
-    console.error(`[needs-you] ${label} failed:`, e instanceof Error ? e.message : e);
-    return fallback;
-  }
+// An injury flag older than this is a standing condition, not news: the coach has it on the client's page and in the panels below. The strip is for what changed.
+export const INJURY_RECENT_DAYS = 14;
+
+export interface NeedsYouLoad {
+  items: NeedsYouItem[];
+  // Reads that could not be made (so "nothing" may not be the whole truth).
+  failed: string[];
 }
 
-export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYouHomeInputs): Promise<NeedsYouItem[]> {
+export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYouHomeInputs): Promise<NeedsYouLoad> {
   const { coachId, now, groupIds } = input;
   const items: NeedsYouItem[] = [];
-  if (groupIds.length === 0) return items;
+  const failed: string[] = [];
+  if (groupIds.length === 0) return { items, failed };
+
+  // A read that fails (an error answer, which the database client returns instead of throwing, or a thrown error) is remembered by name and counts as no rows for that kind only.
+  const soft = async <T,>(label: string, run: () => Promise<{ data: T | null; error: unknown }>, fallback: T): Promise<T> => {
+    try {
+      const { data, error } = await run();
+      if (error) {
+        failed.push(label);
+        console.error(`[needs-you] ${label} failed:`, (error as { message?: string })?.message ?? error);
+        return fallback;
+      }
+      return data ?? fallback;
+    } catch (e) {
+      failed.push(label);
+      console.error(`[needs-you] ${label} failed:`, e instanceof Error ? e.message : e);
+      return fallback;
+    }
+  };
+  // A read that can pass 1000 rows is read a page at a time; a failed or cut-short read counts as failed.
+  const paged = async <T,>(label: string, make: (from: number, to: number) => PromiseLike<{ data: any[] | null; error: unknown }>): Promise<T[]> => {
+    try {
+      const r = await pageAll(make);
+      if (r.failed || r.truncated) failed.push(label);
+      return r.rows as T[];
+    } catch (e) {
+      failed.push(label);
+      console.error(`[needs-you] ${label} failed:`, e instanceof Error ? e.message : e);
+      return [];
+    }
+  };
   const nowMs = now.getTime();
 
   // ---- what Home already knows -------------------------------------------------------------------------------------------------
@@ -76,46 +107,34 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
   const [scheduleRequests, bookingRequests, unreadMessages, lateChanges, expiring, injured, athleteRows] = await Promise.all([
     soft(
       "schedule requests",
-      async () => {
-        const { data } = await supabase.from("schedule_requests").select("id, athlete_id, group_id, kind, created_at").eq("coach_id", coachId).in("status", ["pending", "applying"]).order("created_at", { ascending: true }).limit(50);
-        return (data ?? []) as { id: string; athlete_id: string; group_id: string; kind: string; created_at: string }[];
-      },
-      []
+      () => supabase.from("schedule_requests").select("id, athlete_id, group_id, kind, created_at").eq("coach_id", coachId).in("status", ["pending", "applying"]).order("created_at", { ascending: true }).limit(50) as never,
+      [] as { id: string; athlete_id: string; group_id: string; kind: string; created_at: string }[]
     ),
     soft(
       "booking requests",
-      async () => {
-        const { data } = await supabase.from("booking_requests").select("id, athlete_id, group_id, created_at").eq("coach_id", coachId).eq("status", "pending").order("created_at", { ascending: true }).limit(50);
-        return (data ?? []) as { id: string; athlete_id: string; group_id: string; created_at: string }[];
-      },
-      []
+      () => supabase.from("booking_requests").select("id, athlete_id, group_id, created_at").eq("coach_id", coachId).eq("status", "pending").order("created_at", { ascending: true }).limit(50) as never,
+      [] as { id: string; athlete_id: string; group_id: string; created_at: string }[]
     ),
-    soft(
-      "unread messages",
-      async () => {
-        const { data } = await supabase.from("direct_messages").select("sender_id, group_id, created_at").eq("recipient_id", coachId).is("read_at", null).order("created_at", { ascending: true }).limit(500);
-        return (data ?? []) as { sender_id: string; group_id: string; created_at: string }[];
-      },
-      []
+    paged<{ id: string; sender_id: string; group_id: string; created_at: string }>("unread messages", (from, to) =>
+      supabase.from("direct_messages").select("id, sender_id, group_id, created_at").eq("recipient_id", coachId).is("read_at", null).order("created_at", { ascending: true }).order("id", { ascending: true }).range(from, to)
     ),
     soft(
       "late changes",
-      async () => {
-        const { data } = await supabase.from("bookings").select("id, athlete_id, group_id, start_at").eq("coach_id", coachId).eq("late_charge_state", "flagged").order("start_at", { ascending: true }).limit(50);
-        return (data ?? []) as { id: string; athlete_id: string; group_id: string; start_at: string }[];
-      },
-      []
+      () => supabase.from("bookings").select("id, athlete_id, group_id, start_at").eq("coach_id", coachId).eq("late_charge_state", "flagged").order("start_at", { ascending: true }).limit(50) as never,
+      [] as { id: string; athlete_id: string; group_id: string; start_at: string }[]
     ),
-    soft(
-      "expiring sessions",
-      async () => {
-        const { data: policy } = await supabase.from("coach_booking_policies").select("credit_expiry_days, expiry_heads_up_days").eq("coach_id", coachId).maybeSingle();
+    (async () => {
+      try {
+        const { data: policy, error: policyError } = await supabase.from("coach_booking_policies").select("credit_expiry_days, expiry_heads_up_days").eq("coach_id", coachId).maybeSingle();
+        if (policyError) throw new Error(policyError.message);
         const expiryDays = (policy?.credit_expiry_days as number | undefined) ?? 0;
         if (expiryDays <= 0) return [];
         const headsUp = (policy?.expiry_heads_up_days as number | undefined) ?? DEFAULT_HEADS_UP_DAYS;
-        const { data: credits } = await supabase.from("session_credits").select("athlete_id, group_id, balance, last_granted_at, expiry_hold_until").in("group_id", groupIds);
+        const credits = await paged<{ athlete_id: string; group_id: string; balance: number; last_granted_at: string | null; expiry_hold_until: string | null }>("expiring sessions", (from, to) =>
+          supabase.from("session_credits").select("athlete_id, group_id, balance, last_granted_at, expiry_hold_until").in("group_id", groupIds).order("athlete_id", { ascending: true }).order("group_id", { ascending: true }).range(from, to)
+        );
         const soon = expiringSoon(
-          ((credits ?? []) as { athlete_id: string; group_id: string; balance: number; last_granted_at: string | null; expiry_hold_until: string | null }[]).map((r) => ({
+          credits.map((r) => ({
             athleteId: r.athlete_id,
             groupId: r.group_id,
             balance: r.balance,
@@ -128,34 +147,30 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
         );
         if (soon.length === 0) return [];
         // "Not now" on the check-in card stays away for two weeks: it stays away here too.
-        const { data: feedback } = await supabase
+        const { data: feedback, error: feedbackError } = await supabase
           .from("spotter_recommendation_feedback")
           .select("dismissal_key, created_at")
           .eq("coach_id", coachId)
           .eq("spotter_kind", "expiry")
           .order("created_at", { ascending: false })
           .limit(200);
+        if (feedbackError) throw new Error(feedbackError.message);
         const lastDenied = new Map<string, string>();
         for (const f of (feedback ?? []) as { dismissal_key: string; created_at: string }[]) if (!lastDenied.has(f.dismissal_key)) lastDenied.set(f.dismissal_key, f.created_at);
         return soon.filter((u) => !isSnoozed(lastDenied.get(expiryDismissalKey(u.athleteId, u.groupId, "soon")) ?? null, now));
-      },
-      []
-    ),
+      } catch (e) {
+        failed.push("expiring sessions");
+        console.error("[needs-you] expiring sessions failed:", e instanceof Error ? e.message : e);
+        return [];
+      }
+    })(),
     soft(
       "injuries",
-      async () => {
-        const { data } = await supabase.from("athlete_injury_status").select("athlete_id").eq("is_injured", true).limit(200);
-        return ((data ?? []) as { athlete_id: string }[]).map((r) => r.athlete_id);
-      },
-      [] as string[]
-    ),
-    soft(
-      "roster",
-      async () => {
-        const { data } = await supabase.from("group_memberships").select("group_id, profile_id").in("group_id", groupIds).eq("role", "athlete");
-        return (data ?? []) as { group_id: string; profile_id: string }[];
-      },
-      []
+      () => supabase.from("athlete_injury_status").select("athlete_id, marked_at").eq("is_injured", true).gte("marked_at", new Date(nowMs - INJURY_RECENT_DAYS * 86_400_000).toISOString()).limit(200) as never,
+      [] as { athlete_id: string; marked_at: string }[]
+    ).then((rows) => rows.map((r) => r.athlete_id)),
+    paged<{ group_id: string; profile_id: string }>("roster", (from, to) =>
+      supabase.from("group_memberships").select("group_id, profile_id").in("group_id", groupIds).eq("role", "athlete").order("group_id", { ascending: true }).order("profile_id", { ascending: true }).range(from, to)
     ),
   ]);
 
@@ -175,14 +190,8 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
   ]);
   const nameById = new Map<string, string>();
   if (needNames.size > 0) {
-    const names = await soft(
-      "names",
-      async () => {
-        const { data } = await supabase.from("profiles").select("id, full_name").in("id", [...needNames]);
-        return (data ?? []) as { id: string; full_name: string | null }[];
-      },
-      []
-    );
+    // A name that cannot be read just says "A client": the item itself is still shown.
+    const names = await soft("names", () => supabase.from("profiles").select("id, full_name").in("id", [...needNames]) as never, [] as { id: string; full_name: string | null }[]);
     for (const n of names) nameById.set(n.id, n.full_name?.trim() || "A client");
   }
   const nameOf = (id: string) => nameById.get(id) ?? "A client";
@@ -224,5 +233,5 @@ export async function loadNeedsYouItems(supabase: SupabaseClient, input: NeedsYo
       order: 0,
     });
   }
-  return items;
+  return { items, failed };
 }
