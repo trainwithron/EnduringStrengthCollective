@@ -8,7 +8,8 @@ import type { MealEntryPayload } from "@/lib/meal-plan-assignment";
 import { QuickLogFoodButton } from "./quick-log-food-button";
 import { BarcodeScanButton } from "./barcode-scan-button";
 import { PhotoLogFoodButton } from "./photo-log-food-button";
-import { FavoriteStar } from "./favorite-star";
+import { FoodSearchLog } from "./food-search-log";
+import { FoodLogEntries } from "./food-log-entries";
 import type { RecentFoodLogOption } from "@/lib/recent-food-logs";
 import { COACH_CAN_SEE_LINE, hasTarget, noTargetLine, sumLoggedFood, type DayTargetLike } from "@/lib/nutrition-tracking";
 
@@ -41,7 +42,6 @@ export function FoodLogSection({
   coachProgramming?: boolean;
 }) {
   const planHasMeals = !!plan?.meals && Object.values(plan.meals).some((entries) => (entries ?? []).length > 0);
-  const [quickLogEntries, setQuickLogEntries] = useState(initialEntries.filter((e) => !e.mealSlot));
   const [allEntries, setAllEntries] = useState(initialEntries);
 
   const loggedTotals = sumLoggedFood(allEntries);
@@ -49,12 +49,23 @@ export function FoodLogSection({
   const of = (value: number | null | undefined) => (value != null ? ` / ${Math.round(value)}` : "");
 
   function handleQuickLogged(entry: FoodLogEntry) {
-    setQuickLogEntries((prev) => [...prev, entry]);
     setAllEntries((prev) => [...prev, entry]);
   }
 
+  // A meal ticked off against the plan replaces the earlier entry for that plan meal. A free-form food (quick_log) logged under a meal name such as "snack" is a different
+  // thing and stays.
   function handleMealEntryLogged(entry: FoodLogEntry) {
-    setAllEntries((prev) => [...prev.filter((e) => e.mealSlot !== entry.mealSlot), entry]);
+    setAllEntries((prev) => [...prev.filter((e) => e.mealSlot !== entry.mealSlot || e.status === "quick_log"), entry]);
+  }
+
+  function handleAdded(added: FoodLogEntry[]) {
+    setAllEntries((prev) => [...prev, ...added]);
+  }
+  function handleChanged(entry: FoodLogEntry) {
+    setAllEntries((prev) => prev.map((e) => (e.id === entry.id ? entry : e)));
+  }
+  function handleDeleted(id: string) {
+    setAllEntries((prev) => prev.filter((e) => e.id !== id));
   }
 
   return (
@@ -98,6 +109,7 @@ export function FoodLogSection({
       )}
 
       <div className="space-y-2">
+        <FoodSearchLog athleteId={athleteId} groupId={groupId} logDate={logDate} onLogged={handleQuickLogged} />
         <QuickLogFoodButton
           athleteId={athleteId}
           groupId={groupId}
@@ -109,21 +121,15 @@ export function FoodLogSection({
         <PhotoLogFoodButton athleteId={athleteId} groupId={groupId} logDate={logDate} onLogged={handleQuickLogged} />
       </div>
 
-      {quickLogEntries.length > 0 && (
-        <div className="space-y-1.5">
-          {quickLogEntries.map((e) => (
-            <div key={e.id} className="border border-steel/15 p-2.5">
-              <p className="font-body text-xs text-chalk">{e.description}</p>
-              <p className="font-body text-xs text-steel mt-0.5">
-                {e.calories} kcal · {e.proteinG}p / {e.carbsG}c / {e.fatG}f
-              </p>
-              <div className="mt-1.5">
-                <FavoriteStar profileId={athleteId} entry={e} />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      <FoodLogEntries
+        athleteId={athleteId}
+        groupId={groupId}
+        logDate={logDate}
+        entries={allEntries}
+        onAdded={handleAdded}
+        onChanged={handleChanged}
+        onDeleted={handleDeleted}
+      />
     </div>
   );
 }

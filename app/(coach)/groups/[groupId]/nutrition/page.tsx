@@ -28,6 +28,7 @@ import { dedupeRecentFoodLogs } from "@/lib/recent-food-logs";
 import { getCoachClients } from "@/lib/coach-clients";
 import { dailyCaloriesFromLog } from "@/lib/nutrition-tracking";
 import { addDaysToKey } from "@/lib/date-key";
+import { fetchFoodLogDay } from "@/lib/food-entry";
 
 export default async function NutritionPage(
   props: {
@@ -258,11 +259,8 @@ export default async function NutritionPage(
           .maybeSingle()
       : Promise.resolve({ data: null }),
     // Logging is for every client, whatever their tier: these three reads are never gated.
-    supabase
-      .from("food_log_entries")
-      .select("id, meal_slot, status, description, calories, protein_g, carbs_g, fat_g")
-      .eq("athlete_id", athleteId)
-      .eq("log_date", todayKey),
+    // Today's entries with the searched-food detail (falls back to the original columns before the database has them).
+    fetchFoodLogDay(supabase, athleteId, todayKey).then((data) => ({ data })),
     supabase
       .from("food_log_entries")
       .select("description, calories, protein_g, carbs_g, fat_g, created_at")
@@ -280,16 +278,7 @@ export default async function NutritionPage(
       .order("log_date", { ascending: true }),
   ]);
 
-  const todayFoodLog: FoodLogEntry[] = (todayFoodLogRows ?? []).map((r) => ({
-    id: r.id,
-    mealSlot: r.meal_slot,
-    status: r.status as FoodLogEntry["status"],
-    description: r.description,
-    calories: r.calories,
-    proteinG: r.protein_g,
-    carbsG: r.carbs_g,
-    fatG: r.fat_g,
-  }));
+  const todayFoodLog: FoodLogEntry[] = todayFoodLogRows ?? [];
   // A saved plan's meals are an OBJECT keyed by day type ({ daily | train | rest: [...] }), not a list; the checklist below wants a list, and handing it the
   // object throws on the client's page the day a coach saves a plan. So the checklist only gets a real list, and the saved plan is shown by TodaysMealCards (inside FoodLogSection).
   const todayMealsRaw: GeneratedMeal[] = Array.isArray(todayMealPlan?.meals) ? (todayMealPlan?.meals as unknown as GeneratedMeal[]) : [];

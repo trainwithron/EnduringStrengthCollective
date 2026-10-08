@@ -14,6 +14,14 @@ export interface FoodLogEntry {
   proteinG: number | null;
   carbsG: number | null;
   fatG: number | null;
+  // The detail of a searched, custom or saved food (migration 0300); absent on entries logged any other way.
+  foodSource?: string | null;
+  fdcId?: number | null;
+  amountG?: number | null;
+  servingLabel?: string | null;
+  servingQty?: number | null;
+  nutrients?: Record<string, number> | null;
+  barcode?: string | null;
 }
 
 // The flagship piece of real food logging (calorie_tracking_ux_research_
@@ -47,7 +55,8 @@ export function MealCheckoffList({
   const [savingSlot, setSavingSlot] = useState<string | null>(null);
   const [modifyingSlot, setModifyingSlot] = useState<string | null>(null);
 
-  const entryBySlot = new Map(entries.filter((e) => e.mealSlot).map((e) => [e.mealSlot as string, e]));
+  // Free-form logged foods (status quick_log) can carry a meal name like "snack" too; only entries ticked off against the plan count as the plan's meal being logged.
+  const entryBySlot = new Map(entries.filter((e) => e.mealSlot && e.status !== "quick_log").map((e) => [e.mealSlot as string, e]));
 
   async function logMeal(meal: GeneratedMeal, status: "ate_it" | "skipped") {
     setSavingSlot(meal.spec.id);
@@ -78,14 +87,14 @@ export function MealCheckoffList({
         carbsG: payload.carbs_g,
         fatG: payload.fat_g,
       };
-      setEntries((prev) => [...prev.filter((e) => e.mealSlot !== meal.spec.id), newEntry]);
+      setEntries((prev) => [...prev.filter((e) => e.mealSlot !== meal.spec.id || e.status === "quick_log"), newEntry]);
       onEntryLogged?.(newEntry);
     }
     setSavingSlot(null);
   }
 
   function handleModifiedLogged(meal: GeneratedMeal, entry: FoodLogEntry) {
-    setEntries((prev) => [...prev.filter((e) => e.mealSlot !== meal.spec.id), entry]);
+    setEntries((prev) => [...prev.filter((e) => e.mealSlot !== meal.spec.id || e.status === "quick_log"), entry]);
     onEntryLogged?.(entry);
     setModifyingSlot(null);
   }

@@ -48,7 +48,8 @@ export function TodaysMealCards({
   const bothDayTypes = buckets.includes("train") && buckets.includes("rest");
   const shownBuckets = bothDayTypes ? (dayType ? buckets.filter((b) => b === dayType || b === "daily") : []) : buckets;
 
-  const entryFor = (mealId: string) => entries.find((e) => e.mealSlot === mealId);
+  // Only an entry ticked off against the plan is "this meal logged"; a free-form food logged under the same meal name (a snack) is not.
+  const entryFor = (mealId: string) => entries.find((e) => e.mealSlot === mealId && e.status !== "quick_log");
 
   async function log(meal: MealEntryPayload, choice: MealRecipeChoice | null, status: "ate_it" | "skipped") {
     // Already logged (or being logged): ignore the tap.

@@ -59,7 +59,8 @@ describe("the client Nutrition page", () => {
   });
   it("reads the food log for every client, not only when macros are enabled", () => {
     const foodReads = src.split("\n").filter((l) => l.includes('.from("food_log_entries")'));
-    expect(foodReads.length).toBeGreaterThanOrEqual(3);
+    expect(foodReads.length).toBeGreaterThanOrEqual(2);
+    expect(src).toContain("fetchFoodLogDay(supabase, athleteId, todayKey)");
     for (const line of foodReads) expect(line).not.toMatch(/macrosEnabled/);
     // none of the three food-log reads sits right after a "macrosEnabled ?" gate
     expect(src).not.toMatch(/macrosEnabled\s*\?\s*supabase\s*\.from\("food_log_entries"\)/);
