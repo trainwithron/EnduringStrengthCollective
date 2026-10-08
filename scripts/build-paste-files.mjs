@@ -938,6 +938,28 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["0298 is not already applied (coach_preferences has no faith_track_default yet)", has.noCol("coach_preferences", "faith_track_default")],
     ],
   },
+  {
+    n: "45",
+    slug: "0300",
+    title: "0300 Food search and logging: USDA household portions (public reference table), a record of which USDA batches were loaded, and the optional detail of a searched food on a food log entry (source, USDA food, grams, serving, nutrient snapshot), with sanity limits on what can be logged from now on",
+    migrations: ["0300"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for anyone until the code in the same release is live. After that: any client can search the USDA foods, pick a serving (grams, ounces, household measures once the USDA portions are loaded), see the nutrients and log it, then edit or delete the entry. Existing food logs are untouched.",
+    undo: [
+      "alter table public.food_log_entries drop constraint if exists food_log_entries_amounts_sane;",
+      "alter table public.food_log_entries drop constraint if exists food_log_entries_detail_check;",
+      "alter table public.food_log_entries drop constraint if exists food_log_entries_food_source_check;",
+      "alter table public.food_log_entries drop column if exists food_source, drop column if exists fdc_id, drop column if exists amount_g, drop column if exists serving_label, drop column if exists serving_qty, drop column if exists nutrients, drop column if exists barcode;",
+      "drop table if exists public.usda_load_batches;",
+      "drop table if exists public.usda_food_portions;",
+    ].join(String.fromCharCode(10)),
+    undoWhy: "Only if step 45 misbehaves. Removes the portions table, the batch record and the new optional columns on food_log_entries (the detail of searched foods logged since is lost; the calories and macros of those entries stay). Nothing else is touched.",
+    rows: [
+      ["food_log_entries and usda_foods exist", `${has.table("food_log_entries")} and ${has.table("usda_foods")}`],
+      ["0300 is not already applied (usda_food_portions is not there yet)", has.noTable("usda_food_portions")],
+      ["0300 is not already applied (food_log_entries has no fdc_id yet)", has.noCol("food_log_entries", "fdc_id")],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -1019,6 +1041,7 @@ const BUNDLES = [
   { id: "release-j", name: "Release J (about you, baseline, phase of record)", steps: ["40"] },
   { id: "release-k", name: "Release K (recipe library)", steps: ["41"] },
   { id: "release-l", name: "Release L (schedule requests, Read during rest)", steps: ["42", "43"] },
+  { id: "release-n", name: "Release N (nutrition tracking: food search, custom foods, nutrient detail)", steps: ["45"] },
 ];
 for (const b of BUNDLES) {
   const stepsIn = b.steps.map((n) => STEPS.find((x) => x.n === n));
@@ -1192,6 +1215,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0295", has.table("client_phase_plans")),
     m("0296", has.col("recipes", "content_hash")),
     m("0297", has.table("schedule_requests")),
+    m("0300", has.table("usda_food_portions")),
     m("0298", has.table("read_settings")),
     m("0285", has.table("rest_day_nudges")),
     m("0284", has.policy("client_goals", "client_goals_insert_coach")),

@@ -59,5 +59,13 @@
    "43"
   ],
   "file": "apply-release-l-all.sql"
+ },
+ {
+  "id": "release-n",
+  "name": "Release N (nutrition tracking: food search, custom foods, nutrient detail)",
+  "steps": [
+   "45"
+  ],
+  "file": "apply-release-n-all.sql"
  }
 ]
