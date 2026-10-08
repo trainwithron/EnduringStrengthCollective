@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-let authCallback: ((event: string) => void) | null = null;
+let authCallback: ((event: string, session?: { user: { id: string } } | null) => void) | null = null;
 let user: { id: string } | null = { id: "u1" };
 let row: { hide_demos: boolean } | null = { hide_demos: true };
 let selects = 0;
@@ -8,7 +8,7 @@ vi.mock("@/lib/supabase/client", () => ({
   createBrowserClient: () => ({
     auth: {
       getUser: async () => ({ data: { user } }),
-      onAuthStateChange: (cb: (event: string) => void) => {
+      onAuthStateChange: (cb: (event: string, session?: { user: { id: string } } | null) => void) => {
         authCallback = cb;
         return { data: { subscription: { unsubscribe() {} } } };
       },
@@ -69,7 +69,7 @@ describe("signing out and in on a shared device", () => {
     // a different person signs in; their row says demos are shown
     user = { id: "u2" };
     row = { hide_demos: false };
-    authCallback!("SIGNED_IN");
+    authCallback!("SIGNED_IN", { user: { id: "u2" } });
     await new Promise((r) => setTimeout(r, 0));
     expect(selects).toBe(2);
     expect(readDemosHidden()).toBe(false);
@@ -82,8 +82,19 @@ describe("signing out and in on a shared device", () => {
     authCallback!("SIGNED_OUT");
     user = { id: "u3" };
     row = null;
-    authCallback!("SIGNED_IN");
+    authCallback!("SIGNED_IN", { user: { id: "u3" } });
     await new Promise((r) => setTimeout(r, 0));
     expect(readDemosHidden()).toBe(false);
+  });
+  it("a repeated SIGNED_IN for the same person (a tab regaining focus) does not clear the cache or read again", async () => {
+    const { useDemosHidden, readDemosHidden } = await import("./demo-preference");
+    useDemosHidden();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(selects).toBe(1);
+    authCallback!("SIGNED_IN", { user: { id: "u1" } });
+    authCallback!("SIGNED_IN", { user: { id: "u1" } });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(selects).toBe(1);
+    expect(readDemosHidden()).toBe(true);
   });
 });

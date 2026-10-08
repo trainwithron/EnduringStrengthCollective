@@ -49,18 +49,22 @@ async function saveToAccount(hidden: boolean): Promise<boolean> {
 // The person's own choice, read once per page load (the first screen to ask starts it, the others share the answer).
 let accountLoad: Promise<void> | null = null;
 let watchingSignIn = false;
+// The person the cached answer belongs to. The auth listener also says SIGNED_IN when a tab regains focus or the session is re-checked, which is not a new person: only a different person reloads.
+let loadedFor: string | null = null;
 
 // Signing out forgets this person's choice on the device (and the cached answer), and signing in as someone else loads theirs, so a shared computer never carries one person's switch to the next.
 function watchSignIn(): void {
   if (watchingSignIn) return;
   watchingSignIn = true;
   try {
-    createBrowserClient().auth.onAuthStateChange((event) => {
+    createBrowserClient().auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_OUT") {
         accountLoad = null;
+        loadedFor = null;
         writeLocal(false);
         window.dispatchEvent(new Event(EVENT));
       } else if (event === "SIGNED_IN") {
+        if (session?.user?.id && session.user.id === loadedFor) return;
         accountLoad = null;
         void loadFromAccount();
       }
@@ -80,6 +84,7 @@ function loadFromAccount(): Promise<void> {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) return;
+      loadedFor = user.id;
       const { data, error } = await supabase.from("client_ui_settings").select("hide_demos").eq("athlete_id", user.id).maybeSingle();
       if (error) return;
       if (data) {
