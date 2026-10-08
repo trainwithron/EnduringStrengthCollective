@@ -66,3 +66,15 @@ export async function ensurePhasePlan(
   if (error) return { ok: false, created: false };
   return { ok: await writeTag(supabase, args), created: true };
 }
+
+// The coach's answer on a review: the next review date (the same phase carries on), and, when the coach decided to keep going, that this review happened (the next window starts there).
+// Extending only moves the date. Nothing here changes the phase.
+export async function setReviewDate(
+  supabase: SupabaseClient,
+  args: { athleteId: string; groupId: string; coachId: string; reviewOn: string | null; markReviewed: boolean; todayKey: string }
+): Promise<{ ok: boolean }> {
+  const patch: Record<string, unknown> = { review_on: args.reviewOn, updated_by: args.coachId, updated_at: new Date().toISOString() };
+  if (args.markReviewed) patch.last_reviewed_at = args.todayKey + "T12:00:00Z";
+  const { error } = await supabase.from("client_phase_plans").update(patch).eq("athlete_id", args.athleteId).eq("group_id", args.groupId);
+  return { ok: !error };
+}
