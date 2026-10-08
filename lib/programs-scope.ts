@@ -3,20 +3,25 @@
 
 export interface ScopablePrograms {
   athleteId: string | null;
+  groupId?: string;
 }
 
-// The client id from the address, or null for "everyone". Only a plain id is accepted.
+// The id from the address, or null for "everyone". Only a plain id is accepted.
 export function clientFromSearch(value: string | string[] | null | undefined): string | null {
   const v = Array.isArray(value) ? value[0] : value;
   return typeof v === "string" && /^[0-9a-f-]{8,64}$/i.test(v) ? v : null;
 }
+export const groupFromSearch = clientFromSearch;
 
-// All programs, or only the personal ones of the named client. (A shared group program has no client, so it is not in a client's list.)
-export function scopePrograms<T extends ScopablePrograms>(programs: T[], clientId: string | null): T[] {
-  return clientId ? programs.filter((p) => p.athleteId === clientId) : programs;
+// All programs, or the ones a client's own Programs tab shows: the programs made for that client, plus the programs with no client that live in the client's own group (what they follow
+// when nothing is made for them). Another client's programs, and other groups' shared programs, are never in it.
+export function scopePrograms<T extends ScopablePrograms>(programs: T[], clientId: string | null, clientGroupId: string | null = null): T[] {
+  if (!clientId) return programs;
+  return programs.filter((p) => p.athleteId === clientId || (p.athleteId == null && clientGroupId != null && p.groupId === clientGroupId));
 }
 
 export const ALL_PROGRAMS_HREF = "/programs";
 
-// The address of the page scoped to one client, and the plain one that clears the scope.
-export const programsHrefForClient = (clientId: string): string => `${ALL_PROGRAMS_HREF}?client=${encodeURIComponent(clientId)}`;
+// The address of the page scoped to one client (in the group the coach was looking at them in), and the plain one that clears the scope.
+export const programsHrefForClient = (clientId: string, groupId?: string): string =>
+  `${ALL_PROGRAMS_HREF}?client=${encodeURIComponent(clientId)}${groupId ? `&group=${encodeURIComponent(groupId)}` : ""}`;

@@ -11,13 +11,14 @@ import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
 import { pickCoachAnchor } from "@/lib/coach-anchor";
 import { getCoachClients } from "@/lib/coach-clients";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
-import { ALL_PROGRAMS_HREF, clientFromSearch, scopePrograms } from "@/lib/programs-scope";
+import { ALL_PROGRAMS_HREF, clientFromSearch, groupFromSearch, scopePrograms } from "@/lib/programs-scope";
 
 // The coach's Programs page: ALL of their programs, whichever group or client each one belongs to, wherever the coach is standing. It is scoped to one client only when the address says so
 // (?client=, which a client's own Programs tab uses), with a plain label and a one-click way back to everything. Nothing about the scope is stored, so it never sticks.
-export default async function CoachProgramsPage(props: { searchParams: Promise<{ client?: string | string[] }> }) {
+export default async function CoachProgramsPage(props: { searchParams: Promise<{ client?: string | string[]; group?: string | string[] }> }) {
   const search = await props.searchParams;
   const clientId = clientFromSearch(search.client);
+  const requestedGroupId = groupFromSearch(search.group);
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -55,15 +56,17 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
     athleteName: p.profiles?.full_name ?? null,
     groupId: p.group_id,
   }));
-  const cards = scopePrograms(all, clientId);
 
   // The scoped client's name (for the label) and the place a new program for them goes.
   let scopedName: string | null = null;
   let newProgramGroupId = anchor.id;
   let newProgramQuery = "";
+  // The group the client was being looked at in (the profile's own group, else their one-on-one space), whose shared programs are part of their list.
+  let clientGroupId: string | null = null;
   if (clientId) {
     const clients = await getCoachClients(supabase, user.id, anchor.id);
     const client = clients.find((c) => c.id === clientId);
+    clientGroupId = requestedGroupId && groupIds.includes(requestedGroupId) ? requestedGroupId : (client?.groupId ?? null);
     scopedName = client?.fullName ?? all.find((p) => p.athleteId === clientId)?.athleteName ?? "this client";
     if (client) {
       newProgramGroupId = client.groupId;
@@ -71,6 +74,7 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
     }
   }
 
+  const cards = scopePrograms(all, clientId, clientGroupId);
   const uncoveredProgramIds = cards.filter((c) => !c.coverImagePath).map((c) => c.id);
   const visualsMap = await computeProgramCardVisuals(supabase, uncoveredProgramIds, user.id);
   const visualsByProgramId = Object.fromEntries(visualsMap);

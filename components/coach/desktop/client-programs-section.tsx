@@ -33,7 +33,7 @@ export async function ClientProgramsSection({ groupId, athleteId, actions }: { g
       <div className="flex items-baseline justify-between gap-3 mb-2">
         <h2 className="font-display uppercase text-sm tracking-wide text-steel">Programs</h2>
         {/* The one way into the Programs page scoped to this client; the page says it is scoped and offers everything. */}
-        <Link href={programsHrefForClient(athleteId)} className="font-body text-xs text-steel hover:text-chalk min-h-11 sm:min-h-0 inline-flex items-center">
+        <Link href={programsHrefForClient(athleteId, groupId)} className="font-body text-xs text-steel hover:text-chalk min-h-11 sm:min-h-0 inline-flex items-center">
           Open on the Programs page
         </Link>
       </div>

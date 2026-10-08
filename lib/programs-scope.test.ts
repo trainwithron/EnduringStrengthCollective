@@ -42,7 +42,7 @@ describe("where the scope can and cannot come from", () => {
   it("the all-programs page lists every program of the coach's groups and scopes only from ?client=", () => {
     expect(page).toContain('.in("group_id", groupIds.length > 0 ? groupIds : [""])');
     expect(page).toContain("clientFromSearch(search.client)");
-    expect(page).toContain("scopePrograms(all, clientId)");
+    expect(page).toContain("scopePrograms(all, clientId, clientGroupId)");
   });
   it("when scoped it says so plainly, with a one-click Show all programs", () => {
     expect(page).toContain("programs only");
@@ -55,7 +55,7 @@ describe("where the scope can and cannot come from", () => {
     }
   });
   it("a client's own Programs tab opens the page scoped to that client", () => {
-    expect(section).toContain("programsHrefForClient(athleteId)");
+    expect(section).toContain("programsHrefForClient(athleteId, groupId)");
   });
   it("a group's own Programs page (a deep link) says it is only that group, and offers everything", () => {
     expect(groupPage).toContain("Showing only");
