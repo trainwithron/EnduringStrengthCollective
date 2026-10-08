@@ -37,6 +37,8 @@ export interface ProgramBuilderData {
   exerciseLibrary: string[];
   exerciseAliases: AliasEntry[];
   exerciseTierByName: Record<string, "A" | "B" | "C" | null>;
+  // The coach's own library with its demo links: the builder looks an exercise's demo up from its CURRENT name (the same lookup the client's logger uses).
+  demoLibrary: DemoRow[];
   movementPatterns: MovementPatternOption[];
   laddersByPattern: Record<string, { exerciseName: string }[]>;
   initialStartDate: string | null;
@@ -219,6 +221,7 @@ export async function getProgramBuilderData(
     exerciseLibrary,
     exerciseAliases,
     exerciseTierByName: Object.fromEntries(tierByName),
+    demoLibrary: demoRows,
     movementPatterns,
     laddersByPattern,
     initialStartDate: startDate,

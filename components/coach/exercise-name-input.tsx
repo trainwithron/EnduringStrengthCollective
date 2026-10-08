@@ -4,6 +4,9 @@ import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { clampedLeft, clampedWidth } from "@/lib/viewport-clamp";
 import type { AliasEntry } from "@/lib/exercise-matching";
+import type { DemoRow } from "@/lib/exercise-demo";
+import { builderDemoFor } from "@/lib/builder-demo";
+import { BuilderDemoThumb } from "@/components/coach/builder-demo-thumb";
 import { isExistingExercise, nextActiveIndex, searchExercises } from "@/lib/exercise-search";
 
 export function ExerciseNameInput({
@@ -13,6 +16,7 @@ export function ExerciseNameInput({
   suggestions,
   aliases = [],
   tierByName,
+  demoLibrary,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -24,6 +28,8 @@ export function ExerciseNameInput({
   // Same A/B/C movement-pattern-ladder tier every exercise row already resolves by name elsewhere — search and tier-picking become one moment instead of two. Optional/undefined
   // for callers (the ladder-editing screen itself) that don't need it.
   tierByName?: Record<string, "A" | "B" | "C" | null>;
+  // The coach's library with its demo links: each row of the list shows a tiny picture of that exercise's demo, so similar names (a row, a press) can be told apart. Optional.
+  demoLibrary?: DemoRow[];
 }) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
@@ -141,6 +147,7 @@ export function ExerciseNameInput({
         }}
         placeholder="Exercise name"
         aria-label="Exercise name"
+        title={value}
         className="w-full h-10 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
       />
       {showDropdown && position && typeof document !== "undefined" &&
@@ -166,9 +173,10 @@ export function ExerciseNameInput({
                     pickRow(i);
                   }}
                   onMouseEnter={() => setActive(i)}
-                  className={`w-full flex items-center justify-between gap-2 text-left px-3 min-h-11 sm:min-h-9 py-1 font-body text-sm text-chalk cursor-pointer ${active === i ? "bg-graphite" : ""}`}
+                  className={`w-full flex items-center gap-2 text-left px-3 min-h-11 sm:min-h-9 py-1 font-body text-sm text-chalk cursor-pointer ${active === i ? "bg-graphite" : ""}`}
                 >
-                  <span className="min-w-0">
+                  {demoLibrary && <BuilderDemoThumb size="tiny" exerciseName={row.name} demo={builderDemoFor(demoLibrary, row.name)} />}
+                  <span className="min-w-0 flex-1">
                     <span className="block break-words">{row.name}</span>
                     {row.viaAlias && <span className="block text-xs text-steel">also called {row.viaAlias}</span>}
                   </span>

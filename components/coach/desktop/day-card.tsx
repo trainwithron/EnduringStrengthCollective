@@ -1,5 +1,6 @@
 "use client";
 
+import type { DemoRow } from "@/lib/exercise-demo";
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -46,6 +47,7 @@ export function DayCard({
   exerciseLibrary,
   exerciseAliases,
   exerciseTierByName,
+  demoLibrary,
   movementPatterns,
   laddersByPattern,
   restSuggestions,
@@ -62,6 +64,7 @@ export function DayCard({
   exerciseLibrary: string[];
   exerciseAliases: AliasEntry[];
   exerciseTierByName: Record<string, "A" | "B" | "C" | null>;
+  demoLibrary: DemoRow[];
   movementPatterns: MovementPatternOption[];
   laddersByPattern: Record<string, { exerciseName: string }[]>;
   restSuggestions?: RestTempoSuggestion[];
@@ -539,6 +542,7 @@ export function DayCard({
                       exerciseLibrary={exerciseLibrary}
                       exerciseAliases={exerciseAliases}
                       exerciseTierByName={exerciseTierByName}
+                      demoLibrary={demoLibrary}
                       movementPatterns={movementPatterns}
                       laddersByPattern={laddersByPattern}
                       restSuggestions={restSuggestions}
