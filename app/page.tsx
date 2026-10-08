@@ -7,6 +7,7 @@ import { Hero } from "@/components/marketing/hero";
 import { FeatureGrid } from "@/components/marketing/feature-grid";
 import { Differentiation } from "@/components/marketing/differentiation";
 import { FinalCta } from "@/components/marketing/final-cta";
+import { BetaBanner, WhyIBuiltThis } from "@/components/marketing/founder-note";
 
 // A signed-in user landing on "/" (e.g. opening the installed app, or a
 // bookmark) should never see the marketing page — that's only a front
@@ -38,9 +39,11 @@ export default async function HomePage(props: { searchParams: Promise<{ source?:
 
   return (
     <main className="min-h-screen">
+      <BetaBanner />
       <Hero />
       <FeatureGrid />
       <Differentiation />
+      <WhyIBuiltThis />
       <FinalCta />
     </main>
   );

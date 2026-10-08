@@ -1,7 +1,7 @@
 const POINTS = [
   {
-    label: "Fast, not bloated",
-    body: "No feature you'll never touch buried three menus deep. If it's on the screen, it's there because coaches actually use it.",
+    label: "Simple on purpose",
+    body: "We keep cutting what you don't need, so what's left is what a coach does every day.",
   },
   {
     label: "Built around your program, not a template",
