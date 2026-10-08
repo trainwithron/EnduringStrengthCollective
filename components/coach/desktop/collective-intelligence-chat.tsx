@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import { MessageCircle, ChevronRight, ChevronLeft } from "lucide-react";
 import {
@@ -9,6 +10,8 @@ import {
   DEFAULT_ASK_SPOT_WIDGET_STATE,
 } from "@/lib/ask-spot-widget-state";
 import { AskSpotChatPanel } from "@/components/coach/ask-spot-chat-panel";
+import { FloatingMessages } from "@/components/coach/desktop/floating-messages";
+import { clientIdFromPath } from "@/lib/messages-list";
 
 const MIN_BOTTOM = 88; // clears a mobile bottom tab bar (64px) + margin
 const TOP_SAFE_MARGIN = 160; // keeps the tab and its open panel clear of a top-anchored control (e.g. The Spot)
@@ -58,8 +61,12 @@ function clampBottom(value: number): number {
 // new page even though this component remounts fresh on every page
 // (CoachDesktopShell mounts it per-page, not in a persistent root
 // layout).
-export function CollectiveIntelligenceChat() {
+export function CollectiveIntelligenceChat({ groupId, unread = 0 }: { groupId?: string; unread?: number } = {}) {
   const [open, setOpen] = useState(false);
+  // The panel always opens on Spot. The Messages tab (only where there is a group to read messages for) is a quick view of who needs a reply; the client whose page the coach is on is pinned in it.
+  const [tab, setTab] = useState<"spot" | "messages">("spot");
+  const [messagesOpenId, setMessagesOpenId] = useState<string | null>(null);
+  const viewingClientId = clientIdFromPath(usePathname());
   const [side, setSide] = useState<"left" | "right">(DEFAULT_ASK_SPOT_WIDGET_STATE.side);
   const [bottomOffset, setBottomOffset] = useState(DEFAULT_ASK_SPOT_WIDGET_STATE.bottomOffsetPx);
   const tabDrag = useRef<{ x: number; y: number; startBottom: number; moved: boolean } | null>(null);
@@ -209,7 +216,33 @@ export function CollectiveIntelligenceChat() {
         />
       </div>
 
-      <AskSpotChatPanel />
+      {groupId && (
+        <div role="tablist" aria-label="Panel" className="flex border-b border-steel/20 shrink-0">
+          {(["spot", "messages"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={tab === t}
+              onClick={() => setTab(t)}
+              className={`flex-1 h-11 font-body text-sm flex items-center justify-center gap-2 border-b-2 ${tab === t ? "border-rust text-chalk" : "border-transparent text-steel"}`}
+            >
+              {t === "spot" ? "Spot" : "Messages"}
+              {t === "messages" && unread > 0 && (
+                <span className="h-5 min-w-[20px] px-1 rounded-full bg-rust text-graphite font-body text-xs font-bold flex items-center justify-center">{unread > 9 ? "9+" : unread}</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Spot stays mounted (its conversation is kept) but hidden on the other tab; Messages is mounted only while it is showing, so nothing loads or is marked read while it is hidden or the panel is closed. */}
+      <div className={tab === "spot" || !groupId ? "flex-1 min-h-0 flex flex-col" : "hidden"}>
+        <AskSpotChatPanel />
+      </div>
+      {groupId && tab === "messages" && (
+        <FloatingMessages groupId={groupId} viewingClientId={viewingClientId} openId={messagesOpenId} onOpenIdChange={setMessagesOpenId} />
+      )}
     </div>
   );
 }

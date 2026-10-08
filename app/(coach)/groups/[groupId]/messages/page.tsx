@@ -7,8 +7,9 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
-import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
-import { buildCoachInbox } from "@/lib/coach-inbox";
+import { loadCoachInbox } from "@/lib/coach-inbox-data";
+import { selectedConversation } from "@/lib/messages-list";
+import { MessagesTwoPane } from "@/components/messages/messages-two-pane";
 
 interface ConversationRow {
   otherId: string;
@@ -60,8 +61,9 @@ function buildConversations(
   });
 }
 
-export default async function MessagesPage(props: { params: Promise<{ groupId: string }> }) {
+export default async function MessagesPage(props: { params: Promise<{ groupId: string }>; searchParams: Promise<{ with?: string; draft?: string }> }) {
   const params = await props.params;
+  const search = await props.searchParams;
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -90,33 +92,9 @@ export default async function MessagesPage(props: { params: Promise<{ groupId: s
   const viewerIsCoach = isCoach && !isActingAsOther;
 
   if (viewerIsCoach) {
-    // One inbox for the coach: every client across the groups they coach in this organization, whichever group they last looked at.
-    const coachedGroups = groupsInOrgOf(await getCoachedGroups(supabase, user.id), params.groupId);
-    const scopeGroups = coachedGroups.length > 0 ? coachedGroups : [{ id: params.groupId, kind: "team" as const }];
-    const scopeIds = scopeGroups.map((g) => g.id);
-    const kindByGroup = new Map(scopeGroups.map((g) => [g.id, g.kind]));
-    const [{ data: group }, { data: roster }, { data: messages }] = await Promise.all([
-      supabase.from("groups").select("name").eq("id", params.groupId).single(),
-      supabase
-        .from("group_memberships")
-        .select("profile_id, group_id, profiles ( full_name, avatar_url )")
-        .in("group_id", scopeIds)
-        .eq("role", "athlete"),
-      supabase
-        .from("direct_messages")
-        .select("group_id, sender_id, recipient_id, body, created_at, read_at")
-        .in("group_id", scopeIds)
-        .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`),
-    ]);
-
-    const people = (roster ?? []).map((r: any) => ({
-      id: r.profile_id as string,
-      fullName: (r.profiles?.full_name ?? "Athlete") as string,
-      avatarUrl: (r.profiles?.avatar_url ?? null) as string | null,
-      groupId: r.group_id as string,
-      groupKind: kindByGroup.get(r.group_id) ?? ("team" as const),
-    }));
-    const conversations = buildCoachInbox(people, messages ?? [], user.id);
+    // One inbox for the coach: every client across the groups they coach in this organization (lib/coach-inbox-data.ts, shared with the floating panel).
+    const { conversations, groupName } = await loadCoachInbox(supabase, { coachId: user.id, groupId: params.groupId });
+    const group = { name: groupName };
 
     const list = (
       <div className={showMobileView ? "px-5 pt-4 space-y-1" : "max-w-[560px] space-y-1"}>
@@ -130,10 +108,11 @@ export default async function MessagesPage(props: { params: Promise<{ groupId: s
     );
 
     if (!showMobileView) {
+      const { data: me } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
       return (
         <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="messages">
           <div className="pb-6 border-b border-steel/20 mb-6 flex items-center justify-between">
-            <h1 className="font-display font-bold text-3xl uppercase leading-none">Messages</h1>
+            <h1 className="font-display font-bold text-3xl uppercase leading-none">All messages</h1>
             <Link
               href={`/groups/${params.groupId}/messages/announce`}
               className="h-9 px-4 border border-rust/40 text-rust font-body text-sm flex items-center"
@@ -141,7 +120,14 @@ export default async function MessagesPage(props: { params: Promise<{ groupId: s
               Message all clients
             </Link>
           </div>
-          {list}
+          <MessagesTwoPane
+            conversations={conversations}
+            viewerId={user.id}
+            viewerName={(me as { full_name?: string } | null)?.full_name ?? "You"}
+            initialWithId={selectedConversation(conversations, search.with)?.otherId ?? null}
+            initialDraft={(search.draft ?? "").slice(0, 600)}
+            groupId={params.groupId}
+          />
         </CoachDesktopShell>
       );
     }
