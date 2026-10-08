@@ -9,6 +9,7 @@ import { builderDemoFor } from "@/lib/builder-demo";
 import { BuilderDemoThumb } from "@/components/coach/builder-demo-thumb";
 import { isExistingExercise, nextActiveIndex, searchExercises } from "@/lib/exercise-search";
 import { resolveTypedAlias } from "@/lib/exercise-alias-seed";
+import { capitalizeWords } from "@/lib/exercise-name-case";
 
 export function ExerciseNameInput({
   value,
@@ -42,6 +43,8 @@ export function ExerciseNameInput({
   // Guards against the input's own onBlur re-committing a stale closure value right after a row click already committed the new one — both fire in the same tick, before this
   // component re-renders. Cleared on a short timer so it can never swallow a later blur.
   const suggestionClickedRef = useRef(false);
+  // The name as it was when the box got focus: leaving the box without changing it must never rewrite a saved name (only a name typed now is capitalized).
+  const valueAtFocusRef = useRef<string | null>(null);
 
   const trimmed = value.trim();
   // With text, a live list of every library exercise whose name or alias matches it anywhere (best matches first). Empty input keeps the plain browse-everything list.
@@ -90,12 +93,12 @@ export function ExerciseNameInput({
   function commitTyped(text: string) {
     const alias = resolveTypedAlias(text, suggestions, aliases);
     if (alias) onCommit?.(alias.exerciseName, alias.displayName);
-    else onCommit?.(text);
+    else onCommit?.(text === valueAtFocusRef.current ? text : capitalizeWords(text));
   }
 
   function pickRow(index: number) {
     if (index < rows.length) pick(rows[index].name, rows[index].viaAlias);
-    else pick(trimmed);
+    else pick(capitalizeWords(trimmed));
   }
 
   const optionId = (i: number) => `${listId}-opt-${i}`;
@@ -117,7 +120,10 @@ export function ExerciseNameInput({
           setOpen(true);
           setActive(-1);
         }}
-        onFocus={() => setOpen(true)}
+        onFocus={() => {
+          valueAtFocusRef.current = value;
+          setOpen(true);
+        }}
         onKeyDown={(e) => {
           if (e.key === "ArrowDown" || e.key === "ArrowUp") {
             if (!showDropdown) {
