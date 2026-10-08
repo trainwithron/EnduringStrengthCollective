@@ -61,6 +61,7 @@ from (
     ('2026100600295', 'about_you_baseline_phase_of_record', '0295_about_you_baseline_phase_of_record.sql', to_regclass('public.client_phase_plans') is not null),
     ('2026100600296', 'recipe_library_columns', '0296_recipe_library_columns.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'recipes' and column_name = 'content_hash')),
     ('2026100600297', 'schedule_requests', '0297_schedule_requests.sql', to_regclass('public.schedule_requests') is not null),
+    ('2026100600301', 'ai_budget', '0301_ai_budget.sql', to_regclass('public.ai_budget_notices') is not null),
     ('2026100600300', 'food_search_logging', '0300_food_search_logging.sql', to_regclass('public.usda_food_portions') is not null),
     ('2026100600298', 'read_during_rest', '0298_read_during_rest.sql', to_regclass('public.read_settings') is not null),
     ('2026100600285', 'rest_day_nudge_log', '0285_rest_day_nudge_log.sql', to_regclass('public.rest_day_nudges') is not null),

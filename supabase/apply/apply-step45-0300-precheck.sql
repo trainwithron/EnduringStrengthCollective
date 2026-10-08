@@ -10,5 +10,7 @@ from (
     ('0300 is not already applied (usda_food_portions is not there yet)',
       to_regclass('public.usda_food_portions') is null),
     ('0300 is not already applied (food_log_entries has no fdc_id yet)',
-      not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'food_log_entries' and column_name = 'fdc_id'))
+      not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'food_log_entries' and column_name = 'fdc_id')),
+    ('0300 is not already applied (group_memberships has no food_tracking_enabled yet)',
+      not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_memberships' and column_name = 'food_tracking_enabled'))
 ) as checks(check_name, ok);

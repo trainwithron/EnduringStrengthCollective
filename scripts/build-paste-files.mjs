@@ -950,6 +950,7 @@ alter table public.coach_availability_windows drop column if exists session_minu
       "alter table public.food_log_entries drop constraint if exists food_log_entries_detail_check;",
       "alter table public.food_log_entries drop constraint if exists food_log_entries_food_source_check;",
       "alter table public.food_log_entries drop column if exists food_source, drop column if exists fdc_id, drop column if exists amount_g, drop column if exists serving_label, drop column if exists serving_qty, drop column if exists nutrients, drop column if exists barcode;",
+      "alter table public.group_memberships drop column if exists food_tracking_enabled;",
       "drop table if exists public.usda_load_batches;",
       "drop table if exists public.usda_food_portions;",
     ].join(String.fromCharCode(10)),
@@ -958,6 +959,25 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["food_log_entries and usda_foods exist", `${has.table("food_log_entries")} and ${has.table("usda_foods")}`],
       ["0300 is not already applied (usda_food_portions is not there yet)", has.noTable("usda_food_portions")],
       ["0300 is not already applied (food_log_entries has no fdc_id yet)", has.noCol("food_log_entries", "fdc_id")],
+      ["0300 is not already applied (group_memberships has no food_tracking_enabled yet)", has.noCol("group_memberships", "food_tracking_enabled")],
+    ],
+  },
+  {
+    n: "46",
+    slug: "0301",
+    title: "0301 AI budget: this month's AI use per coach summed by model (server-only), and a record that a coach was told their AI is running low or used up, once per month",
+    migrations: ["0301"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for anyone until the code in the same release is live. After that: each coach has one monthly AI budget measured in real cost; the app tells the coach plainly at about 80 percent and when it is used up, and pauses AI features until the 1st. Food search, barcode and saved meals are never limited.",
+    undo: [
+      "drop table if exists public.ai_budget_notices;",
+      "drop function if exists public.ai_month_usage(uuid, timestamptz);",
+    ].join(String.fromCharCode(10)),
+    undoWhy: "Only if step 46 misbehaves. Removes the budget helper function and the once-a-month notice record. The AI usage log itself is not touched.",
+    rows: [
+      ["ai_usage_log exists", has.table("ai_usage_log")],
+      ["0301 is not already applied (ai_month_usage is not there yet)", "not exists (select 1 from pg_proc where proname = 'ai_month_usage' and pronamespace = 'public'::regnamespace)"],
+      ["0301 is not already applied (ai_budget_notices is not there yet)", has.noTable("ai_budget_notices")],
     ],
   },
 ];
@@ -1041,7 +1061,7 @@ const BUNDLES = [
   { id: "release-j", name: "Release J (about you, baseline, phase of record)", steps: ["40"] },
   { id: "release-k", name: "Release K (recipe library)", steps: ["41"] },
   { id: "release-l", name: "Release L (schedule requests, Read during rest)", steps: ["42", "43"] },
-  { id: "release-n", name: "Release N (nutrition tracking: food search, custom foods, nutrient detail)", steps: ["45"] },
+  { id: "release-n", name: "Release N (nutrition tracking: food search, custom foods, nutrient detail)", steps: ["45", "46"] },
 ];
 for (const b of BUNDLES) {
   const stepsIn = b.steps.map((n) => STEPS.find((x) => x.n === n));
@@ -1215,6 +1235,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0295", has.table("client_phase_plans")),
     m("0296", has.col("recipes", "content_hash")),
     m("0297", has.table("schedule_requests")),
+    m("0301", has.table("ai_budget_notices")),
     m("0300", has.table("usda_food_portions")),
     m("0298", has.table("read_settings")),
     m("0285", has.table("rest_day_nudges")),

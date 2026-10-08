@@ -11,7 +11,8 @@ begin;
 do $guard$
 begin
   if not ((to_regclass('public.usda_food_portions') is null)
-     and (not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'food_log_entries' and column_name = 'fdc_id'))) then
+     and (not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'food_log_entries' and column_name = 'fdc_id'))
+     and (not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_memberships' and column_name = 'food_tracking_enabled'))) then
     raise exception 'Step 45 (0300) looks already applied, or the database is not in the state it expects. Nothing was changed. Run the precheck file and send Spot the result.';
   end if;
 end
@@ -30,7 +31,12 @@ $guard$;
 --  * food_log_entries gets the optional detail of a searched food: where it came from, the USDA food, the grams logged, the serving as shown ("1 cup, chopped" x 1.5), and a
 --    snapshot of the nutrients for the amount logged (a missing key means "not reported", never zero). Existing rows and every existing way of logging are untouched.
 --  * Sanity limits on what can be logged from now on (new rows only; existing rows are not rechecked).
+--  * group_memberships.food_tracking_enabled (default true): a coach can turn food tracking off for a client who does not track. The client's Nutrition page then says so and
+--    offers no logging; nothing already logged is removed. Written by the coach the same way as the other per-client switches on a membership.
 -- Nothing here changes who can read or write a food log: a client writes only their own, their group's coach reads it (0162). Re-runnable.
+
+-- Nullable on purpose (null counts as on): a bulk restore of memberships from a backup file fills columns it does not know with null, and a NOT NULL here would break it.
+alter table public.group_memberships add column if not exists food_tracking_enabled boolean default true;
 
 create table if not exists public.usda_food_portions (
   id bigint generated always as identity primary key,

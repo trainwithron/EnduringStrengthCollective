@@ -64,7 +64,8 @@
   "id": "release-n",
   "name": "Release N (nutrition tracking: food search, custom foods, nutrient detail)",
   "steps": [
-   "45"
+   "45",
+   "46"
   ],
   "file": "apply-release-n-all.sql"
  }

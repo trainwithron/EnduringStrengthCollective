@@ -5,6 +5,7 @@ alter table public.food_log_entries drop constraint if exists food_log_entries_a
 alter table public.food_log_entries drop constraint if exists food_log_entries_detail_check;
 alter table public.food_log_entries drop constraint if exists food_log_entries_food_source_check;
 alter table public.food_log_entries drop column if exists food_source, drop column if exists fdc_id, drop column if exists amount_g, drop column if exists serving_label, drop column if exists serving_qty, drop column if exists nutrients, drop column if exists barcode;
+alter table public.group_memberships drop column if exists food_tracking_enabled;
 drop table if exists public.usda_load_batches;
 drop table if exists public.usda_food_portions;
 commit;

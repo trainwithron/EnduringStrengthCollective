@@ -45,7 +45,9 @@ export const RELEASE_L_SERVER_ONLY_SIGNATURES = [
   ["fail_freeze_resume", "uuid, text", false],
   ["note_schedule_resumed", "uuid, integer, integer", false],
 ];
-export const SERVER_ONLY = [...SERVER_ONLY_SIGNATURES, ...RELEASE_F_SERVER_ONLY_SIGNATURES, ...RELEASE_H_SERVER_ONLY_SIGNATURES, ...RELEASE_L_SERVER_ONLY_SIGNATURES].map((s) => s[0]);
+// Added by 0301: the month's AI cost per coach, read by the server to enforce the AI budget.
+export const RELEASE_N_SERVER_ONLY_SIGNATURES = [["ai_month_usage", "uuid, timestamptz", false]];
+export const SERVER_ONLY = [...SERVER_ONLY_SIGNATURES, ...RELEASE_F_SERVER_ONLY_SIGNATURES, ...RELEASE_H_SERVER_ONLY_SIGNATURES, ...RELEASE_L_SERVER_ONLY_SIGNATURES, ...RELEASE_N_SERVER_ONLY_SIGNATURES].map((s) => s[0]);
 export const AUDIT_WRITERS = SERVER_ONLY_SIGNATURES.filter((s) => s[2]).map((s) => s[0]);
 
 // Signed-in-callable SECURITY DEFINER functions with no caller check in their body that were reviewed and are meant to be (they answer about the

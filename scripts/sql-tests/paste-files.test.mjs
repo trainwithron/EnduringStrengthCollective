@@ -437,6 +437,42 @@ for (const s of steps) {
   const err2 = await run(file);
   check("release-l: the bundle applies again after an undo" + (err2 ? ": " + err2 : ""), !err2);
 }
+// Release N (steps 45 and 46): nutrition tracking, ONE paste. Applies on the live-shaped state, a second run is refused naming step 45, the undo files (newest first) remove exactly
+// the new tables, columns and function, existing food logs and memberships survive both ways, and it applies again.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-n");
+  const file = `apply/${bundle.file}`;
+  const st45 = steps.find((x) => x.n === "45");
+  const st46 = steps.find((x) => x.n === "46");
+  const undoBoth = async () => (await run(`apply/undo-step${st46.n}-${st46.slug}.sql`)) || (await run(`apply/undo-step${st45.n}-${st45.slug}.sql`));
+  const state = async () => (await db.query(`select
+      to_regclass('public.usda_food_portions') is not null as portions,
+      to_regclass('public.usda_load_batches') is not null as batches,
+      exists (select 1 from information_schema.columns where table_name = 'food_log_entries' and column_name = 'fdc_id') as fdc,
+      exists (select 1 from information_schema.columns where table_name = 'food_log_entries' and column_name = 'nutrients') as snapshot,
+      exists (select 1 from information_schema.columns where table_name = 'group_memberships' and column_name = 'food_tracking_enabled') as switch,
+      to_regclass('public.ai_budget_notices') is not null as notices,
+      exists (select 1 from pg_proc where proname = 'ai_month_usage' and pronamespace = 'public'::regnamespace) as fn,
+      (select count(*)::int from public.food_log_entries) as logs,
+      (select count(*)::int from public.group_memberships) as memberships`)).rows[0];
+  const eu = await undoBoth();
+  check("release-n: the undo files run before the steps (nothing to undo)" + (eu ? ": " + eu : ""), !eu);
+  const before = await state();
+  check("release-n: before it runs none of the new objects exist", !before.portions && !before.batches && !before.fdc && !before.snapshot && !before.switch && !before.notices && !before.fn, JSON.stringify(before));
+  const err = await run(file);
+  check("release-n bundle applies on the live-shaped state" + (err ? ": " + err : ""), !err);
+  const after = await state();
+  check("release-n: every new table, column and function exists and no food log or membership was lost", after.portions && after.batches && after.fdc && after.snapshot && after.switch && after.notices && after.fn && after.logs === before.logs && after.memberships === before.memberships, JSON.stringify(after));
+  const again = await run(file);
+  check("release-n: a second run is refused, naming step 45 (" + again + ")", !!again && again.includes("step 45 (0300) cannot run") && again.includes("already applied"));
+  const eu2 = await undoBoth();
+  check("release-n: the undo files run after the steps" + (eu2 ? ": " + eu2 : ""), !eu2);
+  const undone = await state();
+  check("release-n: after the undo the new objects are gone and every food log and membership is still there", !undone.portions && !undone.batches && !undone.fdc && !undone.snapshot && !undone.switch && !undone.notices && !undone.fn && undone.logs === before.logs && undone.memberships === before.memberships, JSON.stringify(undone));
+  const err2 = await run(file);
+  check("release-n: the bundle applies again after an undo" + (err2 ? ": " + err2 : ""), !err2);
+}
 // Steps 30 and 31: the copy matches the original, both groups are gone, and everything in them was saved first.
 {
   const gone = (await db.query("select count(*)::int as n from public.groups where id in ('b292055b-edc6-4171-ad2b-a89d65dcd8db', 'c368ab0b-ccab-442e-a42e-38fb22293182')")).rows[0].n;
