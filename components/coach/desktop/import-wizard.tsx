@@ -88,6 +88,7 @@ interface ImportSummary {
   // human-authored import or a deterministic DUP/GZCLP shell was never
   // credit-metered in the first place, nothing to refund.
   isAiSourced: boolean;
+  creditCharged: boolean;
   programId: string;
   // Days, exercises or sets that failed to save. Non-zero means the program
   // is incomplete and the coach must check it, not trust it.
@@ -125,6 +126,9 @@ interface PendingImport {
   // always stop for a real look before it commits, even when every
   // exercise happened to match exactly (see prepareImport's own comment).
   isAiSourced: boolean;
+  // True only when a program-generation credit was actually charged for this import (the plain-English writer). Reading a picture, PDF or pasted text charges none, so the
+  // "This was wrong" refund is offered only when this is true.
+  creditCharged: boolean;
   // ai_output_validation_audit_findings_sept30.md — generate-program's
   // own post-generation checks, surfaced here so the coach sees them on
   // the review screen before confirming. Never gates/auto-rejects.
@@ -297,7 +301,8 @@ export function ImportWizard({
     progressionRules?: GzclpProgressionRule[],
     isAiSourced: boolean = false,
     libraryFlags: { exerciseName: string; flaggedReason: string }[] = [],
-    adherenceCheck: PendingImport["adherenceCheck"] = null
+    adherenceCheck: PendingImport["adherenceCheck"] = null,
+    creditCharged: boolean = false
   ) {
     setStatusLabel("Matching exercises…");
 
@@ -358,6 +363,7 @@ export function ImportWizard({
       injuryConsiderations,
       progressionRules,
       isAiSourced,
+      creditCharged,
       libraryFlags,
       adherenceCheck,
     };
@@ -561,6 +567,7 @@ export function ImportWizard({
         .map((f) => ({ rawName: f.rawName, matchedTo: f.matchedTo, score: f.score })),
       injuryConsiderations,
       isAiSourced: importData.isAiSourced,
+      creditCharged: importData.creditCharged,
       programId: programRow.id,
       failedWrites,
     });
@@ -730,7 +737,8 @@ export function ImportWizard({
         undefined,
         true,
         data.libraryFlags ?? [],
-        data.adherenceCheck ?? null
+        data.adherenceCheck ?? null,
+        true
       );
     } catch (err) {
       setStatus("error");
@@ -1067,7 +1075,7 @@ export function ImportWizard({
             Import another file
           </button>
         </div>
-        {summary.isAiSourced && (
+        {summary.creditCharged && (
           <AiOutputWrongButton action="program_generation" referenceId={summary.programId} />
         )}
       </div>

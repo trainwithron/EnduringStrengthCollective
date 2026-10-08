@@ -157,3 +157,35 @@ describe("the route", () => {
     expect(route).toContain("status: 503");
   });
 });
+
+describe("the route: who may call it and what it costs (Assistant's review)", () => {
+  const route = readFileSync(resolve(__dirname, "../app/api/ai/parse-workout/route.ts"), "utf8").replace(/\r\n/g, "\n");
+  const usage = readFileSync(resolve(__dirname, "./ai-usage.ts"), "utf8").replace(/\r\n/g, "\n");
+  it("only a coach may import: a client gets 403 before any plan or AI call", () => {
+    expect(route).toContain('.eq("role", "coach")');
+    expect(route).toContain("Only coaches can import programs.");
+    expect(route.indexOf("Only coaches can import programs.")).toBeLessThan(route.indexOf("planImportRequest(body)"));
+    expect(route.indexOf("Only coaches can import programs.")).toBeLessThan(route.indexOf("callClaude("));
+    expect(route).toContain("status: 403");
+  });
+  it("allows the long reads other AI routes allow", () => {
+    expect(route).toContain("export const maxDuration = 120;");
+  });
+  it("shows the coach a fixed message on a provider failure, not the provider's own text", () => {
+    expect(route).toContain("Couldn't read that right now. Try again, or paste the program as text.");
+    expect(route).not.toContain("Couldn't read that: ${message}");
+  });
+  it("each reader feature has a monthly ceiling", () => {
+    for (const f of ["program_import_photo", "program_import_text", "program_import_pdf"]) {
+      expect(usage).toContain(`${f}: { enforce: true, monthlyCeiling: 100 }`);
+    }
+  });
+  it("the refund button shows only when a generation credit was actually charged (the plain-English writer), never for the readers", () => {
+    const wizard = readFileSync(resolve(__dirname, "../components/coach/desktop/import-wizard.tsx"), "utf8").replace(/\r\n/g, "\n");
+    expect(wizard).toContain("{summary.creditCharged && (");
+    const reader = wizard.slice(wizard.indexOf("async function readWithAi"), wizard.indexOf("async function handleAiPhotoUpload"));
+    expect(reader).not.toMatch(/prepareImport\([^)]*,\s*true\s*,\s*[^)]*true\)/);
+    const gen = wizard.slice(wizard.indexOf("async function handleAiGenerate"), wizard.indexOf("autoGenerateFiredRef.current = true"));
+    expect(gen).toContain("data.adherenceCheck ?? null,\n        true\n      );");
+  });
+});
