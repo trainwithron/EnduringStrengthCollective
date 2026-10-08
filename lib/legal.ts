@@ -6,9 +6,9 @@
 export type LegalDocument = "beta_notice" | "terms" | "privacy" | "refunds" | "waiver";
 
 export const LEGAL_VERSIONS: Record<LegalDocument, string> = {
-  beta_notice: "2026-10-05-draft-3",
+  beta_notice: "2026-10-08-draft-4",
   terms: "2026-10-05-placeholder-1",
-  privacy: "2026-10-05-placeholder-1",
+  privacy: "2026-10-08-placeholder-2",
   refunds: "2026-10-05-placeholder-1",
   waiver: "2026-10-05-draft-1",
 };
@@ -33,19 +33,26 @@ export function supportEmail(): string | null {
 export const DRAFT_BANNER =
   "This page is being finalized. The wording below is a draft written in plain language and has not yet been reviewed by a lawyer.";
 
+// The beta notice, as Ron approved it (Oct 7). Plain language, no faith or reading line. The last paragraph names the support address: it is written as
+// {support email} here and filled in by betaNoticeParagraphs() so the notice never shows a made-up address.
+export const SUPPORT_EMAIL_TOKEN = "{support email}";
+
 export const BETA_NOTICE_PARAGRAPHS: string[] = [
-  "This app is an early version (a beta). It is being built and tested with real people while we make it better, so things will change, and some things may not work the way you expect.",
-  "Adults only for now. Please do not enter real information for anyone under 18. Anyone under 13 is blocked from using the app unless a parent or guardian's consent has been verified.",
-  "Beta means data could be lost. Please do not rely on the app as your only record. Keep your own backups and notes of anything important, such as your training numbers and any payments, until we tell you the beta is over.",
-  "What is stored: your name, email and, if you give them, your phone number and date of birth. Also your health questionnaire answers, your weight, wellness check-ins, training and nutrition logs, your messages, and any photos or videos you choose to share.",
-  "Help search: when the app's help search cannot answer a question, we keep the wording of that question to improve it, after removing names, email addresses, links and numbers as best we can. It is not linked to your account. Questions it can answer are not kept as text.",
-  "Who can see it: your coach, and the people who run your coach's organization. During the beta, the platform operator can also read training data across organizations in order to give support, unless a client has been marked private. We plan to tighten this, and we are telling you about it now rather than later.",
-  "AI features: some features send text such as workout notes, nutrition entries and, for the coach's assistant features, client names to an AI provider, Anthropic, in order to produce suggestions. What the AI writes is a draft for your coach to review, not a decision. We are working to send less personal detail than that.",
-  "Text messages are optional and are off unless you turn them on. Reply STOP to any text to stop them, and HELP for help.",
-  "The app and what it suggests are not medical advice. Check with a qualified professional before changing your training or nutrition if you have an injury, an illness or a medical condition, and stop if something hurts.",
-  "You can export your data or delete your account in Settings. When you delete your account, your personal details, check-ins, posts and messages are erased, but some records, such as workout logs and your coach's own notes and payment records, may stay with your coach, no longer linked to you.",
-  "If you ever see someone else's data, please tell us right away using the report button or by writing to us. If something else breaks or seems wrong, please tell us too. Your feedback is how the app gets better.",
+  "Early software. Spotlight Coaching is in beta. Features can change, break or be removed, and data could be lost. Keep your own backups of anything important.",
+  "Not medical advice. Programs, nutrition numbers, readiness scores, injury flags and AI suggestions are coaching tools, not diagnosis or treatment. Check with a doctor before starting or changing training, especially with any injury or health condition.",
+  "AI is used. Some tools send text, and in a few cases photos, to an AI provider (Anthropic). When a coach asks Spot questions or gets a daily briefing, the request can include client names and details such as training results, readiness and wellness check-ins, wearable readings and goals. When a coach asks for a program, it can include the names and strength numbers of the coach's clients and, for a client with an injury or health concern, a note about it. When a meal is described or photographed to log it, or a meal suggestion is written, the request can include the photo, nutrition numbers and food allergies or dislikes. A workout or recipe imported from text or a photo is sent as typed or pictured. Messages between you and your coach, email, phone number, date of birth, body weight and progress photos are not sent. AI output is a draft for the coach to review.",
+  "Your data. We store the info you enter: profile, date of birth, health questionnaire, weight, wellness check-ins, nutrition logs, messages and any photos you choose to share. Your coach can see data in your group. The people who run your coach's organization can see your training data and posts. During the beta the platform operator can also read training data, wearable readings and posts across organizations to give support. Your coach can mark you private from both, which hides your training and wearable data but not posts. People who run the platform can also reach stored data when that is needed to keep the service running. You can download or delete your account in Settings, but some records, such as workout logs, may stay with your coach.",
+  "Help search. When the app's help search can't answer a question, we keep the wording of that question to improve it, with names, email addresses, links and long numbers removed as best we can. It is not linked to your account.",
+  "Texts are optional. Text messages are off unless you turn them on. Reply STOP to stop and HELP for help.",
+  "No minors' real data yet. Please don't enter real data for anyone under 18 until we confirm consent, privacy and safeguarding steps.",
+  "Payments and legal terms are not final. Terms of Service and the Privacy Policy are being finalized and will be sent for acceptance before wider use.",
+  `Contact. Report bugs, privacy questions or deletion requests to ${SUPPORT_EMAIL_TOKEN} at any time. Tell us right away if you see someone else's data.`,
 ];
+
+// The paragraphs as shown on /beta: the contact paragraph gets the real support address, or says plainly that one is being added.
+export function betaNoticeParagraphs(email: string | null = supportEmail()): string[] {
+  return BETA_NOTICE_PARAGRAPHS.map((p) => p.replace(SUPPORT_EMAIL_TOKEN, email ?? "us (a contact address is being added)"));
+}
 
 export const PLACEHOLDER_SECTIONS: Record<"terms" | "privacy" | "refunds", { heading: string; body: string }[]> = {
   terms: [
@@ -65,7 +72,7 @@ export const PLACEHOLDER_SECTIONS: Record<"terms" | "privacy" | "refunds", { hea
     },
     {
       heading: "AI features",
-      body: "Some features send text such as workout notes, nutrition entries and, for coach assistant features, client names to an AI provider (currently Anthropic) to generate suggestions. What the AI writes is a draft your coach reviews. The final policy will list every provider we use.",
+      body: "Some features send text, and in a few cases photos, to an AI provider (currently Anthropic) to generate suggestions. The beta notice lists exactly what can be sent. What the AI writes is a draft your coach reviews. The final policy will list every provider we use.",
     },
     {
       heading: "Your choices",
@@ -79,3 +86,15 @@ export const PLACEHOLDER_SECTIONS: Record<"terms" | "privacy" | "refunds", { hea
     },
   ],
 };
+
+// The exact text a person was shown for a document at the current version, stored with their acceptance so a record can always say what was agreed to
+// (the waiver builds its own snapshot elsewhere). The beta notice is the paragraphs with the support address filled in, as /beta shows them.
+export function legalTextSnapshot(document: LegalDocument, email: string | null = supportEmail()): string | null {
+  const version = LEGAL_VERSIONS[document];
+  if (document === "beta_notice") return [`${LEGAL_TITLES.beta_notice} (version ${version})`, ...betaNoticeParagraphs(email)].join("\n\n");
+  if (document === "terms" || document === "privacy") {
+    const sections = PLACEHOLDER_SECTIONS[document].map((s) => `${s.heading}\n${s.body}`);
+    return [`${LEGAL_TITLES[document]} (version ${version})`, ...sections].join("\n\n");
+  }
+  return null;
+}

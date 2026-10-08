@@ -1077,6 +1077,25 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["0305 is not already applied (ai_topup_draws is not there yet)", has.noTable("ai_topup_draws")],
     ],
   },
+  {
+    n: "44",
+    slug: "0299",
+    title: "0299 The record of what people agreed to (beta notice, terms, privacy, waiver) can only be added to: a trigger refuses any change to a row and any truncate, and the app's roles lose update, delete and truncate on it",
+    migrations: ["0299"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for anyone. Signing up, accepting a new version and the accept screen work exactly as before. What changes: no one, not even the server key, can edit or delete a row of legal_acceptances any more; deleting a person's account still removes their rows.",
+    undo: [
+      "drop trigger if exists legal_acceptances_no_truncate on public.legal_acceptances;",
+      "drop trigger if exists legal_acceptances_append_only on public.legal_acceptances;",
+      "drop function if exists public.legal_acceptances_refuse_changes();",
+      "grant update, delete, truncate, references, trigger on public.legal_acceptances to anon, authenticated;",
+    ].join(String.fromCharCode(10)),
+    undoWhy: "Only if step 44 gets in the way of something. Removes the two triggers and the function and gives the app's roles back the privileges they had before. No acceptance record is touched.",
+    rows: [
+      ["legal_acceptances exists (0255)", has.table("legal_acceptances")],
+      ["0299 is not already applied (the append-only trigger is not there yet)", "not exists (select 1 from pg_trigger where tgname = 'legal_acceptances_append_only' and tgrelid = 'public.legal_acceptances'::regclass)"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -1161,6 +1180,7 @@ const BUNDLES = [
   { id: "release-n", name: "Release N (nutrition tracking: food search, custom foods, nutrient detail)", steps: ["45", "46", "47", "48"] },
   { id: "release-o", name: "Release O (recalculation notice)", steps: ["51"] },
   { id: "release-n2", name: "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)", steps: ["49", "50"] },
+  { id: "release-m", name: "Release M (acceptance record is append-only)", steps: ["44"] },
 ];
 for (const b of BUNDLES) {
   const stepsIn = b.steps.map((n) => STEPS.find((x) => x.n === n));
@@ -1341,6 +1361,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0302", has.table("custom_foods")),
     m("0301", has.table("ai_budget_notices")),
     m("0300", has.table("usda_food_portions")),
+    m("0299", "exists (select 1 from pg_trigger where tgname = 'legal_acceptances_append_only' and tgrelid = 'public.legal_acceptances'::regclass)"),
     m("0298", has.table("read_settings")),
     m("0285", has.table("rest_day_nudges")),
     m("0284", has.policy("client_goals", "client_goals_insert_coach")),

@@ -68,6 +68,7 @@ from (
     ('2026100600302', 'custom_foods_saved_meals', '0302_custom_foods_saved_meals.sql', to_regclass('public.custom_foods') is not null),
     ('2026100600301', 'ai_budget', '0301_ai_budget.sql', to_regclass('public.ai_budget_notices') is not null),
     ('2026100600300', 'food_search_logging', '0300_food_search_logging.sql', to_regclass('public.usda_food_portions') is not null),
+    ('2026100600299', 'legal_acceptances_append_only', '0299_legal_acceptances_append_only.sql', exists (select 1 from pg_trigger where tgname = 'legal_acceptances_append_only' and tgrelid = 'public.legal_acceptances'::regclass)),
     ('2026100600298', 'read_during_rest', '0298_read_during_rest.sql', to_regclass('public.read_settings') is not null),
     ('2026100600285', 'rest_day_nudge_log', '0285_rest_day_nudge_log.sql', to_regclass('public.rest_day_nudges') is not null),
     ('2026100600284', 'coach_proposed_goals', '0284_coach_proposed_goals.sql', exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'client_goals' and policyname = 'client_goals_insert_coach')),

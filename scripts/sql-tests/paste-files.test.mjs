@@ -507,6 +507,37 @@ for (const s of steps) {
   const err2 = await run(file);
   check("release-n: the bundle applies again after an undo" + (err2 ? ": " + err2 : ""), !err2);
 }
+// Release M (step 44): the acceptance record is append-only, ONE paste. Applies on the live-shaped state, a second run is refused, the undo removes exactly the triggers and
+// the function and gives the privileges back, existing acceptances survive both ways, and it applies again.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-m");
+  const file = `apply/${bundle.file}`;
+  const st44 = steps.find((x) => x.n === "44");
+  const undo = async () => run(`apply/undo-step${st44.n}-${st44.slug}.sql`);
+  const state = async () => (await db.query(`select
+      exists (select 1 from pg_trigger where tgname = 'legal_acceptances_append_only' and tgrelid = 'public.legal_acceptances'::regclass) as row_trigger,
+      exists (select 1 from pg_trigger where tgname = 'legal_acceptances_no_truncate' and tgrelid = 'public.legal_acceptances'::regclass) as trunc_trigger,
+      exists (select 1 from pg_proc where proname = 'legal_acceptances_refuse_changes' and pronamespace = 'public'::regnamespace) as fn,
+      has_table_privilege('authenticated', 'public.legal_acceptances', 'UPDATE') as can_update,
+      (select count(*)::int from public.legal_acceptances) as rows`)).rows[0];
+  const eu = await undo();
+  check("release-m: the undo file runs before the step (nothing to undo)" + (eu ? ": " + eu : ""), !eu);
+  const before = await state();
+  check("release-m: before it runs there is no trigger and the app's role can still update", !before.row_trigger && !before.trunc_trigger && !before.fn && before.can_update === true, JSON.stringify(before));
+  const err = await run(file);
+  check("release-m bundle applies on the live-shaped state" + (err ? ": " + err : ""), !err);
+  const after = await state();
+  check("release-m: both triggers and the function exist, the app's role lost update, and no acceptance was lost", after.row_trigger && after.trunc_trigger && after.fn && after.can_update === false && after.rows === before.rows, JSON.stringify(after));
+  const again = await run(file);
+  check("release-m: a second run is refused, naming step 44 (" + again + ")", !!again && /step 44 \(0299\) cannot run/.test(again) && /already applied/.test(again));
+  const eu2 = await undo();
+  check("release-m: the undo file runs after the step" + (eu2 ? ": " + eu2 : ""), !eu2);
+  const undone = await state();
+  check("release-m: after the undo the triggers and function are gone, the privileges are back and every acceptance is still there", !undone.row_trigger && !undone.trunc_trigger && !undone.fn && undone.can_update === true && undone.rows === before.rows, JSON.stringify(undone));
+  const err2 = await run(file);
+  check("release-m: the bundle applies again after an undo" + (err2 ? ": " + err2 : ""), !err2);
+}
 // Steps 30 and 31: the copy matches the original, both groups are gone, and everything in them was saved first.
 {
   const gone = (await db.query("select count(*)::int as n from public.groups where id in ('b292055b-edc6-4171-ad2b-a89d65dcd8db', 'c368ab0b-ccab-442e-a42e-38fb22293182')")).rows[0].n;

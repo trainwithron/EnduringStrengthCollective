@@ -87,5 +87,13 @@
    "50"
   ],
   "file": "apply-release-n2-all.sql"
+ },
+ {
+  "id": "release-m",
+  "name": "Release M (acceptance record is append-only)",
+  "steps": [
+   "44"
+  ],
+  "file": "apply-release-m-all.sql"
  }
 ]
