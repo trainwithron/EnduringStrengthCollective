@@ -50,7 +50,7 @@ describe("Cards | List", () => {
     expect(cards).toContain("grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4");
   });
   it("filters and search apply to both views (one filtered list feeds either view), and the footer note stays", () => {
-    const src = readFileSync(new URL("./coach-clients-list.tsx", import.meta.url), "utf8");
+    const src = readFileSync(new URL("./coach-clients-list.tsx", import.meta.url), "utf8").replace(/\r\n/g, "\n");
     expect(src).toContain('view === "cards" ? <ClientsCardView rows={shown} /> : <ClientsListView rows={shown} />');
     expect(src).toContain("The number is how many sessions are left to schedule.");
     const page = readFileSync(new URL("../../../app/(coach)/clients/page.tsx", import.meta.url), "utf8");
@@ -89,7 +89,7 @@ describe("remembering the choice", () => {
     expect(() => writeClientsView(broken, "list")).not.toThrow();
   });
   it("the page reads the saved choice only after it is on screen, so the server and browser first agree", () => {
-    const src = readFileSync(new URL("./coach-clients-list.tsx", import.meta.url), "utf8");
+    const src = readFileSync(new URL("./coach-clients-list.tsx", import.meta.url), "utf8").replace(/\r\n/g, "\n");
     expect(src).toContain("useEffect(() => {\n    setView(readClientsView(");
   });
 });
