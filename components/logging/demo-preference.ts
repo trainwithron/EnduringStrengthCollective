@@ -48,7 +48,30 @@ async function saveToAccount(hidden: boolean): Promise<boolean> {
 
 // The person's own choice, read once per page load (the first screen to ask starts it, the others share the answer).
 let accountLoad: Promise<void> | null = null;
+let watchingSignIn = false;
+
+// Signing out forgets this person's choice on the device (and the cached answer), and signing in as someone else loads theirs, so a shared computer never carries one person's switch to the next.
+function watchSignIn(): void {
+  if (watchingSignIn) return;
+  watchingSignIn = true;
+  try {
+    createBrowserClient().auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
+        accountLoad = null;
+        writeLocal(false);
+        window.dispatchEvent(new Event(EVENT));
+      } else if (event === "SIGNED_IN") {
+        accountLoad = null;
+        void loadFromAccount();
+      }
+    });
+  } catch {
+    watchingSignIn = false;
+  }
+}
+
 function loadFromAccount(): Promise<void> {
+  watchSignIn();
   if (accountLoad) return accountLoad;
   accountLoad = (async () => {
     try {
