@@ -23,7 +23,6 @@ import { SessionLedgerList } from "@/components/coach/session-ledger-list";
 import { ClientSeriesPanel, type SeriesView } from "@/components/coach/client-series-panel";
 import { getGroupCoachTimezone } from "@/lib/timezone";
 import type { LedgerEntry } from "@/lib/session-ledger";
-import { SwipeDirectionSetting } from "@/components/athlete/swipe-direction-setting";
 import { GoalConfirmationControl } from "@/components/coach/goal-confirmation-control";
 import { GoalWaitingOnClient } from "@/components/coach/goal-waiting-on-client";
 import { GoalProposalForm } from "@/components/athlete/goal-proposal-form";
@@ -137,7 +136,7 @@ export default async function AthleteProfilePage(
     supabase
       .from("group_memberships")
       .select(
-        "joined_at, client_tier, private_from_org, profiles ( id, full_name, avatar_url, exercise_swipe_direction, claimed_at )"
+        "joined_at, client_tier, private_from_org, profiles ( id, full_name, avatar_url, claimed_at )"
       )
       .eq("group_id", params.groupId)
       .eq("profile_id", params.athleteId)
@@ -1397,19 +1396,6 @@ export default async function AthleteProfilePage(
             <div data-tab="settings">
             <SettingsGroup label="Session ledger">
               <SessionLedgerList balance={creditsRow?.balance ?? 0} entries={ledgerEntries.slice(0, 10)} />
-            </SettingsGroup>
-            </div>
-
-            <div data-tab="program">
-            <SettingsGroup label="Workout Logging">
-              <SwipeDirectionSetting
-                athleteId={params.athleteId}
-                label="Swipe direction — set on their behalf"
-                mode="coach"
-                initialDirection={
-                  (profile?.exercise_swipe_direction as "vertical" | "horizontal" | null) ?? null
-                }
-              />
             </SettingsGroup>
             </div>
 

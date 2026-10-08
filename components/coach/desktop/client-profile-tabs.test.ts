@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -119,5 +119,18 @@ describe("leaving Messages", () => {
     expect(choose).toContain("router.push(");
     // the in-page switch (replaceState only) is reached only when neither tab is load-on-open
     expect(choose.indexOf("router.push(")).toBeLessThan(choose.indexOf("window.history.replaceState"));
+  });
+});
+
+describe("workout logging style is the client's own choice", () => {
+  it("the coach's client profile no longer shows or sets the swipe direction, and the coach-only route is gone", () => {
+    expect(page).not.toContain("SwipeDirectionSetting");
+    expect(page).not.toContain("Swipe direction");
+    expect(page).not.toContain("exercise_swipe_direction");
+    expect(existsSync(new URL("../../../app/api/coach/set-swipe-direction/route.ts", import.meta.url))).toBe(false);
+    expect(src("../../athlete/swipe-direction-setting.tsx")).not.toContain("set-swipe-direction");
+  });
+  it("the client still has it in their own Settings", () => {
+    expect(src("../../../app/(coach)/groups/[groupId]/settings/page.tsx")).toContain("<SwipeDirectionSetting");
   });
 });
