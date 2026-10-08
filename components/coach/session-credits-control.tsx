@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -18,11 +19,11 @@ export function SessionCreditsControl({
   const [balance, setBalance] = useState(initialBalance);
   const [error, setError] = useState<string | null>(null);
 
-  function adjust(delta: number) {
+  async function adjust(delta: number) {
     // A balance is money the client paid for. One stray tap on a small
     // button must not add or remove a session without a second look.
     const verb = delta < 0 ? "Remove 1 session from" : "Add 1 session to";
-    if (!window.confirm(`${verb} this client? Their balance goes from ${balance} to ${balance + delta}.`)) {
+    if (!await confirmDialog(`${verb} this client? Their balance goes from ${balance} to ${balance + delta}.`)) {
       return;
     }
 

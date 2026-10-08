@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -124,7 +125,7 @@ export function MovementPatternRow({
   }
 
   async function handleDeletePattern() {
-    if (!window.confirm(`Delete the "${pattern.name}" pattern? This can't be undone.`)) return;
+    if (!await confirmDialog(`Delete the "${pattern.name}" pattern? This can't be undone.`)) return;
     setSubmitting(true);
     const supabase = createBrowserClient();
     await supabase.from("movement_patterns").delete().eq("id", pattern.id);

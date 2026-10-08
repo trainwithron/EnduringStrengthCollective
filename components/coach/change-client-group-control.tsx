@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -115,7 +116,7 @@ export function ChangeClientGroupControl({
       destination === "existing"
         ? `Move ${athleteName} to "${orgGroups?.find((g) => g.id === selectedGroupId)?.name ?? "this group"}"? Their credits, history, and programs move with them.`
         : `Create a new 1-on-1 group "${trimmedNewName}" and move ${athleteName} into it?`;
-    if (!window.confirm(confirmMessage)) return;
+    if (!await confirmDialog(confirmMessage)) return;
 
     setMoving(true);
     const supabase = createBrowserClient();

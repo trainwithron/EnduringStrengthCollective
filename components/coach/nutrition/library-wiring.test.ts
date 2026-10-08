@@ -24,12 +24,12 @@ describe("the coach's planner builds from the library first", () => {
     expect(generator).toMatch(/if \(!libraryData\) \{\s*setError\("Still loading/);
   });
   it("Build the week asks before replacing days that already have a plan, and says what could not be filled", () => {
-    expect(generator).toContain("window.confirm(");
+    expect(generator).toContain("await confirmDialog(");
     expect(generator).toContain('.upsert(rows, { onConflict: "athlete_id,log_date" })');
     expect(generator).toContain("Fewer than three library options for");
     const buildWeek = generator.slice(generator.indexOf("async function handleBuildWeek"), generator.indexOf("async function handleSaveToLibrary"));
-    expect(buildWeek.indexOf("window.confirm(")).toBeGreaterThan(0);
-    expect(buildWeek.indexOf("window.confirm(")).toBeLessThan(buildWeek.indexOf(".upsert(rows"));
+    expect(buildWeek.indexOf("await confirmDialog(")).toBeGreaterThan(0);
+    expect(buildWeek.indexOf("await confirmDialog(")).toBeLessThan(buildWeek.indexOf(".upsert(rows"));
   });
   it("every meal says how many options came from the library and how many are still to generate (never quietly fewer than three)", () => {
     expect(generator).toContain("from the library");
@@ -116,7 +116,7 @@ describe("review fixes", () => {
     expect(buildWeek).toContain("replacement.write.map((d) => ({");
     expect(buildWeek).toContain("dayList(replaced)");
     expect(buildWeek).toContain("LIBRARY_WEEK_RATIONALE");
-    expect(buildWeek.indexOf("window.confirm(")).toBeLessThan(buildWeek.indexOf(".upsert(rows"));
+    expect(buildWeek.indexOf("await confirmDialog(")).toBeLessThan(buildWeek.indexOf(".upsert(rows"));
     expect(generator).toContain("Also replace days I planned by hand");
   });
   it("S1: a saved recipe is checked by the real food each line was matched to, and by its own allergen tags", () => {

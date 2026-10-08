@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { IngredientLine } from "@/components/shared/ingredient-line";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -620,7 +621,7 @@ export function MealPlanGenerator({
         (replacement.skippedPast.length > 0 ? `\n\nNot touched, already passed: ${dayList(replacement.skippedPast)}.` : "") +
         (replacement.skippedHand.length > 0 ? `\nNot touched, planned by hand: ${dayList(replacement.skippedHand)}.` : "") +
         "\n\nContinue?";
-      if (!window.confirm(confirmText)) return;
+      if (!await confirmDialog(confirmText)) return;
 
       const toEntries = entriesFromMeals;
       const rows = replacement.write.map((d) => ({

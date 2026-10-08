@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
@@ -248,7 +249,7 @@ export function ExerciseCard({
     const filled = exercise.sets.filter((s) => s[prop] !== null && s[prop] !== undefined).length;
     if (
       filled > 0 &&
-      !window.confirm(
+      !await confirmDialog(
         `Remove ${fieldDef(field).label}? This clears the ${fieldDef(field).label} you've already entered on ${filled} ${filled === 1 ? "set" : "sets"}.`
       )
     ) {

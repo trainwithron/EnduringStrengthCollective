@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -225,7 +226,7 @@ export function ProgramCardMenu({
     if (athletes.length === 0) return;
 
     if (
-      !window.confirm(
+      !await confirmDialog(
         `Assign "${programName}" to all ${athletes.length} athletes on ${position.name}?\n\n${athletes
           .map((a) => a.fullName)
           .join(", ")}`
@@ -422,7 +423,7 @@ export function ProgramCardMenu({
   }
 
   async function handleDelete() {
-    if (!window.confirm(`Delete "${programName}"? Any real logged history stays intact.`)) return;
+    if (!await confirmDialog(`Delete "${programName}"? Any real logged history stays intact.`)) return;
     setBusy(true);
     setError(null);
     const supabase = createBrowserClient();

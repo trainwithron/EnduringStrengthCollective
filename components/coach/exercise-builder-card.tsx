@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import type { DemoRow } from "@/lib/exercise-demo";
 import { useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -55,8 +56,16 @@ function TargetCell({
     setDraft(value);
   }, [value]);
 
-  function commit() {
-    if (draft !== value && onCommit(draft) === false) setDraft(value);
+  // A commit can now wait on a confirmation (a refused or cancelled value comes back as false afterwards), so a second commit while one is open (Enter then the blur it causes) is ignored.
+  const committing = useRef(false);
+  async function commit() {
+    if (committing.current || draft === value) return;
+    committing.current = true;
+    try {
+      if ((await onCommit(draft)) === false) setDraft(value);
+    } finally {
+      committing.current = false;
+    }
   }
 
   return (
@@ -596,7 +605,7 @@ export function ExerciseBuilderCard({
 
   async function handleDelete() {
     const label = exercise.exerciseName.trim() || "this exercise";
-    if (!window.confirm(`Delete ${label}? This removes its sets, notes, and video. Can't be undone.`)) {
+    if (!await confirmDialog(`Delete ${label}? This removes its sets, notes, and video. Can't be undone.`)) {
       return;
     }
     setBusy(true);
@@ -861,7 +870,7 @@ export function ExerciseBuilderCard({
                         value={targetValue(set, field)}
                         kind={field === "rest" ? "text" : def.kind}
                         label={field === "rest" ? `Rest (m:ss), set ${i + 1}` : `${def.label}, set ${i + 1}`}
-                        onCommit={(typed) => {
+                        onCommit={async (typed) => {
                           let raw = typed;
                           if (field === "rest") {
                             const parsed = parseRestInput(typed);
@@ -869,7 +878,7 @@ export function ExerciseBuilderCard({
                               flashSaveError("Rest looks like 5:00, 3m or 90s (up to 30:00).");
                               return false;
                             }
-                            if (parsed.bare && !window.confirm(`${parsed.seconds} means ${parsed.seconds} seconds. For minutes type ${parsed.seconds}:00 or ${parsed.seconds}m. Save ${parsed.seconds} seconds?`)) return false;
+                            if (parsed.bare && !await confirmDialog(`${parsed.seconds} means ${parsed.seconds} seconds. For minutes type ${parsed.seconds}:00 or ${parsed.seconds}m. Save ${parsed.seconds} seconds?`)) return false;
                             raw = parsed.seconds === null ? "" : String(parsed.seconds);
                           }
                           return set.id === firstSetId && exercise.sets.length > 1

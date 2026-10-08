@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -106,7 +107,7 @@ export function StandingMacroTargetCard({
       setError(parsed);
       return;
     }
-    if (scheduled.length > 0 && !window.confirm(scheduledConfirmMessage(scheduled))) return;
+    if (scheduled.length > 0 && !await confirmDialog(scheduledConfirmMessage(scheduled))) return;
     setBusy(true);
     const supabase = createBrowserClient();
     const {
@@ -125,7 +126,7 @@ export function StandingMacroTargetCard({
   }
 
   async function removeScheduled(date: string) {
-    if (!window.confirm(`Remove the target scheduled from ${shortDateLabel(date)}?`)) return;
+    if (!await confirmDialog(`Remove the target scheduled from ${shortDateLabel(date)}?`)) return;
     setError(null);
     setBusy(true);
     const supabase = createBrowserClient();
@@ -141,7 +142,7 @@ export function StandingMacroTargetCard({
 
   async function handleRemove() {
     const scheduledNote = scheduled.length > 0 ? ` ${scheduledConfirmMessage(scheduled).replace("Saving this also removes", "This also removes").replace(" Continue?", "")}` : "";
-    if (!window.confirm(`Remove the standing target? Days with their own target keep it. Other days will have none.${scheduledNote}`)) return;
+    if (!await confirmDialog(`Remove the standing target? Days with their own target keep it. Other days will have none.${scheduledNote}`)) return;
     setError(null);
     setMessage(null);
     setBusy(true);

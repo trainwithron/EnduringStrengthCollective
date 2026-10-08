@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -306,7 +307,7 @@ export function ExerciseLibraryList({
   }
 
   async function handleDelete(id: string) {
-    if (!window.confirm("Remove this exercise from your library?")) return;
+    if (!await confirmDialog("Remove this exercise from your library?")) return;
     setExercises((prev) => prev.filter((e) => e.id !== id));
     const supabase = createBrowserClient();
     await supabase.from("exercise_library").delete().eq("id", id);

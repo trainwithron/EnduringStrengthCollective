@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -71,7 +72,7 @@ export function TeamDepthChart({
   }
 
   async function handleDeletePosition(id: string) {
-    if (!window.confirm("Delete this position? Players on it move back to unassigned.")) return;
+    if (!await confirmDialog("Delete this position? Players on it move back to unassigned.")) return;
     const supabase = createBrowserClient();
     const { error } = await supabase.from("group_positions").delete().eq("id", id);
     if (!error) {

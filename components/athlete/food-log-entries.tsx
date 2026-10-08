@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { FoodLogEntry } from "./meal-checkoff-list";
@@ -262,7 +263,7 @@ function EntryRow({
 
   async function remove() {
     if (busy) return;
-    if (!window.confirm(`Delete "${entry.description ?? "this entry"}" from your log?`)) return;
+    if (!await confirmDialog(`Delete "${entry.description ?? "this entry"}" from your log?`)) return;
     setBusy(true);
     const ok = await deleteEntry(createBrowserClient(), entry.id);
     setBusy(false);

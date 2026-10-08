@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -56,7 +57,7 @@ export function BulkMacroRangeForm({
   async function handleApply() {
     if (!canApply) return;
     if (
-      !window.confirm(
+      !await confirmDialog(
         `Apply these macro targets to all ${dateKeys.length} day${
           dateKeys.length === 1 ? "" : "s"
         } from ${startDate} to ${endDate}? This replaces any existing targets already saved on those days.`

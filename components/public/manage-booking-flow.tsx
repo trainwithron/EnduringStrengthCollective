@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatInTimezone } from "@/lib/format-in-timezone";
@@ -95,8 +96,8 @@ export function ManageBookingFlow({
           <button
             type="button"
             disabled={busy}
-            onClick={() => {
-              if (window.confirm("Cancel this session?")) act({ action: "cancel" });
+            onClick={async () => {
+              if (await confirmDialog("Cancel this session?")) act({ action: "cancel" });
             }}
             className="border border-rust text-rust font-body text-sm px-4 py-2.5 disabled:opacity-40"
           >
@@ -136,8 +137,8 @@ export function ManageBookingFlow({
                     key={s.startIso}
                     type="button"
                     disabled={busy}
-                    onClick={() => {
-                      if (window.confirm(`Move your session to ${formatInTimezone(new Date(s.startIso), timezone, "dateTime")}?`)) act({ action: "reschedule", startIso: s.startIso });
+                    onClick={async () => {
+                      if (await confirmDialog(`Move your session to ${formatInTimezone(new Date(s.startIso), timezone, "dateTime")}?`)) act({ action: "reschedule", startIso: s.startIso });
                     }}
                     className="border border-steel/30 px-2 py-2 font-body text-sm text-chalk disabled:opacity-40"
                   >

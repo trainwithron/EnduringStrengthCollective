@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -79,7 +80,7 @@ export function ClientAnswersPanel({
 
   async function scalePlan() {
     if (!currentTarget) return;
-    if (!window.confirm(`Scale ${clientName}'s saved meal plans from today on to ${currentTarget.calories.toLocaleString("en-US")} calories? Amounts change; the meals stay the same.`)) return;
+    if (!await confirmDialog(`Scale ${clientName}'s saved meal plans from today on to ${currentTarget.calories.toLocaleString("en-US")} calories? Amounts change; the meals stay the same.`)) return;
     setError(null);
     setMessage(null);
     setBusy("scale");

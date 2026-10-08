@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -81,7 +82,7 @@ export function SessionTypeManager({ initialTypes, teamMode = false }: { initial
   }
 
   async function handleDelete(id: string) {
-    if (!window.confirm("Delete this session type? Existing logged sessions keep their history either way.")) return;
+    if (!await confirmDialog("Delete this session type? Existing logged sessions keep their history either way.")) return;
     const supabase = createBrowserClient();
     await supabase.from("session_types").delete().eq("id", id);
     setTypes((prev) => prev.filter((t) => t.id !== id));

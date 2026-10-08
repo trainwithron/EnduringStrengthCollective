@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import Link from "next/link";
 import { coachBalanceLabel } from "@/lib/reup";
@@ -44,7 +45,7 @@ export function NeedsPaymentPanel({ rows }: { rows: NeedsPaymentRow[] }) {
   // For a coach who bills outside the app (Acuity, cash, a gym): put everyone on this list on hold in one go. A held client leaves the list, is
   // never reminded, and never sees a re-up prompt. Each one can be taken off hold from the Clients page.
   async function holdAll() {
-    if (!window.confirm(`Put all ${list.length} on hold? They leave this list, are never reminded, and don't see a re-up prompt. You can take a hold off from the Clients page.`)) return;
+    if (!await confirmDialog(`Put all ${list.length} on hold? They leave this list, are never reminded, and don't see a re-up prompt. You can take a hold off from the Clients page.`)) return;
     setHoldingAll(true);
     setHoldAllNote(null);
     const failed: string[] = [];

@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { SeriesScheduleForm } from "@/components/coach/series-schedule-form";
@@ -141,8 +142,8 @@ export function ClientSeriesPanel({
                 type="button"
                 className={btn}
                 disabled={busy !== null}
-                onClick={() => {
-                  if (window.confirm(`End this weekly schedule and remove the ${s.upcoming.length} upcoming sessions? Sessions that already happened stay.`)) {
+                onClick={async () => {
+                  if (await confirmDialog(`End this weekly schedule and remove the ${s.upcoming.length} upcoming sessions? Sessions that already happened stay.`)) {
                     run(`${s.id}-end`, `/api/series/${s.id}`, { action: "end", cancelUpcoming: true });
                   }
                 }}
@@ -191,8 +192,8 @@ export function ClientSeriesPanel({
                         type="button"
                         className="font-body text-xs text-steel underline"
                         disabled={busy !== null}
-                        onClick={() => {
-                          if (window.confirm("Remove just this session? The schedule carries on.")) run(`${u.bookingId}-skip`, "/api/series/occurrence", { bookingId: u.bookingId, action: "skip" });
+                        onClick={async () => {
+                          if (await confirmDialog("Remove just this session? The schedule carries on.")) run(`${u.bookingId}-skip`, "/api/series/occurrence", { bookingId: u.bookingId, action: "skip" });
                         }}
                       >
                         Remove
@@ -240,8 +241,8 @@ export function ClientSeriesPanel({
                           type="button"
                           className={btn}
                           disabled={busy !== null || !editedStartIso()}
-                          onClick={() => {
-                            if (window.confirm("Change this session and every one after it to the new day and time?")) {
+                          onClick={async () => {
+                            if (await confirmDialog("Change this session and every one after it to the new day and time?")) {
                               run(`${u.bookingId}-rest`, "/api/series/occurrence", {
                                 bookingId: u.bookingId,
                                 action: "change_from_here",

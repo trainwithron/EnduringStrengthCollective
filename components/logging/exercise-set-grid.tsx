@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useEffect, useRef, useState } from "react";
 import { useSetSave } from "./set-save-context";
 import { validateSetFieldInput } from "@/lib/set-field-validation";
@@ -447,7 +448,7 @@ export function ExerciseSetGrid({
   // metric now that each metric is its own row, so filling in Rest
   // doesn't also overwrite Weight. Separate, separately-discoverable
   // gesture from each cell's own swipe-to-accept above.
-  function handlePropagateRow(field: TrackedField) {
+  async function handlePropagateRow(field: TrackedField) {
     const first = sets[0];
     if (!first || sets.length < 2) return;
     const prop = ACTUAL_PROP[field] as keyof SetLogEntry;
@@ -459,7 +460,7 @@ export function ExerciseSetGrid({
     const overwrites = rest.filter((s) => s[prop] != null && s[prop] !== value).length;
     if (
       overwrites > 0 &&
-      !window.confirm(
+      !await confirmDialog(
         `Replace the ${fieldDef(field).label} you already entered on ${overwrites} other ${overwrites === 1 ? "set" : "sets"} with set 1's value?`
       )
     ) {

@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -53,7 +54,7 @@ export function GuardianShareButton({
 
   async function handleRevoke() {
     if (!token) return;
-    if (!window.confirm("Revoke this parent link? The page will stop working immediately.")) return;
+    if (!await confirmDialog("Revoke this parent link? The page will stop working immediately.")) return;
     setBusy(true);
     const supabase = createBrowserClient();
     await supabase
