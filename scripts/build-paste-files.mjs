@@ -1093,17 +1093,21 @@ alter table public.coach_availability_windows drop column if exists session_minu
   {
     n: "55",
     slug: "0310",
-    title: "0310 The coach's own name for an exercise: one new optional column on the program's exercises (display_name), set only when a coach picks an exercise through their own alias. The real exercise name is untouched, so history, personal records and progression keep matching; only what is shown uses the coach's name",
+    title: "0310 The coach's own name for an exercise: one new optional column on the program's exercises (display_name), set only when a coach picks an exercise through their own alias, and the program copy (Assign to client, Duplicate) carries it across. The real exercise name is untouched, so history, personal records and progression keep matching; only what is shown uses the coach's name",
     migrations: ["0310"],
     sees: "Success. No rows returned.",
     afterwards: "Nothing changes until the code of the same release is live. After that, when a coach picks an exercise through one of their aliases (for example RFESS for the Bulgarian split squat) their program, the client's workout page and the logger show the coach's name, and every record and history lookup still uses the real exercise. Every existing exercise keeps showing exactly what it shows now.",
     undo: [
+      "-- 1. the program copy goes back to the version from migration 0232 (it will no longer carry the coach's names)",
+      migrationSql("0232").slice(migrationSql("0232").indexOf("create or replace function public.duplicate_program(")),
+      "-- 2. the column and its length check",
       "alter table public.group_workout_exercises drop constraint if exists group_workout_exercises_display_name_len;",
       "alter table public.group_workout_exercises drop column if exists display_name;",
     ].join(String.fromCharCode(10)),
-    undoWhy: "Only if step 55 misbehaves. Removes the column and any coach names already saved in it (the exercises themselves and all history are untouched; they simply show their real names again).",
+    undoWhy: "Only if step 55 misbehaves. Puts the program copy back as it was, removes the column and any coach names already saved in it (the exercises themselves and all history are untouched; they simply show their real names again).",
     rows: [
       ["group_workout_exercises exists", has.table("group_workout_exercises")],
+      ["the program copy function exists", has.fn("duplicate_program(uuid, uuid, uuid, uuid, text, date)")],
       ["0310 is not already applied (the display_name column is not there yet)", has.noCol("group_workout_exercises", "display_name")],
     ],
   },
