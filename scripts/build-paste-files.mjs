@@ -1091,6 +1091,20 @@ alter table public.coach_availability_windows drop column if exists session_minu
     ],
   },
   {
+    n: "58",
+    slug: "0313",
+    title: "0313 Session counts worked out in the database for large rosters: one function (booking_counts) returns booked, to mark and prepaid-ahead per client and group, with a small index, so the pages that show \"8 left · 4 booked · 2 to mark\" stay fast and complete with 500+ clients",
+    migrations: ["0313"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing visible changes: the same numbers appear on the Clients page, client profile and calendar. With the code of the same release live they are counted inside the database instead of by reading every open session, which is what keeps them working for a gym with hundreds of clients.",
+    undo: ["drop function if exists public.booking_counts(uuid, uuid, uuid[], uuid);", "drop index if exists public.bookings_open_counts_idx;"].join("\n"),
+    undoWhy: "Only if step 58 misbehaves. Removes the function and its index; the app then counts the old way (reading the open sessions), which is slower for very large rosters but gives the same numbers.",
+    rows: [
+      ["bookings exists", has.table("bookings")],
+      ["0313 is not already applied (booking_counts is not there yet)", `not ${has.fnName("booking_counts")}`],
+    ],
+  },
+  {
     n: "57",
     slug: "0312",
     title: "0312 A client booking or moving their own session must stay inside the coach's open hours and clear of time off: book_session and reschedule_booking now refuse any other time (a coach booking for a client is never refused)",
@@ -1288,7 +1302,7 @@ const BUNDLES = [
   { id: "release-p", name: "Release P (new training block notice)", steps: ["54"] },
   { id: "release-q", name: "Release Q (the coach's own name for an exercise)", steps: ["55"] },
   { id: "release-r", name: "Release R (a client can ask for a different meal plan)", steps: ["56"] },
-  { id: "release-s", name: "Release S (booking hours check, grouped counts, hide demos per person)", steps: ["57"] },
+  { id: "release-s", name: "Release S (booking hours check, grouped counts, hide demos per person)", steps: ["57", "58"] },
   { id: "release-n2", name: "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)", steps: ["49", "50"] },
   { id: "release-m", name: "Release M (acceptance record is append-only)", steps: ["44"] },
 ];
@@ -1464,6 +1478,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0295", has.table("client_phase_plans")),
     m("0296", has.col("recipes", "content_hash")),
     m("0297", has.table("schedule_requests")),
+    m("0313", has.fnName("booking_counts")),
     m("0312", "coalesce((select position('coach_time_is_open' in pg_get_functiondef(p.oid)) > 0 from pg_proc p where p.proname = 'book_session' and p.pronamespace = 'public'::regnamespace limit 1), false)"),
     m("0311", has.table("meal_plan_tries")),
     m("0310", has.col("group_workout_exercises", "display_name")),

@@ -629,18 +629,23 @@ for (const s of steps) {
   const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
   const bundle = bundles.find((b) => b.id === "release-s");
   check("release-s: ONE bundle exists and starts with step 57", !!bundle && bundle.steps[0] === "57");
+  const st58 = steps.find((x) => x.n === "58");
+  const hasCounts = async () => (await db.query("select to_regprocedure('public.booking_counts(uuid, uuid, uuid[], uuid)') is not null as ok")).rows[0].ok === true;
   const st57 = steps.find((x) => x.n === "57");
   const checksHours = async () => (await db.query("select position('coach_time_is_open' in pg_get_functiondef(p.oid)) > 0 as ok from pg_proc p where p.proname = 'book_session' and p.pronamespace = 'public'::regnamespace")).rows[0].ok === true;
+  const eu0b = await run(`apply/undo-step${st58.n}-${st58.slug}.sql`);
   const eu0 = await run(`apply/undo-step${st57.n}-${st57.slug}.sql`);
-  check("release-s: before the bundle runs, book_session does not check the hours" + (eu0 ? ": " + eu0 : ""), !eu0 && !(await checksHours()));
+  check("release-s: before the bundle runs, book_session does not check the hours and booking_counts is not there" + (eu0b ? ": " + eu0b : ""), !eu0b && !(await hasCounts()));
+  check("release-s: (undo of 57) book_session does not check the hours" + (eu0 ? ": " + eu0 : ""), !eu0 && !(await checksHours()));
   const errS = await run(`apply/${bundle.file}`);
-  check("release-s bundle applies on the live-shaped state" + (errS ? ": " + errS : ""), !errS && (await checksHours()));
+  check("release-s bundle applies on the live-shaped state" + (errS ? ": " + errS : ""), !errS && (await checksHours()) && (await hasCounts()));
   const againS = await run(`apply/${bundle.file}`);
   check("release-s: a second run is refused, naming step 57 (" + againS + ")", !!againS && againS.includes("step 57 (0312) cannot run") && againS.includes("already applied"));
+  const euS2 = await run(`apply/undo-step${st58.n}-${st58.slug}.sql`);
   const euS = await run(`apply/undo-step${st57.n}-${st57.slug}.sql`);
-  check("release-s: the undo puts book_session back without the hours check" + (euS ? ": " + euS : ""), !euS && !(await checksHours()));
+  check("release-s: the undo (58 then 57) puts book_session back without the hours check and removes booking_counts" + (euS || euS2 ? ": " + (euS || euS2) : ""), !euS && !euS2 && !(await checksHours()) && !(await hasCounts()));
   const errS2 = await run(`apply/${bundle.file}`);
-  check("release-s: the bundle applies again after an undo" + (errS2 ? ": " + errS2 : ""), !errS2 && (await checksHours()));
+  check("release-s: the bundle applies again after an undo" + (errS2 ? ": " + errS2 : ""), !errS2 && (await checksHours()) && (await hasCounts()));
 }
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {

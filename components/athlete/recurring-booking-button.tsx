@@ -59,7 +59,7 @@ export function RecurringBookingButton({
     return (
       <p className="font-body text-xs text-steel">
         Booked {result.booked} of {occurrences} weekly sessions
-        {result.failed > 0 ? ` (${result.failed} couldn't be booked — check how many sessions you have left)` : ""}.
+        {result.failed > 0 ? ` (${result.failed} couldn't be booked. Check how many sessions you have left, and that the time is inside your coach's hours)` : ""}.
       </p>
     );
   }

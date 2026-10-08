@@ -83,3 +83,4 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0310 | yes | yes | 12 | 0310 the coach's own name for an exercise |
 | 0311 | yes | yes | 36 | 0311 a client can ask for a different meal plan |
 | 0312 | yes | yes | 19 | 0312 booking inside the coach's hours (server check) |
+| 0313 | yes | yes | 13 | 0313 booking_counts for large rosters |
