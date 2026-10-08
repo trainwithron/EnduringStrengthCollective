@@ -1,6 +1,7 @@
 "use client";
 
 import type { DemoRow } from "@/lib/exercise-demo";
+import { NONE_COLLAPSED, allCollapsed, toggleAll, toggleCollapsed } from "@/lib/collapse-state";
 import { ClientPreviewButton } from "@/components/coach/desktop/client-preview";
 import { useRef, useState } from "react";
 import Link from "next/link";
@@ -74,13 +75,7 @@ export function DayCard({
   // Distinct from the day's own header chevron below, which hides the
   // exercise list entirely.
   condensed?: boolean;
-  // Owned by WeekGrid, not this component — expanding one day auto-
-  // collapses whichever other day in the week was expanded
-  // (coach_mobile_v2_feature_spec.md item 3: "a day can collapse to a
-  // compact strip when moving between days"). Collapsing a day
-  // manually still has no effect on its siblings; only expanding one
-  // does, so this stays a real accordion, not a hidden single-day-only
-  // mode.
+  // Owned by WeekGrid. Each day opens and closes on its own: opening one never closes another.
   collapsed: boolean;
   onToggleCollapse: () => void;
   onUpdate: (patch: Partial<Pick<BuilderDay, "title">>) => void;
@@ -102,6 +97,9 @@ export function DayCard({
   // Enter, and it's added as a real exercise with real sets; the input
   // stays focused so the coach can immediately type the next one without
   // ever reaching for the mouse.
+  // Which of this day's exercise cards are collapsed (on screen only, never saved). Everything starts open, and a new exercise is added open.
+  const [collapsedExerciseIds, setCollapsedExerciseIds] = useState<ReadonlySet<string>>(NONE_COLLAPSED);
+  const exerciseIds = day.items.filter((i) => i.kind === "exercise").map((i) => i.id);
   const [quickEntryDraft, setQuickEntryDraft] = useState("");
   const [quickEntryError, setQuickEntryError] = useState<string | null>(null);
   const quickEntryRef = useRef<HTMLInputElement>(null);
@@ -405,6 +403,15 @@ export function DayCard({
         <span className="font-body text-xs text-steel shrink-0">
           {itemCount} {itemCount === 1 ? "exercise" : "exercises"}
         </span>
+        {exerciseIds.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setCollapsedExerciseIds((prev) => toggleAll(prev, exerciseIds))}
+            className="font-body text-xs text-steel active:text-rust transition-colors shrink-0 min-h-11 sm:min-h-0 px-1"
+          >
+            {allCollapsed(collapsedExerciseIds, exerciseIds) ? "Expand all" : "Collapse all"}
+          </button>
+        )}
         <ClientPreviewButton days={[day]} heading={day.title || `Day ${day.dayIndex + 1}`} label="Preview" demoLibrary={demoLibrary} />
         <Link
           href={`/groups/${groupId}/workouts/${day.id}/clients`}
@@ -539,6 +546,8 @@ export function DayCard({
                   {item.kind === "exercise" ? (
                     <ExerciseBuilderCard
                       exercise={item}
+                      collapsed={collapsedExerciseIds.has(item.id)}
+                      onToggleCollapse={() => setCollapsedExerciseIds((prev) => toggleCollapsed(prev, item.id))}
                       workoutId={day.id}
                       groupId={groupId}
                       exerciseLibrary={exerciseLibrary}

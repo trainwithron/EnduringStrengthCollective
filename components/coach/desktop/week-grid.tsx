@@ -1,6 +1,7 @@
 "use client";
 
 import type { DemoRow } from "@/lib/exercise-demo";
+import { NONE_COLLAPSED, allCollapsed, toggleAll, toggleCollapsed } from "@/lib/collapse-state";
 import { ClientPreviewButton } from "@/components/coach/desktop/client-preview";
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -61,29 +62,14 @@ export function WeekGrid({
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [daysCondensed, setDaysCondensed] = useState(false);
-  // Real accordion, not just per-day toggles: expanding a day auto-
-  // collapses whichever other day in this week was expanded
-  // (coach_mobile_v2_feature_spec.md item 3, "a day can collapse to a
-  // compact strip when moving between days"). Collapsing a day manually
-  // (without expanding another) never affects its siblings.
-  const [collapsedDayIds, setCollapsedDayIds] = useState<Set<string>>(new Set());
+  // Every day opens and closes on its own: opening Day 2 leaves Day 1 open, so two or more days can be on screen together while the next one is built. (This used to be an accordion that closed
+  // the others, which is why only one day would stay open.) Everything starts open; nothing here is saved.
+  const [collapsedDayIds, setCollapsedDayIds] = useState<ReadonlySet<string>>(NONE_COLLAPSED);
 
   function handleToggleDayCollapse(dayId: string) {
-    setCollapsedDayIds((prev) => {
-      if (prev.has(dayId)) {
-        // Expanding this day — every other day in the week (whether it
-        // was already collapsed or was the one previously expanded)
-        // ends up collapsed; only the day being opened stays expanded.
-        const next = new Set(days.map((d) => d.id));
-        next.delete(dayId);
-        return next;
-      }
-      // Simple manual collapse — no effect on siblings.
-      const next = new Set(prev);
-      next.add(dayId);
-      return next;
-    });
+    setCollapsedDayIds((prev) => toggleCollapsed(prev, dayId));
   }
+  const dayIds = days.map((d) => d.id);
   // Guards handleAddDay against a real race: it computes day_index off the
   // `days` closure, stale until the parent re-renders with the new array.
   // A fast double-click on "+ Day" would otherwise insert two workouts
@@ -237,6 +223,14 @@ export function WeekGrid({
           className="font-body text-xs text-steel active:text-rust transition-colors shrink-0"
         >
           {daysCondensed ? "Full view" : "Compact view"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setCollapsedDayIds((prev) => toggleAll(prev, dayIds))}
+          disabled={dayIds.length === 0}
+          className="font-body text-xs text-steel active:text-rust transition-colors shrink-0 min-h-11 sm:min-h-0 px-1 disabled:opacity-40"
+        >
+          {allCollapsed(collapsedDayIds, dayIds) ? "Expand all days" : "Collapse all days"}
         </button>
         <ClientPreviewButton days={sortedDays} heading={`Week ${weekNumber}`} label="Preview week" demoLibrary={demoLibrary} />
         <button

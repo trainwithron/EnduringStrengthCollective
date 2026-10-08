@@ -7,6 +7,7 @@ import { formatRest, parseRestInput } from "@/lib/rest-time";
 import { ExerciseNameInput } from "./exercise-name-input";
 import { BuilderDemoThumb } from "@/components/coach/builder-demo-thumb";
 import { builderDemoFor, type BuilderDemo } from "@/lib/builder-demo";
+import { summarizeSets } from "@/lib/exercise-summary";
 import type { AliasEntry } from "@/lib/exercise-matching";
 import { ExerciseMediaPicker } from "./exercise-media-picker";
 import type { BuilderExercise, ExerciseSetTarget } from "@/lib/types";
@@ -99,6 +100,8 @@ export function ExerciseBuilderCard({
   exerciseAliases,
   exerciseTierByName,
   demoLibrary,
+  collapsed: collapsedProp,
+  onToggleCollapse,
   movementPatterns,
   laddersByPattern,
   restSuggestions,
@@ -119,6 +122,9 @@ export function ExerciseBuilderCard({
   exerciseAliases: AliasEntry[];
   exerciseTierByName?: Record<string, "A" | "B" | "C" | null>;
   demoLibrary?: DemoRow[];
+  // Controlled by the day when both are given (Collapse all / Expand all); otherwise the card tracks its own.
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
   movementPatterns: MovementPatternOption[];
   // exercise_tier_template_system_assessment_task.md — every ladder rung
   // for every pattern this coach owns, keyed by movement_pattern_id. A
@@ -158,7 +164,17 @@ export function ExerciseBuilderCard({
   useEffect(() => {
     setNameDraft(exercise.exerciseName);
   }, [exercise.exerciseName]);
-  const [collapsed, setCollapsed] = useState(false);
+  // The day can hold the state (so "Collapse all" works); a card used without a day keeps its own.
+  const [ownCollapsed, setOwnCollapsed] = useState(false);
+  const collapsed = collapsedProp ?? ownCollapsed;
+  function toggleCollapsed() {
+    if (onToggleCollapse) onToggleCollapse();
+    else setOwnCollapsed((v) => !v);
+  }
+  function expand() {
+    if (!collapsed) return;
+    toggleCollapsed();
+  }
   const [showDetails, setShowDetails] = useState(false);
   // The demo for the name this exercise has NOW, from the coach's library (the client gets the same one). A video the coach just added or removed here is remembered for this name until
   // the page loads again.
@@ -695,7 +711,7 @@ export function ExerciseBuilderCard({
         <span className="flex-1" />
         <button
           type="button"
-          onClick={() => setCollapsed((v) => !v)}
+          onClick={toggleCollapsed}
           aria-label={collapsed ? "Expand exercise" : "Collapse exercise"}
           className="w-11 h-11 sm:w-7 sm:h-7 flex items-center justify-center text-steel shrink-0"
         >
@@ -728,20 +744,28 @@ export function ExerciseBuilderCard({
           notes={exercise.notes}
           showCaption={!collapsed}
           onAddVideo={() => {
-            setCollapsed(false);
+            expand();
             setShowDetails(true);
           }}
         />
         <div className="flex-1 min-w-0 pt-0.5">
-          <ExerciseNameInput
-            value={collapsed ? exercise.exerciseName : nameDraft}
-            onChange={setNameDraft}
-            onCommit={handleNameCommit}
-            suggestions={exerciseLibrary}
-            aliases={exerciseAliases}
-            tierByName={exerciseTierByName}
-            demoLibrary={demoLibrary}
-          />
+          {collapsed ? (
+            // Collapsed: the whole name (it wraps, never cut off) and what is prescribed; tapping opens the card.
+            <button type="button" onClick={toggleCollapsed} aria-label={`Expand ${exercise.exerciseName || "exercise"}`} title={exercise.exerciseName} className="block w-full text-left min-h-11 py-1">
+              <span className="block font-body text-sm font-medium text-chalk break-words">{exercise.exerciseName || "Exercise"}</span>
+              <span className="block font-body text-xs text-steel">{summarizeSets(exercise.sets, exercise.trackedFields)}</span>
+            </button>
+          ) : (
+            <ExerciseNameInput
+              value={nameDraft}
+              onChange={setNameDraft}
+              onCommit={handleNameCommit}
+              suggestions={exerciseLibrary}
+              aliases={exerciseAliases}
+              tierByName={exerciseTierByName}
+              demoLibrary={demoLibrary}
+            />
+          )}
         </div>
       </div>
 
