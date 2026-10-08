@@ -26,7 +26,7 @@ export async function POST(request: Request) {
 
   const { data: pkg } = await supabase
     .from("coach_packages")
-    .select("id, group_id, default_program_id")
+    .select("id, group_id, default_program_id, group_access_group_id")
     .eq("id", packageId)
     .maybeSingle();
   if (!pkg) return NextResponse.json({ error: "Package not found." }, { status: 404 });
@@ -73,7 +73,12 @@ export async function POST(request: Request) {
   }
 
   // Access to a group the package includes. Done by the server (a coach may not add someone to a group through the browser); the package's group is checked inside.
-  const access = await grantLinkedGroupAccess(createServiceRoleClient(), { coachPackageId: packageId, athleteId });
+  // The same rule as adding a member by hand: a coach may only bring in someone they already coach (the browser path enforces it in the database; this runs with the server's rights, so it is checked here).
+  let access: { granted: boolean; error?: string } = { granted: false };
+  if (pkg.group_access_group_id) {
+    const { data: coachesThem } = await supabase.rpc("is_coach_of_athlete", { target_athlete_id: athleteId });
+    access = coachesThem === true ? await grantLinkedGroupAccess(createServiceRoleClient(), { coachPackageId: packageId, athleteId }) : { granted: false, error: "You can only give group access to a client you coach." };
+  }
 
   return NextResponse.json({ ok: true, programId: programResult?.programId ?? null, ...(access.error ? { groupAccessError: access.error } : {}) });
 }

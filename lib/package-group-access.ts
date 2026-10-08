@@ -1,10 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // A package can include access to a group (migration 0317): the buyer becomes a member of that group and sees its programs. Like a linked program (lib/package-program-access.ts) it runs
-// with the service role, so the group is checked here: it has to be a group this same coach coaches. Selling sessions never attaches a program, and a package with no group does nothing here.
+// with the service role, so the group is checked here: it has to be a group this same coach coaches, and never a client's one-on-one space. Selling sessions never attaches a program, and a package with no group does nothing here.
 export async function groupBelongsToCoach(supabase: SupabaseClient, coachId: string, groupId: string): Promise<boolean> {
   const { data } = await supabase.from("group_memberships").select("role").eq("group_id", groupId).eq("profile_id", coachId).eq("role", "coach").maybeSingle();
-  return !!data;
+  if (!data) return false;
+  const { data: group } = await supabase.from("groups").select("group_kind").eq("id", groupId).maybeSingle();
+  return (group as { group_kind?: string | null } | null)?.group_kind !== "one_on_one";
 }
 
 // Gives the buyer access to the package's group (idempotent: a second call changes nothing). If they are already a member, nothing is added and the group keeps them whatever happens to
@@ -47,7 +49,16 @@ export async function revokeLinkedGroupAccess(
     await supabase.from("package_group_access").delete().eq("coach_package_id", coachPackageId).eq("athlete_id", athleteId).eq("group_id", row.group_id);
     if (!row.created_membership) continue;
     const { data: others } = await supabase.from("package_group_access").select("coach_package_id").eq("athlete_id", athleteId).eq("group_id", row.group_id).limit(1);
-    if ((others ?? []).length > 0) continue;
+    if ((others ?? []).length > 0) {
+      // Another package still gives this group: it now carries the "the package put them here" mark, so when it ends too, they are taken out (otherwise the access would outlive both).
+      await supabase
+        .from("package_group_access")
+        .update({ created_membership: true })
+        .eq("athlete_id", athleteId)
+        .eq("group_id", row.group_id)
+        .eq("coach_package_id", (others as { coach_package_id: string }[])[0].coach_package_id);
+      continue;
+    }
     const { error } = await supabase.from("group_memberships").delete().eq("group_id", row.group_id).eq("profile_id", athleteId).eq("role", "athlete");
     if (!error) removed = true;
   }

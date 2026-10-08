@@ -78,6 +78,12 @@ async function assignLinkedProgramIfFirstEnrollment(
   });
 }
 
+// Access to the group a package includes. A buyer who could not be added (the group is full for a one-on-one space, a database hiccup) must not fail the payment, but it must leave a trace.
+async function grantGroupAccessLogged(supabase: SupabaseClient, coachPackageId: string | null, athleteId: string) {
+  const result = await grantLinkedGroupAccess(supabase, { coachPackageId, athleteId });
+  if (result.error) console.error("package group access not granted", { coachPackageId, athleteId, error: result.error });
+}
+
 // Zapier's "package_purchased" trigger — the one event this build's
 // real validated use case (a gym partner's session-credit
 // reconciliation) actually cares about. Fires on every real credit-
@@ -504,7 +510,7 @@ export async function POST(request: Request) {
             alreadyEnrolled: (priorPurchaseCount ?? 0) > 0,
           });
           // Access to a group the package includes (a no-op for a package without one, and for someone already in the group).
-          await grantLinkedGroupAccess(supabase, { coachPackageId, athleteId });
+          await grantGroupAccessLogged(supabase, coachPackageId, athleteId);
           await dispatchPackagePurchasedEvent(supabase, {
             groupId,
             coachPackageId,
@@ -547,7 +553,7 @@ export async function POST(request: Request) {
             groupId,
             alreadyEnrolled: !!existingSubscription,
           });
-          await grantLinkedGroupAccess(supabase, { coachPackageId, athleteId });
+          await grantGroupAccessLogged(supabase, coachPackageId, athleteId);
           await dispatchPackagePurchasedEvent(supabase, {
             groupId,
             coachPackageId,
