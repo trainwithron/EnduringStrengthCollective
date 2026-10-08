@@ -128,6 +128,19 @@ describe("the fuller nutrient panel", () => {
     expect(out.find((r: any) => r.fdc_id === 1 && r.nutrient_key === "folate_mcg").amount_per_100g).toBe(170);
     expect(out.find((r: any) => r.fdc_id === 2 && r.nutrient_key === "folate_mcg").amount_per_100g).toBe(60);
   });
+  it("counts niacin in niacin equivalents: preformed niacin plus one sixtieth of the tryptophan, and never writes tryptophan as a row", () => {
+    const rows2 = [{ id: "7", name: "Niacin", unit_name: "MG", nutrient_nbr: "406" }, { id: "8", name: "Tryptophan", unit_name: "G", nutrient_nbr: "501" }];
+    const c = createNutrientCollector(new Map([[1, {}], [2, {}], [3, {}]]), buildNutrientIndex(rows2));
+    c.add({ fdc_id: "1", nutrient_id: "7", amount: "10" });
+    c.add({ fdc_id: "1", nutrient_id: "8", amount: "0.3" }); // 0.3 g = 300 mg tryptophan = 5 mg NE
+    c.add({ fdc_id: "2", nutrient_id: "7", amount: "4" }); // no tryptophan reported: niacin alone
+    c.add({ fdc_id: "3", nutrient_id: "8", amount: "0.3" }); // tryptophan but no niacin: nothing is reported
+    const out = c.rows();
+    expect(out.find((r: any) => r.fdc_id === 1 && r.nutrient_key === "niacin_mg").amount_per_100g).toBe(15);
+    expect(out.find((r: any) => r.fdc_id === 2 && r.nutrient_key === "niacin_mg").amount_per_100g).toBe(4);
+    expect(out.some((r: any) => r.fdc_id === 3)).toBe(false);
+    expect(out.some((r: any) => String(r.nutrient_key).startsWith("_"))).toBe(false);
+  });
   it("converts copper from mg to mcg", () => {
     const c = createNutrientCollector(new Map([[1, {}]]), buildNutrientIndex(rows));
     c.add({ fdc_id: "1", nutrient_id: "3", amount: "0.25" });
@@ -194,10 +207,74 @@ describe("batches are atomic and resumable", () => {
     expect(sql.indexOf("insert into public.usda_load_batches")).toBeGreaterThan(sql.indexOf("insert into public.usda_food_portions"));
     expect(sql.trim().endsWith("$load$;")).toBe(true);
   });
-  it("upserts foods, nutrients and portions and counts the rows in the marker", () => {
+  it("in the default add mode it only ADDS: anything already in the database is left alone", () => {
     expect(sql).toContain("(7, 'Cook''s rice', 'SR Legacy', null)");
-    expect(sql).toContain("on conflict (fdc_id, nutrient_key) do update");
-    expect(sql).toContain("on conflict (fdc_id, seq) do update");
+    expect(sql).toContain("on conflict (fdc_id) do nothing");
+    expect(sql).toContain("on conflict (fdc_id, nutrient_key) do nothing");
+    expect(sql).toContain("on conflict (fdc_id, seq) do nothing");
+    expect(sql).not.toContain("do update");
     expect(sql).toContain("values ('fdc-2026-04-001', 3)");
+  });
+  it("add mode still updates the keys it is told to refresh (folate moves from total to DFE), and only those", () => {
+    const rows = [{ fdc_id: 7, nutrient_key: "folate_mcg", amount_per_100g: 20 }, { fdc_id: 7, nutrient_key: "protein_g", amount_per_100g: 2.7 }];
+    const s2 = toBatchSql("b", foods, rows, [], { mode: "add", refreshKeys: ["folate_mcg"] });
+    const marker = "on conflict (fdc_id, nutrient_key) do nothing;";
+    const cut = s2.indexOf(marker) + marker.length;
+    const addPart = s2.slice(0, cut);
+    const updPart = s2.slice(cut);
+    expect(addPart).toContain("(7, 'protein_g', 2.7)");
+    expect(addPart).not.toContain("folate_mcg");
+    expect(updPart).toContain("(7, 'folate_mcg', 20)");
+    expect(updPart).toContain("do update set amount_per_100g");
+    expect(updPart).not.toContain("protein_g");
+  });
+  it("refresh mode updates everything already there", () => {
+    const s3 = toBatchSql("b", foods, [{ fdc_id: 7, nutrient_key: "protein_g", amount_per_100g: 2.7 }], [{ fdc_id: 7, seq: 1, description: "1 cup", gram_weight: 158 }], { mode: "refresh" });
+    expect(s3).toContain("on conflict (fdc_id) do update");
+    expect(s3).toContain("on conflict (fdc_id, nutrient_key) do update");
+    expect(s3).toContain("on conflict (fdc_id, seq) do update");
+  });
+  it("refuses any text that contains the dollar-quote tag the batch is wrapped in", () => {
+    const evil = new Map([[8, { fdc_id: 8, description: "Rice $load$; drop table x; --", data_type: "SR Legacy", food_category: null }]]);
+    expect(() => toBatchSql("b", evil, [], [])).toThrow("contains $load$");
+    expect(() => toBatchSql("b", foods, [], [{ fdc_id: 7, seq: 1, description: "1 $load$ cup", gram_weight: 1 }])).toThrow();
+  });
+});
+
+describe("the before / after report", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { compareWithExisting, formatReport } = require("../scripts/usda-batch-lib.mjs");
+  const foods = new Map([
+    [1, { fdc_id: 1, description: "Chicken breast, raw", data_type: "SR Legacy", food_category: null }],
+    [2, { fdc_id: 2, description: "Oats", data_type: "SR Legacy", food_category: null }],
+    [3, { fdc_id: 3, description: "Brand new food", data_type: "Foundation", food_category: null }],
+  ]);
+  const rows = [
+    { fdc_id: 1, nutrient_key: "kcal", amount_per_100g: 120 },
+    { fdc_id: 1, nutrient_key: "protein_g", amount_per_100g: 23 },
+    { fdc_id: 1, nutrient_key: "vitamin_k_mcg", amount_per_100g: 0.5 },
+    { fdc_id: 2, nutrient_key: "kcal", amount_per_100g: 389 },
+    { fdc_id: 3, nutrient_key: "kcal", amount_per_100g: 50 },
+  ];
+  const existing = {
+    foods: new Map([[1, { description: "Chicken, broilers or fryers, breast, raw" }], [2, { description: "Oats" }]]),
+    nutrients: new Map([["1|kcal", 165], ["1|protein_g", 23], ["2|kcal", 389]]),
+    portions: new Set(["1|1"]),
+  };
+  const r = compareWithExisting(foods, rows, [{ fdc_id: 1, seq: 1, description: "x", gram_weight: 1 }, { fdc_id: 1, seq: 2, description: "y", gram_weight: 1 }], existing);
+  it("counts new and already-there foods, values and portions", () => {
+    expect(r.foods).toMatchObject({ total: 3, new: 1, existing: 2, descriptionChanged: 1 });
+    expect(r.nutrients).toMatchObject({ total: 5, new: 2, same: 2, changed: 1 });
+    expect(r.nutrients.newKeys).toEqual(["vitamin_k_mcg"]);
+    expect(r.portions).toMatchObject({ new: 1, existing: 1 });
+  });
+  it("lists the biggest changes to the four macros in foods already there", () => {
+    expect(r.largestMacroChanges[0]).toMatchObject({ fdc_id: 1, key: "kcal", before: 165, after: 120, relPct: 27.3, description: "Chicken breast, raw" });
+  });
+  it("the report says what WOULD be rewritten in each mode", () => {
+    expect(formatReport(r, "add", [])).toContain("Different values that WOULD be rewritten in this mode: **0**");
+    expect(formatReport(r, "refresh", [])).toContain("Different values that WOULD be rewritten in this mode: **1**");
+    expect(formatReport(r, "add", ["kcal"])).toContain("**1**");
+    expect(formatReport(r, "add", [])).toContain("NOT changed in add mode");
   });
 });

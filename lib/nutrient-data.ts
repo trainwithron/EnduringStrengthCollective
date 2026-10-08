@@ -6,33 +6,35 @@ import type { FoodRules } from "@/lib/allergen-check";
 import type { LoggedEntry } from "@/lib/nutrient-day";
 import type { Sex } from "@/lib/dri-data";
 import { datesEndingOn } from "@/lib/nutrient-view";
+import { pageAll } from "@/lib/page-all";
 
 // Everything the nutrient screens read for one client, with the signed-in person's own access (a client reads their own; a coach reads their clients' through the existing rules).
 // Each read fails soft: a missing table or column (the database paste is pending) gives an empty log or an unknown age/sex, never an error page.
 
 export const LOG_DAYS = 30;
 
-export async function fetchNutrientLog(supabase: SupabaseClient, athleteId: string, todayKey: string): Promise<LoggedEntry[]> {
+export interface NutrientLog {
+  entries: LoggedEntry[];
+  // True when the log was longer than the reader allows (or a page failed), so the figures are based on part of it. Shown to the person; never silently dropped.
+  truncated: boolean;
+}
+
+type Row = { log_date: string; status: string | null; description: string | null; calories: number | string | null; nutrients?: Record<string, number> | null };
+const toEntry = (r: Row): LoggedEntry => ({ logDate: r.log_date, status: r.status, description: r.description, calories: r.calories == null ? null : Number(r.calories), nutrients: r.nutrients ?? null });
+
+// The last 30 days of one client's log. A request returns at most 1,000 rows however many are asked for, and a heavy logger (a saved meal is one row per food) passes that in a month,
+// so this reads page by page in a fixed order (date, then id) and says so if it still could not read it all.
+export async function fetchNutrientLog(supabase: SupabaseClient, athleteId: string, todayKey: string): Promise<NutrientLog> {
   const since = datesEndingOn(todayKey, LOG_DAYS)[0];
-  const full = await supabase.from("food_log_entries").select("log_date, status, description, calories, nutrients").eq("athlete_id", athleteId).gte("log_date", since).lte("log_date", todayKey).limit(3000);
-  if (!full.error) {
-    return ((full.data ?? []) as { log_date: string; status: string | null; description: string | null; calories: number | string | null; nutrients: Record<string, number> | null }[]).map((r) => ({
-      logDate: r.log_date,
-      status: r.status,
-      description: r.description,
-      calories: r.calories == null ? null : Number(r.calories),
-      nutrients: r.nutrients ?? null,
-    }));
-  }
-  // The detail column is not in the database yet: the calories still count, no nutrient is reported.
-  const base = await supabase.from("food_log_entries").select("log_date, status, description, calories").eq("athlete_id", athleteId).gte("log_date", since).lte("log_date", todayKey).limit(3000);
-  return ((base.data ?? []) as { log_date: string; status: string | null; description: string | null; calories: number | string | null }[]).map((r) => ({
-    logDate: r.log_date,
-    status: r.status,
-    description: r.description,
-    calories: r.calories == null ? null : Number(r.calories),
-    nutrients: null,
-  }));
+  const read = (columns: string) =>
+    pageAll((from, to) =>
+      supabase.from("food_log_entries").select(columns).eq("athlete_id", athleteId).gte("log_date", since).lte("log_date", todayKey).order("log_date", { ascending: true }).order("id", { ascending: true }).range(from, to)
+    );
+  const full = await read("log_date, status, description, calories, nutrients");
+  if (!full.failed) return { entries: (full.rows as Row[]).map(toEntry), truncated: full.truncated };
+  // The detail column is not in the database yet (or a page failed): try without it. The calories still count, no nutrient is reported.
+  const base = await read("log_date, status, description, calories");
+  return { entries: (base.rows as Row[]).map((r) => toEntry({ ...r, nutrients: null })), truncated: base.truncated || base.failed };
 }
 
 export async function fetchAgeAndSex(supabase: SupabaseClient, athleteId: string, todayKey: string): Promise<{ age: number | null; sex: Sex | null }> {

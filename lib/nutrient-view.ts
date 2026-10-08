@@ -1,7 +1,7 @@
 import { NUTRIENT_CATALOG, catalogNutrient, type CatalogNutrient } from "@/lib/nutrient-catalog";
 import { assumptionNote, referenceFor, type Reference } from "@/lib/dri";
 import type { Sex } from "@/lib/dri-data";
-import { checkLines, type FoodRules } from "@/lib/allergen-check";
+import { allergyKeysOf, checkLines, type FoodRules } from "@/lib/allergen-check";
 import { dayTotals, detailShare, topSources, windowTotals, type DayTotals, type LoggedEntry, type SourceShare } from "@/lib/nutrient-day";
 import { isUsableDay, percentOfTarget, summarizeNutrient, topGaps, type NutrientWindowSummary } from "@/lib/nutrient-gaps";
 
@@ -26,6 +26,8 @@ export function datesEndingOn(todayKey: string, n: number): string[] {
 export interface NutrientRow {
   nutrient: CatalogNutrient;
   ref: Reference | null;
+  // True when no "worth a look" verdict is given because the target is an average of different targets (the person's sex or age is not filled in).
+  gapsSkipped: boolean;
   // Today's total from the foods that report it, or null (never 0) when nothing logged does.
   total: number | null;
   // Today's total as a percent of the reference intake; null when either is unknown.
@@ -55,6 +57,8 @@ export interface Overview {
   // How many of today's logged foods carry nutrient detail beyond the macros.
   detail: { detailed: number; total: number };
   assumption: string | null;
+  // A gentle line about what to fill in to switch "worth a look" on for the nutrients where men and women (or age groups) differ; null when nothing was skipped.
+  skippedNote: string | null;
 }
 
 export function buildOverview(args: { entries: LoggedEntry[]; todayKey: string; age: number | null; sex: Sex | null; plan?: PlanEstimate | null }): Overview {
@@ -73,13 +77,17 @@ export function buildOverview(args: { entries: LoggedEntry[]; todayKey: string; 
     const planAmount = usePlan ? args.plan!.totals[nutrient.key] : undefined;
     const t = usePlan ? { total: typeof planAmount === "number" ? planAmount : null, coveragePct: typeof planAmount === "number" ? planCoveragePct : 0, reportingEntries: 0, entries: 0 } : logged;
     const target = nutrient.role === "target" ? ref?.target ?? null : null;
+    // "Worth a look" needs this person's own target: where the figure is an average of different targets (sex or age unknown) and the nutrient is one where they differ, or the data
+    // cannot support a verdict (niacin), no verdict is given.
+    const gapTarget = ref?.targetsDiffer || nutrient.noGaps ? null : target;
     return {
       nutrient,
       ref,
+      gapsSkipped: nutrient.role === "target" && target != null && !!ref?.targetsDiffer,
       total: t.total,
       pct: t.total != null && target != null ? Math.round(percentOfTarget(t.total, target)) : null,
       coveragePct: t.coveragePct,
-      summary: summarizeNutrient(window, nutrient.key, target),
+      summary: summarizeNutrient(window, nutrient.key, gapTarget),
       seenRecently: month.some((d) => d.byKey[nutrient.key].total != null),
     };
   });
@@ -93,7 +101,15 @@ export function buildOverview(args: { entries: LoggedEntry[]; todayKey: string; 
     todayEntries: today.entries,
     detail,
     assumption: firstRef ? assumptionNote(firstRef) : null,
+    skippedNote: skippedLine(rows, age, sex),
   };
+}
+
+function skippedLine(rows: NutrientRow[], age: number | null, sex: Sex | null): string | null {
+  if (!rows.some((r) => r.gapsSkipped)) return null;
+  if (!sex && age == null) return "Add your sex and date of birth in About you for personal targets. Until then we show amounts and an average, and we don't say a nutrient looks low where men's and women's targets differ.";
+  if (!sex) return "Add your sex in About you for personal targets. Until then we show amounts and an average, and we don't say a nutrient looks low where men's and women's targets differ.";
+  return "Add your date of birth in About you for personal targets. Until then we show amounts and an average, and we don't say a nutrient looks low where the targets differ by age.";
 }
 
 export interface DayBar {
@@ -122,6 +138,8 @@ export interface Detail {
   avg7: number | null;
   avg30: number | null;
   summary: NutrientWindowSummary;
+  // True when no verdict is given on this nutrient because the target is an average of different targets, or the data cannot support one.
+  gapSkipped: boolean;
   sources: SourceShare[];
   // Everyday foods that could help, safe for this person; empty with a reason when none can be shown.
   ideas: { foods: string[]; hiddenReason: "no-rules" | "diet" | null };
@@ -138,7 +156,11 @@ export function safeIdeas(nutrient: CatalogNutrient, rules: FoodRules | null): {
   if (!rules) return { foods: [], hiddenReason: "no-rules" };
   if (rules.dietType && IDEAS_NOT_FOR.has(rules.dietType)) return { foods: [], hiddenReason: "diet" };
   const blocked = new Set(checkLines(nutrient.goodSources, rules).map((h) => h.line));
-  return { foods: nutrient.goodSources.filter((f) => !blocked.has(f)), hiddenReason: null };
+  // Oats are usually cross-contaminated with wheat and many people with celiac disease avoid them, so for a gluten allergy or intolerance they are never suggested here (the meal builder
+  // keeps its own rule, which treats oats as fine for a plain wheat allergy).
+  const glutenRule = allergyKeysOf([...(rules.allergies ?? []), ...(rules.intolerances ?? [])]).has("wheat or gluten");
+  const kept = nutrient.goodSources.filter((f) => !blocked.has(f) && !(glutenRule && /oats?/i.test(f)));
+  return { foods: kept, hiddenReason: null };
 }
 
 export function buildDetail(args: { key: string; entries: LoggedEntry[]; todayKey: string; age: number | null; sex: Sex | null; rules: FoodRules | null }): Detail | null {
@@ -165,7 +187,8 @@ export function buildDetail(args: { key: string; entries: LoggedEntry[]; todayKe
     last30,
     avg7: avg(last7),
     avg30: avg(last30),
-    summary: summarizeNutrient(d14, nutrient.key, target),
+    summary: summarizeNutrient(d14, nutrient.key, ref?.targetsDiffer || nutrient.noGaps ? null : target),
+    gapSkipped: nutrient.role === "target" && target != null && (!!ref?.targetsDiffer || !!nutrient.noGaps),
     sources: topSources(args.entries.filter((e) => since30.has(e.logDate)), nutrient.key, 5),
     ideas: safeIdeas(nutrient, args.rules),
     assumption: ref ? assumptionNote(ref) : null,

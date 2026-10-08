@@ -44,7 +44,7 @@ export default async function NutrientDetailPage(props: { params: Promise<{ grou
 
   const timezone = await getGroupCoachTimezone(supabase, params.groupId);
   const todayKey = dateKeyInZone(timezone);
-  const [entries, { age, sex }, rules] = await Promise.all([fetchNutrientLog(supabase, athleteId, todayKey), fetchAgeAndSex(supabase, athleteId, todayKey), fetchFoodRules(supabase, athleteId)]);
+  const [{ entries, truncated }, { age, sex }, rules] = await Promise.all([fetchNutrientLog(supabase, athleteId, todayKey), fetchAgeAndSex(supabase, athleteId, todayKey), fetchFoodRules(supabase, athleteId)]);
   const d = buildDetail({ key: params.key, entries, todayKey, age, sex, rules });
   if (!d) notFound();
 
@@ -58,6 +58,9 @@ export default async function NutrientDetailPage(props: { params: Promise<{ grou
 
   const body = (
     <div className="space-y-6 max-w-[760px]">
+      {truncated && (
+        <p className="font-body text-xs text-amber-400 border-l-2 border-amber-400/60 pl-2" data-testid="partial-log">These figures are based on part of the log: it is longer than we can read at once, so the newest days or some entries may be missing.</p>
+      )}
       <div>
         <Link href={backHref} className="font-body text-xs text-steel underline underline-offset-2">
           ← Back to Nutrition
@@ -88,6 +91,7 @@ export default async function NutrientDetailPage(props: { params: Promise<{ grou
           </p>
         )}
         {d.ref?.note && <p className="font-body text-xs text-steel">{d.ref.note}</p>}
+        {n.dataNote && <p className="font-body text-xs text-steel">{n.dataNote}</p>}
       </section>
 
       <section aria-label="Today">
@@ -127,6 +131,8 @@ export default async function NutrientDetailPage(props: { params: Promise<{ grou
               <p className="font-body text-sm text-chalk border border-steel/20 p-4 max-w-[70ch]">{audience === "coach" ? gapMessageForCoach(n.label, who, GAP_WINDOW_DAYS) : gapMessage(n.label, GAP_WINDOW_DAYS)}</p>
             ) : d.summary.status === "ok" ? (
               <p className="font-body text-sm text-steel">Nothing stands out: on the days that count over the last {GAP_WINDOW_DAYS} days, {n.label.toLowerCase()} is not running low.</p>
+            ) : d.gapSkipped ? (
+              <p className="font-body text-sm text-steel">We don&apos;t say whether this is running low until {audience === "coach" ? "the client's" : "your"} {d.ref?.assumedSex ? "sex" : "date of birth"} is filled in, because the target is different for different people{audience === "coach" ? "" : ". You can add it in About you"}.</p>
             ) : (
               <p className="font-body text-sm text-steel">{NOT_ENOUGH_DATA_LINE}</p>
             )}

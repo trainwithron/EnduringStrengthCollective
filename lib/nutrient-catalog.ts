@@ -24,11 +24,16 @@ export interface CatalogNutrient {
   goodSources: string[];
   // True for the nutrients the USDA records already carry in the app today (the 12 key nutrients); the rest appear as the fuller USDA data is loaded, and show "not reported" until then.
   inDatabaseToday: boolean;
+  // When set, "worth a look" never calls this nutrient low (the food data cannot support a verdict).
+  noGaps?: boolean;
+  // A plain note about how the figure is worked out, shown on the nutrient's page.
+  dataNote?: string;
 }
 
 const KEY12 = new Set(KEY_12_NUTRIENTS.map((n) => n.key));
 
-const def = (key: string, label: string, unit: string, group: NutrientGroup, role: NutrientRole, why: string, goodSources: string[]): CatalogNutrient => ({
+const def = (key: string, label: string, unit: string, group: NutrientGroup, role: NutrientRole, why: string, goodSources: string[], extra: { noGaps?: boolean; dataNote?: string } = {}): CatalogNutrient => ({
+  ...extra,
   key,
   label,
   unit,
@@ -58,9 +63,9 @@ export const NUTRIENT_CATALOG: CatalogNutrient[] = [
   def("vitamin_k_mcg", "Vitamin K", "mcg", "vitamin", "target", "Vitamin K is needed for normal blood clotting and bone health.", ["Kale", "Spinach", "Broccoli", "Collard greens", "Brussels sprouts", "Green cabbage"]),
   def("thiamin_mg", "Thiamin (B1)", "mg", "vitamin", "target", "Thiamin helps the body turn food into energy.", ["Pork loin", "Sunflower seeds", "Black beans", "Whole grain bread", "Fortified cereal", "Trout"]),
   def("riboflavin_mg", "Riboflavin (B2)", "mg", "vitamin", "target", "Riboflavin helps the body turn food into energy and keeps skin and eyes healthy.", ["Milk", "Plain yogurt", "Eggs", "Almonds", "Beef", "Mushrooms"]),
-  def("niacin_mg", "Niacin (B3)", "mg", "vitamin", "target", "Niacin helps the body turn food into energy.", ["Chicken breast", "Tuna", "Turkey", "Peanuts", "Mushrooms", "Brown rice"]),
+  def("niacin_mg", "Niacin (B3)", "mg NE", "vitamin", "target", "Niacin helps the body turn food into energy.", ["Chicken breast", "Tuna", "Turkey", "Peanuts", "Mushrooms", "Brown rice"], { dataNote: "Counted in niacin equivalents (mg NE), the way the reference intake is set: the niacin in the food plus one sixtieth of its tryptophan, which the body turns into niacin. A food whose tryptophan is not reported is counted by its niacin alone, so its figure can be a little low." }),
   def("b6_mg", "Vitamin B6", "mg", "vitamin", "target", "Vitamin B6 helps the body use protein and make red blood cells.", ["Chickpeas", "Salmon", "Chicken breast", "Potatoes", "Banana", "Tuna"]),
-  def("folate_mcg", "Folate", "mcg DFE", "vitamin", "target", "Folate helps the body make new cells and DNA.", ["Lentils", "Spinach", "Asparagus", "Black-eyed peas", "Fortified cereal", "Avocado", "Broccoli"]),
+  def("folate_mcg", "Folate", "mcg DFE", "vitamin", "target", "Folate helps the body make new cells and DNA.", ["Lentils", "Spinach", "Asparagus", "Black-eyed peas", "Fortified cereal", "Avocado", "Broccoli"], { dataNote: "Counted in dietary folate equivalents (mcg DFE), the way the reference intake is set. A food with no DFE value is counted by its total folate, which is the same for foods that are not fortified." }),
   def("b12_mcg", "Vitamin B12", "mcg", "vitamin", "target", "Vitamin B12 supports nerves and red blood cells. It comes mainly from animal foods and fortified foods.", ["Clams", "Beef", "Salmon", "Eggs", "Milk", "Plain yogurt", "Fortified nutritional yeast"]),
   def("choline_mg", "Choline", "mg", "other", "target", "Choline supports cell structure and nerve signalling.", ["Eggs", "Beef", "Chicken", "Soybeans", "Salmon", "Potatoes"]),
   def("sodium_mg", "Sodium", "mg", "mineral", "limit", "Sodium is needed in small amounts. Most people eat more than they need; this is shown against the level health authorities suggest staying under.", []),

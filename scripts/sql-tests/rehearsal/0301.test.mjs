@@ -100,6 +100,10 @@ export default {
       h.check("the first notice for a month is recorded and a repeat is a no-op (so the organization is told once)", first.rows?.length === 1 && again.rows?.length === 0, JSON.stringify({ first, again }));
       const next = await tryQ(db, `insert into public.ai_budget_notices (organization_id, month, level) values ($1, '2026-10-01', 'out') on conflict do nothing returning level`, [org]);
       h.check("'used up' is a separate notice from 'running low'", next.rows?.length === 1, JSON.stringify(next));
+      const bal = await tryQ(db, `insert into public.ai_budget_notices (organization_id, month, level) values ($1, '2026-10-01', 'balance') on conflict do nothing returning level`, [org]);
+      h.check("'the top-up balance is paying' has its own slot, so the earlier 80 percent notice for the month does not swallow it", bal.rows?.length === 1, JSON.stringify(bal));
+      const balAgain = await tryQ(db, `insert into public.ai_budget_notices (organization_id, month, level) values ($1, '2026-10-01', 'balance') on conflict do nothing returning level`, [org]);
+      h.check("...and is sent once a month", balAgain.rows?.length === 0, JSON.stringify(balAgain));
       const badLevel = await tryQ(db, `insert into public.ai_budget_notices (organization_id, month, level) values ($1, '2026-11-01', 'whatever')`, [org]);
       h.check("an unknown level is refused", !!badLevel.error, JSON.stringify(badLevel));
 

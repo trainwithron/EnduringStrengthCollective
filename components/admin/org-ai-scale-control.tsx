@@ -4,7 +4,7 @@ import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 
 // Platform-admin-only: this organization's own AI budget scale (organization_billing.ai_allowance_scale). Blank means the standard rule (a free-access organization gets the
-// reduced beta share, a paid one gets the full budget); 1 means the full standard budget even for a free-access organization; 0.3 is the beta share; 0 turns AI off for them.
+// reduced beta share, a paid one gets the full budget); 1 means the full standard budget even for a free-access organization; 0.3 is the beta share; 0 turns the included AI off for them (a top-up balance they bought still works).
 // Writes straight to organization_billing: RLS only lets the platform admin do that. The upsert names only its own columns, so it never touches the free-access flag.
 export function OrgAiScaleControl({ organizationId, initialScale }: { organizationId: string; initialScale: number | null }) {
   const [text, setText] = useState(initialScale == null ? "" : String(initialScale));
@@ -35,6 +35,7 @@ export function OrgAiScaleControl({ organizationId, initialScale }: { organizati
       <label className="font-body text-xs text-steel block" htmlFor={`ai-scale-${organizationId}`}>
         AI budget scale
       </label>
+      <p className="font-body text-[11px] text-steel/80 max-w-[16rem] ml-auto">blank = standard · 1 = full · 0 = included AI off (a bought top-up balance still works)</p>
       <div className="flex items-center gap-1 justify-end mt-1">
         <input
           id={`ai-scale-${organizationId}`}

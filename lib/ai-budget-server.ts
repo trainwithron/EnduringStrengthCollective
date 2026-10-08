@@ -167,7 +167,7 @@ export async function noteBudgetLevel(db: SupabaseClient, crossingCoachId: strin
   try {
     const orgId = await resolveOrg(db, crossingCoachId);
     if (!orgId) return false;
-    const { data, error } = await db.from("ai_budget_notices").upsert({ organization_id: orgId, month: monthStartDate(now), level: level === "balance" ? "low" : level }, { onConflict: "organization_id,month,level", ignoreDuplicates: true }).select("level");
+    const { data, error } = await db.from("ai_budget_notices").upsert({ organization_id: orgId, month: monthStartDate(now), level }, { onConflict: "organization_id,month,level", ignoreDuplicates: true }).select("level");
     if (error || !data || data.length === 0) return false;
     const { data: org } = await db.from("organizations").select("owner_id").eq("id", orgId).maybeSingle();
     const recipients = [...new Set([(org?.owner_id as string | undefined) ?? null, crossingCoachId].filter((x): x is string => !!x))];

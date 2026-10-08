@@ -45,6 +45,15 @@ export default {
       const failed = await tryQ(db, bad);
       const half = await h.one(`select (select count(*)::int from public.usda_foods where fdc_id = 991002) as foods, (select count(*)::int from public.usda_food_nutrients where fdc_id = 991002) as nutrients, (select count(*)::int from public.usda_load_batches where name = 'rehearsal-load-002') as marker`);
       h.check("a batch with one bad row loads NOTHING (no food, no nutrient, no marker): a half-loaded batch cannot exist", !!failed.error && half.foods === 0 && half.nutrients === 0 && half.marker === 0, JSON.stringify({ failed, half }));
+      // add mode leaves a value that is already there alone (the foods the app relies on cannot shift); a listed refresh key is the one exception
+      await db.query(`update public.usda_food_nutrients set amount_per_100g = 40 where fdc_id = 991001 and nutrient_key = 'kcal'`);
+      await db.query(`insert into public.usda_food_nutrients (fdc_id, nutrient_key, amount_per_100g) values (991001, 'folate_mcg', 11) on conflict do nothing`);
+      const addBatch = toBatchSql("rehearsal-load-003", foods, [{ fdc_id: 991001, nutrient_key: "kcal", amount_per_100g: 999 }, { fdc_id: 991001, nutrient_key: "folate_mcg", amount_per_100g: 22 }, { fdc_id: 991001, nutrient_key: "b6_mg", amount_per_100g: 0.1 }], [], { mode: "add", refreshKeys: ["folate_mcg"] });
+      await db.exec(addBatch);
+      const added = await h.rows(`select nutrient_key, amount_per_100g::float as v from public.usda_food_nutrients where fdc_id = 991001 order by nutrient_key`);
+      const vOf = (k) => added.find((r) => r.nutrient_key === k)?.v;
+      h.check("add mode: an existing value stays as it was, a listed refresh key is updated, and a missing key is added", vOf("kcal") === 40 && vOf("folate_mcg") === 22 && vOf("b6_mg") === 0.1, JSON.stringify(added));
+      await db.query(`delete from public.usda_load_batches where name = 'rehearsal-load-003'`);
       await db.query(`delete from public.usda_foods where fdc_id = 991001`);
       await db.query(`delete from public.usda_load_batches where name = 'rehearsal-load-001'`);
 

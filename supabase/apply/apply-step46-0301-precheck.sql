@@ -1,4 +1,4 @@
--- STEP 46 (PRECHECK, run first, changes nothing): 0301 AI budget: one pool per organization (its size, and this month's AI use summed by model, both server-only), paid top-up packs added to a month's budget, and a record that the owner and coach were told the AI is running low or used up, once per month
+-- STEP 46 (PRECHECK, run first, changes nothing): 0301 AI budget: one pool per organization (its size, and this month's AI use summed by model, both server-only), paid top-up packs (a balance that carries over from month to month; the small step 50 record after the deploy keeps what each month used), and a record that the owner and coach were told the AI is running low or used up, once per month
 --
 -- Paste into the Supabase SQL editor and run. Every row must say ok = true.
 -- If any row says false: do NOT run the apply file. Copy the result table and send it back.

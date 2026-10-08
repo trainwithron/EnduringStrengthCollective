@@ -211,10 +211,10 @@ describe("the top-up balance rolls over; the included budget does not", () => {
     spy.mockRestore();
   });
 
-  it("noteBudgetLevel tells the owner once when the balance starts paying, recorded as the 'low' notice", async () => {
+  it("noteBudgetLevel tells the owner once when the balance starts paying, in its OWN slot (so the earlier 80 percent notice does not swallow it)", async () => {
     const { db, upserts } = fakeDb({ org: "org1", owner: "owner1" });
     await noteBudgetLevel(db, "coach1", "balance", NOW);
-    expect(upserts[0]).toMatchObject({ organization_id: "org1", level: "low" });
+    expect(upserts[0]).toMatchObject({ organization_id: "org1", level: "balance" });
     expect(sent.map((x) => x.profileId).sort()).toEqual(["coach1", "owner1"]);
     expect(sent[0].title).toContain("top-up balance");
   });

@@ -31,13 +31,13 @@ export async function NutrientsSection({
   planEstimate?: PlanEstimate | null;
 }) {
   const supabase = await createServerClient();
-  const [entries, { age, sex }] = await Promise.all([fetchNutrientLog(supabase, athleteId, todayKey), fetchAgeAndSex(supabase, athleteId, todayKey)]);
+  const [{ entries, truncated }, { age, sex }] = await Promise.all([fetchNutrientLog(supabase, athleteId, todayKey), fetchAgeAndSex(supabase, athleteId, todayKey)]);
   const o = buildOverview({ entries, todayKey, age, sex, plan: planEstimate });
-  return <NutrientsView overview={o} audience={audience} clientName={clientName} detailHref={detailHref} />;
+  return <NutrientsView overview={o} audience={audience} clientName={clientName} detailHref={detailHref} partialLog={truncated} />;
 }
 
 // The markup, separate from the reading so it can be rendered and tested on its own.
-export function NutrientsView({ overview: o, audience, clientName, detailHref }: { overview: Overview; audience: "client" | "coach"; clientName?: string; detailHref: (key: string) => string }) {
+export function NutrientsView({ overview: o, audience, clientName, detailHref, partialLog = false }: { overview: Overview; audience: "client" | "coach"; clientName?: string; detailHref: (key: string) => string; partialLog?: boolean }) {
   const who = audience === "coach" ? clientName ?? "this client" : "you";
   const headline = new Set<string>(HEADLINE_KEYS);
   const shown = o.rows.filter((r) => r.nutrient.role === "target" && (headline.has(r.nutrient.key) || r.seenRecently));
@@ -65,7 +65,10 @@ export function NutrientsView({ overview: o, audience, clientName, detailHref }:
         </p>
       )}
 
+      {partialLog && <p className="font-body text-xs text-amber-400 border-l-2 border-amber-400/60 pl-2 max-w-[70ch]" data-testid="partial-log">These figures are based on part of the log: it is longer than we can read at once.</p>}
       {o.assumption && <p className="font-body text-xs text-amber-400 border-l-2 border-amber-400/60 pl-2 max-w-[70ch]">{o.assumption}</p>}
+      {o.skippedNote && audience === "client" && <p className="font-body text-xs text-steel max-w-[70ch]" data-testid="gaps-skipped">{o.skippedNote}</p>}
+      {o.skippedNote && audience === "coach" && <p className="font-body text-xs text-steel max-w-[70ch]" data-testid="gaps-skipped">{"We don't say a nutrient looks low where men's and women's (or age groups') targets differ until the client's sex and date of birth are filled in (About you)."}</p>}
 
       {o.gaps.length > 0 && (
         <section className="border border-steel/20 p-4" aria-label="Worth a look">

@@ -102,6 +102,61 @@ describe("the meal-plan estimate stands in only when nothing logged has detail, 
   });
 });
 
+describe("no verdict where the target is an average of different targets", () => {
+  // a man eating 8 mg of iron a day (his RDA is 8) over six full days
+  const eightMg = datesEndingOn(TODAY, 6).flatMap((d) => Array.from({ length: 4 }, () => entry(d, { iron_mg: 2 })));
+  it("a man at 8 mg of iron with his sex unknown is NOT told iron looks low (the averaged 13 mg would say so)", () => {
+    const o = buildOverview({ entries: eightMg, todayKey: TODAY, age: 30, sex: null });
+    const iron = o.rows.find((r) => r.nutrient.key === "iron_mg")!;
+    expect(iron.ref?.target).toBe(13);
+    expect(iron.gapsSkipped).toBe(true);
+    expect(iron.summary.status).toBe("not-enough-data");
+    expect(o.gaps.find((g) => g.nutrient.key === "iron_mg")).toBeUndefined();
+    expect(o.skippedNote).toMatch(/Add your sex in About you/);
+  });
+  it("amounts and the averaged percent are still shown, labelled as an average", () => {
+    const o = buildOverview({ entries: eightMg, todayKey: TODAY, age: 30, sex: null });
+    const iron = o.rows.find((r) => r.nutrient.key === "iron_mg")!;
+    expect(iron.total).toBe(8);
+    expect(iron.pct).toBe(62);
+    expect(o.assumption).toMatch(/average of men and women/);
+  });
+  it("with his sex known the same intake is on target", () => {
+    const o = buildOverview({ entries: eightMg, todayKey: TODAY, age: 30, sex: "male" });
+    expect(o.rows.find((r) => r.nutrient.key === "iron_mg")!.summary.status).toBe("ok");
+    expect(o.skippedNote).toBeNull();
+  });
+  it("a nutrient with the same target for men and women still gets a verdict when sex is unknown", () => {
+    const low = datesEndingOn(TODAY, 6).flatMap((d) => Array.from({ length: 4 }, () => entry(d, { vitamin_d_mcg: 1 })));
+    const o = buildOverview({ entries: low, todayKey: TODAY, age: 30, sex: null });
+    const d = o.rows.find((r) => r.nutrient.key === "vitamin_d_mcg")!;
+    expect(d.ref?.targetsDiffer).toBe(false);
+    expect(o.gaps.map((g) => g.nutrient.key)).toContain("vitamin_d_mcg");
+  });
+  it("unknown age is handled the same way for nutrients whose target changes between the adult age groups", () => {
+    const o = buildOverview({ entries: [], todayKey: TODAY, age: null, sex: "male" });
+    expect(o.rows.find((r) => r.nutrient.key === "magnesium_mg")!.gapsSkipped).toBe(true);
+    expect(o.skippedNote).toMatch(/date of birth/);
+  });
+  it("the nutrient page says why no verdict is given", () => {
+    const d = buildDetail({ key: "iron_mg", entries: eightMg, todayKey: TODAY, age: 30, sex: null, rules: null })!;
+    expect(d.gapSkipped).toBe(true);
+    expect(d.summary.status).toBe("not-enough-data");
+    expect(buildDetail({ key: "iron_mg", entries: eightMg, todayKey: TODAY, age: 30, sex: "male", rules: null })!.gapSkipped).toBe(false);
+  });
+});
+
+describe("oats and gluten", () => {
+  it("oats are not suggested to anyone with a gluten or wheat allergy or a gluten intolerance, but still are for others", () => {
+    const fiber = catalogNutrient("fiber_g")!;
+    expect(safeIdeas(fiber, { allergies: [] }).foods).toContain("Oats");
+    expect(safeIdeas(fiber, { allergies: ["wheat or gluten"] }).foods).not.toContain("Oats");
+    expect(safeIdeas(fiber, { intolerances: ["gluten"] }).foods).not.toContain("Oats");
+    expect(safeIdeas(catalogNutrient("magnesium_mg")!, { allergies: ["wheat or gluten"] }).foods).not.toContain("Oats");
+    expect(safeIdeas(fiber, { allergies: ["peanut"] }).foods).toContain("Oats");
+  });
+});
+
 describe("safeIdeas: foods that could help, checked against the person's rules", () => {
   const vitD = catalogNutrient("vitamin_d_mcg")!;
   it("removes foods that break an allergy", () => {

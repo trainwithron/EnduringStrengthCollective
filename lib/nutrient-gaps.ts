@@ -3,12 +3,13 @@ import type { DayTotals } from "@/lib/nutrient-day";
 // A kind look at which nutrients have been on the low side lately, from what the person logged. It is information, never a diagnosis: it can only say "from the foods logged and
 // reported, this has been low on most days we can see", and it says nothing at all when there is not enough to go on.
 //
-// A day counts for a nutrient only when it is a real day of eating (enough calories logged) AND enough of that day's food reports the nutrient. A nutrient is "on the low side" when
+// A day counts for a nutrient only when it is a real day of eating (enough calories logged) AND at least 80 percent of that day's calories come from foods that report the nutrient (so
+// the percent of the reference, which counts only the reporting foods, is close to the whole day and not a long way under it). A nutrient is "on the low side" when
 // at least MIN_USABLE_DAYS days count and MORE THAN HALF of them are under GAP_BELOW_PCT of the reference intake.
 
 export const GAP_BELOW_PCT = 67;
 export const MIN_DAY_KCAL = 800;
-export const MIN_DAY_COVERAGE_PCT = 60;
+export const MIN_DAY_COVERAGE_PCT = 80;
 export const MIN_USABLE_DAYS = 4;
 
 export type GapStatus = "gap" | "ok" | "not-enough-data";

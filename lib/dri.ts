@@ -25,6 +25,9 @@ export interface Reference {
   groupLabel: string;
   assumedAge: boolean;
   assumedSex: boolean;
+  // True when an averaged figure hides a real difference: the rows that were averaged (men and women, or the two adult age groups) do not share one target. An average is not
+  // this person's target, so it is never used to call a nutrient low.
+  targetsDiffer: boolean;
   source: string;
   sourceUrl: string;
   note: string;
@@ -81,6 +84,7 @@ export function referenceFor(key: string, age: number | null, sex: Sex | null): 
     groupLabel,
     assumedAge: groups.assumed,
     assumedSex: !sex,
+    targetsDiffer: target != null && new Set(targets).size > 1,
     source: n.source,
     sourceUrl: n.sourceUrl,
     note: n.note,

@@ -32,7 +32,10 @@ export const NUTRIENT_SOURCES = {
   vitamin_k_mcg: { numbers: ["430"], unit: "UG" },
   thiamin_mg: { numbers: ["404"], unit: "MG" },
   riboflavin_mg: { numbers: ["405"], unit: "MG" },
+  // Niacin is counted in niacin EQUIVALENTS (mg NE), the way its reference intake is set: the niacin in the food plus one sixtieth of its tryptophan (the body makes niacin from it).
+  // USDA reports preformed niacin (406) and tryptophan (501, in g); they are combined below. A food with no tryptophan value is counted by its niacin alone.
   niacin_mg: { numbers: ["406"], unit: "MG" },
+  _tryptophan_g: { numbers: ["501"], unit: "G" }, // helper only: never written as a row of its own
   b6_mg: { numbers: ["415"], unit: "MG" },
   choline_mg: { numbers: ["421"], unit: "MG" },
   phosphorus_mg: { numbers: ["305"], unit: "MG" },
@@ -135,7 +138,13 @@ export function createNutrientCollector(foods, nutrientIndex) {
       const out = [];
       for (const [k, v] of best) {
         const [fdc, key] = k.split("|");
-        out.push({ fdc_id: Number(fdc), nutrient_key: key, amount_per_100g: Math.round(v.amount * 1000) / 1000 });
+        if (key.startsWith("_")) continue; // helper values
+        let amount = v.amount;
+        if (key === "niacin_mg") {
+          const trp = best.get(`${fdc}|_tryptophan_g`);
+          if (trp) amount += (trp.amount * 1000) / 60; // grams of tryptophan -> mg, / 60 = mg NE
+        }
+        out.push({ fdc_id: Number(fdc), nutrient_key: key, amount_per_100g: Math.round(amount * 1000) / 1000 });
       }
       return out.sort((a, b) => a.fdc_id - b.fdc_id || a.nutrient_key.localeCompare(b.nutrient_key));
     },

@@ -30,7 +30,7 @@ $guard$;
 --  * ai_org_month_usage(org, since): this month's AI use for every coach in the organization, summed by model (input tokens, output tokens, calls), counting only calls that
 --    finished (ok, or cut off after producing output); a failed call is never counted. Priced in the app (lib/ai-budget.ts), so a price change never needs a database change.
 --  * ai_budget_topups: money added to an organization's budget for one month by a paid top-up pack (written by the payment webhook, once per payment).
---  * ai_budget_notices: one row per organization, month and level ('low' = about 80 percent, 'out' = used up) so the owner and the coach are told ONCE, not on every request.
+--  * ai_budget_notices: one row per organization, month and level ('low' = about 80 percent of the included budget, 'balance' = the included budget is used up and the top-up balance has started paying, 'out' = everything used up) so the owner and the coach are told ONCE, not on every request.
 -- Nothing here changes who can read or write anything else. Re-runnable.
 
 create or replace function public.ai_org_summary(p_org_id uuid)
@@ -96,7 +96,7 @@ revoke all on public.ai_budget_topups from anon, authenticated;
 create table if not exists public.ai_budget_notices (
   organization_id uuid not null references public.organizations(id) on delete cascade,
   month date not null,
-  level text not null check (level in ('low', 'out')),
+  level text not null check (level in ('low', 'balance', 'out')),
   created_at timestamptz not null default now(),
   primary key (organization_id, month, level)
 );

@@ -50,6 +50,19 @@ describe("NutrientsView", () => {
     expect(html).toContain("estimated from the meal plan");
     expect(html).not.toContain("Log some food today");
   });
+  it("says plainly when the figures rest on part of the log", () => {
+    const html = renderToStaticMarkup(createElement(NutrientsView, { overview: buildOverview({ entries: day(TODAY, 500), todayKey: TODAY, age: 30, sex: "male" }), audience: "client", detailHref: (k: string) => "/n/" + k, partialLog: true }));
+    expect(html).toContain("based on part of the log");
+  });
+  it("when sex is unknown it still shows amounts, adds a gentle line, and gives no 'Worth a look' for nutrients whose targets differ", () => {
+    const eightMgIron = datesEndingOn(TODAY, 6).flatMap((d) => Array.from({ length: 4 }, () => meal(d, { iron_mg: 2 })));
+    const html = render(eightMgIron, "client", 30, null);
+    expect(html).toContain("Add your sex in About you for personal targets");
+    expect(html).toContain("8 mg");
+    expect(html).not.toContain("Worth a look");
+    expect(render(eightMgIron, "coach", 30, null)).toContain("until the client&#x27;s sex and date of birth are filled in");
+    expect(render(eightMgIron, "client", 30, "male")).not.toContain("Add your sex in About you");
+  });
   it("shows the assumption note only when age or sex is missing", () => {
     expect(render(day(TODAY, 500), "client", null, null)).toContain("adult average");
     expect(render(day(TODAY, 500), "client", 30, "male")).not.toContain("adult average");
