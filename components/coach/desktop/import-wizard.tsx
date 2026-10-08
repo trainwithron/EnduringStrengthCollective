@@ -324,8 +324,10 @@ export function ImportWizard({
       const usesRest = parsed.some(
         (r) => normalizeName(r.exerciseName) === key && parseRestSeconds(r.rest) != null
       );
+      // Timed work with no reps anywhere (a plank for 60 seconds) tracks Time instead of reps.
+      const usesReps = parsed.some((r) => normalizeName(r.exerciseName) === key && r.reps != null && r.reps !== "");
       const trackedFields: TrackedField[] = [
-        ...DEFAULT_TRACKED_FIELDS,
+        ...(usesTime && !usesReps ? DEFAULT_TRACKED_FIELDS.filter((f) => f !== "reps") : DEFAULT_TRACKED_FIELDS),
         ...(usesTime ? (["time"] as TrackedField[]) : []),
         ...(usesRest ? (["rest"] as TrackedField[]) : []),
       ];
@@ -930,9 +932,9 @@ export function ImportWizard({
                     <ul className="font-body text-xs text-steel space-y-0.5">
                       {day.exercises.map((ex, j) => (
                         <li key={j}>
-                          {ex.exerciseName} — {ex.sets}×{ex.reps ?? "?"}
+                          {ex.exerciseName} — {ex.sets}×{ex.reps ?? (ex.timeSeconds != null ? `${ex.timeSeconds}s` : "?")}
                           {ex.weight != null ? ` @ ${ex.weight}` : ""}
-                          {ex.timeSeconds != null ? ` (${ex.timeSeconds}s)` : ""}
+                          {ex.reps != null && ex.timeSeconds != null ? ` (${ex.timeSeconds}s)` : ""}
                         </li>
                       ))}
                     </ul>

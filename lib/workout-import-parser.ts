@@ -2,6 +2,8 @@
 // string[][] (already extracted from a file by the caller — xlsx.js in the
 // browser) so this stays testable without touching File/ArrayBuffer APIs.
 
+import { normalizeTimedRow } from "@/lib/timed-exercise";
+
 export type ImportColumn =
   | "week"
   | "day"
@@ -129,17 +131,20 @@ export function parseImportRows(dataRows: string[][], mapping: ColumnMapping): P
     const rpe = rpeRaw ? parseFloat(rpeRaw) : null;
     const rest = cell(row, mapping.rest) || null;
 
-    rows.push({
-      week,
-      day,
-      exerciseName,
-      sets,
-      reps,
-      weight: weight != null && Number.isFinite(weight) ? weight : null,
-      rpe: rpe != null && Number.isFinite(rpe) ? rpe : null,
-      rest,
-      timeSeconds,
-    });
+    // A duration in the reps place ("60 sec") or a bare number on a plank or wall sit is a time, not reps.
+    rows.push(
+      normalizeTimedRow({
+        week,
+        day,
+        exerciseName,
+        sets,
+        reps,
+        weight: weight != null && Number.isFinite(weight) ? weight : null,
+        rpe: rpe != null && Number.isFinite(rpe) ? rpe : null,
+        rest,
+        timeSeconds,
+      })
+    );
   }
 
   return rows;
