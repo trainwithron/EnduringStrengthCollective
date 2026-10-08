@@ -3,6 +3,7 @@
 
 import type { ParsedImportRow } from "@/lib/workout-import-parser";
 import { MAX_AI_FILE_BYTES, MAX_PASTE_CHARS } from "@/lib/import-input-kind";
+import { normalizeTimedRow } from "@/lib/timed-exercise";
 
 export const PROGRAM_IMPORT_SYSTEM_PROMPT = `You read a workout program and extract every exercise into a flat JSON array. The program may
 arrive as a photo or screenshot, a PDF, or text pasted from a document, an email, or another training
@@ -123,7 +124,8 @@ function isValidRow(row: unknown): row is Record<string, unknown> & { week: stri
 
 // Keeps only usable rows and puts every field in the shape the review screen expects.
 export function normalizeRows(parsed: unknown[]): ParsedImportRow[] {
-  return parsed.filter(isValidRow).map((r) => ({
+  return parsed.filter(isValidRow).map((r) =>
+    normalizeTimedRow({
     week: r.week,
     day: r.day,
     exerciseName: r.exerciseName,
@@ -133,7 +135,8 @@ export function normalizeRows(parsed: unknown[]): ParsedImportRow[] {
     rpe: typeof r.rpe === "number" ? r.rpe : null,
     rest: r.rest != null ? String(r.rest) : null,
     timeSeconds: typeof r.timeSeconds === "number" ? r.timeSeconds : null,
-  }));
+    })
+  );
 }
 
 export function noRowsMessage(feature: "program_import_photo" | "program_import_text" | "program_import_pdf"): string {

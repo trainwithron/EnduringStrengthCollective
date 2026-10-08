@@ -15,7 +15,7 @@ import {
   formatCondensedSets,
   type TrackedField,
 } from "@/lib/exercise-fields";
-import { parseQuickEntry } from "@/lib/quick-entry";
+import { parseQuickEntry, quickNote } from "@/lib/quick-entry";
 import { matchExercise, type AliasEntry } from "@/lib/exercise-matching";
 import { ExerciseBuilderCard, type MovementPatternOption } from "../exercise-builder-card";
 import type { RestTempoSuggestion } from "@/lib/training-intent";
@@ -271,7 +271,7 @@ export function DayCard({
   async function handleQuickAdd() {
     const parsed = parseQuickEntry(quickEntryDraft);
     if (!parsed) {
-      setQuickEntryError('Try "Exercise 3x8" or "Exercise 3x8 @7"');
+      setQuickEntryError('Try "Exercise 3x8", "Exercise 3x8 @7" or "Plank 60s"');
       return;
     }
     if (addItemBusy) return;
@@ -290,6 +290,9 @@ export function DayCard({
           group_id: groupId,
           exercise_name: resolvedExerciseName,
           exercise_order: nextOrder,
+          // A timed exercise (a plank for 60 seconds) tracks Time, not reps, so the logger shows a time field.
+          ...(parsed.timeSeconds != null ? { tracked_fields: ["time", ...(parsed.rpe != null ? ["rpe"] : [])] } : {}),
+          ...(quickNote(parsed) ? { notes: quickNote(parsed) } : {}),
         })
         .select("id, tracked_fields")
         .single();
@@ -303,6 +306,7 @@ export function DayCard({
         group_workout_exercise_id: newRow.id,
         set_order: i,
         target_reps: parsed.reps,
+        target_time_seconds: parsed.timeSeconds,
         target_rpe: parsed.rpe,
       }));
 
@@ -322,7 +326,7 @@ export function DayCard({
         exerciseName: resolvedExerciseName,
         movementPatternId: null,
         trackedFields: newRow.tracked_fields ?? DEFAULT_TRACKED_FIELDS,
-        notes: null,
+        notes: quickNote(parsed),
         videoPath: null,
         youtubeUrl: null,
         tier: null,
@@ -460,7 +464,7 @@ export function DayCard({
               }
             }}
             disabled={addItemBusy}
-            placeholder='Quick add — "Bench 3x5 @7", Enter'
+            placeholder='Quick add — "Bench 3x5 @7", "Plank 60s", Enter'
             className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust disabled:opacity-50"
           />
           {quickEntryError && (

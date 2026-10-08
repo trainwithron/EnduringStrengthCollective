@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError, AiTruncatedError } from "@/lib/anthropic-client";
 import { AiRateLimitedError } from "@/lib/ai-usage";
 import type { ParsedImportRow } from "@/lib/workout-import-parser";
+import { normalizeTimedRow } from "@/lib/timed-exercise";
 import { hasFlaggedMusculoskeletalConcern } from "@/lib/athlete-injury-flag";
 import { checkAndSpendCoachCredits, canRunAiAction } from "@/lib/coach-credits";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
@@ -342,7 +343,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const rows: ParsedImportRow[] = parsed.rows.filter(isValidRow).map((r: any) => ({
+    const rows: ParsedImportRow[] = parsed.rows.filter(isValidRow).map((r: any) =>
+      normalizeTimedRow({
       week: r.week,
       day: r.day,
       exerciseName: r.exerciseName,
@@ -352,7 +354,8 @@ export async function POST(request: Request) {
       rpe: typeof r.rpe === "number" ? r.rpe : null,
       rest: r.rest != null ? String(r.rest) : null,
       timeSeconds: typeof r.timeSeconds === "number" ? r.timeSeconds : null,
-    }));
+      })
+    );
 
     if (rows.length === 0) {
       return NextResponse.json(
