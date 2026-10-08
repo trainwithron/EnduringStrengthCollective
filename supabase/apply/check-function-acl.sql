@@ -17,7 +17,8 @@ select check_name, ok from (
     and p.proname <> all (array['coach_ai_multiplier', 'coach_client_steps', 'get_invite_info', 'has_valid_group_invite', 'athlete_in_org', 'can_view_org_branding', 'join_group_with_invite', 'set_sms_consent', 'attach_refund_reason', 'refund_coach_credit', 'group_session_counts'])
     and p.proname not like 'is\_%'
     and p.proname not like 'training\_partner%'
-    and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')))
+    and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e'))),
+    ('no trigger function can be run by a signed-in user or the public (they only ever run as triggers, so they are closed like the other internal functions)', not exists (select 1 from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prorettype = 'trigger'::regtype and (has_function_privilege('authenticated', p.oid, 'execute') or has_function_privilege('anon', p.oid, 'execute')) and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')))
 ) as checks(check_name, ok)
 union all
 select 'UNREVIEWED signed-in-callable function: ' || p.oid::regprocedure::text, false from pg_proc p where p.pronamespace = 'public'::regnamespace

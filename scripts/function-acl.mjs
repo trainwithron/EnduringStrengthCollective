@@ -52,6 +52,26 @@ export const RELEASE_N_SERVER_ONLY_SIGNATURES = [
 ];
 // Closed by 0306 / 0307: the target-change notice trigger function (a trigger function nobody can call as a function, but internal functions are closed on purpose).
 export const RELEASE_O_SERVER_ONLY_SIGNATURES = [["notify_on_target_change", "", false]];
+// Closed by 0308 (Release O fix, step 53): every trigger function a signed-in person could run by default. A trigger function can only ever run as a trigger (nobody can call it
+// as a function or through the API), and the right to run it is checked when the trigger is created, not when it fires, so closing them changes nothing that works; it makes them
+// follow the same rule as every other internal function. Their ACL before was exactly: owner, authenticated, service_role (no anon, no PUBLIC). notify_on_target_change is not here:
+// step 52 (0307) closed it. A trigger function that app code calls through .rpc() must NOT be on this list (none are: a trigger function cannot be called that way).
+export const TRIGGER_SWEEP = [
+  "audit_log_refuse_changes", "audit_watch", "backfill_placeholder_group_name", "block_athlete_edits_to_completed_session", "clear_client_goal_phase_on_insert",
+  "default_client_tier_for_one_on_one", "enforce_one_on_one_athlete_limit", "guard_ai_recipe_ingredient", "guard_athlete_session_columns", "guard_athlete_session_insert",
+  "guard_client_goal_update", "guard_client_nutrition_feedback", "guard_client_nutrition_preferences", "guard_direct_message_columns", "guard_group_columns",
+  "guard_group_session_bookings", "guard_membership_identity", "guard_organization_columns", "guard_partner_request_columns", "guard_post_columns",
+  "guard_profile_sensitive_columns", "guard_workout_log_columns", "limit_food_favorites", "note_series_session_skipped", "notify_on_client_goal", "notify_on_comment",
+  "notify_on_direct_message", "notify_on_gym_visitor_lead", "notify_on_macros_assigned", "notify_on_mention", "notify_on_nutrition_baseline", "notify_on_nutrition_feedback",
+  "notify_on_nutrition_preferences", "notify_on_partner_request", "notify_on_post_mention", "notify_on_program_assigned", "notify_on_video_comment", "notify_on_video_upload",
+  "phase_follows_confirmed_goal", "prevent_platform_admin_self_escalation", "recompute_training_max", "recompute_workout_log", "resurface_inactive_client",
+  "set_gwe_athlete_id", "set_workout_athlete_id", "set_workout_notes_athlete_id",
+];
+
+// Undo for step 53: back to exactly what each had (owner, signed-in users and the server).
+export const triggerSweepUndoSql = () =>
+  TRIGGER_SWEEP.map((n) => `do $u$ begin if to_regprocedure('public.${n}()') is not null then grant execute on function public.${n}() to authenticated; end if; end $u$;`).join(String.fromCharCode(10));
+
 export const SERVER_ONLY = [...SERVER_ONLY_SIGNATURES, ...RELEASE_F_SERVER_ONLY_SIGNATURES, ...RELEASE_H_SERVER_ONLY_SIGNATURES, ...RELEASE_L_SERVER_ONLY_SIGNATURES, ...RELEASE_N_SERVER_ONLY_SIGNATURES, ...RELEASE_O_SERVER_ONLY_SIGNATURES].map((s) => s[0]);
 export const AUDIT_WRITERS = SERVER_ONLY_SIGNATURES.filter((s) => s[2]).map((s) => s[0]);
 
@@ -98,7 +118,8 @@ export const checkSql = () =>
     `    ('no server-only function can be run by a signed-in user or the public', not exists (select 1 from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname = any (array[${quote(SERVER_ONLY)}]) and (has_function_privilege('authenticated', p.oid, 'execute') or has_function_privilege('anon', p.oid, 'execute')))),`,
     `    ('the audit writers can only be run by the triggers that own them, not even by the server', not exists (select 1 from pg_proc p where p.pronamespace = 'public'::regnamespace and p.proname = any (array[${quote(AUDIT_WRITERS)}]) and has_function_privilege('service_role', p.oid, 'execute'))),`,
     `    ('a signed-out visitor can run only get_invite_info (and the database event helper rls_auto_enable)', not exists (select 1 from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prokind = 'f' and p.proname not in ('get_invite_info', 'rls_auto_enable') and has_function_privilege('anon', p.oid, 'execute') and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e'))),`,
-    `    ('every other signed-in-callable SECURITY DEFINER function checks who is calling, is an is_* or training_partner* helper, or was reviewed', not exists (select 1 from pg_proc p where ${offenderWhere}))`,
+    `    ('every other signed-in-callable SECURITY DEFINER function checks who is calling, is an is_* or training_partner* helper, or was reviewed', not exists (select 1 from pg_proc p where ${offenderWhere})),`,
+    "    ('no trigger function can be run by a signed-in user or the public (they only ever run as triggers, so they are closed like the other internal functions)', not exists (select 1 from pg_proc p where p.pronamespace = 'public'::regnamespace and p.prorettype = 'trigger'::regtype and (has_function_privilege('authenticated', p.oid, 'execute') or has_function_privilege('anon', p.oid, 'execute')) and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')))",
     ") as checks(check_name, ok)",
     "union all",
     `select 'UNREVIEWED signed-in-callable function: ' || p.oid::regprocedure::text, false from pg_proc p where ${offenderWhere}`,

@@ -62,3 +62,13 @@ In this order:
 None of 0236 to 0267 is recorded in `supabase_migrations.schema_migrations` (the newest row is 0247), so `supabase db push` and the dashboard's migration list show them as unapplied. `record-history-applied.sql` inserts the missing rows. It only records a migration whose change is really in the database (each has a check), skips rows already there, and can be run again after steps 07 to 09 to add those. It is safe to run any time; it changes no tables, only the history list. Run it again now that 0270, 0273, 0274, 0275 and 0276 are live (it records those; 0271 and 0272 stay unrecorded until they are applied), and once more after steps 13 and 17.
 
 Regenerate everything with `node scripts/build-paste-files.mjs`; `node scripts/sql-tests/paste-files.test.mjs` applies the whole sequence on the live-equivalent schema, including the guards, the history file and the undo.
+
+### Release O fix 2 (step 53, `apply-release-o3-all.sql`): close the trigger functions
+
+**What it does.** Closes 46 trigger functions to the public and signed-in users (`revoke all ... from public, anon, authenticated`). A trigger function can only ever run as a trigger: nobody can call it as a function or through the API, and the right to run it is checked when the trigger is created, not when it fires, so no trigger stops firing. It makes them follow the same rule as every other internal function, and the permanent check (`check-function-acl.sql`) now has a fifth row that fails if any trigger function can be run by a signed-in user. The list is in `scripts/function-acl.mjs` (`TRIGGER_SWEEP`) and in the migration, which a rehearsal compares name by name. `notify_on_target_change` is not in it: step 52 closed it.
+
+**Run it after step 52**, any time. Nothing visible changes. Then run `check-function-acl.sql`: every row (now five) must say ok = true.
+
+**Before (read from the live database, Oct 8):** every one of the 46 had the access list `owner (postgres), authenticated, service_role` and nothing else (no signed-out visitor, no public). **After:** `owner (postgres), service_role`. The undo grants `authenticated` back to each, which restores the exact previous list (a rehearsal proves it).
+
+**Proof the triggers still fire** (rehearsal 0308): with the functions closed, a signed-in client's own save still runs the guard and the notice triggers, a signed-in comment still notifies the post's author, a coach applying a new target still notifies the client, a signed-in person still cannot make themselves a platform admin, and the service role still passes through the guard.

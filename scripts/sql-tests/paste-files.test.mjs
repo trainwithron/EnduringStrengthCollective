@@ -531,8 +531,11 @@ for (const s of steps) {
   }
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
+  // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.
+  await db.exec(read("migrations/0307_close_target_change_notice_function.sql"));
+  await db.exec(read("migrations/0308_close_trigger_functions.sql"));
   const rows = (await db.query(read("apply/check-function-acl.sql"))).rows;
-  check("check-function-acl.sql after step 24: " + rows.length + " rows, all true" + (rows.some((r) => !r.ok) ? " (FALSE: " + rows.filter((r) => !r.ok).map((r) => r.check_name).join("; ") + ")" : ""), rows.length === 4 && rows.every((r) => r.ok));
+  check("check-function-acl.sql after step 24: " + rows.length + " rows, all true" + (rows.some((r) => !r.ok) ? " (FALSE: " + rows.filter((r) => !r.ok).map((r) => r.check_name).join("; ") + ")" : ""), rows.length === 5 && rows.every((r) => r.ok));
   await db.exec("create function public.zz_new_internal(p_id uuid) returns void language plpgsql security definer set search_path = public as $f$ begin delete from public.profiles where id = p_id; end $f$; grant execute on function public.zz_new_internal(uuid) to authenticated");
   const caught = (await db.query(read("apply/check-function-acl.sql"))).rows;
   check("check-function-acl.sql catches a new SECURITY DEFINER function with no caller check that signed-in users can run", caught.some((r) => !r.ok && /zz_new_internal/.test(r.check_name)));
