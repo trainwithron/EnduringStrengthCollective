@@ -22,6 +22,14 @@ describe("recordLegalAcceptances", () => {
     expect(rows[0]).toMatchObject({ profile_id: "p1", version: LEGAL_VERSIONS.beta_notice, ip: "203.0.113.5", user_agent: "TestAgent/1.0" });
   });
 
+  it("stores the text shown with every beta notice, terms and privacy acceptance", async () => {
+    const { client, upsert } = fakeClient();
+    await recordLegalAcceptances(client, { profileId: "p1", documents: SIGNUP_DOCUMENTS, ip: null, userAgent: null });
+    const rows = (upsert.mock.calls[0] as unknown as [Record<string, unknown>[]])[0];
+    for (const r of rows) expect(String(r.text_snapshot)).toContain(`(version ${LEGAL_VERSIONS[r.document as keyof typeof LEGAL_VERSIONS]})`);
+    expect(String(rows[0].text_snapshot)).toContain("Early software.");
+  });
+
   it("keeps the exact waiver text with the acceptance", async () => {
     const { client, upsert } = fakeClient();
     await recordLegalAcceptances(client, { profileId: "p1", documents: ["waiver"], ip: null, userAgent: null, snapshots: { waiver: "I agree to ..." } });

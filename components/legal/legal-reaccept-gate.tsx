@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { LegalAcceptance } from "@/components/legal/legal-acceptance";
 import { LEGAL_VERSIONS, type LegalDocument } from "@/lib/legal";
-import { legalGateAppliesTo } from "@/lib/legal-status";
+import { gateCopy, legalGateAppliesTo } from "@/lib/legal-status";
 import { recordLegalConsentNow } from "@/lib/legal-client";
 import { createBrowserClient } from "@/lib/supabase/client";
 
@@ -52,6 +52,7 @@ export function LegalReacceptGate() {
   }, [pathname]);
 
   if (needs.length === 0 || !legalGateAppliesTo(pathname)) return null;
+  const copy = gateCopy(needs);
 
   async function accept() {
     if (!checked || busy) return;
@@ -83,11 +84,9 @@ export function LegalReacceptGate() {
       <div className="min-h-full flex items-center justify-center px-6 py-10">
         <div className="w-full max-w-sm">
           <h1 id="legal-gate-title" className="font-display uppercase text-2xl font-bold">
-            One quick thing
+            {copy.heading}
           </h1>
-          <p className="font-body text-sm text-steel mt-2 mb-5">
-            Please read and accept our terms before you continue. You will only be asked again if they change.
-          </p>
+          <p className="font-body text-sm text-steel mt-2 mb-5">{copy.body}</p>
           <LegalAcceptance checked={checked} onChange={setChecked} id="legal-gate-accept" />
           {error && (
             <p className="font-body text-sm text-rust mt-3" role="alert">

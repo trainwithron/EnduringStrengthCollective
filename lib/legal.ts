@@ -6,9 +6,9 @@
 export type LegalDocument = "beta_notice" | "terms" | "privacy" | "refunds" | "waiver";
 
 export const LEGAL_VERSIONS: Record<LegalDocument, string> = {
-  beta_notice: "2026-10-05-draft-3",
+  beta_notice: "2026-10-08-draft-4",
   terms: "2026-10-05-placeholder-1",
-  privacy: "2026-10-05-placeholder-1",
+  privacy: "2026-10-08-placeholder-2",
   refunds: "2026-10-05-placeholder-1",
   waiver: "2026-10-05-draft-1",
 };
@@ -40,8 +40,9 @@ export const SUPPORT_EMAIL_TOKEN = "{support email}";
 export const BETA_NOTICE_PARAGRAPHS: string[] = [
   "Early software. Spotlight Coaching is in beta. Features can change, break or be removed, and data could be lost. Keep your own backups of anything important.",
   "Not medical advice. Programs, nutrition numbers, readiness scores, injury flags and AI suggestions are coaching tools, not diagnosis or treatment. Check with a doctor before starting or changing training, especially with any injury or health condition.",
-  "AI is used. Some tools send text, and in a few cases photos, to an AI provider (Anthropic): when a coach asks Spot questions or gets a daily briefing (this can include client names and training or readiness details), when a meal is described or photographed to log it, when a workout or recipe is imported from text or a photo, and when program or meal suggestions are written. AI output is a draft for the coach to review.",
-  "Your data. We store the info you enter: profile, date of birth, health questionnaire, weight, wellness check-ins, nutrition logs, messages and any photos you choose to share. Your coach can see data in your group. You can download or delete your account in Settings, but some records, such as workout logs, may stay with your coach.",
+  "AI is used. Some tools send text, and in a few cases photos, to an AI provider (Anthropic). When a coach asks Spot questions or gets a daily briefing, the request can include client names and details such as training results, readiness and wellness check-ins, wearable readings and goals. When a coach asks for a program, it can include the names and strength numbers of the coach's clients and, for a client with an injury or health concern, a note about it. When a meal is described or photographed to log it, or a meal suggestion is written, the request can include the photo, nutrition numbers and food allergies or dislikes. A workout or recipe imported from text or a photo is sent as typed or pictured. Your messages, email, phone number, date of birth, body weight and progress photos are not sent. AI output is a draft for the coach to review.",
+  "Your data. We store the info you enter: profile, date of birth, health questionnaire, weight, wellness check-ins, nutrition logs, messages and any photos you choose to share. Your coach can see data in your group. The people who run your coach's organization can too, and during the beta the platform operator can also read training data across organizations to give support, unless a client has been marked private. You can download or delete your account in Settings, but some records, such as workout logs, may stay with your coach.",
+  "Help search. When the app's help search can't answer a question, we keep the wording of that question to improve it, with names, email addresses, links and numbers removed as best we can. It is not linked to your account.",
   "Texts are optional. Text messages are off unless you turn them on. Reply STOP to stop and HELP for help.",
   "No minors' real data yet. Please don't enter real data for anyone under 18 until we confirm consent, privacy and safeguarding steps.",
   "Payments and legal terms are not final. Terms of Service and the Privacy Policy are being finalized and will be sent for acceptance before wider use.",
@@ -71,7 +72,7 @@ export const PLACEHOLDER_SECTIONS: Record<"terms" | "privacy" | "refunds", { hea
     },
     {
       heading: "AI features",
-      body: "Some features send text such as workout notes, nutrition entries and, for coach assistant features, client names to an AI provider (currently Anthropic) to generate suggestions. What the AI writes is a draft your coach reviews. The final policy will list every provider we use.",
+      body: "Some features send text, and in a few cases photos, to an AI provider (currently Anthropic) to generate suggestions. The beta notice lists exactly what can be sent. What the AI writes is a draft your coach reviews. The final policy will list every provider we use.",
     },
     {
       heading: "Your choices",
@@ -85,3 +86,15 @@ export const PLACEHOLDER_SECTIONS: Record<"terms" | "privacy" | "refunds", { hea
     },
   ],
 };
+
+// The exact text a person was shown for a document at the current version, stored with their acceptance so a record can always say what was agreed to
+// (the waiver builds its own snapshot elsewhere). The beta notice is the paragraphs with the support address filled in, as /beta shows them.
+export function legalTextSnapshot(document: LegalDocument, email: string | null = supportEmail()): string | null {
+  const version = LEGAL_VERSIONS[document];
+  if (document === "beta_notice") return [`${LEGAL_TITLES.beta_notice} (version ${version})`, ...betaNoticeParagraphs(email)].join("\n\n");
+  if (document === "terms" || document === "privacy") {
+    const sections = PLACEHOLDER_SECTIONS[document].map((s) => `${s.heading}\n${s.body}`);
+    return [`${LEGAL_TITLES[document]} (version ${version})`, ...sections].join("\n\n");
+  }
+  return null;
+}

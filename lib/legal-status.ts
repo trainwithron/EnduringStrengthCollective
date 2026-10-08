@@ -8,6 +8,14 @@ export function documentsNeedingAcceptance(accepted: { document: string; version
   return SIGNUP_DOCUMENTS.filter((d) => !have.has(`${d}@${LEGAL_VERSIONS[d]}`));
 }
 
+// What the accept screen says. When only the beta notice changed it says exactly that (the terms and privacy policy were not touched); otherwise the general line.
+export function gateCopy(needs: LegalDocument[]): { heading: string; body: string } {
+  if (needs.length === 1 && needs[0] === "beta_notice") {
+    return { heading: "The beta notice was updated", body: "Please read and accept it to continue. You will only be asked again if it changes." };
+  }
+  return { heading: "One quick thing", body: "Please read and accept our terms before you continue. You will only be asked again if they change." };
+}
+
 // Pages that must stay readable and usable without agreeing first: the documents themselves and the signed-out flows.
 const OPEN_PREFIXES = ["/terms", "/privacy", "/beta", "/refunds", "/login", "/signup", "/invite", "/join", "/set-password", "/forgot-password", "/reset-password", "/claim", "/book", "/share", "/pr", "/auth", "/api"];
 
