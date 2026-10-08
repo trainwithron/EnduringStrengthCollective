@@ -2,7 +2,10 @@
 // option into the choice that is saved in a plan. The screens keep using GeneratedMeal / MealOption; only where the options come from changes.
 import { buildMealSpecs, type GeneratedMeal, type MacroTargets, type MealOption, type MealSpec } from "@/lib/meal-engine";
 import type { MealRecipeChoice } from "@/lib/meal-plan-assignment";
-import { selectOptions, type SelectionContext } from "@/lib/library-selection";
+import type { FoodRules } from "@/lib/allergen-check";
+import type { LibraryContextData } from "@/lib/library-data";
+import { selectOptions, varietySettings, type SelectionContext } from "@/lib/library-selection";
+import { DIET_TYPES, type DietType } from "@/lib/meal-templates/types";
 import { buildWeekPlan, type WeekPlanResult, type WeekSlotSpec } from "@/lib/week-build";
 import { roundMacros, type ScaledMeal } from "@/lib/scaled-meal";
 import type { Slot } from "@/lib/meal-templates/types";
@@ -83,4 +86,48 @@ export function choiceFromOption(opt: MealOption): MealRecipeChoice {
     ...(opt.mainProtein !== undefined ? { mainProtein: opt.mainProtein } : {}),
     ...(opt.key ? { key: opt.key } : {}),
   };
+}
+
+// The diet the library is filtered by: the client's own diet type when they have one, else what the plan's archetype says.
+export function libraryDietFor(ownDiet: string | null | undefined, archetype: string): DietType {
+  if (ownDiet && (DIET_TYPES as string[]).includes(ownDiet)) return ownDiet as DietType;
+  return (DIET_TYPES as string[]).includes(archetype) ? (archetype as DietType) : "omnivore";
+}
+
+// Everything a library build reads, in one place: the client's rules, what they like (saved, plus anything typed for this build), what they have eaten and been offered, and the
+// coach's own recipes. Used by the coach's planner and by a client's request for a different plan, so both build from the same inputs. A request for a different plan passes
+// variety "mix_it_up": the client asked for change, so meals offered lately are moved down whatever their usual setting.
+export function buildSelectionContext(args: {
+  libraryData: LibraryContextData | null;
+  rules: FoodRules;
+  archetype: string;
+  extraLikes?: string[];
+  variety?: string | null;
+  excludeKeys?: Set<string>;
+}): SelectionContext {
+  const v = varietySettings(args.variety !== undefined ? args.variety : args.libraryData?.variety);
+  return {
+    rules: args.rules,
+    diet: libraryDietFor(args.rules.dietType, args.archetype),
+    likes: [...(args.libraryData?.likes ?? []), ...(args.extraLikes ?? [])],
+    favorites: { ids: new Set(args.libraryData?.favorites.ids ?? []), names: new Set(args.libraryData?.favorites.names ?? []) },
+    recentlyOffered: args.libraryData?.recentlyOffered ?? new Map(),
+    mixItUp: v.mixItUp,
+    recentDays: v.recentDays,
+    coachRecipes: args.libraryData?.coachRecipes ?? [],
+    excludeKeys: args.excludeKeys,
+  };
+}
+
+// The meals of one day as they are saved in a plan (what the client's card reads).
+export function entriesFromMeals(meals: GeneratedMeal[]) {
+  return meals.map((m) => ({
+    mealId: m.spec.id,
+    title: m.spec.title,
+    proteinTarget: m.spec.proteinTarget,
+    carbsTarget: m.spec.carbsTarget,
+    fatTarget: m.spec.fatTarget,
+    recipes: m.options.map(choiceFromOption),
+    ...((m.featuredIndex ?? 0) > 0 ? { featuredIndex: m.featuredIndex } : {}),
+  }));
 }

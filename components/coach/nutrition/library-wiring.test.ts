@@ -151,7 +151,7 @@ describe("second review: typed items reach the AI route, edits relabel a library
   });
   it("changing a library-built day by hand relabels it, so the next Build the week asks", () => {
     expect(assignment).toContain("EDITED_BY_HAND_RATIONALE");
-    expect(assignment).toContain("base.rationale === LIBRARY_WEEK_RATIONALE");
+    expect(assignment).toContain("isLibraryRationale(base.rationale)");
   });
   it("what the note says the client likes boosts meals", () => {
     expect(generator).toContain("...typedRules.likes");

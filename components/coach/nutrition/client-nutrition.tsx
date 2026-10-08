@@ -12,6 +12,7 @@ import { GroceryListSection } from "@/components/coach/nutrition/grocery-list-se
 import { FoodTrackingSwitch } from "@/components/coach/nutrition/food-tracking-switch";
 import { PreferencesSection } from "@/components/coach/nutrition/preferences-section";
 import { ClientAnswersPanel } from "@/components/coach/nutrition/client-answers-panel";
+import { PlanTriesPanel, type PlanTryView } from "@/components/coach/nutrition/plan-tries-panel";
 import type { RecalcAnswer } from "@/lib/recalc-prompt";
 import { computeWeeklyWeightTrend } from "@/lib/weight-trend";
 import { computeReadinessAverage } from "@/lib/wellness";
@@ -192,6 +193,26 @@ export async function ClientNutrition({
     targetEffectiveFrom: r.target_effective_from as string,
     createdAt: r.created_at as string,
   }));
+  // When the client asked for a different meal plan ("Not feeling it?"): the latest tries, newest first. A failed read (or a database without the table yet) is no tries, never a failed page.
+  const { data: tryRows, error: triesError } = await supabase
+    .from("meal_plan_tries")
+    .select("id, try_number, note, summary, dates, requested_at, restored_at")
+    .eq("athlete_id", athleteId)
+    .eq("group_id", groupId)
+    .order("requested_at", { ascending: false })
+    .limit(6);
+  if (triesError) console.error("[client-nutrition] could not read the plan tries:", triesError.message);
+  const planTries: PlanTryView[] = triesError
+    ? []
+    : (tryRows ?? []).map((r) => ({
+        id: r.id as string,
+        tryNumber: Number(r.try_number),
+        note: (r.note as string | null) ?? "",
+        summary: (r.summary as string | null) ?? "",
+        dates: (r.dates as string[] | null) ?? [],
+        requestedAt: r.requested_at as string,
+        restored: !!r.restored_at,
+      }));
   // The target in force today as whole numbers, when all four are set (scaling a plan needs every one).
   const scaleTarget =
     standingTarget && standingTarget.calories != null && standingTarget.protein_g != null && standingTarget.carbs_g != null && standingTarget.fat_g != null
@@ -648,6 +669,7 @@ export async function ClientNutrition({
 
       <section>
         <SectionHeading id="meal-plan" title="Meal plan" note="Work out a target with the calculator if you need one, then build the plan from it." />
+        <PlanTriesPanel clientName={firstName} tries={planTries} />
         {flaggedAssigned.length > 0 && (
           <div role="status" className="mb-4 border border-amber-400/40 bg-amber-400/5 p-3 space-y-1.5">
             <p className="font-body text-sm text-amber-400 font-medium">

@@ -34,6 +34,7 @@ import { FOOD_TRACKING_OFF_LINE, dailyCaloriesFromLog } from "@/lib/nutrition-tr
 import { addDaysToKey } from "@/lib/date-key";
 import { fetchFoodLogDay } from "@/lib/food-entry";
 import { AiBudgetMeter } from "@/components/coach/ai-budget-meter";
+import { retryState as retryStateFor, type RetryState } from "@/lib/meal-plan-retry";
 
 export default async function NutritionPage(
   props: {
@@ -329,6 +330,15 @@ export default async function NutritionPage(
     8
   );
 
+  // "Not feeling it?": only for the client themself (a coach acting as them cannot ask on their behalf), and only when there is a saved plan to change. The state is read from the plan
+  // itself (the try number is written on each rebuilt day), so a coach who assigns a new plan starts the count over.
+  let planRetry: RetryState | null = null;
+  if (macrosEnabled && !isActingAsOther && savedPlanMeals) {
+    const { data: futurePlanDays, error: futurePlanError } = await supabase.from("meal_plans").select("log_date, rationale").eq("athlete_id", athleteId).gte("log_date", todayKey).limit(62);
+    if (futurePlanError) console.error("[nutrition] could not read the plan days:", futurePlanError.message);
+    else planRetry = retryStateFor((futurePlanDays ?? []) as { log_date: string; rationale: string | null }[], todayKey);
+  }
+
   const standingHistory = macrosEnabled ? await fetchStandingHistory(supabase, athleteId, params.groupId) : [];
   const todayKeyForMacros = todayKey;
   // "Are you happy with your meal plan?": only for the client themself (a coach acting as them cannot answer for them), only after a real change of target, and only until it is answered.
@@ -480,6 +490,7 @@ export default async function NutritionPage(
                 coachProgramming={macrosEnabled}
                 nutrients={nutrientData}
                 plan={savedPlanMeals ? { meals: clientPlan.meals, hiddenCount: clientPlan.hiddenCount, emptiedMeals: clientPlan.emptiedMeals } : null}
+                planRetry={planRetry}
                 athleteId={athleteId}
                 groupId={params.groupId}
                 logDate={todayKey}

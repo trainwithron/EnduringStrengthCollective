@@ -34,6 +34,7 @@ export async function GET() {
     { data: sessionCredits },
     { data: foodPreferences },
     { data: nutritionFeedback },
+    { data: mealPlanTries },
     { data: readSettings },
   ] = await Promise.all([
     supabase.from("profiles").select("full_name, avatar_url").eq("id", userId).maybeSingle(),
@@ -55,6 +56,7 @@ export async function GET() {
     supabase.from("session_credits").select("group_id, balance").eq("athlete_id", userId),
     supabase.from("client_nutrition_preferences").select("*").eq("athlete_id", userId).maybeSingle(),
     supabase.from("client_nutrition_feedback").select("*").eq("athlete_id", userId),
+    supabase.from("meal_plan_tries").select("try_number, note, summary, dates, requested_at, restored_at").eq("athlete_id", userId),
     supabase.from("read_settings").select("faith_track, note_seen_at, updated_at").eq("athlete_id", userId).maybeSingle(),
   ]);
 
@@ -79,6 +81,7 @@ export async function GET() {
     sessionCredits,
     foodPreferences,
     nutritionFeedback,
+    mealPlanTries,
     readSettings,
   };
 

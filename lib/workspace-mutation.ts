@@ -10,7 +10,7 @@ const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 // The app's own routes that SAVE coach or client data. A test (workspace-mutation.test.ts) walks every route that can write and fails if a route is neither here nor in
 // that test's explicit NOT_A_SAVE list, so a new route cannot be missed by accident.
 export const SAVING_API =
-  /^\/api\/(clients|invites|bookings|credits|group-sessions|organizations|broadcast|sms|webhooks|reup|legal|account|calendar-spotter|google-calendar|zapier|assistant\/action|kiosk\/checkin|org-dispatch\/(accept|decline|reply|ask-question)|programming-spotter\/(dismiss|feedback|stop-suggesting)|coaches\/invite|series(?!\/preview)|ai\/(refund-credit|meal-plan-credit-charge|program-chat\/confirm-rule)|coach\/(packages|package-assignments|dashboard-layout|api-key|video-checkin))(\/|$)/;
+  /^\/api\/(clients|invites|bookings|credits|group-sessions|organizations|broadcast|sms|webhooks|reup|legal|account|calendar-spotter|google-calendar|zapier|assistant\/action|kiosk\/checkin|org-dispatch\/(accept|decline|reply|ask-question)|programming-spotter\/(dismiss|feedback|stop-suggesting)|coaches\/invite|series(?!\/preview)|ai\/(refund-credit|meal-plan-credit-charge|program-chat\/confirm-rule)|coach\/(packages|package-assignments|dashboard-layout|api-key|video-checkin)|nutrition\/plan-retry)(\/|$)/;
 
 // Database functions that only read (named like reads). Everything else called through /rest/v1/rpc/ is treated as a save.
 const READ_RPC = /^((get|list|search|check|is|has|can|fetch|count|find|preview)_|coach_roster|booking_counts|group_leaderboard|athlete_|coach_client_steps|coach_inbox|org_billable|org_coach_seats|group_session_counts|training_partner)/;

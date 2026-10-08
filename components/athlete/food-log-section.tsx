@@ -4,6 +4,8 @@ import { useState } from "react";
 import type { GeneratedMeal } from "@/lib/meal-engine";
 import { MealCheckoffList, type FoodLogEntry } from "./meal-checkoff-list";
 import { TodaysMealCards } from "./todays-meal-cards";
+import { MealPlanRetryBox } from "./meal-plan-retry-box";
+import type { RetryState } from "@/lib/meal-plan-retry";
 import type { MealEntryPayload } from "@/lib/meal-plan-assignment";
 import { QuickLogFoodButton } from "./quick-log-food-button";
 import { BarcodeScanButton } from "./barcode-scan-button";
@@ -33,6 +35,7 @@ export function FoodLogSection({
   target,
   coachProgramming = true,
   nutrients,
+  planRetry = null,
 }: {
   athleteId: string;
   groupId: string;
@@ -48,6 +51,8 @@ export function FoodLogSection({
   coachProgramming?: boolean;
   // Vitamins and minerals shown with the log: the 29 days before today added up on the server, the person's age and sex for their reference intake, and (optionally) an estimate from the meal plan.
   nutrients?: { pastDays: DayTotals[]; age: number | null; sex: Sex | null; planEstimate: PlanEstimate | null; partialLog?: boolean } | null;
+  // "Not feeling it? Tell us what to change." under the meals. Null for a coach acting as the client, a client with no saved plan, and anyone who may not ask.
+  planRetry?: RetryState | null;
 }) {
   const planHasMeals = !!plan?.meals && Object.values(plan.meals).some((entries) => (entries ?? []).length > 0);
   const [allEntries, setAllEntries] = useState(initialEntries);
@@ -112,16 +117,19 @@ export function FoodLogSection({
       )}
 
       {planHasMeals ? (
-        <TodaysMealCards
-          athleteId={athleteId}
-          groupId={groupId}
-          logDate={logDate}
-          meals={plan!.meals}
-          hiddenCount={plan!.hiddenCount}
-          emptiedMeals={plan!.emptiedMeals}
-          entries={allEntries}
-          onEntryLogged={handleMealEntryLogged}
-        />
+        <>
+          <TodaysMealCards
+            athleteId={athleteId}
+            groupId={groupId}
+            logDate={logDate}
+            meals={plan!.meals}
+            hiddenCount={plan!.hiddenCount}
+            emptiedMeals={plan!.emptiedMeals}
+            entries={allEntries}
+            onEntryLogged={handleMealEntryLogged}
+          />
+          {planRetry && <MealPlanRetryBox groupId={groupId} state={planRetry} />}
+        </>
       ) : (
         <MealCheckoffList
           athleteId={athleteId}
