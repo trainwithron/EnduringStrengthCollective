@@ -250,6 +250,14 @@ export function ProgramBuilderDesktop({
           >
             Exercise Progressions
           </Link>
+          <a
+            href={`/print/programs/${programId}`}
+            target="_blank"
+            rel="noopener"
+            className="inline-flex items-center h-9 font-body text-xs text-rust border border-rust px-3"
+          >
+            Print or PDF
+          </a>
           {startDate && trainingDays && trainingDays.length > 0 && (
             <Link
               href={`/groups/${groupId}/programs/${programId}/calendar`}

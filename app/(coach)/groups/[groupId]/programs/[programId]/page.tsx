@@ -152,6 +152,9 @@ export default async function ProgramDetailPage(
             {program.description}
           </p>
         )}
+        <a href={`/print/programs/${params.programId}`} target="_blank" rel="noopener" className="inline-flex items-center h-9 mt-4 mr-2 font-body text-xs text-rust border border-rust px-3">
+          Print or PDF
+        </a>
         {program.start_date && program.training_days && program.training_days.length > 0 && (
           <Link
             href={`/groups/${params.groupId}/programs/${params.programId}/calendar`}
