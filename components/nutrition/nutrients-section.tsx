@@ -53,7 +53,7 @@ export function NutrientsView({ overview: o, audience, clientName, detailHref }:
 
       {o.source === "plan" ? (
         <p className="font-body text-xs text-amber-400 border-l-2 border-amber-400/60 pl-2 max-w-[70ch]" data-testid="plan-estimate-note">
-          These figures are an ESTIMATE from today's meal plan, not from food {audience === "coach" ? "logged" : "you logged"}.
+          These figures are an ESTIMATE from today&apos;s meal plan, not from food {audience === "coach" ? "logged" : "you logged"}.
           {o.planCoverage && o.planCoverage.total > 0 ? ` ${o.planCoverage.covered} of ${o.planCoverage.total} planned ingredients could be matched to nutrition data, so the totals may be partial.` : ""} Once {audience === "coach" ? "they log" : "you log"} foods with vitamin and mineral detail, this shows what was actually eaten.
         </p>
       ) : o.todayEntries === 0 ? (
