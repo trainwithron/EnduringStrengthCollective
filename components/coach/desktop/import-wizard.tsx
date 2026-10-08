@@ -39,6 +39,8 @@ import { generateDupProgram, generateDupSelfUpdatingProgram, DUP_WEEKLY_SCHEME }
 import { generateGzclpProgram, type GzclpLiftInput, type GzclpProgressionRule } from "@/lib/gzclp-generator";
 import { AiOutputWrongButton } from "@/components/coach/ai-output-wrong-button";
 import { AiUsageMeter } from "@/components/coach/ai-usage-meter";
+import { detectImportKind } from "@/lib/import-input-kind";
+import { buildImportPrompt } from "@/lib/import-prompt";
 
 type Status = "idle" | "working" | "reviewing" | "done" | "error";
 
@@ -691,6 +693,10 @@ export function ImportWizard({
   }
 
   const [aiPrompt, setAiPrompt] = useState(initialAiPrompt ?? "");
+  const [dragOver, setDragOver] = useState(false);
+  const [promptCopied, setPromptCopied] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const boxKind = detectImportKind({ text: aiPrompt });
   const autoGenerateFiredRef = useRef(false);
 
   async function handleAiGenerate() {
@@ -746,42 +752,105 @@ export function ImportWizard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function handleAiPhotoUpload(file: File) {
+  // Everything the AI reader can take (a photo, a PDF, pasted text) goes through one call to /api/ai/parse-workout and lands on the same review screen as every other path.
+  async function readWithAi(body: Record<string, unknown>, workingLabel: string, programName: string, sourceNote: string, fallbackError: string) {
     if (processingRef.current) return;
     processingRef.current = true;
     setStatus("working");
     setError(null);
-    setStatusLabel("Reading the photo with AI…");
+    setStatusLabel(workingLabel);
 
     try {
-      const base64 = await fileToBase64(file);
       const res = await fetch("/api/ai/parse-workout", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ imageBase64: base64, mediaType: file.type }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
 
       if (!res.ok) {
         setStatus("error");
-        setError(data.error ?? "Couldn't read that image — try again.");
+        setError(data.error ?? fallbackError);
         processingRef.current = false;
         return;
       }
 
-      prepareImport(
-        data.rows,
-        file.name.replace(/\.\w+$/, ""),
-        `Imported from a photo (AI) — ${file.name}`,
-        null,
-        null,
-        undefined,
-        true
-      );
+      prepareImport(data.rows, programName, sourceNote, null, null, undefined, true);
     } catch (err) {
       setStatus("error");
-      setError(err instanceof Error ? err.message : "Couldn't read that image — try again.");
+      setError(err instanceof Error ? err.message : fallbackError);
       processingRef.current = false;
+    }
+  }
+
+  async function handleAiPhotoUpload(file: File) {
+    if (processingRef.current) return;
+    const base64 = await fileToBase64(file);
+    await readWithAi({ imageBase64: base64, mediaType: file.type }, "Reading the picture with AI…", file.name.replace(/\.\w+$/, ""), `Imported from a picture (AI) — ${file.name}`, "Couldn't read that picture — try again.");
+  }
+
+  async function handleAiPdfUpload(file: File) {
+    if (processingRef.current) return;
+    const base64 = await fileToBase64(file);
+    await readWithAi({ pdfBase64: base64 }, "Reading the PDF…", file.name.replace(/\.\w+$/, ""), `Imported from a PDF (AI) — ${file.name}`, "Couldn't read that PDF — try again.");
+  }
+
+  async function handleAiTextImport(text: string, programName: string, sourceNote: string) {
+    await readWithAi({ text }, "Reading the program with AI…", programName, sourceNote, "Couldn't read that text — try again.");
+  }
+
+  // One drop zone, one chooser, one paste: the app decides what it is. A spreadsheet is read free in the browser; a PDF, picture or text file goes to the AI reader.
+  async function handleBoxFile(file: File) {
+    if (processingRef.current) return;
+    const decision = detectImportKind({ fileName: file.name, mimeType: file.type, sizeBytes: file.size });
+    if (decision.kind === "unsupported") {
+      setStatus("error");
+      setError(decision.message ?? "That file can't be read here.");
+      return;
+    }
+    if (decision.kind === "spreadsheet") return handleFile(file);
+    if (decision.kind === "image") return handleAiPhotoUpload(file);
+    if (decision.kind === "pdf") return handleAiPdfUpload(file);
+    // a .txt or .md file: its content is the program
+    const text = (await file.text()).trim();
+    const checked = detectImportKind({ text });
+    if (checked.kind === "empty") {
+      setStatus("error");
+      setError("That file is empty.");
+      return;
+    }
+    if (checked.kind === "unsupported") {
+      setStatus("error");
+      setError(checked.message ?? "That text is too long to read at once.");
+      return;
+    }
+    await handleAiTextImport(text, file.name.replace(/\.\w+$/, ""), `Imported from a text file (AI) — ${file.name}`);
+  }
+
+  // The button under the box: a plain description is written into a program, pasted program text is read as it is.
+  function handleBoxSubmit() {
+    if (processingRef.current) return;
+    const decision = detectImportKind({ text: aiPrompt });
+    if (decision.kind === "empty") return;
+    if (decision.kind === "unsupported") {
+      setStatus("error");
+      setError(decision.message ?? "That text can't be used.");
+      return;
+    }
+    if (decision.kind === "pasted_program") {
+      void handleAiTextImport(aiPrompt.trim(), "Pasted program", "Imported from pasted text (AI)");
+      return;
+    }
+    void handleAiGenerate();
+  }
+
+  async function copyImportPrompt() {
+    try {
+      await navigator.clipboard.writeText(buildImportPrompt());
+      setPromptCopied(true);
+      setTimeout(() => setPromptCopied(false), 2000);
+    } catch {
+      setPromptCopied(false);
     }
   }
 
@@ -1022,23 +1091,79 @@ export function ImportWizard({
           </button>
         </div>
       )}
-      <div className="border border-steel/20 bg-surface/40 rounded-token-lg p-6">
-        <p className="font-body text-sm text-steel mb-4">
-          Upload a spreadsheet export (.csv or .xlsx) — columns and headers can be in any order.
-          We&apos;ll match exercises against your library automatically and add anything new.
-          Nothing is created until you&apos;ve confirmed it — the only case that skips a review
-          step is when every exercise matched exactly or was clearly new, with nothing guessed.
+      <div
+        className={`border rounded-token-lg p-6 ${dragOver ? "border-rust bg-rust/5 border-dashed" : "border-steel/20 bg-surface/40"}`}
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (status !== "working") setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          const file = e.dataTransfer.files?.[0];
+          if (file && status !== "working") handleBoxFile(file);
+        }}
+      >
+        <label htmlFor="build-with-ai-box" className="block font-display uppercase text-sm tracking-wide mb-1">
+          Describe a program, or drop one in
+        </label>
+        <p className="font-body text-xs text-steel mb-3">
+          Type what you want, paste a program, or drop a spreadsheet, PDF, photo or screenshot. You review everything before anything is created.
         </p>
-        <input
-          type="file"
-          accept=".csv,.xlsx,.xls"
-          disabled={status === "working"}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) handleFile(file);
+        <textarea
+          id="build-with-ai-box"
+          value={aiPrompt}
+          onChange={(e) => setAiPrompt(e.target.value)}
+          onPaste={(e) => {
+            const file = e.clipboardData?.files?.[0];
+            if (file && status !== "working") {
+              e.preventDefault();
+              handleBoxFile(file);
+            }
           }}
-          className="font-body text-sm text-chalk disabled:opacity-40"
+          disabled={status === "working"}
+          rows={5}
+          placeholder={'e.g. "12-week strength block, 4 days/week, squat/bench/deadlift focus, intermediate client". Or paste a program here.'}
+          className="w-full bg-graphite border border-steel/30 text-chalk px-3 py-2 font-body text-sm focus:outline-none focus:border-rust resize-y disabled:opacity-40"
         />
+        <p className="font-body text-xs text-steel mt-1.5">Helpful to mention: weeks, days per week, experience level, focus, and anything to avoid.</p>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={handleBoxSubmit}
+            disabled={status === "working" || boxKind.kind === "empty"}
+            className="h-11 sm:h-9 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
+          >
+            {boxKind.kind === "pasted_program" ? "Read this program" : "Generate program"}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,.tsv,.xlsx,.xls,.pdf,.txt,.md,image/*"
+            disabled={status === "working"}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (file) handleBoxFile(file);
+            }}
+            className="sr-only"
+            tabIndex={-1}
+            aria-label="Choose a program file"
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={status === "working"}
+            className="h-11 sm:h-9 px-4 border border-steel/40 text-chalk font-body text-sm disabled:opacity-40"
+          >
+            Choose a file
+          </button>
+          <span className="font-body text-xs text-steel">Spreadsheets are read free. PDFs, photos and text use AI.</span>
+        </div>
+        <div className="mt-2">
+          <AiUsageMeter groupId={groupId} focus="program" compact />
+        </div>
         {status === "working" && (
           <div className="mt-3">
             <p className="font-body text-xs text-steel flex items-center gap-2">
@@ -1046,9 +1171,7 @@ export function ImportWizard({
               {statusLabel}
             </p>
             {statusLabel === "Writing a program with AI…" && (
-              <p className="font-body text-xs text-steel mt-1">
-                Longer programs can take up to a minute — hang tight, this hasn&apos;t stalled.
-              </p>
+              <p className="font-body text-xs text-steel mt-1">Longer programs can take up to a minute — hang tight, this hasn&apos;t stalled.</p>
             )}
           </div>
         )}
@@ -1057,92 +1180,29 @@ export function ImportWizard({
             {error}
           </p>
         )}
-      </div>
-
-      <div className="border border-steel/20 bg-surface/40 rounded-token-lg p-6">
-        <p className="font-body text-sm text-steel mb-4">
-          Or upload a photo or screenshot of a program — from another app, a spreadsheet, or a
-          handwritten sheet — and AI will read it in. You&apos;ll always get a real review screen
-          before anything is created, even if nothing needs a second look. Convert a PDF page to
-          an image first (a screenshot works fine).
-        </p>
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/gif"
-          disabled={status === "working"}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            e.target.value = "";
-            if (file) handleAiPhotoUpload(file);
-          }}
-          className="font-body text-sm text-chalk disabled:opacity-40"
-        />
-      </div>
-
-      <div className="border border-steel/20 bg-surface/40 rounded-token-lg p-6">
-        <p className="font-body text-sm text-steel mb-3">
-          Or describe the program you want and AI will write a full draft, preferring exercises
-          already in your library. You&apos;ll always get a real review screen before anything is
-          created, even if nothing needs a second look.
-        </p>
-        <div className="mb-3 border border-steel/15 bg-graphite/60 p-3">
-          <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5">
-            For the best result, mention:
-          </p>
-          <ul className="font-body text-xs text-steel space-y-0.5 list-disc list-inside">
-            <li>Duration and days per week (e.g. &ldquo;8 weeks, 4 days/week&rdquo;)</li>
-            <li>Experience level (beginner / intermediate / advanced)</li>
-            <li>Focus — specific lifts, a goal (strength, hypertrophy, conditioning), or a sport</li>
-            <li>Anything to avoid (an injury, equipment you don&apos;t have)</li>
-          </ul>
-          <button
-            type="button"
-            onClick={() =>
-              setAiPrompt(
-                'An 8-week intermediate strength block, 4 days/week, upper/lower split, built around squat/bench/deadlift/overhead press. No dumbbells past 50 lbs available.'
-              )
-            }
-            disabled={status === "working"}
-            className="mt-2 font-body text-xs text-rust underline decoration-dotted disabled:opacity-40"
-          >
-            Use this example →
-          </button>
-        </div>
-        <textarea
-          value={aiPrompt}
-          onChange={(e) => setAiPrompt(e.target.value)}
-          disabled={status === "working"}
-          rows={3}
-          placeholder='e.g. "12-week strength block, 4 days/week, squat/bench/deadlift focus, intermediate client"'
-          className="w-full bg-graphite border border-steel/30 text-chalk px-3 py-2 font-body text-sm focus:outline-none focus:border-rust resize-none disabled:opacity-40"
-        />
-        <button
-          type="button"
-          onClick={handleAiGenerate}
-          disabled={status === "working" || !aiPrompt.trim()}
-          className="mt-3 h-9 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
-        >
-          Generate program
-        </button>
-        <div className="mt-2">
-          <AiUsageMeter groupId={groupId} focus="program" compact />
-        </div>
+        <details className="mt-4">
+          <summary className="font-body text-xs text-steel cursor-pointer">Prefer to use your own AI? Copy this prompt</summary>
+          <div className="mt-2 space-y-2">
+            <p className="font-body text-xs text-steel">Give it to your AI along with your program. Drop the CSV it gives you back into the box above, which is read free.</p>
+            <button
+              type="button"
+              onClick={copyImportPrompt}
+              className="h-11 sm:h-9 px-4 border border-steel/40 text-chalk font-body text-sm"
+            >
+              {promptCopied ? "Copied" : "Copy prompt"}
+            </button>
+          </div>
+        </details>
       </div>
 
       {athleteId && dupTrainingMaxes.length > 0 && (
         <div className="border border-steel/20 bg-surface/40 rounded-token-lg p-6">
           <p className="font-body text-sm text-steel mb-1">
-            Or generate a Daily Undulating Periodization (DUP) block for{" "}
-            <span className="text-chalk">{athleteName ?? "this client"}</span> — deterministic, no
-            AI involved, computed straight from their current training maxes below.
+            Or a DUP block for <span className="text-chalk">{athleteName ?? "this client"}</span> — no AI, built from their current training maxes.
           </p>
           <p className="font-body text-xs text-steel mb-4">
-            Every training day covers every lift you select, rotating through{" "}
-            {DUP_WEEKLY_SCHEME.map((s) => `${s.label} (${s.reps} @ ~${Math.round(s.percentOfTrainingMax * 100)}%)`).join(
-              " → "
-            )}
-            {" "}each week. A defensible default scheme, not the one official DUP — adjust freely
-            after it&apos;s created.
+            Each day rotates through{" "}
+            {DUP_WEEKLY_SCHEME.map((s) => `${s.label} (${s.reps} @ ~${Math.round(s.percentOfTrainingMax * 100)}%)`).join(" → ")}.
           </p>
           <div className="space-y-1.5 mb-4">
             {dupTrainingMaxes.map((lift) => (
@@ -1198,10 +1258,7 @@ export function ImportWizard({
       {athleteId && (
         <div className="border border-steel/20 bg-surface/40 rounded-token-lg p-6">
           <p className="font-body text-sm text-steel mb-1">
-            Or generate a GZCLP-style tier block for{" "}
-            <span className="text-chalk">{athleteName ?? "this client"}</span> — 4 main lifts, each
-            playing a main (T1, auto-progressing 5x3+/6x2+/10x1+ off their real performance) and
-            secondary (T2, fixed 3x10) role across a 4-day week.
+            Or a GZCLP-style block for <span className="text-chalk">{athleteName ?? "this client"}</span> — 4 main lifts, 4 days a week, no AI.
           </p>
           {dupTrainingMaxes.length < 4 ? (
             <p className="font-body text-xs text-steel mt-3">
@@ -1212,8 +1269,7 @@ export function ImportWizard({
           ) : (
             <>
               <p className="font-body text-xs text-steel mb-4">
-                T1 starting weight (week 1 only — every week after is computed live from real logged
-                performance, never precomputed) comes from{" "}
+                T1 starts at{" "}
                 <label className="inline-flex items-center gap-1">
                   <input
                     type="number"
@@ -1226,8 +1282,7 @@ export function ImportWizard({
                   />
                   %
                 </label>{" "}
-                of their current training max — a defensible starting point, not the one official
-                number; adjust before generating if you know better for this athlete.
+                of their training max.
               </p>
               <div className="space-y-2 mb-4">
                 {[0, 1, 2, 3].map((i) => (
@@ -1273,8 +1328,7 @@ export function ImportWizard({
                 ))}
               </div>
               <p className="font-body text-xs text-steel mb-4">
-                Lifts 1+2 pair together (each is the other&apos;s T2), same for lifts 3+4 — the
-                standard squat/bench + press/deadlift split, whatever you actually name them.
+                Lifts 1 and 2 pair as each other&apos;s T2, as do lifts 3 and 4.
               </p>
               <label className="flex items-center gap-2 font-body text-xs text-steel mb-4">
                 Weeks

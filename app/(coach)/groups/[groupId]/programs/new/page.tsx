@@ -133,11 +133,6 @@ export default async function NewProgramPage(
         </div>
       ) : (
         <>
-          <p className="font-body text-sm text-steel mb-4 max-w-[70ch]">
-            Describe the program you want in plain English and AI writes a full draft — you&apos;ll
-            review anything it had to guess on before it&apos;s actually created. Photo/spreadsheet
-            import is also here if that&apos;s easier than typing.
-          </p>
           <ImportWizard
             coachId={user.id}
             groupId={params.groupId}

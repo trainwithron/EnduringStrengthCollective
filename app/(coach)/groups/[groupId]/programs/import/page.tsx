@@ -61,11 +61,7 @@ export default async function ImportProgramPage(
           Import or build with AI
         </h1>
         <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
-          Three ways in, all landing in the same review step before anything is created: upload a
-          spreadsheet export from another platform, upload a photo of a program (even
-          handwritten), or just describe the program you want in plain English and AI writes a
-          full draft. Exercises are matched against your library automatically — you&apos;re only
-          stopped to double-check anything that was guessed rather than matched exactly.
+          Describe a program, or drop in a spreadsheet, PDF, photo or pasted text. Exercises are matched against your library automatically, and you review everything before anything is created.
         </p>
       </div>
 
