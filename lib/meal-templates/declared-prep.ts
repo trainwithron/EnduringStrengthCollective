@@ -22,6 +22,7 @@ export const DECLARED_PREP_FOODS: Record<string, { foods: string[]; reason: stri
   d_seitan_black_bean_chili_bowl_vegan: { foods: ["chili"], reason: "Chili spices." },
   s_melon_mint_protein: { foods: ["water"], reason: "Cold water for the shake: no calories." },
   s_jerky_eggs_carnivore: { foods: ["salt"], reason: "Salt to season the meat; no calories counted." },
+  s_steak_bites_eggs_carnivore: { foods: ["salt"], reason: "Salt to season the steak; no calories counted." },
   s_tuna_rice_cakes_pescatarian: { foods: ["lemon"], reason: "A squeeze of lemon." },
 };
 

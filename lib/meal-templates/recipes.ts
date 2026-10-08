@@ -1,9 +1,28 @@
-// The 66 recipe templates of Ron's Mix & Macros app, copied as written (docs/old-app/enduring-strength-checkin-engine.html (Mix & Macros), lines 1170-2259). Each build(p, c, f) takes a slot's protein, carb and fat
+// The 66 recipe templates of Ron's Mix & Macros app, copied as written (and since reworked or added: see docs/NUTRITION_PORT_LOG.md section 7) (docs/old-app/enduring-strength-checkin-engine.html (Mix & Macros), lines 1170-2259). Each build(p, c, f) takes a slot's protein, carb and fat
 // grams and returns the meal's lines. The formulas are NOT edited here: the engine calls them through scaleTemplate (scale.ts), which re-aims a formula whose fixed
 // sides push the meal off target, and skips a recipe that cannot land (disabled.ts says which and why).
 import { FOOD_DENSITY, UNIT_WEIGHT_G } from "./food-table";
 import { toOz } from "./render";
 import type { TemplateRecipe } from "./types";
+
+// The Preparation sentence is built from the lines that print at this size. Many of Ron's formulas leave a line out when its amount is too small to show (an avocado, a few
+// berries, a teaspoon of oil), and a sentence that still tells the cook to add it would name a food that is not on the plate. When every line prints, these helpers give back
+// exactly the sentence Ron wrote; when one is left out, the sentence drops that food (a test checks every recipe at every size it is served at).
+type Part = string | false;
+const parts = (xs: Part[]): string[] => xs.filter((x): x is string => typeof x === "string");
+// "a", "a and b", "a, b, and c" (the series comma Ron's sentences use).
+const andList = (xs: Part[]): string => {
+  const l = parts(xs);
+  return l.length <= 1 ? l.join("") : l.length === 2 ? `${l[0]} and ${l[1]}` : `${l.slice(0, -1).join(", ")}, and ${l[l.length - 1]}`;
+};
+const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+// " Top with a and b." (nothing at all when there is nothing to name)
+const after = (lead: string, xs: Part[]): string => (parts(xs).length ? ` ${lead} ${andList(xs)}.` : "");
+// " Scramble the whites, toast the bread, and serve with berries." from clauses that start in lower case.
+const steps = (xs: Part[]): string => (parts(xs).length ? ` ${cap(andList(xs))}.` : "");
+// " Pair a and b with c and d." / " Enjoy a and b." (when only one side prints)
+const pairWith = (left: Part[], right: Part[]): string =>
+  parts(left).length && parts(right).length ? ` Pair ${andList(left)} with ${andList(right)}.` : parts(left).length || parts(right).length ? ` Enjoy ${andList(parts(left).length ? left : right)}.` : "";
 
 // ---- BREAKFAST, LUNCH, DINNER, SNACK ----
 export const RECIPES: TemplateRecipe[] = [
@@ -46,7 +65,7 @@ export const RECIPES: TemplateRecipe[] = [
       const wheyG = Math.round(Math.max(10, p - 6 - Math.round(dryOatsG * 0.13) - Math.round(pbG * 0.25)) / FOOD_DENSITY.whey_isolate.protein);
 
       return [
-        { text: `<strong>Preparation:</strong> Cook rolled oats in skim milk, stir in whey. Top with sliced fresh banana and peanut butter.` },
+        { text: `<strong>Preparation:</strong> Cook rolled oats in skim milk, stir in whey.${after("Top with", [bananaG > 10 && "sliced fresh banana", pbG > 2 && "peanut butter"])}` },
         { name: "Skim Milk", category: "dairy", qty: milkG, unit: "g", text: `<strong>Skim Milk:</strong> ${milkG}g` },
         { name: "Rolled Oats (Dry)", category: "starches", qty: dryOatsG, unit: "g", text: `<strong>Rolled Oats:</strong> ${dryOatsG}g` },
         { name: "Banana", category: "produce", qty: bananaG, unit: "g", text: bananaG > 10 ? `<strong>Banana Slices:</strong> ${bananaG}g` : `` },
@@ -112,7 +131,7 @@ export const RECIPES: TemplateRecipe[] = [
       const peachG = Math.round(Math.max(0, c - Math.round(cheeseG * FOOD_DENSITY.cottage_cheese_2pct.carbs)) / FOOD_DENSITY.peach_raw.carbs);
       const almondG = Math.round(Math.max(0, f - Math.round(cheeseG * FOOD_DENSITY.cottage_cheese_2pct.fat)) / FOOD_DENSITY.almonds_raw.fat);
       return [
-        { text: `<strong>Preparation:</strong> Scoop cottage cheese into a bowl. Dice fresh peaches and scatter on top along with raw almonds.` },
+        { text: `<strong>Preparation:</strong> Scoop cottage cheese into a bowl.${peachG > 10 && almondG > 2 ? " Dice fresh peaches and scatter on top along with raw almonds." : peachG > 10 ? " Dice fresh peaches and scatter on top." : almondG > 2 ? " Scatter raw almonds on top." : ""}` },
         { name: "2% Cottage Cheese", category: "dairy", qty: cheeseG, unit: "g", text: `<strong>2% Cottage Cheese:</strong> ${cheeseG}g` },
         { name: "Fresh Peaches", category: "produce", qty: peachG, unit: "g", text: peachG > 10 ? `<strong>Fresh Peaches:</strong> ${peachG}g` : `` },
         { name: "Raw Almonds", category: "fats", qty: almondG, unit: "g", text: almondG > 2 ? `<strong>Raw Almonds:</strong> ${almondG}g` : `` }
@@ -164,7 +183,7 @@ export const RECIPES: TemplateRecipe[] = [
       const remFat = Math.max(0, f - Math.round(tofuG * FOOD_DENSITY.tofu_extra_firm.fat));
       const avoG = Math.round(remFat / FOOD_DENSITY.avocado_hass.fat);
       return [
-        { text: `<strong>Preparation:</strong> Crumble and pan-sear pressed tofu with turmeric and nutritional yeast. Serve with fresh mixed berries and sliced avocado.` },
+        { text: `<strong>Preparation:</strong> Crumble and pan-sear pressed tofu with turmeric and nutritional yeast.${after("Serve with", [berryG > 10 && "fresh mixed berries", avoG > 5 && "sliced avocado"])}` },
         { name: "Extra Firm Tofu", category: "proteins", qty: tofuG, unit: "g", text: `<strong>Extra Firm Tofu:</strong> ${tofuG}g ${toOz(tofuG)}` },
         { name: "Plant Protein Isolate", category: "proteins", qty: powderG, unit: "g", text: powderG > 5 ? `<strong>Plant Protein (Side Shake):</strong> ${powderG}g` : `` },
         { name: "Mixed Berries", category: "produce", qty: berryG, unit: "g", text: berryG > 10 ? `<strong>Fresh Mixed Berries:</strong> ${berryG}g` : `` },
@@ -214,15 +233,48 @@ export const RECIPES: TemplateRecipe[] = [
   {
     id: "b_salmon_eggs_avocado", name: "Salmon, Eggs & Avocado Plate", slot: "breakfast", archetypes: ["omnivore", "pescatarian", "keto", "paleo"], keywords: ["salmon", "egg", "avocado", "fish"],
     build: (p, c, f) => {
-      const eggs = Math.min(3, Math.max(1, Math.floor(f / FOOD_DENSITY.egg_whole_large.fat)));
-      const salmonG = Math.round(Math.max(0, p - (eggs * FOOD_DENSITY.egg_whole_large.protein)) / FOOD_DENSITY.salmon_raw.protein);
-      const remFat = Math.max(0, f - (eggs * FOOD_DENSITY.egg_whole_large.fat) - Math.round(salmonG * FOOD_DENSITY.salmon_raw.fat));
-      const avoG = Math.round(remFat / FOOD_DENSITY.avocado_hass.fat);
+      // Reworked for the USDA values: salmon carries about 13 g of fat per 100 g, so the plate keeps the salmon to part of the protein (and of the fat), tops the protein up with
+      // egg whites, and adds sourdough toast and berries when the target has carbs to fill. Same foods and same intent: salmon, eggs and avocado.
+      const eggs = Math.min(2, Math.max(1, Math.floor((f * 0.35) / FOOD_DENSITY.egg_whole_large.fat)));
+      // The toast carries the bulk of the carbs (up to 6 slices); the berries are a topping, so they stop at 200 g.
+      const slices = c > 12 ? Math.min(6, Math.max(0, Math.round((c * 0.7) / FOOD_DENSITY.sourdough_slice.carbs))) : 0;
+      const salmonG = Math.round(Math.max(0, Math.min((p * 0.55) / FOOD_DENSITY.salmon_raw.protein, (f * 0.45) / FOOD_DENSITY.salmon_raw.fat)));
+      const whitesG = Math.round(Math.max(0, p - (eggs * FOOD_DENSITY.egg_whole_large.protein) - Math.round(salmonG * FOOD_DENSITY.salmon_raw.protein) - (slices * FOOD_DENSITY.sourdough_slice.protein)) / FOOD_DENSITY.egg_whites_liquid.protein);
+      const remFat = Math.max(0, f - (eggs * FOOD_DENSITY.egg_whole_large.fat) - Math.round(salmonG * FOOD_DENSITY.salmon_raw.fat) - (slices * FOOD_DENSITY.sourdough_slice.fat));
+      // The avocado brings carbs too, so on a low-carb target it is limited and olive oil makes up the rest of the fat.
+      const avoG = Math.min(200, Math.round(remFat / FOOD_DENSITY.avocado_hass.fat), Math.round((Math.max(c, 0) * 0.6) / FOOD_DENSITY.avocado_hass.carbs));
+      const oilG = Math.max(0, Math.round(remFat - (avoG * FOOD_DENSITY.avocado_hass.fat)));
+      const berryG = c <= 14 ? 0 : Math.min(200, Math.round(Math.max(0, c - (slices * FOOD_DENSITY.sourdough_slice.carbs) - (eggs * FOOD_DENSITY.egg_whole_large.carbs) - (whitesG * FOOD_DENSITY.egg_whites_liquid.carbs) - (avoG * FOOD_DENSITY.avocado_hass.carbs)) / FOOD_DENSITY.berries_mixed.carbs));
       return [
-        { text: `<strong>Preparation:</strong> Pan-sear salmon fillet, fry eggs to preference, and serve with sliced avocado.` },
+        { text: `<strong>Preparation:</strong> Pan-sear the salmon fillet.${steps(["scramble the whole eggs" + (whitesG > 10 ? " with the egg whites" : ""), slices > 0 && "toast the sourdough", (avoG > 5 || berryG > 10) && "serve with " + andList([avoG > 5 && "sliced avocado", berryG > 10 && "berries"])])}` },
         { name: "Atlantic Salmon", category: "proteins", qty: salmonG, unit: "g", text: `<strong>Atlantic Salmon:</strong> ${salmonG}g ${toOz(salmonG)}` },
         { name: "Whole Eggs", category: "proteins", qty: eggs, unit: "large", text: `<strong>Whole Eggs:</strong> ${eggs} large` },
-        { name: "Hass Avocado", category: "fats", qty: avoG, unit: "g", text: avoG > 5 ? `<strong>Avocado:</strong> ${avoG}g` : `` }
+        { name: "Liquid Egg Whites", category: "proteins", qty: whitesG, unit: "g", text: whitesG > 10 ? `<strong>Liquid Egg Whites:</strong> ${whitesG}g` : `` },
+        { name: "Sourdough Bread", category: "starches", qty: slices, unit: "slices", text: slices > 0 ? `<strong>Sourdough Bread:</strong> ${slices} slice(s)` : `` },
+        { name: "Mixed Berries", category: "produce", qty: berryG, unit: "g", text: berryG > 10 ? `<strong>Mixed Berries:</strong> ${berryG}g` : `` },
+        { name: "Hass Avocado", category: "fats", qty: avoG, unit: "g", text: avoG > 5 ? `<strong>Avocado:</strong> ${avoG}g` : `` },
+        { name: "Olive Oil", category: "fats", qty: oilG, unit: "g", text: oilG > 2 ? `<strong>Olive Oil:</strong> ${(oilG/4.5).toFixed(1)} tsp` : `` }
+      ];
+    }
+  },
+  {
+    id: "b_white_fish_scramble_toast", name: "White Fish, Egg-White Scramble & Sourdough Toast", slot: "breakfast", archetypes: ["pescatarian", "omnivore"], keywords: ["white fish", "cod", "egg whites", "sourdough", "fish", "seafood"],
+    build: (p, c, f) => {
+      // A lean-fish breakfast for the pescatarian plans (the other two fish breakfasts are fatty salmon): cod, egg whites and sourdough toast, with berries for any remaining
+      // carbs and olive oil for the cooking fat. Lean on purpose, so it fits the standard, high-carb, high-protein and light shapes.
+      // The toast carries the bulk of the carbs (up to 6 slices); the berries are a topping, so they stop at 200 g and the rest of the carbs is left to the toast.
+      const slices = c > 12 ? Math.min(6, Math.max(0, Math.round((c * 0.7) / FOOD_DENSITY.sourdough_slice.carbs))) : 0;
+      const fishG = Math.round(Math.max(0, (p * 0.55) / FOOD_DENSITY.white_fish.protein));
+      const whitesG = Math.round(Math.max(0, p - (slices * FOOD_DENSITY.sourdough_slice.protein) - Math.round(fishG * FOOD_DENSITY.white_fish.protein)) / FOOD_DENSITY.egg_whites_liquid.protein);
+      const berryG = Math.min(200, Math.round(Math.max(0, c - (slices * FOOD_DENSITY.sourdough_slice.carbs) - (whitesG * FOOD_DENSITY.egg_whites_liquid.carbs)) / FOOD_DENSITY.berries_mixed.carbs));
+      const remFat = Math.max(0, f - Math.round(fishG * FOOD_DENSITY.white_fish.fat) - (slices * FOOD_DENSITY.sourdough_slice.fat) - Math.round(whitesG * FOOD_DENSITY.egg_whites_liquid.fat));
+      return [
+        { text: `<strong>Preparation:</strong> Pan-sear the cod${remFat > 2 ? " in olive oil" : ""}.${steps([whitesG > 10 && "scramble the egg whites", slices > 0 && "toast the sourdough", berryG > 10 && "serve with fresh berries"])}` },
+        { name: "White Fish (Cod)", category: "proteins", qty: fishG, unit: "g", text: `<strong>White Fish (Cod, Raw):</strong> ${fishG}g ${toOz(fishG)}` },
+        { name: "Liquid Egg Whites", category: "proteins", qty: whitesG, unit: "g", text: whitesG > 10 ? `<strong>Liquid Egg Whites:</strong> ${whitesG}g` : `` },
+        { name: "Sourdough Bread", category: "starches", qty: slices, unit: "slices", text: slices > 0 ? `<strong>Sourdough Bread:</strong> ${slices} slice(s)` : `` },
+        { name: "Mixed Berries", category: "produce", qty: berryG, unit: "g", text: berryG > 10 ? `<strong>Mixed Berries:</strong> ${berryG}g` : `` },
+        { name: "Olive Oil", category: "fats", qty: remFat, unit: "g", text: remFat > 2 ? `<strong>Olive Oil:</strong> ${(remFat/4.5).toFixed(1)} tsp` : `` }
       ];
     }
   },
@@ -299,7 +351,7 @@ export const RECIPES: TemplateRecipe[] = [
       const remFat = Math.max(0, f - Math.round(chickenG * FOOD_DENSITY.chicken_thigh.fat) - Math.round(riceG * FOOD_DENSITY.jasmine_rice_dry.fat));
       const avoG = Math.round(remFat / FOOD_DENSITY.avocado_hass.fat);
       return [
-        { text: `<strong>Preparation:</strong> Cook jasmine rice. Pan-sear seasoned skinless chicken thigh and slice. Serve over rice topped with sliced avocado.` },
+        { text: `<strong>Preparation:</strong> Cook jasmine rice. Pan-sear seasoned skinless chicken thigh and slice. Serve over rice${avoG > 5 ? " topped with sliced avocado" : ""}.` },
         { name: "Chicken Thigh", category: "proteins", qty: chickenG, unit: "g", text: `<strong>Chicken Thigh, Skinless (Raw):</strong> ${chickenG}g ${toOz(chickenG)}` },
         { name: "Jasmine White Rice", category: "starches", qty: riceG, unit: "g", text: `<strong>Jasmine Rice (Dry):</strong> ${riceG}g` },
         { name: "Hass Avocado", category: "fats", qty: avoG, unit: "g", text: avoG > 5 ? `<strong>Avocado:</strong> ${avoG}g` : `` }
@@ -330,7 +382,7 @@ export const RECIPES: TemplateRecipe[] = [
       const remFat = Math.max(0, f - Math.round(cheeseG * FOOD_DENSITY.cottage_cheese_2pct.fat));
       const walnutG = Math.round(remFat / FOOD_DENSITY.walnuts_raw.fat);
       return [
-        { text: `<strong>Preparation:</strong> Ready-to-eat. Top cottage cheese with fresh mixed berries and chopped walnuts.` },
+        { text: `<strong>Preparation:</strong> Ready-to-eat.${after("Top cottage cheese with", [berryG > 10 && "fresh mixed berries", walnutG > 2 && "chopped walnuts"])}` },
         { name: "2% Cottage Cheese", category: "proteins", qty: cheeseG, unit: "g", text: `<strong>2% Cottage Cheese:</strong> ${cheeseG}g` },
         { name: "Mixed Berries", category: "produce", qty: berryG, unit: "g", text: berryG > 10 ? `<strong>Mixed Berries:</strong> ${berryG}g` : `` },
         { name: "Raw Walnuts", category: "fats", qty: walnutG, unit: "g", text: walnutG > 2 ? `<strong>Chopped Walnuts:</strong> ${walnutG}g` : `` }
@@ -396,7 +448,7 @@ export const RECIPES: TemplateRecipe[] = [
       const sirloinG = Math.max(60, Math.round((p - Math.round(quinoaG * FOOD_DENSITY.quinoa_dry.protein)) / FOOD_DENSITY.sirloin_steak.protein));
       const remFat = Math.max(0, f - Math.round(sirloinG * FOOD_DENSITY.sirloin_steak.fat) - Math.round(quinoaG * FOOD_DENSITY.quinoa_dry.fat));
       return [
-        { text: `<strong>Preparation:</strong> Boil quinoa. Grill sirloin steak and slice thin. Toss shredded green cabbage and carrots with olive oil and vinegar.` },
+        { text: `<strong>Preparation:</strong> Boil quinoa. Grill sirloin steak and slice thin. Toss shredded green cabbage and carrots with ${remFat > 2 ? "olive oil and vinegar" : "vinegar"}.` },
         { name: "Top Sirloin Steak", category: "proteins", qty: sirloinG, unit: "g", text: `<strong>Top Sirloin (Raw):</strong> ${sirloinG}g ${toOz(sirloinG)}` },
         { name: "Dry Quinoa", category: "starches", qty: quinoaG, unit: "g", text: `<strong>Quinoa (Dry):</strong> ${quinoaG}g` },
         { name: "Green Cabbage", category: "produce", qty: 100, unit: "g", text: `<strong>Green Cabbage (Shredded):</strong> 100g` },
@@ -429,7 +481,7 @@ export const RECIPES: TemplateRecipe[] = [
       const beefG = Math.round(Math.max(0, p - Math.round(beanG * FOOD_DENSITY.black_beans_cooked.protein) - (wraps * FOOD_DENSITY.whole_wheat_wrap.protein)) / FOOD_DENSITY.ground_beef_93_7.protein);
       const remFat = Math.max(0, f - Math.round(beefG * FOOD_DENSITY.ground_beef_93_7.fat) - (wraps * FOOD_DENSITY.whole_wheat_wrap.fat));
       return [
-        { text: `<strong>Preparation:</strong> Brown 93/7 beef in a skillet. Warm black beans. Load both into the whole wheat wrap with sliced avocado.` },
+        { text: `<strong>Preparation:</strong> Brown 93/7 beef in a skillet. Warm black beans. Load both into the whole wheat wrap${remFat > 2 ? " with sliced avocado" : ""}.` },
         { name: "93/7 Ground Beef", category: "proteins", qty: beefG, unit: "g", text: `<strong>93/7 Ground Beef:</strong> ${beefG}g ${toOz(beefG)}` },
         { name: "Black Beans (Cooked)", category: "starches", qty: beanG, unit: "g", text: `<strong>Black Beans (Cooked):</strong> ${beanG}g` },
         { name: "Whole Wheat Wrap", category: "starches", qty: wraps, unit: "wraps", text: `<strong>Whole Wheat Wrap:</strong> ${wraps} wrap(s)` },
@@ -479,7 +531,7 @@ export const RECIPES: TemplateRecipe[] = [
       const remFat = Math.max(0, f - (wraps * FOOD_DENSITY.whole_wheat_wrap.fat) - Math.round(turkeyG * FOOD_DENSITY.turkey_breast.fat));
       const avoG = Math.round(remFat / FOOD_DENSITY.avocado_hass.fat);
       return [
-        { text: `<strong>Preparation:</strong> Layer sliced turkey breast, thinly sliced apples, spinach, and mashed avocado inside the wrap.` },
+        { text: `<strong>Preparation:</strong> Layer ${andList(["sliced turkey breast", "thinly sliced apples", "spinach", avoG > 5 && "mashed avocado"])} inside the wrap.` },
         { name: "Turkey Breast", category: "proteins", qty: turkeyG, unit: "g", text: `<strong>Turkey Breast:</strong> ${turkeyG}g ${toOz(turkeyG)}` },
         { name: "Whole Wheat Wrap", category: "starches", qty: wraps, unit: "wraps", text: `<strong>Whole Wheat Wrap:</strong> ${wraps} wrap(s)` },
         { name: "Apples", category: "produce", qty: appleG, unit: "g", text: `<strong>Fresh Apple:</strong> ${appleG}g` },
@@ -510,7 +562,7 @@ export const RECIPES: TemplateRecipe[] = [
       const remFat = Math.max(0, f - Math.round(tempehG * FOOD_DENSITY.tempeh_organic.fat));
       const avoG = Math.round(remFat / FOOD_DENSITY.avocado_hass.fat);
       return [
-        { text: `<strong>Preparation:</strong> Pan-sear cubed tempeh until golden. Warm black beans. Serve over rice with sliced avocado.` },
+        { text: `<strong>Preparation:</strong> Pan-sear cubed tempeh until golden. Warm black beans. Serve over rice${avoG > 5 ? " with sliced avocado" : ""}.` },
         { name: "Organic Tempeh", category: "proteins", qty: tempehG, unit: "g", text: `<strong>Organic Tempeh:</strong> ${tempehG}g ${toOz(tempehG)}` },
         { name: "Black Beans (Cooked)", category: "starches", qty: beanG, unit: "g", text: `<strong>Black Beans (Cooked):</strong> ${beanG}g` },
         { name: "Jasmine White Rice", category: "starches", qty: riceG, unit: "g", text: `<strong>Jasmine Rice (Dry):</strong> ${riceG}g` },
@@ -575,7 +627,7 @@ export const RECIPES: TemplateRecipe[] = [
       const turkeyG = Math.max(60, Math.round((p - Math.round(quinoaG * FOOD_DENSITY.quinoa_dry.protein)) / FOOD_DENSITY.turkey_breast.protein));
       const remFat = Math.max(0, f - Math.round(turkeyG * FOOD_DENSITY.turkey_breast.fat) - Math.round(quinoaG * FOOD_DENSITY.quinoa_dry.fat));
       return [
-        { text: `<strong>Preparation:</strong> Cook quinoa. Grill or pan-sear turkey breast and slice. Steam broccoli. Combine in a bowl with olive oil.` },
+        { text: `<strong>Preparation:</strong> Cook quinoa. Grill or pan-sear turkey breast and slice. Steam broccoli. Combine in a bowl${remFat > 2 ? " with olive oil" : ""}.` },
         { name: "Turkey Breast", category: "proteins", qty: turkeyG, unit: "g", text: `<strong>Turkey Breast:</strong> ${turkeyG}g ${toOz(turkeyG)}` },
         { name: "Dry Quinoa", category: "starches", qty: quinoaG, unit: "g", text: `<strong>Quinoa (Dry):</strong> ${quinoaG}g` },
         { name: "Broccoli Florets", category: "produce", qty: 150, unit: "g", text: `<strong>Broccoli Florets:</strong> 150g` },
@@ -587,11 +639,11 @@ export const RECIPES: TemplateRecipe[] = [
     id: "l_chuck_roast_sweet_potato_bowl", name: "Chuck Roast & Sweet Potato Bowl", slot: "lunch", archetypes: ["omnivore", "paleo"], keywords: ["chuck roast", "beef", "sweet potato"],
     build: (p, c, f) => {
       const spG = Math.round(c / FOOD_DENSITY.sweet_potato_raw.carbs);
-      const beefG = Math.max(60, Math.round((p - Math.round(spG * FOOD_DENSITY.sweet_potato_raw.protein)) / FOOD_DENSITY.chuck_roast.protein));
-      const remFat = Math.max(0, f - Math.round(beefG * FOOD_DENSITY.chuck_roast.fat));
+      const beefG = Math.max(60, Math.round((p - Math.round(spG * FOOD_DENSITY.sweet_potato_raw.protein)) / FOOD_DENSITY.chuck_roast_trimmed.protein));
+      const remFat = Math.max(0, f - Math.round(beefG * FOOD_DENSITY.chuck_roast_trimmed.fat));
       return [
-        { text: `<strong>Preparation:</strong> Shred slow-cooked chuck roast. Roast cubed sweet potato and asparagus. Combine in a bowl.` },
-        { name: "Chuck Roast", category: "proteins", qty: beefG, unit: "g", text: `<strong>Chuck Roast (Raw):</strong> ${beefG}g ${toOz(beefG)}` },
+        { text: `<strong>Preparation:</strong> Trim the visible fat from the chuck roast, slow-cook it and shred it. Roast cubed sweet potato and asparagus. Combine in a bowl.` },
+        { name: "Chuck Roast, Trimmed", category: "proteins", qty: beefG, unit: "g", text: `<strong>Trimmed Chuck Roast (Raw):</strong> ${beefG}g ${toOz(beefG)}` },
         { name: "Sweet Potato", category: "starches", qty: spG, unit: "g", text: `<strong>Sweet Potato (Raw):</strong> ${spG}g` },
         { name: "Asparagus", category: "produce", qty: 100, unit: "g", text: `<strong>Asparagus:</strong> 100g` },
         { name: "Olive Oil", category: "fats", qty: remFat, unit: "g", text: remFat > 2 ? `<strong>Olive Oil:</strong> ${(remFat/4.5).toFixed(1)} tsp` : `` }
@@ -621,7 +673,7 @@ export const RECIPES: TemplateRecipe[] = [
       const remFat = Math.max(0, f - Math.round(quinoaG * FOOD_DENSITY.quinoa_dry.fat) - Math.round(tempehG * FOOD_DENSITY.tempeh_organic.fat));
       const avoG = Math.round(remFat / FOOD_DENSITY.avocado_hass.fat);
       return [
-        { text: `<strong>Preparation:</strong> Cook quinoa. Pan-sear cubed tempeh until crisp. Steam broccoli. Assemble the bowl and top with sliced avocado.` },
+        { text: `<strong>Preparation:</strong> Cook quinoa. Pan-sear cubed tempeh until crisp. Steam broccoli. Assemble the bowl${avoG > 5 ? " and top with sliced avocado" : ""}.` },
         { name: "Organic Tempeh", category: "proteins", qty: tempehG, unit: "g", text: `<strong>Tempeh (Cubed):</strong> ${tempehG}g ${toOz(tempehG)}` },
         { name: "Dry Quinoa", category: "starches", qty: quinoaG, unit: "g", text: `<strong>Quinoa (Dry):</strong> ${quinoaG}g` },
         { name: "Broccoli Florets", category: "produce", qty: 150, unit: "g", text: `<strong>Broccoli Florets:</strong> 150g` },
@@ -653,7 +705,7 @@ export const RECIPES: TemplateRecipe[] = [
       const chickenG = Math.max(60, Math.round((p - Math.round(riceG * FOOD_DENSITY.jasmine_rice_dry.protein)) / FOOD_DENSITY.chicken_thigh.protein));
       const remFat = Math.max(0, f - Math.round(chickenG * FOOD_DENSITY.chicken_thigh.fat) - Math.round(riceG * FOOD_DENSITY.jasmine_rice_dry.fat));
       return [
-        { text: `<strong>Preparation:</strong> Cook jasmine rice. Pan-sear seasoned skinless chicken thigh and slice. Steam broccoli florets. Combine in a bowl and drizzle with olive oil.` },
+        { text: `<strong>Preparation:</strong> Cook jasmine rice. Pan-sear seasoned skinless chicken thigh and slice. Steam broccoli florets. Combine in a bowl${remFat > 2 ? " and drizzle with olive oil" : ""}.` },
         { name: "Chicken Thigh", category: "proteins", qty: chickenG, unit: "g", text: `<strong>Chicken Thigh, Skinless (Raw):</strong> ${chickenG}g ${toOz(chickenG)}` },
         { name: "Jasmine White Rice", category: "starches", qty: riceG, unit: "g", text: `<strong>Jasmine Rice (Dry):</strong> ${riceG}g` },
         { name: "Broccoli Florets", category: "produce", qty: 150, unit: "g", text: `<strong>Broccoli Florets:</strong> 150g` },
@@ -683,7 +735,7 @@ export const RECIPES: TemplateRecipe[] = [
       const potG = Math.round(c / FOOD_DENSITY.potato_russet_raw.carbs);
       const remFat = Math.max(0, f - Math.round(steakG * FOOD_DENSITY.ribeye_steak.fat));
       return [
-        { text: `<strong>Preparation:</strong> Sear ribeye in a screaming hot cast-iron skillet. Bake russet potatoes in the oven. Top steak with grass-fed butter.` },
+        { text: `<strong>Preparation:</strong> Sear ribeye in a screaming hot cast-iron skillet.${potG > 10 ? " Bake russet potatoes in the oven." : ""}${remFat > 2 ? " Top steak with grass-fed butter." : ""}` },
         { name: "Ribeye Steak", category: "proteins", qty: steakG, unit: "g", text: `<strong>Ribeye Steak (Raw):</strong> ${steakG}g ${toOz(steakG)}` },
         { name: "Russet Potatoes", category: "starches", qty: potG, unit: "g", text: potG > 10 ? `<strong>Russet Potatoes (Raw):</strong> ${potG}g` : `` },
         { name: "Asparagus", category: "produce", qty: 100, unit: "g", text: `<strong>Asparagus Spears:</strong> 100g` },
@@ -736,7 +788,7 @@ export const RECIPES: TemplateRecipe[] = [
       const potG = Math.round(Math.max(0, c - Math.round(plumG * FOOD_DENSITY.plum_raw.carbs)) / FOOD_DENSITY.potato_russet_raw.carbs);
       const remFat = Math.max(0, f - Math.round(steakG * FOOD_DENSITY.flank_steak.fat));
       return [
-        { text: `<strong>Preparation:</strong> Sear flank steak, let rest, and slice thin. Toss spinach, sliced plums, and olive oil dressing. Serve potatoes on the side.` },
+        { text: `<strong>Preparation:</strong> Sear flank steak, let rest, and slice thin. Toss ${andList(["spinach", "sliced plums", remFat > 2 && "olive oil dressing"])}.${potG > 10 ? " Serve potatoes on the side." : ""}` },
         { name: "Flank Steak", category: "proteins", qty: steakG, unit: "g", text: `<strong>Flank Steak (Raw):</strong> ${steakG}g ${toOz(steakG)}` },
         { name: "Plums", category: "produce", qty: plumG, unit: "g", text: `<strong>Fresh Plums:</strong> ${plumG}g` },
         { name: "Russet Potatoes", category: "starches", qty: potG, unit: "g", text: potG > 10 ? `<strong>Russet Potatoes (Raw):</strong> ${potG}g` : `` },
@@ -792,13 +844,13 @@ export const RECIPES: TemplateRecipe[] = [
   {
     id: "d_chuck_roast_mash", name: "Slow-Braised Chuck Roast & Mash", slot: "dinner", archetypes: ["omnivore", "keto", "paleo"], keywords: ["beef", "roast", "potato"],
     build: (p, c, f) => {
-      const roastG = Math.round(p / FOOD_DENSITY.chuck_roast.protein);
-      const roastFat = Math.round(roastG * FOOD_DENSITY.chuck_roast.fat);
+      const roastG = Math.round(p / FOOD_DENSITY.chuck_roast_trimmed.protein);
+      const roastFat = Math.round(roastG * FOOD_DENSITY.chuck_roast_trimmed.fat);
       const potG = Math.round(c / FOOD_DENSITY.potato_russet_raw.carbs);
       const remFat = Math.max(0, f - roastFat);
       return [
-        { text: `<strong>Preparation:</strong> Braise chuck roast in beef broth for 3-4 hours until fork-tender. Serve over mashed potatoes.` },
-        { name: "Chuck Roast", category: "proteins", qty: roastG, unit: "g", text: `<strong>Chuck Roast (Raw):</strong> ${roastG}g ${toOz(roastG)}` },
+        { text: `<strong>Preparation:</strong> Trim the visible fat from the chuck roast and braise it in beef broth for 3-4 hours until fork-tender.${potG > 10 ? " Serve over mashed potatoes." : ""}` },
+        { name: "Chuck Roast, Trimmed", category: "proteins", qty: roastG, unit: "g", text: `<strong>Trimmed Chuck Roast (Raw):</strong> ${roastG}g ${toOz(roastG)}` },
         { name: "Russet Potatoes", category: "starches", qty: potG, unit: "g", text: potG > 10 ? `<strong>Russet Potatoes (Raw):</strong> ${potG}g` : `` },
         { name: "Asparagus", category: "produce", qty: 100, unit: "g", text: `<strong>Asparagus:</strong> 100g` },
         { name: "Grass-Fed Butter", category: "fats", qty: remFat, unit: "g", text: remFat > 2 ? `<strong>Butter:</strong> ${(remFat/4.5).toFixed(1)} tsp` : `` }
@@ -813,7 +865,7 @@ export const RECIPES: TemplateRecipe[] = [
       const thighG = Math.round(Math.max(0, p - Math.round(carrotG * FOOD_DENSITY.carrots_raw.protein) - Math.round(beetG * FOOD_DENSITY.beets_raw.protein)) / FOOD_DENSITY.chicken_thigh.protein);
       const remFat = Math.max(0, f - Math.round(thighG * FOOD_DENSITY.chicken_thigh.fat));
       return [
-        { text: `<strong>Preparation:</strong> Chop carrots and beets, toss in olive oil, and roast at 400°F. Bake skinless chicken thighs alongside until golden brown.` },
+        { text: `<strong>Preparation:</strong> Chop ${beetG > 10 ? "carrots and beets" : "carrots"}${remFat > 2 ? ", toss in olive oil, and roast at 400°F" : " and roast at 400°F"}. Bake skinless chicken thighs alongside until golden brown.` },
         { name: "Chicken Thigh", category: "proteins", qty: thighG, unit: "g", text: `<strong>Chicken Thigh, Skinless (Raw):</strong> ${thighG}g ${toOz(thighG)}` },
         { name: "Carrots", category: "produce", qty: carrotG, unit: "g", text: `<strong>Carrots:</strong> ${carrotG}g` },
         { name: "Beets", category: "produce", qty: beetG, unit: "g", text: beetG > 10 ? `<strong>Beets (Raw):</strong> ${beetG}g` : `` },
@@ -939,7 +991,7 @@ export const RECIPES: TemplateRecipe[] = [
       const remFat = Math.max(0, f - Math.round(tempehG * FOOD_DENSITY.tempeh_organic.fat));
       const avoG = Math.round(remFat / FOOD_DENSITY.avocado_hass.fat);
       return [
-        { text: `<strong>Preparation:</strong> Roast cubed sweet potato and broccoli. Pan-sear sliced tempeh until crisp. Combine in a bowl and top with sliced avocado.` },
+        { text: `<strong>Preparation:</strong> Roast cubed sweet potato and broccoli. Pan-sear sliced tempeh until crisp. Combine in a bowl${avoG > 5 ? " and top with sliced avocado" : ""}.` },
         { name: "Organic Tempeh", category: "proteins", qty: tempehG, unit: "g", text: `<strong>Tempeh (Sliced):</strong> ${tempehG}g ${toOz(tempehG)}` },
         { name: "Sweet Potato", category: "starches", qty: spG, unit: "g", text: `<strong>Sweet Potato (Raw):</strong> ${spG}g` },
         { name: "Broccoli Florets", category: "produce", qty: 150, unit: "g", text: `<strong>Broccoli Florets:</strong> 150g` },
@@ -967,11 +1019,11 @@ export const RECIPES: TemplateRecipe[] = [
     id: "d_chuck_roast_root_veggie_dinner", name: "Chuck Roast & Root Veggie Dinner", slot: "dinner", archetypes: ["omnivore", "paleo"], keywords: ["chuck roast", "beef", "potato", "carrots"],
     build: (p, c, f) => {
       const potG = Math.round(c / FOOD_DENSITY.potato_russet_raw.carbs);
-      const beefG = Math.max(60, Math.round((p - Math.round(potG * FOOD_DENSITY.potato_russet_raw.protein)) / FOOD_DENSITY.chuck_roast.protein));
-      const remFat = Math.max(0, f - Math.round(beefG * FOOD_DENSITY.chuck_roast.fat));
+      const beefG = Math.max(60, Math.round((p - Math.round(potG * FOOD_DENSITY.potato_russet_raw.protein)) / FOOD_DENSITY.chuck_roast_trimmed.protein));
+      const remFat = Math.max(0, f - Math.round(beefG * FOOD_DENSITY.chuck_roast_trimmed.fat));
       return [
-        { text: `<strong>Preparation:</strong> Slow-cook chuck roast with russet potatoes and carrots until fork-tender. Shred beef before serving.` },
-        { name: "Chuck Roast", category: "proteins", qty: beefG, unit: "g", text: `<strong>Chuck Roast (Raw):</strong> ${beefG}g ${toOz(beefG)}` },
+        { text: `<strong>Preparation:</strong> Trim the visible fat from the chuck roast and slow-cook it with russet potatoes and carrots until fork-tender. Shred beef before serving.` },
+        { name: "Chuck Roast, Trimmed", category: "proteins", qty: beefG, unit: "g", text: `<strong>Trimmed Chuck Roast (Raw):</strong> ${beefG}g ${toOz(beefG)}` },
         { name: "Russet Potatoes", category: "starches", qty: potG, unit: "g", text: `<strong>Russet Potatoes (Raw):</strong> ${potG}g` },
         { name: "Carrots", category: "produce", qty: 80, unit: "g", text: `<strong>Carrots:</strong> 80g` },
         { name: "Grass-Fed Butter", category: "fats", qty: remFat, unit: "g", text: remFat > 2 ? `<strong>Butter:</strong> ${(remFat/4.5).toFixed(1)} tsp` : `` }
@@ -999,16 +1051,22 @@ export const RECIPES: TemplateRecipe[] = [
   {
     id: "s_string_cheese_jerky_apple", name: "String Cheese, Beef Jerky & Apple", slot: "snack", archetypes: ["omnivore", "paleo"], keywords: ["cheese", "jerky", "beef", "apple"],
     build: (p, c, f) => {
-      const cheese = Math.min(3, Math.max(1, Math.floor((f * 0.5) / (UNIT_WEIGHT_G.pieces * FOOD_DENSITY.string_cheese.fat))));
-      const jerkyG = Math.round(Math.max(0, p - (cheese * UNIT_WEIGHT_G.pieces * FOOD_DENSITY.string_cheese.protein)) / FOOD_DENSITY.beef_jerky.protein);
-      const remFat = Math.max(0, f - (cheese * UNIT_WEIGHT_G.pieces * FOOD_DENSITY.string_cheese.fat));
-      const appleG = Math.round(Math.max(0, c - (cheese * UNIT_WEIGHT_G.pieces * FOOD_DENSITY.string_cheese.carbs) - Math.round(jerkyG * FOOD_DENSITY.beef_jerky.carbs)) / FOOD_DENSITY.apple_raw.carbs);
+      // Reworked for the USDA values: beef jerky is about a quarter fat, so the jerky is limited to part of the protein and of the fat, and egg whites carry the rest of the protein.
+      const stick = UNIT_WEIGHT_G.pieces;
+      const cheese = Math.min(3, Math.max(1, Math.floor((f * 0.4) / (stick * FOOD_DENSITY.string_cheese.fat))));
+      const cheeseP = cheese * stick * FOOD_DENSITY.string_cheese.protein;
+      const jerkyG = Math.round(Math.max(0, Math.min(((p - cheeseP) * 0.5) / FOOD_DENSITY.beef_jerky.protein, (f * 0.45) / FOOD_DENSITY.beef_jerky.fat)));
+      const whitesG = Math.round(Math.max(0, p - cheeseP - (jerkyG * FOOD_DENSITY.beef_jerky.protein)) / FOOD_DENSITY.egg_whites_liquid.protein);
+      const appleG = Math.round(Math.max(0, c - (cheese * stick * FOOD_DENSITY.string_cheese.carbs) - Math.round(jerkyG * FOOD_DENSITY.beef_jerky.carbs) - (whitesG * FOOD_DENSITY.egg_whites_liquid.carbs)) / FOOD_DENSITY.apple_raw.carbs);
+      const remFat = Math.max(0, f - (cheese * stick * FOOD_DENSITY.string_cheese.fat) - (jerkyG * FOOD_DENSITY.beef_jerky.fat));
+      const seedG = Math.round(remFat / FOOD_DENSITY.pumpkin_seeds.fat);
       return [
-        { text: `<strong>Preparation:</strong> Ready-to-eat snack pack. Pair string cheese with beef jerky, pumpkin seeds, and fresh apple slices.` },
+        { text: `<strong>Preparation:</strong> Ready-to-eat snack pack.${after("Pair string cheese with", [jerkyG > 5 && "beef jerky", whitesG > 10 && "hard-boiled egg whites", seedG > 2 && "pumpkin seeds", appleG > 5 && "fresh apple slices"])}` },
         { name: "String Cheese", category: "dairy", qty: cheese, unit: "pieces", text: `<strong>String Cheese:</strong> ${cheese} stick(s)` },
-        { name: "Beef Jerky", category: "proteins", qty: jerkyG, unit: "g", text: `<strong>Beef Jerky:</strong> ${jerkyG}g` },
+        { name: "Beef Jerky", category: "proteins", qty: jerkyG, unit: "g", text: jerkyG > 5 ? `<strong>Beef Jerky:</strong> ${jerkyG}g` : `` },
+        { name: "Liquid Egg Whites", category: "proteins", qty: whitesG, unit: "g", text: whitesG > 10 ? `<strong>Hard-Boiled Egg Whites:</strong> ${whitesG}g` : `` },
         { name: "Raw Apple", category: "produce", qty: appleG, unit: "g", text: appleG > 5 ? `<strong>Fresh Apple:</strong> ${appleG}g` : `` },
-        { name: "Pumpkin Seeds", category: "fats", qty: Math.round(remFat/0.46), unit: "g", text: remFat > 2 ? `<strong>Pumpkin Seeds:</strong> ${Math.round(remFat/0.46)}g` : `` }
+        { name: "Pumpkin Seeds", category: "fats", qty: seedG, unit: "g", text: seedG > 2 ? `<strong>Pumpkin Seeds:</strong> ${seedG}g` : `` }
       ];
     }
   },
@@ -1043,26 +1101,67 @@ export const RECIPES: TemplateRecipe[] = [
   {
     id: "s_cantaloupe_jerky", name: "Cantaloupe & Beef Jerky", slot: "snack", archetypes: ["omnivore", "paleo"], keywords: ["cantaloupe", "jerky", "beef", "melon"],
     build: (p, c, f) => {
-      const jerkyG = Math.round(p / FOOD_DENSITY.beef_jerky.protein);
-      const cantaloupeG = Math.round(Math.max(0, c - Math.round(jerkyG * FOOD_DENSITY.beef_jerky.carbs)) / FOOD_DENSITY.cantaloupe_raw.carbs);
+      // Reworked for the USDA values: beef jerky is about a quarter fat, so the jerky is limited to part of the protein and of the fat, and hard-boiled egg whites carry the rest.
+      const jerkyG = Math.round(Math.max(0, Math.min((p * 0.5) / FOOD_DENSITY.beef_jerky.protein, (f * 0.7) / FOOD_DENSITY.beef_jerky.fat)));
+      const whitesG = Math.round(Math.max(0, p - (jerkyG * FOOD_DENSITY.beef_jerky.protein)) / FOOD_DENSITY.egg_whites_liquid.protein);
+      const cantaloupeG = Math.round(Math.max(0, c - Math.round(jerkyG * FOOD_DENSITY.beef_jerky.carbs) - (whitesG * FOOD_DENSITY.egg_whites_liquid.carbs)) / FOOD_DENSITY.cantaloupe_raw.carbs);
       const seedG = Math.round(Math.max(0, f - Math.round(jerkyG * FOOD_DENSITY.beef_jerky.fat)) / FOOD_DENSITY.pumpkin_seeds.fat);
       return [
-        { text: `<strong>Preparation:</strong> Ready-to-eat snack. Pair savory beef jerky with sweet cantaloupe slices and pumpkin seeds.` },
-        { name: "Beef Jerky", category: "proteins", qty: jerkyG, unit: "g", text: `<strong>Beef Jerky:</strong> ${jerkyG}g` },
+        { text: `<strong>Preparation:</strong> Ready-to-eat snack.${pairWith([jerkyG > 5 && "savory beef jerky", whitesG > 10 && "hard-boiled egg whites"], [cantaloupeG > 10 && "sweet cantaloupe slices", seedG > 2 && "pumpkin seeds"])}` },
+        { name: "Beef Jerky", category: "proteins", qty: jerkyG, unit: "g", text: jerkyG > 5 ? `<strong>Beef Jerky:</strong> ${jerkyG}g` : `` },
+        { name: "Liquid Egg Whites", category: "proteins", qty: whitesG, unit: "g", text: whitesG > 10 ? `<strong>Hard-Boiled Egg Whites:</strong> ${whitesG}g` : `` },
         { name: "Cantaloupe", category: "produce", qty: cantaloupeG, unit: "g", text: cantaloupeG > 10 ? `<strong>Cantaloupe Slices:</strong> ${cantaloupeG}g` : `` },
         { name: "Pumpkin Seeds", category: "fats", qty: seedG, unit: "g", text: seedG > 2 ? `<strong>Pumpkin Seeds:</strong> ${seedG}g` : `` }
       ];
     }
   },
   {
-    id: "s_jerky_eggs_carnivore", name: "Beef Jerky & Hard-Boiled Eggs", slot: "snack", archetypes: ["carnivore", "keto"], keywords: ["jerky", "beef", "egg"],
+    // The id still says carnivore although the recipe is keto only now (jerky has carbs): saved plans and favorites store recipe ids, so the id is kept.
+    id: "s_jerky_eggs_carnivore", name: "Beef Jerky & Hard-Boiled Eggs", slot: "snack", archetypes: ["keto"], keywords: ["jerky", "beef", "egg"],
     build: (p, c, f) => {
-      const eggs = Math.min(3, Math.max(1, Math.round(f / FOOD_DENSITY.egg_whole_large.fat)));
-      const jerkyG = Math.round(Math.max(0, p - (eggs * FOOD_DENSITY.egg_whole_large.protein)) / FOOD_DENSITY.beef_jerky.protein);
+      // Reworked for the USDA values: beef jerky carries about 11 g of carbs and 26 g of fat per 100 g, so the carbs cap the jerky, the eggs carry the rest of the protein,
+      // and macadamia nuts fill the fat. A keto snack only (a zero-carb plan cannot have jerky).
+      const jerkyG = Math.round(Math.max(0, Math.min((p * 0.5) / FOOD_DENSITY.beef_jerky.protein, (c * 0.8) / FOOD_DENSITY.beef_jerky.carbs)));
+      const eggs = Math.min(6, Math.max(1, Math.round(Math.max(0, p - (jerkyG * FOOD_DENSITY.beef_jerky.protein)) / FOOD_DENSITY.egg_whole_large.protein)));
+      const remFat = Math.max(0, f - Math.round(jerkyG * FOOD_DENSITY.beef_jerky.fat) - (eggs * FOOD_DENSITY.egg_whole_large.fat));
+      const nutG = Math.round(remFat / FOOD_DENSITY.macadamia_raw.fat);
       return [
-        { text: `<strong>Preparation:</strong> Ready-to-eat. Pair beef jerky with hard-boiled eggs and a pinch of sea salt.` },
+        { text: `<strong>Preparation:</strong> Ready-to-eat. Pair beef jerky with hard-boiled eggs and a handful of macadamia nuts, and a pinch of sea salt.` },
         { name: "Hard-Boiled Eggs", category: "proteins", qty: eggs, unit: "large", text: `<strong>Hard-Boiled Eggs:</strong> ${eggs} large` },
-        { name: "Beef Jerky", category: "proteins", qty: jerkyG, unit: "g", text: `<strong>Beef Jerky:</strong> ${jerkyG}g` }
+        { name: "Beef Jerky", category: "proteins", qty: jerkyG, unit: "g", text: jerkyG > 5 ? `<strong>Beef Jerky:</strong> ${jerkyG}g` : `` },
+        { name: "Raw Macadamia Nuts", category: "fats", qty: nutG, unit: "g", text: nutG > 2 ? `<strong>Raw Macadamia Nuts:</strong> ${nutG}g` : `` }
+      ];
+    }
+  },
+  {
+    id: "s_cheese_egg_macadamia_keto", name: "Cheese, Egg & Macadamia Snack Plate", slot: "snack", archetypes: ["keto"], keywords: ["cheese", "egg", "macadamia", "keto"],
+    build: (p, c, f) => {
+      // A keto snack: hard-boiled eggs and string cheese for the protein, macadamia nuts for the rest of the fat. Almost no carbs.
+      const stick = UNIT_WEIGHT_G.pieces;
+      const eggs = Math.min(4, Math.max(1, Math.round((p * 0.4) / FOOD_DENSITY.egg_whole_large.protein)));
+      const cheese = Math.min(6, Math.max(0, Math.round(Math.max(0, p - (eggs * FOOD_DENSITY.egg_whole_large.protein)) / (stick * FOOD_DENSITY.string_cheese.protein))));
+      const remFat = Math.max(0, f - (eggs * FOOD_DENSITY.egg_whole_large.fat) - (cheese * stick * FOOD_DENSITY.string_cheese.fat));
+      const nutG = Math.round(remFat / FOOD_DENSITY.macadamia_raw.fat);
+      return [
+        { text: `<strong>Preparation:</strong> Ready-to-eat. Hard-boil the eggs, and plate them with string cheese and a handful of macadamia nuts.` },
+        { name: "Hard-Boiled Eggs", category: "proteins", qty: eggs, unit: "large", text: `<strong>Hard-Boiled Eggs:</strong> ${eggs} large` },
+        { name: "String Cheese", category: "dairy", qty: cheese, unit: "pieces", text: cheese > 0 ? `<strong>String Cheese:</strong> ${cheese} stick(s)` : `` },
+        { name: "Raw Macadamia Nuts", category: "fats", qty: nutG, unit: "g", text: nutG > 2 ? `<strong>Raw Macadamia Nuts:</strong> ${nutG}g` : `` }
+      ];
+    }
+  },
+  {
+    id: "s_steak_bites_eggs_carnivore", name: "Steak Bites & Hard-Boiled Eggs", slot: "snack", archetypes: ["carnivore", "keto"], keywords: ["steak", "ribeye", "egg", "beef", "carnivore"],
+    build: (p, c, f) => {
+      // A carnivore snack: ribeye bites and hard-boiled eggs (protein and fat in about equal parts, no carbs), with butter for any fat still missing.
+      const eggs = Math.min(5, Math.max(1, Math.round((p * 0.3) / FOOD_DENSITY.egg_whole_large.protein)));
+      const steakG = Math.round(Math.max(0, p - (eggs * FOOD_DENSITY.egg_whole_large.protein)) / FOOD_DENSITY.ribeye_steak.protein);
+      const remFat = Math.max(0, f - (eggs * FOOD_DENSITY.egg_whole_large.fat) - Math.round(steakG * FOOD_DENSITY.ribeye_steak.fat));
+      return [
+        { text: `<strong>Preparation:</strong> Sear ribeye bites${remFat > 2 ? " in butter" : ""} and season with sea salt. Serve warm with hard-boiled eggs.` },
+        { name: "Ribeye Steak", category: "proteins", qty: steakG, unit: "g", text: `<strong>Ribeye (Raw):</strong> ${steakG}g ${toOz(steakG)}` },
+        { name: "Hard-Boiled Eggs", category: "proteins", qty: eggs, unit: "large", text: `<strong>Hard-Boiled Eggs:</strong> ${eggs} large` },
+        { name: "Grass-Fed Butter", category: "fats", qty: remFat, unit: "g", text: remFat > 2 ? `<strong>Butter:</strong> ${(remFat/4.5).toFixed(1)} tsp` : `` }
       ];
     }
   },
@@ -1088,7 +1187,7 @@ export const RECIPES: TemplateRecipe[] = [
       const celeryG = Math.min(500, Math.round(c / FOOD_DENSITY.celery_raw.carbs));
       const avoG = Math.round(Math.max(0, f - (eggs * 5.0)) / FOOD_DENSITY.avocado_hass.fat);
       return [
-        { text: `<strong>Preparation:</strong> Hard boil eggs. Use mashed avocado as a dip for celery sticks. Drink whey on the side if needed.` },
+        { text: `<strong>Preparation:</strong> Hard boil eggs.${avoG > 5 && celeryG > 10 ? " Use mashed avocado as a dip for celery sticks." : celeryG > 10 ? " Serve with celery sticks." : avoG > 5 ? " Serve with mashed avocado." : ""}${wheyG > 5 ? " Drink whey on the side if needed." : ""}` },
         { name: "Whole Eggs", category: "proteins", qty: eggs, unit: "large", text: `<strong>Hard-Boiled Eggs:</strong> ${eggs} large` },
         { name: "Whey Protein Isolate", category: "proteins", qty: wheyG, unit: "g", text: wheyG > 5 ? `<strong>Whey Shake (Side):</strong> ${wheyG}g` : `` },
         { name: "Celery", category: "produce", qty: celeryG, unit: "g", text: celeryG > 10 ? `<strong>Celery Sticks:</strong> ${celeryG}g` : `` },

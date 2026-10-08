@@ -1,3 +1,4 @@
+import { BRAND_OG_IMAGES } from "@/lib/brand";
 import type { Metadata } from "next";
 import { NoAccess } from "@/components/shared/no-access";
 import Link from "next/link";
@@ -50,7 +51,7 @@ export async function generateMetadata(
   return {
     title,
     description,
-    openGraph: { title, description },
+    openGraph: { title, description, images: BRAND_OG_IMAGES },
   };
 }
 

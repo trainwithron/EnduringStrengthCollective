@@ -1,3 +1,4 @@
+import { BRAND_OG_IMAGES } from "@/lib/brand";
 import type { Metadata } from "next";
 import { NoAccess } from "@/components/shared/no-access";
 import { getSharedMilestone, type SharedMilestone } from "@/lib/shared-milestone";
@@ -29,7 +30,7 @@ export async function generateMetadata(
 
   const title = cardTitle(shared);
   const description = `Training with ${shared.groupName}.`;
-  return { title, description, openGraph: { title, description } };
+  return { title, description, openGraph: { title, description, images: BRAND_OG_IMAGES } };
 }
 
 export default async function ShareMilestonePage(

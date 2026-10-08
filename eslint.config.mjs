@@ -40,15 +40,6 @@ const eslintConfig = [
       "@typescript-eslint/no-explicit-any": "warn",
     },
   },
-  {
-    // Plain CommonJS build-time script, outside the app's TypeScript/ESM
-    // surface — never bundled or imported, so there's no benefit to
-    // rewriting it to ESM just to satisfy this rule.
-    files: ["scripts/generate-icons.js"],
-    rules: {
-      "@typescript-eslint/no-require-imports": "off",
-    },
-  },
 ];
 
 export default eslintConfig;

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { createNoteAutosaver, type NoteAutosaver } from "@/lib/note-autosave";
-import { clearNoteDraft, decideDraft, readNoteDraft, writeNoteDraft } from "@/lib/note-draft";
+import { clearNoteDraft, clearNoteOffer, clearOtherUsersDrafts, decideDraft, readNoteDraft, readNoteOffer, writeNoteDraft, writeNoteOffer } from "@/lib/note-draft";
 import { useSetSave } from "./set-save-context";
 
 // A place to leave a note on this exact exercise ("shoulder felt off today"), separate from the heavier video-comment system
@@ -20,10 +20,13 @@ export function ExerciseAthleteNote({
   initialNote,
   readOnly,
   ownNote = true,
+  viewerId = null,
 }: {
   sessionExerciseId: string;
   initialNote: string | null;
   readOnly: boolean;
+  // Who is signed in. A kept draft belongs to this person only (lib/note-draft.ts); with nobody signed in no draft is kept.
+  viewerId?: string | null;
   // False when a coach is typing in a client's session (the note is stored as the exercise's note, the label says whose it is).
   ownNote?: boolean;
 }) {
@@ -47,8 +50,8 @@ export function ExerciseAthleteNote({
           setSavedNote(trimmed);
           serverNoteRef.current = trimmed ?? "";
           // Clear the kept draft only if it is exactly what was just saved: if the person kept typing while the save was in flight, the newer text stays.
-          const kept = readNoteDraft(sessionExerciseId);
-          if (kept && kept.text.trim() === (trimmed ?? "")) clearNoteDraft(sessionExerciseId);
+          const kept = viewerId ? readNoteDraft(viewerId, sessionExerciseId) : null;
+          if (viewerId && kept && kept.text.trim() === (trimmed ?? "")) clearNoteDraft(viewerId, sessionExerciseId);
           return true;
         }
         return false;
@@ -60,13 +63,24 @@ export function ExerciseAthleteNote({
 
   // A draft kept on this phone: put back and saved if the server note is the one it was typed over, offered if the note changed since, dropped if identical.
   useEffect(() => {
-    if (readOnly) return;
-    const decision = decideDraft(readNoteDraft(sessionExerciseId), initialNote);
-    if (decision.kind === "discard") clearNoteDraft(sessionExerciseId);
+    if (readOnly || !viewerId) return;
+    // Anything on this phone that is not this person's (left by an expired session, or an older key) goes before it can be read.
+    clearOtherUsersDrafts(viewerId);
+    const decision = decideDraft(readNoteDraft(viewerId, sessionExerciseId), initialNote);
+    if (decision.kind === "discard") clearNoteDraft(viewerId, sessionExerciseId);
     else if (decision.kind === "restore") {
       setDraft(decision.text);
       saver.change(decision.text);
-    } else if (decision.kind === "ask") setStaleDraft(decision.text);
+    } else if (decision.kind === "ask") {
+      // Kept under its own key while the person decides, so typing meanwhile (which keeps writing the normal draft) cannot overwrite it.
+      writeNoteOffer(viewerId, sessionExerciseId, decision.text);
+      clearNoteDraft(viewerId, sessionExerciseId);
+      setStaleDraft(decision.text);
+    } else {
+      // An offer made on an earlier visit and not yet answered.
+      const offer = readNoteOffer(viewerId, sessionExerciseId);
+      if (offer) setStaleDraft(offer.text);
+    }
     // only on mount
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -127,7 +141,10 @@ export function ExerciseAthleteNote({
               type="button"
               onClick={() => {
                 setDraft(staleDraft);
-                writeNoteDraft(sessionExerciseId, serverNoteRef.current, staleDraft);
+                if (viewerId) {
+                  writeNoteDraft(viewerId, sessionExerciseId, serverNoteRef.current, staleDraft);
+                  clearNoteOffer(viewerId, sessionExerciseId);
+                }
                 saver.change(staleDraft);
                 setStaleDraft(null);
               }}
@@ -138,7 +155,7 @@ export function ExerciseAthleteNote({
             <button
               type="button"
               onClick={() => {
-                clearNoteDraft(sessionExerciseId);
+                if (viewerId) clearNoteOffer(viewerId, sessionExerciseId);
                 setStaleDraft(null);
               }}
               className="min-h-[44px] font-body text-xs text-steel"
@@ -153,7 +170,7 @@ export function ExerciseAthleteNote({
         value={draft}
         onChange={(e) => {
           setDraft(e.target.value);
-          writeNoteDraft(sessionExerciseId, serverNoteRef.current, e.target.value);
+          if (viewerId) writeNoteDraft(viewerId, sessionExerciseId, serverNoteRef.current, e.target.value);
           saver.change(e.target.value);
         }}
         onBlur={(e) => void saver.flush(e.currentTarget.value)}

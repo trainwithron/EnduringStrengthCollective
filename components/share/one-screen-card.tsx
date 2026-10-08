@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { SpotlightLockup } from "@/components/brand/spotlight-mark";
 import { RefreshCw } from "lucide-react";
 import type { ShareImageModel } from "@/lib/share-image";
 
@@ -127,7 +128,7 @@ export function OneScreenCard({
         )}
 
         <div>
-          <p className="font-display text-[11px] tracking-[0.4em] text-chalk">SPOTLIGHT</p>
+          <SpotlightLockup compact />
           <p className="font-body text-[10px] text-steel tracking-wider mt-0.5">{model.dateLabel}</p>
         </div>
       </div>

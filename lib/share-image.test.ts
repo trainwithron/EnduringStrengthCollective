@@ -264,6 +264,8 @@ describe.each<ShareImageFormat>(["story", "post"])("%s picture fits its frame", 
     if (format === "post") {
       expect(funTop).toBeGreaterThan(lastRowBottom);
       expect(funBottom).toBeLessThan(p.footerY - 40 * 0.72);
+      // ...and clear of the top of the Spotlight mark itself (its halo starts 30 px above the wordmark baseline).
+      expect(funBottom).toBeLessThan(p.footerY - 30);
     } else {
       expect(funBottom).toBeLessThan(p.liftsTitleY - p.statLabelSize * 0.72);
       expect(funTop).toBeGreaterThan(p.chipY);

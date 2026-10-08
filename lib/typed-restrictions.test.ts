@@ -63,7 +63,7 @@ describe("the coach's typed note becomes rules", () => {
     const open = selectOptions("breakfast", gridFor("standard", "breakfast")[2], ctxOf());
     const closed = selectOptions("breakfast", gridFor("standard", "breakfast")[2], ctxOf({ rules }));
     expect(closed.leftOutForRules).toBeGreaterThan(0);
-    expect(open.options.map((m) => m.key).join()).not.toBe(closed.options.map((m) => m.key).join());
+    expect(open.leftOutForRules).toBe(0);
   });
 });
 

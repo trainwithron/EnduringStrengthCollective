@@ -9,7 +9,7 @@ import { FOOD_DENSITY, PER_UNIT_KEYS, UNIT_WEIGHT_G } from "./food-table";
 import { EXTRA_NAME_TO_KEY, FOOD_ARCHETYPES, NAME_TO_KEY } from "./food-names";
 import { FAMILIES, familiesOf, familiesOfDiet, gridFor, SCALES } from "./grid";
 import { foodKeyOf, ingredientMacros, mealIngredients, mealMacros } from "./macros";
-import { renderLines, stripOunceHints, toOz } from "./render";
+import { renderLines, stripOunceHints, toOz, visibleIngredients } from "./render";
 import { MAX_DRIFT, scaleTemplate } from "./scale";
 import { dietProblems, preparationText, templateAllergens } from "./tags";
 import { absAllowanceG, carbFatAllowanceG, checkDayTolerance, checkTolerance } from "./tolerance";
@@ -33,11 +33,11 @@ function bestPasses(r: TemplateRecipe): number {
 }
 
 describe("the library is what the old app had", () => {
-  it("has 66 recipes: 20 breakfast, 19 lunch, 19 dinner, 8 snack, unique ids", () => {
-    expect(RECIPES).toHaveLength(66);
+  it("has 69 recipes (Ron's 66 plus 3 added): 21 breakfast, 19 lunch, 19 dinner, 10 snack, unique ids", () => {
+    expect(RECIPES).toHaveLength(69);
     const count = (slot: string) => RECIPES.filter((r) => r.slot === slot).length;
-    expect([count("breakfast"), count("lunch"), count("dinner"), count("snack")]).toEqual([20, 19, 19, 8]);
-    expect(new Set(RECIPES.map((r) => r.id)).size).toBe(66);
+    expect([count("breakfast"), count("lunch"), count("dinner"), count("snack")]).toEqual([21, 19, 19, 10]);
+    expect(new Set(RECIPES.map((r) => r.id)).size).toBe(69);
   });
   it("every recipe has a name, at least one real diet, keywords and a slot", () => {
     for (const r of RECIPES) {
@@ -53,13 +53,13 @@ describe("the library is what the old app had", () => {
   });
   it("covers every diet the old app declared, pescatarian included", () => {
     for (const d of DIET_TYPES) expect(RECIPES.some((r) => r.archetypes.includes(d)), d).toBe(true);
-    expect(RECIPES.filter((r) => r.archetypes.includes("pescatarian"))).toHaveLength(8);
+    expect(RECIPES.filter((r) => r.archetypes.includes("pescatarian"))).toHaveLength(9);
   });
 });
 
 describe("the food tables are consistent", () => {
-  it("150 foods, each with sane per-gram macros (or per-unit for an egg, a slice, a wrap, a cake, a bagel)", () => {
-    expect(Object.keys(FOOD_DENSITY)).toHaveLength(150);
+  it("151 foods (Ron's 150 plus the trimmed chuck roast), each with sane per-gram macros (or per-unit for an egg, a slice, a wrap, a cake, a bagel)", () => {
+    expect(Object.keys(FOOD_DENSITY)).toHaveLength(151);
     for (const [key, d] of Object.entries(FOOD_DENSITY)) {
       for (const n of [d.protein, d.carbs, d.fat]) expect(n, key).toBeGreaterThanOrEqual(0);
       if (!PER_UNIT_KEYS.has(key)) expect(d.protein + d.carbs + d.fat, `${key} cannot weigh more than itself`).toBeLessThanOrEqual(1.001);
@@ -123,7 +123,7 @@ describe("the food tables are consistent", () => {
   it("every row carries its USDA record, except the exact list that has none (supplements, branded cereals, edamame, mixed berries, seitan, the plant blend)", () => {
     const source = readFileSync(new URL("./food-table.ts", import.meta.url), "utf8");
     const rows = [...source.matchAll(/^\s+([a-z0-9_]+):\s*\{[^}]*\},?(.*)$/gm)].filter((m) => m[1] in FOOD_DENSITY);
-    expect(rows).toHaveLength(150);
+    expect(rows).toHaveLength(151);
     const without = rows.filter((m) => !/\/\/ USDA fdc \d+ \(was /.test(m[2])).map((m) => m[1]);
     expect(without.sort()).toEqual(
       ["berries_mixed", "brown_rice_pasta", "casein_protein", "corn_flakes", "cottage_cheese_2pct", "edamame", "milk_2_pct", "milk_skim", "pea_protein", "plant_protein", "rice_krispies", "seitan", "shredded_wheat", "tvp_dry", "whey_isolate"].sort()
@@ -201,8 +201,6 @@ const KNOWN_NARROW = [
   "d_ribeye_potatoes|omnivore|0",
   "d_ribeye_potatoes|paleo|0",
   "d_flank_steak_butter_carnivore|keto|2",
-  "d_chuck_roast_mash|omnivore|0",
-  "d_chuck_roast_mash|paleo|0",
   "d_ribeye_sweet_potato_steakhouse|omnivore|0",
   "d_ribeye_sweet_potato_steakhouse|paleo|0",
 ];
@@ -302,53 +300,6 @@ const KNOWN_GAPS = [
   "vegan|breakfast|high_protein|1.6",
   "vegan|breakfast|high_protein|2",
   "vegan|snack|high_protein|0.6",
-  "keto|snack|keto|0.6",
-  "keto|snack|keto|0.8",
-  "keto|snack|keto|1",
-  "keto|snack|keto|1.25",
-  "keto|snack|keto|1.6",
-  "keto|snack|keto|2",
-  "paleo|snack|standard|1",
-  "paleo|snack|standard|1.25",
-  "paleo|snack|standard|1.6",
-  "paleo|snack|standard|2",
-  "paleo|snack|high_carb|0.6",
-  "paleo|snack|high_carb|0.8",
-  "paleo|snack|high_carb|1",
-  "paleo|snack|high_carb|1.25",
-  "paleo|snack|high_carb|1.6",
-  "paleo|snack|high_carb|2",
-  "paleo|snack|high_protein|0.6",
-  "paleo|snack|high_protein|0.8",
-  "paleo|snack|high_protein|2",
-  "paleo|snack|light|0.6",
-  "paleo|snack|light|0.8",
-  "paleo|snack|light|1.6",
-  "paleo|snack|light|2",
-  "pescatarian|breakfast|standard|0.6",
-  "pescatarian|breakfast|standard|0.8",
-  "pescatarian|breakfast|standard|1",
-  "pescatarian|breakfast|standard|1.25",
-  "pescatarian|breakfast|standard|1.6",
-  "pescatarian|breakfast|standard|2",
-  "pescatarian|breakfast|high_carb|0.6",
-  "pescatarian|breakfast|high_carb|0.8",
-  "pescatarian|breakfast|high_carb|1",
-  "pescatarian|breakfast|high_carb|1.25",
-  "pescatarian|breakfast|high_carb|1.6",
-  "pescatarian|breakfast|high_carb|2",
-  "pescatarian|breakfast|high_protein|0.6",
-  "pescatarian|breakfast|high_protein|0.8",
-  "pescatarian|breakfast|high_protein|1",
-  "pescatarian|breakfast|high_protein|1.25",
-  "pescatarian|breakfast|high_protein|1.6",
-  "pescatarian|breakfast|high_protein|2",
-  "pescatarian|breakfast|light|0.6",
-  "pescatarian|breakfast|light|0.8",
-  "pescatarian|breakfast|light|1",
-  "pescatarian|breakfast|light|1.25",
-  "pescatarian|breakfast|light|1.6",
-  "pescatarian|breakfast|light|2",
   "pescatarian|snack|standard|1.6",
   "pescatarian|snack|standard|2",
   "pescatarian|snack|low_carb|0.6",
@@ -360,27 +311,11 @@ const KNOWN_GAPS = [
   "pescatarian|snack|high_carb|2",
   "pescatarian|snack|high_protein|0.8",
   "pescatarian|snack|light|0.8",
-  "carnivore|snack|carnivore|0.6",
-  "carnivore|snack|carnivore|0.8",
-  "carnivore|snack|carnivore|1",
-  "carnivore|snack|carnivore|1.25",
-  "carnivore|snack|carnivore|1.6",
-  "carnivore|snack|carnivore|2",
 ];
 
 // (slot | shape | size | meals) where an everyday omnivore has fewer than three meals (two on the high-protein and light shapes). All are snacks: the jerky snacks no longer land
 // with USDA-accurate jerky.
-const KNOWN_OMNIVORE_THIN = [
-  "snack|standard|1.6|2",
-  "snack|standard|2|2",
-  "snack|low_carb|1|2",
-  "snack|low_carb|1.6|2",
-  "snack|high_carb|1|2",
-  "snack|high_carb|1.25|2",
-  "snack|high_carb|1.6|1",
-  "snack|high_carb|2|1",
-  "snack|high_protein|0.8|1",
-];
+const KNOWN_OMNIVORE_THIN: string[] = [];
 
 describe("coverage: which diets and slots the starter library can fill", () => {
   it("the gaps are exactly the known ones", () => {
@@ -463,6 +398,79 @@ describe("tags: allergens and diets are worked out from what is in the recipe", 
       expect(DECLARED_PREP_FOODS[id].reason.length, id).toBeGreaterThan(5);
     }
   });
+  it("at every size a recipe is served at, the preparation text names only foods that are printed as a line at that size (or are declared)", () => {
+    // How the preparation text would call a line's food: the whole name ("Hass Avocado" -> avocado), its last word, and any word in brackets ("White Fish (Cod)" -> cod).
+    const GENERIC = new Set(["raw", "fresh", "whole", "large", "liquid", "hass", "atlantic", "mixed", "extra", "virgin", "ground", "lean", "dry", "cooked", "organic", "plain", "natural", "grass", "fed"]);
+    const TOO_LOOSE_AS_A_HEAD = new Set(["white", "oil", "steak", "fish", "bean", "rice", "milk"]);
+    const words = (t: string) => t.toLowerCase().replace(/[^a-z ]+/g, " ").split(/\s+/).filter((w) => w.length > 2 && !GENERIC.has(w));
+    const sing = (w: string) => w.replace(/ies$/, "y").replace(/s$/, "");
+    const aliasesOf = (name: string): string[] => {
+      const base = words(name.replace(/\([^)]*\)/g, " ")).map(sing);
+      const paren = words(name.match(/\(([^)]*)\)/)?.[1] ?? "").map(sing);
+      const head = base[base.length - 1];
+      return [...new Set([base.join(" "), ...(head && !TOO_LOOSE_AS_A_HEAD.has(head) ? [head] : []), ...paren])].filter(Boolean);
+    };
+    const patternFor = (alias: string) => (alias === "egg" ? /\beggs?\b(?!\s+whites?)/ : new RegExp(`\\b${alias}(s|es)?\\b`));
+    const plain = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().toLowerCase();
+    const problems: string[] = [];
+    for (const r of RECIPES) {
+      const declared = DECLARED_PREP_FOODS[r.id]?.foods ?? [];
+      const vocabulary = new Map<string, string[]>(); // line name -> aliases
+      for (const fam of FAMILIES) {
+        for (const t of gridFor(fam, r.slot)) for (const i of r.build(t.proteinG, t.carbsG, t.fatG)) if (isIngredient(i)) vocabulary.set(i.name, aliasesOf(i.name));
+      }
+      for (const fam of familiesOf(r.archetypes)) {
+        for (const t of gridFor(fam, r.slot)) {
+          const meal = scaleTemplate(r, t);
+          if (!meal) continue;
+          const prep = meal.items.filter((i) => !isIngredient(i)).map((i) => plain(i.text)).join(" ");
+          const printedAliases = new Set(visibleIngredients(meal.items).flatMap((i) => aliasesOf(i.name)));
+          for (const [name, aliases] of vocabulary) {
+            if (aliases.some((a) => printedAliases.has(a))) continue;
+            if (aliases.some((a) => declared.some((d) => d.includes(a) || a.includes(d)))) continue;
+            if (aliases.some((a) => patternFor(a).test(prep))) problems.push(`${r.id}: preparation names "${name}" at a size where no such line is printed`);
+          }
+        }
+      }
+    }
+    expect([...new Set(problems)], "preparation text must be built from the lines that print").toEqual([]);
+  });
+  it("when every line prints, the preparation text is exactly the sentence the recipe has always had; a line left out only drops its own food", () => {
+    const preps = (id: string) => {
+      const r = RECIPES.find((x) => x.id === id)!;
+      const out = new Set<string>();
+      for (const fam of familiesOf(r.archetypes)) {
+        for (const t of gridFor(fam, r.slot)) {
+          const meal = scaleTemplate(r, t);
+          if (meal) out.add(meal.items.filter((i) => !isIngredient(i)).map((i) => i.text.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim()).join(" "));
+        }
+      }
+      return out;
+    };
+    const full: Record<string, string> = {
+      b_power_oats: "Preparation: Cook rolled oats in skim milk, stir in whey. Top with sliced fresh banana and peanut butter.",
+      b_peach_cottage_cheese: "Preparation: Scoop cottage cheese into a bowl. Dice fresh peaches and scatter on top along with raw almonds.",
+      b_tofu_scramble_berries_vegan: "Preparation: Crumble and pan-sear pressed tofu with turmeric and nutritional yeast. Serve with fresh mixed berries and sliced avocado.",
+      b_salmon_eggs_avocado: "Preparation: Pan-sear the salmon fillet. Scramble the whole eggs with the egg whites, toast the sourdough, and serve with sliced avocado and berries.",
+      l_turkey_apple_salad: "Preparation: Layer sliced turkey breast, thinly sliced apples, spinach, and mashed avocado inside the wrap.",
+      d_steak_plum_salad: "Preparation: Sear flank steak, let rest, and slice thin. Toss spinach, sliced plums, and olive oil dressing. Serve potatoes on the side.",
+      d_chicken_thigh_root_veg: "Preparation: Chop carrots and beets, toss in olive oil, and roast at 400\u00b0F. Bake skinless chicken thighs alongside until golden brown.",
+      s_string_cheese_jerky_apple: "Preparation: Ready-to-eat snack pack. Pair string cheese with beef jerky, hard-boiled egg whites, pumpkin seeds, and fresh apple slices.",
+      s_cantaloupe_jerky: "Preparation: Ready-to-eat snack. Pair savory beef jerky and hard-boiled egg whites with sweet cantaloupe slices and pumpkin seeds.",
+      d_ribeye_potatoes: "Preparation: Sear ribeye in a screaming hot cast-iron skillet. Bake russet potatoes in the oven. Top steak with grass-fed butter.",
+    };
+    for (const [id, sentence] of Object.entries(full)) expect([...preps(id)], id).toContain(sentence);
+    // And a size where the avocado is left out no longer tells the cook to slice one.
+    expect([...preps("l_turkey_apple_salad")].some((t) => !/avocado/.test(t) && /Layer sliced turkey breast, thinly sliced apples, and spinach inside the wrap/.test(t))).toBe(true);
+    // Every sentence is whole: it starts with the label, ends with a full stop, has no doubled spaces or stray punctuation.
+    for (const r of RECIPES) {
+      for (const text of preps(r.id)) {
+        expect(text, r.id).toMatch(/^Preparation: \S/);
+        expect(text, r.id).toMatch(/[.)]$/);
+        expect(text, r.id).not.toMatch(/ {2}| \.|,\.|\.\.| ,|, and\./);
+      }
+    }
+  });
   it("a vegan recipe is never tagged with dairy, egg, fish or shellfish; a pescatarian one never with meat-only logic breaking", () => {
     for (const r of RECIPES.filter((x) => x.archetypes.includes("vegan"))) {
       const t = templateAllergens(r);
@@ -519,8 +527,9 @@ describe("the scaler", () => {
     expect(meal!.passes).toBeGreaterThan(1);
   });
   it("returns null, never a bad meal, when a recipe cannot land", () => {
-    const r = RECIPES.find((x) => x.id === "s_jerky_eggs_carnivore")!;
-    expect(scaleTemplate(r, { proteinG: 25, carbsG: 0, fatG: 25 })).toBeNull();
+    const r = RECIPES.find((x) => x.id === "l_chicken_rice_broccoli")!;
+    expect(scaleTemplate(r, { proteinG: 150, carbsG: 0, fatG: 80 })).toBeNull();
+    expect(scaleTemplate(r, { proteinG: 0, carbsG: 0, fatG: 0 })).toBeNull();
   });
   it("a formula that throws is skipped, not shown", () => {
     const bad: TemplateRecipe = { id: "bad", name: "Bad", slot: "lunch", archetypes: ["omnivore"], keywords: ["bad"], build: () => { throw new Error("boom"); } };

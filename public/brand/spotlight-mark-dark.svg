@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Spotlight Coaching mark: a halo with light falling onto a barbell">
+  <title>Spotlight Coaching</title>
+  <defs>
+    <linearGradient id="cone" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F4C95D" stop-opacity="0.78"/>
+      <stop offset="1" stop-color="#F4C95D" stop-opacity="0.08"/>
+    </linearGradient>
+  </defs>
+  <polygon points="72,38 128,38 176,150 24,150" fill="url(#cone)"/>
+  <ellipse cx="100" cy="30" rx="31" ry="9" fill="none" stroke="#FFF4D6" stroke-width="7"/>
+  <rect x="34" y="152" width="132" height="7" rx="3" fill="#FFF4D6"/>
+  <rect x="44" y="130" width="12" height="50" rx="3" fill="#F4C95D"/>
+  <rect x="144" y="130" width="12" height="50" rx="3" fill="#F4C95D"/>
+  <rect x="58" y="138" width="9" height="34" rx="3" fill="#E29A2C"/>
+  <rect x="133" y="138" width="9" height="34" rx="3" fill="#E29A2C"/>
+</svg>

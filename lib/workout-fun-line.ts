@@ -1,5 +1,6 @@
 import { getVolumeEquivalence } from "./volume-equivalence";
 import { GYM_JOKES } from "./gym-jokes";
+import { FAMOUS_QUOTE_LINES } from "./famous-quotes";
 import { hashSeed, seededRandom } from "./seeded-pick";
 
 // The one light line on the post-workout card. It is picked when the card is made, from three kinds that are spread out over time:
@@ -157,7 +158,22 @@ export const QUOTES: string[] = [
 
 // The absurd bank. This is where the vetted batch of lines is loaded (plain strings, clean and kind, no real people or trademarks, 110 characters or fewer). Gym
 // jokes and quotes are in it now; more lines only make a repeat rarer.
-export const ABSURD_LINES: string[] = [...GYM_JOKES, ...QUOTES];
+// Ron's own lines (his jokes, puns and parodies, approved word for word). They are the one place a named person, a first-person line or a skipped-leg-day joke is allowed, so
+// the tests that ban those in the rest of the bank list these by exact text. Keep them as Ron wrote them; the Franklin Roosevelt line is deliberately straight.
+export const RON_LINES: string[] = [
+  "Two fish are in a tank. One says to the other: How do I drive this thing?",
+  "Why couldn't the bicycle stand up by itself? It was two tired.",
+  "What do you get when you cross an elephant and a rhinoceros? Ellifino.",
+  "Two peanuts were walking down the road. One was a-salted.",
+  "You just got rick-rolled by a dumbbell. Always gonna pick you up. - Rick Dumbbell-ley",
+  "Never gonna let the bar down. Never gonna run around and skip leg day. - Rick Dumbbell-ley",
+  "Give me liberty, or give me reps. - Patrick Henry, allegedly",
+  "I think, therefore I am sore. - Descartes",
+  "Someone rolled off the wrong side of the bench press this morning.",
+  "The only thing we have to fear is fear itself. - Franklin D. Roosevelt",
+];
+
+export const ABSURD_LINES: string[] = [...GYM_JOKES, ...QUOTES, ...FAMOUS_QUOTE_LINES, ...RON_LINES];
 
 const FITS = (s: string) => s.length <= MAX_FUN_LINE_CHARS;
 

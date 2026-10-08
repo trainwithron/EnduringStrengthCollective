@@ -298,7 +298,7 @@ function SetCompletionSync({
   readOnly,
   touched,
   weightOptional,
-  restPrescribed,
+  prescribedRestSeconds,
   onChange,
 }: {
   set: SetLogEntry;
@@ -306,13 +306,15 @@ function SetCompletionSync({
   readOnly: boolean;
   // Bodyweight movements: reps alone complete the set (no typing 0 lbs).
   weightOptional: boolean;
-  // The coach prescribed this set's rest (own or inherited): it is not logged by the client, so it is not needed to complete the set.
-  restPrescribed: boolean;
+  // The rest the coach prescribed for this set (own or inherited), or null. The client does not log it, so it is not needed to complete the set, and it is written
+  // into the set's log when the set completes (so the logged history and the session-length check see the rest that was asked for).
+  prescribedRestSeconds: number | null;
   // Whether the athlete has interacted with this set this session.
   touched: boolean;
   onChange: (patch: Partial<SetLogEntry>) => void;
 }) {
   const { save } = useSetSave();
+  const restPrescribed = prescribedRestSeconds != null;
   useEffect(() => {
     if (readOnly || set.status === "skipped") return;
     const requiredProps = orderTrackedFields(trackedFields)
@@ -331,9 +333,15 @@ function SetCompletionSync({
       // Flip the status right away — this is what the checkmark and the
       // rest-timer trigger key off. The write is queued (and retried), never
       // reverted: reverting on failure made this effect fire again forever.
-      onChange(patch);
+      // A rest the client typed is never overwritten: only an empty one takes the prescribed rest.
+      const withRest: Partial<SetLogEntry> =
+        patch.status === "completed" && prescribedRestSeconds != null && set.restSeconds == null ? { ...patch, restSeconds: prescribedRestSeconds } : patch;
+      onChange(withRest);
       const payload: Record<string, unknown> = { ...patch };
-      if (patch.status === "completed") payload.completed_at = new Date().toISOString();
+      if (patch.status === "completed") {
+        payload.completed_at = new Date().toISOString();
+        if (withRest.restSeconds !== undefined) payload[ACTUAL_COLUMN.rest] = withRest.restSeconds;
+      }
       save(set.id, payload);
     }
 
@@ -357,7 +365,7 @@ function SetCompletionSync({
     set.height,
     set.distance,
     set.restSeconds,
-    restPrescribed,
+    prescribedRestSeconds,
     set.pace,
     set.status,
     readOnly,
@@ -541,7 +549,10 @@ export function ExerciseSetGrid({
           readOnly={readOnly}
           touched={touchedSetIds.has(set.id)}
           weightOptional={weightOptional}
-          restPrescribed={restForSet(sets, set.id)?.source === "coach"}
+          prescribedRestSeconds={(() => {
+            const r = restForSet(sets, set.id);
+            return r?.source === "coach" ? r.seconds : null;
+          })()}
           onChange={(patch) => onSetChange(set.id, patch)}
         />
       ))}

@@ -86,8 +86,8 @@ describe("library-first selection", () => {
     expect(liked.options.map((m) => m.key)).toContain(third.key);
     expect(liked.options.findIndex((m) => m.key === third.key)).toBeLessThanOrEqual(base.options.findIndex((m) => m.key === third.key));
   });
-  it("a keto snack has no library meal: it says three are missing so the screen offers to generate them", () => {
-    const sel = selectOptions("snack", gridFor("keto", "snack")[2], ctxOf({ diet: "keto" }));
+  it("a slot with no library meal says three are missing so the screen offers to generate them (a vegan high-protein small snack)", () => {
+    const sel = selectOptions("snack", gridFor("high_protein", "snack")[0], ctxOf({ diet: "vegan" }));
     expect(sel.options).toEqual([]);
     expect(sel.shortfall).toBe(3);
   });

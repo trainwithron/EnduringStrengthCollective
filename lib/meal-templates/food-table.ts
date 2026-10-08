@@ -26,6 +26,7 @@ export const FOOD_DENSITY = {
   filet_mignon:        { protein: 0.217, carbs: 0, fat: 0.067, category: "proteins" }, // USDA fdc 173988 (was 0.22 / 0 / 0.05)
   skirt_steak:         { protein: 0.204, carbs: 0, fat: 0.117, category: "proteins" }, // USDA fdc 172158 (was 0.21 / 0 / 0.12)
   chuck_roast:         { protein: 0.191, carbs: 0, fat: 0.186, category: "proteins" }, // USDA fdc 168668 (was 0.2 / 0 / 0.16)
+  chuck_roast_trimmed: { protein: 0.221, carbs: 0, fat: 0.042, category: "proteins" }, // USDA fdc 174051 (was a new row: chuck arm pot roast, separable lean only, trimmed to 1/8 in fat, all grades, raw)
   brisket:             { protein: 0.179, carbs: 0, fat: 0.222, category: "proteins" }, // USDA fdc 168666 (was 0.19 / 0 / 0.22)
   flat_iron:           { protein: 0.202, carbs: 0, fat: 0.073, category: "proteins" }, // USDA fdc 168693 (was 0.22 / 0 / 0.09)
   porterhouse:         { protein: 0.204, carbs: 0, fat: 0.146, category: "proteins" }, // USDA fdc 168715 (was 0.23 / 0 / 0.14)
