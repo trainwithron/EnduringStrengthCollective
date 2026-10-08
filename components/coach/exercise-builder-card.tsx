@@ -3,7 +3,7 @@
 import type { DemoRow } from "@/lib/exercise-demo";
 import { useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { formatRest, parseRestInput } from "@/lib/rest-time";
+import { MAX_TIME_SECONDS, formatRest, parseRestInput } from "@/lib/rest-time";
 import { ExerciseNameInput } from "./exercise-name-input";
 import { BuilderDemoThumb } from "@/components/coach/builder-demo-thumb";
 import { builderDemoFor, type BuilderDemo } from "@/lib/builder-demo";
@@ -62,7 +62,7 @@ function TargetCell({
   return (
     <input
       type={kind === "number" ? "number" : "text"}
-      placeholder={label.startsWith("Rest") ? "m:ss" : undefined}
+      placeholder={label.startsWith("Rest") || label.startsWith("Time") ? "m:ss" : undefined}
       inputMode={kind === "number" ? "decimal" : "text"}
       min={kind === "number" ? "0" : undefined}
       aria-label={label}
@@ -89,7 +89,7 @@ function targetValue(set: ExerciseSetTarget, field: TrackedField): string {
   const v = set[prop];
   if (v === null || v === undefined) return "";
   // Rest is shown as m:ss (5:00), and typed as 5:00, 300 or 90s.
-  if (field === "rest" && typeof v === "number") return v > 0 ? formatRest(v) : "";
+  if ((field === "rest" || field === "time") && typeof v === "number") return v > 0 ? formatRest(v) : "";
   return String(v);
 }
 
@@ -853,20 +853,20 @@ export function ExerciseBuilderCard({
                 return (
                   <div key={field} className="flex items-center gap-1.5">
                     <span className="w-14 shrink-0 font-body text-xs text-steel uppercase tracking-wide">
-                      {field === "rest" ? "Rest" : def.label}
+                      {def.label}
                     </span>
                     {exercise.sets.map((set, i) => (
                       <TargetCell
                         key={set.id}
                         value={targetValue(set, field)}
-                        kind={field === "rest" ? "text" : def.kind}
-                        label={field === "rest" ? `Rest (m:ss), set ${i + 1}` : `${def.label}, set ${i + 1}`}
+                        kind={field === "rest" || field === "time" ? "text" : def.kind}
+                        label={field === "rest" || field === "time" ? `${def.label} (m:ss), set ${i + 1}` : `${def.label}, set ${i + 1}`}
                         onCommit={(typed) => {
                           let raw = typed;
-                          if (field === "rest") {
-                            const parsed = parseRestInput(typed);
+                          if (field === "rest" || field === "time") {
+                            const parsed = parseRestInput(typed, field === "time" ? MAX_TIME_SECONDS : undefined);
                             if (!parsed.ok) {
-                              flashSaveError("Rest looks like 5:00, 3m or 90s (up to 30:00).");
+                              flashSaveError(field === "time" ? "Time looks like 3:00, 3 min, 90s or 180 (up to 4:00:00)." : "Rest looks like 5:00, 3m or 90s (up to 30:00).");
                               return false;
                             }
                             if (parsed.bare && !window.confirm(`${parsed.seconds} means ${parsed.seconds} seconds. For minutes type ${parsed.seconds}:00 or ${parsed.seconds}m. Save ${parsed.seconds} seconds?`)) return false;
@@ -988,6 +988,24 @@ export function ExerciseBuilderCard({
             )}
           </div>
 
+          <textarea
+            value={notesDraft}
+            onChange={(e) => setNotesDraft(e.target.value)}
+            onBlur={() => {
+              if (notesDraft !== (exercise.notes ?? "")) persistNotes(notesDraft);
+            }}
+            ref={(el) => {
+              if (el) {
+                el.style.height = "auto";
+                el.style.height = `${el.scrollHeight}px`;
+              }
+            }}
+            aria-label="Note for this exercise"
+            placeholder="Add a note"
+            rows={1}
+            className="mt-2 w-full bg-graphite border border-steel/30 text-chalk px-2 py-1.5 font-body text-xs focus:outline-none focus:border-rust resize-none overflow-hidden"
+          />
+
           <div className="mt-2 flex items-center gap-3">
             <button
               type="button"
@@ -1000,8 +1018,8 @@ export function ExerciseBuilderCard({
 
           {showDetails && (
             <div className="mt-2 pt-2 border-t border-steel/15 space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="font-body text-xs text-steel uppercase tracking-wide shrink-0">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="font-body text-xs text-steel uppercase tracking-wide">
                   {exercise.trackedFields.includes("distance") && !exercise.trackedFields.includes("reps")
                     ? "Distance range (for Double Progression)"
                     : "Rep range (for Double Progression)"}
@@ -1024,16 +1042,6 @@ export function ExerciseBuilderCard({
                   className="w-14 h-8 bg-graphite border border-steel/30 text-chalk px-1 font-body text-xs text-center focus:outline-none focus:border-rust"
                 />
               </div>
-              <textarea
-                value={notesDraft}
-                onChange={(e) => setNotesDraft(e.target.value)}
-                onBlur={() => {
-                  if (notesDraft !== (exercise.notes ?? "")) persistNotes(notesDraft);
-                }}
-                placeholder="Notes for this exercise (cues, setup, etc.)"
-                rows={2}
-                className="w-full bg-graphite border border-steel/30 text-chalk px-2 py-1.5 font-body text-xs focus:outline-none focus:border-rust resize-none"
-              />
               <ExerciseMediaPicker
                 exerciseName={exercise.exerciseName}
                 videoPath={liveDemo && !liveDemo.storedUnder ? liveDemo.demo.videoPath : null}

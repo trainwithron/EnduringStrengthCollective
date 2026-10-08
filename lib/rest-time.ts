@@ -7,12 +7,15 @@ import type { SetLogEntry } from "@/lib/types";
 // A rest above 30 minutes is almost always a slip (3000 for 300), so it is refused rather than saved.
 export const MAX_REST_SECONDS = 1800;
 
+// A time worked (the Time field): the same typing as rest, but allowed up to four hours (a long run or row is a legitimate target; a rest that long is a slip).
+export const MAX_TIME_SECONDS = 14400;
+
 // A bare number this small is probably minutes typed without a unit ("3" for 3:00), so the caller asks before saving it as seconds.
 export const BARE_SECONDS_HINT_BELOW = 20;
 
 // "5:00", "3:30", "300", "90s", "2m", "2m30" -> seconds. Empty or 0 is a valid "no rest" (null). Anything else that is not a time is refused. A bare number
 // is seconds; `bare` is set when it is small enough that the coach probably meant minutes, so the caller can ask first.
-export function parseRestInput(text: string): { ok: true; seconds: number | null; bare?: boolean } | { ok: false } {
+export function parseRestInput(text: string, maxSeconds: number = MAX_REST_SECONDS): { ok: true; seconds: number | null; bare?: boolean } | { ok: false } {
   const t = text.trim().toLowerCase();
   if (t === "") return { ok: true, seconds: null };
   let seconds: number | null = null;
@@ -26,7 +29,7 @@ export function parseRestInput(text: string): { ok: true; seconds: number | null
     seconds = Number(m[1]);
     bare = m[2] === undefined && seconds > 0 && seconds < BARE_SECONDS_HINT_BELOW;
   }
-  if (seconds === null || !Number.isFinite(seconds) || seconds < 0 || seconds > MAX_REST_SECONDS) return { ok: false };
+  if (seconds === null || !Number.isFinite(seconds) || seconds < 0 || seconds > maxSeconds) return { ok: false };
   if (seconds === 0) return { ok: true, seconds: null };
   return bare ? { ok: true, seconds, bare: true } : { ok: true, seconds };
 }

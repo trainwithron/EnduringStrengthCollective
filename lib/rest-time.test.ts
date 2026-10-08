@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatRest, MAX_REST_SECONDS, parseRestInput, restForSet } from "@/lib/rest-time";
+import { formatRest, MAX_REST_SECONDS, MAX_TIME_SECONDS, parseRestInput, restForSet } from "@/lib/rest-time";
 
 describe("the coach's rest field accepts a clear format and shows m:ss", () => {
   it("reads 5:00, 300, 90s, 2m and 2m30", () => {
@@ -89,5 +89,27 @@ describe("the rest that applies after a set", () => {
   it("a typed 0 or a stored 0 counts as no rest: the set uses the nearest earlier rest, or the picker", () => {
     expect(restForSet([set("a", 0, 120), set("b", 1, 0)], "b")).toEqual({ seconds: 120, source: "coach" });
     expect(restForSet([set("a", 0, 0)], "a")).toBeNull();
+  });
+});
+
+describe("the Time field takes the same typing as rest, with a longer limit", () => {
+  const secs = (t: string) => {
+    const r = parseRestInput(t, MAX_TIME_SECONDS);
+    return r.ok ? r.seconds : "refused";
+  };
+  it('accepts "3:00", "180", "90s" and "3 min" and stores seconds', () => {
+    expect(secs("3:00")).toBe(180);
+    expect(secs("180")).toBe(180);
+    expect(secs("90s")).toBe(90);
+    expect(secs("3 min")).toBe(180);
+    expect(formatRest(180)).toBe("3:00");
+  });
+  it("allows a long effort that a rest would refuse, and refuses nonsense", () => {
+    expect(secs("45 min")).toBe(2700);
+    expect(parseRestInput("45 min").ok).toBe(false);
+    expect(secs("abc")).toBe("refused");
+    expect(secs("5:99")).toBe("refused");
+    expect(secs("999 min")).toBe("refused");
+    expect(secs("")).toBeNull();
   });
 });
