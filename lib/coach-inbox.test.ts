@@ -52,3 +52,33 @@ describe("coach inbox", () => {
     expect(amber.lastBody).toBe("sent by coach");
   });
 });
+
+describe("coach inbox with an away auto-reply", () => {
+  const auto = (group: string, from: string, to: string, at: string, body = "I am away"): InboxMessage => ({ ...msg(group, from, to, at, body), auto_reply: true });
+  it("a client message followed by the coach's auto-reply is still waiting, and the preview is their message", () => {
+    const inbox = buildCoachInbox(
+      people,
+      [msg("g-johann", "johann", COACH, "2026-10-05T10:00:00Z", "can we move Thursday?", "2026-10-05T10:05:00Z"), auto("g-johann", COACH, "johann", "2026-10-05T10:00:01Z")],
+      COACH
+    );
+    const johann = inbox.find((c) => c.otherId === "johann")!;
+    expect(johann.lastFromOther).toBe(true);
+    expect(johann.lastBody).toBe("can we move Thursday?");
+  });
+  it("a real reply from the coach after it clears the waiting", () => {
+    const inbox = buildCoachInbox(
+      people,
+      [
+        msg("g-johann", "johann", COACH, "2026-10-05T10:00:00Z", "can we move Thursday?"),
+        auto("g-johann", COACH, "johann", "2026-10-05T10:00:01Z"),
+        msg("g-johann", COACH, "johann", "2026-10-06T08:00:00Z", "Yes, 5 works"),
+      ],
+      COACH
+    );
+    expect(inbox.find((c) => c.otherId === "johann")!.lastFromOther).toBe(false);
+  });
+  it("a conversation with only an auto-reply has no last message", () => {
+    const inbox = buildCoachInbox(people, [auto("g-johann", COACH, "johann", "2026-10-05T10:00:01Z")], COACH);
+    expect(inbox.find((c) => c.otherId === "johann")!.lastAt).toBeNull();
+  });
+});

@@ -12,20 +12,24 @@ export async function loadCoachInbox(supabase: SupabaseClient, args: { coachId: 
   const scopeIds = scopeGroups.map((g) => g.id);
   const kindByGroup = new Map(scopeGroups.map((g) => [g.id, g.kind]));
   // The messages are read a page at a time (PostgREST stops at 1,000 rows), in a fixed order, so the newest message and the unread count of every conversation are right however many there are.
-  const [{ data: group }, { data: roster }, messagePages] = await Promise.all([
-    supabase.from("groups").select("name").eq("id", groupId).single(),
-    supabase.from("group_memberships").select("profile_id, group_id, profiles ( full_name, avatar_url )").in("group_id", scopeIds).eq("role", "athlete"),
+  const readMessages = (columns: string) =>
     pageAll((from, to) =>
       supabase
         .from("direct_messages")
-        .select("id, group_id, sender_id, recipient_id, body, created_at, read_at")
+        .select(columns)
         .in("group_id", scopeIds)
         .or(`sender_id.eq.${coachId},recipient_id.eq.${coachId}`)
         .order("created_at", { ascending: true })
         .order("id", { ascending: true })
         .range(from, to)
-    ),
+    );
+  const [{ data: group }, { data: roster }, firstPages] = await Promise.all([
+    supabase.from("groups").select("name").eq("id", groupId).single(),
+    supabase.from("group_memberships").select("profile_id, group_id, profiles ( full_name, avatar_url )").in("group_id", scopeIds).eq("role", "athlete"),
+    readMessages("id, group_id, sender_id, recipient_id, body, created_at, read_at, auto_reply"),
   ]);
+  // Before the 0315 database update there is no auto_reply column and that read fails: read again with the old column list so the inbox is never empty.
+  const messagePages = firstPages.failed && firstPages.rows.length === 0 ? await readMessages("id, group_id, sender_id, recipient_id, body, created_at, read_at") : firstPages;
   const messages = messagePages.rows;
   const people = (roster ?? []).map((r: any) => ({
     id: r.profile_id as string,

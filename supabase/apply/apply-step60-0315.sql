@@ -31,7 +31,8 @@ $guard$;
 --     reply text, the last day has passed (in the coach's time zone, New York when none is set), or this coach already auto-replied to this client in this group in the last
 --     5 minutes (a burst of messages gets one reply, not many). Every other message gets the reply: it is not limited to one per period.
 --   * The coach still gets the usual notice for the client's message (nothing about that changes), and the client gets the usual notice for the reply.
--- New table, one new column, three functions (all closed to signed-in users: they only ever run as triggers). Re-runnable.
+-- If writing the reply ever fails, the client's own message is still stored (the failure is only a warning). New table, one new column, two functions (both closed to signed-in
+-- users: they only ever run as triggers). Re-runnable.
 
 create table if not exists public.coach_away_replies (
   coach_id uuid primary key references public.profiles(id) on delete cascade,
@@ -128,8 +129,12 @@ begin
 
   perform set_config('app.away_reply', '1', true);
   -- created_at is the clock, not the start of the transaction, so the reply always sorts after the message it answers (both would otherwise carry the same time).
-  insert into public.direct_messages (group_id, sender_id, recipient_id, body, auto_reply, created_at)
-  values (new.group_id, new.recipient_id, new.sender_id, v_cfg.message, true, clock_timestamp());
+  begin
+    insert into public.direct_messages (group_id, sender_id, recipient_id, body, auto_reply, created_at)
+    values (new.group_id, new.recipient_id, new.sender_id, v_cfg.message, true, clock_timestamp());
+  exception when others then
+    raise warning 'away reply not sent: %', sqlerrm;
+  end;
   perform set_config('app.away_reply', '', true);
   return new;
 end;

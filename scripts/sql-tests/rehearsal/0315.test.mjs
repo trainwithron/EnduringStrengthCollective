@@ -145,6 +145,21 @@ export default {
       const otherThread = await h.rows("select sender_id, body from public.direct_messages where group_id = $1 and auto_reply", [group2]);
       h.check("a client of coach two is answered with coach two's text, never coach one's", otherThread.length === 1 && otherThread[0].sender_id === other && otherThread[0].body === "Other coach away", JSON.stringify(otherThread));
 
+      // if writing the reply fails for any reason, the client's own message is still stored
+      await reset();
+      await h.asSuper();
+      await db.query("update public.coach_away_replies set enabled = true, message = 'Coach one away', ends_on = null where coach_id = $1", [coach]);
+      await db.query("alter table public.direct_messages add constraint tmp_block_auto_reply check (not auto_reply)");
+      const blocked = await say(ann, coach, "message while the reply cannot be written");
+      await h.asSuper();
+      const keptRows = await msgs(ann, coach);
+      await db.query("alter table public.direct_messages drop constraint tmp_block_auto_reply");
+      h.check("when the reply cannot be written, the client's message is still stored (and no reply)", !blocked.error && keptRows.length === 1 && keptRows[0].auto_reply === false, JSON.stringify({ blocked, keptRows }));
+      const afterFail = await say(ann, coach, "next one after the failure");
+      await h.asSuper();
+      const flagged = await h.rows("select auto_reply from public.direct_messages where body = 'next one after the failure'");
+      h.check("a failure leaves nothing behind: the next message works normally and is not marked", !afterFail.error && flagged.length === 1 && flagged[0].auto_reply === false);
+
       // grants
       const g = await h.one(
         "select has_function_privilege('authenticated', 'public.send_away_reply()', 'execute') as a, has_function_privilege('anon', 'public.send_away_reply()', 'execute') as b, has_table_privilege('anon', 'public.coach_away_replies', 'select') as c, has_table_privilege('authenticated', 'public.coach_away_replies', 'truncate') as d"
