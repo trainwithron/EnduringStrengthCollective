@@ -25,3 +25,10 @@ export async function createBaselineSuggestion(
   });
   return { ok: !error };
 }
+
+// A starting target left waiting from an OLD phase must not be applied after the phase has moved (it would put the client's calories on the old phase's number). Dismisses the pending
+// baseline suggestions for this client in this group, the way the suggestion card's own Dismiss does.
+export async function dismissPendingBaselines(supabase: SupabaseClient, args: { athleteId: string; groupId: string }): Promise<{ ok: boolean }> {
+  const { error } = await supabase.from("nutrition_checkin_suggestions").update({ status: "dismissed" }).eq("athlete_id", args.athleteId).eq("group_id", args.groupId).eq("kind", "baseline").eq("status", "pending");
+  return { ok: !error };
+}

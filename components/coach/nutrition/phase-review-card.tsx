@@ -10,7 +10,7 @@ import { shortDateLabel } from "@/lib/apply-from";
 import { PHASE_LABELS, type PhasePlan } from "@/lib/phase-plan";
 import { setReviewDate } from "@/lib/phase-plan-write";
 import { switchToPlannedPhase, NEW_BLOCK_NOTICE } from "@/lib/phase-switch";
-import { createBaselineSuggestion } from "@/lib/baseline-suggestion";
+import { createBaselineSuggestion, dismissPendingBaselines } from "@/lib/baseline-suggestion";
 import type { BaselineResult } from "@/lib/nutrition-baseline";
 import type { NutritionPhase } from "@/lib/nutrition-checkin";
 import type { ReviewVerdict, Stance } from "@/lib/phase-review";
@@ -35,10 +35,10 @@ export interface PhaseReviewCardProps {
   stance: Stance | null;
   stanceLine: string | null;
   factors: string[];
-  // The starting target worked out for the NEXT phase (null when it cannot be worked out yet), and whether a starting-target suggestion is already waiting.
+  // The starting target worked out for the NEXT phase (null when it cannot be worked out yet), and the phase of a starting-target suggestion already waiting (null when none).
   nextBaseline: BaselineResult | null;
   nextArchetype: "standard" | "keto" | "carnivore";
-  hasPendingBaseline: boolean;
+  pendingBaselinePhase: NutritionPhase | null;
   drafts: { continue: string; move: string | null; extend: string };
 }
 
@@ -92,14 +92,21 @@ export function PhaseReviewCard(p: PhaseReviewCardProps) {
         setBusy(false);
         return setError("Couldn't start the new phase. Check your connection and try again.");
       }
-      // The new starting target is prepared for the coach to review (never applied by itself).
-      const target = p.nextBaseline && !p.hasPendingBaseline ? await createBaselineSuggestion(supabase, { athleteId: p.athleteId, groupId: p.groupId, outcome: p.nextBaseline, archetype: p.nextArchetype }) : null;
+      // The new starting target is prepared for the coach to review (never applied by itself). One left waiting from the OLD phase is set aside first: applying it would put the
+      // client's calories on the old phase's number.
+      let note: string;
+      if (!p.nextBaseline) {
+        note = " Add what's missing in About you to get a starting target worked out.";
+      } else if (p.pendingBaselinePhase === p.next) {
+        note = " A starting target for it is already waiting in Targets.";
+      } else {
+        if (p.pendingBaselinePhase != null) await dismissPendingBaselines(supabase, { athleteId: p.athleteId, groupId: p.groupId });
+        const made = await createBaselineSuggestion(supabase, { athleteId: p.athleteId, groupId: p.groupId, outcome: p.nextBaseline, archetype: p.nextArchetype });
+        note = made.ok ? " A starting target is ready in Targets for you to review and apply." : " The phase was started, but the starting target could not be prepared. Open Targets and use Starting target to make it.";
+      }
       notifyPush(p.athleteId, NEW_BLOCK_NOTICE.title, NEW_BLOCK_NOTICE.body, `/groups/${p.groupId}`);
       setBusy(false);
-      setDone(
-        `${p.clientFirst} is now in ${PHASE_LABELS[p.next].toLowerCase()} and was told a new training block started.` +
-          (target?.ok ? " A starting target is ready in Targets for you to review and apply." : p.hasPendingBaseline ? " A starting target is already waiting in Targets." : " Add what's missing in About you to get a starting target worked out.")
-      );
+      setDone(`${p.clientFirst} is now in ${PHASE_LABELS[p.next].toLowerCase()} and was told a new training block started.${note}`);
       router.refresh();
       return;
     }

@@ -25,7 +25,7 @@ const base: PhaseReviewCardProps = {
   plan: { phase: "fat_loss", startedOn: "2026-09-10", reviewOn: "2026-10-08", plannedNextPhase: "reverse_diet", lastReviewedAt: null },
   nextBaseline: null,
   nextArchetype: "standard",
-  hasPendingBaseline: false,
+  pendingBaselinePhase: null,
   drafts: { continue: "Hi Sam, keep going.", move: "Hi Sam, the best path now is a reverse diet.", extend: "Hi Sam, a little more time." },
 };
 const render = (over: Partial<PhaseReviewCardProps> = {}) => renderToStaticMarkup(createElement(PhaseReviewCard, { ...base, ...over }));

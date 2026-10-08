@@ -463,7 +463,7 @@ export async function ClientNutrition({
         return outcome.ok ? outcome : null;
       })(),
       nextArchetype: baselineArchetype,
-      hasPendingBaseline: pendingSuggestions.some((x) => x.kind === "baseline"),
+      pendingBaselinePhase: (pendingSuggestions.find((x) => x.kind === "baseline")?.phase as NutritionPhase | undefined) ?? null,
       drafts: draftsFor(review, facts, assessment?.stance ?? null, next),
     };
   }
