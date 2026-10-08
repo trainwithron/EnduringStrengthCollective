@@ -17,7 +17,7 @@ export async function GET(request: Request) {
   const { data: mine } = await supabase.from("group_memberships").select("role").eq("group_id", groupId).eq("profile_id", user.id).maybeSingle();
   if (mine?.role !== "coach") return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const { conversations } = await loadCoachInbox(supabase, { coachId: user.id, groupId });
+  const { conversations, incomplete } = await loadCoachInbox(supabase, { coachId: user.id, groupId });
   const [{ data: me }, { data: notices }] = await Promise.all([
     supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
     // The same urgent lines the bell shows (schedule, pause, freeze and cancel requests, late changes), unread only. Reading them here marks nothing.
@@ -25,6 +25,7 @@ export async function GET(request: Request) {
   ]);
   return NextResponse.json({
     conversations,
+    incomplete,
     notices: (notices ?? []).map((n: { id: string; body: string; link_path: string | null; created_at: string }) => ({ id: n.id, body: n.body, linkPath: n.link_path, createdAt: n.created_at })),
     viewerId: user.id,
     viewerName: (me as { full_name?: string } | null)?.full_name ?? "You",

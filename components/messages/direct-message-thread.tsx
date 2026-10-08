@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { notifyPush } from "@/lib/push-notify";
+import { attachVisibleReader } from "@/lib/visible-read";
 
 interface MessageRow {
   id: string;
@@ -44,6 +45,22 @@ export function DirectMessageThread({
 
   useEffect(() => {
     const supabase = createBrowserClient();
+    // A message from the other person counts as read only while this page is in front of the coach: arriving in a background tab or an unfocused window leaves it unread (so the badge shows)
+    // and it is marked read the moment the page comes back to the front. The update must be started with .then(): the query builder sends nothing until it is awaited.
+    const reader = attachVisibleReader({
+      doc: document,
+      win: window,
+      markRead: () => {
+        supabase
+          .from("direct_messages")
+          .update({ read_at: new Date().toISOString() })
+          .eq("group_id", groupId)
+          .eq("recipient_id", viewerId)
+          .eq("sender_id", otherId)
+          .is("read_at", null)
+          .then(() => undefined);
+      },
+    });
     const channel = supabase
       .channel(`dm:${groupId}:${[viewerId, otherId].sort().join(":")}`)
       .on(
@@ -56,17 +73,13 @@ export function DirectMessageThread({
             (row.sender_id === otherId && row.recipient_id === viewerId);
           if (!isThisPair) return;
           setMessages((prev) => (prev.some((m) => m.id === row.id) ? prev : [...prev, row]));
-          // A message arriving live from the other party while this
-          // thread is already open is effectively already read —
-          // mark it so the conversation list's unread badge doesn't
-          // lag behind reality until the next full page load.
-          if (row.sender_id === otherId) {
-            supabase.from("direct_messages").update({ read_at: new Date().toISOString() }).eq("id", row.id);
-          }
+          // A message arriving live while this thread is open and in front of the coach is read; otherwise it waits (see above).
+          if (row.sender_id === otherId) reader.onArrive();
         }
       )
       .subscribe();
     return () => {
+      reader.dispose();
       supabase.removeChannel(channel);
     };
   }, [groupId, viewerId, otherId]);

@@ -37,7 +37,7 @@ export function ThreadPane({
     let cancelled = false;
     setMessages(null);
     setFailed(false);
-    fetch(`/api/messages/thread?groupId=${encodeURIComponent(groupId)}&otherId=${encodeURIComponent(otherId)}`, { cache: "no-store" })
+    fetch("/api/messages/thread", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ groupId, otherId }), cache: "no-store" })
       .then(async (res) => {
         if (!res.ok) throw new Error("load failed");
         return (await res.json()) as { messages: ThreadMessage[] };

@@ -93,7 +93,7 @@ export default async function MessagesPage(props: { params: Promise<{ groupId: s
 
   if (viewerIsCoach) {
     // One inbox for the coach: every client across the groups they coach in this organization (lib/coach-inbox-data.ts, shared with the floating panel).
-    const { conversations, groupName } = await loadCoachInbox(supabase, { coachId: user.id, groupId: params.groupId });
+    const { conversations, groupName, incomplete } = await loadCoachInbox(supabase, { coachId: user.id, groupId: params.groupId });
     const group = { name: groupName };
 
     const list = (
@@ -122,6 +122,7 @@ export default async function MessagesPage(props: { params: Promise<{ groupId: s
           </div>
           <MessagesTwoPane
             conversations={conversations}
+            incomplete={incomplete}
             viewerId={user.id}
             viewerName={(me as { full_name?: string } | null)?.full_name ?? "You"}
             initialWithId={selectedConversation(conversations, search.with)?.otherId ?? null}

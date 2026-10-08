@@ -4,12 +4,14 @@ import Link from "next/link";
 import { useCallback, useState } from "react";
 import { ThreadPane } from "@/components/messages/thread-pane";
 import { filterConversations } from "@/lib/messages-list";
+import { useInboxRefresh } from "@/components/messages/use-inbox-refresh";
 import type { InboxConversation } from "@/lib/coach-inbox";
 
 // "All messages": the conversation list on the left (unread first, searchable by name) and the open thread beside it. Picking a row opens that thread in place; the page does not
 // navigate, so Back leaves the page as it should. The address keeps the selection (?with=) without adding history entries, so a refresh or a shared link opens the same thread.
 export function MessagesTwoPane({
-  conversations,
+  conversations: initialConversations,
+  incomplete: initialIncomplete = false,
   viewerId,
   viewerName,
   initialWithId,
@@ -17,6 +19,8 @@ export function MessagesTwoPane({
   groupId,
 }: {
   conversations: InboxConversation[];
+  // True when some messages could not all be read, so the list may be a little off: the page says so.
+  incomplete?: boolean;
   viewerId: string;
   viewerName: string;
   initialWithId: string | null;
@@ -26,6 +30,10 @@ export function MessagesTwoPane({
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(initialWithId);
   const [cleared, setCleared] = useState<Set<string>>(new Set());
+  // The list is refreshed every 45 seconds while the page is in front, so a message in another conversation shows up without a reload; a fresh list has the truth, so the "just opened" overrides go.
+  const refreshed = useInboxRefresh(groupId, initialConversations, () => setCleared(new Set()));
+  const conversations = refreshed.conversations;
+  const incomplete = initialIncomplete || refreshed.incomplete;
 
   const visible = filterConversations(conversations, query);
   const selected = conversations.find((c) => c.otherId === selectedId) ?? null;
@@ -59,6 +67,7 @@ export function MessagesTwoPane({
             className="w-full h-10 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
           />
         </div>
+        {incomplete && <p className="font-body text-xs text-steel px-3 py-2 border-b border-steel/15">Some older messages could not be loaded, so a last message or an unread count may be a little off. Reload to try again.</p>}
         <ul className="flex-1 overflow-y-auto" aria-label="Conversations">
           {visible.length === 0 && <li className="font-body text-sm text-steel px-3 py-3">{query ? "No client matches that." : "No athletes to message yet."}</li>}
           {visible.map((c) => {

@@ -136,7 +136,8 @@ describe("opening a thread in place is the 'seen it' moment, and only when it is
     expect(inbox).toContain(".is(\"read_at\", null)");
   });
   it("the thread loads when its pane mounts, not before", () => {
-    expect(thread).toContain("/api/messages/thread?groupId=");
+    expect(thread).toContain("\"/api/messages/thread\"");
+    expect(thread).toContain("method: \"POST\"");
     expect(thread).toContain("useEffect");
   });
   it("the panel opens on Spot, the Messages tab mounts its content only while showing, and the Spot chat stays mounted but hidden", () => {
@@ -154,5 +155,33 @@ describe("opening a thread in place is the 'seen it' moment, and only when it is
   });
   it("the shell passes the group and the rail's unread count", () => {
     expect(read("../components/coach/coach-desktop-shell.tsx")).toContain("<CollectiveIntelligenceChat groupId={groupId} unread={messagesUnread} />");
+  });
+});
+
+describe("the inbox is read in full and kept fresh (Assistant's review)", () => {
+  const data = read("./coach-inbox-data.ts");
+  const route = read("../app/api/messages/thread/route.ts");
+  const refresh = read("../components/messages/use-inbox-refresh.ts");
+  it("the messages are read a page at a time, in a fixed order, and a failed or cut-off read is reported", () => {
+    expect(data).toContain("pageAll(");
+    expect(data).toContain('.order("created_at", { ascending: true })');
+    expect(data).toContain('.order("id", { ascending: true })');
+    expect(data).toContain("incomplete: messagePages.failed || messagePages.truncated");
+    expect(read("../app/api/messages/inbox/route.ts")).toContain("incomplete,");
+    expect(read("../app/(coach)/groups/[groupId]/messages/page.tsx")).toContain("incomplete={incomplete}");
+    expect(read("../components/messages/messages-two-pane.tsx")).toContain("could not be loaded");
+  });
+  it("the thread route is a POST that is never cached", () => {
+    expect(route).toContain("export async function POST");
+    expect(route).not.toContain("export async function GET");
+    expect(route).toContain('"Cache-Control": "no-store"');
+    expect(route.match(/headers: NO_STORE/g)!.length).toBeGreaterThanOrEqual(4);
+  });
+  it("the list refreshes every 45 seconds, only while the tab is in front, through the read-only route", () => {
+    expect(refresh).toContain("INBOX_REFRESH_MS = 45_000");
+    expect(refresh).toContain('document.visibilityState !== "visible"');
+    expect(refresh).toContain("/api/messages/inbox?groupId=");
+    expect(read("../components/messages/messages-two-pane.tsx")).toContain("useInboxRefresh(");
+    expect(read("../components/coach/desktop/floating-messages.tsx")).toContain("setInterval(() => load(false), INBOX_REFRESH_MS)");
   });
 });

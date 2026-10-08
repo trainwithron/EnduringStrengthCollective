@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ThreadPane } from "@/components/messages/thread-pane";
+import { INBOX_REFRESH_MS } from "@/components/messages/use-inbox-refresh";
 import { panelSections, withPinnedClient } from "@/lib/messages-list";
 import type { InboxConversation } from "@/lib/coach-inbox";
 
@@ -14,6 +15,7 @@ interface Notice {
 
 interface InboxPayload {
   conversations: InboxConversation[];
+  incomplete?: boolean;
   notices: Notice[];
   viewerId: string;
   viewerName: string;
@@ -42,19 +44,28 @@ export function FloatingMessages({
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/messages/inbox?groupId=${encodeURIComponent(groupId)}`, { cache: "no-store" })
-      .then(async (res) => {
-        if (!res.ok) throw new Error("load failed");
-        return (await res.json()) as InboxPayload;
-      })
-      .then((d) => {
-        if (!cancelled) setData(d);
-      })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
-      });
+    function load(first: boolean) {
+      if (!first && document.visibilityState !== "visible") return;
+      fetch(`/api/messages/inbox?groupId=${encodeURIComponent(groupId)}`, { cache: "no-store" })
+        .then(async (res) => {
+          if (!res.ok) throw new Error("load failed");
+          return (await res.json()) as InboxPayload;
+        })
+        .then((d) => {
+          if (cancelled) return;
+          setData(d);
+          setCleared(new Set());
+        })
+        .catch(() => {
+          if (!cancelled && first) setFailed(true);
+        });
+    }
+    load(true);
+    // fresh again every 45 seconds while the tab is in front (read only; nothing is marked read here)
+    const timer = setInterval(() => load(false), INBOX_REFRESH_MS);
     return () => {
       cancelled = true;
+      clearInterval(timer);
     };
   }, [groupId]);
 
@@ -141,6 +152,7 @@ export function FloatingMessages({
       {section("Unread", sections.unread.filter((c) => c.otherId !== pinnedId))}
       {section("Waiting on your reply", sections.waiting.filter((c) => c.otherId !== pinnedId))}
       {section("Everyone else", sections.others.filter((c) => c.otherId !== pinnedId))}
+      {data.incomplete && <p className="font-body text-xs text-steel px-3 pt-2">Some older messages could not be loaded, so a count may be a little off.</p>}
       {data.conversations.length === 0 && <p className="font-body text-sm text-steel px-3 py-3">No clients to message yet.</p>}
       <div className="px-3 py-3">
         <Link href={`/groups/${groupId}/messages`} className="font-body text-xs text-steel underline underline-offset-2">
