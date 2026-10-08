@@ -298,6 +298,8 @@ export function ProgramBuilderDesktop({
             programId={programId}
             groupId={groupId}
             athleteId={athleteId}
+            // The day-level Clients link is for the general Programs tab only: not on a client's own copy and not on the full group program page.
+            showDayClients={embedded && !athleteId}
             exerciseLibrary={exerciseLibrary}
             exerciseAliases={exerciseAliases}
             exerciseTierByName={exerciseTierByName}

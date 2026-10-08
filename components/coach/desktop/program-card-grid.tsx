@@ -16,6 +16,8 @@ export interface ProgramCardData {
   name: string;
   isActive: boolean;
   workoutCount: number;
+  // Half or more of its workout days are empty: it does not match its own shape (lib/program-completeness.ts).
+  looksUnfinished?: boolean;
   coverImagePath: string | null;
   athleteId: string | null;
   athleteName: string | null;
@@ -198,7 +200,15 @@ function ProgramCard({
       <div className="p-3 flex flex-col gap-2 flex-1">
         <div className="flex items-start justify-between gap-2">
           <Link href={`/groups/${groupId}/programs/${program.id}`} className="min-w-0 flex-1">
-            <p className={`font-body font-medium ${titleSize} text-chalk truncate`}>{program.name}</p>
+            <p className={`font-body font-medium ${titleSize} text-chalk truncate`}>
+              {program.name}
+              {program.looksUnfinished && (
+                <span className="text-rust" title="Does this one need work? Many of its days have no exercises yet." aria-label="Looks unfinished. Does this one need work?">
+                  {" "}
+                  *
+                </span>
+              )}
+            </p>
             <p className="font-body text-xs text-steel mt-0.5">
               {program.workoutCount} {program.workoutCount === 1 ? "workout" : "workouts"}
             </p>

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { UnavailableState } from "@/components/ui/unavailable-state";
+import { programDayShape } from "@/lib/program-completeness";
 import { ProgramCardGrid, type ProgramCardData } from "@/components/coach/desktop/program-card-grid";
 import { computeProgramCardVisuals } from "@/lib/program-card-data";
 import { SwappableTerm } from "@/components/coach/swappable-term";
@@ -46,7 +47,7 @@ export default async function ProgramsListPage(
   const { data: programs, error: programsError } = await supabase
     .from("programs")
     .select(
-      "id, name, is_active, cover_image_path, athlete_id, profiles!programs_athlete_id_fkey ( full_name ), workouts(count)"
+      "id, name, is_active, cover_image_path, athlete_id, profiles!programs_athlete_id_fkey ( full_name ), workouts(id, group_workout_exercises(count))"
     )
     .eq("group_id", params.groupId)
     .order("is_active", { ascending: false })
@@ -56,7 +57,7 @@ export default async function ProgramsListPage(
     id: p.id,
     name: p.name,
     isActive: p.is_active,
-    workoutCount: p.workouts?.[0]?.count ?? 0,
+    ...programDayShape(p.workouts),
     coverImagePath: p.cover_image_path ?? null,
     athleteId: p.athlete_id,
     athleteName: p.profiles?.full_name ?? null,

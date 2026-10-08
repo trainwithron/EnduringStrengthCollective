@@ -4,6 +4,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { NoAccess } from "@/components/shared/no-access";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { UnavailableState } from "@/components/ui/unavailable-state";
+import { programDayShape } from "@/lib/program-completeness";
 import { ProgramCardGrid, type ProgramCardData } from "@/components/coach/desktop/program-card-grid";
 import { SwappableTerm } from "@/components/coach/swappable-term";
 import { computeProgramCardVisuals } from "@/lib/program-card-data";
@@ -41,7 +42,7 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
   const groupIds = inOrg.map((g) => g.id);
   const { data: programs, error: programsError } = await supabase
     .from("programs")
-    .select("id, group_id, name, is_active, cover_image_path, athlete_id, profiles!programs_athlete_id_fkey ( full_name ), workouts(count)")
+    .select("id, group_id, name, is_active, cover_image_path, athlete_id, profiles!programs_athlete_id_fkey ( full_name ), workouts(id, group_workout_exercises(count))")
     .in("group_id", groupIds.length > 0 ? groupIds : [""])
     .order("is_active", { ascending: false })
     .order("created_at", { ascending: false });
@@ -50,7 +51,7 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
     id: p.id,
     name: p.name,
     isActive: p.is_active,
-    workoutCount: p.workouts?.[0]?.count ?? 0,
+    ...programDayShape(p.workouts),
     coverImagePath: p.cover_image_path ?? null,
     athleteId: p.athlete_id,
     athleteName: p.profiles?.full_name ?? null,

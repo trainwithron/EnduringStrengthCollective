@@ -22,6 +22,7 @@ export function WeekGrid({
   programId,
   groupId,
   athleteId,
+  showDayClients = false,
   exerciseLibrary,
   exerciseAliases,
   exerciseTierByName,
@@ -42,6 +43,7 @@ export function WeekGrid({
   programId: string;
   groupId: string;
   athleteId: string | null;
+  showDayClients?: boolean;
   exerciseLibrary: string[];
   exerciseAliases: AliasEntry[];
   exerciseTierByName: Record<string, "A" | "B" | "C" | null>;
@@ -201,11 +203,11 @@ export function WeekGrid({
 
   return (
     <div className="border border-steel/20">
-      <div className="w-full flex items-center gap-2 px-5 py-3">
+      <div className="w-full flex flex-wrap items-center gap-x-2 gap-y-1 px-5 py-3">
         <button
           type="button"
           onClick={onToggle}
-          className="flex-1 flex items-center justify-between active:bg-surface/40 transition-colors"
+          className="flex-1 min-w-[8rem] flex items-center justify-between active:bg-surface/40 transition-colors"
         >
           <span className="font-display uppercase text-sm tracking-wide text-steel">
             Week {weekNumber}
@@ -286,6 +288,7 @@ export function WeekGrid({
                   day={day}
                   scheduledDate={scheduledDateByDayId?.get(day.id)}
                   groupId={groupId}
+                  showClients={showDayClients}
                   exerciseLibrary={exerciseLibrary}
                   exerciseAliases={exerciseAliases}
                   exerciseTierByName={exerciseTierByName}
