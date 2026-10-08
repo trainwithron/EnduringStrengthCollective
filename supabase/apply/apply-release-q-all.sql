@@ -21,7 +21,7 @@ begin
       ('0310 is not already applied (the display_name column is not there yet)', not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercises' and column_name = 'display_name'))
   ) as checks(check_name, ok) where not ok;
   if failed is not null then
-    raise exception 'Release Q (the coach's own name for an exercise), step 55 (0310) cannot run: this step looks already applied, or the database is not in the state it expects. Failed checks: %. NOTHING was changed (the whole bundle is all or nothing). If an earlier step was applied by hand, use the single-step files for the rest, and send Spot this message.', failed;
+    raise exception 'Release Q (the coach''s own name for an exercise), step 55 (0310) cannot run: this step looks already applied, or the database is not in the state it expects. Failed checks: %. NOTHING was changed (the whole bundle is all or nothing). If an earlier step was applied by hand, use the single-step files for the rest, and send Spot this message.', failed;
   end if;
 end
 $g55$;

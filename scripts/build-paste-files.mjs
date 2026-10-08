@@ -1268,7 +1268,7 @@ for (const b of BUNDLES) {
         values,
         "  ) as checks(check_name, ok) where not ok;",
         "  if failed is not null then",
-        `    raise exception '${b.name}, step ${s.n} (${s.slug}) cannot run: this step looks already applied, or the database is not in the state it expects. Failed checks: %. NOTHING was changed (the whole bundle is all or nothing). If an earlier step was applied by hand, use the single-step files for the rest, and send Spot this message.', failed;`,
+        `    raise exception '${b.name.replace(/'/g, "''")}, step ${s.n} (${s.slug}) cannot run: this step looks already applied, or the database is not in the state it expects. Failed checks: %. NOTHING was changed (the whole bundle is all or nothing). If an earlier step was applied by hand, use the single-step files for the rest, and send Spot this message.', failed;`,
         "  end if;",
         "end",
         `$${tag}$;`,

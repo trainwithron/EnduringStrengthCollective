@@ -585,6 +585,26 @@ for (const s of steps) {
   const err2 = await run(`apply/${bundle.file}`);
   check("release-o2: the bundle applies again after an undo" + (err2 ? ": " + err2 : ""), !err2 && (await openCount()) === 0);
 }
+// Release Q (step 55): ONE paste. The display_name column is not there before, the bundle adds it (its quoting is valid even with an apostrophe in a name), a second run is refused naming
+// step 55, the undo removes it, and it applies again.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-q");
+  check("release-q: ONE bundle holds step 55", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["55"]));
+  const st55 = steps.find((x) => x.n === "55");
+  const hasCol = async () => (await db.query("select count(*)::int as n from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercises' and column_name = 'display_name'")).rows[0].n === 1;
+  // earlier tests applied 0310 by its own file; take it back so the bundle runs on the state live has
+  const eu0 = await run(`apply/undo-step${st55.n}-${st55.slug}.sql`);
+  check("release-q: the column is not there before the bundle runs" + (eu0 ? ": " + eu0 : ""), !eu0 && !(await hasCol()));
+  const errQ = await run(`apply/${bundle.file}`);
+  check("release-q bundle applies on the live-shaped state" + (errQ ? ": " + errQ : ""), !errQ && (await hasCol()));
+  const againQ = await run(`apply/${bundle.file}`);
+  check("release-q: a second run is refused, naming step 55 (" + againQ + ")", !!againQ && againQ.includes("step 55 (0310) cannot run") && againQ.includes("already applied"));
+  const euQ = await run(`apply/undo-step${st55.n}-${st55.slug}.sql`);
+  check("release-q: the undo removes the column" + (euQ ? ": " + euQ : ""), !euQ && !(await hasCol()));
+  const errQ2 = await run(`apply/${bundle.file}`);
+  check("release-q: the bundle applies again after an undo" + (errQ2 ? ": " + errQ2 : ""), !errQ2 && (await hasCol()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.
