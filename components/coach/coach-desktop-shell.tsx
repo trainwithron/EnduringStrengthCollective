@@ -55,6 +55,7 @@ import { CalendarRailWidget } from "@/components/coach/desktop/rail-widgets/cale
 import { TeamRailWidget } from "@/components/coach/desktop/rail-widgets/team-rail-widget";
 import { BusinessRailWidget } from "@/components/coach/desktop/rail-widgets/business-rail-widget";
 import { ShellListPanel, type SectionSubLink } from "@/components/coach/desktop/shell-list-panel";
+import { ALL_PROGRAMS_HREF } from "@/lib/programs-scope";
 import { CollectiveIntelligenceChat } from "@/components/coach/desktop/collective-intelligence-chat";
 import { useWorkspaceRegistration } from "@/components/coach/workspace/workspace-host";
 import { WorkspaceRailButton } from "@/components/coach/workspace/workspace-rail-button";
@@ -409,7 +410,7 @@ function CoachDesktopShellFull({
       label: "Programming",
       icon: LayoutGrid,
       items: [
-        { key: "programs", label: "Programs", href: `/groups/${groupId}/programs`, icon: LayoutGrid, termKey: "program", termForm: "plural" },
+        { key: "programs", label: "Programs", href: ALL_PROGRAMS_HREF, icon: LayoutGrid, termKey: "program", termForm: "plural" },
         { key: "exercise-library", label: "Exercise Library", href: `/groups/${groupId}/exercise-library`, icon: Dumbbell },
       ],
     },

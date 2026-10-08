@@ -7,6 +7,7 @@ import { UnavailableState } from "@/components/ui/unavailable-state";
 import { ProgramCardGrid, type ProgramCardData } from "@/components/coach/desktop/program-card-grid";
 import { computeProgramCardVisuals } from "@/lib/program-card-data";
 import { SwappableTerm } from "@/components/coach/swappable-term";
+import { ALL_PROGRAMS_HREF } from "@/lib/programs-scope";
 
 export default async function ProgramsListPage(
   props: {
@@ -74,6 +75,14 @@ export default async function ProgramsListPage(
         <h1 className="font-display font-bold text-3xl uppercase leading-none">
           <SwappableTerm termKey="program" form="plural" className="capitalize" />
         </h1>
+        <p className="font-body text-sm text-chalk mt-2 flex flex-wrap items-center gap-x-3 gap-y-1" role="status">
+          <span>
+            Showing only <span className="font-medium">{group?.name ?? "this group"}</span>&apos;s programs
+          </span>
+          <Link href={ALL_PROGRAMS_HREF} className="font-body text-sm text-rust underline underline-offset-2 min-h-11 sm:min-h-0 inline-flex items-center">
+            Show all programs
+          </Link>
+        </p>
         <p className="font-body text-sm text-steel mt-2">
           {cards.length} {cards.length === 1 ? "program" : "programs"}
         </p>
