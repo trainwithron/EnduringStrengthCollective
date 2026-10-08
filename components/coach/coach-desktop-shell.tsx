@@ -186,6 +186,8 @@ function CoachDesktopShellFull({
   // ambiguous whether "Karina Ramirez" up top is a person or a team.
   useEffect(() => {
     let cancelled = false;
+    // Moving to another space: the previous client's link must not stay on the new space's name while the new one loads.
+    setSoloClientId(null);
     async function run() {
       const supabase = createBrowserClient();
       const { data } = await supabase
