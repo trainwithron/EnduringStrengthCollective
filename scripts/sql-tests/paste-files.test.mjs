@@ -445,7 +445,9 @@ for (const s of steps) {
   const file = `apply/${bundle.file}`;
   const st45 = steps.find((x) => x.n === "45");
   const st46 = steps.find((x) => x.n === "46");
-  const undoBoth = async () => (await run(`apply/undo-step${st46.n}-${st46.slug}.sql`)) || (await run(`apply/undo-step${st45.n}-${st45.slug}.sql`));
+  const st47 = steps.find((x) => x.n === "47");
+  const undoBoth = async () =>
+    (await run(`apply/undo-step${st47.n}-${st47.slug}.sql`)) || (await run(`apply/undo-step${st46.n}-${st46.slug}.sql`)) || (await run(`apply/undo-step${st45.n}-${st45.slug}.sql`));
   const state = async () => (await db.query(`select
       to_regclass('public.usda_food_portions') is not null as portions,
       to_regclass('public.usda_load_batches') is not null as batches,
@@ -453,23 +455,25 @@ for (const s of steps) {
       exists (select 1 from information_schema.columns where table_name = 'food_log_entries' and column_name = 'nutrients') as snapshot,
       exists (select 1 from information_schema.columns where table_name = 'group_memberships' and column_name = 'food_tracking_enabled') as switch,
       to_regclass('public.ai_budget_notices') is not null as notices,
+      to_regclass('public.custom_foods') is not null as custom,
+      to_regclass('public.saved_meals') is not null as meals,
       exists (select 1 from pg_proc where proname = 'ai_month_usage' and pronamespace = 'public'::regnamespace) as fn,
       (select count(*)::int from public.food_log_entries) as logs,
       (select count(*)::int from public.group_memberships) as memberships`)).rows[0];
   const eu = await undoBoth();
   check("release-n: the undo files run before the steps (nothing to undo)" + (eu ? ": " + eu : ""), !eu);
   const before = await state();
-  check("release-n: before it runs none of the new objects exist", !before.portions && !before.batches && !before.fdc && !before.snapshot && !before.switch && !before.notices && !before.fn, JSON.stringify(before));
+  check("release-n: before it runs none of the new objects exist", !before.portions && !before.batches && !before.fdc && !before.snapshot && !before.switch && !before.notices && !before.fn && !before.custom && !before.meals, JSON.stringify(before));
   const err = await run(file);
   check("release-n bundle applies on the live-shaped state" + (err ? ": " + err : ""), !err);
   const after = await state();
-  check("release-n: every new table, column and function exists and no food log or membership was lost", after.portions && after.batches && after.fdc && after.snapshot && after.switch && after.notices && after.fn && after.logs === before.logs && after.memberships === before.memberships, JSON.stringify(after));
+  check("release-n: every new table, column and function exists and no food log or membership was lost", after.portions && after.batches && after.fdc && after.snapshot && after.switch && after.notices && after.fn && after.custom && after.meals && after.logs === before.logs && after.memberships === before.memberships, JSON.stringify(after));
   const again = await run(file);
   check("release-n: a second run is refused, naming step 45 (" + again + ")", !!again && again.includes("step 45 (0300) cannot run") && again.includes("already applied"));
   const eu2 = await undoBoth();
   check("release-n: the undo files run after the steps" + (eu2 ? ": " + eu2 : ""), !eu2);
   const undone = await state();
-  check("release-n: after the undo the new objects are gone and every food log and membership is still there", !undone.portions && !undone.batches && !undone.fdc && !undone.snapshot && !undone.switch && !undone.notices && !undone.fn && undone.logs === before.logs && undone.memberships === before.memberships, JSON.stringify(undone));
+  check("release-n: after the undo the new objects are gone and every food log and membership is still there", !undone.portions && !undone.batches && !undone.fdc && !undone.snapshot && !undone.switch && !undone.notices && !undone.fn && !undone.custom && !undone.meals && undone.logs === before.logs && undone.memberships === before.memberships, JSON.stringify(undone));
   const err2 = await run(file);
   check("release-n: the bundle applies again after an undo" + (err2 ? ": " + err2 : ""), !err2);
 }

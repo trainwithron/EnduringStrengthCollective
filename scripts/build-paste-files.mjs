@@ -980,6 +980,26 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["0301 is not already applied (ai_budget_notices is not there yet)", has.noTable("ai_budget_notices")],
     ],
   },
+  {
+    n: "47",
+    slug: "0302",
+    title: "0302 Custom foods and saved meals: a client's own foods (with the numbers from a label, an optional full label and a barcode) and meals saved from several foods, private to the client and readable by their coaches, with limits on how many",
+    migrations: ["0302"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for anyone until the code in the same release is live. After that: a client can add a food that is not in the USDA data (a bar, a restaurant dish, a family recipe), scan a barcode that is not found and create it, and save a meal to log again in one tap. Their coach can see these.",
+    undo: [
+      "drop table if exists public.saved_meal_items;",
+      "drop table if exists public.saved_meals;",
+      "drop table if exists public.custom_foods;",
+      "drop function if exists public.guard_food_library_limits();",
+    ].join(String.fromCharCode(10)),
+    undoWhy: "Only if step 47 misbehaves. Removes the custom foods and saved meals people created since (what they logged from them stays in their food log).",
+    rows: [
+      ["profiles, usda_foods and is_coach_of_athlete exist", `${has.table("profiles")} and ${has.table("usda_foods")} and ${has.fnName("is_coach_of_athlete")}`],
+      ["0302 is not already applied (custom_foods is not there yet)", has.noTable("custom_foods")],
+      ["0302 is not already applied (saved_meals is not there yet)", has.noTable("saved_meals")],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -1061,7 +1081,7 @@ const BUNDLES = [
   { id: "release-j", name: "Release J (about you, baseline, phase of record)", steps: ["40"] },
   { id: "release-k", name: "Release K (recipe library)", steps: ["41"] },
   { id: "release-l", name: "Release L (schedule requests, Read during rest)", steps: ["42", "43"] },
-  { id: "release-n", name: "Release N (nutrition tracking: food search, custom foods, nutrient detail)", steps: ["45", "46"] },
+  { id: "release-n", name: "Release N (nutrition tracking: food search, custom foods, nutrient detail)", steps: ["45", "46", "47"] },
 ];
 for (const b of BUNDLES) {
   const stepsIn = b.steps.map((n) => STEPS.find((x) => x.n === n));
@@ -1235,6 +1255,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0295", has.table("client_phase_plans")),
     m("0296", has.col("recipes", "content_hash")),
     m("0297", has.table("schedule_requests")),
+    m("0302", has.table("custom_foods")),
     m("0301", has.table("ai_budget_notices")),
     m("0300", has.table("usda_food_portions")),
     m("0298", has.table("read_settings")),
