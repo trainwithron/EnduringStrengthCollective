@@ -39,6 +39,9 @@ import { StuckDesktopModeBanner } from "@/components/coach/desktop/stuck-desktop
 import { fetchInactiveKeys, inactiveKey } from "@/lib/inactive-ids";
 import { TerminologyFirstRunCard } from "@/components/coach/desktop/terminology-first-run-card";
 import { GettingStartedCard } from "@/components/coach/desktop/getting-started-card";
+import { NeedsYouStrip } from "@/components/coach/desktop/needs-you-strip";
+import { pickNeedsYou } from "@/lib/needs-you";
+import { loadNeedsYouItems } from "@/lib/needs-you-data";
 
 interface GroupRow {
   id: string;
@@ -529,6 +532,26 @@ export default async function CoachHomePage() {
     notices: orgNotifications.map((n) => ({ id: n.id, body: n.body, linkPath: n.linkPath, createdAt: n.createdAt })),
   });
 
+  // "Needs you": the single most urgent item of each of three kinds, from what is already loaded above plus a few small soft reads. A failure leaves that kind out, never the page.
+  // A strip that could not be built, or built from checks that did not all succeed, never says "You're caught up."
+  let needsYouView = pickNeedsYou([], { incomplete: true });
+  try {
+    const needsYou = await loadNeedsYouItems(supabase, {
+        coachId: user.id,
+        timezone: coachTimezone,
+        now: new Date(),
+        groupIds: allGroupIdList,
+        todayBookings: dashboardData.todayBookings,
+        needsPayment: dashboardData.needsPayment,
+        lowReadiness,
+        quietTierByAthlete: dashboardData.quietTierByAthlete,
+        needsReplyThreads,
+    });
+    needsYouView = pickNeedsYou(needsYou.items, { incomplete: needsYou.failed.length > 0 });
+  } catch (e) {
+    console.error("[dashboard] needs-you failed:", e instanceof Error ? e.message : e);
+  }
+
   // "N — Dual Signal" (coach_dashboard_redesign_scoping.md): a "Right
   // now" hero beside per-team-group Team Pulse gauges, above a bento
   // grid (stats, Today, This Week, the expandable roster wall). The
@@ -558,6 +581,8 @@ export default async function CoachHomePage() {
         <GettingStartedCard groupId={(allGroups.find((g) => g.group_kind !== "one_on_one") ?? allGroups[0]).id} />
       )}
 
+      <NeedsYouStrip view={needsYouView} />
+
       <YourDayPanel schedule={yourDaySchedule} attention={yourDayAttention} timezone={coachTimezone} />
 
       <div className="mb-6">
@@ -580,18 +605,27 @@ export default async function CoachHomePage() {
         />
       </div>
 
-      <CollectiveIntelligencePanel items={collectiveIntelligenceItems} hasRunToday={!!todaysBriefing} />
+      {/* The stack below is what the strip's "N more" opens; the strip's buttons also jump to the panel that handles the request. Nothing in it changed. */}
+      <div id="needs-stack">
+        <CollectiveIntelligencePanel items={collectiveIntelligenceItems} hasRunToday={!!todaysBriefing} />
 
-      <OrgNotificationsPanel initialNotifications={orgNotifications} />
+        <OrgNotificationsPanel initialNotifications={orgNotifications} />
 
-      <NeedsReplyPanel coachId={user.id} threads={needsReplyThreads} />
+        <NeedsReplyPanel coachId={user.id} threads={needsReplyThreads} />
 
-      <LateChangesPanel />
-      <ScheduleRequestsPanel />
-      <ExpiryCheckInPanel />
-      <InactiveClientsPanel />
-      <ProgressLookPanel />
-      <NeedsPaymentPanel rows={dashboardData.needsPayment} />
+        <div id="late-changes">
+          <LateChangesPanel />
+        </div>
+        <div id="schedule-requests">
+          <ScheduleRequestsPanel />
+        </div>
+        <div id="expiring">
+          <ExpiryCheckInPanel />
+        </div>
+        <InactiveClientsPanel />
+        <ProgressLookPanel />
+        <NeedsPaymentPanel rows={dashboardData.needsPayment} />
+      </div>
 
       <DashboardTileGrid
         initialOrder={(layoutRow?.tile_order as string[] | undefined) ?? []}
