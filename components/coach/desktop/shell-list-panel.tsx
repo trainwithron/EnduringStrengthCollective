@@ -17,6 +17,7 @@ import {
 } from "@/lib/coach-shell-panel-storage";
 import { NeedsAttentionStrip } from "./needs-attention-strip";
 import { RosterMiniList } from "./roster-mini-list";
+import { AddClientButton } from "./add-client-button";
 import { BusinessMiniDashboard } from "./business-mini-dashboard";
 import { CalendarMiniView } from "./calendar-mini-view";
 import { EmbeddedProgramBuilder } from "./embedded-program-builder";
@@ -39,11 +40,13 @@ export interface SectionSubLink {
 export function ShellListPanel({
   coachId,
   groupId,
+  groupName,
   sectionLabel,
   sectionSubLinks,
 }: {
   coachId: string;
   groupId: string;
+  groupName: string;
   sectionLabel: string | null;
   sectionSubLinks: SectionSubLink[];
 }) {
@@ -51,6 +54,8 @@ export function ShellListPanel({
   const [collapsed, setCollapsed] = useState(false);
   const [view, setView] = useState<ListPanelView>("roster");
   const [dragging, setDragging] = useState(false);
+  // Bumped when someone is added from the panel, so the list below is read again and shows them.
+  const [rosterVersion, setRosterVersion] = useState(0);
   const dragStartX = useRef(0);
   const dragStartWidth = useRef(0);
 
@@ -195,7 +200,15 @@ export function ShellListPanel({
           </button>
         </div>
 
-        {view === "roster" && <RosterMiniList groupId={groupId} />}
+        {view === "roster" && (
+          <>
+            {/* One obvious click to add a client from anywhere in the coach app: the same Add client as on the Clients page, opening right here. Only in the open panel. */}
+            <div className="mb-2">
+              <AddClientButton groupId={groupId} groupName={groupName} createdBy={coachId} onAdded={() => setRosterVersion((v) => v + 1)} />
+            </div>
+            <RosterMiniList key={rosterVersion} groupId={groupId} />
+          </>
+        )}
         {view === "business" && <BusinessMiniDashboard groupId={groupId} />}
         {view === "calendar" && <CalendarMiniView groupId={groupId} />}
         {view === "program" && <EmbeddedProgramBuilder groupId={groupId} />}

@@ -682,6 +682,7 @@ function CoachDesktopShellFull({
           <ShellListPanel
             coachId={coachId}
             groupId={groupId}
+            groupName={groupName}
             sectionLabel={sectionLabel}
             sectionSubLinks={sectionSubLinks}
           />
