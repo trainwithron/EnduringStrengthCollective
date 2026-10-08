@@ -5,6 +5,7 @@ import { useCallback, useState } from "react";
 import { ThreadPane } from "@/components/messages/thread-pane";
 import { filterConversations } from "@/lib/messages-list";
 import { useInboxRefresh } from "@/components/messages/use-inbox-refresh";
+import { MessagesSynopsisCard } from "@/components/messages/messages-synopsis-card";
 import type { InboxConversation } from "@/lib/coach-inbox";
 
 // "All messages": the conversation list on the left (unread first, searchable by name) and the open thread beside it. Picking a row opens that thread in place; the page does not
@@ -57,6 +58,7 @@ export function MessagesTwoPane({
   return (
     <div className="flex border border-steel/20 h-[calc(100vh-14rem)] min-h-[420px]">
       <div className="w-72 shrink-0 border-r border-steel/20 flex flex-col">
+        <MessagesSynopsisCard conversations={conversations} onPick={select} />
         <div className="p-2 border-b border-steel/15">
           <input
             type="search"
