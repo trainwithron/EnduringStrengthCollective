@@ -2,6 +2,8 @@
 -- WHAT YOU SHOULD SEE: "Success. No rows returned."   Then tell Spot, and do not run the step again until Spot says why it failed.
 begin;
 do $undo$ declare v_def text; v_have text[]; begin select pg_get_constraintdef(c.oid) into v_def from pg_constraint c where c.conname = 'notifications_type_check' and c.conrelid = 'public.notifications'::regclass; delete from public.notifications where type in ('schedule_request', 'schedule_applied', 'schedule_resumed'); select coalesce(array_agg(m[1] order by m[1]), '{}') into v_have from regexp_matches(v_def, '''([^'']+)''::text', 'g') as m; v_have := array(select t from unnest(v_have) as t where t not in ('schedule_request', 'schedule_applied', 'schedule_resumed')); alter table public.notifications drop constraint notifications_type_check; execute format('alter table public.notifications add constraint notifications_type_check check (type = any (array[%s]))', (select string_agg(quote_literal(t) || '::text', ', ') from unnest(v_have) as t)); end $undo$;
+drop trigger if exists recurring_series_freeze_guard on public.recurring_booking_series;
+drop function if exists public.recurring_series_freeze_guard();
 drop trigger if exists schedule_requests_audit on public.schedule_requests;
 drop table if exists public.schedule_request_notes;
 drop table if exists public.schedule_requests;
@@ -15,9 +17,13 @@ drop function if exists public.end_schedule_freeze(uuid, date);
 drop function if exists public.claim_due_freeze_resumes(integer);
 drop function if exists public.fail_freeze_resume(uuid, text);
 drop function if exists public.note_schedule_resumed(uuid, integer, integer);
+drop function if exists public.settle_schedule_freeze(uuid, uuid, uuid, date, date, integer);
+drop function if exists public.shorten_expiry_after_freeze(uuid, uuid, uuid, integer, text);
 drop function if exists public.extend_expiry_for_freeze(uuid, uuid, uuid, integer, text);
+drop function if exists public.schedule_expiry_window_days(uuid, uuid);
 drop function if exists public.schedule_request_recipients(uuid, uuid);
 drop function if exists public.schedule_local_today(text, uuid);
+alter table public.recurring_booking_series drop constraint if exists recurring_booking_series_frozen_hold_ok;
 alter table public.recurring_booking_series drop constraint if exists recurring_booking_series_frozen_ok;
-alter table public.recurring_booking_series drop column if exists frozen_from, drop column if exists frozen_until, drop column if exists resume_claimed_at, drop column if exists resume_attempts, drop column if exists resume_error;
+alter table public.recurring_booking_series drop column if exists frozen_from, drop column if exists frozen_until, drop column if exists resume_claimed_at, drop column if exists resume_attempts, drop column if exists resume_error, drop column if exists frozen_hold_days;
 commit;

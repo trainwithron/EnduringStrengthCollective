@@ -53,9 +53,10 @@
  },
  {
   "id": "release-l",
-  "name": "Release L (schedule requests)",
+  "name": "Release L (schedule requests, Read during rest)",
   "steps": [
-   "42"
+   "42",
+   "43"
   ],
   "file": "apply-release-l-all.sql"
  }

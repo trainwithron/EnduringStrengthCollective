@@ -883,6 +883,8 @@ alter table public.coach_availability_windows drop column if exists session_minu
     afterwards: "Nothing changes for anyone until the code in the same release is live. After that: a client with a weekly schedule sees My schedule with three buttons (pause, freeze, cancel), chooses a date and sends; the coach sees the request in Needs your decision and the schedule changes by itself on the chosen date (or when the coach presses Done on or after it). A freeze restarts on its day and adds its length to the expiry of the client's unused sessions (only for a coach who has an expiry window). No existing function is replaced and no existing row changes.",
     undo: [
       "do $undo$ declare v_def text; v_have text[]; begin select pg_get_constraintdef(c.oid) into v_def from pg_constraint c where c.conname = 'notifications_type_check' and c.conrelid = 'public.notifications'::regclass; delete from public.notifications where type in ('schedule_request', 'schedule_applied', 'schedule_resumed'); select coalesce(array_agg(m[1] order by m[1]), '{}') into v_have from regexp_matches(v_def, '''([^'']+)''::text', 'g') as m; v_have := array(select t from unnest(v_have) as t where t not in ('schedule_request', 'schedule_applied', 'schedule_resumed')); alter table public.notifications drop constraint notifications_type_check; execute format('alter table public.notifications add constraint notifications_type_check check (type = any (array[%s]))', (select string_agg(quote_literal(t) || '::text', ', ') from unnest(v_have) as t)); end $undo$;",
+      "drop trigger if exists recurring_series_freeze_guard on public.recurring_booking_series;",
+      "drop function if exists public.recurring_series_freeze_guard();",
       "drop trigger if exists schedule_requests_audit on public.schedule_requests;",
       "drop table if exists public.schedule_request_notes;",
       "drop table if exists public.schedule_requests;",
@@ -896,11 +898,15 @@ alter table public.coach_availability_windows drop column if exists session_minu
       "drop function if exists public.claim_due_freeze_resumes(integer);",
       "drop function if exists public.fail_freeze_resume(uuid, text);",
       "drop function if exists public.note_schedule_resumed(uuid, integer, integer);",
+      "drop function if exists public.settle_schedule_freeze(uuid, uuid, uuid, date, date, integer);",
+      "drop function if exists public.shorten_expiry_after_freeze(uuid, uuid, uuid, integer, text);",
       "drop function if exists public.extend_expiry_for_freeze(uuid, uuid, uuid, integer, text);",
+      "drop function if exists public.schedule_expiry_window_days(uuid, uuid);",
       "drop function if exists public.schedule_request_recipients(uuid, uuid);",
       "drop function if exists public.schedule_local_today(text, uuid);",
+      "alter table public.recurring_booking_series drop constraint if exists recurring_booking_series_frozen_hold_ok;",
       "alter table public.recurring_booking_series drop constraint if exists recurring_booking_series_frozen_ok;",
-      "alter table public.recurring_booking_series drop column if exists frozen_from, drop column if exists frozen_until, drop column if exists resume_claimed_at, drop column if exists resume_attempts, drop column if exists resume_error;",
+      "alter table public.recurring_booking_series drop column if exists frozen_from, drop column if exists frozen_until, drop column if exists resume_claimed_at, drop column if exists resume_attempts, drop column if exists resume_error, drop column if exists frozen_hold_days;",
     ].join(String.fromCharCode(10)),
     undoWhy: "Only if schedule requests misbehave after step 42. Removes the two request tables (every request and every private note is lost), their audit trigger, the functions, and the freeze columns on the schedule (a schedule that is frozen stays paused: restart it from the client's profile), deletes the three new kinds of notification and puts the notification types back to the list the database had without them (read from the live list, so another release's types are kept). An expiry hold that a freeze already set stays as it is (a coach can clear it on the client's profile). Nothing else is touched.",
     rows: [
@@ -910,6 +916,26 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the notification types list exists and can be read (notifications_type_check)", "exists (select 1 from pg_constraint where conname = 'notifications_type_check' and conrelid = 'public.notifications'::regclass)"],
       ["0297 is not already applied (schedule_requests is not there yet)", has.noTable("schedule_requests")],
       ["0297 is not already applied (recurring_booking_series has no frozen_from yet)", has.noCol("recurring_booking_series", "frozen_from")],
+    ],
+  },
+  {
+    n: "43",
+    slug: "0298",
+    title: "0298 Read during rest: the client's own on/off switch (a table only that client can read or write), the coach's switch for all their clients, the coach's choice of passage for a day, and one function the client's screen asks (is Read on for me here, is there a coach's passage today, have I seen the note); the passages themselves are in the app",
+    migrations: ["0298"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for anyone until the code in the same release is live. After that: a client who opens the rest timer sees a Read button beside the games (on for everyone by default, one tap turns it off, in the Read panel or in Settings); a coach can turn Read off for all their clients in Settings, which hides it entirely for them, and can choose the passage for a day. No existing function is replaced and no existing row changes.",
+    undo: [
+      "drop function if exists public.read_track_for_me(uuid, date);",
+      "drop table if exists public.read_passage_overrides;",
+      "drop table if exists public.read_settings;",
+      "alter table public.coach_preferences drop column if exists faith_track_default;",
+    ].join(String.fromCharCode(10)),
+    undoWhy: "Only if Read misbehaves after step 43. Removes the client switches and note records (every client is back to the default, Read on), the coach's day-by-day passages, the coach's switch for all their clients, and the one function. The passages are in the app and are not touched.",
+    rows: [
+      ["profiles, group_memberships and coach_preferences exist", `${has.table("profiles")} and ${has.table("group_memberships")} and ${has.table("coach_preferences")}`],
+      ["0298 is not already applied (read_settings is not there yet)", has.noTable("read_settings")],
+      ["0298 is not already applied (coach_preferences has no faith_track_default yet)", has.noCol("coach_preferences", "faith_track_default")],
     ],
   },
 ];
@@ -992,7 +1018,7 @@ const BUNDLES = [
   { id: "release-i", name: "Release I (food preferences)", steps: ["39"] },
   { id: "release-j", name: "Release J (about you, baseline, phase of record)", steps: ["40"] },
   { id: "release-k", name: "Release K (recipe library)", steps: ["41"] },
-  { id: "release-l", name: "Release L (schedule requests)", steps: ["42"] },
+  { id: "release-l", name: "Release L (schedule requests, Read during rest)", steps: ["42", "43"] },
 ];
 for (const b of BUNDLES) {
   const stepsIn = b.steps.map((n) => STEPS.find((x) => x.n === n));
@@ -1166,6 +1192,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0295", has.table("client_phase_plans")),
     m("0296", has.col("recipes", "content_hash")),
     m("0297", has.table("schedule_requests")),
+    m("0298", has.table("read_settings")),
     m("0285", has.table("rest_day_nudges")),
     m("0284", has.policy("client_goals", "client_goals_insert_coach")),
     m("0283", has.col("coach_availability_windows", "session_minutes")),

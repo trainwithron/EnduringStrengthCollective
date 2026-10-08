@@ -186,7 +186,7 @@ export default {
       const phaseOf = async (id) => (await h.one(`select nutrition_phase, status, created_by from public.client_goals where id = $1`, [id]));
       const planNow = async (x) => (await h.rows(`select phase, started_on::text as started_on, review_on from public.client_phase_plans where athlete_id = $1 and group_id = $2`, [x, g]))[0];
       const tag = async (x) => (await h.rows(`select phase from public.nutrition_phases where athlete_id = $1 and group_id = $2`, [x, g]))[0]?.phase ?? null;
-      const today = new Date().toISOString().slice(0, 10);
+      const today = (await h.one(`select current_date::text as d`)).d; // the database's own date (the machine's zone), not the UTC date, so the check holds at any hour
 
       await h.as(f);
       const clientOwn = await mk(f, f, "hypertrophy");
