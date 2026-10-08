@@ -40,7 +40,9 @@ const TABLE: Entry[] = [
   { id: "quinoa_dry", match: /quinoa/, cupG: 170, spoons: true },
   { id: "oatmeal_cooked", match: /(oatmeal|oats).*cooked|cooked.*(oatmeal|oats)|^oatmeal$/, cupG: 234 },
   // Dry oats only when the line says it is the dry form. Overnight, baked, protein or bare "Oats" could be soaked or cooked (about 230 g a cup), so they get grams.
-  { id: "oats_dry", match: /rolled oats|old[- ]fashioned|quick oats|steel[- ]cut|oats \(dry\)|dry oats|oat flakes/, exclude: /cooked|milk|flour|bar|overnight|baked|protein|bran|porridge/, cupG: 81, spoons: true },
+  // Steel-cut oats are much denser than rolled: about 160 g a cup (the pack serving is 1/4 cup = 40 g), twice the rolled weight.
+  { id: "oats_steel_cut", match: /steel[- ]cut/, exclude: /cooked|overnight|baked|protein|porridge/, cupG: 160, spoons: true },
+  { id: "oats_dry", match: /rolled oats|old[- ]fashioned|quick oats|oats \(dry\)|dry oats|oat flakes/, exclude: /cooked|milk|flour|bar|overnight|baked|protein|bran|porridge/, cupG: 81, spoons: true },
   { id: "corn_flakes", match: /corn flakes|cornflakes/, cupG: 28 },
   { id: "pasta_cooked", match: /(pasta|spaghetti|penne|macaroni|noodles?).*cooked|cooked.*(pasta|spaghetti|penne|macaroni|noodles?)/, cupG: 140 },
   { id: "black_beans", match: /black beans/, cupG: 172 },

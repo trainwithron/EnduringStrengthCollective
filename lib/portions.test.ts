@@ -33,6 +33,11 @@ describe("householdMeasure", () => {
   it("oats get the dry weight only when the line says dry: overnight, baked, protein and bare oats are not guessed", () => {
     expect(householdMeasure("Rolled Oats (Dry)", 40)).toBe("1/2 cup");
     expect(householdMeasure("Old-Fashioned Oats", 81)).toBe("1 cup");
+    // steel-cut oats are twice as dense as rolled: 40 g is a quarter cup, not a half
+    expect(householdMeasure("Steel-Cut Oats", 40)).toBe("1/4 cup");
+    expect(householdMeasure("Steel-cut oats (dry)", 160)).toBe("1 cup");
+    expect(householdMeasure("Cooked Steel-Cut Oats", 234)).toBe("1 cup"); // cooked oatmeal weighs the same whatever the oat
+    expect(householdMeasure("Rolled Oats (Dry)", 40)).toBe("1/2 cup");
     expect(householdMeasure("Oats (Dry)", 40)).toBe("1/2 cup");
     expect(householdMeasure("Oats", 240)).toBeNull();
     expect(householdMeasure("Baked Oats", 240)).toBeNull();
