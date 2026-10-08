@@ -7,9 +7,11 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { notifyPush } from "@/lib/push-notify";
 import { addDaysToKey } from "@/lib/date-key";
 import { shortDateLabel } from "@/lib/apply-from";
-import { PHASE_LABELS } from "@/lib/phase-plan";
+import { PHASE_LABELS, type PhasePlan } from "@/lib/phase-plan";
 import { setReviewDate } from "@/lib/phase-plan-write";
-import { proposePhaseMove } from "@/lib/phase-move";
+import { switchToPlannedPhase, NEW_BLOCK_NOTICE } from "@/lib/phase-switch";
+import { createBaselineSuggestion } from "@/lib/baseline-suggestion";
+import type { BaselineResult } from "@/lib/nutrition-baseline";
 import type { NutritionPhase } from "@/lib/nutrition-checkin";
 import type { ReviewVerdict, Stance } from "@/lib/phase-review";
 
@@ -22,6 +24,8 @@ export interface PhaseReviewCardProps {
   clientFirst: string;
   todayKey: string;
   phase: NutritionPhase;
+  // The saved plan (needed to move to the next phase).
+  plan: PhasePlan;
   headline: string;
   results: string[];
   verdictLine: string;
@@ -31,7 +35,10 @@ export interface PhaseReviewCardProps {
   stance: Stance | null;
   stanceLine: string | null;
   factors: string[];
-  moveState: "none" | "waiting" | "declined";
+  // The starting target worked out for the NEXT phase (null when it cannot be worked out yet), and whether a starting-target suggestion is already waiting.
+  nextBaseline: BaselineResult | null;
+  nextArchetype: "standard" | "keto" | "carnivore";
+  hasPendingBaseline: boolean;
   drafts: { continue: string; move: string | null; extend: string };
 }
 
@@ -39,7 +46,8 @@ const primary = "h-11 px-4 bg-rust text-graphite font-body text-sm font-medium d
 const quiet = "h-11 px-4 border border-steel/40 text-chalk font-body text-sm disabled:opacity-40";
 
 // "Review {client}'s phase": what actually happened, what the numbers say about the planned next step, and three plain choices. It only ever raises a prompt: nothing changes until the
-// coach picks one, and a move to another phase is a SUGGESTED GOAL the client confirms. The drafts are the coach's to edit and send; nothing is sent from here.
+// coach picks one. Moving to the planned phase starts it today (no goal, nothing for the client to accept), prepares the new starting target for the coach to review and apply, and tells
+// the client in one plain line. The drafts are the coach's to edit and send; nothing is sent from here except that one line.
 export function PhaseReviewCard(p: PhaseReviewCardProps) {
   const router = useRouter();
   const [action, setAction] = useState<Action | null>(null);
@@ -79,11 +87,19 @@ export function PhaseReviewCard(p: PhaseReviewCardProps) {
     setBusy(true);
     if (action === "move") {
       if (!p.next) return setBusy(false);
-      const res = await proposePhaseMove(supabase, { athleteId: p.athleteId, groupId: p.groupId, coachId: p.coachId, phase: p.next });
+      const switched = await switchToPlannedPhase(supabase, { athleteId: p.athleteId, groupId: p.groupId, coachId: p.coachId, phase: p.next, todayKey: p.todayKey, existing: p.plan });
+      if (!switched.ok) {
+        setBusy(false);
+        return setError("Couldn't start the new phase. Check your connection and try again.");
+      }
+      // The new starting target is prepared for the coach to review (never applied by itself).
+      const target = p.nextBaseline && !p.hasPendingBaseline ? await createBaselineSuggestion(supabase, { athleteId: p.athleteId, groupId: p.groupId, outcome: p.nextBaseline, archetype: p.nextArchetype }) : null;
+      notifyPush(p.athleteId, NEW_BLOCK_NOTICE.title, NEW_BLOCK_NOTICE.body, `/groups/${p.groupId}`);
       setBusy(false);
-      if (!res.ok) return setError("Couldn't suggest that. Check your connection and try again.");
-      if (!res.already) notifyPush(p.athleteId, "Your coach suggested a goal", "Open My Goal to confirm it, change it, or say not now.", `/groups/${p.groupId}/goal`);
-      setDone(`Suggested to ${p.clientFirst}. They confirm or change it on My Goal; their phase changes only when they confirm.`);
+      setDone(
+        `${p.clientFirst} is now in ${PHASE_LABELS[p.next].toLowerCase()} and was told a new training block started.` +
+          (target?.ok ? " A starting target is ready in Targets for you to review and apply." : p.hasPendingBaseline ? " A starting target is already waiting in Targets." : " Add what's missing in About you to get a starting target worked out.")
+      );
       router.refresh();
       return;
     }
@@ -144,17 +160,21 @@ export function PhaseReviewCard(p: PhaseReviewCardProps) {
           )}
         </div>
       )}
-      {p.moveState === "waiting" && <p className="font-body text-sm text-amber-400">You suggested this to {p.clientFirst}. Waiting for them to confirm or change it.</p>}
-      {p.moveState === "declined" && <p className="font-body text-sm text-amber-400">{p.clientFirst} said not now to that suggestion. Keep going or extend the review.</p>}
 
       <div className="flex flex-wrap gap-2">
         {btn("continue", "Keep going")}
-        {moving && p.moveState !== "waiting" && btn("move", `Suggest ${PHASE_LABELS[p.next as NutritionPhase].toLowerCase()}`)}
+        {moving && btn("move", `Move to ${PHASE_LABELS[p.next as NutritionPhase].toLowerCase()}`)}
         {btn("extend", "Extend the review")}
       </div>
 
       {action && (
         <div className="space-y-3 border-t border-steel/15 pt-3">
+          {action === "move" && p.next && (
+            <p className="font-body text-xs text-steel max-w-[70ch]">
+              This starts {PHASE_LABELS[p.next].toLowerCase()} for {p.clientFirst} today. They are told in one plain line (&ldquo;{NEW_BLOCK_NOTICE.body}&rdquo;) and nothing is asked of them. Their new starting target is prepared for you to review; their
+              calories do not change until you apply it.
+            </p>
+          )}
           {action !== "move" && (
             <label className="block font-body text-xs text-steel">
               {action === "continue" ? "Check again" : "Look again"}
@@ -167,12 +187,12 @@ export function PhaseReviewCard(p: PhaseReviewCardProps) {
             </label>
           )}
           <label className="block font-body text-xs text-steel">
-            A message to start from (yours to edit; nothing is sent from here)
+            A message to start from (yours to edit and send; this screen does not send it)
             <textarea value={text} onChange={(e) => setText(e.target.value)} rows={5} maxLength={600} className="block mt-1 w-full bg-graphite border border-steel/30 p-2 font-body text-sm text-chalk" />
           </label>
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" onClick={save} disabled={busy} className={primary}>
-              {busy ? "Saving…" : action === "move" ? `Suggest to ${p.clientFirst}` : action === "continue" ? "Keep going" : "Extend the review"}
+              {busy ? "Saving…" : action === "move" ? `Start ${p.next ? PHASE_LABELS[p.next].toLowerCase() : "the new phase"}` : action === "continue" ? "Keep going" : "Extend the review"}
             </button>
             {/* The message holds the client's name and weight, so it is copied, never put in a web address (addresses end up in logs and browser history). */}
             <button type="button" onClick={copy} className={quiet}>

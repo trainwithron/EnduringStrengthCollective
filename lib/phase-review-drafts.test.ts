@@ -66,7 +66,7 @@ describe("the drafted messages", () => {
     expect(supports.stance).toBe("supports");
     const d = draftsFor(good, facts(good), supports.stance, "reverse_diet");
     expect(d.move).toContain("reverse diet");
-    expect(d.move).toContain("suggested goal");
+    expect(d.move).toContain("starting your new training block");
     const lowR = review({ daysLogged: 6 });
     const lowDrafts = draftsFor(lowR, facts(lowR), "does_not_support", "reverse_diet");
     expect(lowDrafts.move).not.toMatch(/reverse diet|metabolism/i);

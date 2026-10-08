@@ -66,7 +66,7 @@ const NEXT_STEP: Record<NutritionPhase, string> = {
 
 // Used only when the numbers support the move; otherwise the coach gets the plain check-in below.
 export function moveDraft(f: DraftFacts, next: NutritionPhase): string {
-  return `Hi ${f.firstName}, over the last ${days(f.windowDays)} you logged food on ${f.daysLogged} of them.${weightSentence(f)} That is what I hoped to see: your body responds when we ask it to. The best path now is ${NEXT_STEP[next]}. If you are happy with that, I will send it to you as a suggested goal that you can confirm or change. What do you think?`;
+  return `Hi ${f.firstName}, over the last ${days(f.windowDays)} you logged food on ${f.daysLogged} of them.${weightSentence(f)} That is what I hoped to see: your body responds when we ask it to. The best path now is ${NEXT_STEP[next]}. I am starting your new training block now and will send you the new plan. Tell me if anything about it worries you.`;
 }
 
 export function checkInDraft(f: DraftFacts): string {

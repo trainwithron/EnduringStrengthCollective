@@ -22,7 +22,10 @@ const base: PhaseReviewCardProps = {
   stance: "supports",
   stanceLine: "The numbers support moving to reverse diet.",
   factors: ["Body fat is under the rule-of-thumb line, so rebuilding is a reasonable next step."],
-  moveState: "none",
+  plan: { phase: "fat_loss", startedOn: "2026-09-10", reviewOn: "2026-10-08", plannedNextPhase: "reverse_diet", lastReviewedAt: null },
+  nextBaseline: null,
+  nextArchetype: "standard",
+  hasPendingBaseline: false,
   drafts: { continue: "Hi Sam, keep going.", move: "Hi Sam, the best path now is a reverse diet.", extend: "Hi Sam, a little more time." },
 };
 const render = (over: Partial<PhaseReviewCardProps> = {}) => renderToStaticMarkup(createElement(PhaseReviewCard, { ...base, ...over }));
@@ -37,13 +40,13 @@ describe("the phase review card", () => {
     expect(html).toContain("Only you see this plan.");
     expect(html).toContain("rule-of-thumb line");
     expect(html).toContain("Keep going");
-    expect(html).toContain("Suggest reverse diet");
+    expect(html).toContain("Move to reverse diet");
     expect(html).toContain("Extend the review");
   });
   it("highlights only the choice the numbers point to: the move when it is supported", () => {
     const html = render();
     expect((html.match(/bg-rust text-graphite/g) ?? []).length).toBe(1);
-    expect(html.indexOf("Suggest reverse diet")).toBeGreaterThan(html.lastIndexOf("bg-rust text-graphite", html.indexOf("Suggest reverse diet")) - 1);
+    expect(html.indexOf("Move to reverse diet")).toBeGreaterThan(html.lastIndexOf("bg-rust text-graphite", html.indexOf("Move to reverse diet")) - 1);
   });
   it("does not pitch the move when the numbers do not support it: nothing is highlighted for it", () => {
     const html = render({ verdict: "low_adherence", stance: "does_not_support", stanceLine: "The numbers do not support moving to reverse diet yet.", verdictLine: "Sam logged food on 6 of 14 days, so the result does not say much yet." });
@@ -59,17 +62,15 @@ describe("the phase review card", () => {
   it("with no planned next phase there is nothing about one and no move button", () => {
     const html = render({ next: null, stance: null, stanceLine: null, factors: [], drafts: { ...base.drafts, move: null } });
     expect(html).not.toContain("Planned next");
-    expect(html).not.toContain("Suggest ");
+    expect(html).not.toContain("Move to ");
   });
   it("planning the same phase again is 'keep going', not a move", () => {
     const html = render({ next: "fat_loss", stanceLine: "The numbers support continuing fat loss." });
-    expect(html).not.toContain("Suggest fat loss");
+    expect(html).not.toContain("Move to fat loss");
   });
-  it("says when a suggestion is waiting or was declined, and hides a second move while waiting", () => {
-    const waiting = render({ moveState: "waiting" });
-    expect(waiting).toContain("Waiting for them to confirm or change it");
-    expect(waiting).not.toContain("Suggest reverse diet");
-    expect(render({ moveState: "declined" })).toContain("said not now to that suggestion");
+  it("nothing is asked of the client: no waiting or declined states, no goal wording", () => {
+    const html = render();
+    expect(html).not.toMatch(/waiting for|said not now|confirm or change|suggested goal/i);
   });
   it("never sends anything itself: it says the message is the coach's to edit and send", () => {
     // The text area only appears after a choice is opened, so the promise lives in the source too.

@@ -50,7 +50,6 @@ import { PhaseReviewCard, type PhaseReviewCardProps } from "@/components/coach/n
 import { buildPhaseReview, pathAssessment, reviewWindowStart } from "@/lib/phase-review";
 import { factsFromReview, draftsFor } from "@/lib/phase-review-drafts";
 import { resultLines, stanceLine, verdictLine } from "@/lib/phase-review-view";
-import { moveState } from "@/lib/phase-move";
 
 const PHASE_TAG_LABEL: Record<MilestonePhaseTag, string> = { reverse_diet: "Reverse diet", cut: "Cut", bulk: "Bulk" };
 
@@ -172,7 +171,7 @@ export async function ClientNutrition({
     supabase.from("nutrition_phases").select("phase, started_at").eq("athlete_id", athleteId).eq("group_id", groupId).maybeSingle(),
     // The phase of record (coach-only) and the goals the client and coach have agreed or proposed.
     supabase.from("client_phase_plans").select("*").eq("athlete_id", athleteId).eq("group_id", groupId).maybeSingle(),
-    supabase.from("client_goals").select("goal_type, status, nutrition_phase, created_at, created_by, athlete_id").eq("athlete_id", athleteId).eq("group_id", groupId),
+    supabase.from("client_goals").select("goal_type, status, nutrition_phase, created_at").eq("athlete_id", athleteId).eq("group_id", groupId),
   ]);
   // What the client answered to "are you happy with your meal plan?" after a new target (newest first; a failed read is no answers, never a failed page).
   const { data: answerRows, error: answersError } = await supabase
@@ -436,6 +435,7 @@ export async function ClientNutrition({
       clientFirst: firstName,
       todayKey,
       phase: phasePlan.phase,
+      plan: phasePlan,
       headline: `Review ${phasePlan.reviewOn && phasePlan.reviewOn < todayKey ? "was due" : "is due"} ${shortDateLabel(phasePlan.reviewOn as string)}`,
       results: resultLines(review, bodyProfile.weightUnit),
       verdictLine: verdictLine(review, firstName),
@@ -444,7 +444,26 @@ export async function ClientNutrition({
       stance: assessment?.stance ?? null,
       stanceLine: assessment && next ? stanceLine(assessment, phasePlan.phase, next) : null,
       factors: assessment?.factors ?? [],
-      moveState: moveState((goalRows ?? []) as Parameters<typeof moveState>[0], phasePlan),
+      // The starting target for the NEXT phase, worked out the way the Starting target card does it, so moving can prepare it for the coach to review.
+      nextBaseline: (() => {
+        if (!next || next === phasePlan.phase) return null;
+        const outcome = computeBaseline({
+          weightLbs: weightLogs?.[0]?.weight != null ? Number(weightLogs[0].weight) : null,
+          heightCm: bodyProfile.heightCm,
+          sex: bodyProfile.sex,
+          dateOfBirth: readDateOfBirth(bodyProfile),
+          bodyFatPct: bodyProfile.bodyFatPct,
+          activity: bodyProfile.activity,
+          phase: next,
+          todayKey,
+          proteinGPerLb: prefs.proteinGPerLb,
+          carbSplit: prefs.carbSplit,
+          dietType: prefs.dietType,
+        });
+        return outcome.ok ? outcome : null;
+      })(),
+      nextArchetype: baselineArchetype,
+      hasPendingBaseline: pendingSuggestions.some((x) => x.kind === "baseline"),
       drafts: draftsFor(review, facts, assessment?.stance ?? null, next),
     };
   }
