@@ -14,7 +14,7 @@ import { OrgNotificationsPanel, type OrgNotification } from "@/components/coach/
 import { MarkAllSeenButton } from "@/components/coach/desktop/mark-all-seen-button";
 import { findThreadsNeedingReply } from "@/lib/notification-priority";
 import { getCoachedGroups, LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-groups";
-import { activeOrgId, inActiveOrg } from "@/lib/active-org";
+import { activeOrgId, clientCountsByOrg, inActiveOrg, rememberedOrgId } from "@/lib/active-org";
 import { getCoachDashboardData } from "@/lib/dashboard-data";
 import { PulseTabs } from "@/components/coach/desktop/pulse-tabs";
 import { DashboardStatTiles } from "@/components/coach/desktop/dashboard-stat-tiles";
@@ -135,7 +135,10 @@ export default async function CoachHomePage() {
   // Home belongs to ONE organization at a time: the one the coach chose with the organization switcher (else their first). Everything on it, and every count, is that
   // organization's; another one appears only after switching to it.
   const coachedForOrg = await getCoachedGroups(supabase, user.id);
-  const homeOrgId = activeOrgId(coachedForOrg, (await cookies()).get(LAST_WORKSPACE_GROUP_COOKIE)?.value ?? null);
+  // The organization they last used (the switcher remembers it); with none remembered, the one with the most clients.
+  const rememberedWorkspace = (await cookies()).get(LAST_WORKSPACE_GROUP_COOKIE)?.value ?? null;
+  const clientsByOrg = rememberedOrgId(coachedForOrg, rememberedWorkspace) ? {} : await clientCountsByOrg(supabase, coachedForOrg);
+  const homeOrgId = activeOrgId(coachedForOrg, rememberedWorkspace, clientsByOrg);
   const primaryOrgMembership = (homeOrgId ? orgMemberships?.find((m) => m.organization_id === homeOrgId) : null) ?? orgMemberships?.[0] ?? null;
   const { data: viewerProfile } = await supabase.from("profiles").select("full_name, timezone").eq("id", user.id).maybeSingle();
   // The coach's own time zone: "today" on this page is their day, not the server's.

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { activeOrgId, inActiveOrg } from "./active-org";
+import { activeOrgId, clientCountsByOrg, inActiveOrg, rememberedOrgId } from "./active-org";
 import type { CoachedGroup } from "./coach-groups";
 
 // A coach who owns three separate organizations (three businesses).
@@ -22,12 +22,47 @@ describe("the active organization", () => {
     expect(activeOrgId(groups, null)).toBe("A");
     expect(activeOrgId(groups, "deleted-group")).toBe("A");
   });
+  it("with nothing remembered, takes the organization with the most clients, however the group names sort (three organizations, all owned)", () => {
+    expect(activeOrgId(groups, null, { A: 2, B: 9, C: 4 })).toBe("B");
+    expect(activeOrgId(groups, "gone", { A: 2, B: 3, C: 11 })).toBe("C");
+    expect(activeOrgId(groups, null, { A: 13, B: 3, C: 11 })).toBe("A");
+  });
+  it("what they last used wins over the biggest organization", () => {
+    expect(activeOrgId(groups, "c1", { A: 50, B: 9, C: 1 })).toBe("C");
+    expect(rememberedOrgId(groups, "b1")).toBe("B");
+    expect(rememberedOrgId(groups, "a2")).toBeNull();
+    expect(rememberedOrgId(groups, "gone")).toBeNull();
+    expect(rememberedOrgId(groups, null)).toBeNull();
+  });
+  it("a tie, or no client counts at all, falls back to the first team or social group by name", () => {
+    expect(activeOrgId(groups, null, { A: 5, B: 5, C: 1 })).toBe("A");
+    expect(activeOrgId(groups, null, {})).toBe("A");
+  });
   it("never anchors on a client's own one-on-one group", () => {
     expect(activeOrgId(groups, "a2")).toBe("A");
     expect(activeOrgId([g("x2", "Solo", "X", "one_on_one"), g("y1", "Team Y", "Y")], "x2")).toBe("Y");
   });
   it("a coach with nothing has no active organization", () => {
     expect(activeOrgId([], null)).toBeNull();
+  });
+});
+
+describe("counting each organization's clients", () => {
+  const fakeDb = (rows: unknown[], error: unknown = null) =>
+    ({
+      from: () => {
+        const self: any = new Proxy({}, { get: (_t, prop) => (prop === "then" ? (r: (v: unknown) => void) => r({ data: error ? null : rows, error }) : () => self) });
+        return self;
+      },
+    }) as never;
+  it("counts each client once per organization, even in two of its groups, and counts a client in two organizations in both", async () => {
+    const gs = [g("a1", "A1", "A"), g("a3", "A3", "A"), g("b1", "B1", "B")];
+    const counts = await clientCountsByOrg(fakeDb([{ group_id: "a1", profile_id: "p1" }, { group_id: "a3", profile_id: "p1" }, { group_id: "a3", profile_id: "p2" }, { group_id: "b1", profile_id: "p1" }]), gs);
+    expect(counts).toEqual({ A: 2, B: 1 });
+  });
+  it("gives no counts when the read fails, and none for a coach with no groups", async () => {
+    expect(await clientCountsByOrg(fakeDb([], { message: "boom" }), groups)).toEqual({});
+    expect(await clientCountsByOrg(fakeDb([]), [])).toEqual({});
   });
 });
 
@@ -58,7 +93,8 @@ describe("Home is scoped to the active organization everywhere", () => {
   const page = read("app/(coach)/dashboard/page.tsx");
   it("reads the organization switcher's choice and keeps only that organization's groups before anything is counted", () => {
     expect(page).toContain("LAST_WORKSPACE_GROUP_COOKIE");
-    expect(page).toContain("activeOrgId(coachedForOrg");
+    expect(page).toContain("activeOrgId(coachedForOrg, rememberedWorkspace, clientsByOrg)");
+    expect(page).toContain("clientCountsByOrg(supabase, coachedForOrg)");
     expect(page.indexOf("inActiveOrg([g], homeOrgId)")).toBeGreaterThan(-1);
     expect(page.indexOf("inActiveOrg([g], homeOrgId)")).toBeLessThan(page.indexOf("const allGroups = [...byId.values()]"));
     expect(page.indexOf("const allGroups = [...byId.values()]")).toBeLessThan(page.indexOf("getCoachDashboardData(supabase"));
