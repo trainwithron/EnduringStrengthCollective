@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ClientNutrition } from "@/components/coach/nutrition/client-nutrition";
+import { ClientFoodLogOnly } from "@/components/coach/nutrition/client-food-log-only";
 import { FavoriteMealsTab } from "@/components/coach/nutrition/favorite-meals-tab";
 import { MacroCalculator } from "@/components/tools/macro-calculator";
 import { getEffectiveAthlete } from "@/lib/acting-as";
@@ -25,6 +26,7 @@ import { Key12NutrientGrid } from "@/components/athlete/key12-nutrient-grid";
 import { NutritionYouthModeToggle } from "@/components/coach/desktop/nutrition-youth-mode-toggle";
 import { dedupeRecentFoodLogs } from "@/lib/recent-food-logs";
 import { getCoachClients } from "@/lib/coach-clients";
+import { dailyCaloriesFromLog } from "@/lib/nutrition-tracking";
 
 export default async function NutritionPage(
   props: {
@@ -155,9 +157,7 @@ export default async function NutritionPage(
               {!selected ? (
                 <p className="font-body text-sm text-steel">Pick a client to see their nutrition.</p>
               ) : selectedTier === "group" ? (
-                <p className="font-body text-sm text-steel">
-                  Macro/meal planning isn&apos;t enabled for group-tier clients.
-                </p>
+                <ClientFoodLogOnly groupId={selected.groupId} athleteId={selected.profileId} clientName={selected.fullName} />
               ) : (
                 <ClientNutrition
                   groupId={selected.groupId}
@@ -213,6 +213,7 @@ export default async function NutritionPage(
     { data: todayFoodLogRows },
     { data: recentFoodLogRows },
     { data: athleteInjuryStatus },
+    { data: eatenRows },
   ] = await Promise.all([
     macrosEnabled
       ? supabase
@@ -254,24 +255,27 @@ export default async function NutritionPage(
           .limit(1)
           .maybeSingle()
       : Promise.resolve({ data: null }),
-    macrosEnabled
-      ? supabase
-          .from("food_log_entries")
-          .select("id, meal_slot, status, description, calories, protein_g, carbs_g, fat_g")
-          .eq("athlete_id", athleteId)
-          .eq("log_date", todayKey)
-      : Promise.resolve({ data: [] }),
-    macrosEnabled
-      ? supabase
-          .from("food_log_entries")
-          .select("description, calories, protein_g, carbs_g, fat_g, created_at")
-          .eq("athlete_id", athleteId)
-          .neq("status", "skipped")
-          .not("description", "is", null)
-          .order("created_at", { ascending: false })
-          .limit(40)
-      : Promise.resolve({ data: [] }),
+    // Logging is for every client, whatever their tier: these three reads are never gated.
+    supabase
+      .from("food_log_entries")
+      .select("id, meal_slot, status, description, calories, protein_g, carbs_g, fat_g")
+      .eq("athlete_id", athleteId)
+      .eq("log_date", todayKey),
+    supabase
+      .from("food_log_entries")
+      .select("description, calories, protein_g, carbs_g, fat_g, created_at")
+      .eq("athlete_id", athleteId)
+      .neq("status", "skipped")
+      .not("description", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(40),
     supabase.from("athlete_injury_status").select("is_injured").eq("athlete_id", athleteId).maybeSingle(),
+    supabase
+      .from("food_log_entries")
+      .select("log_date, status, calories")
+      .eq("athlete_id", athleteId)
+      .gte("log_date", thirtyDaysAgoKey)
+      .order("log_date", { ascending: true }),
   ]);
 
   const todayFoodLog: FoodLogEntry[] = (todayFoodLogRows ?? []).map((r) => ({
@@ -334,6 +338,7 @@ export default async function NutritionPage(
   const { data: unitRow } = await supabase.from("athlete_profile_details").select("weight_unit").eq("athlete_id", athleteId).maybeSingle();
   const weightUnit = asWeightUnit(unitRow?.weight_unit);
   const weightTrendPoints = (weightLogs ?? []).map((w) => ({ date: w.logged_date, value: displayWeightValue(w.weight, weightUnit) }));
+  const caloriesEatenPoints = dailyCaloriesFromLog((eatenRows ?? []) as { log_date: string; status: string | null; calories: number | null }[]);
   const calorieTrendPoints = (macroHistory ?? [])
     .filter((m: any) => m.calories != null)
     .map((m: any) => ({ date: m.log_date, value: m.calories }));
@@ -372,12 +377,10 @@ export default async function NutritionPage(
         </div>
       )}
 
-      {!macrosEnabled ? (
-        <p className="font-body text-sm text-steel px-5 pt-6 max-w-[50ch]">
-          Macro programming isn&apos;t part of your current plan.
-        </p>
-      ) : (
-        <div className="px-5 pt-6 space-y-6">
+      {/* Every client can track what they eat here, whatever their tier and whether or not a coach has set a target. Targets, meal plans, food rules and the weekly
+          check-in are a coach-run feature and show only for clients on a tier that has them. */}
+      <div className="px-5 pt-6 space-y-6">
+          {macrosEnabled && (
           <section className="border border-steel/20 p-4">
             <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
               Today&apos;s targets
@@ -427,8 +430,9 @@ export default async function NutritionPage(
               <p className="font-body text-sm text-steel">No targets set for today yet.</p>
             )}
           </section>
+          )}
 
-          <NutritionPreferencesCard athleteId={athleteId} initial={clientPrefs} />
+          {macrosEnabled && <NutritionPreferencesCard athleteId={athleteId} initial={clientPrefs} />}
 
           {micronutrients.hasAnyData && (
             <Key12NutrientGrid
@@ -440,9 +444,10 @@ export default async function NutritionPage(
 
           <section>
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
-              Today&apos;s meals
+              Today&apos;s food
             </h2>
             <FoodLogSection
+              target={todayMacros}
               plan={savedPlanMeals ? { meals: clientPlan.meals, hiddenCount: clientPlan.hiddenCount, emptiedMeals: clientPlan.emptiedMeals } : null}
               athleteId={athleteId}
               groupId={params.groupId}
@@ -453,6 +458,7 @@ export default async function NutritionPage(
             />
           </section>
 
+          {macrosEnabled && (
           <section>
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
               Weekly check-in
@@ -481,6 +487,7 @@ export default async function NutritionPage(
               </p>
             )}
           </section>
+          )}
 
           <section>
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
@@ -491,12 +498,20 @@ export default async function NutritionPage(
 
           <section>
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+              Calories eaten
+            </h2>
+            <TrendChart points={caloriesEatenPoints} unit=" cal" emptyLabel="Nothing logged in the last 30 days yet." />
+          </section>
+
+          {macrosEnabled && (
+          <section>
+            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
               Calorie target
             </h2>
             <TrendChart points={calorieTrendPoints} unit=" cal" emptyLabel="No calorie targets set yet." />
           </section>
-        </div>
-      )}
+          )}
+      </div>
 
       <BottomTabBar groupId={params.groupId} activeOverride="nutrition" />
     </main>

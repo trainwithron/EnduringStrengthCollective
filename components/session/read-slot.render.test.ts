@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 vi.mock("@/lib/supabase/client", () => ({
@@ -9,7 +10,7 @@ import { ReadSlot } from "@/components/session/read-slot";
 
 function render(noteSeen: boolean) {
   return renderToStaticMarkup(
-    <ReadSlot athleteId="a1" reference="Psalm 46:1" text="God is our refuge and strength, a very present help in trouble." noteSeen={noteSeen} onClose={() => {}} onTurnedOff={() => {}} />
+    createElement(ReadSlot, { athleteId: "a1", reference: "Psalm 46:1", text: "God is our refuge and strength, a very present help in trouble.", noteSeen, onClose: () => {}, onTurnedOff: () => {} })
   );
 }
 

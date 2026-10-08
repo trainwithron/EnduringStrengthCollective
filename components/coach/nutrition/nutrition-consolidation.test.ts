@@ -148,8 +148,9 @@ describe("Apply writes the STANDING target from an apply-from date, never lies a
 });
 
 describe("the other review fixes", () => {
-  it("a group-tier client's Nutrition tab on the profile says so instead of being blank", () => {
-    expect(profile).toContain("Macro/meal planning isn&apos;t enabled for group-tier clients.");
+  it("a group-tier client's Nutrition tab on the profile shows what they logged instead of a dead end", () => {
+    expect(profile).toContain("<ClientFoodLogOnly");
+    expect(profile).not.toContain("isn&apos;t enabled for group-tier clients");
     expect(profile.indexOf('data-tab="nutrition"')).toBeLessThan(profile.indexOf("macrosEnabled ? ("));
   });
   it("the 7-day view resolves a day the way the client sees it: own target, else assigned plan, else standing", () => {

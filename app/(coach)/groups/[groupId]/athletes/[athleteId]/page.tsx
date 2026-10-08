@@ -8,6 +8,7 @@ import { NoAccess } from "@/components/shared/no-access";
 import { calorieSeriesWithStanding, standingForDate } from "@/lib/macro-resolution";
 import { fetchStandingHistory } from "@/lib/standing-macros";
 import { ClientNutrition } from "@/components/coach/nutrition/client-nutrition";
+import { ClientFoodLogOnly } from "@/components/coach/nutrition/client-food-log-only";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
@@ -1689,7 +1690,7 @@ export default async function AthleteProfilePage(
             variant="profile"
           />
         ) : (
-          <p className="font-body text-sm text-steel">Macro/meal planning isn&apos;t enabled for group-tier clients.</p>
+          <ClientFoodLogOnly athleteId={params.athleteId} groupId={params.groupId} clientName={profile?.full_name ?? "Client"} />
         )}
       </div>
       </div>

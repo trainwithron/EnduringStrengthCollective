@@ -10,6 +10,7 @@ import { BarcodeScanButton } from "./barcode-scan-button";
 import { PhotoLogFoodButton } from "./photo-log-food-button";
 import { FavoriteStar } from "./favorite-star";
 import type { RecentFoodLogOption } from "@/lib/recent-food-logs";
+import { NO_TARGET_LINE, hasTarget, sumLoggedFood, type DayTargetLike } from "@/lib/nutrition-tracking";
 
 // Wires the checkoff list + quick-log entry point + a running "logged so
 // far today" total into one section for the athlete's Nutrition page
@@ -23,6 +24,7 @@ export function FoodLogSection({
   initialEntries,
   recents,
   plan,
+  target,
 }: {
   athleteId: string;
   groupId: string;
@@ -32,20 +34,16 @@ export function FoodLogSection({
   recents: RecentFoodLogOption[];
   // The saved plan for today (already filtered against this client's food preferences). When it has meals they are shown as option cards; otherwise the plain checklist.
   plan?: { meals: Record<string, MealEntryPayload[]> | null; hiddenCount: number; emptiedMeals: { bucket: string; mealId: string }[] } | null;
+  // Today's target when a coach has set one. Without it the totals still show, with a friendly line instead of a comparison.
+  target?: DayTargetLike | null;
 }) {
   const planHasMeals = !!plan?.meals && Object.values(plan.meals).some((entries) => (entries ?? []).length > 0);
   const [quickLogEntries, setQuickLogEntries] = useState(initialEntries.filter((e) => !e.mealSlot));
   const [allEntries, setAllEntries] = useState(initialEntries);
 
-  const loggedTotals = allEntries.reduce(
-    (acc, e) => ({
-      calories: acc.calories + (e.calories ?? 0),
-      proteinG: acc.proteinG + (e.proteinG ?? 0),
-      carbsG: acc.carbsG + (e.carbsG ?? 0),
-      fatG: acc.fatG + (e.fatG ?? 0),
-    }),
-    { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 }
-  );
+  const loggedTotals = sumLoggedFood(allEntries);
+  const withTarget = hasTarget(target);
+  const of = (value: number | null | undefined) => (value != null ? ` / ${Math.round(value)}` : "");
 
   function handleQuickLogged(entry: FoodLogEntry) {
     setQuickLogEntries((prev) => [...prev, entry]);
@@ -58,20 +56,20 @@ export function FoodLogSection({
 
   return (
     <div className="space-y-3">
-      {allEntries.length > 0 && (
-        <div className="border border-steel/20 p-3">
-          <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5">
-            Logged so far today
-          </p>
-          <p className="font-display text-lg leading-none">
-            {Math.round(loggedTotals.calories)} kcal
-          </p>
-          <p className="font-body text-xs text-steel mt-0.5">
-            {Math.round(loggedTotals.proteinG)}p / {Math.round(loggedTotals.carbsG)}c /{" "}
-            {Math.round(loggedTotals.fatG)}f
-          </p>
-        </div>
-      )}
+      <div className="border border-steel/20 p-3" data-testid="logged-totals">
+        <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5">Logged so far today</p>
+        <p className="font-display text-lg leading-none [font-variant-numeric:tabular-nums]">
+          {Math.round(loggedTotals.calories)}
+          {withTarget ? of(target?.calories) : ""} kcal
+        </p>
+        <p className="font-body text-xs text-steel mt-0.5 [font-variant-numeric:tabular-nums]">
+          {Math.round(loggedTotals.proteinG)}
+          {withTarget ? of(target?.proteinG) : ""}p / {Math.round(loggedTotals.carbsG)}
+          {withTarget ? of(target?.carbsG) : ""}c / {Math.round(loggedTotals.fatG)}
+          {withTarget ? of(target?.fatG) : ""}f
+        </p>
+        {!withTarget && <p className="font-body text-xs text-steel mt-2">{NO_TARGET_LINE}</p>}
+      </div>
 
       {planHasMeals ? (
         <TodaysMealCards
