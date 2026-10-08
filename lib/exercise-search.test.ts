@@ -158,10 +158,23 @@ describe("searchExercises: a typo is found as a last resort", () => {
   it("the typo matches sit below every other kind of match, so the exact name stays first", () => {
     const r = searchExercises("push up", LIB, []);
     expect(r[0]).toMatchObject({ name: "Push-up" });
-    expect(r[0].tier).toBeLessThan(5);
+    expect(r[0].tier).toBeLessThan(4);
     const mixed = searchExercises("pull up", ["Pull-up", "Pull-ups Band", "Push-up"], []);
     expect(mixed[0].name).toBe("Pull-up");
     expect(mixed.find((x) => x.name === "Push-up")!.tier).toBeGreaterThan(mixed[0].tier);
+  });
+  it("on a big library of press exercises the near-spelling is still in the first eight rows", () => {
+    const press = ["Overhead Press", "Dumbbell Shoulder Press", "Incline Press", "Landmine Press", "Leg Press", "Floor Press", "Push Press", "Seated Press", "Cable Chest Press", "Machine Chest Press", "Arnold Press", "Z Press", "Bench Press", "Close Grip Bench Press"];
+    const r = searchExercises("bech press", press, []);
+    expect(r.length).toBeLessThanOrEqual(8);
+    expect(r.map((x) => x.name)).toContain("Bench Press");
+    expect(r[0].name).toBe("Bench Press");
+  });
+  it("a typo of a word in a longer name still finds it, and a looser word overlap sits below it", () => {
+    const lib = ["Overhead Press", "Incline Press", "Bench Press", "Close Grip Bench Press"];
+    const r = searchExercises("bech press", lib, []);
+    expect(r[0]).toMatchObject({ name: "Bench Press", tier: 4 });
+    expect(r.slice(1).every((x) => x.tier === 5)).toBe(true);
   });
   it("very short text and unrelated words are not matched this way", () => {
     expect(found("pu")).not.toContain("Back Squat");
