@@ -580,6 +580,7 @@ export async function ClientNutrition({
           rulesReadable={!prefsReadError}
           weightUnit={bodyProfile.weightUnit}
           initialActivity={bodyProfile.activity}
+          clientName={clientName}
         />
         <div className="mt-8">
           <h3 id="grocery-list" className="font-display font-bold text-lg uppercase leading-none mb-2 scroll-mt-24">Grocery list</h3>

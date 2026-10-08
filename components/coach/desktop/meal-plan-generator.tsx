@@ -26,6 +26,7 @@ import { describeTypedRules, mergeRules, newFromTyped, rulesFromTypedText } from
 import { dayList, LIBRARY_WEEK_RATIONALE, planWeekReplacement } from "@/lib/week-replace";
 import { DIET_TYPES, type DietType, type Slot } from "@/lib/meal-templates/types";
 import { specTarget } from "@/lib/library-meal-plan";
+import { savePlanThenLibrary } from "@/lib/plan-save-flow";
 import { applySwap, ROLE_LABEL, safeSwapChoices, swappableRole } from "@/lib/meal-swap";
 import {
   getDatesForWeekdays,
@@ -84,6 +85,7 @@ export function MealPlanGenerator({
   proteinGPerLb,
   foodRules,
   rulesReadable = true,
+  clientName,
 }: {
   athleteId: string;
   groupId: string;
@@ -115,6 +117,8 @@ export function MealPlanGenerator({
   foodRules?: FoodRules;
   // False when this client's saved food rules could not be READ. Nothing is built or saved then: a plan made without their allergies is how an allergen reaches a client.
   rulesReadable?: boolean;
+  // The client's name, only so it can be kept OUT of the meals saved to the coach's library.
+  clientName?: string;
 }) {
   const router = useRouter();
   const resultsRef = useRef<HTMLDivElement>(null);
@@ -432,24 +436,7 @@ export function MealPlanGenerator({
       ? { train: buildMealsPayload(mealsByView.train), rest: buildMealsPayload(mealsByView.rest) }
       : { daily: buildMealsPayload(mealsByView.daily) };
 
-    await supabase.from("meal_plans").upsert(
-      {
-        athlete_id: athleteId,
-        group_id: groupId,
-        log_date: date,
-        archetype,
-        meal_count: parseInt(mealCount, 10) || 4,
-        include_snack: includeSnack,
-        carb_cycling: isCycling,
-        rationale,
-        macros: isCycling ? { train: trainMacros, rest: restMacros } : { daily: dailyMacros },
-        meals: mealsPayload,
-        created_by: user.id,
-      },
-      { onConflict: "athlete_id,log_date" }
-    );
-
-    // The plan is saved; now the AI options the coach approved go into their library.
+    // The AI options the coach approved (they go into the library only AFTER the plan itself has saved).
     const approvedForSave: { slot: GeneratedMeal["spec"]["slot"]; opt: MealOption }[] = [];
     for (const meals of isCycling ? [mealsByView.train, mealsByView.rest] : [mealsByView.daily]) {
       for (const m of meals) {
@@ -457,7 +444,33 @@ export function MealPlanGenerator({
         for (const i of idxs) if (m.options[i]) approvedForSave.push({ slot: m.spec.slot, opt: m.options[i] });
       }
     }
-    setLibraryAutoMsg(await autoSaveApprovedAiOptions(approvedForSave));
+    const outcome = await savePlanThenLibrary(
+      () =>
+        supabase.from("meal_plans").upsert(
+          {
+            athlete_id: athleteId,
+            group_id: groupId,
+            log_date: date,
+            archetype,
+            meal_count: parseInt(mealCount, 10) || 4,
+            include_snack: includeSnack,
+            carb_cycling: isCycling,
+            rationale,
+            macros: isCycling ? { train: trainMacros, rest: restMacros } : { daily: dailyMacros },
+            meals: mealsPayload,
+            created_by: user.id,
+          },
+          { onConflict: "athlete_id,log_date" }
+        ),
+      () => autoSaveApprovedAiOptions(approvedForSave)
+    );
+    if (!outcome.ok) {
+      setError(outcome.error);
+      setLibraryAutoMsg(null);
+      setSaving(false);
+      return;
+    }
+    setLibraryAutoMsg(outcome.libraryMessage);
 
     setSaving(false);
     router.refresh();
@@ -535,9 +548,16 @@ export function MealPlanGenerator({
       };
     });
 
-    await supabase.from("meal_plans").upsert(rows, { onConflict: "athlete_id,log_date" });
-
-    const autoMsg = await autoSaveApprovedAiOptions(chosenOptions.map((x) => ({ slot: meal.spec.slot, opt: x.opt })));
+    const outcome = await savePlanThenLibrary(
+      () => supabase.from("meal_plans").upsert(rows, { onConflict: "athlete_id,log_date" }),
+      () => autoSaveApprovedAiOptions(chosenOptions.map((x) => ({ slot: meal.spec.slot, opt: x.opt })))
+    );
+    if (!outcome.ok) {
+      setAssigning(null);
+      setAssignedMsg((prev) => ({ ...prev, [meal.spec.id]: outcome.error ?? "The plan couldn't be saved." }));
+      return;
+    }
+    const autoMsg = outcome.libraryMessage;
     setAssigning(null);
     setAssignedMsg((prev) => ({
       ...prev,
@@ -676,7 +696,7 @@ export function MealPlanGenerator({
   async function saveAiOptionToLibrary(slotIn: GeneratedMeal["spec"]["slot"], opt: MealOption): Promise<{ result: "saved" | "exists" | "unsupported" | "failed"; reason?: string }> {
     if (!coachId) return { result: "failed" };
     const slot: Slot = slotIn === "any" ? "lunch" : slotIn;
-    const built = await buildAiRecipeRows(opt, slot);
+    const built = await buildAiRecipeRows(opt, slot, new Date(), { clientWords: (clientName ?? "").split(/s+/).filter(Boolean) });
     if (!built.ok) return { result: "unsupported", reason: built.reason };
     const supabase = createBrowserClient();
     const { data: recipe, error } = await supabase

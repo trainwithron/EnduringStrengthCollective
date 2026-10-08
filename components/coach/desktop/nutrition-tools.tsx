@@ -46,6 +46,7 @@ export function NutritionTools({
   rulesReadable = true,
   weightUnit = "lb",
   initialActivity = null,
+  clientName,
 }: {
   athleteId: string;
   groupId: string;
@@ -73,6 +74,8 @@ export function NutritionTools({
   // How the client sees weight, and the activity level they gave: the calculator starts from them.
   weightUnit?: WeightUnit;
   initialActivity?: ActivityLevel | null;
+  // Only so the client's name is kept out of meals saved to the coach's library.
+  clientName?: string;
 }) {
   const [importedMacros, setImportedMacros] = useState<ImportedMacros | null>(null);
   const [calculatorExpanded, setCalculatorExpanded] = useState(true);
@@ -135,6 +138,7 @@ export function NutritionTools({
           proteinGPerLb={proteinGPerLb}
           foodRules={foodRules}
           rulesReadable={rulesReadable}
+          clientName={clientName}
         />
       </div>
     </div>

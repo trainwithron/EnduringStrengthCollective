@@ -16,6 +16,23 @@ const option = (over: Partial<MealOption> = {}): MealOption => ({
   ...over,
 });
 
+describe("a client's name never travels with a library meal", () => {
+  it("is taken out of the recipe name, and a meal whose lines mention the client is not saved", async () => {
+    const named = await buildAiRecipeRows(option({ recipeName: "Sarah's high protein bowl" }), "dinner", new Date(), { clientWords: ["Sarah", "Jones"] });
+    expect(named.ok && named.rows.recipe.name).toBe("high protein bowl");
+    const inLines = await buildAiRecipeRows(option({ aiLines: option().aiLines!.map((l, i) => (i === 0 ? { ...l, rawLine: "200g chicken for Sarah" } : l)) }), "dinner", new Date(), { clientWords: ["Sarah"] });
+    expect(inLines.ok).toBe(false);
+    const other = await buildAiRecipeRows(option({ recipeName: "Sarahs lunch" }), "dinner", new Date(), { clientWords: ["Sarah"] });
+    expect(other.ok && other.rows.recipe.name).toBe("Sarahs lunch");
+    const none = await buildAiRecipeRows(option(), "dinner", new Date(), { clientWords: [] });
+    expect(none.ok).toBe(true);
+  });
+  it("a name that is only the client's name falls back to a neutral one", async () => {
+    const r = await buildAiRecipeRows(option({ recipeName: "Sarah" }), "dinner", new Date(), { clientWords: ["Sarah"] });
+    expect(r.ok && r.rows.recipe.name).toBe("AI meal");
+  });
+});
+
 describe("saving an approved AI option to the library", () => {
   it("makes a private AI recipe with reference grams, roles, tags and a fingerprint", async () => {
     const r = await buildAiRecipeRows(option(), "dinner", new Date("2026-10-07T12:00:00Z"));

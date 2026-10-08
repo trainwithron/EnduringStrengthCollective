@@ -62,7 +62,29 @@ export async function contentHashOf(lines: { label: string; grams: number | null
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-export async function buildAiRecipeRows(option: MealOption, slot: Slot, now: Date = new Date()): Promise<AiRecipeResult> {
+// Library meals are offered to the coach's OTHER clients, so nothing about the client they were made for may travel with them. The AI is never given the client's name, but the coach's
+// typed notes can contain it and the model can echo a note back, so the client's name is taken out of the recipe's name and a meal whose lines mention it is not saved.
+// A word as a name would be matched: lower case, with surrounding punctuation and a possessive 's taken off.
+const core = (w: string): string => w.toLowerCase().replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "").replace(/'s$/, "");
+const nameSet = (words: string[]): Set<string> => new Set(words.map(core).filter((w) => w.length >= 3));
+export function mentionsAny(text: string, words: string[]): boolean {
+  const names = nameSet(words);
+  return names.size > 0 && text.split(/[ \t\n,;:()/]+/).some((tok) => names.has(core(tok)));
+}
+export function scrubWords(text: string, words: string[]): string {
+  const names = nameSet(words);
+  if (names.size === 0) return text;
+  return text
+    .split(/( +)/)
+    .filter((tok) => !names.has(core(tok)))
+    .join("")
+    .replace(/ {2,}/g, " ")
+    .replace(/^[ ,:;-]+|[ ,:;-]+$/g, "")
+    .trim();
+}
+
+export async function buildAiRecipeRows(option: MealOption, slot: Slot, now: Date = new Date(), opts: { clientWords?: string[] } = {}): Promise<AiRecipeResult> {
+  const clientWords = opts.clientWords ?? [];
   if (!option.isAi || !option.aiLines || option.aiLines.length === 0) return { ok: false, reason: "Only a verified AI option can be saved to the library." };
   if (!option.verifiedMacros) return { ok: false, reason: "This option has no verified macros, so it cannot be saved." };
   const ingredients: AiRecipeRows["ingredients"] = [];
@@ -96,6 +118,8 @@ export async function buildAiRecipeRows(option: MealOption, slot: Slot, now: Dat
     weighted.push({ name: label, proteinG: p });
   }
   if (!ingredients.some((i) => i.role !== "fixed")) return { ok: false, reason: "This option has no measured line to scale, so it cannot be saved." };
+  if (clientWords.length > 0 && option.aiLines.some((l) => mentionsAny(`${l.rawLine} ${l.name ?? ""}`, clientWords))) return { ok: false, reason: "This meal's lines mention the client by name, so it was not added to your library." };
+  const cleanedName = clientWords.length > 0 ? scrubWords(option.recipeName ?? "", clientWords) : (option.recipeName ?? "");
 
   // Tags are worked out from the name, the matched food AND the line as the AI wrote it, so a label that hides the food cannot hide an allergen.
   const text = [option.recipeName ?? "", ...ingredients.map((i) => i.label), ...option.aiLines.map((l) => l.rawLine), ...ingredients.map((i) => i.fixed_display_text ?? "")].filter(Boolean);
@@ -108,7 +132,7 @@ export async function buildAiRecipeRows(option: MealOption, slot: Slot, now: Dat
     ok: true,
     rows: {
       recipe: {
-        name: (option.recipeName ?? "AI meal").slice(0, 120),
+        name: (cleanedName || "AI meal").slice(0, 120),
         slot,
         archetypes: diets,
         keywords: [...new Set(ingredients.filter((i) => i.role !== "fixed").map((i) => cleanName(i.label).split(" ")[0]))].slice(0, 8),
