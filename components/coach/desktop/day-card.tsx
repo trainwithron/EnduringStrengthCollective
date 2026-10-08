@@ -12,7 +12,7 @@ import {
   formatCondensedSets,
   type TrackedField,
 } from "@/lib/exercise-fields";
-import { parseQuickEntry } from "@/lib/quick-entry";
+import { parseQuickEntry, quickNote } from "@/lib/quick-entry";
 import { matchExercise, type AliasEntry } from "@/lib/exercise-matching";
 import { ExerciseBuilderCard, type MovementPatternOption } from "../exercise-builder-card";
 import type { RestTempoSuggestion } from "@/lib/training-intent";
@@ -290,7 +290,7 @@ export function DayCard({
           exercise_order: nextOrder,
           // A timed exercise (a plank for 60 seconds) tracks Time, not reps, so the logger shows a time field.
           ...(parsed.timeSeconds != null ? { tracked_fields: ["time", ...(parsed.rpe != null ? ["rpe"] : [])] } : {}),
-          ...(parsed.eachSide ? { notes: "Each side" } : {}),
+          ...(quickNote(parsed) ? { notes: quickNote(parsed) } : {}),
         })
         .select("id, tracked_fields")
         .single();
@@ -324,7 +324,7 @@ export function DayCard({
         exerciseName: resolvedExerciseName,
         movementPatternId: null,
         trackedFields: newRow.tracked_fields ?? DEFAULT_TRACKED_FIELDS,
-        notes: parsed.eachSide ? "Each side" : null,
+        notes: quickNote(parsed),
         videoPath: null,
         youtubeUrl: null,
         tier: null,

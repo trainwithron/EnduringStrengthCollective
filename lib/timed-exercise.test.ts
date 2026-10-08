@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { parseDurationSeconds, isTimedHold, normalizeTimedRow } from "@/lib/timed-exercise";
+import { parseDurationSeconds, parseDurationRange, isTimedHold, normalizeTimedRow } from "@/lib/timed-exercise";
 import { parseImportRows, detectColumns } from "@/lib/workout-import-parser";
 import { normalizeRows } from "@/lib/program-import-request";
 import { TRACKED_FIELD_DEFS } from "@/lib/exercise-fields";
@@ -29,14 +29,25 @@ describe("parseDurationSeconds", () => {
   });
 });
 
+describe("parseDurationRange", () => {
+  it("the upper end is the time, the range is kept as typed", () => {
+    expect(parseDurationRange("30-45s")).toEqual({ seconds: 45, note: "30-45s" });
+    expect(parseDurationRange("30 - 45 seconds")).toEqual({ seconds: 45, note: "30 - 45 seconds" });
+    expect(parseDurationRange("1-2 min")).toEqual({ seconds: 120, note: "1-2 min" });
+  });
+  it("not a range: a single duration, a rep range, or a backwards range", () => {
+    for (const t of ["45s", "8-12", "45-30s", "30-30s", "30-45"]) expect(parseDurationRange(t)).toBeNull();
+  });
+});
+
 describe("isTimedHold", () => {
   it("knows the usual holds", () => {
-    for (const n of ["Plank", "planks", "Side Plank", "Wall Sit", "Dead Hang", "Hollow Hold", "Hollow Body Hold", "L-Sit", "Isometric Split Squat Hold", "Copenhagen Plank", "Bar Hang"]) {
+    for (const n of ["Plank", "planks", "Side Plank", "Wall Sit", "Dead Hang", "Hollow Hold", "Hollow Body Hold", "L-Sit", "Isometric Split Squat Hold", "Copenhagen Plank", "Bar Hang", "Forearm Plank", "High Plank", "Plank Hold", "Side Plank Each Side"]) {
       expect(isTimedHold(n), n).toBe(true);
     }
   });
   it("moving planks and everything else are counted in reps", () => {
-    for (const n of ["Plank Row", "Plank Jack", "Plank to Pushup", "Plank Walkout", "Squat", "Bench Press", "Farmer Carry", "Pull-Up", "Row"]) {
+    for (const n of ["Plank Row", "Plank Jack", "Plank to Pushup", "Plank Walkout", "Plank Hip Dips", "Plank with Leg Lift", "Plank Twist", "Spiderman Plank", "Squat", "Bench Press", "Farmer Carry", "Pull-Up", "Row"]) {
       expect(isTimedHold(n), n).toBe(false);
     }
   });
@@ -101,7 +112,7 @@ describe("what the builder and the logger do with a timed exercise", () => {
     expect(dayCard).toContain('...(parsed.timeSeconds != null ? { tracked_fields: ["time", ...(parsed.rpe != null ? ["rpe"] : [])] } : {})');
     expect(dayCard).toContain("target_time_seconds: parsed.timeSeconds,");
     expect(dayCard).toContain("target_reps: parsed.reps,");
-    expect(dayCard).toContain('parsed.eachSide ? "Each side" : null');
+    expect(dayCard).toContain('notes: quickNote(parsed)');
   });
   it("the import review shows the time where reps would be, and a timed exercise with no reps tracks Time instead of reps", () => {
     expect(wizard).toContain('ex.reps ?? (ex.timeSeconds != null ? `${ex.timeSeconds}s` : "?")');

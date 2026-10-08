@@ -22,17 +22,34 @@ export function parseDurationSeconds(text: string | null | undefined): number | 
   return Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds) : null;
 }
 
-// Exercises that are held for time. A plank that moves (a plank row, a plank jack, a walkout) is counted in reps, so those are left out. Carries are not here: a carry is timed only when its
-// time is typed with a unit.
-const HOLD_WORDS = /\b(planks?|side planks?|wall[- ]?sits?|dead[- ]?hangs?|active hangs?|passive hangs?|bar hangs?|hollow (body )?holds?|hollow rocks? hold|l[- ]?sits?|isometric|iso hold|static hold|[a-z]+ holds?|holds?)\b/i;
-const MOVING_PLANK = /\b(row|jack|walk[- ]?out|tap|taps|shoulder|to |up[- ]?down|reach|drag|pull[- ]?through|knee|crawl|saw|rock|push[- ]?up|pushup|climber)\b/i;
+// Exercises that are held for time. Carries are not here: a carry is timed only when its time is typed with a unit.
+// A plank is a hold only when the name is the plank itself plus a position word (forearm, high, side, copenhagen...). Anything else with "plank" in it (hip dips, leg lift, twist, row, jack,
+// spiderman...) moves, so it is counted in reps unless a unit is typed.
+const PLAIN_PLANK = /^(?:(?:high|low|front|forearm|elbow|straight[- ]arm|long[- ]lever|rkc|copenhagen|reverse|side)\s+)*planks?(?:\s+(?:hold|each side|per side))?$/i;
+const OTHER_HOLDS = /\b(wall[- ]?sits?|dead[- ]?hangs?|active hangs?|passive hangs?|bar hangs?|hollow (body )?holds?|hollow rocks? hold|l[- ]?sits?|isometric|iso hold|static hold|[a-z]+ holds?|holds?)\b/i;
 
 export function isTimedHold(name: string): boolean {
-  const n = name.trim();
+  const n = name.trim().replace(/\s+/g, " ");
   if (!n) return false;
-  if (!HOLD_WORDS.test(n)) return false;
-  if (/\bplank/i.test(n) && MOVING_PLANK.test(n) && !/\bhold\b/i.test(n)) return false;
-  return true;
+  if (/\bplank/i.test(n)) return PLAIN_PLANK.test(n);
+  return OTHER_HOLDS.test(n);
+}
+
+// A duration written as a range ("30-45s", "30-45 seconds", "1-2 min"): the upper end is used as the time and the whole range is kept as a note.
+const RANGE_WHOLE = new RegExp(`^(\\d+(?:\\.\\d+)?)\\s*-\\s*(${DURATION_SOURCE})$`, "i");
+export const RANGE_SOURCE = `\\d+(?:\\.\\d+)?\\s*-\\s*${DURATION_SOURCE}`;
+
+export function parseDurationRange(text: string | null | undefined): { seconds: number; note: string } | null {
+  const t = (text ?? "").trim();
+  const m = RANGE_WHOLE.exec(t);
+  if (!m) return null;
+  const high = parseDurationSeconds(m[2]);
+  const low = Number(m[1]);
+  const unit = /^[\d.]+\s*(.*)$/.exec(m[2].trim())?.[1] ?? "";
+  if (high == null || !unit) return null;
+  const lowSeconds = parseDurationSeconds(`${low} ${unit}`);
+  if (lowSeconds == null || lowSeconds >= high) return null;
+  return { seconds: high, note: t.replace(/\s+/g, " ") };
 }
 
 // A bare number with no unit on a timed hold means seconds, but only from 5 up (1 to 4 would be reps of something odd).

@@ -1,14 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { parseQuickEntry } from "./quick-entry";
+import { parseQuickEntry, quickNote } from "./quick-entry";
 
-const reps = (exerciseName: string, sets: number, r: string, rpe: number | null = null) => ({ exerciseName, sets, reps: r, timeSeconds: null, rpe, eachSide: false });
-const timed = (exerciseName: string, sets: number, timeSeconds: number, extra: { rpe?: number | null; eachSide?: boolean } = {}) => ({
+const reps = (exerciseName: string, sets: number, r: string, rpe: number | null = null) => ({ exerciseName, sets, reps: r, timeSeconds: null, rpe, eachSide: false, rangeNote: null });
+const timed = (exerciseName: string, sets: number, timeSeconds: number, extra: { rpe?: number | null; eachSide?: boolean; rangeNote?: string | null } = {}) => ({
   exerciseName,
   sets,
   reps: null,
   timeSeconds,
   rpe: extra.rpe ?? null,
   eachSide: extra.eachSide ?? false,
+  rangeNote: extra.rangeNote ?? null,
 });
 
 describe("parseQuickEntry: sets and reps (unchanged)", () => {
@@ -80,15 +81,50 @@ describe("parseQuickEntry: timed work is time, never reps", () => {
     expect(parseQuickEntry("Plank 3x3")).toEqual(reps("Plank", 3, "3"));
   });
   it('a duration first is one effort: "5 minute row", "20 min bike"', () => {
-    expect(parseQuickEntry("5 minute row")).toEqual(timed("row", 1, 300));
-    expect(parseQuickEntry("20 min bike")).toEqual(timed("bike", 1, 1200));
+    expect(parseQuickEntry("5 minute row")).toEqual(timed("Row", 1, 300));
+    expect(parseQuickEntry("20 min bike")).toEqual(timed("Bike", 1, 1200));
   });
-  it('a plain duration after a movement: "Row 5 min"', () => {
-    expect(parseQuickEntry("Row 5 min")).toEqual(timed("Row", 3, 300));
+  it("a long effort typed after the name is one effort, like the leading form: Bike 20 min is 1 x 1200", () => {
+    expect(parseQuickEntry("Row 5 min")).toEqual(timed("Row", 1, 300));
+    expect(parseQuickEntry("Bike 20 min")).toEqual(timed("Bike", 1, 1200));
+    expect(parseQuickEntry("Run 30 minutes")).toEqual(timed("Run", 1, 1800));
+  });
+  it("a hold or a short effort after the name is repeated for the default 3 sets", () => {
+    expect(parseQuickEntry("Plank 60s")).toEqual(timed("Plank", 3, 60));
+    expect(parseQuickEntry("Sprint 10 s")).toEqual(timed("Sprint", 3, 10));
+    expect(parseQuickEntry("Wall sit 2 min")).toEqual(timed("Wall sit", 3, 120));
+    expect(parseQuickEntry("Dead hang 3 min")).toEqual(timed("Dead hang", 3, 180));
+  });
+  it("an explicit set count is never changed: 3x5 min stays three sets", () => {
+    expect(parseQuickEntry("Tempo run 3x5 min")).toEqual(timed("Tempo run", 3, 300));
+  });
+  it("a range of seconds uses the upper end and keeps the range as a note", () => {
+    expect(parseQuickEntry("Plank 30-45s")).toEqual(timed("Plank", 3, 45, { rangeNote: "30-45s" }));
+    expect(parseQuickEntry("Plank 30-45 seconds")).toEqual(timed("Plank", 3, 45, { rangeNote: "30-45 seconds" }));
+    expect(parseQuickEntry("Side plank 3x20-30s each side")).toEqual(timed("Side plank", 3, 30, { eachSide: true, rangeNote: "20-30s" }));
+    expect(parseQuickEntry("Dead hang 1-2 min")).toEqual(timed("Dead hang", 3, 120, { rangeNote: "1-2 min" }));
+  });
+  it("the saved note carries each side and the range", () => {
+    expect(quickNote({ eachSide: true, rangeNote: null })).toBe("Each side");
+    expect(quickNote({ eachSide: false, rangeNote: "30-45s" })).toBe("Hold 30-45s");
+    expect(quickNote({ eachSide: true, rangeNote: "30-45s" })).toBe("Each side. Hold 30-45s");
+    expect(quickNote({ eachSide: false, rangeNote: null })).toBeNull();
   });
   it("a plank that moves is counted in reps, not held for time", () => {
     expect(parseQuickEntry("Plank row 3x10")).toEqual(reps("Plank row", 3, "10"));
     expect(parseQuickEntry("Plank row 30")).toBeNull();
+    expect(parseQuickEntry("Plank hip dips 3x12")).toEqual(reps("Plank hip dips", 3, "12"));
+    expect(parseQuickEntry("Plank with leg lift 3x10")).toEqual(reps("Plank with leg lift", 3, "10"));
+    expect(parseQuickEntry("Plank twist 3x12")).toEqual(reps("Plank twist", 3, "12"));
+    expect(parseQuickEntry("Spiderman plank 3x10")).toEqual(reps("Spiderman plank", 3, "10"));
+  });
+  it("but with a unit typed, even a moving plank is time", () => {
+    expect(parseQuickEntry("Plank hip dips 30s")).toEqual(timed("Plank hip dips", 3, 30));
+  });
+  it("a plain plank with a position word is still a hold", () => {
+    expect(parseQuickEntry("Forearm plank 60")).toEqual(timed("Forearm plank", 3, 60));
+    expect(parseQuickEntry("Side plank 30")).toEqual(timed("Side plank", 3, 30));
+    expect(parseQuickEntry("Copenhagen plank 3x20")).toEqual(timed("Copenhagen plank", 3, 20));
   });
   it('regression: "3x10 squats" style stays reps', () => {
     expect(parseQuickEntry("Squat 3x10")).toEqual(reps("Squat", 3, "10"));
