@@ -7,6 +7,7 @@ import { NutritionSpotterPanel, type NutritionSpotterFinding } from "@/component
 import { StandingMacroTargetCard } from "@/components/coach/desktop/standing-macro-target-card";
 import { CalorieFloorWarning } from "@/components/coach/nutrition/calorie-floor-warning";
 import { WhatTheyAte } from "@/components/coach/nutrition/what-they-ate";
+import { FoodTrackingSwitch } from "@/components/coach/nutrition/food-tracking-switch";
 import { PreferencesSection } from "@/components/coach/nutrition/preferences-section";
 import { computeWeeklyWeightTrend } from "@/lib/weight-trend";
 import { computeReadinessAverage } from "@/lib/wellness";
@@ -421,6 +422,8 @@ export async function ClientNutrition({
           <a href="#macro-calculator" className="hover:text-chalk">Calculator</a>
         </nav>
       </div>
+
+      <FoodTrackingSwitch athleteId={athleteId} groupId={groupId} clientName={clientName} />
 
       <section>
         <SectionHeading id="targets" title="Targets" note="What they should eat each day, what the weekly check-in suggests, and where it came from." />

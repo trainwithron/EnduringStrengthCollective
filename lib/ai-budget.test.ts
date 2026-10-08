@@ -1,0 +1,131 @@
+import { describe, expect, it } from "vitest";
+import {
+  AI_BUDGET_USD_PER_STEP,
+  CLIENT_AI_PAUSED_MESSAGE,
+  MODEL_PRICES,
+  UNKNOWN_MODEL_PRICE,
+  budgetFromMultiplier,
+  budgetStatus,
+  budgetUsd,
+  callCostUsd,
+  coachBudgetMessage,
+  meterLine,
+  priceFor,
+  totalCostUsd,
+} from "@/lib/ai-budget";
+import { BETA_ALLOWANCE_SCALE } from "@/lib/ai-usage";
+import { CREDIT_PACK_PRICE_CENTS } from "@/lib/coach-credits";
+
+describe("prices", () => {
+  it("prices Sonnet 5 and 5.5 at $2 in / $10 out per million tokens and Haiku 5.5 at $0.10 / $0.50 (Anthropic's list, checked 2026-10-08)", () => {
+    expect(priceFor("claude-sonnet-5")).toEqual({ inputPerMTok: 2, outputPerMTok: 10 });
+    expect(priceFor("claude-sonnet-5-5")).toEqual({ inputPerMTok: 2, outputPerMTok: 10 });
+    expect(priceFor("claude-haiku-5-5")).toEqual({ inputPerMTok: 0.1, outputPerMTok: 0.5 });
+  });
+  it("finds the price of a dated id by its start, longest key first (5-5 is not mistaken for 5)", () => {
+    expect(priceFor("claude-sonnet-5-5-20261001")).toBe(MODEL_PRICES["claude-sonnet-5-5"]);
+    expect(priceFor("claude-opus-5-5")).toEqual({ inputPerMTok: 4, outputPerMTok: 20 });
+    expect(priceFor("claude-opus-5")).toEqual({ inputPerMTok: 5, outputPerMTok: 25 });
+  });
+  it("prices an unknown or missing model at the cautious rate, so the meter can only run ahead of the bill", () => {
+    expect(priceFor("claude-future-9")).toBe(UNKNOWN_MODEL_PRICE);
+    expect(priceFor(null)).toBe(UNKNOWN_MODEL_PRICE);
+    expect(UNKNOWN_MODEL_PRICE.outputPerMTok).toBeGreaterThanOrEqual(MODEL_PRICES["claude-sonnet-5"].outputPerMTok);
+  });
+});
+
+describe("cost from logged tokens", () => {
+  it("is tokens times the per-million price", () => {
+    expect(callCostUsd("claude-sonnet-5", 1_000_000, 0)).toBeCloseTo(2, 6);
+    expect(callCostUsd("claude-sonnet-5", 0, 1_000_000)).toBeCloseTo(10, 6);
+    // a food photo: 1,500 in and 200 out
+    expect(callCostUsd("claude-sonnet-5", 1500, 200)).toBeCloseTo(0.005, 6);
+  });
+  it("treats missing token counts as zero", () => {
+    expect(callCostUsd("claude-sonnet-5", null, undefined)).toBe(0);
+  });
+  it("sums several models, counting every call once (rows are already grouped by model)", () => {
+    const total = totalCostUsd([
+      { model: "claude-sonnet-5", input_tokens: "7000", output_tokens: "9400", calls: 3 },
+      { model: "claude-haiku-5-5", input_tokens: 3000, output_tokens: 400, calls: 1 },
+    ]);
+    expect(total).toBeCloseTo((7000 * 2 + 9400 * 10) / 1e6 + (3000 * 0.1 + 400 * 0.5) / 1e6, 8);
+  });
+  it("is zero for no usage", () => {
+    expect(totalCostUsd([])).toBe(0);
+  });
+});
+
+describe("the budget scales like every other AI limit", () => {
+  it("is $25 per 100-client step", () => {
+    expect(AI_BUDGET_USD_PER_STEP).toBe(25);
+    expect(budgetUsd(100)).toBe(25);
+    expect(budgetUsd(101)).toBe(50);
+    expect(budgetUsd(250)).toBe(75);
+  });
+  it("gives a coach with few clients a prorated share, never below a quarter", () => {
+    expect(budgetUsd(10)).toBe(10);
+    expect(budgetUsd(0)).toBe(6.25);
+  });
+  it("gives a free-access (beta) organization the beta scale of a step, or the org's own scale", () => {
+    expect(budgetUsd(500, { exempt: true })).toBe(Math.round(25 * BETA_ALLOWANCE_SCALE * 100) / 100);
+    expect(budgetUsd(500, { exempt: true, scale: 1 })).toBe(25);
+  });
+  it("matches the multiplier the database computes", () => {
+    expect(budgetFromMultiplier(2)).toBe(50);
+    expect(budgetFromMultiplier(0.3)).toBe(7.5);
+  });
+});
+
+describe("budgetStatus", () => {
+  it("is ok below 80 percent, low from 80, out at 100 and over", () => {
+    expect(budgetStatus(10, 25).level).toBe("ok");
+    expect(budgetStatus(19.99, 25).level).toBe("ok");
+    expect(budgetStatus(20, 25).level).toBe("low");
+    expect(budgetStatus(24.99, 25).level).toBe("low");
+    expect(budgetStatus(25, 25).level).toBe("out");
+    expect(budgetStatus(40, 25).level).toBe("out");
+    expect(budgetStatus(40, 25).pct).toBe(160);
+  });
+  it("reports whole percent used", () => {
+    expect(budgetStatus(15.5, 25).pct).toBe(62);
+  });
+  it("an internal unlimited account is never low or out", () => {
+    expect(budgetStatus(9999, 25, true).level).toBe("unlimited");
+  });
+  it("a zero budget is out", () => {
+    expect(budgetStatus(0, 0).level).toBe("out");
+  });
+});
+
+describe("the words", () => {
+  const live = { available: true, supportEmail: "help@enduringstrengthco.com", resetsOn: "November 1" };
+  const off = { available: false, supportEmail: "help@enduringstrengthco.com", resetsOn: "November 1" };
+  it("tells the coach plainly at about 80 percent, with the existing top-up price and what stays free", () => {
+    const m = coachBudgetMessage("low", live);
+    expect(m).toContain("Heads up: your AI for this month is almost used up.");
+    expect(m).toContain("Every AI request costs real money, and I'm running a small business");
+    expect(m).toContain(`Top-ups start at $${CREDIT_PACK_PRICE_CENTS / 100}.`);
+    expect(m).toContain("Food search, barcode and saved meals stay free.");
+  });
+  it("while billing is off there is no top-up to buy: it says AI resumes on the 1st and how to reach help", () => {
+    for (const level of ["low", "out"] as const) {
+      const m = coachBudgetMessage(level, off);
+      expect(m).toContain("November 1");
+      expect(m).toContain("help@enduringstrengthco.com");
+      expect(m).not.toMatch(/buy|purchase|checkout/i);
+      expect(m).not.toContain("Top-ups start at");
+    }
+  });
+  it("says AI features are paused when it is used up", () => {
+    expect(coachBudgetMessage("out", live)).toContain("used up, so AI features are paused");
+  });
+  it("never shows a client the business explanation, only a friendly pause and what still works", () => {
+    expect(CLIENT_AI_PAUSED_MESSAGE).toBe("AI photo and typed logging is paused for this month. You can still search foods, scan a barcode or use your saved meals.");
+    expect(CLIENT_AI_PAUSED_MESSAGE).not.toMatch(/money|business|top-up|\$/i);
+  });
+  it("the meter line is one short sentence", () => {
+    expect(meterLine(budgetStatus(15.5, 25))).toBe("AI this month: 62% used");
+    expect(meterLine(budgetStatus(1, 25, true))).toBe("AI this month: no limit on your account.");
+  });
+});

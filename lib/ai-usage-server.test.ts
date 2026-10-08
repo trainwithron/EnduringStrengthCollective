@@ -20,32 +20,117 @@ const from = vi.fn(() => {
 });
 vi.mock("@/lib/supabase/service-role", () => ({ createServiceRoleClient: () => ({ rpc, from }) }));
 
+// The budget side is faked here (its own server functions are tested in ai-budget-server.test.ts): who the bill lands on, how far through the budget they are, and the notices.
+let billingCoach: string | null = null;
+let status: { level: "ok" | "low" | "out" | "unlimited"; spentUsd: number; budgetUsd: number; pct: number; unlimited: boolean } | null = null;
+const noted: string[] = [];
+vi.mock("@/lib/ai-budget-server", () => ({
+  resolveBillingCoach: async () => billingCoach,
+  getCoachBudgetStatus: async () => status,
+  noteBudgetLevel: async (_db: unknown, _coach: string, level: string) => {
+    noted.push(level);
+    return true;
+  },
+  topUpInfo: () => ({ available: false, supportEmail: "help@enduringstrengthco.com", resetsOn: "November 1" }),
+}));
+
 import { reserveAiCall } from "@/lib/ai-usage-server";
 
 beforeEach(() => {
   logCount = 0;
   countError = null;
+  billingCoach = null;
+  status = null;
+  noted.length = 0;
   rpc.mockClear();
   from.mockClear();
 });
 
+const mk = (level: "ok" | "low" | "out" | "unlimited") => ({ level, spentUsd: 0, budgetUsd: 25, pct: 0, unlimited: level === "unlimited" });
+
+describe("the coach's monthly AI budget", () => {
+  it("lets a coach under budget through with no notice", async () => {
+    billingCoach = "c1";
+    status = mk("ok");
+    await expect(reserveAiCall({ feature: "program_chat", userId: "c1" })).resolves.toBeTruthy();
+    expect(noted).toEqual([]);
+    expect(rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("tells the coach once as it runs low, and the call still goes ahead", async () => {
+    billingCoach = "c1";
+    status = mk("low");
+    await expect(reserveAiCall({ feature: "program_chat", userId: "c1" })).resolves.toBeTruthy();
+    expect(noted).toEqual(["low"]);
+  });
+
+  it("pauses a coach's own AI request when the budget is used up, with the plain-spoken message, and never reaches the model", async () => {
+    billingCoach = "c1";
+    status = mk("out");
+    await expect(reserveAiCall({ feature: "program_generation", userId: "c1" })).rejects.toMatchObject({ reason: "budget_out" });
+    const err = (await reserveAiCall({ feature: "program_generation", userId: "c1" }).catch((e) => e)) as AiRateLimitedError;
+    expect(err.message).toContain("Your AI for this month is used up, so AI features are paused until November 1.");
+    expect(err.message).toContain("I'm running a small business");
+    expect(err.message).toContain("help@enduringstrengthco.com");
+    expect(rpc).not.toHaveBeenCalled();
+    expect(noted).toContain("out");
+  });
+
+  it("shows a CLIENT only the friendly pause line, never the business explanation", async () => {
+    billingCoach = "c1";
+    status = mk("out");
+    const err = (await reserveAiCall({ feature: "food_photo_parse", userId: "client-9" }).catch((e) => e)) as AiRateLimitedError;
+    expect(err.reason).toBe("budget_out");
+    expect(err.message).toBe("AI photo and typed logging is paused for this month. You can still search foods, scan a barcode or use your saved meals.");
+    expect(err.message).not.toMatch(/money|business|top-up/i);
+  });
+
+  it("counts nightly jobs and the spotters against the coach they belong to: a job with a coach and no person is refused as 'budget_out' (the caller skips it)", async () => {
+    billingCoach = "c1";
+    status = mk("out");
+    const err = (await reserveAiCall({ feature: "coach_briefing", coachId: "c1" }).catch((e) => e)) as AiRateLimitedError;
+    expect(err.reason).toBe("budget_out");
+    expect(err.message).toContain("paused until November 1");
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("leaves an internal unlimited account alone, however much it has used", async () => {
+    billingCoach = "c1";
+    status = mk("unlimited");
+    await expect(reserveAiCall({ feature: "program_generation", userId: "c1" })).resolves.toBeTruthy();
+    expect(noted).toEqual([]);
+  });
+
+  it("carries on under the other limits when the budget cannot be worked out (the database has no step 46 yet, or a read failed)", async () => {
+    billingCoach = "c1";
+    status = null;
+    await expect(reserveAiCall({ feature: "program_chat", userId: "c1" })).resolves.toBeTruthy();
+  });
+
+  it("carries on when nobody's bill can be found (a platform admin's own call)", async () => {
+    billingCoach = null;
+    status = mk("out");
+    await expect(reserveAiCall({ feature: "trivia_generate", userId: "admin" })).resolves.toBeTruthy();
+  });
+});
+
 describe("per-person monthly ceilings", () => {
   it("sets generous, tunable ceilings for food photos and typed estimates only", () => {
-    expect(USER_MONTHLY_CEILING).toEqual({ food_photo_parse: 90, food_log_parse: 300 });
-    expect(userMonthlyCeilingFor("food_photo_parse")).toBe(90);
+    expect(USER_MONTHLY_CEILING).toEqual({ food_photo_parse: 150, food_log_parse: 300 });
+    expect(userMonthlyCeilingFor("food_photo_parse")).toBe(150);
     expect(userMonthlyCeilingFor("food_log_parse")).toBe(300);
     expect(userMonthlyCeilingFor("program_generation")).toBeNull();
   });
 
   it("lets a person under their ceiling through", async () => {
-    logCount = 89;
+    logCount = 149;
     const handle = await reserveAiCall({ feature: "food_photo_parse", userId: "u1" });
     expect(handle).toBeTruthy();
     expect(rpc).toHaveBeenCalledTimes(1);
   });
 
   it("stops a person at their ceiling before the model is reached, with the friendly message", async () => {
-    logCount = 90;
+    logCount = 150;
     await expect(reserveAiCall({ feature: "food_photo_parse", userId: "u1" })).rejects.toMatchObject({
       reason: "user_monthly",
       message: "You've used this month's photo logs. You can still search foods, scan a barcode or use your saved meals.",

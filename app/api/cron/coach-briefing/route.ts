@@ -5,6 +5,7 @@ import { gatherCandidateSignals, type CandidateSignal } from "@/lib/coach-briefi
 import { validateNoHallucinatedNumbers, validateNoNumbers } from "@/lib/coach-briefing-numeral-guard";
 import { enforceReservedQuietSlot } from "@/lib/coach-briefing-reserved-slot";
 import { withCronRun } from "@/lib/cron-monitor";
+import { AiRateLimitedError } from "@/lib/ai-usage";
 
 // AI Assistant Slice 2 ("Collective Intelligence" — The Briefing). Same
 // CRON_SECRET/service-role shape as every other cron in this app. One
@@ -119,11 +120,13 @@ async function handler(request: Request) {
       });
       const parsed = JSON.parse(extractJson(responseText));
       if (Array.isArray(parsed)) rawItems = parsed.slice(0, MAX_ITEMS_PER_DAY);
-    } catch {
+    } catch (err) {
       // Take the empty briefing row back so tomorrow's run (or a retry today) tries again instead of reading "already generated today".
       const { error: deleteError } = await supabase.from("coach_briefings").delete().eq("id", briefing.id);
       if (deleteError) console.error("coach-briefing: could not remove the empty briefing row, a retry today will be skipped:", deleteError.message);
-      results.push({ coachId, itemCount: 0, skipped: "generation or parse failure" });
+      // A coach whose AI budget for the month is used up is skipped, not failed (the coach was told once when it ran out), and the run resumes by itself on the 1st.
+      const budgetOut = err instanceof AiRateLimitedError && err.reason === "budget_out";
+      results.push({ coachId, itemCount: 0, skipped: budgetOut ? "AI budget used up this month" : "generation or parse failure" });
       continue;
     }
 

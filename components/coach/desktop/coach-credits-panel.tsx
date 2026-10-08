@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { LIFT_OFF_MONTHLY_CREDITS } from "@/lib/coach-credits";
 import { AiUsageMeter } from "@/components/coach/ai-usage-meter";
+import { AiBudgetMeter } from "@/components/coach/ai-budget-meter";
 
 // credit_topup_low_tier_monetization_idea.md — the coach's own AI
 // credits (program generation, nutrition plans), genuinely separate
@@ -48,6 +49,9 @@ export function CoachCreditsPanel({
 
   return (
     <div className="max-w-[60ch]">
+      <div className="mb-4">
+        <AiBudgetMeter />
+      </div>
       <AiUsageMeter groupId={groupId} />
 
       <p className="font-body text-sm text-steel mb-4">

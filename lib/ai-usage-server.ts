@@ -9,6 +9,8 @@ import {
   isEnforced,
   type AiCallMeta,
 } from "@/lib/ai-usage";
+import { budgetOutMessage } from "@/lib/ai-budget";
+import { getCoachBudgetStatus, noteBudgetLevel, resolveBillingCoach, topUpInfo } from "@/lib/ai-budget-server";
 
 // Server-only half of AI cost control (see lib/ai-usage.ts for the policy
 // and pure helpers). Kept separate so client components that import
@@ -36,6 +38,19 @@ export async function reserveAiCall(meta: AiCallMeta): Promise<UsageHandle> {
     return NOOP_HANDLE;
   }
   try {
+    // The coach's monthly AI budget, in real cost, for everything AI on their behalf (see lib/ai-budget.ts). Checked before the model is reached. A coach who is used up gets the
+    // plain explanation; a client gets only the friendly pause line; a nightly job (no person) gets the error and skips. If the budget cannot be worked out (null) the call
+    // carries on under the other limits.
+    const billingCoach = meta.coachId ?? (meta.userId ? await resolveBillingCoach(supabase, meta.userId) : null);
+    if (billingCoach) {
+      const status = await getCoachBudgetStatus(supabase, billingCoach);
+      if (status?.level === "out") {
+        await noteBudgetLevel(supabase, billingCoach, "out");
+        const actorIsCoach = !meta.userId || meta.userId === billingCoach;
+        throw new AiRateLimitedError("budget_out", meta.feature, budgetOutMessage(actorIsCoach, topUpInfo()));
+      }
+      if (status?.level === "low") await noteBudgetLevel(supabase, billingCoach, "low");
+    }
     // A per-person monthly ceiling (food photos and typed estimates): counted from the person's own log this month, every attempt included. Checked before the call is
     // reserved, so a person at their ceiling never reaches the model. If it cannot be counted the call is refused (fail closed), like the other metered limits.
     const personCeiling = userMonthlyCeilingFor(meta.feature);

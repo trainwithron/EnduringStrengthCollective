@@ -26,9 +26,10 @@ import { Key12NutrientGrid } from "@/components/athlete/key12-nutrient-grid";
 import { NutritionYouthModeToggle } from "@/components/coach/desktop/nutrition-youth-mode-toggle";
 import { dedupeRecentFoodLogs } from "@/lib/recent-food-logs";
 import { getCoachClients } from "@/lib/coach-clients";
-import { dailyCaloriesFromLog } from "@/lib/nutrition-tracking";
+import { FOOD_TRACKING_OFF_LINE, dailyCaloriesFromLog } from "@/lib/nutrition-tracking";
 import { addDaysToKey } from "@/lib/date-key";
 import { fetchFoodLogDay } from "@/lib/food-entry";
+import { AiBudgetMeter } from "@/components/coach/ai-budget-meter";
 
 export default async function NutritionPage(
   props: {
@@ -125,6 +126,11 @@ export default async function NutritionPage(
           </nav>
         </div>
 
+        {/* Shows only when there is something to say: about 80 percent of this month's AI used, or all of it. */}
+        <div className="mb-6 max-w-[70ch]">
+          <AiBudgetMeter variant="banner" />
+        </div>
+
         {tab === "favorites" ? (
           <FavoriteMealsTab userId={user.id} />
         ) : tab === "calculator" ? (
@@ -199,6 +205,15 @@ export default async function NutritionPage(
     .eq("profile_id", athleteId)
     .maybeSingle();
   const macrosEnabled = (viewerMembership?.client_tier ?? null) !== "group";
+  // The coach's per-client switch for food tracking (on unless a coach turned it off). Read on its own, so a database without the column yet reads as on and the tier above
+  // is never lost to a failed combined read.
+  const { data: trackingRow } = await supabase
+    .from("group_memberships")
+    .select("food_tracking_enabled")
+    .eq("group_id", params.groupId)
+    .eq("profile_id", athleteId)
+    .maybeSingle();
+  const trackingOn = (trackingRow as { food_tracking_enabled?: boolean | null } | null)?.food_tracking_enabled !== false;
 
   const { data: groupRow } = await supabase
     .from("groups")
@@ -437,17 +452,23 @@ export default async function NutritionPage(
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
               Today&apos;s food
             </h2>
-            <FoodLogSection
-              target={todayMacros}
-              coachProgramming={macrosEnabled}
-              plan={savedPlanMeals ? { meals: clientPlan.meals, hiddenCount: clientPlan.hiddenCount, emptiedMeals: clientPlan.emptiedMeals } : null}
-              athleteId={athleteId}
-              groupId={params.groupId}
-              logDate={todayKey}
-              meals={todayMeals}
-              initialEntries={todayFoodLog}
-              recents={recentFoodOptions}
-            />
+            {trackingOn ? (
+              <FoodLogSection
+                target={todayMacros}
+                coachProgramming={macrosEnabled}
+                plan={savedPlanMeals ? { meals: clientPlan.meals, hiddenCount: clientPlan.hiddenCount, emptiedMeals: clientPlan.emptiedMeals } : null}
+                athleteId={athleteId}
+                groupId={params.groupId}
+                logDate={todayKey}
+                meals={todayMeals}
+                initialEntries={todayFoodLog}
+                recents={recentFoodOptions}
+              />
+            ) : (
+              <p className="font-body text-sm text-steel border border-steel/20 p-4" data-testid="tracking-off">
+                {FOOD_TRACKING_OFF_LINE}
+              </p>
+            )}
           </section>
 
           {macrosEnabled && (

@@ -6,6 +6,7 @@ import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { asWeightUnit } from "@/lib/units";
 import { WhatTheyAte } from "@/components/coach/nutrition/what-they-ate";
 import { GROUP_TIER_COACH_NOTE } from "@/lib/nutrition-tracking";
+import { FoodTrackingSwitch } from "@/components/coach/nutrition/food-tracking-switch";
 
 // What a coach sees for a client whose tier has no targets or meal plans (the group tier): the client still logs what they eat, and the coach can see it. The rest of the
 // Nutrition area (targets, preferences, meal plan, calculator) is the coach-run programming that this tier does not include.
@@ -32,6 +33,7 @@ export async function ClientFoodLogOnly({ athleteId, groupId, clientName }: { at
   return (
     <div className="space-y-4">
       <p className="font-body text-sm text-steel max-w-[70ch]">{GROUP_TIER_COACH_NOTE}</p>
+      <FoodTrackingSwitch athleteId={athleteId} groupId={groupId} clientName={clientName} />
       <section>
         <h3 className="font-display uppercase text-sm tracking-wide text-steel mb-2">What they ate</h3>
         <WhatTheyAte week={week} weightTrend={weightTrend} clientName={firstName} weightUnit={asWeightUnit(unitRow?.weight_unit)} />
