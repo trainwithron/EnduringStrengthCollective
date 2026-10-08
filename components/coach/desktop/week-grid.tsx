@@ -1,6 +1,7 @@
 "use client";
 
 import type { DemoRow } from "@/lib/exercise-demo";
+import { ClientPreviewButton } from "@/components/coach/desktop/client-preview";
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { BuilderDay, BuilderExercise } from "@/lib/types";
@@ -237,6 +238,7 @@ export function WeekGrid({
         >
           {daysCondensed ? "Full view" : "Compact view"}
         </button>
+        <ClientPreviewButton days={sortedDays} heading={`Week ${weekNumber}`} label="Preview week" demoLibrary={demoLibrary} />
         <button
           type="button"
           onClick={handleDeleteWeek}
