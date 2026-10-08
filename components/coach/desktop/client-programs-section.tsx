@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { createServerClient } from "@/lib/supabase/server";
+import { programsHrefForClient } from "@/lib/programs-scope";
 
 // The Programs tab of one client's profile: the programs made for this client (their own copies), the active one first, each opening the builder. Assigning one
 // is the "Programming" menu at the top of the profile.
@@ -29,7 +30,13 @@ export async function ClientProgramsSection({ groupId, athleteId, actions }: { g
 
   return (
     <section>
-      <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">Programs</h2>
+      <div className="flex items-baseline justify-between gap-3 mb-2">
+        <h2 className="font-display uppercase text-sm tracking-wide text-steel">Programs</h2>
+        {/* The one way into the Programs page scoped to this client; the page says it is scoped and offers everything. */}
+        <Link href={programsHrefForClient(athleteId)} className="font-body text-xs text-steel hover:text-chalk min-h-11 sm:min-h-0 inline-flex items-center">
+          Open on the Programs page
+        </Link>
+      </div>
       {actions}
       {shared && (
         <Link href={`/groups/${groupId}/programs/${shared.id}`} className="flex items-center justify-between gap-3 py-2.5 px-1 mb-2 border-y border-steel/15 hover:bg-surface/60">

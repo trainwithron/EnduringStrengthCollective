@@ -19,6 +19,8 @@ export interface ProgramCardData {
   coverImagePath: string | null;
   athleteId: string | null;
   athleteName: string | null;
+  // The group the program belongs to, when the page lists programs from more than one group (the coach-level Programs page). Otherwise the grid's own group.
+  groupId?: string;
 }
 
 const GRID_CLASS: Record<CardSize, string> = {
@@ -80,7 +82,7 @@ export function ProgramCardGrid({
       ) : (
         <div className={`grid ${GRID_CLASS[size]} mb-6`}>
           {sharedPrograms.map((p) => (
-            <ProgramCard key={p.id} groupId={groupId} program={p} size={size} visual={visualsByProgramId[p.id]} />
+            <ProgramCard key={p.id} groupId={p.groupId ?? groupId} program={p} size={size} visual={visualsByProgramId[p.id]} />
           ))}
         </div>
       )}
@@ -96,7 +98,7 @@ export function ProgramCardGrid({
       ) : (
         <div className={`grid ${GRID_CLASS[size]}`}>
           {clientPrograms.map((p) => (
-            <ProgramCard key={p.id} groupId={groupId} program={p} size={size} visual={visualsByProgramId[p.id]} />
+            <ProgramCard key={p.id} groupId={p.groupId ?? groupId} program={p} size={size} visual={visualsByProgramId[p.id]} />
           ))}
         </div>
       )}
