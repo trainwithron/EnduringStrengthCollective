@@ -52,6 +52,8 @@ export const RELEASE_N_SERVER_ONLY_SIGNATURES = [
 ];
 // Closed by 0306 / 0307: the target-change notice trigger function (a trigger function nobody can call as a function, but internal functions are closed on purpose).
 export const RELEASE_O_SERVER_ONLY_SIGNATURES = [["notify_on_target_change", "", false]];
+// Closed from the start by 0311: applying a client's meal plan try is done by the server only (the count and the hand-built-day rule are enforced inside it).
+export const RELEASE_R_SERVER_ONLY_SIGNATURES = [["apply_meal_plan_try", "uuid, uuid, date, jsonb, text, text", false]];
 // Closed by 0308 (Release O fix, step 53): every trigger function a signed-in person could run by default. A trigger function can only ever run as a trigger (nobody can call it
 // as a function or through the API), and the right to run it is checked when the trigger is created, not when it fires, so closing them changes nothing that works; it makes them
 // follow the same rule as every other internal function. Their ACL before was exactly: owner, authenticated, service_role (no anon, no PUBLIC). notify_on_target_change is not here:
@@ -72,7 +74,7 @@ export const TRIGGER_SWEEP = [
 export const triggerSweepUndoSql = () =>
   TRIGGER_SWEEP.map((n) => `do $u$ begin if to_regprocedure('public.${n}()') is not null then grant execute on function public.${n}() to authenticated; end if; end $u$;`).join(String.fromCharCode(10));
 
-export const SERVER_ONLY = [...SERVER_ONLY_SIGNATURES, ...RELEASE_F_SERVER_ONLY_SIGNATURES, ...RELEASE_H_SERVER_ONLY_SIGNATURES, ...RELEASE_L_SERVER_ONLY_SIGNATURES, ...RELEASE_N_SERVER_ONLY_SIGNATURES, ...RELEASE_O_SERVER_ONLY_SIGNATURES].map((s) => s[0]);
+export const SERVER_ONLY = [...SERVER_ONLY_SIGNATURES, ...RELEASE_F_SERVER_ONLY_SIGNATURES, ...RELEASE_H_SERVER_ONLY_SIGNATURES, ...RELEASE_L_SERVER_ONLY_SIGNATURES, ...RELEASE_N_SERVER_ONLY_SIGNATURES, ...RELEASE_O_SERVER_ONLY_SIGNATURES, ...RELEASE_R_SERVER_ONLY_SIGNATURES].map((s) => s[0]);
 export const AUDIT_WRITERS = SERVER_ONLY_SIGNATURES.filter((s) => s[2]).map((s) => s[0]);
 
 // Signed-in-callable SECURITY DEFINER functions with no caller check in their body that were reviewed and are meant to be (they answer about the

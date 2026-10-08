@@ -26,7 +26,7 @@ $guard$;
 --    (the builder, the client's workout page and the logger) uses display_name when there is one.
 --  * public.duplicate_program (the atomic copy behind Assign to client, Duplicate and package auto-assign) carries display_name across, so a copied or assigned program keeps the coach's own names.
 --    It is the LIVE function (identical to migration 0232, checked) with display_name added to the exercise copy; same security (invoker) and the same grants.
---  * A length limit so it stays a name. Nothing else changes: no policy, no function, no other table. A client reads it through the policies they already have on their program's exercises.
+--  * A length limit so it stays a name. Nothing else changes: no policy, no other table. A client reads it through the policies they already have on their program's exercises.
 -- One new column, and one function replaced with the same text plus display_name. Re-runnable.
 
 alter table public.group_workout_exercises add column if not exists display_name text;

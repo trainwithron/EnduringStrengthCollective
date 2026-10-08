@@ -105,6 +105,14 @@
   "file": "apply-release-q-all.sql"
  },
  {
+  "id": "release-r",
+  "name": "Release R (a client can ask for a different meal plan)",
+  "steps": [
+   "56"
+  ],
+  "file": "apply-release-r-all.sql"
+ },
+ {
   "id": "release-n2",
   "name": "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)",
   "steps": [

@@ -605,6 +605,25 @@ for (const s of steps) {
   const errQ2 = await run(`apply/${bundle.file}`);
   check("release-q: the bundle applies again after an undo" + (errQ2 ? ": " + errQ2 : ""), !errQ2 && (await hasCol()));
 }
+// Release R (step 56): ONE paste. The tries table is not there before, the bundle adds it, a second run is refused naming step 56, the undo removes it, and it applies again.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-r");
+  check("release-r: ONE bundle holds step 56", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["56"]));
+  const st56 = steps.find((x) => x.n === "56");
+  const hasTable = async () => (await db.query("select to_regclass('public.meal_plan_tries') is not null as ok")).rows[0].ok === true;
+  const eu0 = await run(`apply/undo-step${st56.n}-${st56.slug}.sql`);
+  check("release-r: the tries table is not there before the bundle runs" + (eu0 ? ": " + eu0 : ""), !eu0 && !(await hasTable()));
+  const errR = await run(`apply/${bundle.file}`);
+  check("release-r bundle applies on the live-shaped state" + (errR ? ": " + errR : ""), !errR && (await hasTable()));
+  const againR = await run(`apply/${bundle.file}`);
+  check("release-r: a second run is refused, naming step 56 (" + againR + ")", !!againR && againR.includes("step 56 (0311) cannot run") && againR.includes("already applied"));
+  const euR = await run(`apply/undo-step${st56.n}-${st56.slug}.sql`);
+  const typeGone = (await db.query("select pg_get_constraintdef(oid) as d from pg_constraint where conname = 'notifications_type_check'")).rows[0].d;
+  check("release-r: the undo removes the table, the functions and the notification type, and keeps the older types" + (euR ? ": " + euR : ""), !euR && !(await hasTable()) && !/meal_plan_try/.test(typeGone) && /'comment'/.test(typeGone));
+  const errR2 = await run(`apply/${bundle.file}`);
+  check("release-r: the bundle applies again after an undo" + (errR2 ? ": " + errR2 : ""), !errR2 && (await hasTable()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.
