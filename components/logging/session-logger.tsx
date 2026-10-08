@@ -16,6 +16,7 @@ import { DemoLibraryProvider } from "./demo-library-context";
 import type { RestForSet } from "@/lib/rest-time";
 import { DemoBrowserSheet } from "./demo-browser-sheet";
 import type { DemoRow } from "@/lib/exercise-demo";
+import type { ReadForViewer } from "@/lib/read-content/for-viewer";
 
 export function SessionLogger({
   sessionId,
@@ -35,6 +36,7 @@ export function SessionLogger({
   coachNoteByExerciseName,
   exerciseSwipeDirection,
   demoLibrary,
+  read,
 }: {
   sessionId: string;
   isCompleted: boolean;
@@ -63,6 +65,8 @@ export function SessionLogger({
   exerciseSwipeDirection?: SwipeDirection | null;
   // The coach's exercise library (name and demo links) so a demo is found from an exercise's current name, including one added or swapped mid-workout.
   demoLibrary?: DemoRow[];
+  // Today's short reading for the person resting, or null when Read is off (only ever set for the athlete's own session).
+  read?: ReadForViewer | null;
 }) {
   const [exercises, setExercises] = useState(initialExercises);
   // The one demo sheet for the workout: which exercise it is showing (null = closed). Closing it brings the workout back to the exercise it ended on.
@@ -258,6 +262,7 @@ export function SessionLogger({
           athleteId={athleteId}
           groupId={groupId}
           todayDate={todayDate}
+          read={read}
         />
       )}
       <SetSaveBanner />

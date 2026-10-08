@@ -26,6 +26,10 @@ import { FeedBroadcastSettings } from "@/components/athlete/feed-broadcast-setti
 import { DeleteAccountButton } from "@/components/athlete/delete-account-button";
 import { GamificationToggle } from "@/components/coach/gamification-toggle";
 import { GoogleCalendarConnection } from "@/components/coach/google-calendar-connection";
+import { ReadDuringRestToggle } from "@/components/athlete/read-during-rest-toggle";
+import { ReadDuringRestSettings } from "@/components/coach/read-during-rest-settings";
+import { FAITH_PACK } from "@/lib/read-content";
+import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 
 export default async function SettingsPage(
   props: {
@@ -146,6 +150,29 @@ export default async function SettingsPage(
     }));
   }
 
+  // Read during rest. A client's own switch is theirs alone (never read or changed while a coach is acting as them); a coach's settings are the coach's own.
+  const todayKey = dateKeyInZone(await getGroupCoachTimezone(supabase, params.groupId));
+  let readOn = true;
+  let readDefaultOn = true;
+  let readOverrides: { id: string; date: string; reference: string }[] = [];
+  if (!isCoach && !effective.isActingAsOther) {
+    const { data: readRow } = await supabase.from("read_settings").select("faith_track").eq("athlete_id", user.id).maybeSingle();
+    readOn = readRow?.faith_track ?? true;
+  } else if (isCoach && !effective.isActingAsOther) {
+    const [{ data: prefRow }, { data: overrideRows }] = await Promise.all([
+      supabase.from("coach_preferences").select("faith_track_default").eq("coach_id", user.id).maybeSingle(),
+      supabase
+        .from("read_passage_overrides")
+        .select("id, override_date, reference")
+        .eq("coach_id", user.id)
+        .gte("override_date", todayKey)
+        .order("override_date", { ascending: true })
+        .limit(60),
+    ]);
+    readDefaultOn = (prefRow as { faith_track_default?: boolean } | null)?.faith_track_default ?? true;
+    readOverrides = (overrideRows ?? []).map((r) => ({ id: r.id, date: r.override_date, reference: r.reference }));
+  }
+
   let actingAsFullName: string | null = null;
   if (effective.isActingAsOther) {
     actingAsFullName = profile?.full_name ?? "Client";
@@ -214,6 +241,17 @@ export default async function SettingsPage(
                 initialError={searchParams.google_calendar_error ?? null}
               />
             </div>
+            {!effective.isActingAsOther && (
+              <div className="mt-4 pt-4 border-t border-steel/15">
+                <ReadDuringRestSettings
+                  coachId={user.id}
+                  initialDefaultOn={readDefaultOn}
+                  refs={FAITH_PACK.items.map((i) => i.ref)}
+                  initialOverrides={readOverrides}
+                  today={todayKey}
+                />
+              </div>
+            )}
           </SettingsGroup>
         )}
 
@@ -279,6 +317,11 @@ export default async function SettingsPage(
             <div className="mt-4">
               <HideDemosToggle />
             </div>
+            {!effective.isActingAsOther && (
+              <div className="mt-4">
+                <ReadDuringRestToggle athleteId={user.id} initialOn={readOn} />
+              </div>
+            )}
           </SettingsGroup>
         )}
 

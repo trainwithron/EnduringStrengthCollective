@@ -19,6 +19,7 @@ import { ExitWorkoutButton } from "@/components/session/exit-workout-button";
 import { ResumeWorkoutButton } from "@/components/session/resume-workout-button";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { findDemo, type DemoRow } from "@/lib/exercise-demo";
+import { getReadForViewer, type ReadForViewer } from "@/lib/read-content/for-viewer";
 
 export default async function SessionPage(
   props: {
@@ -503,6 +504,12 @@ export default async function SessionPage(
     }
   }
 
+  // Read during rest: only the athlete's own in-progress session (a coach logging for a client holds the phone, not the person resting), and only when it is switched on for them.
+  let read: ReadForViewer | null = null;
+  if (isOwnSession && session.status === "in_progress") {
+    read = await getReadForViewer(supabase, session.group_id, user.id, todayKey);
+  }
+
   const backHref = session.workout_id
     ? `/groups/${session.group_id}/workouts/${session.workout_id}`
     : `/groups/${session.group_id}`;
@@ -567,6 +574,7 @@ export default async function SessionPage(
         coachNoteByExerciseName={coachNoteByExerciseName}
         exerciseSwipeDirection={exerciseSwipeDirection}
         demoLibrary={demoLibrary}
+        read={read}
       />
 
       {isOwnSession && (

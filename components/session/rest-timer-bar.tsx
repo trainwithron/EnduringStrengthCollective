@@ -16,6 +16,8 @@ import { BreakoutMiniGame } from "./breakout-mini-game";
 import { LaneDodgeMiniGame } from "./lane-dodge-mini-game";
 import { TriviaMiniGame } from "./trivia-mini-game";
 import { WellnessCheckinWidget } from "@/components/athlete/wellness-checkin-widget";
+import { ReadSlot } from "./read-slot";
+import type { ReadForViewer } from "@/lib/read-content/for-viewer";
 
 // A real pending item — a habit that's due today and not yet checked
 // off, or no wellness check-in submitted today — becomes the unlock key
@@ -61,6 +63,7 @@ export function RestTimerBar({
   athleteId,
   groupId,
   todayDate,
+  read,
 }: {
   sessionId: string;
   startedAt: string;
@@ -78,8 +81,13 @@ export function RestTimerBar({
   athleteId?: string;
   groupId?: string;
   todayDate?: string;
+  // Today's short reading for this person, or null/undefined when Read is off or not offered (never offered when a coach is logging for a client).
+  read?: ReadForViewer | null;
 }) {
   const [running, setRunning] = useState<RunningState | null>(null);
+  const [readOpen, setReadOpen] = useState(false);
+  // Turning Read off from the panel hides the button for the rest of this visit without waiting for a reload.
+  const [readTurnedOff, setReadTurnedOff] = useState(false);
   const [remaining, setRemaining] = useState(0);
   const [justFinished, setJustFinished] = useState(false);
   const [selectedGame, setSelectedGame] = useState<GameKey | null>(null);
@@ -101,6 +109,7 @@ export function RestTimerBar({
     if (!running) {
       setSelectedGame(null);
       setPickerOpen(false);
+      setReadOpen(false);
     }
   }, [running]);
 
@@ -218,7 +227,7 @@ export function RestTimerBar({
         <SessionStopwatch startedAt={startedAt} />
 
         {running && (
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
             <p className="font-display text-3xl leading-none text-rust tabular-nums">
               {formatMMSS(remaining)}
             </p>
@@ -238,6 +247,21 @@ export function RestTimerBar({
             >
               Skip
             </button>
+            {read && !readTurnedOff && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedGame(null);
+                  setPickerOpen(false);
+                  setReadOpen((v) => !v);
+                }}
+                className={`h-11 px-2.5 border font-body text-xs ${
+                  readOpen ? "bg-rust border-rust text-graphite" : "border-steel/30 text-steel"
+                }`}
+              >
+                📖 {readOpen ? "Hide" : "Read"}
+              </button>
+            )}
             {/* Below the 45s minimum, no mini-game — just the plain
                 countdown above. A real game needs a real ~20-25s+
                 window to feel like a game rather than a flash on
@@ -272,6 +296,7 @@ export function RestTimerBar({
                         onClick={() => {
                           setSelectedGame(key);
                           setPickerOpen(false);
+                          setReadOpen(false);
                         }}
                         className="w-full text-left px-3 py-1.5 font-body text-xs text-chalk active:text-rust"
                       >
@@ -322,6 +347,20 @@ export function RestTimerBar({
         <p className="font-body text-xs text-steel mt-1.5">
           Rest {formatRest(running.prescribedSeconds ?? running.durationSeconds)} (set by your coach)
         </p>
+      )}
+
+      {running && readOpen && read && !readTurnedOff && athleteId && (
+        <ReadSlot
+          athleteId={athleteId}
+          reference={read.ref}
+          text={read.text}
+          noteSeen={read.noteSeen}
+          onClose={() => setReadOpen(false)}
+          onTurnedOff={() => {
+            setReadTurnedOff(true);
+            setReadOpen(false);
+          }}
+        />
       )}
 
       {running && selectedGame && (
