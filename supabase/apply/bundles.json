@@ -117,7 +117,8 @@
   "name": "Release S (booking hours check, grouped counts, hide demos per person)",
   "steps": [
    "57",
-   "58"
+   "58",
+   "59"
   ],
   "file": "apply-release-s-all.sql"
  },

@@ -84,3 +84,4 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0311 | yes | yes | 36 | 0311 a client can ask for a different meal plan |
 | 0312 | yes | yes | 19 | 0312 booking inside the coach's hours (server check) |
 | 0313 | yes | yes | 13 | 0313 booking_counts for large rosters |
+| 0314 | yes | yes | 8 | 0314 client_ui_settings (hide demos follows the person) |

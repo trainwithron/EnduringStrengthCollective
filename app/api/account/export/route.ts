@@ -34,6 +34,7 @@ export async function GET() {
     { data: sessionCredits },
     { data: foodPreferences },
     { data: nutritionFeedback },
+    { data: uiSettings },
     { data: mealPlanTries },
     { data: readSettings },
   ] = await Promise.all([
@@ -56,6 +57,7 @@ export async function GET() {
     supabase.from("session_credits").select("group_id, balance").eq("athlete_id", userId),
     supabase.from("client_nutrition_preferences").select("*").eq("athlete_id", userId).maybeSingle(),
     supabase.from("client_nutrition_feedback").select("*").eq("athlete_id", userId),
+    supabase.from("client_ui_settings").select("hide_demos, updated_at").eq("athlete_id", userId).maybeSingle(),
     supabase.from("meal_plan_tries").select("try_number, note, summary, dates, requested_at, restored_at").eq("athlete_id", userId),
     supabase.from("read_settings").select("faith_track, note_seen_at, updated_at").eq("athlete_id", userId).maybeSingle(),
   ]);
@@ -82,6 +84,7 @@ export async function GET() {
     foodPreferences,
     nutritionFeedback,
     mealPlanTries,
+    uiSettings,
     readSettings,
   };
 

@@ -1,4 +1,4 @@
--- RELEASE S (BOOKING HOURS CHECK, GROUPED COUNTS, HIDE DEMOS PER PERSON): ONE paste. Steps 57, 58 in order, all or nothing.
+-- RELEASE S (BOOKING HOURS CHECK, GROUPED COUNTS, HIDE DEMOS PER PERSON): ONE paste. Steps 57, 58, 59 in order, all or nothing.
 --
 -- Paste this whole file into the Supabase SQL editor and run it once. It replaces the separate precheck and apply files for these steps (they stay as the fallback).
 -- Every check from each step's precheck is built in as a guard in front of that step. If any check is false, the run stops with a message that names the step and the
@@ -7,6 +7,7 @@
 -- ON ERROR: run   rollback;   once, copy the red text, send it to Spot. Do not run it again.
 -- AFTER STEP 57: Nothing changes for normal use: the booking screens already only offer times inside the coach's hours. A direct call that tries to book or move a client's own session outside the coach's open hours, or onto time off, is now refused with 'that time is outside your coach's hours'. A coach scheduling a client is never refused.
 -- AFTER STEP 58: Nothing visible changes: the same numbers appear on the Clients page, client profile and calendar. With the code of the same release live they are counted inside the database instead of by reading every open session, which is what keeps them working for a gym with hundreds of clients.
+-- AFTER STEP 59: Nothing changes until the code of the same release is live. After that a client who turns off exercise demos in Settings has them off on every phone and computer they sign in on; a client who never touched it sees demos as before.
 -- It contains no text searching, so editor re-indenting cannot break it.
 
 begin;
@@ -373,6 +374,55 @@ $function$;
 revoke all on function public.booking_counts(uuid, uuid, uuid[], uuid) from public, anon;
 grant execute on function public.booking_counts(uuid, uuid, uuid[], uuid) to authenticated, service_role;
 
+-- ===== Release S (booking hours check, grouped counts, hide demos per person), step 59: 0314 "Hide exercise demos" follows the person, not the device: one tiny private table (client_ui_settings, one row per client, only that client can read or change it)
+do $g59$
+declare
+  failed text;
+begin
+  select string_agg(check_name, '; ') into failed from (
+    values
+      ('profiles exists', to_regclass('public.profiles') is not null),
+      ('0314 is not already applied (client_ui_settings is not there yet)', to_regclass('public.client_ui_settings') is null)
+  ) as checks(check_name, ok) where not ok;
+  if failed is not null then
+    raise exception 'Release S (booking hours check, grouped counts, hide demos per person), step 59 (0314) cannot run: this step looks already applied, or the database is not in the state it expects. Failed checks: %. NOTHING was changed (the whole bundle is all or nothing). If an earlier step was applied by hand, use the single-step files for the rest, and send Spot this message.', failed;
+  end if;
+end
+$g59$;
+
+-- ====================================================================================================
+-- migration 0314_client_ui_settings.sql
+-- ====================================================================================================
+
+-- Release S, part 4: "Hide exercise demos" follows the PERSON, not the device (Ron: a client who turns demos off should not have to do it again on every phone and computer).
+--
+-- Until now the choice lived only in the browser. This adds one tiny private table, one row per client, holding that switch (and room for other personal display switches later):
+--   * client_ui_settings(athlete_id, hide_demos, updated_at): readable and writable ONLY by that client (not their coach, not anyone else), exactly like read_settings (0298).
+--     It is deliberately NOT a column on read_settings: a row there means "this client made a reading choice", and a coach's own default for the reading would be overridden
+--     the moment a row existed for some other reason.
+--   * Nothing is deleted or changed in any existing table. A client who has not used the switch has no row and sees demos as before. The app keeps the old on-this-device value
+--     until the person next flips the switch (then it is saved here too), so nobody loses their current choice. Removing the account removes the row with it.
+-- New object only. Re-runnable.
+
+create table if not exists public.client_ui_settings (
+  athlete_id uuid primary key references public.profiles(id) on delete cascade,
+  hide_demos boolean not null default false,
+  updated_at timestamptz not null default now()
+);
+alter table public.client_ui_settings enable row level security;
+drop policy if exists "client_ui_settings_select_own" on public.client_ui_settings;
+create policy "client_ui_settings_select_own" on public.client_ui_settings for select to authenticated using (athlete_id = (select auth.uid()));
+drop policy if exists "client_ui_settings_insert_own" on public.client_ui_settings;
+create policy "client_ui_settings_insert_own" on public.client_ui_settings for insert to authenticated with check (athlete_id = (select auth.uid()));
+drop policy if exists "client_ui_settings_update_own" on public.client_ui_settings;
+create policy "client_ui_settings_update_own" on public.client_ui_settings for update to authenticated
+  using (athlete_id = (select auth.uid())) with check (athlete_id = (select auth.uid()));
+drop policy if exists "client_ui_settings_delete_own" on public.client_ui_settings;
+create policy "client_ui_settings_delete_own" on public.client_ui_settings for delete to authenticated using (athlete_id = (select auth.uid()));
+revoke all on public.client_ui_settings from anon;
+-- Row policies do not govern TRUNCATE, REFERENCES or TRIGGER; no client path needs them.
+revoke truncate, references, trigger on public.client_ui_settings from authenticated;
+
 commit;
 
 -- Read-only result (after the commit): every row must say in_place = true.
@@ -380,4 +430,6 @@ select step, what, in_place from (
   select 'step 57 (0312)' as step, '0312 A client booking or moving their own session must stay inside the coach''s open hours and clear of time off: book_session and reschedule_booking now refuse any other time' as what, not ((coalesce((select position('coach_time_is_open' in pg_get_functiondef(p.oid)) = 0 from pg_proc p where p.proname = 'book_session' and p.pronamespace = 'public'::regnamespace limit 1), false))) as in_place
   union all
   select 'step 58 (0313)' as step, '0313 Session counts worked out in the database for large rosters: one function' as what, not ((not exists (select 1 from pg_proc where proname = 'booking_counts' and pronamespace = 'public'::regnamespace))) as in_place
+  union all
+  select 'step 59 (0314)' as step, '0314 "Hide exercise demos" follows the person' as what, not ((to_regclass('public.client_ui_settings') is null)) as in_place
 ) as result order by step;
