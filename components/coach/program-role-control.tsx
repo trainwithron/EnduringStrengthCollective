@@ -6,7 +6,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 
 const SUGGESTIONS = ["Main", "Mobility", "Warm-up", "Conditioning"];
 
-// When a client has more than one program running (a main program, mobility on
+// Shown inline in the program's button row (not as a block of its own). When a client has more than one program running (a main program, mobility on
 // off days, a warm-up), this is how the coach tells them apart: a short label
 // the athlete sees on each card, and the order the cards appear in. Both are
 // optional. With neither set, a program shows under its own name, oldest first.
@@ -57,75 +57,60 @@ export function ProgramRoleControl({
 
   if (!available) {
     return (
-      <div className="border border-steel/20 bg-surface/40 p-4 mb-5">
-        <h3 className="font-display uppercase text-sm tracking-wide">Label and order</h3>
-        <p className="font-body text-xs text-steel mt-1 max-w-[60ch]">
-          Labelling programs (Main, Mobility, Warm-up) turns on after the next database update. Until then each
-          program shows under its own name, oldest first.
-        </p>
-      </div>
+      <p className="font-body text-xs text-steel max-w-[40ch]">
+        Labelling programs (Main, Mobility, Warm-up) turns on after the next database update.
+      </p>
     );
   }
 
   return (
-    <div className="border border-steel/20 bg-surface/40 p-4 mb-5">
-      <h3 className="font-display uppercase text-sm tracking-wide">Label and order</h3>
-      <p className="font-body text-xs text-steel mt-1 max-w-[60ch]">
-        If this client has more than one program running, the label is what they see on each card and the order sets
-        which comes first (1 is first).
-      </p>
-      <div className="grid grid-cols-2 gap-3 mt-3 max-w-md">
-        <label className="block">
-          <span className="font-body text-xs text-steel">Label</span>
-          <input
-            list="program-label-suggestions"
-            value={label}
-            maxLength={30}
-            onChange={(e) => {
-              setLabel(e.target.value);
-              setMessage(null);
-            }}
-            placeholder="e.g. Mobility"
-            className="mt-1 w-full h-11 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
-          />
-          <datalist id="program-label-suggestions">
-            {SUGGESTIONS.map((s) => (
-              <option key={s} value={s} />
-            ))}
-          </datalist>
-        </label>
-        <label className="block">
-          <span className="font-body text-xs text-steel">Order</span>
-          <input
-            type="number"
-            inputMode="numeric"
-            min={0}
-            max={99}
-            value={order}
-            onChange={(e) => {
-              setOrder(e.target.value);
-              setMessage(null);
-            }}
-            placeholder="1"
-            className="mt-1 w-full h-11 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
-          />
-        </label>
-      </div>
-      <div className="flex items-center gap-3 mt-3">
-        <button
-          type="button"
-          onClick={save}
-          disabled={busy || !dirty}
-          className="h-11 px-5 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
-        >
-          {busy ? "Saving…" : "Save"}
-        </button>
-        {message && <span className="font-body text-xs text-positive">{message}</span>}
-      </div>
+    <div className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+      <input
+        list="program-label-suggestions"
+        aria-label="Label: what the client sees on this program's card"
+        title="The label is what the client sees on each card when they have more than one program."
+        value={label}
+        maxLength={30}
+        onChange={(e) => {
+          setLabel(e.target.value);
+          setMessage(null);
+        }}
+        placeholder="Label"
+        className="w-32 h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"
+      />
+      <datalist id="program-label-suggestions">
+        {SUGGESTIONS.map((s) => (
+          <option key={s} value={s} />
+        ))}
+      </datalist>
+      <input
+        type="number"
+        inputMode="numeric"
+        aria-label="Order: which program comes first (1 is first)"
+        title="The order sets which program comes first for the client (1 is first)."
+        min={0}
+        max={99}
+        value={order}
+        onChange={(e) => {
+          setOrder(e.target.value);
+          setMessage(null);
+        }}
+        placeholder="Order"
+        className="w-20 h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"
+      />
+      <button
+        type="button"
+        onClick={save}
+        disabled={busy || !dirty}
+        className="h-9 px-4 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
+      >
+        {busy ? "Saving…" : "Save"}
+      </button>
+      {message && <span className="font-body text-xs text-positive">{message}</span>}
       {error && (
-        <p className="font-body text-xs text-rust mt-2" role="alert">
+        <span className="font-body text-xs text-rust" role="alert">
           {error}
-        </p>
+        </span>
       )}
     </div>
   );

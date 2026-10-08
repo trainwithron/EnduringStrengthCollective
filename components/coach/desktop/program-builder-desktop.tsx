@@ -40,6 +40,7 @@ export function ProgramBuilderDesktop({
   initialTrainingIntent,
   initialExpandedWeek = null,
   embedded = false,
+  toolbarExtra,
 }: {
   programId: string;
   groupId: string;
@@ -87,6 +88,8 @@ export function ProgramBuilderDesktop({
   // meant to keep you on your current page. Delete stays available; it's
   // a real in-place action on this same program.
   embedded?: boolean;
+  // Extra controls for the button row under the name (the program page puts the label and order box here). Not given in the embedded copy.
+  toolbarExtra?: React.ReactNode;
 }) {
   // Own channel per mount — fixes a real bug (see lib/save-toast.ts's
   // createSaveToastChannel doc comment): the full-page builder and an
@@ -258,6 +261,7 @@ export function ProgramBuilderDesktop({
           >
             Print or PDF
           </a>
+          {toolbarExtra}
           {startDate && trainingDays && trainingDays.length > 0 && (
             <Link
               href={`/groups/${groupId}/programs/${programId}/calendar`}
