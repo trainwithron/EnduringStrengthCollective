@@ -5,6 +5,7 @@
 //   2  every typed word starts a word in the name (any order): "split bulg" finds "Bulgarian split squat"
 //   3  what was typed appears inside a word or across words: "ulgar"
 //   4  the words overlap enough to be a near miss (the importer's own fuzzy score)
+//   5  last resort, a typo: with the spaces and punctuation taken out, the typed text is a letter or two away from the name ("ps uh up" finds "Push-up", "bech press" "Bench press")
 // Ties keep the order the library was given in, which the page sorts most-used first, so a coach's usual exercises come up ahead of rarely used ones.
 
 import { normalizeName, type AliasEntry } from "@/lib/exercise-matching";
@@ -13,7 +14,7 @@ export interface ExerciseSearchResult {
   name: string;
   // The alias the coach's text matched, when it matched an alias and not the name itself ("RFESS" for "Bulgarian split squat"); null when the name itself matched.
   viaAlias: string | null;
-  tier: 0 | 1 | 2 | 3 | 4;
+  tier: 0 | 1 | 2 | 3 | 4 | 5;
 }
 
 export const DROPDOWN_LIMIT = 8;
@@ -35,8 +36,34 @@ function jaccard(a: string, b: string): number {
   return both / new Set([...sa, ...sb]).size;
 }
 
+// Letters only, no spaces or punctuation: "push up" and "Push-up" both become "pushup".
+const squash = (s: string): string => s.replace(/[^a-z0-9]/g, "");
+
+// The number of single-letter changes (add, drop, change, or swap two neighbours) to turn one text into the other.
+function editDistance(a: string, b: string): number {
+  const d: number[][] = Array.from({ length: a.length + 1 }, (_, i) => [i, ...Array<number>(b.length).fill(0)]);
+  for (let j = 1; j <= b.length; j++) d[0][j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+    }
+  }
+  return d[a.length][b.length];
+}
+
+// A typo of the name: one letter off for a short name, two for a medium one, three for a long one. Very short typed text is never matched this way.
+function isTypoOf(typed: string, text: string): boolean {
+  const a = squash(typed);
+  const b = squash(text);
+  if (a.length < 3 || !b) return false;
+  const allowed = b.length < 6 ? 1 : b.length <= 12 ? 2 : 3;
+  return editDistance(a, b) <= allowed;
+}
+
 // How well one piece of text (an exercise name or an alias) matches the typed text, or null for no match.
-function tierOfOne(typed: string, text: string): 0 | 1 | 2 | 3 | 4 | null {
+function tierOfOne(typed: string, text: string): 0 | 1 | 2 | 3 | 4 | 5 | null {
   const t = plain(text);
   if (!t) return null;
   if (t === typed) return 0;
@@ -46,6 +73,7 @@ function tierOfOne(typed: string, text: string): 0 | 1 | 2 | 3 | 4 | null {
   if (typedWords.every((tw) => words.some((w) => w.startsWith(tw)))) return 2;
   if (t.includes(typed)) return 3;
   if (jaccard(normalizeName(typed), normalizeName(text)) >= FUZZY_FLOOR) return 4;
+  if (isTypoOf(typed, t)) return 5;
   return null;
 }
 
@@ -65,8 +93,8 @@ export function searchExercises(query: string, library: string[], aliases: Alias
   const expanded = expandShorthand(typed);
   const variants = expanded === typed ? [typed] : [typed, expanded];
   // the best (lowest) tier over what was typed and its expansion
-  const tierOf = (_unused: string, text: string): 0 | 1 | 2 | 3 | 4 | null => {
-    let best: 0 | 1 | 2 | 3 | 4 | null = null;
+  const tierOf = (_unused: string, text: string): 0 | 1 | 2 | 3 | 4 | 5 | null => {
+    let best: 0 | 1 | 2 | 3 | 4 | 5 | null = null;
     for (const v of variants) {
       const t = tierOfOne(v, text);
       if (t !== null && (best === null || t < best)) best = t;

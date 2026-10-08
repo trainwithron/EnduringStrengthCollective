@@ -146,3 +146,31 @@ describe("the name box", () => {
     expect(src).toContain("else onCommit?.(name);");
   });
 });
+
+describe("searchExercises: a typo is found as a last resort", () => {
+  const LIB = ["Bench Press", "Push-up", "Pull-up", "Plank", "Back Squat", "Romanian Deadlift"];
+  const found = (q: string) => searchExercises(q, LIB, []).map((r) => r.name);
+  it('"ps uh up" finds Push-up and "bech press" finds Bench Press', () => {
+    expect(found("ps uh up")).toContain("Push-up");
+    expect(found("bech press")).toContain("Bench Press");
+    expect(found("romanain deadlift")).toContain("Romanian Deadlift");
+  });
+  it("the typo matches sit below every other kind of match, so the exact name stays first", () => {
+    const r = searchExercises("push up", LIB, []);
+    expect(r[0]).toMatchObject({ name: "Push-up" });
+    expect(r[0].tier).toBeLessThan(5);
+    const mixed = searchExercises("pull up", ["Pull-up", "Pull-ups Band", "Push-up"], []);
+    expect(mixed[0].name).toBe("Pull-up");
+    expect(mixed.find((x) => x.name === "Push-up")!.tier).toBeGreaterThan(mixed[0].tier);
+  });
+  it("very short text and unrelated words are not matched this way", () => {
+    expect(found("pu")).not.toContain("Back Squat");
+    expect(found("zzzzzz")).toEqual([]);
+    expect(found("xq")).toEqual([]);
+  });
+  it("a short name allows one letter off, a long name more", () => {
+    expect(searchExercises("plnk", ["Plank"], []).map((r) => r.name)).toEqual(["Plank"]);
+    expect(searchExercises("plnkk x", ["Plank"], [])).toEqual([]);
+    expect(searchExercises("romanian deadlft", ["Romanian Deadlift"], []).length).toBe(1);
+  });
+});
