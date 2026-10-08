@@ -5,11 +5,11 @@ import { PrintButton } from "@/components/shared/print-button";
 import { SET_ROW_SELECT, mapSetRow } from "@/lib/exercise-fields";
 import { computeScheduledDates, isLocked } from "@/lib/program-schedule";
 import { getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
-import { describePrescription, groupPrintWeeks, type PrintDay } from "@/lib/program-print";
+import { describePrescription, groupPrintWeeks, releasedDayIds, type PrintDay } from "@/lib/program-print";
 
 // A printable copy of a program (Ron: a coach must never be stuck in our software). Plain black on white, one line per exercise with its prescription and blank boxes to write in
-// what was actually done, grouped by week and day, several days across the page. No videos. The coach can print ANY program they coach, any time. A client prints their own copy in
-// full; a member of a group program prints only the days already released to them (the same rule the app uses to show them). "Print or save as PDF" uses the browser's own print.
+// what was actually done, grouped by week and day, several days across the page. No videos. The coach can print ANY program they coach, any time. A client or a member of a group program prints only
+// the days already released to them (the same rule the app uses to show them). "Print or save as PDF" uses the browser's own print.
 export default async function PrintProgramPage(props: { params: Promise<{ programId: string }> }) {
   const params = await props.params;
   const supabase = await createServerClient();
@@ -50,16 +50,17 @@ export default async function PrintProgramPage(props: { params: Promise<{ progra
       })),
   }));
 
-  // Who sees what: the coach everything; a client everything of their own copy; anyone else only the days already released to them.
+  // Who sees what: the coach everything; anyone else (a client printing their own copy, or a member of a group program) only the days already released to them. The database also hides a
+  // locked day's exercises, so a day that comes back with none is left out too (the app and the database can differ by a few hours around midnight).
   let keep: Set<string> | undefined;
-  if (!isCoach && program.athlete_id !== user.id) {
+  if (!isCoach) {
     const timezone = await getGroupCoachTimezone(supabase, program.group_id);
     const today = nowInZone(timezone);
     const dates =
       program.start_date && program.training_days && program.training_days.length > 0
         ? computeScheduledDates(program.start_date, program.training_days, (rows ?? []).map((w: any) => ({ id: w.id as string, scheduledDate: w.scheduled_date as string | null })))
         : new Map<string, Date>();
-    keep = new Set(days.filter((d) => !isLocked(dates.get(d.id), today, program.visibility_window)).map((d) => d.id));
+    keep = releasedDayIds(days, (id) => isLocked(dates.get(id), today, program.visibility_window));
   }
   const weeks = groupPrintWeeks(days, keep);
 

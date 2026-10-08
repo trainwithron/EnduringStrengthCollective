@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { describePrescription, groupPrintWeeks, type PrintDay } from "./program-print";
+import { describePrescription, groupPrintWeeks, releasedDayIds, type PrintDay } from "./program-print";
 import type { ExerciseSetTarget } from "./types";
 
 const set = (order: number, over: Partial<ExerciseSetTarget> = {}): ExerciseSetTarget => ({
@@ -39,6 +39,25 @@ describe("what is prescribed, on one line", () => {
   });
   it("orders sets by their own order, not the order they arrive", () => {
     expect(describePrescription([set(2, { targetReps: "8" }), set(1, { targetReps: "10" })])).toBe("2 sets: 10/8");
+  });
+});
+
+describe("which days a client or member may print", () => {
+  const day = (id: string, week: number, index: number, exercises: number): PrintDay => ({
+    id,
+    title: id,
+    weekNumber: week,
+    dayIndex: index,
+    exercises: Array.from({ length: exercises }, (_, i) => ({ name: "Ex " + i, prescription: "3 x 10" })),
+  });
+  const days = [day("d1", 1, 1, 4), day("d2", 1, 2, 3), day("d3", 2, 1, 0), day("d4", 2, 2, 5)];
+  it("only released days: a locked day is dropped, and so is a day that came back empty", () => {
+    const keep = releasedDayIds(days, (id) => id === "d4");
+    expect(Array.from(keep).sort()).toEqual(["d1", "d2"]);
+    expect(groupPrintWeeks(days, keep).map((w) => w.weekNumber)).toEqual([1]);
+  });
+  it("the coach passes no filter and gets every day, empty ones included", () => {
+    expect(groupPrintWeeks(days).flatMap((w) => w.days.map((d) => d.id))).toEqual(["d1", "d2", "d3", "d4"]);
   });
 });
 

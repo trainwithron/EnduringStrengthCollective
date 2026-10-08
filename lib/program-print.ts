@@ -52,6 +52,11 @@ export interface PrintDay {
   exercises: { name: string; prescription: string }[];
 }
 
+// The days a non-coach may print: not locked, and with exercises (a locked day comes back from the database with none).
+export function releasedDayIds(days: PrintDay[], isDayLocked: (id: string) => boolean): Set<string> {
+  return new Set(days.filter((d) => !isDayLocked(d.id) && d.exercises.length > 0).map((d) => d.id));
+}
+
 // Weeks in order, each with its days in order. A viewer who is not the coach and not the owner of the copy only gets the days already released: the caller passes the ids to keep.
 export function groupPrintWeeks(days: PrintDay[], keepIds?: Set<string>): { weekNumber: number; days: PrintDay[] }[] {
   const weeks = new Map<number, PrintDay[]>();
