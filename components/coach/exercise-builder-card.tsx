@@ -8,6 +8,7 @@ import { ExerciseNameInput } from "./exercise-name-input";
 import { BuilderDemoThumb } from "@/components/coach/builder-demo-thumb";
 import { builderDemoFor, type BuilderDemo } from "@/lib/builder-demo";
 import { summarizeSets } from "@/lib/exercise-summary";
+import { cleanDisplayName } from "@/lib/exercise-alias-seed";
 import type { AliasEntry } from "@/lib/exercise-matching";
 import { ExerciseMediaPicker } from "./exercise-media-picker";
 import type { BuilderExercise, ExerciseSetTarget } from "@/lib/types";
@@ -224,7 +225,8 @@ export function ExerciseBuilderCard({
   async function handleNameCommit(name: string, aliasUsed?: string) {
     const trimmed = name.trim();
     if (!trimmed) return;
-    const display = aliasUsed?.trim() || null;
+    // A name longer than the database accepts is not used as the shown name (the real exercise is still saved).
+    const display = cleanDisplayName(aliasUsed);
     // Nothing to save when the real exercise and the shown name are both unchanged. (Text typed over an aliased row that equals what it already shows is that same row.)
     if (trimmed === exercise.exerciseName && display === exercise.displayName) return;
     if (!aliasUsed && exercise.displayName && trimmed === exercise.displayName) return;

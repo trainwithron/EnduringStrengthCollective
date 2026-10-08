@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { ALIAS_GROUPS, mergeAliases, resolveTypedAlias, seedAliasesFor } from "@/lib/exercise-alias-seed";
+import { ALIAS_GROUPS, cleanDisplayName, mergeAliases, resolveTypedAlias, seedAliasesFor } from "@/lib/exercise-alias-seed";
 import { searchExercises } from "@/lib/exercise-search";
 
 const LIB = ["Bulgarian Split Squat", "Front Foot Elevated Split Squat", "Romanian Deadlift", "Overhead Press", "Dumbbell Bench Press", "Goblet Squat", "Plank"];
@@ -41,6 +41,20 @@ describe("the built-in aliases (definitively the same movement only)", () => {
   });
   it("a library with none of a group's exercises gets nothing from it", () => {
     expect(seedAliasesFor(["Plank"])).toEqual([]);
+  });
+  it("SLDL is NOT an alias (many programs mean single-leg deadlift by it)", () => {
+    const all = ALIAS_GROUPS.flatMap((g) => g.names.map((n) => n.toLowerCase()));
+    expect(all).not.toContain("sldl");
+    expect(seedAliasesFor(["Stiff Leg Deadlift"]).some((a) => a.rawName.toLowerCase() === "sldl")).toBe(false);
+    expect(seedAliasesFor(["Stiff Leg Deadlift"]).find((a) => a.rawName === "Straight Leg Deadlift")?.exerciseName).toBe("Stiff Leg Deadlift");
+  });
+  it("a shown name is capped at what the database accepts; a longer one is not used", () => {
+    expect(cleanDisplayName("RFESS")).toBe("RFESS");
+    expect(cleanDisplayName("  RFESS  ")).toBe("RFESS");
+    expect(cleanDisplayName("x".repeat(120))).toBe("x".repeat(120));
+    expect(cleanDisplayName("x".repeat(121))).toBeNull();
+    expect(cleanDisplayName("   ")).toBeNull();
+    expect(cleanDisplayName(undefined)).toBeNull();
   });
   it("abbreviations: RDL and OHP", () => {
     const seeds = seedAliasesFor(LIB);
@@ -87,6 +101,7 @@ describe("the coach's name travels: saved, shown, copied", () => {
   it("picking through an alias saves the real exercise and the alias; any other rename clears the alias", () => {
     const card = read("../components/coach/exercise-builder-card.tsx");
     expect(card).toContain(".update({ exercise_name: trimmed, display_name: display })");
+    expect(card).toContain("cleanDisplayName(aliasUsed)");
     expect(card).toContain("onUpdate({ exerciseName: trimmed, displayName: display });");
     expect(card).toContain("useState(exercise.displayName ?? exercise.exerciseName)");
     const box = read("../components/coach/exercise-name-input.tsx");

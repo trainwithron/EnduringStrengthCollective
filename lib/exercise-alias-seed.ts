@@ -16,7 +16,8 @@ export const ALIAS_GROUPS: AliasGroup[] = [
   { names: ["Bulgarian Split Squat", "Rear Foot Elevated Split Squat", "RFESS", "RFE Split Squat"], why: "one exercise: split squat with the back foot on a bench; Bulgarian is the common name, RFESS the abbreviation" },
   { names: ["Romanian Deadlift", "RDL"], why: "abbreviation of the same lift" },
   { names: ["Overhead Press", "Barbell Overhead Press", "OHP"], why: "the standing barbell press overhead; OHP is the abbreviation (a dumbbell press is a different exercise and is not listed)" },
-  { names: ["Stiff Leg Deadlift", "Straight Leg Deadlift", "SLDL"], why: "two names for the same straight-leg deadlift" },
+  // No "SLDL" here: in many programs it means SINGLE-leg deadlift, a different lift. A coach who uses it as an abbreviation saves it as their own alias.
+  { names: ["Stiff Leg Deadlift", "Straight Leg Deadlift"], why: "two names for the same straight-leg deadlift" },
   { names: ["Lat Pulldown", "Lat Pull Down", "Lat Pull-Down"], why: "spelling of the same machine exercise" },
   { names: ["Skull Crusher", "Lying Triceps Extension"], why: "two names for the same lying triceps extension" },
   { names: ["Pull-Up", "Pull Up", "Pullup"], why: "spelling only (a chin-up is a different grip and is not listed)" },
@@ -68,4 +69,12 @@ export function resolveTypedAlias(typed: string, library: string[], aliases: Ali
   if (library.some((n) => n.trim().toLowerCase() === t.toLowerCase())) return null;
   const hit = aliases.find((a) => key(a.rawName) === k && library.includes(a.exerciseName));
   return hit ? { exerciseName: hit.exerciseName, displayName: hit.rawName } : null;
+}
+
+// The longest name the database accepts for a coach's own name (group_workout_exercises_display_name_len). A longer alias (a long learned import name) is simply not used as a display name.
+export const MAX_DISPLAY_NAME = 120;
+
+export function cleanDisplayName(alias: string | null | undefined): string | null {
+  const t = (alias ?? "").trim();
+  return t.length >= 1 && t.length <= MAX_DISPLAY_NAME ? t : null;
 }
