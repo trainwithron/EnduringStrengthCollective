@@ -67,3 +67,6 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0294 | yes | yes | 69 | 0294 food preferences, protein floor, allergy notices, feedback |
 | 0295 | yes | yes | 68 | 0295 about you, baseline, phase of record, goal phase |
 | 0296 | yes | yes | 24 | 0296 recipe library columns |
+| 0297 | yes | yes | 103 | 0297 schedule requests |
+| 0298 | yes | yes | 27 | 0298 read during rest |
+| 0299 | yes | yes | 17 | 0299 legal acceptances are append-only |
