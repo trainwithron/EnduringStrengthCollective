@@ -675,6 +675,22 @@ for (const s of steps) {
   const errT2 = await run(`apply/${bundle.file}`);
   check("release-t: the bundle applies again after an undo" + (errT2 ? ": " + errT2 : ""), !errT2 && (await hasCol()) && (await storesSource()));
 }
+// The paste channel garbles non-ASCII characters (a typed em dash became three odd characters in a live function), so no line of SQL in a paste file may contain one (comments are fine:
+// they are never run). Steps already applied are listed and left alone.
+{
+  const { readdirSync } = await import("node:fs");
+  const ALREADY_APPLIED = new Set(["apply-release-q-all.sql", "apply-step55-0310.sql", "undo-step55-0310.sql"]);
+  const offenders = [];
+  for (const f of readdirSync(new URL("../../supabase/apply/", import.meta.url))) {
+    if (!f.endsWith(".sql") || ALREADY_APPLIED.has(f)) continue;
+    const lines = readFileSync(new URL("../../supabase/apply/" + f, import.meta.url), "utf8").split(/\r?\n/);
+    lines.forEach((line, i) => {
+      if (/^\s*--/.test(line)) return;
+      if (/[^\x00-\x7f]/.test(line)) offenders.push(f + ":" + (i + 1));
+    });
+  }
+  check("no paste or undo file has a non-ASCII character outside a comment" + (offenders.length ? ": " + offenders.slice(0, 6).join(", ") : ""), offenders.length === 0);
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.

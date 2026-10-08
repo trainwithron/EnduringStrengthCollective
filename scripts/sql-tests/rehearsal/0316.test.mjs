@@ -33,6 +33,9 @@ export default {
       const by = Object.fromEntries(rows.map((r) => [r.id, r]));
       h.check("a copy for a client records its source", by[forAnn].source_program_id === prog && by[forAnn].athlete_id === ann, JSON.stringify(by[forAnn]));
       h.check("a plain duplicate records its source", by[plain].source_program_id === prog);
+      const named = await h.one("select name from public.programs where id = $1", [forAnn]);
+      const wantName = (await h.one("select 'Base ' || chr(8212) || ' Ann' as n")).n;
+      h.check("a copy for a client is named 'Program - Client' with a real long dash", named.name === wantName && !/[^\x20-\x7e\u2014]/.test(named.name), JSON.stringify(named));
       h.check("a copy into another group records its source", by[elsewhere].source_program_id === prog);
 
       const exCount = async (p) => Number((await h.one("select count(*)::int as n from public.group_workout_exercises e join public.workouts w on w.id = e.workout_id where w.program_id = $1", [p])).n);

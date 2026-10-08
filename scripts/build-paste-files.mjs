@@ -1097,7 +1097,7 @@ alter table public.coach_availability_windows drop column if exists session_minu
     migrations: ["0316"],
     sees: "Success. No rows returned.",
     afterwards: "Nothing visible changes. Programs made before this keep no link (nothing is matched or renamed). From now on every copy (Assign to client, Duplicate, a package that carries a program) records the program it came from, and the program's label at the top of the builder lists the clients assigned to it.",
-    undo: ["drop index if exists public.programs_source_program_id_idx;", "alter table public.programs drop column if exists source_program_id;", fnFromMigration("0310", "duplicate_program"), "revoke execute on function public.duplicate_program(uuid, uuid, uuid, uuid, text, date) from public, anon;", "grant execute on function public.duplicate_program(uuid, uuid, uuid, uuid, text, date) to authenticated, service_role;"].join(String.fromCharCode(10)),
+    undo: ["drop index if exists public.programs_source_program_id_idx;", "alter table public.programs drop column if exists source_program_id;", fnFromMigration("0310", "duplicate_program").split("' — '").join("' ' || chr(8212) || ' '"), "revoke execute on function public.duplicate_program(uuid, uuid, uuid, uuid, text, date) from public, anon;", "grant execute on function public.duplicate_program(uuid, uuid, uuid, uuid, text, date) to authenticated, service_role;"].join(String.fromCharCode(10)),
     undoWhy: "Only if step 61 misbehaves. Puts the copy function back exactly as it was (without storing the source) and removes the column; every program and copy stays.",
     rows: [
       ["the program copy function exists", has.fn("duplicate_program(uuid, uuid, uuid, uuid, text, date)")],

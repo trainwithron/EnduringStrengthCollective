@@ -36,6 +36,7 @@ $g61$;
 --     copy changes: it stays a fully independent program. Existing programs are NOT touched or matched: only copies made from now on carry the link.
 --   * duplicate_program: the 0310 text plus storing the source in that column. Everything that copies a program (Assign to client, Duplicate, a package that carries a program) goes
 --     through this one function, so they all record it.
+-- The dash in a client copy's name ("Program - Ann") is written as chr(8212), not typed, so it survives being pasted into the SQL editor (a typed dash was being saved as garbled characters).
 -- Re-runnable.
 
 alter table public.programs add column if not exists source_program_id uuid references public.programs(id) on delete set null;
@@ -79,7 +80,7 @@ begin
   values (
     p_destination_group_id,
     case when p_client_name is not null and length(trim(p_client_name)) > 0
-         then src.name || ' — ' || p_client_name else src.name end,
+         then src.name || ' ' || chr(8212) || ' ' || p_client_name else src.name end,
     src.description,
     v_by,
     p_athlete_id,

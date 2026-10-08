@@ -41,7 +41,7 @@ begin
   values (
     p_destination_group_id,
     case when p_client_name is not null and length(trim(p_client_name)) > 0
-         then src.name || ' — ' || p_client_name else src.name end,
+         then src.name || ' ' || chr(8212) || ' ' || p_client_name else src.name end,
     src.description,
     v_by,
     p_athlete_id,
