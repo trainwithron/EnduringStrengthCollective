@@ -129,8 +129,8 @@ describe("a date never changes a phase", () => {
   });
 });
 
-describe("a starting target left over from the old phase", () => {
-  it("is set aside (dismissed) before the new phase's target is prepared, only the pending baselines of this client", async () => {
+describe("a suggestion left over from the old phase", () => {
+  it("is set aside (dismissed) before the new phase's target is prepared: every pending suggestion of this client whose phase differs, either kind", async () => {
     const { dismissPendingBaselines } = await import("@/lib/baseline-suggestion");
     const seen: { patch: Record<string, unknown>; filters: [string, unknown][] }[] = [];
     const db = {
@@ -140,30 +140,36 @@ describe("a starting target left over from the old phase", () => {
           const chain: Record<string, unknown> = {
             eq: (c: string, v: unknown) => {
               filters.push([c, v]);
-              if (filters.length === 4) {
-                seen.push({ patch, filters });
-                return Promise.resolve({ error: null });
-              }
               return chain;
+            },
+            neq: (c: string, v: unknown) => {
+              filters.push([`not ${c}`, v]);
+              seen.push({ patch, filters });
+              return Promise.resolve({ error: null });
             },
           };
           return chain;
         },
       }),
     } as unknown as SupabaseClient;
-    expect((await dismissPendingBaselines(db, { athleteId: "a1", groupId: "g1" })).ok).toBe(true);
+    expect((await dismissPendingBaselines(db, { athleteId: "a1", groupId: "g1", newPhase: "cut" })).ok).toBe(true);
     expect(seen[0].patch).toEqual({ status: "dismissed" });
     expect(seen[0].filters).toEqual([
       ["athlete_id", "a1"],
       ["group_id", "g1"],
-      ["kind", "baseline"],
       ["status", "pending"],
+      ["not phase", "cut"],
     ]);
+    // both kinds: no filter on kind
+    expect(seen[0].filters.some(([c]) => c === "kind")).toBe(false);
   });
   it("the card sets the old one aside first, keeps a matching one, and says plainly when the new one could not be prepared", () => {
     const card = src("../components/coach/nutrition/phase-review-card.tsx");
     expect(card.indexOf("dismissPendingBaselines(supabase")).toBeGreaterThan(-1);
     expect(card.indexOf("dismissPendingBaselines(supabase")).toBeLessThan(card.indexOf("createBaselineSuggestion(supabase"));
+    expect(card).toContain("newPhase: p.next");
+    // dismissed on every move, even when no starting target is being prepared
+    expect(card.indexOf("dismissPendingBaselines(supabase")).toBeLessThan(card.indexOf("if (!p.nextBaseline)"));
     expect(card).toContain("p.pendingBaselinePhase === p.next");
     expect(card).toContain("The phase was started, but the starting target could not be prepared");
     // the About-you line is only for a start target that cannot be worked out, not for a failed save

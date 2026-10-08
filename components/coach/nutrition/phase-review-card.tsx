@@ -92,15 +92,15 @@ export function PhaseReviewCard(p: PhaseReviewCardProps) {
         setBusy(false);
         return setError("Couldn't start the new phase. Check your connection and try again.");
       }
-      // The new starting target is prepared for the coach to review (never applied by itself). One left waiting from the OLD phase is set aside first: applying it would put the
-      // client's calories on the old phase's number.
+      // Anything left waiting from the OLD phase (a starting target or a weekly change) is set aside first: applying it would put the client's calories on the old phase's number.
+      // The new starting target is then prepared for the coach to review (never applied by itself).
+      await dismissPendingBaselines(supabase, { athleteId: p.athleteId, groupId: p.groupId, newPhase: p.next });
       let note: string;
       if (!p.nextBaseline) {
         note = " Add what's missing in About you to get a starting target worked out.";
       } else if (p.pendingBaselinePhase === p.next) {
         note = " A starting target for it is already waiting in Targets.";
       } else {
-        if (p.pendingBaselinePhase != null) await dismissPendingBaselines(supabase, { athleteId: p.athleteId, groupId: p.groupId });
         const made = await createBaselineSuggestion(supabase, { athleteId: p.athleteId, groupId: p.groupId, outcome: p.nextBaseline, archetype: p.nextArchetype });
         note = made.ok ? " A starting target is ready in Targets for you to review and apply." : " The phase was started, but the starting target could not be prepared. Open Targets and use Starting target to make it.";
       }
