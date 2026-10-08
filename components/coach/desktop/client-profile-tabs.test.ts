@@ -109,3 +109,15 @@ describe("loadDirectThread", () => {
     expect(bell.filters).toContainEqual(["type", "direct_message"]);
   });
 });
+
+describe("leaving Messages", () => {
+  const tabsSource = src("./client-profile-tabs.tsx");
+  it("goes by address (the page stops rendering the thread) and never just hides it, so a message from the client is not marked read while the coach looks at another tab", () => {
+    const choose = tabsSource.slice(tabsSource.indexOf("function choose"), tabsSource.indexOf("const base ="));
+    // the navigation branch covers BOTH opening and leaving a load-on-open tab
+    expect(choose).toContain("LOADED_ON_OPEN.includes(next) || LOADED_ON_OPEN.includes(tab)");
+    expect(choose).toContain("router.push(");
+    // the in-page switch (replaceState only) is reached only when neither tab is load-on-open
+    expect(choose.indexOf("router.push(")).toBeLessThan(choose.indexOf("window.history.replaceState"));
+  });
+});

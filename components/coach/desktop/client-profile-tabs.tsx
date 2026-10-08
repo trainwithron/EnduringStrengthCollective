@@ -27,10 +27,12 @@ export function ClientProfileTabs({ initial = "overview" }: { groupId?: string; 
 
   function choose(next: ClientProfileTab) {
     if (next === tab) return;
-    if (LOADED_ON_OPEN.includes(next)) {
-      // Not on the page yet: ask for it. The strip changes at once; the content follows as soon as it is loaded.
+    if (LOADED_ON_OPEN.includes(next) || LOADED_ON_OPEN.includes(tab)) {
+      // Opening Messages or Calendar: it is not on the page yet, so ask for it. LEAVING one: go by address too, so the page stops rendering it. A hidden Messages thread would stay
+      // mounted and keep marking what the client sends as read while the coach looks at another tab, and the unread badge would never show it.
+      // The strip changes at once; the content follows as soon as it is loaded.
       setTab(next);
-      startTransition(() => router.push(`${pathname}?tab=${next}`, { scroll: false }));
+      startTransition(() => router.push(next === "overview" ? pathname : `${pathname}?tab=${next}`, { scroll: false }));
       return;
     }
     setTab(next);
