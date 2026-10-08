@@ -75,13 +75,7 @@ export function DayCard({
   // Distinct from the day's own header chevron below, which hides the
   // exercise list entirely.
   condensed?: boolean;
-  // Owned by WeekGrid, not this component — expanding one day auto-
-  // collapses whichever other day in the week was expanded
-  // (coach_mobile_v2_feature_spec.md item 3: "a day can collapse to a
-  // compact strip when moving between days"). Collapsing a day
-  // manually still has no effect on its siblings; only expanding one
-  // does, so this stays a real accordion, not a hidden single-day-only
-  // mode.
+  // Owned by WeekGrid. Each day opens and closes on its own: opening one never closes another.
   collapsed: boolean;
   onToggleCollapse: () => void;
   onUpdate: (patch: Partial<Pick<BuilderDay, "title">>) => void;
