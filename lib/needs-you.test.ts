@@ -8,7 +8,7 @@ const item = (id: string, kind: NeedsYouKind, order = 0, name = "Sam"): NeedsYou
 
 describe("the three slots", () => {
   it("has exactly three fixed slots with the wording Ron asked for, and every kind belongs to one", () => {
-    expect(SLOT_TITLE).toEqual({ waiting: "Someone is waiting on you", due: "Something is due soon", slipping: "Someone may be slipping" });
+    expect(SLOT_TITLE).toEqual({ waiting: "Someone is waiting on you", due: "Something is due soon", slipping: "Someone may need a check-in" });
     for (const k of KIND_ORDER) expect(KIND_SLOT[k]).toBeDefined();
     expect(KIND_ORDER).toHaveLength(Object.keys(KIND_SLOT).length);
   });
