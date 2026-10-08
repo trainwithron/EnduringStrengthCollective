@@ -49,7 +49,9 @@ export function BookSlotButton({
           ? CANT_BOOK_NO_SESSIONS
           : bookError.message.includes("just taken")
             ? "That slot was just taken. Try another."
-            : "Couldn't book that slot."
+            : bookError.message.includes("outside your coach")
+              ? "That time is outside your coach's hours."
+              : "Couldn't book that slot."
       );
       setSubmitting(false);
       router.refresh();

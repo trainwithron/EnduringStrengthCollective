@@ -82,3 +82,7 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0309 | yes | yes | 9 | 0309 new training block notice |
 | 0310 | yes | yes | 12 | 0310 the coach's own name for an exercise |
 | 0311 | yes | yes | 36 | 0311 a client can ask for a different meal plan |
+| 0312 | yes | yes | 19 | 0312 booking inside the coach's hours (server check) |
+| 0313 | yes | yes | 13 | 0313 booking_counts for large rosters |
+| 0314 | yes | yes | 8 | 0314 client_ui_settings (hide demos follows the person) |
+| 0315 | yes | yes | 22 | 0315 away reply (preset reply to a client's message) |

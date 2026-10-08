@@ -113,6 +113,17 @@
   "file": "apply-release-r-all.sql"
  },
  {
+  "id": "release-s",
+  "name": "Release S (booking hours check, grouped counts, hide demos per person, the away preset reply)",
+  "steps": [
+   "57",
+   "58",
+   "59",
+   "60"
+  ],
+  "file": "apply-release-s-all.sql"
+ },
+ {
   "id": "release-n2",
   "name": "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)",
   "steps": [

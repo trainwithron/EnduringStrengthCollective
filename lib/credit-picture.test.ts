@@ -142,3 +142,48 @@ describe("running out of pages", () => {
     expect(m.size).toBe(0);
   });
 });
+
+describe("counting in the database (booking_counts)", () => {
+  const rpcRow = (i: number) => ({ athlete_id: `a${String(i).padStart(4, "0")}`, group_id: "g", booked: 1, to_mark: i % 2, prepaid_ahead: 0 });
+  it("reads the per-client rows a page at a time and maps them to the same counts, with every filter passed through", async () => {
+    const all = Array.from({ length: 2300 }, (_, i) => rpcRow(i));
+    const seen: Record<string, unknown>[] = [];
+    let calls = 0;
+    const sb = {
+      rpc: (name: string, args: Record<string, unknown>) => {
+        expect(name).toBe("booking_counts");
+        seen.push(args);
+        return {
+          range: (from: number, to: number) => {
+            calls += 1;
+            // the server returns at most 1000 rows whatever range is asked for
+            return Promise.resolve({ data: all.slice(from, Math.min(to + 1, from + 1000)), error: null });
+          },
+        };
+      },
+      from: () => {
+        throw new Error("the old read must not run when the function works");
+      },
+    } as any;
+    const m = await fetchBookingCounts(sb, { coachId: "c", groupId: "g", athleteIds: ["x", "y"] });
+    expect(m.size).toBe(2300);
+    expect(m.get("a0001:g")).toEqual({ booked: 1, toMark: 1, prepaidAhead: 0 });
+    expect(m.get("a0002:g")).toEqual({ booked: 1, toMark: 0, prepaidAhead: 0 });
+    expect(calls).toBe(3);
+    expect(seen[0]).toEqual({ p_coach_id: "c", p_athlete_id: null, p_athlete_ids: ["x", "y"], p_group_id: "g" });
+  });
+  it("falls back to the older read (same numbers) when the function is not in the database yet", async () => {
+    const rows = [{ id: "1", athlete_id: "a", group_id: "g", start_at: "2099-01-01T00:00:00Z", end_at: "2099-01-01T01:00:00Z", credit_state: "unsettled" }];
+    const chain: any = { select: () => chain, eq: () => chain, in: () => chain, or: () => chain, order: () => chain, range: () => Promise.resolve({ data: rows, error: null }) };
+    const sb = {
+      rpc: () => ({ range: () => Promise.resolve({ data: null, error: { message: "Could not find the function public.booking_counts" } }) }),
+      from: () => chain,
+    } as any;
+    const m = await fetchBookingCounts(sb, { coachId: "c" });
+    expect(m.get("a:g")).toEqual({ booked: 1, toMark: 0, prepaidAhead: 0 });
+  });
+  it("a client with no open sessions simply has no entry, and an empty answer is an empty map", async () => {
+    const sb = { rpc: () => ({ range: () => Promise.resolve({ data: [], error: null }) }), from: () => { throw new Error("no"); } } as any;
+    expect((await fetchBookingCounts(sb, { athleteId: "a" })).size).toBe(0);
+  });
+});

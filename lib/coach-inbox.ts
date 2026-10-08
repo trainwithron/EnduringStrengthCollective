@@ -19,6 +19,8 @@ export interface InboxMessage {
   body: string;
   created_at: string;
   read_at: string | null;
+  // A reply the database wrote from the coach's "I'm away" preset (migration 0315). It is not an answer from the coach, so it never counts as the last word.
+  auto_reply?: boolean;
 }
 
 export interface InboxConversation {
@@ -65,13 +67,15 @@ export function buildCoachInbox(people: InboxPerson[], messages: InboxMessage[],
     const row = byId.get(otherId);
     // Only messages in a group this client is actually in count; anything else is not part of this inbox.
     if (!row || !row._groups.has(m.group_id)) continue;
+    if (m.recipient_id === viewerId && !m.read_at) row.unreadCount++;
+    // An away auto-reply is not the coach answering: the client who wrote before it is still waiting, and the preview shows their message, not the preset.
+    if (m.auto_reply) continue;
     if (!row.lastAt || m.created_at > row.lastAt) {
       row.lastAt = m.created_at;
       row.lastBody = m.body;
       row.groupId = m.group_id;
       row.lastFromOther = m.sender_id !== viewerId;
     }
-    if (m.recipient_id === viewerId && !m.read_at) row.unreadCount++;
   }
   return Array.from(byId.values())
     .map(({ _rank, _groups, ...c }) => c)

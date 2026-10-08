@@ -8,16 +8,20 @@ export interface ThreadMessage {
   sender_id: string;
   body: string;
   created_at: string;
+  // A reply the database wrote from the coach's "I'm away" preset (migration 0315); the thread marks it.
+  auto_reply?: boolean;
 }
 
 export async function loadDirectThread(supabase: SupabaseClient, args: { groupId: string; viewerId: string; otherId: string }): Promise<ThreadMessage[]> {
   const { groupId, viewerId, otherId } = args;
-  const { data: messages } = await supabase
-    .from("direct_messages")
-    .select("id, sender_id, body, created_at")
-    .eq("group_id", groupId)
-    .or(`and(sender_id.eq.${viewerId},recipient_id.eq.${otherId}),and(sender_id.eq.${otherId},recipient_id.eq.${viewerId})`)
-    .order("created_at", { ascending: true });
+  const pair = `and(sender_id.eq.${viewerId},recipient_id.eq.${otherId}),and(sender_id.eq.${otherId},recipient_id.eq.${viewerId})`;
+  const first = await supabase.from("direct_messages").select("id, sender_id, body, created_at, auto_reply").eq("group_id", groupId).or(pair).order("created_at", { ascending: true });
+  let messages: ThreadMessage[] | null = first.data as ThreadMessage[] | null;
+  // Before the 0315 database update the marker column does not exist and that read errors: read again without it so a thread is never empty.
+  if (first.error) {
+    const again = await supabase.from("direct_messages").select("id, sender_id, body, created_at").eq("group_id", groupId).or(pair).order("created_at", { ascending: true });
+    messages = again.data;
+  }
 
   const now = new Date().toISOString();
   await supabase.from("direct_messages").update({ read_at: now }).eq("group_id", groupId).eq("recipient_id", viewerId).eq("sender_id", otherId).is("read_at", null);

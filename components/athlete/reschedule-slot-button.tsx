@@ -66,7 +66,7 @@ export function RescheduleSlotButton({
     });
 
     if (rpcError) {
-      setError("That slot was just taken. Try another.");
+      setError(/outside your coach/.test(rpcError.message ?? "") ? "That time is outside your coach's hours." : "That slot was just taken. Try another.");
       setSubmitting(false);
       router.refresh();
       return;

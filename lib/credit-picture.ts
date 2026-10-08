@@ -102,8 +102,37 @@ export async function fetchBookingCounts(supabase: SupabaseClient, filter: { coa
   return (await fetchBookingCountsOrNull(supabase, filter, now)) ?? new Map();
 }
 
+// Worked out in the database (booking_counts, migration 0313): one row per client and group, so a gym with hundreds of clients is neither slow nor cut short. It runs as the caller,
+// so row security decides what is counted, exactly as the read below does. Null when it cannot be used (the function is not in the database yet, or a page fails): the caller then
+// falls back to the older read below, which gives the same numbers.
+async function countsFromDatabase(supabase: SupabaseClient, filter: { coachId?: string; athleteId?: string; athleteIds?: string[]; groupId?: string }): Promise<Map<string, BookingCounts> | null> {
+  if (typeof supabase.rpc !== "function") return null;
+  try {
+    const { rows, failed, truncated } = await pageAll((from, to) =>
+      supabase
+        .rpc("booking_counts", {
+          p_coach_id: filter.coachId ?? null,
+          p_athlete_id: filter.athleteId ?? null,
+          p_athlete_ids: filter.athleteIds ?? null,
+          p_group_id: filter.groupId ?? null,
+        })
+        .range(from, to)
+    );
+    if (failed || truncated) return null;
+    const out = new Map<string, BookingCounts>();
+    for (const r of rows as { athlete_id: string; group_id: string; booked: number; to_mark: number; prepaid_ahead: number }[]) {
+      out.set(`${r.athlete_id}:${r.group_id}`, { booked: Number(r.booked), toMark: Number(r.to_mark), prepaidAhead: Number(r.prepaid_ahead) });
+    }
+    return out;
+  } catch {
+    return null;
+  }
+}
+
 // The same read, but null when it could not be completed (so a caller that must not guess, like the credit-expiry job, can tell "none booked" from "could not read").
 export async function fetchBookingCountsOrNull(supabase: SupabaseClient, filter: { coachId?: string; athleteId?: string; athleteIds?: string[]; groupId?: string }, now: Date = new Date()): Promise<Map<string, BookingCounts> | null> {
+  const viaDatabase = await countsFromDatabase(supabase, filter);
+  if (viaDatabase) return viaDatabase;
   const { rows, failed, truncated } = await pageAll((from, to) => {
     let q = supabase
       .from("bookings")

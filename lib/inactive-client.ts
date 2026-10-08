@@ -78,6 +78,18 @@ export function isSnoozedFor(lastAnsweredAt: string | null | undefined, days: nu
   return now.getTime() - new Date(lastAnsweredAt).getTime() < days * 86400000;
 }
 
+// The messages between the coach and one client, as the quiet-client suggestion reads them. A reply the database wrote from the coach's "I'm away" preset (auto_reply) is not the coach
+// reaching out, so it is left out: a client who wrote while the coach was away and then went quiet must not read as "you messaged them and they have not answered".
+export function inactiveThread(
+  rows: { group_id: string; sender_id: string; recipient_id: string; created_at: string; auto_reply?: boolean | null }[],
+  clientId: string,
+  groupId: string
+): { fromClient: boolean; at: string }[] {
+  return rows
+    .filter((x) => x.group_id === groupId && (x.sender_id === clientId || x.recipient_id === clientId) && !x.auto_reply)
+    .map((x) => ({ fromClient: x.sender_id === clientId, at: x.created_at }));
+}
+
 // How long the unanswered stretch has been, from the messages between coach and client (newest last or any order).
 export function unansweredFromMessages(
   messages: { fromClient: boolean; at: string }[],
