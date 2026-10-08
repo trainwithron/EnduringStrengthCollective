@@ -1188,8 +1188,7 @@ const BUNDLES = [
   { id: "release-l", name: "Release L (schedule requests, Read during rest)", steps: ["42", "43"] },
   { id: "release-n", name: "Release N (nutrition tracking: food search, custom foods, nutrient detail)", steps: ["45", "46", "47", "48"] },
   { id: "release-o", name: "Release O (recalculation notice)", steps: ["51"] },
-  { id: "release-o2", name: "Release O fix (close the notice function; run any time after Release O)", steps: ["52"] },
-  { id: "release-o3", name: "Release O fix 2 (close the trigger functions; run any time after step 52)", steps: ["53"] },
+  { id: "release-o2", name: "Release O fix (close the notice function and the trigger functions; run any time after Release O)", steps: ["52", "53"] },
   { id: "release-n2", name: "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)", steps: ["49", "50"] },
 ];
 for (const b of BUNDLES) {

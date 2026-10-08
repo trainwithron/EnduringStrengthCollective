@@ -81,19 +81,12 @@
  },
  {
   "id": "release-o2",
-  "name": "Release O fix (close the notice function; run any time after Release O)",
+  "name": "Release O fix (close the notice function and the trigger functions; run any time after Release O)",
   "steps": [
-   "52"
-  ],
-  "file": "apply-release-o2-all.sql"
- },
- {
-  "id": "release-o3",
-  "name": "Release O fix 2 (close the trigger functions; run any time after step 52)",
-  "steps": [
+   "52",
    "53"
   ],
-  "file": "apply-release-o3-all.sql"
+  "file": "apply-release-o2-all.sql"
  },
  {
   "id": "release-n2",
