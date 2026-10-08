@@ -13,6 +13,8 @@ import { SpotClientsGroupsPanel } from "./spot-clients-groups-panel";
 import { PushNotificationToggle } from "@/components/athlete/push-notification-toggle";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { useTerm } from "@/components/coach/terminology-provider";
+import { getCoachedGroups, LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-groups";
+import { hubOrgs, hubStartOrgId, type HubOrg } from "@/lib/hub-orgs";
 
 type TileKey = "clients" | "business" | "calendar" | "program" | "ask-spot" | "quick-payment";
 
@@ -50,12 +52,53 @@ export function CoachSpotHub({
   const [view, setView] = useState<"grid" | TileKey>(initialAthleteId ? "program" : "grid");
   const [builderOpen, setBuilderOpen] = useState(!!initialAthleteId);
   const [profileId, setProfileId] = useState<string | undefined>(undefined);
+  // The group every tile acts on. A coach who runs more than one organization chooses the organization in the header; the tiles then use that organization's group.
+  const [activeGroupId, setActiveGroupId] = useState(groupId);
+  const [orgs, setOrgs] = useState<HubOrg[]>([]);
+  const [orgId, setOrgId] = useState<string | null>(null);
   useEffect(() => {
-    // Only needed for the notification tile's test message.
-    createBrowserClient()
-      .auth.getUser()
-      .then(({ data }) => setProfileId(data.user?.id));
-  }, []);
+    // Needed for the notification tile's test message, and to know which organizations this coach has.
+    let cancelled = false;
+    (async () => {
+      const supabase = createBrowserClient();
+      const { data } = await supabase.auth.getUser();
+      if (cancelled) return;
+      setProfileId(data.user?.id);
+      if (!data.user) return;
+      try {
+        const groups = await getCoachedGroups(supabase, data.user.id);
+        const remembered = document.cookie.split("; ").find((c) => c.startsWith(`${LAST_WORKSPACE_GROUP_COOKIE}=`))?.split("=")[1];
+        const rememberedId = remembered ? decodeURIComponent(remembered) : null;
+        const list = hubOrgs(groups, rememberedId);
+        if (cancelled || list.length === 0) return;
+        const start = hubStartOrgId(groups, rememberedId, groupId);
+        setOrgs(list);
+        setOrgId(start);
+        // Starts on the organization Home is showing (the one chosen with the organization switcher), except when the hub was opened for one particular client.
+        const startOrg = list.find((o) => o.orgId === start);
+        if (startOrg && !initialAthleteId) setActiveGroupId(startOrg.anchorGroupId);
+      } catch {
+        // the hub keeps working on the page's own group
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [groupId, initialAthleteId]);
+
+  function chooseOrg(nextOrgId: string) {
+    const next = orgs.find((o) => o.orgId === nextOrgId);
+    if (!next) return;
+    setOrgId(next.orgId);
+    setActiveGroupId(next.anchorGroupId);
+    setBuilderOpen(false);
+    try {
+      // The same memory the organization switcher keeps, so Home follows the hub.
+      document.cookie = `${LAST_WORKSPACE_GROUP_COOKIE}=${encodeURIComponent(next.anchorGroupId)}; path=/; max-age=${60 * 60 * 24 * 90}`;
+    } catch {
+      // not remembered; the hub still switched
+    }
+  }
   const panelId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -97,7 +140,7 @@ export function CoachSpotHub({
 
   function handleHeaderPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
     // Controls inside the header (back, close) keep their own taps.
-    if ((e.target as HTMLElement).closest("button")) return;
+    if ((e.target as HTMLElement).closest("button, select")) return;
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
     } catch {
@@ -185,6 +228,20 @@ export function CoachSpotHub({
                 </button>
               ) : null}
               <p className="font-body text-xs text-steel uppercase tracking-wide font-bold truncate flex-1">{title}</p>
+              {orgs.length >= 2 && (
+                <select
+                  value={orgId ?? ""}
+                  onChange={(e) => chooseOrg(e.target.value)}
+                  aria-label="Organization"
+                  className="h-8 max-w-[9rem] bg-graphite border border-steel/30 text-chalk font-body text-xs px-1 truncate"
+                >
+                  {orgs.map((o) => (
+                    <option key={o.orgId} value={o.orgId}>
+                      {o.orgName}
+                    </option>
+                  ))}
+                </select>
+              )}
               <button
                 type="button"
                 onClick={close}
@@ -220,24 +277,25 @@ export function CoachSpotHub({
               )}
               {view === "clients" && (
                 <div className="h-full overflow-y-auto p-4">
-                  <SpotClientsGroupsPanel groupId={groupId} onNavigated={close} />
+                  <SpotClientsGroupsPanel key={activeGroupId} groupId={activeGroupId} onNavigated={close} />
                 </div>
               )}
               {view === "business" && (
                 <div className="h-full overflow-y-auto p-4">
-                  <BusinessMiniDashboard groupId={groupId} expanded />
+                  <BusinessMiniDashboard key={activeGroupId} groupId={activeGroupId} expanded />
                 </div>
               )}
               {view === "calendar" && (
                 <div className="h-full overflow-y-auto p-4">
-                  <CalendarMiniView groupId={groupId} />
+                  <CalendarMiniView key={activeGroupId} groupId={activeGroupId} />
                 </div>
               )}
               {view === "program" && (
                 <div className="h-full overflow-y-auto p-4">
                   {builderOpen ? (
                     <SpotBuilderPanel
-                      groupId={groupId}
+                      key={activeGroupId}
+                      groupId={activeGroupId}
                       initialAthleteId={initialAthleteId}
                       initialAthleteName={initialAthleteName}
                     />
@@ -251,7 +309,7 @@ export function CoachSpotHub({
                         <Sparkles className="w-4 h-4" />
                         Build a program with AI
                       </button>
-                      <ProgramMiniView groupId={groupId} />
+                      <ProgramMiniView key={activeGroupId} groupId={activeGroupId} />
                     </>
                   )}
                 </div>
@@ -263,7 +321,7 @@ export function CoachSpotHub({
               )}
               {view === "quick-payment" && (
                 <div className="h-full overflow-y-auto">
-                  <QuickPaymentPanel groupId={groupId} />
+                  <QuickPaymentPanel key={activeGroupId} groupId={activeGroupId} />
                 </div>
               )}
             </div>
