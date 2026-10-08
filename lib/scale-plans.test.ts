@@ -18,19 +18,22 @@ function lunch(skip = 0): MealRecipeChoice {
   throw new Error("no template fits");
 }
 const entry = (): MealEntryPayload => ({ mealId: "1", title: "Lunch", proteinTarget: 40, carbsTarget: 60, fatTarget: 20, recipes: [lunch(0), lunch(1), lunch(2)] });
+// The protein the one meal in a test day really delivers: the day's header says the same, as a real saved plan does.
+const P0 = Math.round(entry().recipes![0].macros!.proteinG);
 const day = (log_date: string, calories = 2000) => ({
   log_date,
-  macros: { daily: { calories, protein: 160, carbs: 200, fats: 60 } },
+  macros: { daily: { calories, protein: P0, carbs: 200, fats: 60 } },
   meals: { daily: [entry()] },
 });
-const NEW = { calories: 2100, protein: 168, carbs: 210, fats: 63 };
+const NEW = { calories: 2100, protein: Math.round(P0 * 1.05), carbs: 210, fats: 63 };
 
 describe("scalePlanDays", () => {
   it("scales each saved day to the new target and takes the exact target for a daily day", () => {
     const r = scalePlanDays([day("2026-10-09"), day("2026-10-10")], NEW);
     expect(r.days).toBe(2);
     expect(r.updates.map((u) => u.log_date)).toEqual(["2026-10-09", "2026-10-10"]);
-    expect(r.updates[0].macros.daily).toMatchObject({ calories: 2100, protein: 168, carbs: 210, fats: 63 });
+    expect(r.updates[0].macros.daily).toMatchObject({ calories: 2100, protein: NEW.protein, carbs: 210, fats: 63 });
+    expect(r.proteinShort).toEqual([]);
     expect(r.report.optionsScaled + r.report.optionsDropped).toBeGreaterThanOrEqual(6);
   });
   it("a day already at the new target is left alone, not rewritten", () => {
@@ -50,6 +53,37 @@ describe("scalePlanDays", () => {
     const r = scalePlanDays([{ log_date: "2026-10-09", macros: {}, meals: { daily: [] } }, { log_date: "2026-10-10", macros: { daily: { calories: 2000 } }, meals: [] }], NEW);
     expect(r.days).toBe(0);
     expect(r.unreadable).toBe(2);
+  });
+  it("a cut that holds protein warns: 2,400 to 1,800 with protein held leaves the meals short, and the header shows what the meals deliver", () => {
+    const row = day("2026-10-09", 2400);
+    const r = scalePlanDays([row], { calories: 1800, protein: P0, carbs: 150, fats: 50 });
+    expect(r.days).toBe(1);
+    expect(r.proteinShort).toHaveLength(1);
+    expect(r.proteinShort[0]).toMatchObject({ date: "2026-10-09", targetG: P0 });
+    expect(r.proteinShort[0].deliveredG).toBeLessThan(P0 * 0.9);
+    // Not the exact target: the scaled protein, which is what the meals give.
+    const written = r.updates[0].macros.daily as { calories: number; protein: number };
+    expect(written.calories).toBe(1800);
+    expect(written.protein).toBeLessThan(P0 * 0.9);
+    const text = describeScalePlans(r);
+    expect(text).toContain("g of protein against the " + P0 + " g target");
+    expect(text).toContain("Rebuild it instead of scaling");
+  });
+  it("a day whose meals meet the new protein is not warned about", () => {
+    const r = scalePlanDays([day("2026-10-09", 2400)], { calories: 1800, protein: Math.round(P0 * 0.75), carbs: 150, fats: 50 });
+    expect(r.proteinShort).toEqual([]);
+    expect((r.updates[0].macros.daily as { protein: number }).protein).toBe(Math.round(P0 * 0.75));
+  });
+  it("refuses a change that is too big (a typo: 220 for 2200 would squash every day)", () => {
+    const r = scalePlanDays([day("2026-10-09"), day("2026-10-10")], { calories: 200, protein: 20, carbs: 20, fats: 5 });
+    expect(r.days).toBe(0);
+    expect(r.tooBig).toBe(2);
+    expect(r.updates).toEqual([]);
+    expect(describeScalePlans(r)).toMatch(/Nothing was scaled\..*too big.*rebuild the plan instead of scaling it/i);
+    expect(scalePlanDays([day("2026-10-09")], { calories: 3300, protein: P0, carbs: 300, fats: 90 }).tooBig).toBe(1);
+    // The edges are allowed.
+    expect(scalePlanDays([day("2026-10-09")], { calories: 1000, protein: P0, carbs: 100, fats: 30 }).tooBig).toBe(0);
+    expect(scalePlanDays([day("2026-10-09")], { calories: 3200, protein: P0, carbs: 300, fats: 90 }).tooBig).toBe(0);
   });
   it("does not change the rows it was given", () => {
     const rows = [day("2026-10-09")];
