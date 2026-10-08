@@ -10,6 +10,7 @@ import { BarcodeScanButton } from "./barcode-scan-button";
 import { PhotoLogFoodButton } from "./photo-log-food-button";
 import { FoodSearchLog } from "./food-search-log";
 import { FoodLogEntries } from "./food-log-entries";
+import { MyFoodsPanel } from "./my-foods-panel";
 import type { RecentFoodLogOption } from "@/lib/recent-food-logs";
 import { COACH_CAN_SEE_LINE, hasTarget, noTargetLine, sumLoggedFood, type DayTargetLike } from "@/lib/nutrition-tracking";
 
@@ -110,6 +111,7 @@ export function FoodLogSection({
 
       <div className="space-y-2">
         <FoodSearchLog athleteId={athleteId} groupId={groupId} logDate={logDate} onLogged={handleQuickLogged} />
+        <MyFoodsPanel athleteId={athleteId} groupId={groupId} logDate={logDate} onLogged={handleAdded} />
         <QuickLogFoodButton
           athleteId={athleteId}
           groupId={groupId}

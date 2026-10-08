@@ -16,6 +16,7 @@ import {
   type MealSlot,
 } from "@/lib/food-entry";
 import { servingText } from "@/lib/food-serving";
+import { itemInsertRow, itemsFromEntries } from "@/lib/saved-meal";
 import { checkMacros, parseNumberField } from "@/lib/food-validation";
 import { addDaysToKey } from "@/lib/date-key";
 
@@ -46,6 +47,44 @@ export function FoodLogEntries({
   const [busy, setBusy] = useState(false);
   const [copyFor, setCopyFor] = useState<MealSlot | "other" | null>(null);
   const [copyDate, setCopyDate] = useState(addDaysToKey(logDate, 1));
+  const [saveFor, setSaveFor] = useState<MealSlot | "other" | null>(null);
+  const [mealName, setMealName] = useState("");
+
+  // Saves what is in one meal as a named meal to log again in one tap (my-foods-panel.tsx).
+  async function saveAsMeal(group: FoodLogEntry[]) {
+    const name = mealName.trim();
+    if (busy) return;
+    if (name === "") {
+      setNotice("Give the meal a name.");
+      return;
+    }
+    const items = itemsFromEntries(group);
+    if (items.length === 0) {
+      setNotice("There is nothing with numbers in this meal to save.");
+      return;
+    }
+    setBusy(true);
+    setNotice(null);
+    const supabase = createBrowserClient();
+    const { data: meal, error: mealError } = await supabase.from("saved_meals").insert({ athlete_id: athleteId, name: name.slice(0, 120) }).select("id").single();
+    if (mealError || !meal) {
+      setBusy(false);
+      setNotice(mealError?.message?.includes("limit of 300") ? "You have reached the limit of 300 saved meals. Delete some you no longer use." : "That didn't save. Try again.");
+      return;
+    }
+    const { error: itemsError } = await supabase.from("saved_meal_items").insert(items.map((i) => itemInsertRow(meal.id as string, i)));
+    if (itemsError) {
+      // Do not leave an empty meal behind.
+      await supabase.from("saved_meals").delete().eq("id", meal.id);
+      setBusy(false);
+      setNotice("That didn't save. Try again.");
+      return;
+    }
+    setBusy(false);
+    setSaveFor(null);
+    setMealName("");
+    setNotice(`Saved "${name}". Find it under My foods and saved meals.`);
+  }
 
   async function copyFromYesterday() {
     if (busy) return;
@@ -104,10 +143,23 @@ export function FoodLogEntries({
         <section key={g.slot}>
           <div className="flex items-center justify-between gap-2">
             <h3 className="font-display uppercase text-xs tracking-wide text-steel">{g.label}</h3>
-            <button type="button" onClick={() => setCopyFor(copyFor === g.slot ? null : g.slot)} className="min-h-[44px] px-2 font-body text-xs text-steel underline">
-              Copy to another day
-            </button>
+            <div className="flex items-center">
+              <button type="button" onClick={() => { setSaveFor(saveFor === g.slot ? null : g.slot); setCopyFor(null); setMealName(g.label === "Other" ? "" : g.label); }} className="min-h-[44px] px-2 font-body text-xs text-steel underline">
+                Save as a meal
+              </button>
+              <button type="button" onClick={() => { setCopyFor(copyFor === g.slot ? null : g.slot); setSaveFor(null); }} className="min-h-[44px] px-2 font-body text-xs text-steel underline">
+                Copy to another day
+              </button>
+            </div>
           </div>
+          {saveFor === g.slot && (
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <input type="text" value={mealName} onChange={(e) => setMealName(e.target.value)} maxLength={120} placeholder="Name this meal" aria-label="Meal name" className="flex-1 min-w-[10rem] min-h-[44px] bg-surface border border-steel/30 px-3 font-body text-sm text-chalk" />
+              <button type="button" onClick={() => saveAsMeal(g.items)} disabled={busy} className="min-h-[44px] px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40">
+                Save meal
+              </button>
+            </div>
+          )}
           {copyFor === g.slot && (
             <div className="flex flex-wrap items-center gap-2 mb-2">
               <input type="date" value={copyDate} onChange={(e) => setCopyDate(e.target.value)} aria-label="Copy to day" className="min-h-[44px] bg-surface border border-steel/30 px-2 font-body text-sm text-chalk" />
