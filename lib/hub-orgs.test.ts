@@ -52,4 +52,14 @@ describe("the hub is wired to it", () => {
     expect(hub).toContain("LAST_WORKSPACE_GROUP_COOKIE");
     expect(hub).toContain("!initialAthleteId");
   });
+  it("reads the organizations the first time the hub opens, not on every page", () => {
+    expect(hub).toContain("if (!open || orgsRequested.current) return;");
+  });
+  it("the Clients tile follows the hub: its own organization memory and tabs are off inside the hub", () => {
+    expect(hub).toMatch(/<SpotClientsGroupsPanel[^>]*fromHub/);
+    const tile = readFileSync(join(__dirname, "..", "components/coach/mobile/spot-clients-groups-panel.tsx"), "utf8").replace(/\r\n/g, "\n");
+    expect(tile).toContain("(fromHub ? [currentOrgId] : [remembered, currentOrgId])");
+    expect(tile).toContain("orgs.length >= 2 && !fromHub");
+    expect(tile).toMatch(/if \(fromHub\) return;\s*try \{\s*window\.localStorage\.setItem\(SELECTED_ORG_KEY/);
+  });
 });

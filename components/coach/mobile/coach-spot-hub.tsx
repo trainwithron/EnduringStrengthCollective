@@ -56,15 +56,22 @@ export function CoachSpotHub({
   const [activeGroupId, setActiveGroupId] = useState(groupId);
   const [orgs, setOrgs] = useState<HubOrg[]>([]);
   const [orgId, setOrgId] = useState<string | null>(null);
+  const orgsRequested = useRef(false);
   useEffect(() => {
-    // Needed for the notification tile's test message, and to know which organizations this coach has.
+    // Only needed for the notification tile's test message.
+    createBrowserClient()
+      .auth.getUser()
+      .then(({ data }) => setProfileId(data.user?.id));
+  }, []);
+  useEffect(() => {
+    // Which organizations this coach has: read the first time the hub is opened (the dropdown is only visible then), not on every page.
+    if (!open || orgsRequested.current) return;
+    orgsRequested.current = true;
     let cancelled = false;
     (async () => {
       const supabase = createBrowserClient();
       const { data } = await supabase.auth.getUser();
-      if (cancelled) return;
-      setProfileId(data.user?.id);
-      if (!data.user) return;
+      if (cancelled || !data.user) return;
       try {
         const groups = await getCoachedGroups(supabase, data.user.id);
         const remembered = document.cookie.split("; ").find((c) => c.startsWith(`${LAST_WORKSPACE_GROUP_COOKIE}=`))?.split("=")[1];
@@ -84,7 +91,7 @@ export function CoachSpotHub({
     return () => {
       cancelled = true;
     };
-  }, [groupId, initialAthleteId]);
+  }, [open, groupId, initialAthleteId]);
 
   function chooseOrg(nextOrgId: string) {
     const next = orgs.find((o) => o.orgId === nextOrgId);
@@ -277,7 +284,7 @@ export function CoachSpotHub({
               )}
               {view === "clients" && (
                 <div className="h-full overflow-y-auto p-4">
-                  <SpotClientsGroupsPanel key={activeGroupId} groupId={activeGroupId} onNavigated={close} />
+                  <SpotClientsGroupsPanel key={activeGroupId} groupId={activeGroupId} onNavigated={close} fromHub />
                 </div>
               )}
               {view === "business" && (
