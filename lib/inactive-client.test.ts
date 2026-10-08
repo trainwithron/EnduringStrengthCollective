@@ -8,6 +8,7 @@ import {
   inactiveSuggestion,
   isSnoozedFor,
   unansweredFromMessages,
+  inactiveThread,
   type InactiveSignals,
 } from "./inactive-client";
 
@@ -84,5 +85,28 @@ describe("buildDoorOpenDraft", () => {
     expect(t).toContain("no pressure");
     expect(t).not.toMatch(/pay|owe|money|refund/i);
     expect(buildDoorOpenDraft("")).toContain("Hi there");
+  });
+});
+
+describe("the quiet-client thread ignores away auto-replies", () => {
+  const row = (from: string, to: string, at: string, auto = false) => ({ group_id: "g1", sender_id: from, recipient_id: to, created_at: at, auto_reply: auto });
+  it("a client who wrote while the coach was away is not 'messaged and never answered'", () => {
+    const now = new Date("2026-10-20T12:00:00Z");
+    const rows = [row("c1", "coach", "2026-10-01T10:00:00Z"), row("coach", "c1", "2026-10-01T10:00:01Z", true)];
+    const thread = inactiveThread(rows, "c1", "g1");
+    expect(thread).toEqual([{ fromClient: true, at: "2026-10-01T10:00:00Z" }]);
+    expect(unansweredFromMessages(thread, now)).toEqual({ unanswered: 0, daysSinceLastCoachMessage: null });
+  });
+  it("a real message from the coach still counts, and other groups and clients are left out", () => {
+    const now = new Date("2026-10-20T12:00:00Z");
+    const rows = [
+      row("coach", "c1", "2026-10-10T10:00:00Z"),
+      row("coach", "c1", "2026-10-11T10:00:00Z", true),
+      { ...row("coach", "c1", "2026-10-12T10:00:00Z"), group_id: "g2" },
+      row("coach", "c2", "2026-10-13T10:00:00Z"),
+    ];
+    const r = unansweredFromMessages(inactiveThread(rows, "c1", "g1"), now);
+    expect(r.unanswered).toBe(1);
+    expect(r.daysSinceLastCoachMessage).toBe(10);
   });
 });

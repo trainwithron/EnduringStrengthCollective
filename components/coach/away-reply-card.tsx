@@ -75,17 +75,17 @@ export function AwayReplyCard({ coachId, initial, today }: { coachId: string; in
           value={endsOn}
           min={today}
           onChange={(e) => setEndsOn(e.target.value)}
-          className="h-8 bg-graphite border border-steel/40 px-2 font-body text-xs text-chalk"
+          className="min-h-[44px] sm:min-h-0 sm:h-8 bg-graphite border border-steel/40 px-2 font-body text-xs text-chalk"
         />
       </label>
       <p className="font-body text-xs text-steel">
-        It is sent once per burst of messages, never reads what the client wrote, and you still get the normal notice for their message. Turn it off any time.
+        Each client message gets this reply. Nothing reads what the client wrote, and you still get the normal notice for their message. Turn it off any time.
       </p>
       <div className="flex flex-wrap gap-2">
-        <button type="button" disabled={saving} onClick={() => void turnOn()} className="h-9 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40">
+        <button type="button" disabled={saving} onClick={() => void turnOn()} className="min-h-[44px] sm:min-h-0 sm:h-9 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40">
           {state === "on" ? "Save changes" : "Turn on"}
         </button>
-        <button type="button" disabled={saving} onClick={() => setEditing(false)} className="h-9 px-4 border border-steel/40 text-steel font-body text-sm">
+        <button type="button" disabled={saving} onClick={() => setEditing(false)} className="min-h-[44px] sm:min-h-0 sm:h-9 px-4 border border-steel/40 text-steel font-body text-sm">
           Cancel
         </button>
       </div>
@@ -116,18 +116,18 @@ export function AwayReplyCard({ coachId, initial, today }: { coachId: string; in
         <div className="flex gap-2 shrink-0">
           {state === "on" ? (
             <>
-              <button type="button" disabled={saving} onClick={() => void turnOff()} className="h-9 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40">
+              <button type="button" disabled={saving} onClick={() => void turnOff()} className="min-h-[44px] sm:min-h-0 sm:h-9 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40">
                 Turn off
               </button>
               {!editing && (
-                <button type="button" onClick={() => setEditing(true)} className="h-9 px-3 border border-steel/40 text-steel font-body text-sm">
+                <button type="button" onClick={() => setEditing(true)} className="min-h-[44px] sm:min-h-0 sm:h-9 px-3 border border-steel/40 text-steel font-body text-sm">
                   Edit
                 </button>
               )}
             </>
           ) : (
             !editing && (
-              <button type="button" onClick={() => setEditing(true)} className="h-9 px-4 border border-rust/40 text-rust font-body text-sm">
+              <button type="button" onClick={() => setEditing(true)} className="min-h-[44px] sm:min-h-0 sm:h-9 px-4 border border-rust/40 text-rust font-body text-sm">
                 {state === "ended" ? "Turn on again" : "I'm away"}
               </button>
             )

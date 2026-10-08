@@ -13,6 +13,7 @@ import {
   inactiveSuggestion,
   isSnoozedFor,
   unansweredFromMessages,
+  inactiveThread,
 } from "@/lib/inactive-client";
 
 interface Item {
@@ -98,7 +99,12 @@ export function InactiveClientsPanel() {
         supabase.from("profiles").select("id, full_name").in("id", quietIds),
         supabase.from("session_credits").select("athlete_id, group_id, balance").in("athlete_id", quietIds).in("group_id", quietGroupIds),
         supabase.from("session_credit_ledger").select("athlete_id, group_id, amount").in("athlete_id", quietIds).in("group_id", quietGroupIds).gt("amount", 0),
-        supabase.from("direct_messages").select("group_id, sender_id, recipient_id, created_at").or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`).in("group_id", quietGroupIds).limit(5000),
+        (async () => {
+          const read = (columns: string) => supabase.from("direct_messages").select(columns).or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`).in("group_id", quietGroupIds).limit(5000);
+          const first = await read("group_id, sender_id, recipient_id, created_at, auto_reply");
+          // Before the 0315 database update there is no auto_reply column and that read errors: read again with the old column list.
+          return first.error ? await read("group_id, sender_id, recipient_id, created_at") : first;
+        })(),
         Promise.all(quietIds.map(async (id) => [id, ((await supabase.from("workout_logs").select("created_at").eq("athlete_id", id).order("created_at", { ascending: false }).limit(1)).data ?? [])[0]?.created_at as string | undefined] as const)),
         Promise.all(quietIds.map(async (id) => [id, ((await supabase.from("bookings").select("start_at").eq("athlete_id", id).lte("start_at", now.toISOString()).order("start_at", { ascending: false }).limit(1)).data ?? [])[0]?.start_at as string | undefined] as const)),
         Promise.all(quietIds.map(async (id) => [id, ((await supabase.from("direct_messages").select("created_at").eq("sender_id", id).eq("recipient_id", user.id).order("created_at", { ascending: false }).limit(1)).data ?? [])[0]?.created_at as string | undefined] as const)),
@@ -121,9 +127,7 @@ export function InactiveClientsPanel() {
         const key = `${m.profile_id}:${m.group_id}`;
         if (isSnoozedFor(lastAnswer.get(inactiveDismissalKey(m.profile_id, m.group_id)), NOT_NOW_SNOOZE_DAYS, now)) continue;
         if (isSnoozedFor(lastAnswer.get(inactiveKeepActiveKey(m.profile_id, m.group_id)), KEEP_ACTIVE_SNOOZE_DAYS, now)) continue;
-        const thread = ((messages.data ?? []) as any[])
-          .filter((x) => x.group_id === m.group_id && (x.sender_id === m.profile_id || x.recipient_id === m.profile_id))
-          .map((x) => ({ fromClient: x.sender_id === m.profile_id, at: x.created_at as string }));
+        const thread = inactiveThread((messages.data ?? []) as any[], m.profile_id, m.group_id);
         const { unanswered, daysSinceLastCoachMessage } = unansweredFromMessages(thread, now);
         const last = lastActivity.get(m.profile_id);
         const s = inactiveSuggestion({

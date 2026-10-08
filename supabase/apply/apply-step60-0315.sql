@@ -2,7 +2,7 @@
 --
 -- Run apply-precheck first (every row ok = true). Then paste THIS file and run it once.
 -- WHAT YOU SHOULD SEE: "Success. No rows returned."
--- AFTERWARDS: Nothing changes until a coach turns it on in Messages. While it is on, each message a client sends gets the coach's reply (one reply per burst of messages within 5 minutes), the coach still gets the usual notice for the client's message, and the thread shows a small 'Auto-reply' note on each reply that went out. It stops after the last day if one was set, or when the coach turns it off.
+-- AFTERWARDS: Nothing changes until a coach turns it on in Messages. While it is on, each message a client sends gets the coach's reply (no limit: every message gets it), the coach still gets the usual notice for the client's message, and the thread shows a small 'Auto-reply' note on each reply that went out. It stops after the last day if one was set, or when the coach turns it off.
 -- ON ERROR: it is all or nothing, so nothing was applied. Run   rollback;   once, copy the red error text, and send it back. Do not run the file again.
 -- It contains no text searching, so editor re-indenting cannot break it.
 
@@ -28,8 +28,8 @@ $guard$;
 --     A person cannot mark their own message as an auto-reply, and cannot change the mark afterwards: only the function below can set it.
 --   * send_away_reply(): after a CLIENT's message to their coach is added, writes the preset reply from the coach to that client, in the same group. It never reads the message.
 --     It does nothing when: the new message is itself an auto-reply (no loops), the sender is a coach, the recipient is not a coach of the group, the coach has it off or no
---     reply text, the last day has passed (in the coach's time zone, New York when none is set), or this coach already auto-replied to this client in this group in the last
---     5 minutes (a burst of messages gets one reply, not many). Every other message gets the reply: it is not limited to one per period.
+--     reply text, the last day has passed (in the coach's time zone, New York when none is set), or
+--     the new message is from a coach. Every other message gets the reply: there is no limit and no waiting time (Ron: every message while away is on gets it).
 --   * The coach still gets the usual notice for the client's message (nothing about that changes), and the client gets the usual notice for the reply.
 -- If writing the reply ever fails, the client's own message is still stored (the failure is only a warning). New table, one new column, two functions (both closed to signed-in
 -- users: they only ever run as triggers). Re-runnable.
@@ -116,15 +116,6 @@ begin
     if (now() at time zone v_tz)::date > v_cfg.ends_on then
       return new;
     end if;
-  end if;
-
-  -- A burst of messages from the same client gets one reply.
-  if exists (
-    select 1 from public.direct_messages d
-    where d.group_id = new.group_id and d.sender_id = new.recipient_id and d.recipient_id = new.sender_id
-      and d.auto_reply and d.created_at > now() - interval '5 minutes'
-  ) then
-    return new;
   end if;
 
   perform set_config('app.away_reply', '1', true);

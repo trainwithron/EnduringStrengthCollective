@@ -1,5 +1,5 @@
 // 0315: the "I'm away" preset reply. While it is on, a client's message to their coach gets the coach's own reply back in the same thread (marked auto_reply); never a loop, never to
-// a coach's own message, not after the last day, one per burst, and nobody can fake the mark or read/change another coach's setting.
+// a coach's own message, not after the last day, no limit on how many, and nobody can fake the mark or read/change another coach's setting.
 const tryQ = async (db, sql, params) => {
   try {
     return { rows: (await db.query(sql, params)).rows };
@@ -62,18 +62,14 @@ export default {
       const bellAnn = await h.rows("select 1 from public.notifications where profile_id = $1 and type = 'direct_message'", [ann]);
       h.check("the coach still gets the notice for the client's message, and the client for the reply", bellCoach.length === 1 && bellAnn.length === 1, JSON.stringify({ bellCoach, bellAnn }));
 
-      // a burst gets one reply
+      // no limit: three quick messages get three more replies (four in all), and still no loop
       await say(ann, coach, "and also Friday?");
       await say(ann, coach, "hello?");
-      await h.asSuper();
-      h.check("a burst of messages inside 5 minutes gets one reply", (await h.rows("select 1 from public.direct_messages where auto_reply")).length === 1);
-
-      // after 5 minutes the next message is answered again (not once per period)
-      await h.asSuper();
-      await db.query("update public.direct_messages set created_at = created_at - interval '10 minutes' where auto_reply");
       await say(ann, coach, "any news?");
       await h.asSuper();
-      h.check("a later message is answered again", (await h.rows("select 1 from public.direct_messages where auto_reply")).length === 2);
+      const manyReplies = await h.rows("select sender_id, auto_reply from public.direct_messages where auto_reply");
+      h.check("every message gets its own reply, however quick (four messages, four replies, none from the client)", manyReplies.length === 4 && manyReplies.every((r) => r.sender_id === coach), JSON.stringify(manyReplies));
+      h.check("and no loop: eight rows in the thread, four of them replies", (await msgs(ann, coach)).length === 8);
 
       // each client is answered separately
       await say(bo, coach, "hey from Bo");

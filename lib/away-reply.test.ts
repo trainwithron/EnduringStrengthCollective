@@ -69,7 +69,7 @@ describe("wiring", () => {
   it("the database does the replying, never reads the client's message, and guards against loops and fakes", () => {
     const sql = read("supabase/migrations/0315_away_reply.sql");
     expect(sql).toContain("if new.auto_reply then");
-    expect(sql).toContain("interval '5 minutes'");
+    expect(sql).not.toContain("interval '");
     expect(sql).toContain("app.away_reply");
     expect(sql).not.toMatch(/new\.body/);
   });

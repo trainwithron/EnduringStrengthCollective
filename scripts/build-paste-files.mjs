@@ -1096,7 +1096,7 @@ alter table public.coach_availability_windows drop column if exists session_minu
     title: "0315 The \"I'm away\" preset reply: a coach writes one reply, turns it on (optionally with a last day), and every message a client sends them gets that reply back in the thread (marked as an auto-reply). One tiny private table, one marker column, two trigger functions",
     migrations: ["0315"],
     sees: "Success. No rows returned.",
-    afterwards: "Nothing changes until a coach turns it on in Messages. While it is on, each message a client sends gets the coach's reply (one reply per burst of messages within 5 minutes), the coach still gets the usual notice for the client's message, and the thread shows a small 'Auto-reply' note on each reply that went out. It stops after the last day if one was set, or when the coach turns it off.",
+    afterwards: "Nothing changes until a coach turns it on in Messages. While it is on, each message a client sends gets the coach's reply (no limit: every message gets it), the coach still gets the usual notice for the client's message, and the thread shows a small 'Auto-reply' note on each reply that went out. It stops after the last day if one was set, or when the coach turns it off.",
     undo: [
       "drop trigger if exists direct_messages_send_away_reply on public.direct_messages;",
       "drop trigger if exists direct_messages_guard_auto_reply on public.direct_messages;",
