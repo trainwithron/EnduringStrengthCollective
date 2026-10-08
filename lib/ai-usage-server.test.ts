@@ -5,10 +5,15 @@ import { AiRateLimitedError, USER_MONTHLY_CEILING, userMonthlyCeilingFor } from 
 let logCount = 0;
 let countError: { message: string } | null = null;
 const rpc = vi.fn(async () => ({ data: [{ log_id: "log-1", denied_reason: null }], error: null }));
+const filters: string[] = [];
 const from = vi.fn(() => {
   const chain: Record<string, unknown> = {};
   chain.select = () => chain;
   chain.eq = () => chain;
+  chain.neq = (column: string, value: string) => {
+    filters.push(`${column}!=${value}`);
+    return chain;
+  };
   chain.gte = () => Promise.resolve({ count: logCount, error: countError });
   chain.update = () => chain;
   return chain;
@@ -53,6 +58,12 @@ describe("per-person monthly ceilings", () => {
     await expect(reserveAiCall({ feature: "food_log_parse", userId: "u1" })).rejects.toMatchObject({ reason: "user_monthly" });
     logCount = 299;
     await expect(reserveAiCall({ feature: "food_log_parse", userId: "u1" })).resolves.toBeTruthy();
+  });
+
+  it("does not count failed calls against the person (an outage or an unreadable photo is not theirs to pay for)", async () => {
+    filters.length = 0;
+    await reserveAiCall({ feature: "food_photo_parse", userId: "u1" });
+    expect(filters).toContain("status!=error");
   });
 
   it("does not count or limit other features per person", async () => {

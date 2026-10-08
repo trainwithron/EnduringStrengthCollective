@@ -45,6 +45,9 @@ export async function reserveAiCall(meta: AiCallMeta): Promise<UsageHandle> {
         .select("id", { count: "exact", head: true })
         .eq("user_id", meta.userId)
         .eq("feature", meta.feature)
+        // A call that failed (a model outage, a photo it could not read) is not the person's to pay for: only started, finished and cut-off calls count. The per-minute burst
+        // limit already stops a runaway of failures.
+        .neq("status", "error")
         .gte("created_at", `${currentAllowancePeriod()}T00:00:00Z`);
       if (countError) throw new AiRateLimitedError("unavailable");
       if ((count ?? 0) >= personCeiling) throw new AiRateLimitedError("user_monthly", meta.feature);
