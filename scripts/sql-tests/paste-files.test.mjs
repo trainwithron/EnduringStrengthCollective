@@ -481,12 +481,13 @@ for (const s of steps) {
   const again = await run(file);
   check("release-n: a second run is refused, naming step 45 (" + again + ")", !!again && again.includes("step 45 (0300) cannot run") && again.includes("already applied"));
   // Part two, after the deploy: anything the old code wrote into the old column in the meantime is copied across, then the column goes.
+  await db.exec("update public.group_memberships set monthly_rate = 130 where id = (select id from public.group_memberships where role = 'athlete' order by id limit 1)");
   await db.exec("update public.group_memberships set monthly_rate = 77 where id = (select id from public.group_memberships where role = 'athlete' order by id offset 1 limit 1)");
   const errN2 = await run(`apply/${bundle2.file}`);
   check("release-n part 2 (after the deploy) applies" + (errN2 ? ": " + errN2 : ""), !errN2);
   const afterN2 = await state();
   const rateRowsN2 = (await db.query("select count(*)::int as n, coalesce(sum(monthly_rate), 0)::numeric as total from public.client_billing_rates")).rows[0];
-  check("release-n part 2: the old column is gone and a rate written there in the gap was copied across first", !afterN2.ratecol && afterN2.rates && rateRowsN2.n === 2 && Number(rateRowsN2.total) === 197, JSON.stringify({ afterN2, rateRowsN2 }));
+  check("release-n part 2: the old column is gone and a rate written there in the gap was copied across first (a newer edit wins over the row step 48 made)", !afterN2.ratecol && afterN2.rates && rateRowsN2.n === 2 && Number(rateRowsN2.total) === 207, JSON.stringify({ afterN2, rateRowsN2 }));
   const againN2 = await run(`apply/${bundle2.file}`);
   check("release-n part 2: a second run is refused (" + againN2 + ")", !!againN2 && againN2.includes("already applied"));
   const eN2 = await run(`apply/undo-step${st49.n}-${st49.slug}.sql`);
@@ -498,7 +499,7 @@ for (const s of steps) {
   const undone = await state();
   check("release-n: after the undo the new objects are gone and every food log and membership is still there", !undone.portions && !undone.batches && !undone.fdc && !undone.snapshot && !undone.switch && !undone.notices && !undone.fn && !undone.custom && !undone.meals && !undone.rates && undone.ratecol && undone.logs === before.logs && undone.memberships === before.memberships, JSON.stringify(undone));
   const restoredRate = (await db.query("select count(*)::int as n, coalesce(sum(monthly_rate), 0)::numeric as total from public.group_memberships where monthly_rate is not null")).rows[0];
-  check("release-n: the undo puts the clients' rates back on the roster rows", restoredRate.n === 2 && Number(restoredRate.total) === 197, JSON.stringify(restoredRate));
+  check("release-n: the undo puts the clients' rates back on the roster rows", restoredRate.n === 2 && Number(restoredRate.total) === 207, JSON.stringify(restoredRate));
   const err2 = await run(file);
   check("release-n: the bundle applies again after an undo" + (err2 ? ": " + err2 : ""), !err2);
 }

@@ -39,7 +39,7 @@ create policy "client_billing_rates_org_admin_select" on public.client_billing_r
 do $copy$
 begin
   if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_memberships' and column_name = 'monthly_rate') then
-    -- a rate that is not a sensible amount is not carried over (the old column allowed any number); it stays on the old row until 0304 drops it
+    -- an amount above 100,000 is not a real rate (the old column allowed any number): it is neither carried over nor kept
     insert into public.client_billing_rates (membership_id, group_id, profile_id, monthly_rate)
     select gm.id, gm.group_id, gm.profile_id, gm.monthly_rate
     from public.group_memberships gm
