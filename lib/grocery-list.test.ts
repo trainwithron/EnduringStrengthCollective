@@ -88,6 +88,34 @@ describe("compileGroceryList", () => {
   });
 });
 
+describe("one row per food, whatever it is printed as", () => {
+  it("'Hard-Boiled Eggs' and 'Whole Eggs' are one row with one dozens figure", () => {
+    const eggs = (name: string, n: number) => L(name, "egg_whole_large", "proteins", n, "large");
+    const list = compileGroceryList([
+      day("2026-10-05", [{ mealId: "1", recipes: [choice("A", [eggs("Whole Eggs", 6)])] }, { mealId: "2", recipes: [choice("B", [eggs("Hard-Boiled Eggs", 4)])] }]),
+    ]);
+    const items = list.categories[0].items;
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ name: "Whole Eggs", qty: 10 });
+    expect(items[0].display).toBe("10 large (~1 dozen, ~500g)");
+  });
+  it("two names for spinach and for apples are one row each, and a swapped line merges with the same food", () => {
+    const list = compileGroceryList([
+      day("2026-10-05", [
+        { mealId: "1", recipes: [choice("A", [L("Baby Spinach", "spinach_raw", "produce", 50, "g"), L("Apples", "apple_raw", "produce", 100, "g")])] },
+        { mealId: "2", recipes: [choice("B", [L("Fresh Spinach", "spinach_raw", "produce", 30, "g"), L("Raw Apple", "apple_raw", "produce", 100, "g")])] },
+      ]),
+    ]);
+    expect(list.categories[0].items.map((i) => [i.name, i.qty])).toEqual([["Apples", 200], ["Baby Spinach", 80]]);
+  });
+  it("the sourdough, egg white and bag rules follow the food, not the printed name", () => {
+    expect(displayFor("Bread", 20, "slices", false, "sourdough_slice")).toBe("2 loaves (~20 slices needed, ~800g)");
+    expect(displayFor("Egg Whites", 1200, "g", false, "egg_whites_liquid")).toBe("1200g (~3x 500g cartons)");
+    expect(displayFor("Rice", 2500, "g", false, "jasmine_rice_dry")).toBe("2500g (~88.2 oz) → 10 lb bag");
+    expect(displayFor("Rice Cakes", 10, "cakes", false, "rice_cake")).toBe("10 cakes (~90g)");
+  });
+});
+
 describe("how a total reads", () => {
   it("whole eggs to dozens", () => expect(displayFor("Whole Eggs", 20, "large", false)).toBe("20 large (~2 dozen, ~1000g)"));
   it("liquid egg whites to 500 g cartons", () => expect(displayFor("Liquid Egg Whites", 1200, "g", false)).toBe("1200g (~3x 500g cartons)"));

@@ -1,6 +1,7 @@
 import { UNIT_WEIGHT_G, toOz } from "@/lib/meal-templates";
 import { choicesFeaturedFirst, mealRecipeChoices, type MealEntryPayload, type MealPlanBucket } from "@/lib/meal-plan-assignment";
 import { isStructuredLine } from "@/lib/meal-line";
+import { displayNameOfKey } from "@/lib/meal-swap";
 
 // The grocery list, ported from Ron's Mix & Macros app (generateMasterGroceryList). It reads the SAVED plan: for each day, the option the client's card shows first in each meal
 // (or every option, split evenly), adds up the structured lines across the week (swaps included, because a swap rewrites the line) and rounds the way the old app did: eggs to
@@ -67,20 +68,24 @@ const BAG_SIZES_LBS = [5, 10, 15, 20, 25];
 const G_PER_LB = 453.592;
 const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
-// How one total reads on the list, by the old app's rules.
-export function displayFor(name: string, qty: number, unit: string, metric: boolean): string {
+// The foods the bag-size rule applies to: rice and potatoes (the old app tested the printed name, so cream of rice counted too; a rice cake never does).
+const BAG_FOOD_KEYS = new Set(["jasmine_rice_dry", "cream_of_rice_dry", "potato_russet_raw", "sweet_potato_raw"]);
+
+// How one total reads on the list, by the old app's rules. The food key (when the line has one) decides which rule applies, so every name a food is printed under gets the same rule.
+export function displayFor(name: string, qty: number, unit: string, metric: boolean, foodKey?: string): string {
   const lower = name.toLowerCase();
   const rounded = Math.round(qty);
-  if (name.includes("Whole Eggs")) {
+  if (foodKey === "egg_whole_large" || name.includes("Whole Eggs")) {
     const dozens = Math.max(1, Math.ceil(qty / 12));
     return `${rounded} large (~${dozens} dozen, ~${Math.round(qty * UNIT_WEIGHT_G.large)}g)`;
   }
-  if (lower.includes("egg whites") && qty > 0) return `${rounded}g (~${Math.ceil(qty / 500)}x 500g cartons)`;
-  if (name === "Sourdough Bread" && unit === "slices") {
+  if ((foodKey === "egg_whites_liquid" || lower.includes("egg whites")) && qty > 0) return `${rounded}g (~${Math.ceil(qty / 500)}x 500g cartons)`;
+  if ((foodKey === "sourdough_slice" || name === "Sourdough Bread") && unit === "slices") {
     const loaves = Math.max(1, Math.ceil(qty / SLICES_PER_LOAF));
     return `${loaves} ${plural(loaves, "loaf", "loaves")} (~${rounded} slices needed, ~${Math.round(qty * UNIT_WEIGHT_G.slices)}g)`;
   }
-  if (unit === "g" && !metric && (lower.includes("potato") || (lower.includes("rice") && !lower.includes("rice cake") && !lower.includes("pasta")))) {
+  const bagFood = foodKey ? BAG_FOOD_KEYS.has(foodKey) : lower.includes("potato") || (lower.includes("rice") && !lower.includes("rice cake") && !lower.includes("pasta"));
+  if (unit === "g" && !metric && bagFood) {
     const lbs = qty / G_PER_LB;
     const maxBag = BAG_SIZES_LBS[BAG_SIZES_LBS.length - 1];
     const bag = lbs <= maxBag ? `${BAG_SIZES_LBS.find((s) => s >= lbs)} lb bag` : `${Math.ceil(lbs / maxBag)}x ${maxBag} lb bags`;
@@ -107,7 +112,7 @@ export function compileGroceryList(days: PlanDay[], opts: GroceryOptions = {}): 
   const mode = opts.mode ?? "featured";
   const metric = !!opts.metric;
   const trainingDays = opts.trainingDaysPerWeek ?? 4;
-  const totals = new Map<string, { category: GroceryCategory; name: string; qty: number; unit: string }>();
+  const totals = new Map<string, { category: GroceryCategory; name: string; foodKey: string; qty: number; unit: string }>();
   const unstructured = new Set<string>();
   let daysCounted = 0;
 
@@ -122,8 +127,9 @@ export function compileGroceryList(days: PlanDay[], opts: GroceryOptions = {}): 
         for (const choice of choices) {
           for (const line of choice.lines ?? []) {
             if (isStructuredLine(line) && line.category in CATEGORY_LABEL) {
-              const key = `${line.category}|${line.name}|${line.unit}`;
-              const cur = totals.get(key) ?? { category: line.category as GroceryCategory, name: line.name, qty: 0, unit: line.unit };
+              // One row per FOOD, not per printed name: "Whole Eggs" and "Hard-Boiled Eggs" are the same food, and a swap names its line with the food's first name.
+              const key = `${line.foodKey}|${line.unit}`;
+              const cur = totals.get(key) ?? { category: line.category as GroceryCategory, name: displayNameOfKey(line.foodKey), foodKey: line.foodKey, qty: 0, unit: line.unit };
               cur.qty += line.qty * share;
               totals.set(key, cur);
             } else if (line.name) unstructured.add(line.name);
@@ -144,7 +150,7 @@ export function compileGroceryList(days: PlanDay[], opts: GroceryOptions = {}): 
     items: [...totals.values()]
       .filter((t) => t.category === key && t.qty > 0)
       .sort((a, b) => a.name.localeCompare(b.name))
-      .map((t) => ({ category: key, name: t.name, qty: t.qty, unit: t.unit, display: displayFor(t.name, t.qty, t.unit, metric) })),
+      .map((t) => ({ category: key, name: t.name, qty: t.qty, unit: t.unit, display: displayFor(t.name, t.qty, t.unit, metric, t.foodKey) })),
   })).filter((c) => c.items.length > 0);
   return { categories, unstructured: [...unstructured].sort((a, b) => a.localeCompare(b)), daysCounted };
 }

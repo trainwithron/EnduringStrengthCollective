@@ -449,6 +449,16 @@ export function MealPlanGenerator({
       { onConflict: "athlete_id,log_date" }
     );
 
+    // The plan is saved; now the AI options the coach approved go into their library.
+    const approvedForSave: { slot: GeneratedMeal["spec"]["slot"]; opt: MealOption }[] = [];
+    for (const meals of isCycling ? [mealsByView.train, mealsByView.rest] : [mealsByView.daily]) {
+      for (const m of meals) {
+        const idxs = selections[m.spec.id]?.length ? selections[m.spec.id] : [0];
+        for (const i of idxs) if (m.options[i]) approvedForSave.push({ slot: m.spec.slot, opt: m.options[i] });
+      }
+    }
+    setLibraryAutoMsg(await autoSaveApprovedAiOptions(approvedForSave));
+
     setSaving(false);
     router.refresh();
   }
@@ -527,12 +537,13 @@ export function MealPlanGenerator({
 
     await supabase.from("meal_plans").upsert(rows, { onConflict: "athlete_id,log_date" });
 
+    const autoMsg = await autoSaveApprovedAiOptions(chosenOptions.map((x) => ({ slot: meal.spec.slot, opt: x.opt })));
     setAssigning(null);
     setAssignedMsg((prev) => ({
       ...prev,
       [meal.spec.id]: `Assigned ${chosenRecipes.map((r) => `"${r.recipeName}"`).join(", ")} to ${weekdays
         .map((w) => WEEKDAY_LABELS[w])
-        .join(", ")}`,
+        .join(", ")}${autoMsg ? `. ${autoMsg}` : ""}`,
     }));
     setDayPicker((prev) => ({ ...prev, [meal.spec.id]: [] }));
     router.refresh();
@@ -660,33 +671,55 @@ export function MealPlanGenerator({
   }
 
   const [libraryMsg, setLibraryMsg] = useState<Record<string, string>>({});
-  async function handleSaveToLibrary(meal: GeneratedMeal, opt: MealOption) {
-    if (!coachId) return;
-    const slot: Slot = meal.spec.slot === "any" ? "lunch" : meal.spec.slot;
-    const say = (text: string) => setLibraryMsg((prev) => ({ ...prev, [opt.recipeId]: text }));
+  // Saves one verified AI option into the coach's private library. "saved" = a new recipe was made, "exists" = the same lines are already there (the fingerprint is unique per coach),
+  // "unsupported" = it cannot be saved as a recipe (the reason says why), "failed" = the save did not go through.
+  async function saveAiOptionToLibrary(slotIn: GeneratedMeal["spec"]["slot"], opt: MealOption): Promise<{ result: "saved" | "exists" | "unsupported" | "failed"; reason?: string }> {
+    if (!coachId) return { result: "failed" };
+    const slot: Slot = slotIn === "any" ? "lunch" : slotIn;
     const built = await buildAiRecipeRows(opt, slot);
-    if (!built.ok) {
-      say(built.reason);
-      return;
-    }
+    if (!built.ok) return { result: "unsupported", reason: built.reason };
     const supabase = createBrowserClient();
     const { data: recipe, error } = await supabase
       .from("recipes")
       .insert({ created_by: coachId, ...built.rows.recipe })
       .select("id")
       .single();
-    if (error || !recipe) {
-      // 23505: the same lines are already saved (the fingerprint is unique per coach).
-      say(error?.code === "23505" ? "This meal is already in your library." : "Couldn't save this meal to your library.");
-      return;
-    }
+    if (error || !recipe) return { result: error?.code === "23505" ? "exists" : "failed" };
     const { error: linesError } = await supabase.from("recipe_ingredients").insert(built.rows.ingredients.map((i) => ({ recipe_id: recipe.id, ...i })));
     if (linesError) {
       await supabase.from("recipes").delete().eq("id", recipe.id);
-      say("Couldn't save this meal to your library.");
-      return;
+      return { result: "failed" };
     }
-    say("Saved to your library. It will be offered first from now on.");
+    return { result: "saved" };
+  }
+
+  async function handleSaveToLibrary(meal: GeneratedMeal, opt: MealOption) {
+    const say = (text: string) => setLibraryMsg((prev) => ({ ...prev, [opt.recipeId]: text }));
+    const r = await saveAiOptionToLibrary(meal.spec.slot, opt);
+    say(r.result === "saved" ? "Saved to your library. It will be offered first from now on." : r.result === "exists" ? "This meal is already in your library." : r.result === "unsupported" ? r.reason ?? "This meal can't be saved to your library." : "Couldn't save this meal to your library.");
+  }
+
+  // When the coach SAVES or ASSIGNS a plan, every AI option that is part of what they approved is saved to their private library (once: the same lines are never saved twice). Only
+  // options that are in the saved plan are saved; the ones the coach unticked are not. Returns the line to show, or null when there was nothing to save.
+  const [libraryAutoMsg, setLibraryAutoMsg] = useState<string | null>(null);
+  async function autoSaveApprovedAiOptions(approved: { slot: GeneratedMeal["spec"]["slot"]; opt: MealOption }[]): Promise<string | null> {
+    const aiOptions = approved.filter((a) => a.opt.isAi && a.opt.aiLines);
+    if (aiOptions.length === 0) return null;
+    let saved = 0;
+    let failed = 0;
+    const seen = new Set<string>();
+    for (const a of aiOptions) {
+      const key = a.opt.recipeId;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const r = await saveAiOptionToLibrary(a.slot, a.opt);
+      if (r.result === "saved") saved += 1;
+      else if (r.result === "failed") failed += 1;
+    }
+    if (saved > 0 && failed === 0) return `Saved ${saved} new ${saved === 1 ? "meal" : "meals"} to your library.`;
+    if (saved > 0) return `Saved ${saved} new ${saved === 1 ? "meal" : "meals"} to your library; ${failed} could not be saved.`;
+    if (failed > 0) return "The plan was saved, but its new meals could not be added to your library.";
+    return null;
   }
 
   // The Nutrition Spot (nutrition_spot_revamp_scoping_sept19.md) — AI is
@@ -1286,8 +1319,12 @@ export function MealPlanGenerator({
                         <ul className="space-y-0.5 pl-6">
                           {
                             // Always text (only an exact <strong> shows bold), never HTML.
-                            opt.ingredients.map((ing, i) => {
-                              const lineIdx = (opt.lines ?? []).findIndex((l) => l.text === ing);
+                            (() => {
+                              // Two lines printed identically each get their OWN line (matched by occurrence), so a Swap button never acts on the wrong one.
+                              const taken = new Set<number>();
+                              return opt.ingredients.map((ing, i) => {
+                              const lineIdx = (opt.lines ?? []).findIndex((l, li) => l.text === ing && !taken.has(li));
+                              if (lineIdx >= 0) taken.add(lineIdx);
                               const role = lineIdx >= 0 ? swappableRole(opt.lines![lineIdx]) : null;
                               const open = role && swapOpen?.mealId === meal.spec.id && swapOpen.optIdx === idx && swapOpen.lineIdx === lineIdx;
                               return (
@@ -1325,7 +1362,8 @@ export function MealPlanGenerator({
                                   )}
                                 </li>
                               );
-                            })
+                            });
+                            })()
                           }
                         </ul>
                         {opt.swaps && opt.swaps.length > 0 && (
@@ -1426,6 +1464,11 @@ export function MealPlanGenerator({
           >
             {saving ? "Saving…" : "Save meal plan"}
           </button>
+          {libraryAutoMsg && (
+            <p className="font-body text-xs text-positive" role="status" data-testid="library-auto-msg">
+              {libraryAutoMsg} You can edit or delete them in Favorite meals.
+            </p>
+          )}
         </div>
       )}
     </div>
