@@ -4,6 +4,8 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getStripeClient, isStripeConfigured } from "@/lib/stripe";
 import { CREDIT_PACK_CREDITS } from "@/lib/coach-credits";
 import { appOrigin } from "@/lib/app-url";
+import { packFor } from "@/lib/ai-budget";
+import { resolveOrg } from "@/lib/ai-budget-server";
 
 // credit_topup_low_tier_monetization_idea.md — a coach buying their OWN
 // AI credits/Lift Off from the platform, genuinely distinct from
@@ -27,16 +29,27 @@ export async function POST(request: Request) {
     );
   }
 
-  const { kind, groupId } = await request.json();
-  if (kind !== "credit_pack" && kind !== "lift_off") {
+  const { kind, groupId, pack } = await request.json();
+  if (kind !== "credit_pack" && kind !== "lift_off" && kind !== "ai_topup") {
     return NextResponse.json({ error: "Invalid purchase kind." }, { status: 400 });
   }
   if (!groupId || typeof groupId !== "string") {
     return NextResponse.json({ error: "Missing groupId." }, { status: 400 });
   }
+  // An AI top-up is one of the fixed packs (lib/ai-budget.ts TOP_UP_PACKS); the dollar amount it adds is looked up from the pack on our side, never taken from the request.
+  const topUpPack = kind === "ai_topup" ? packFor(Number(pack)) : null;
+  if (kind === "ai_topup" && !topUpPack) {
+    return NextResponse.json({ error: "Invalid top-up pack." }, { status: 400 });
+  }
 
   const priceId =
-    kind === "credit_pack" ? process.env.STRIPE_PRICE_COACH_CREDIT_PACK : process.env.STRIPE_PRICE_COACH_LIFT_OFF;
+    kind === "credit_pack"
+      ? process.env.STRIPE_PRICE_COACH_CREDIT_PACK
+      : kind === "lift_off"
+        ? process.env.STRIPE_PRICE_COACH_LIFT_OFF
+        : topUpPack?.cents === 500
+          ? process.env.STRIPE_PRICE_AI_TOPUP_5
+          : process.env.STRIPE_PRICE_AI_TOPUP_10;
   if (!priceId) {
     return NextResponse.json(
       { error: "This purchase isn't available yet." },
@@ -70,15 +83,28 @@ export async function POST(request: Request) {
     }
 
     const origin = appOrigin(request);
-    const purchaseKind = kind === "credit_pack" ? "coach_credit_pack" : "coach_lift_off";
+
+    // An AI top-up adds to the organization's pool, so the buyer must belong to an organization (a coach does). The organization id rides along in the metadata for the webhook.
+    let organizationId: string | null = null;
+    if (kind === "ai_topup") {
+      organizationId = await resolveOrg(serviceRole, user.id);
+      if (!organizationId) {
+        return NextResponse.json({ error: "Only a coach can buy an AI top-up." }, { status: 403 });
+      }
+    }
+
+    const purchaseKind = kind === "credit_pack" ? "coach_credit_pack" : kind === "lift_off" ? "coach_lift_off" : "ai_topup";
 
     const session = await stripe.checkout.sessions.create({
       customer: stripeCustomerId,
-      mode: kind === "credit_pack" ? "payment" : "subscription",
+      mode: kind === "lift_off" ? "subscription" : "payment",
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${origin}/groups/${groupId}/branding?tab=credits&purchase=success`,
       cancel_url: `${origin}/groups/${groupId}/branding?tab=credits&purchase=canceled`,
-      metadata: { purchase_kind: purchaseKind, coach_id: user.id, credits: String(CREDIT_PACK_CREDITS) },
+      metadata:
+        kind === "ai_topup"
+          ? { purchase_kind: purchaseKind, coach_id: user.id, organization_id: organizationId ?? "", pack_cents: String(topUpPack?.cents ?? 0) }
+          : { purchase_kind: purchaseKind, coach_id: user.id, credits: String(CREDIT_PACK_CREDITS) },
       subscription_data:
         kind === "lift_off" ? { metadata: { purchase_kind: purchaseKind, coach_id: user.id } } : undefined,
     });

@@ -102,4 +102,43 @@ begin
   end if;
 end $$;
 
+-- Food search, ranked in the database. A common word ("beef", "chicken", "oil") matches hundreds of the ~8,200 USDA foods, so the best matches have to be picked by the database,
+-- not from whatever rows happen to come back first. The words must ALL be in the name; the best come first: a name that is exactly the search, then names that start with the first
+-- word, then the most words in the first part of the name (USDA names put the food first: "Chicken, broilers or fryers, breast, ..."), then the second part, then the more carefully
+-- measured Foundation foods, then shorter names. Returns the four macros per 100 g with each food. Words are cleaned to letters and digits here too, so a wildcard can never reach
+-- the pattern. A normal signed-in function (USDA data is readable by any signed-in person); at most 100 rows.
+create or replace function public.search_usda_foods(p_tokens text[], p_limit integer default 60)
+returns table(fdc_id integer, description text, data_type text, food_category text, kcal numeric, protein_g numeric, carbs_g numeric, fat_g numeric)
+language sql
+stable
+set search_path = public
+as $function$
+  with raw as (
+    select lower(regexp_replace(u.t, '[^a-zA-Z0-9]', '', 'g')) as t, u.n
+    from unnest(coalesce(p_tokens, array[]::text[])) with ordinality as u(t, n)
+  ),
+  clean as (select r.t, r.n from raw r where r.t <> '' order by r.n limit 6),
+  first_tok as (select c.t from clean c order by c.n limit 1),
+  phrase as (select string_agg(c.t, ' ' order by c.n) as p from clean c)
+  select f.fdc_id, f.description, f.data_type, f.food_category,
+         (select n.amount_per_100g from public.usda_food_nutrients n where n.fdc_id = f.fdc_id and n.nutrient_key = 'kcal'),
+         (select n.amount_per_100g from public.usda_food_nutrients n where n.fdc_id = f.fdc_id and n.nutrient_key = 'protein_g'),
+         (select n.amount_per_100g from public.usda_food_nutrients n where n.fdc_id = f.fdc_id and n.nutrient_key = 'carbs_g'),
+         (select n.amount_per_100g from public.usda_food_nutrients n where n.fdc_id = f.fdc_id and n.nutrient_key = 'fat_g')
+  from public.usda_foods f
+  where exists (select 1 from clean)
+    and not exists (select 1 from clean c where position(c.t in lower(f.description)) = 0)
+  order by
+    (split_part(lower(f.description), ',', 1) = (select p from phrase)) desc,
+    (lower(f.description) like (select t from first_tok) || '%') desc,
+    (select count(*) from clean c where position(c.t in split_part(lower(f.description), ',', 1)) > 0) desc,
+    (select count(*) from clean c where position(c.t in split_part(lower(f.description), ',', 2)) > 0) desc,
+    (f.data_type = 'Foundation') desc,
+    length(f.description) asc,
+    f.fdc_id asc
+  limit least(greatest(coalesce(p_limit, 60), 1), 100);
+$function$;
+revoke all on function public.search_usda_foods(text[], integer) from public, anon;
+grant execute on function public.search_usda_foods(text[], integer) to authenticated, service_role;
+
 commit;

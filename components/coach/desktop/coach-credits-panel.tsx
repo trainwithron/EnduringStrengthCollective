@@ -50,7 +50,7 @@ export function CoachCreditsPanel({
   return (
     <div className="max-w-[60ch]">
       <div className="mb-4">
-        <AiBudgetMeter />
+        <AiBudgetMeter groupId={groupId} />
       </div>
       <AiUsageMeter groupId={groupId} />
 

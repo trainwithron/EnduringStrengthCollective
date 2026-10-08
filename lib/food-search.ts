@@ -71,13 +71,41 @@ export function rankFoodRows(rows: FoodRow[], query: string, limit = SEARCH_RESU
 }
 
 // Runs in the browser with the signed-in person's client: the USDA tables are readable by any signed-in person.
-export async function searchFoods(supabase: SupabaseClient, query: string, limit = SEARCH_RESULT_LIMIT): Promise<FoodHit[]> {
+interface SearchRpcRow {
+  fdc_id: number;
+  description: string;
+  data_type: string | null;
+  food_category: string | null;
+  kcal: number | string | null;
+  protein_g: number | string | null;
+  carbs_g: number | string | null;
+  fat_g: number | string | null;
+}
+
+// The ranking happens in the database (search_usda_foods, migration 0300): a common word matches hundreds of foods, so the best must be chosen there, not from whatever rows come
+// back first. Returns null when the search itself failed (so the screen can say so) and [] when nothing matched. A database without the function yet (the Release N paste is
+// pending) falls back to the older read-then-rank, which is only exact for words that match fewer than CANDIDATE_LIMIT foods.
+export async function searchFoods(supabase: SupabaseClient, query: string, limit = SEARCH_RESULT_LIMIT): Promise<FoodHit[] | null> {
   const tokens = tokenize(query);
   if (tokens.length === 0) return [];
+  const ranked = await supabase.rpc("search_usda_foods", { p_tokens: tokens, p_limit: limit });
+  if (!ranked.error && Array.isArray(ranked.data)) {
+    return (ranked.data as SearchRpcRow[]).slice(0, limit).map((r) => {
+      const per100g: NutrientMap = {};
+      if (r.kcal != null) per100g.kcal = Number(r.kcal);
+      if (r.protein_g != null) per100g.protein_g = Number(r.protein_g);
+      if (r.carbs_g != null) per100g.carbs_g = Number(r.carbs_g);
+      if (r.fat_g != null) per100g.fat_g = Number(r.fat_g);
+      return { fdcId: r.fdc_id, description: r.description, category: r.food_category ?? null, dataType: r.data_type ?? null, per100g };
+    });
+  }
+  const missing = ranked.error && (ranked.error.code === "PGRST202" || ranked.error.code === "42883" || /search_usda_foods/.test(ranked.error.message ?? ""));
+  if (!missing) return null;
+
   let q = supabase.from("usda_foods").select("fdc_id, description, data_type, food_category");
   for (const t of tokens) q = q.ilike("description", `%${escapeLike(t)}%`);
   const { data, error } = await q.limit(CANDIDATE_LIMIT);
-  if (error || !data) return [];
+  if (error || !data) return null;
   const top = rankFoodRows(data as FoodRow[], query, limit);
   if (top.length === 0) return [];
   const { data: nutrientRows } = await supabase

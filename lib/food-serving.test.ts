@@ -78,6 +78,13 @@ describe("scaleNutrients", () => {
     expect(out).toEqual({ kcal: 205.4, protein_g: 4.266, carbs_g: 44.556, fat_g: 0.474 });
     expect("fiber_g" in out).toBe(false);
   });
+  it("keeps a trace nutrient of a small amount accurate when it is scaled up again (6 decimals in the snapshot)", () => {
+    const per100 = { b12_mcg: 0.04 };
+    const small = scaleNutrients(per100, 5); // 5 g
+    expect(small.b12_mcg).toBe(0.002);
+    const back = per100gFromSnapshot(small, 5);
+    expect(scaleNutrients(back, 500).b12_mcg).toBeCloseTo(0.2, 4);
+  });
   it("round-trips through the stored snapshot", () => {
     const per100 = { kcal: 130, protein_g: 2.7, carbs_g: 28.2 };
     const snap = scaleNutrients(per100, 237);

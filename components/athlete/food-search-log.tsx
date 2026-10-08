@@ -25,6 +25,7 @@ export function FoodSearchLog({
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<FoodHit[] | null>(null);
   const [searching, setSearching] = useState(false);
+  const [searchFailed, setSearchFailed] = useState(false);
   const [detail, setDetail] = useState<FoodDetail | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [optionKey, setOptionKey] = useState("g");
@@ -49,7 +50,8 @@ export function FoodSearchLog({
     const timer = setTimeout(async () => {
       const found = await searchFoods(createBrowserClient(), q);
       if (mine !== seq.current) return;
-      setHits(found);
+      setSearchFailed(found === null);
+      setHits(found ?? []);
       setSearching(false);
     }, 250);
     return () => clearTimeout(timer);
@@ -144,7 +146,12 @@ export function FoodSearchLog({
           />
           {added && <p className="font-body text-xs text-rust mt-2">{added}</p>}
           {searching && <p className="font-body text-xs text-steel mt-2">Searching…</p>}
-          {!searching && hits && hits.length === 0 && (
+          {!searching && searchFailed && (
+            <p className="font-body text-xs text-rust mt-2" role="alert">
+              Couldn&apos;t search just now. Check your connection and try again.
+            </p>
+          )}
+          {!searching && !searchFailed && hits && hits.length === 0 && (
             <p className="font-body text-xs text-steel mt-2">No foods found for that. Try a simpler word, like &quot;chicken&quot; instead of &quot;grilled chicken&quot;.</p>
           )}
           {hits && hits.length > 0 && (

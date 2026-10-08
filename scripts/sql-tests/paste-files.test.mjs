@@ -457,7 +457,7 @@ for (const s of steps) {
       to_regclass('public.ai_budget_notices') is not null as notices,
       to_regclass('public.custom_foods') is not null as custom,
       to_regclass('public.saved_meals') is not null as meals,
-      exists (select 1 from pg_proc where proname = 'ai_month_usage' and pronamespace = 'public'::regnamespace) as fn,
+      exists (select 1 from pg_proc where proname = 'ai_org_month_usage' and pronamespace = 'public'::regnamespace) as fn,
       (select count(*)::int from public.food_log_entries) as logs,
       (select count(*)::int from public.group_memberships) as memberships`)).rows[0];
   const eu = await undoBoth();

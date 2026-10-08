@@ -128,7 +128,7 @@ export default async function NutritionPage(
 
         {/* Shows only when there is something to say: about 80 percent of this month's AI used, or all of it. */}
         <div className="mb-6 max-w-[70ch]">
-          <AiBudgetMeter variant="banner" />
+          <AiBudgetMeter variant="banner" groupId={params.groupId} />
         </div>
 
         {tab === "favorites" ? (

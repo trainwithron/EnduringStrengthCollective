@@ -47,6 +47,7 @@ export function FoodLogEntries({
   const [busy, setBusy] = useState(false);
   const [copyFor, setCopyFor] = useState<MealSlot | "other" | null>(null);
   const [copyDate, setCopyDate] = useState(addDaysToKey(logDate, 1));
+  const [copiedYesterday, setCopiedYesterday] = useState(false);
   const [saveFor, setSaveFor] = useState<MealSlot | "other" | null>(null);
   const [mealName, setMealName] = useState("");
 
@@ -87,7 +88,7 @@ export function FoodLogEntries({
   }
 
   async function copyFromYesterday() {
-    if (busy) return;
+    if (busy || copiedYesterday) return;
     setBusy(true);
     setNotice(null);
     const supabase = createBrowserClient();
@@ -105,6 +106,8 @@ export function FoodLogEntries({
       return;
     }
     onAdded(added);
+    // Once is enough: pressing it again would double the day.
+    setCopiedYesterday(true);
     setNotice(`Copied ${added.length} ${added.length === 1 ? "entry" : "entries"} from yesterday.`);
   }
 
@@ -133,8 +136,8 @@ export function FoodLogEntries({
   return (
     <div className="space-y-3" data-testid="food-log-entries">
       <div className="flex flex-wrap items-center gap-2">
-        <button type="button" onClick={copyFromYesterday} disabled={busy} className="min-h-[44px] px-3 border border-steel/30 text-steel font-body text-xs disabled:opacity-50">
-          Copy yesterday
+        <button type="button" onClick={copyFromYesterday} disabled={busy || copiedYesterday} className="min-h-[44px] px-3 border border-steel/30 text-steel font-body text-xs disabled:opacity-50">
+          {copiedYesterday ? "Copied from yesterday" : "Copy yesterday"}
         </button>
         {notice && <p className="font-body text-xs text-steel" role="status">{notice}</p>}
       </div>

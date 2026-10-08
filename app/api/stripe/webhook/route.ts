@@ -11,6 +11,7 @@ import { duplicateProgram } from "@/lib/program-duplication";
 import { programBelongsToCoach } from "@/lib/package-program-access";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatch";
 import { LIFT_OFF_MONTHLY_CREDITS } from "@/lib/coach-credits";
+import { recordAiTopUp } from "@/lib/ai-topup";
 import type Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -358,6 +359,20 @@ export async function POST(request: Request) {
         // matching the exact same split already used for the client-
         // billing membership_subscriptions flow below.
         const purchaseKind = session.metadata?.purchase_kind;
+
+        // A coach's paid AI top-up: adds to the organization's budget for the month. Only a settled payment counts, and the dollars come from the pack matching what was paid.
+        if (purchaseKind === "ai_topup") {
+          if (session.payment_status === "paid") {
+            await recordAiTopUp(supabase, {
+              eventId: event.id,
+              organizationId: session.metadata?.organization_id,
+              amountPaidCents: session.amount_total,
+              eventCreatedSeconds: event.created,
+            });
+          }
+          break;
+        }
+
         if (purchaseKind === "coach_credit_pack" || purchaseKind === "coach_lift_off") {
           const coachId = session.metadata?.coach_id;
           if (!coachId) break;

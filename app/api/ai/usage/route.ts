@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { getAiUsage } from "@/lib/coach-credits";
-import { coachBudgetMessage, meterLine, type BudgetStatus } from "@/lib/ai-budget";
-import { getCoachBudgetStatus, topUpInfo } from "@/lib/ai-budget-server";
+import { coachBudgetMessage, meterLine, type BudgetStatus, type TopUpPack } from "@/lib/ai-budget";
+import { getCoachBudgetStatus, purchasablePacks, topUpInfo } from "@/lib/ai-budget-server";
 
 // Feeds the coach-facing usage meter: how much of this month's included
 // AI generations (per 100-client step) a coach has used, and the one simple
@@ -17,6 +17,8 @@ export interface AiBudgetView {
   message: string | null;
   // False while billing is off: the screen then shows no buy button.
   canBuy: boolean;
+  // The packs that can really be bought now AND would lift the pause (empty while billing is off).
+  packs: TopUpPack[];
 }
 
 export async function GET() {
@@ -34,12 +36,15 @@ export async function GET() {
   try {
     const status = await getCoachBudgetStatus(createServiceRoleClient(), user.id);
     if (status) {
-      const top = topUpInfo();
+      // Only packs that are really for sale AND would lift the pause count: a coach who is out is offered a pack only if it brings the month back under budget.
+      const packs = purchasablePacks().filter((p) => status.level !== "out" || status.spentUsd < status.budgetUsd + p.addUsd);
+      const top = { ...topUpInfo(), available: packs.length > 0 };
       budget = {
         status,
         line: meterLine(status),
         message: status.level === "low" || status.level === "out" ? coachBudgetMessage(status.level, top) : null,
         canBuy: top.available,
+        packs,
       };
     }
   } catch {

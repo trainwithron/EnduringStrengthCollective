@@ -86,6 +86,32 @@ export default {
       h.check("the group's coach reads the log, searched foods included", coachSees.rows?.[0]?.n === 3 && coachSees.rows?.[0]?.searched === 1, JSON.stringify(coachSees));
       const coachWrite = await tryQ(db, `update public.food_log_entries set calories = 1 where athlete_id = $1 returning id`, [ann]);
       h.check("and still cannot change it", !coachWrite.error && coachWrite.rows?.length === 0, JSON.stringify(coachWrite));
+
+      // ---- ranked food search: the best match first even when a word matches far more than 300 foods ----
+      await h.asSuper();
+      // 600 foods that merely mention chicken or beef (inserted FIRST, so a plain unordered read would return them), then the foods a person means (inserted last).
+      await db.query(`insert into public.usda_foods (fdc_id, description, data_type) select 910000 + g, 'Soup, chicken noodle, variety ' || g, 'SR Legacy' from generate_series(1, 400) g`);
+      await db.query(`insert into public.usda_foods (fdc_id, description, data_type) select 920000 + g, 'Babyfood, dinner, beef and vegetables ' || g, 'SR Legacy' from generate_series(1, 400) g`);
+      await db.query(`insert into public.usda_foods (fdc_id, description, data_type) values (930001, 'Chicken, broilers or fryers, breast, meat only, cooked, roasted', 'SR Legacy'), (930002, 'Beef', 'Foundation'), (930003, 'Beef, ground, 93% lean meat / 7% fat, raw', 'Foundation'), (930004, 'Milk, whole, 3.25% milkfat', 'SR Legacy'), (930005, 'Oil, olive, salad or cooking', 'SR Legacy')`);
+      await db.query(`insert into public.usda_food_nutrients (fdc_id, nutrient_key, amount_per_100g) values (930001, 'kcal', 165), (930001, 'protein_g', 31), (930001, 'carbs_g', 0), (930001, 'fat_g', 3.6)`);
+      await h.as(ann);
+      const chicken = await tryQ(db, `select fdc_id, description, kcal::int as kcal, protein_g::int as protein from public.search_usda_foods(array['chicken','breast'], 25)`);
+      h.check("'chicken breast' finds the real chicken breast first, not one of 400 soups", chicken.rows?.[0]?.fdc_id === 930001 && chicken.rows[0].kcal === 165 && chicken.rows[0].protein === 31, JSON.stringify(chicken.rows?.slice(0, 2)));
+      const beef = await tryQ(db, `select fdc_id from public.search_usda_foods(array['beef'], 25)`);
+      h.check("'beef' (matched by 400+ foods) puts the food named Beef first, then ground beef, ahead of the baby food", beef.rows?.[0]?.fdc_id === 930002 && beef.rows?.[1]?.fdc_id === 930003, JSON.stringify(beef.rows?.slice(0, 3)));
+      const milk = await tryQ(db, `select fdc_id from public.search_usda_foods(array['milk'], 25)`);
+      h.check("'milk' finds milk", milk.rows?.[0]?.fdc_id === 930004, JSON.stringify(milk.rows?.slice(0, 2)));
+      const oil = await tryQ(db, `select fdc_id from public.search_usda_foods(array['oil','olive'], 25)`);
+      h.check("'oil olive' finds olive oil", oil.rows?.[0]?.fdc_id === 930005, JSON.stringify(oil.rows?.slice(0, 2)));
+      const limited = await tryQ(db, `select count(*)::int as n from public.search_usda_foods(array['chicken'], 1000)`);
+      h.check("never more than 100 rows, however many are asked for", limited.rows?.[0]?.n === 100, JSON.stringify(limited));
+      const wild = await tryQ(db, `select count(*)::int as n from public.search_usda_foods(array['%', '_', ''], 25)`);
+      h.check("wildcard characters are stripped, so they match nothing instead of everything", wild.rows?.[0]?.n === 0, JSON.stringify(wild));
+      const none = await tryQ(db, `select count(*)::int as n from public.search_usda_foods(array[]::text[], 25)`);
+      h.check("an empty search returns nothing", none.rows?.[0]?.n === 0, JSON.stringify(none));
+      await h.asSuper();
+      const anon = await h.one(`select has_function_privilege('anon', 'public.search_usda_foods(text[], integer)', 'execute') as a, has_function_privilege('authenticated', 'public.search_usda_foods(text[], integer)', 'execute') as s`);
+      h.check("signed-in people can search; signed-out visitors cannot", anon.a === false && anon.s === true, JSON.stringify(anon));
     },
   },
 };

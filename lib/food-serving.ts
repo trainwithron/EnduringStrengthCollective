@@ -68,13 +68,14 @@ export function quantityProblem(option: ServingOption, qty: number): string | nu
   return null;
 }
 
-const round3 = (n: number): number => Math.round(n * 1000) / 1000;
+// Six decimals: the stored snapshot is scaled again when the number of servings changes, and a small amount of a food with a tiny trace nutrient (5 g with 0.04 mg) must not lose it.
+const round6 = (n: number): number => Math.round(n * 1_000_000) / 1_000_000;
 
 // Every nutrient the food reports, for this many grams.
 export function scaleNutrients(per100g: NutrientMap, grams: number): NutrientMap {
   const out: NutrientMap = {};
   for (const [key, amount] of Object.entries(per100g)) {
-    if (typeof amount === "number" && Number.isFinite(amount)) out[key] = round3((amount * grams) / 100);
+    if (typeof amount === "number" && Number.isFinite(amount)) out[key] = round6((amount * grams) / 100);
   }
   return out;
 }

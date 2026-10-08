@@ -4,7 +4,10 @@ import {
   CLIENT_AI_PAUSED_MESSAGE,
   MODEL_PRICES,
   UNKNOWN_MODEL_PRICE,
-  budgetFromMultiplier,
+  TOP_UP_PACKS,
+  orgBudgetUsd,
+  packFor,
+  topUpPackLine,
   budgetStatus,
   budgetUsd,
   callCostUsd,
@@ -14,7 +17,6 @@ import {
   totalCostUsd,
 } from "@/lib/ai-budget";
 import { BETA_ALLOWANCE_SCALE } from "@/lib/ai-usage";
-import { CREDIT_PACK_PRICE_CENTS } from "@/lib/coach-credits";
 
 describe("prices", () => {
   it("prices Sonnet 5 and 5.5 at $2 in / $10 out per million tokens and Haiku 5.5 at $0.10 / $0.50 (Anthropic's list, checked 2026-10-08)", () => {
@@ -71,9 +73,45 @@ describe("the budget scales like every other AI limit", () => {
     expect(budgetUsd(500, { exempt: true })).toBe(Math.round(25 * BETA_ALLOWANCE_SCALE * 100) / 100);
     expect(budgetUsd(500, { exempt: true, scale: 1 })).toBe(25);
   });
-  it("matches the multiplier the database computes", () => {
-    expect(budgetFromMultiplier(2)).toBe(50);
-    expect(budgetFromMultiplier(0.3)).toBe(7.5);
+  it("a gym pools its clients: steps by total clients, plus $5 for each coach beyond the first", () => {
+    expect(orgBudgetUsd({ clients: 100, coaches: 1 })).toBe(25);
+    expect(orgBudgetUsd({ clients: 100, coaches: 3 })).toBe(35);
+    expect(orgBudgetUsd({ clients: 250, coaches: 4 })).toBe(90);
+    expect(orgBudgetUsd({ clients: 10, coaches: 2 })).toBe(15);
+  });
+  it("a solo coach's budget is the same as before", () => {
+    expect(orgBudgetUsd({ clients: 40, coaches: 1 })).toBe(budgetUsd(40));
+  });
+  it("a free-access organization gets the beta scale of the steps AND of the extra coaches; an explicit scale of 1 gives the full standard budget", () => {
+    expect(orgBudgetUsd({ clients: 500, coaches: 3, exempt: true })).toBe(Math.round((25 * BETA_ALLOWANCE_SCALE + 10 * BETA_ALLOWANCE_SCALE) * 100) / 100);
+    expect(orgBudgetUsd({ clients: 100, coaches: 1, exempt: true, scale: 1 })).toBe(25);
+    expect(orgBudgetUsd({ clients: 100, coaches: 2, exempt: true, scale: 1 })).toBe(30);
+  });
+  it("paid top-ups add to the month and are never scaled", () => {
+    expect(orgBudgetUsd({ clients: 100, coaches: 1, topUpsUsd: 3.5 })).toBe(28.5);
+    expect(orgBudgetUsd({ clients: 500, coaches: 1, exempt: true, topUpsUsd: 7 })).toBe(Math.round((25 * BETA_ALLOWANCE_SCALE + 7) * 100) / 100);
+  });
+});
+
+describe("top-up packs", () => {
+  it("a $5 pack adds $3.50 and a $10 pack adds $7, priced to stay profitable after Stripe's fees", () => {
+    expect(TOP_UP_PACKS).toEqual([
+      { cents: 500, addUsd: 3.5 },
+      { cents: 1000, addUsd: 7 },
+    ]);
+    for (const p of TOP_UP_PACKS) {
+      const stripeFee = p.cents / 100 * 0.029 + 0.3;
+      expect(p.addUsd + stripeFee).toBeLessThan(p.cents / 100);
+    }
+  });
+  it("finds a pack by what was paid, and knows no other amount", () => {
+    expect(packFor(500)?.addUsd).toBe(3.5);
+    expect(packFor(1000)?.addUsd).toBe(7);
+    expect(packFor(750)).toBeNull();
+    expect(packFor(100000)).toBeNull();
+  });
+  it("says what a pack buys in plain words", () => {
+    expect(topUpPackLine()).toBe("A $5 top-up adds $3.50 of AI for this month; a $10 top-up adds $7 of AI for this month.");
   });
 });
 
@@ -101,24 +139,28 @@ describe("budgetStatus", () => {
 describe("the words", () => {
   const live = { available: true, supportEmail: "help@enduringstrengthco.com", resetsOn: "November 1" };
   const off = { available: false, supportEmail: "help@enduringstrengthco.com", resetsOn: "November 1" };
-  it("tells the coach plainly at about 80 percent, with the existing top-up price and what stays free", () => {
+  it("tells the coach plainly at about 80 percent, with what a top-up really buys, when a purchase is possible", () => {
     const m = coachBudgetMessage("low", live);
     expect(m).toContain("Heads up: your AI for this month is almost used up.");
     expect(m).toContain("Every AI request costs real money, and I'm running a small business");
-    expect(m).toContain(`Top-ups start at $${CREDIT_PACK_PRICE_CENTS / 100}.`);
+    expect(m).toContain("so extra AI use is a paid top-up");
+    expect(m).toContain("A $5 top-up adds $3.50 of AI for this month; a $10 top-up adds $7 of AI for this month.");
     expect(m).toContain("Food search, barcode and saved meals stay free.");
   });
-  it("while billing is off there is no top-up to buy: it says AI resumes on the 1st and how to reach help", () => {
+  it("while a purchase is not possible there is NO price and no buy wording: it says what will happen and when, and how to reach help", () => {
     for (const level of ["low", "out"] as const) {
       const m = coachBudgetMessage(level, off);
       expect(m).toContain("November 1");
       expect(m).toContain("help@enduringstrengthco.com");
-      expect(m).not.toMatch(/buy|purchase|checkout/i);
-      expect(m).not.toContain("Top-ups start at");
+      expect(m).toContain("will become a paid top-up, which isn't open yet");
+      expect(m).not.toMatch(/buy|purchase|checkout|\$/i);
+      // no contradiction: it never says extra use "is" a paid top-up while also saying top-ups are not open
+      expect(m).not.toContain("so extra AI use is a paid top-up");
     }
   });
   it("says AI features are paused when it is used up", () => {
     expect(coachBudgetMessage("out", live)).toContain("used up, so AI features are paused");
+    expect(coachBudgetMessage("out", off)).toContain("paused until November 1");
   });
   it("never shows a client the business explanation, only a friendly pause and what still works", () => {
     expect(CLIENT_AI_PAUSED_MESSAGE).toBe("AI photo and typed logging is paused for this month. You can still search foods, scan a barcode or use your saved meals.");

@@ -1,5 +1,4 @@
-import { CLIENT_STEP_SIZE, aiMultiplier, type AllowanceScaleInput } from "@/lib/ai-usage";
-import { CREDIT_PACK_PRICE_CENTS } from "@/lib/coach-credits";
+import { BETA_ALLOWANCE_SCALE, CLIENT_STEP_SIZE, aiMultiplier, type AllowanceScaleInput } from "@/lib/ai-usage";
 
 // The monthly AI budget: ONE number per coach, in real cost, for everything the AI does on their behalf (programs, meal plans and slots, Spot questions, the daily briefing,
 // the spotters, imports, food photo and typed logging). Every AI call is logged with its model and token counts (ai_usage_log); this prices them and compares the month's total with
@@ -57,18 +56,51 @@ export function totalCostUsd(rows: ModelUsage[]): number {
 }
 
 // ---- the budget ------------------------------------------------------------------------------------------------------------------------------------
-// US dollars of AI per 100-client step per month. Change this one number to change every coach's budget. It is scaled exactly like the other AI limits (aiMultiplier): a coach
-// with fewer than 25 clients gets a prorated share (never below a quarter), 100 clients = one step, 150 = two, and a free-access (beta) organization gets BETA_ALLOWANCE_SCALE
-// of a step unless the platform admin sets its own scale.
+// US dollars of AI per 100-client step per month, for the whole ORGANIZATION: a solo coach's organization is just them; a gym with several trainers shares one pool. Change these
+// numbers to change every budget. It is scaled exactly like the other AI limits (aiMultiplier): an organization with fewer than 25 clients gets a prorated share (never below a
+// quarter), 100 clients = one step, 150 = two. Each coach beyond the first adds a little (they are real people using it). A free-access (beta) organization gets BETA_ALLOWANCE_SCALE of
+// all that unless the platform admin sets the organization's own scale (Admin > Organizations). Paid top-up packs add to ONE month's budget (TOP_UP_PACKS).
 export const AI_BUDGET_USD_PER_STEP = 25;
+export const AI_BUDGET_USD_PER_EXTRA_COACH = 5;
 export { CLIENT_STEP_SIZE };
 
-export function budgetUsd(clientCount: number, opts: AllowanceScaleInput = {}): number {
-  return Math.round(AI_BUDGET_USD_PER_STEP * aiMultiplier(clientCount, opts) * 100) / 100;
+// A top-up pack: what the coach pays and the dollars of AI it adds to THIS month's budget. Priced so a pack is profitable after Stripe's fees: $5 buys $3.50 of AI, $10 buys $7.
+// A pack only ever adds to the month it was bought in.
+export interface TopUpPack {
+  cents: number;
+  addUsd: number;
+}
+export const TOP_UP_PACKS: TopUpPack[] = [
+  { cents: 500, addUsd: 3.5 },
+  { cents: 1000, addUsd: 7 },
+];
+export const packFor = (cents: number): TopUpPack | null => TOP_UP_PACKS.find((p) => p.cents === cents) ?? null;
+
+export interface OrgBudgetInput {
+  clients: number;
+  coaches: number;
+  exempt?: boolean;
+  scale?: number | null;
+  // Dollars added to this month by paid top-ups.
+  topUpsUsd?: number;
 }
 
-// The same, from the multiplier the database already computes (coach_ai_multiplier, which mirrors aiMultiplier).
-export const budgetFromMultiplier = (multiplier: number): number => Math.round(AI_BUDGET_USD_PER_STEP * multiplier * 100) / 100;
+const roundCents = (n: number): number => Math.round(n * 100) / 100;
+
+// The organization's budget for the month: steps by total clients, plus a little for each coach beyond the first, both scaled for a free-access or specially-scaled organization,
+// plus this month's paid top-ups (which are never scaled).
+export function orgBudgetUsd(input: OrgBudgetInput): number {
+  const opts: AllowanceScaleInput = { exempt: input.exempt, scale: input.scale };
+  const steps = AI_BUDGET_USD_PER_STEP * aiMultiplier(input.clients, opts);
+  const factor = input.scale != null ? input.scale : input.exempt ? BETA_ALLOWANCE_SCALE : 1;
+  const extras = AI_BUDGET_USD_PER_EXTRA_COACH * Math.max(0, input.coaches - 1) * factor;
+  return roundCents(steps + extras + (input.topUpsUsd ?? 0));
+}
+
+// A solo coach with no top-ups (the common case), for the simple callers and tests.
+export function budgetUsd(clientCount: number, opts: AllowanceScaleInput = {}): number {
+  return orgBudgetUsd({ clients: clientCount, coaches: 1, exempt: opts.exempt, scale: opts.scale });
+}
 
 export const LOW_AT = 0.8;
 
@@ -92,29 +124,33 @@ export function budgetStatus(spentUsd: number, budget: number, unlimited = false
 
 // ---- words -----------------------------------------------------------------------------------------------------------------------------------------
 export interface TopUpInfo {
-  // True when buying more is possible right now (payments are switched on). While billing is off there is no buy button and the message says AI resumes on the 1st.
+  // True only when a coach can really buy more right now: payments are switched on AND a purchase adds to the budget (it does, through the payment webhook). While billing is off
+  // there is no buy option and the message says AI resumes on the 1st.
   available: boolean;
   supportEmail: string | null;
   resetsOn: string; // "November 1"
 }
 
 const money = (cents: number): string => `$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`;
+const usd = (n: number): string => `$${n.toFixed(Number.isInteger(n) ? 0 : 2)}`;
 
-// The coach hears it plainly, in Ron's own voice. The top-up price is the existing top-up pack price (lib/coach-credits.ts), never a number made up here.
+// "A $5 top-up adds $3.50 of AI for this month; a $10 top-up adds $7."
+export const topUpPackLine = (): string => TOP_UP_PACKS.map((p, i) => `${i === 0 ? "A" : "a"} ${money(p.cents)} top-up adds ${usd(p.addUsd)} of AI for this month`).join("; ") + ".";
+
+// The coach hears it plainly, in Ron's own voice. A price is only ever mentioned when a purchase really lifts the pause (top.available); otherwise the message says what will happen
+// and when, and never points at a button that does not exist.
 export function coachBudgetMessage(level: "low" | "out", top: TopUpInfo): string {
   const free = "Food search, barcode and saved meals stay free.";
-  const business =
-    "Every AI request costs real money, and I'm running a small business: if it keeps going past what's included I lose money, so extra AI use is a paid top-up.";
-  const price = `Top-ups start at ${money(CREDIT_PACK_PRICE_CENTS)}.`;
   const help = top.supportEmail ? ` Questions: ${top.supportEmail}.` : "";
+  const cost = "Every AI request costs real money, and I'm running a small business";
   if (level === "low") {
     return top.available
-      ? `Heads up: your AI for this month is almost used up. ${business} ${price} ${free}`
-      : `Heads up: your AI for this month is almost used up. ${business} Top-ups aren't open yet, so if it runs out, AI features pause until ${top.resetsOn}. ${free}${help}`;
+      ? `Heads up: your AI for this month is almost used up. ${cost}: if it keeps going past what's included I lose money, so extra AI use is a paid top-up. ${topUpPackLine()} ${free}`
+      : `Heads up: your AI for this month is almost used up. ${cost}: AI use beyond what's included will become a paid top-up, which isn't open yet. If it runs out, AI features pause until ${top.resetsOn}. ${free}${help}`;
   }
   return top.available
-    ? `Your AI for this month is used up, so AI features are paused. ${business} ${price} ${free}`
-    : `Your AI for this month is used up, so AI features are paused until ${top.resetsOn}. ${business} Top-ups aren't open yet. ${free}${help}`;
+    ? `Your AI for this month is used up, so AI features are paused. ${cost}: extra AI use is a paid top-up. ${topUpPackLine()} ${free}`
+    : `Your AI for this month is used up, so AI features are paused until ${top.resetsOn}. ${cost}: AI use beyond what's included will become a paid top-up, which isn't open yet. ${free}${help}`;
 }
 
 // What a CLIENT sees when their coach's AI is used up. Never the business explanation, and always the ways that still work.

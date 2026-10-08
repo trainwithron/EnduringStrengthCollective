@@ -15,8 +15,9 @@ export function FoodTrackingToggle({ athleteId, groupId, initialEnabled, clientF
     setEnabled(next);
     setSaving(true);
     setError(null);
-    const { error: saveError } = await createBrowserClient().from("group_memberships").update({ food_tracking_enabled: next }).eq("group_id", groupId).eq("profile_id", athleteId);
-    if (saveError) {
+    // Ask for the row back: row security can change zero rows without an error, and the switch should only say it saved when a row really changed.
+    const { data, error: saveError } = await createBrowserClient().from("group_memberships").update({ food_tracking_enabled: next }).eq("group_id", groupId).eq("profile_id", athleteId).select("food_tracking_enabled");
+    if (saveError || !data || data.length === 0) {
       setEnabled(!next);
       setError("That didn't save. The switch is back to what it was.");
     }

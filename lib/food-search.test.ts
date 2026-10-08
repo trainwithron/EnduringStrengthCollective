@@ -53,8 +53,10 @@ describe("ranking", () => {
 });
 
 // A small fake of the Supabase query builder, enough for the two reads each function makes.
-function fakeSupabase(tables: Record<string, unknown[]>, failOn: string[] = []) {
+type RpcAnswer = { data: unknown; error: { code?: string; message: string } | null };
+function fakeSupabase(tables: Record<string, unknown[]>, failOn: string[] = [], rpcAnswer: RpcAnswer = { data: null, error: { code: "PGRST202", message: "Could not find the function public.search_usda_foods" } }) {
   const calls: { table: string; ilike: string[] }[] = [];
+  const rpcCalls: { fn: string; args: Record<string, unknown> }[] = [];
   const from = (table: string) => {
     const state = { ilike: [] as string[] };
     calls.push({ table, ilike: state.ilike });
@@ -71,10 +73,50 @@ function fakeSupabase(tables: Record<string, unknown[]>, failOn: string[] = []) 
     chain.then = (resolve: (v: unknown) => unknown) => Promise.resolve(result()).then(resolve);
     return chain;
   };
-  return { client: { from } as never, calls };
+  const rpc = async (fn: string, args: Record<string, unknown>) => {
+    rpcCalls.push({ fn, args });
+    return rpcAnswer;
+  };
+  return { client: { from, rpc } as never, calls, rpcCalls };
 }
 
-describe("searchFoods", () => {
+describe("searchFoods (ranked in the database)", () => {
+  const ranked = (rows: Record<string, unknown>[]): RpcAnswer => ({ data: rows, error: null });
+  it("asks the database to rank by the cleaned words and keeps its order", async () => {
+    const { client, rpcCalls } = fakeSupabase(
+      {},
+      [],
+      ranked([
+        { fdc_id: 930001, description: "Chicken, broilers or fryers, breast, meat only, cooked, roasted", data_type: "SR Legacy", food_category: null, kcal: "165", protein_g: "31", carbs_g: "0", fat_g: "3.6" },
+        { fdc_id: 5, description: "Soup, chicken noodle", data_type: "SR Legacy", food_category: null, kcal: null, protein_g: null, carbs_g: null, fat_g: null },
+      ])
+    );
+    const hits = await searchFoods(client, "Chicken, BREAST!!");
+    expect(rpcCalls).toEqual([{ fn: "search_usda_foods", args: { p_tokens: ["chicken", "breast"], p_limit: 25 } }]);
+    expect(hits?.map((h) => h.fdcId)).toEqual([930001, 5]);
+    expect(hits?.[0].per100g).toEqual({ kcal: 165, protein_g: 31, carbs_g: 0, fat_g: 3.6 });
+    // a macro the food does not report is absent, never zero
+    expect(hits?.[1].per100g).toEqual({});
+  });
+  it("the common words people type all go through the database ranking (chicken, beef, pork, cheese, milk, oil)", async () => {
+    for (const word of ["chicken", "beef", "pork", "cheese", "milk", "oil"]) {
+      const { client, rpcCalls } = fakeSupabase({}, [], ranked([]));
+      expect(await searchFoods(client, word)).toEqual([]);
+      expect(rpcCalls[0].args.p_tokens).toEqual([word]);
+    }
+  });
+  it("says the search failed (null) instead of 'nothing found' when the database errors", async () => {
+    const { client } = fakeSupabase({}, [], { data: null, error: { code: "57014", message: "statement timeout" } });
+    expect(await searchFoods(client, "rice")).toBeNull();
+  });
+  it("never limits to an arbitrary 300 rows itself: the cap is applied after the database ranked (limit is passed through)", async () => {
+    const many = Array.from({ length: 60 }, (_, i) => ({ fdc_id: i + 1, description: `Beef ${i}`, data_type: "SR Legacy", food_category: null, kcal: 1, protein_g: 1, carbs_g: 1, fat_g: 1 }));
+    const { client } = fakeSupabase({}, [], ranked(many));
+    expect((await searchFoods(client, "beef"))?.length).toBe(25);
+  });
+});
+
+describe("searchFoods (database without the function yet)", () => {
   it("matches every word, ranks, and attaches the four macros per 100 g", async () => {
     const { client, calls } = fakeSupabase({
       usda_foods: [row(2, "Chicken, broilers or fryers, breast, meat only, cooked, roasted"), row(1, "Soup, chicken noodle")],
@@ -85,16 +127,16 @@ describe("searchFoods", () => {
     });
     const hits = await searchFoods(client, "chicken breast");
     expect(calls[0].ilike).toEqual(["%chicken%", "%breast%"]);
-    expect(hits[0].fdcId).toBe(2);
-    expect(hits[0].per100g).toEqual({ kcal: 165, protein_g: 31 });
+    expect(hits?.[0].fdcId).toBe(2);
+    expect(hits?.[0].per100g).toEqual({ kcal: 165, protein_g: 31 });
     // a food with no nutrient rows is still listed, with nothing claimed about it
-    expect(hits.find((h) => h.fdcId === 1)?.per100g).toEqual({});
+    expect(hits?.find((h) => h.fdcId === 1)?.per100g).toEqual({});
   });
-  it("returns nothing for an empty query or a failed read", async () => {
+  it("returns nothing for an empty query and null for a failed read", async () => {
     const { client } = fakeSupabase({ usda_foods: [row(1, "Rice")] });
     expect(await searchFoods(client, "  ")).toEqual([]);
     const failing = fakeSupabase({ usda_foods: [row(1, "Rice")] }, ["usda_foods"]);
-    expect(await searchFoods(failing.client, "rice")).toEqual([]);
+    expect(await searchFoods(failing.client, "rice")).toBeNull();
   });
   it("cannot be used to widen the pattern: wildcard characters in the query never reach it", async () => {
     const { client, calls } = fakeSupabase({ usda_foods: [] });

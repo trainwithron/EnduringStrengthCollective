@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { NewOrganizationForm } from "@/components/admin/new-organization-form";
 import { OrgBillingExemptToggle } from "@/components/admin/org-billing-exempt-toggle";
+import { OrgAiScaleControl } from "@/components/admin/org-ai-scale-control";
 
 export default async function AdminOrganizationsPage() {
   const supabase = await createServerClient();
@@ -33,8 +34,9 @@ export default async function AdminOrganizationsPage() {
     .from("groups")
     .select("id, organization_id, created_at")
     .order("created_at", { ascending: true });
-  const { data: billingRows } = await supabase.from("organization_billing").select("organization_id, billing_exempt");
+  const { data: billingRows } = await supabase.from("organization_billing").select("organization_id, billing_exempt, ai_allowance_scale");
   const exemptByOrg = new Map((billingRows ?? []).map((b) => [b.organization_id, b.billing_exempt]));
+  const aiScaleByOrg = new Map((billingRows ?? []).map((b) => [b.organization_id, b.ai_allowance_scale == null ? null : Number(b.ai_allowance_scale)]));
   const groupCountByOrg = new Map<string, number>();
   const firstGroupByOrg = new Map<string, string>();
   for (const g of groupCounts ?? []) {
@@ -84,6 +86,7 @@ export default async function AdminOrganizationsPage() {
                 ) : (
                   <div className="flex-1">{info}</div>
                 )}
+                <OrgAiScaleControl organizationId={org.id} initialScale={aiScaleByOrg.get(org.id) ?? null} />
                 <OrgBillingExemptToggle organizationId={org.id} initialExempt={exemptByOrg.get(org.id) ?? false} />
               </div>
             );
