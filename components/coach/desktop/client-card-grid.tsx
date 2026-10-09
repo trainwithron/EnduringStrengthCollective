@@ -487,7 +487,7 @@ export function ClientCardGrid({
       .in("profile_id", ids);
     setBulkBusy(false);
     if (updateError) {
-      setError("Couldn't update tier for the selected athletes.");
+      setError(`Couldn't update tier for the selected ${t("client", "plural")}.`);
       return;
     }
     setSelectedIds(new Set());
@@ -501,7 +501,7 @@ export function ClientCardGrid({
       setError("A group needs at least one coach — deselect the coach before removing.");
       return;
     }
-    if (!await confirmDialog(`Remove ${targets.length} selected ${targets.length === 1 ? "athlete" : "athletes"} from the group?`)) {
+    if (!await confirmDialog(`Remove ${targets.length} selected ${t("client", targets.length === 1 ? "singular" : "plural")} from the group?`)) {
       return;
     }
     setBulkBusy(true);
@@ -515,7 +515,7 @@ export function ClientCardGrid({
       .in("profile_id", ids);
     setBulkBusy(false);
     if (deleteError) {
-      setError("Couldn't remove the selected athletes.");
+      setError(`Couldn't remove the selected ${t("client", "plural")}.`);
       setRows(members);
       return;
     }
@@ -880,7 +880,7 @@ export function ClientCardGrid({
                         }}
                             className="whitespace-nowrap px-3 py-2 font-body text-xs text-chalk hover:bg-graphite/50 disabled:opacity-40"
                       >
-                        {member.role === "coach" ? "Make athlete" : "Make coach"}
+                        {member.role === "coach" ? `Make ${t("client")}` : "Make coach"}
                       </button>
                     </div>
                   )}

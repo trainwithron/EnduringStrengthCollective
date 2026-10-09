@@ -80,7 +80,7 @@ export function ClientAnswersPanel({
 
   async function scalePlan() {
     if (!currentTarget) return;
-    if (!await confirmDialog(`Scale ${clientName}'s saved meal plans from today on to ${currentTarget.calories.toLocaleString("en-US")} calories? Amounts change; the meals stay the same.`)) return;
+    if (!await confirmDialog({ message: `Scale ${clientName}'s saved meal plans from today on to ${currentTarget.calories.toLocaleString("en-US")} calories? Amounts change; the meals stay the same.`, confirmLabel: "Scale plans" })) return;
     setError(null);
     setMessage(null);
     setBusy("scale");

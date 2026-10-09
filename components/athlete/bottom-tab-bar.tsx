@@ -7,6 +7,7 @@ import { Home, CalendarDays, MessagesSquare, Mail, Settings, Apple, Users, Menu 
 import { createBrowserClient } from "@/lib/supabase/client";
 import { hasSocialTabAccess } from "@/lib/social-access";
 import { usePushStatus } from "@/lib/use-push-status";
+import { useTerm } from "@/components/coach/terminology-provider";
 
 // Home/Workout merge (mobile_home_workout_tab_merge_idea.md, locked
 // 2026-09-14): Home itself is now today's workout — a hero CTA at the
@@ -40,6 +41,7 @@ export function BottomTabBar({
   onMoreClick?: () => void;
 }) {
   const pathname = usePathname();
+  const term = useTerm();
   // A small dot on Settings while notifications could be switched on but aren't — the way to
   // reach the toggle is right there. Not shown where the device can't do push at all.
   const { state: pushState } = usePushStatus();
@@ -136,7 +138,7 @@ export function BottomTabBar({
 
   const coachTabs: { key: TabKey; label: string; href: string | null; icon: typeof Home }[] = [
     { key: "home", label: "Home", href: `/groups/${groupId}`, icon: Home },
-    { key: "roster", label: "Clients", href: `/groups/${groupId}/clients`, icon: Users },
+    { key: "roster", label: term("client", "plural", { cap: true }), href: `/groups/${groupId}/clients`, icon: Users },
     { key: "messages", label: "Messages", href: `/groups/${groupId}/messages`, icon: Mail },
     { key: "calendar", label: "Calendar", href: `/groups/${groupId}/calendar`, icon: CalendarDays },
     { key: "more", label: "More", href: null, icon: Menu },

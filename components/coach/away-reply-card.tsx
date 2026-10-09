@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { awayReplyState, DEFAULT_AWAY_REPLY, MAX_AWAY_REPLY } from "@/lib/away-reply";
+import { awayReplyState, DEFAULT_AWAY_REPLY, MAX_AWAY_REPLY, readableDay } from "@/lib/away-reply";
 
 export interface AwayReplySetting {
   enabled: boolean;
@@ -16,7 +16,8 @@ export function AwayReplyCard({ coachId, initial, today }: { coachId: string; in
   const [setting, setSetting] = useState<AwayReplySetting | null>(initial);
   const [editing, setEditing] = useState(false);
   const [message, setMessage] = useState(initial?.message?.trim() ? initial.message : DEFAULT_AWAY_REPLY);
-  const [endsOn, setEndsOn] = useState(initial?.endsOn ?? "");
+  // An away reply that has ended starts the form with no last day (the old one is in the past and would be refused).
+  const [endsOn, setEndsOn] = useState(awayReplyState(initial, today) === "ended" ? "" : initial?.endsOn ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -103,10 +104,10 @@ export function AwayReplyCard({ coachId, initial, today }: { coachId: string; in
             {state === "on" ? (
               <>
                 <span className="font-bold text-rust">Away reply is ON</span>
-                {setting?.endsOn ? ` until ${setting.endsOn}` : ""}. Clients who message you get your reply.
+                {setting?.endsOn ? ` until ${readableDay(setting.endsOn)}` : ""}. Clients who message you get your reply.
               </>
             ) : state === "ended" ? (
-              <>Away reply ended on {setting?.endsOn}. It is off.</>
+              <>Away reply ended on {setting?.endsOn ? readableDay(setting.endsOn) : "its last day"}. It is off.</>
             ) : (
               <>Away reply is off.</>
             )}

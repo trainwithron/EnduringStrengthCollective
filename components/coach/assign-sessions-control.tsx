@@ -40,7 +40,7 @@ export function AssignSessionsControl({
       setMessage("The balance is already " + next + ".");
       return;
     }
-    if (!await confirmDialog(`Set ${clientName}'s balance from ${balance} to ${next}? This is recorded in their session ledger.`)) return;
+    if (!await confirmDialog({ message: `Set ${clientName}'s balance from ${balance} to ${next}? This is recorded in their session ledger.`, confirmLabel: "Set balance" })) return;
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -88,9 +88,10 @@ export function AssignSessionsControl({
       return;
     }
     if (
-      !await confirmDialog(
-        `Add ${n} session${n === 1 ? "" : "s"} to ${clientName}? Their balance goes from ${balance} to ${balance + n}.`
-      )
+      !await confirmDialog({
+        message: `Add ${n} session${n === 1 ? "" : "s"} to ${clientName}? Their balance goes from ${balance} to ${balance + n}.`,
+        confirmLabel: "Add sessions",
+      })
     ) {
       return;
     }

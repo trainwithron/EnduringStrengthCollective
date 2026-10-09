@@ -143,7 +143,7 @@ export function ClientSeriesPanel({
                 className={btn}
                 disabled={busy !== null}
                 onClick={async () => {
-                  if (await confirmDialog(`End this weekly schedule and remove the ${s.upcoming.length} upcoming sessions? Sessions that already happened stay.`)) {
+                  if (await confirmDialog({ message: `End this weekly schedule and remove the ${s.upcoming.length} upcoming sessions? Sessions that already happened stay.`, confirmLabel: "End schedule" })) {
                     run(`${s.id}-end`, `/api/series/${s.id}`, { action: "end", cancelUpcoming: true });
                   }
                 }}
@@ -242,7 +242,7 @@ export function ClientSeriesPanel({
                           className={btn}
                           disabled={busy !== null || !editedStartIso()}
                           onClick={async () => {
-                            if (await confirmDialog("Change this session and every one after it to the new day and time?")) {
+                            if (await confirmDialog({ message: "Change this session and every one after it to the new day and time?", confirmLabel: "Change them all" })) {
                               run(`${u.bookingId}-rest`, "/api/series/occurrence", {
                                 bookingId: u.bookingId,
                                 action: "change_from_here",

@@ -116,7 +116,7 @@ export function ChangeClientGroupControl({
       destination === "existing"
         ? `Move ${athleteName} to "${orgGroups?.find((g) => g.id === selectedGroupId)?.name ?? "this group"}"? Their credits, history, and programs move with them.`
         : `Create a new 1-on-1 group "${trimmedNewName}" and move ${athleteName} into it?`;
-    if (!await confirmDialog(confirmMessage)) return;
+    if (!await confirmDialog({ message: confirmMessage, confirmLabel: destination === "existing" ? "Move" : "Create and move" })) return;
 
     setMoving(true);
     const supabase = createBrowserClient();

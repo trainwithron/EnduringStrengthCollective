@@ -2,6 +2,7 @@
 
 import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
+import { useTerm } from "@/components/coach/terminology-provider";
 import { useRouter } from "next/navigation";
 import { addDaysToDateKey } from "@/lib/series-schedule";
 import { dateKeyInZone, zonedTimeToUtc } from "@/lib/timezone";
@@ -61,6 +62,7 @@ export function GroupSessionsManager({
   nowIso: string;
 }) {
   const router = useRouter();
+  const term = useTerm();
   const [title, setTitle] = useState("");
   const [dateKey, setDateKey] = useState(addDaysToDateKey(dateKeyInZone(timezone), 1));
   const [time, setTime] = useState("18:00");
@@ -158,7 +160,7 @@ export function GroupSessionsManager({
         {!cancelled && !past && (
           <div className="flex flex-wrap items-end gap-3 mt-3">
             <label className="block">
-              <span className="font-body text-xs text-steel block mb-1">Add a client</span>
+              <span className="font-body text-xs text-steel block mb-1">Add a {term("client")}</span>
               <select className={`${input} min-w-[11rem]`} value={addPick[c.id] ?? ""} onChange={(e) => setAddPick((p) => ({ ...p, [c.id]: e.target.value }))}>
                 <option value="">Choose…</option>
                 {addable.map((cl) => (
@@ -248,7 +250,7 @@ export function GroupSessionsManager({
             <input className={`${input} w-full`} value={place} onChange={(e) => setPlace(e.target.value)} maxLength={200} />
           </label>
           <p className="font-body text-xs text-steel">
-            Times are in your time zone ({timezone.replace("_", " ")}). The time is blocked in your calendar. Clients join with one tap; a client
+            Times are in your time zone ({timezone.replace("_", " ")}). The time is blocked in your calendar. {term("client", "plural", { cap: true })} join with one tap; a {term("client")}
             who joins uses one session. When it is full, the next people go on a waiting list.
           </p>
           <button type="submit" disabled={busy !== null} className="bg-rust text-graphite font-display font-bold uppercase tracking-wide px-4 py-2 disabled:opacity-40">

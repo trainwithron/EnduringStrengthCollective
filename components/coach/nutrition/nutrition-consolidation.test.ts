@@ -131,7 +131,7 @@ describe("Apply writes the STANDING target from an apply-from date, never lies a
   });
   it("the standing editor lists scheduled targets, asks before a save removes one, and can remove one on its own", () => {
     const standing = src("../desktop/standing-macro-target-card.tsx");
-    expect(standing).toContain("scheduled.length > 0 && !await confirmDialog(scheduledConfirmMessage(scheduled))");
+    expect(standing).toContain('scheduled.length > 0 && !await confirmDialog({ message: scheduledConfirmMessage(scheduled), confirmLabel: "Save target" })');
     expect(standing).toContain("removeScheduled(r.date)");
     expect(standing).toContain("Scheduled");
     expect(clientNutrition).toContain("scheduled={scheduledTargets}");

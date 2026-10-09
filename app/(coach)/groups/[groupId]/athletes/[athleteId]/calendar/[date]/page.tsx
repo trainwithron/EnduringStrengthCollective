@@ -3,6 +3,7 @@ import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { getViewerDisplayTimezone } from "@/lib/display-timezone-server";
+import { SwappableTerm } from "@/components/coach/swappable-term";
 import { zonedTimeToUtc } from "@/lib/timezone";
 import { formatInTimezone } from "@/lib/format-in-timezone";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
@@ -417,7 +418,7 @@ export default async function ClientCalendarDayPage(
             {dayBookings.map((b: any, i: number) => (
               <div key={i} className="py-2 flex items-center justify-between">
                 <span className="font-body text-sm">
-                  {b.profiles?.full_name ?? "A client"}
+                  {b.profiles?.full_name ?? <SwappableTerm termKey="client" cap />}
                 </span>
                 <span className="font-body text-xs text-steel">
                   {formatInTimezone(b.start_at, displayZone, "time")}

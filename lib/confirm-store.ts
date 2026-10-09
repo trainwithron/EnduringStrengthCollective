@@ -25,7 +25,9 @@ export function describeConfirm(options: string | ConfirmOptions): ConfirmReques
   const o: ConfirmOptions = typeof options === "string" ? { message: options } : options;
   const message = o.message;
   const first = message.trim().split(/\s+/)[0]?.toLowerCase().replace(/[^a-z]/g, "") ?? "";
-  const destructive = o.destructive ?? DESTRUCTIVE.test(message);
+  // Only the question itself decides the red button: a later sentence that says what is NOT touched ("nothing is cancelled") is not a reason to warn.
+  const question = message.includes("?") ? message.slice(0, message.indexOf("?") + 1) : message;
+  const destructive = o.destructive ?? DESTRUCTIVE.test(question);
   let confirmLabel = o.confirmLabel;
   let cancelLabel = o.cancelLabel;
   if (!confirmLabel) {

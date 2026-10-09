@@ -36,8 +36,8 @@ export function ProgramRoleControl({
     setMessage(null);
     const trimmedOrder = order.trim();
     const parsedOrder = trimmedOrder === "" ? null : Number(trimmedOrder);
-    if (parsedOrder !== null && (!Number.isInteger(parsedOrder) || parsedOrder < 0 || parsedOrder > 99)) {
-      setError("Order must be a whole number from 0 to 99, or empty.");
+    if (parsedOrder !== null && (!Number.isInteger(parsedOrder) || parsedOrder < 1 || parsedOrder > 99)) {
+      setError("Order must be a whole number from 1 to 99, or empty.");
       return;
     }
     setBusy(true);
@@ -58,7 +58,7 @@ export function ProgramRoleControl({
   if (!available) {
     return (
       <p className="font-body text-xs text-steel max-w-[40ch]">
-        Labelling programs (Main, Mobility, Warm-up) turns on after the next database update.
+        Labels for programs (Main, Mobility, Warm-up) are not switched on yet.
       </p>
     );
   }
@@ -88,7 +88,7 @@ export function ProgramRoleControl({
         inputMode="numeric"
         aria-label="Order: which program comes first (1 is first)"
         title="The order sets which program comes first for the client (1 is first)."
-        min={0}
+        min={1}
         max={99}
         value={order}
         onChange={(e) => {

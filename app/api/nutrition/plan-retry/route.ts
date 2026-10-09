@@ -87,7 +87,7 @@ export async function POST(request: Request) {
     rotateFeatured: true,
   });
   if (rebuilt.rows.length === 0 || rebuilt.hasEmptyMeal) {
-    return fail("I couldn't find meals that fit all of that. Try changing less, or message your coach.", 422);
+    return fail("We couldn't find meals that fit all of that. Try changing less, or message your coach.", 422);
   }
   if (!planChanged(plan, rebuilt.rows)) {
     return fail("The library didn't have different meals that fit. Try asking for something else, or message your coach.", 422);

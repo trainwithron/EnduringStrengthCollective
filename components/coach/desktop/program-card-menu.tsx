@@ -231,11 +231,12 @@ export function ProgramCardMenu({
     if (athletes.length === 0) return;
 
     if (
-      !await confirmDialog(
-        `Assign "${programName}" to all ${athletes.length} athletes on ${position.name}?\n\n${athletes
+      !await confirmDialog({
+        message: `Assign "${programName}" to all ${athletes.length} athletes on ${position.name}?\n\n${athletes
           .map((a) => a.fullName)
-          .join(", ")}`
-      )
+          .join(", ")}`,
+        confirmLabel: "Assign",
+      })
     ) {
       return;
     }
@@ -478,7 +479,7 @@ export function ProgramCardMenu({
                     }}
                     className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50"
                   >
-                    Assign to Client
+                    Assign program
                   </button>
                   <button
                     type="button"

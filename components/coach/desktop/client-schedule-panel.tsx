@@ -103,7 +103,7 @@ export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client
   async function adjustCredits(delta: number) {
     if (!groupId) return;
     // Money moves with one tap here, so it is asked once.
-    if (!await confirmDialog(`${delta > 0 ? "Add" : "Remove"} one ${noun.singular} ${delta > 0 ? "to" : "from"} ${client.fullName}?`)) return;
+    if (!await confirmDialog({ message: `${delta > 0 ? "Add" : "Remove"} one ${noun.singular} ${delta > 0 ? "to" : "from"} ${client.fullName}?`, confirmLabel: delta > 0 ? "Add" : "Remove" })) return;
     setAdjusting(true);
     setError(null);
     const { data: newBalance, error: rpcError } = await createBrowserClient().rpc("adjust_session_credits", { p_athlete_id: client.athleteId, p_group_id: groupId, p_delta: delta });

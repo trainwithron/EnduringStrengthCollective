@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTerm } from "@/components/coach/terminology-provider";
 import { createBrowserClient } from "@/lib/supabase/client";
 
 interface RosterOption {
@@ -17,6 +18,7 @@ interface RosterOption {
 // `window.location.href = data.url`), just coach-initiated with a
 // coach-typed amount instead of a client picking a pre-set package.
 export function QuickPaymentPanel({ groupId }: { groupId: string }) {
+  const term = useTerm();
   const [roster, setRoster] = useState<RosterOption[] | null>(null);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<RosterOption | null>(null);
@@ -76,7 +78,7 @@ export function QuickPaymentPanel({ groupId }: { groupId: string }) {
   return (
     <div className="flex flex-col h-full min-h-0 overflow-y-auto p-4 space-y-4">
       <div>
-        <label className="font-body text-xs text-steel uppercase tracking-wide">Client</label>
+        <label className="font-body text-xs text-steel uppercase tracking-wide">{term("client", "singular", { cap: true })}</label>
         {selected ? (
           <div className="mt-1 flex items-center justify-between border border-rust/40 bg-rust/5 px-3 h-10">
             <span className="font-body text-sm text-chalk">{selected.fullName}</span>
@@ -90,14 +92,14 @@ export function QuickPaymentPanel({ groupId }: { groupId: string }) {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search clients…"
+              placeholder={`Search ${term("client", "plural")}…`}
               className="w-full h-10 mt-1 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
             />
             <div className="mt-2 max-h-40 overflow-y-auto divide-y divide-steel/10 border border-steel/20">
               {roster === null ? (
                 <p className="font-body text-xs text-steel p-3">Loading…</p>
               ) : filtered.length === 0 ? (
-                <p className="font-body text-xs text-steel p-3">No matching clients.</p>
+                <p className="font-body text-xs text-steel p-3">No matching {term("client", "plural")}.</p>
               ) : (
                 filtered.map((r) => (
                   <button

@@ -621,7 +621,7 @@ export function MealPlanGenerator({
         (replacement.skippedPast.length > 0 ? `\n\nNot touched, already passed: ${dayList(replacement.skippedPast)}.` : "") +
         (replacement.skippedHand.length > 0 ? `\nNot touched, planned by hand: ${dayList(replacement.skippedHand)}.` : "") +
         "\n\nContinue?";
-      if (!await confirmDialog(confirmText)) return;
+      if (!await confirmDialog({ message: confirmText, confirmLabel: "Build plan" })) return;
 
       const toEntries = entriesFromMeals;
       const rows = replacement.write.map((d) => ({

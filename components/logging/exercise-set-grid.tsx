@@ -466,9 +466,10 @@ export function ExerciseSetGrid({
     const overwrites = rest.filter((s) => s[prop] != null && s[prop] !== value).length;
     if (
       overwrites > 0 &&
-      !await confirmDialog(
-        `Replace the ${fieldDef(field).label} you already entered on ${overwrites} other ${overwrites === 1 ? "set" : "sets"} with set 1's value?`
-      )
+      !await confirmDialog({
+        message: `Replace the ${fieldDef(field).label} you already entered on ${overwrites} other ${overwrites === 1 ? "set" : "sets"} with set 1's value?`,
+        confirmLabel: "Replace",
+      })
     ) {
       return;
     }
