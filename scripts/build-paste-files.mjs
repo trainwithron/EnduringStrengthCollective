@@ -1119,6 +1119,20 @@ alter table public.coach_availability_windows drop column if exists session_minu
     ],
   },
   {
+    n: "63",
+    slug: "0318",
+    title: "0318 A program copy is named \"Program - Client\" without stacking: assigning a client's copy to someone else drops the old client's tail, and a name that already ends with this client gets nothing added (the copy function only; existing programs are not renamed)",
+    migrations: ["0318"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing visible changes for existing programs (none is renamed). From now on assigning \"Base - Alice\" to Bob names the copy \"Base - Bob\", and assigning the same program to the same client twice no longer repeats the name.",
+    undo: [fnFromMigration("0316", "duplicate_program"), "revoke execute on function public.duplicate_program(uuid, uuid, uuid, uuid, text, date) from public, anon;", "grant execute on function public.duplicate_program(uuid, uuid, uuid, uuid, text, date) to authenticated, service_role;"].join(String.fromCharCode(10)),
+    undoWhy: "Only if step 63 misbehaves. Puts the copy function back exactly as step 61 left it (names stack again, as before).",
+    rows: [
+      ["the program copy function exists with the source link (step 61 is applied)", "exists (select 1 from pg_proc where proname = 'duplicate_program' and pronamespace = 'public'::regnamespace and position('ai_sequencing_notes, source_program_id' in prosrc) > 0)"],
+      ["0318 is not already applied (the copy function does not strip a client tail yet)", "not exists (select 1 from pg_proc where proname = 'duplicate_program' and pronamespace = 'public'::regnamespace and position('v_tail' in prosrc) > 0)"],
+    ],
+  },
+  {
     n: "60",
     slug: "0315",
     title: "0315 The \"I'm away\" preset reply: a coach writes one reply, turns it on (optionally with a last day), and every message a client sends them gets that reply back in the thread (marked as an auto-reply). One tiny private table, one marker column, two trigger functions",
@@ -1367,6 +1381,7 @@ const BUNDLES = [
   { id: "release-r", name: "Release R (a client can ask for a different meal plan)", steps: ["56"] },
   { id: "release-s", name: "Release S (booking hours check, grouped counts, hide demos per person, the away preset reply)", steps: ["57", "58", "59", "60"] },
   { id: "release-t", name: "Release T (a program copy remembers its source; a package can open a group)", steps: ["61", "62"] },
+  { id: "release-u", name: "Release U (copy names no longer stack)", steps: ["63"] },
   { id: "release-n2", name: "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)", steps: ["49", "50"] },
   { id: "release-m", name: "Release M (acceptance record is append-only)", steps: ["44"] },
 ];
@@ -1542,6 +1557,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0295", has.table("client_phase_plans")),
     m("0296", has.col("recipes", "content_hash")),
     m("0297", has.table("schedule_requests")),
+    m("0318", "exists (select 1 from pg_proc where proname = 'duplicate_program' and pronamespace = 'public'::regnamespace and position('v_tail' in prosrc) > 0)"),
     m("0317", has.table("package_group_access")),
     m("0316", has.col("programs", "source_program_id")),
     m("0315", has.table("coach_away_replies")),
