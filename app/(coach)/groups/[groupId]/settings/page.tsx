@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
-import { CoachMobileShell } from "@/components/coach/mobile/coach-mobile-shell";
+import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { SignOutButton } from "@/components/group/sign-out-button";
@@ -178,45 +178,9 @@ export default async function SettingsPage(
     actingAsFullName = profile?.full_name ?? "Client";
   }
 
-  return (
-    <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
-      {effective.isActingAsOther && (
-        <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
-      )}
-      <header className="px-5 pt-8 pb-6 border-b border-steel/20">
-        <Link
-          href={`/groups/${params.groupId}`}
-          className="font-body text-xs text-steel uppercase tracking-wide"
-        >
-          &larr; Back to group
-        </Link>
-        <h1 className="font-display font-bold text-4xl leading-none mt-3 uppercase">
-          Settings
-        </h1>
-      </header>
-
-      <section className="px-5 pt-6 flex items-center gap-3">
-        <Avatar name={profile?.full_name ?? "?"} url={profile?.avatar_url ?? null} />
-        <div className="flex-1">
-          <EditDisplayName initialName={profile?.full_name ?? ""} profileId={athleteId} />
-          {!effective.isActingAsOther && (
-            <>
-              <p className="font-body text-xs text-steel mt-0.5">{user.email}</p>
-              {user.email && <ChangeMyEmail currentEmail={user.email} />}
-            </>
-          )}
-        </div>
-      </section>
-
-      <section className="px-5 pt-8 space-y-6">
-        {/* Notifications first: it is the one switch that decides whether the coach can reach this
-            person at all, so it should not be buried below Profile. */}
-        <SettingsGroup label="Notifications">
-          <PushNotificationToggle variant="settings" profileId={user.id} />
-        </SettingsGroup>
-
-        {isCoach && (
-          <SettingsGroup label="Coaching">
+  // The coach's own blocks come first on a coach's page (their vocabulary, Read during rest, Google Calendar); a client's page starts with Notifications.
+  const coachingGroup = isCoach ? (
+    <SettingsGroup label="Coaching">
             <Link
               href={`/groups/${params.groupId}/dashboard`}
               className="font-body text-sm font-bold text-rust"
@@ -253,7 +217,54 @@ export default async function SettingsPage(
               </div>
             )}
           </SettingsGroup>
+  ) : null;
+  const terminologyGroup = isCoach ? (
+    <SettingsGroup label="What do you call your people?">
+            <TerminologyChooser groupId={params.groupId} moreHref={`/groups/${params.groupId}/branding?tab=terminology`} />
+          </SettingsGroup>
+  ) : null;
+  const notificationsGroup = (
+    <SettingsGroup label="Notifications">
+          <PushNotificationToggle variant="settings" profileId={user.id} audience={isCoach ? "coach" : "client"} />
+        </SettingsGroup>
+  );
+
+  // A coach (not acting as a client) gets the same coach shell as every other coach page (sidebar on a desktop, the coach tabs on a phone), not the phone client page.
+  const coachDesktop = isCoach && !effective.isActingAsOther;
+  const page = (
+    <main className={`bg-graphite text-chalk font-body ${coachDesktop ? "max-w-3xl pb-10" : "min-h-screen pb-24"}`}>
+      {effective.isActingAsOther && (
+        <ActingAsBanner athleteFullName={actingAsFullName ?? "Client"} groupId={params.groupId} />
+      )}
+      <header className="px-5 pt-8 pb-6 border-b border-steel/20">
+        {!coachDesktop && (
+          <Link
+            href={`/groups/${params.groupId}`}
+            className="font-body text-xs text-steel uppercase tracking-wide"
+          >
+            &larr; Back to group
+          </Link>
         )}
+        <h1 className={`font-display font-bold text-4xl leading-none uppercase ${coachDesktop ? "" : "mt-3"}`}>
+          Settings
+        </h1>
+      </header>
+
+      <section className="px-5 pt-6 flex items-center gap-3">
+        <Avatar name={profile?.full_name ?? "?"} url={profile?.avatar_url ?? null} />
+        <div className="flex-1">
+          <EditDisplayName initialName={profile?.full_name ?? ""} profileId={athleteId} />
+          {!effective.isActingAsOther && (
+            <>
+              <p className="font-body text-xs text-steel mt-0.5">{user.email}</p>
+              {user.email && <ChangeMyEmail currentEmail={user.email} />}
+            </>
+          )}
+        </div>
+      </section>
+
+      <section className="px-5 pt-8 space-y-6">
+        {isCoach ? <>{coachingGroup}{terminologyGroup}{notificationsGroup}</> : notificationsGroup}
 
         <SettingsGroup label="Profile">
           {!isCoach && !effective.isActingAsOther && (
@@ -262,6 +273,7 @@ export default async function SettingsPage(
             </Link>
           )}
           <ProfileDetailsEditor
+            showEmergencyContact={!isCoach}
             athleteId={athleteId}
             initial={{
               bio: profileDetails?.bio ?? "",
@@ -325,13 +337,6 @@ export default async function SettingsPage(
           </SettingsGroup>
         )}
 
-        {/* The coach's vocabulary: chosen once on Home, and changeable here (also reachable on a phone). */}
-        {isCoach && (
-          <SettingsGroup label="What do you call your people?">
-            <TerminologyChooser groupId={params.groupId} moreHref={`/groups/${params.groupId}/branding?tab=terminology`} />
-          </SettingsGroup>
-        )}
-
         {/* A group member's workouts post to the group feed by default (accountability); this is the clear way to turn that off. A one-on-one client has no feed, so no control. */}
         {!isCoach && (membership as { client_tier?: string | null } | null)?.client_tier !== "one_on_one" && (
           <SettingsGroup label="Sharing to the group feed">
@@ -376,13 +381,17 @@ export default async function SettingsPage(
         </div>
       </section>
 
-      {/* A coach gets their own tabs and Spotlight button here, not the client tab bar. */}
-      {isCoach && !effective.isActingAsOther ? (
-        <CoachMobileShell groupId={params.groupId} groupName={(group as { name?: string } | null)?.name ?? "Coaching"}>{null}</CoachMobileShell>
-      ) : (
-        <BottomTabBar groupId={params.groupId} activeOverride="settings" />
-      )}
+      {/* A coach's tabs and Spotlight button come from the coach shell around this page; the client tab bar is for clients. */}
+      {!coachDesktop && <BottomTabBar groupId={params.groupId} activeOverride="settings" />}
     </main>
+  );
+
+  return coachDesktop ? (
+    <CoachDesktopShell groupId={params.groupId} groupName={(group as { name?: string } | null)?.name ?? "Coaching"} active="settings">
+      {page}
+    </CoachDesktopShell>
+  ) : (
+    page
   );
 }
 

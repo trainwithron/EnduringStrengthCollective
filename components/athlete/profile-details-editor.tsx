@@ -18,9 +18,12 @@ export interface ProfileDetails {
 export function ProfileDetailsEditor({
   athleteId,
   initial,
+  showEmergencyContact = true,
 }: {
   athleteId: string;
   initial: ProfileDetails;
+  // An emergency contact is a client's; a coach is not asked for one.
+  showEmergencyContact?: boolean;
 }) {
   const [details, setDetails] = useState(initial);
   const [saving, setSaving] = useState(false);
@@ -94,6 +97,7 @@ export function ProfileDetailsEditor({
           />
         </div>
       </div>
+      {showEmergencyContact && (
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label htmlFor="profile-emergency-name" className="font-body text-xs text-steel">
@@ -122,9 +126,12 @@ export function ProfileDetailsEditor({
           />
         </div>
       </div>
-      <p className="font-body text-xs text-steel">
-        Only visible to you and your coach — never shown to other clients.
-      </p>
+      )}
+      {showEmergencyContact && (
+        <p className="font-body text-xs text-steel">
+          Only visible to you and your coach — never shown to other clients.
+        </p>
+      )}
       {saving && <p className="font-body text-xs text-steel">Saving…</p>}
       {error && (
         <p className="font-body text-xs text-rust" role="alert">

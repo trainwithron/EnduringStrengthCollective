@@ -15,8 +15,11 @@ export function PushNotificationToggle({
   variant = "settings",
   profileId,
   onEnabled,
+  audience = "client",
 }: {
   variant?: PushVariant;
+  // A coach reads the settings page too, so the words are not written only for a client on a phone.
+  audience?: "client" | "coach";
   // Needed to send the "it works" test push after turning on.
   profileId?: string;
   onEnabled?: () => void;
@@ -116,14 +119,15 @@ export function PushNotificationToggle({
       {!big && <p className="font-body text-sm mb-1">Push notifications</p>}
       {!big && (
         <p className="font-body text-xs text-steel mb-2">
-          Get notified when your coach reaches out — reminders, new programs, and more.
+          {audience === "coach" ? "Get notified about client messages, bookings and your daily summary." : "Get notified when your coach reaches out — reminders, new programs, and more."}
         </p>
       )}
 
       {state === "denied" ? (
         <p className="font-body text-xs text-steel" role="status">
-          Notifications are blocked for this app. Turn them on in your phone&apos;s settings (Settings, then
-          Notifications, then this app), then come back.
+          {audience === "coach"
+            ? "Notifications are blocked for this site. Allow them in your browser's site settings (or your device's notification settings), then come back."
+            : "Notifications are blocked for this app. Turn them on in your phone's settings (Settings, then Notifications, then this app), then come back."}
         </p>
       ) : needsInstall && !on ? (
         <p className="font-body text-xs text-steel" role="status">

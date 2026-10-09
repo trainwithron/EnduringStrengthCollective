@@ -3,6 +3,7 @@ import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { ClientPicker } from "@/components/coach/client-picker";
+import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ClientSlotRow } from "@/components/coach/client-slot-row";
 import { hasReachedProgressionCeiling } from "@/lib/move-them-back";
 
@@ -68,6 +69,7 @@ export default async function WorkoutClientsPage(
     (a: any, b: any) => a.exercise_order - b.exercise_order
   );
 
+  const { data: groupRow } = await supabase.from("groups").select("name").eq("id", params.groupId).maybeSingle();
   const selectedAthleteId = searchParams.athlete ?? null;
 
   let resolvedSlots: Array<{
@@ -154,8 +156,9 @@ export default async function WorkoutClientsPage(
   }
 
   return (
-    <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
-      <header className="px-5 pt-8 pb-6 border-b border-steel/20">
+    <CoachDesktopShell groupId={params.groupId} groupName={(groupRow as { name?: string } | null)?.name ?? "Coaching"} active="programs">
+    <main className="max-w-3xl pb-10">
+      <header className="pb-6 border-b border-steel/20">
         <Link
           href={`/groups/${params.groupId}/workouts/${params.workoutId}`}
           className="font-body text-xs text-steel uppercase tracking-wide"
@@ -168,7 +171,7 @@ export default async function WorkoutClientsPage(
         <p className="font-body text-sm text-steel mt-2">{workout.title}</p>
       </header>
 
-      <section className="px-5 pt-6">
+      <section className="pt-6">
         <ClientPicker athletes={athletes} selectedAthleteId={selectedAthleteId} />
 
         {selectedAthleteId && (
@@ -191,5 +194,6 @@ export default async function WorkoutClientsPage(
         )}
       </section>
     </main>
+    </CoachDesktopShell>
   );
 }
