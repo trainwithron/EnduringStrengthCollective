@@ -36,7 +36,8 @@ export function FloatingMessages({
   // Which thread is open lives in the parent, so leaving the tab and coming back returns to it (the thread itself is unmounted while the tab is hidden, and loads again when shown).
   openId: string | null;
   onOpenIdChange: (id: string | null) => void;
-  onOpened?: (otherId: string) => void;
+  // Called when a thread is opened and read, with how many unread messages it had, so the panel's badge can drop.
+  onOpened?: (otherId: string, unreadCount: number) => void;
 }) {
   const [data, setData] = useState<InboxPayload | null>(null);
   const [failed, setFailed] = useState(false);
@@ -94,7 +95,7 @@ export function FloatingMessages({
             otherName={opened.fullName}
             onOpened={(id) => {
               setCleared((prev) => new Set(prev).add(id));
-              onOpened?.(id);
+              onOpened?.(id, data.conversations.find((c) => c.otherId === id)?.unreadCount ?? 0);
             }}
           />
         </div>
