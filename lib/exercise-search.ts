@@ -4,8 +4,9 @@
 //   1  the name (or alias) starts with what was typed
 //   2  every typed word starts a word in the name (any order): "split bulg" finds "Bulgarian split squat"
 //   3  what was typed appears inside a word or across words: "ulgar"
-//   4  the words overlap enough to be a near miss (the importer's own fuzzy score)
-//   5  last resort, a typo: with the spaces and punctuation taken out, the typed text is a letter or two away from the name ("ps uh up" finds "Push-up", "bech press" "Bench press")
+//   4  a typo: with the spaces and punctuation taken out, the typed text is a letter or two away from the name ("ps uh up" finds "Push-up", "bech press" "Bench press"). It ranks above the loose
+//      word overlap below, which on a big library fills every row with whatever shares one word ("press") and would push the real near-spelling off the end
+//   5  the words overlap enough to be a near miss (the importer's own fuzzy score)
 // Ties keep the order the library was given in, which the page sorts most-used first, so a coach's usual exercises come up ahead of rarely used ones.
 
 import { normalizeName, type AliasEntry } from "@/lib/exercise-matching";
@@ -72,8 +73,8 @@ function tierOfOne(typed: string, text: string): 0 | 1 | 2 | 3 | 4 | 5 | null {
   const typedWords = typed.split(" ");
   if (typedWords.every((tw) => words.some((w) => w.startsWith(tw)))) return 2;
   if (t.includes(typed)) return 3;
-  if (jaccard(normalizeName(typed), normalizeName(text)) >= FUZZY_FLOOR) return 4;
-  if (isTypoOf(typed, t)) return 5;
+  if (isTypoOf(typed, t)) return 4;
+  if (jaccard(normalizeName(typed), normalizeName(text)) >= FUZZY_FLOOR) return 5;
   return null;
 }
 
