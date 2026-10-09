@@ -11,6 +11,7 @@ import {
 } from "@/lib/ask-spot-widget-state";
 import { AskSpotChatPanel } from "@/components/coach/ask-spot-chat-panel";
 import { FloatingMessages } from "@/components/coach/desktop/floating-messages";
+import { afterThreadOpened, badgeText, panelHeader, shownUnread } from "@/lib/floating-panel";
 import { clientIdFromPath } from "@/lib/messages-list";
 
 const MIN_BOTTOM = 88; // clears a mobile bottom tab bar (64px) + margin
@@ -66,6 +67,15 @@ export function CollectiveIntelligenceChat({ groupId, unread = 0 }: { groupId?: 
   // The panel always opens on Spot. The Messages tab (only where there is a group to read messages for) is a quick view of who needs a reply; the client whose page the coach is on is pinned in it.
   const [tab, setTab] = useState<"spot" | "messages">("spot");
   const [messagesOpenId, setMessagesOpenId] = useState<string | null>(null);
+  // Threads read in the panel since the page loaded its count: they come off the badge (on the tab and on the edge tab). A fresh count from the page starts this over.
+  const [readSince, setReadSince] = useState(0);
+  const [countedThreads, setCountedThreads] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    setReadSince(0);
+    setCountedThreads(new Set());
+  }, [unread]);
+  const unreadNow = shownUnread(unread, readSince);
+  const header = panelHeader(tab);
   const viewingClientId = clientIdFromPath(usePathname());
   const [side, setSide] = useState<"left" | "right">(DEFAULT_ASK_SPOT_WIDGET_STATE.side);
   const [bottomOffset, setBottomOffset] = useState(DEFAULT_ASK_SPOT_WIDGET_STATE.bottomOffsetPx);
@@ -179,7 +189,7 @@ export function CollectiveIntelligenceChat({ groupId, unread = 0 }: { groupId?: 
     return (
       <button
         type="button"
-        aria-label="Open Ask Spot chat"
+        aria-label={unreadNow > 0 ? `Open Ask Spot chat, ${unreadNow} unread ${unreadNow === 1 ? "message" : "messages"}` : "Open Ask Spot chat"}
         style={edgeStyle}
         className={`fixed z-40 w-7 h-14 bg-rust/80 active:bg-rust transition-colors flex items-center justify-center touch-none select-none ${
           side === "right" ? "rounded-l-token-sm" : "rounded-r-token-sm"
@@ -189,6 +199,9 @@ export function CollectiveIntelligenceChat({ groupId, unread = 0 }: { groupId?: 
         onPointerUp={handleTabPointerUp}
       >
         <MessageCircle className="w-3.5 h-3.5 text-graphite" />
+        {unreadNow > 0 && (
+          <span className={`absolute -top-2 ${side === "right" ? "left-0" : "right-0"} h-5 min-w-[20px] px-1 rounded-full bg-chalk text-graphite font-body text-xs font-bold flex items-center justify-center shadow`}>{badgeText(unreadNow)}</span>
+        )}
       </button>
     );
   }
@@ -206,13 +219,13 @@ export function CollectiveIntelligenceChat({ groupId, unread = 0 }: { groupId?: 
       >
         <div>
           <p className="font-body text-xs text-steel uppercase tracking-wide font-bold">
-            Ask Spot
+            {header.title}
           </p>
-          <p className="font-body text-xs text-steel mt-0.5">Find a page, learn how to do something, or ask about a client.</p>
+          <p className="font-body text-xs text-steel mt-0.5">{header.subtitle}</p>
         </div>
         <ChevronIcon
           className="w-4 h-4 text-steel shrink-0"
-          aria-label="Collapse Ask Spot chat"
+          aria-label={header.collapseLabel}
         />
       </div>
 
@@ -228,8 +241,8 @@ export function CollectiveIntelligenceChat({ groupId, unread = 0 }: { groupId?: 
               className={`flex-1 h-11 font-body text-sm flex items-center justify-center gap-2 border-b-2 ${tab === t ? "border-rust text-chalk" : "border-transparent text-steel"}`}
             >
               {t === "spot" ? "Spot" : "Messages"}
-              {t === "messages" && unread > 0 && (
-                <span className="h-5 min-w-[20px] px-1 rounded-full bg-rust text-graphite font-body text-xs font-bold flex items-center justify-center">{unread > 9 ? "9+" : unread}</span>
+              {t === "messages" && unreadNow > 0 && (
+                <span className="h-5 min-w-[20px] px-1 rounded-full bg-rust text-graphite font-body text-xs font-bold flex items-center justify-center">{badgeText(unreadNow)}</span>
               )}
             </button>
           ))}
@@ -241,7 +254,17 @@ export function CollectiveIntelligenceChat({ groupId, unread = 0 }: { groupId?: 
         <AskSpotChatPanel />
       </div>
       {groupId && tab === "messages" && (
-        <FloatingMessages groupId={groupId} viewingClientId={viewingClientId} openId={messagesOpenId} onOpenIdChange={setMessagesOpenId} />
+        <FloatingMessages
+          groupId={groupId}
+          viewingClientId={viewingClientId}
+          openId={messagesOpenId}
+          onOpenIdChange={setMessagesOpenId}
+          onOpened={(otherId, threadUnread) => {
+            const next = afterThreadOpened(countedThreads, readSince, otherId, threadUnread);
+            setCountedThreads(next.counted);
+            setReadSince(next.readSince);
+          }}
+        />
       )}
     </div>
   );
