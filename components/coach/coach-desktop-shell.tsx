@@ -9,7 +9,6 @@ import {
   ChevronRight,
   CalendarDays,
   MessagesSquare,
-  Users,
   LayoutDashboard,
   Palette,
   TrendingUp,
@@ -22,7 +21,7 @@ import {
   Globe,
   Link2,
   Users2,
-  UsersRound,
+  UserRound,
   Home,
   MonitorPlay,
   Activity,
@@ -41,6 +40,7 @@ import {
   Settings,
 } from "lucide-react";
 import { SignOutButton } from "@/components/group/sign-out-button";
+import { ThreePeopleIcon } from "@/components/coach/desktop/three-people-icon";
 import { DownloadAppButton } from "@/components/coach/desktop/download-app-button";
 import { FeedbackButton } from "@/components/feedback/feedback-button";
 import { ClientFinder } from "@/components/coach/desktop/client-finder";
@@ -416,14 +416,14 @@ function CoachDesktopShellFull({
     // The rail is short and coach-level: Clients, Calendar, Messages, Programs, Nutrition, Business (Home and Settings sit around it).
     // Everything else is under "More tools". The old group Dashboard entry is gone from the rail (Home is the dashboard); it is under More tools.
     // Clients is always the coach's full list, wherever they are. A team or social group's own roster is a separate "Members" entry, shown only inside such a group.
-    { key: "clients", label: "Clients", href: CLIENTS_HREF, icon: Users, badge: clientsUnread, termKey: "client", termForm: "plural" },
+    { key: "clients", label: "Clients", href: CLIENTS_HREF, icon: UserRound, badge: clientsUnread, termKey: "client", termForm: "plural" },
     { key: "calendar", label: "Calendar", href: `/groups/${groupId}/calendar`, icon: CalendarDays },
     { key: "messages", label: "Messages", href: `/groups/${groupId}/messages`, icon: Mail, badge: messagesUnread },
     {
       label: "Programming",
-      icon: LayoutGrid,
+      icon: Dumbbell,
       items: [
-        { key: "programs", label: "Programs", href: ALL_PROGRAMS_HREF, icon: LayoutGrid, termKey: "program", termForm: "plural" },
+        { key: "programs", label: "Programs", href: ALL_PROGRAMS_HREF, icon: Dumbbell, termKey: "program", termForm: "plural" },
         { key: "exercise-library", label: "Exercise Library", href: `/groups/${groupId}/exercise-library`, icon: Dumbbell },
       ],
     },
@@ -450,7 +450,7 @@ function CoachDesktopShellFull({
     // The group's own tools. Members (a team or social group's own roster) and the team pages show only where they apply; nothing here is removed, only regrouped.
     {
       label: "Group",
-      icon: UsersRound,
+      icon: ThreePeopleIcon as unknown as typeof LayoutGrid,
       items: [
         ...(showsMembers(groupKind, coachLevel) ? [{ key: "members" as const, label: "Members", href: membersHref(groupId), icon: Users2 }] : []),
         { key: "dashboard", label: "Group dashboard", href: `/groups/${groupId}/dashboard`, icon: LayoutDashboard },
