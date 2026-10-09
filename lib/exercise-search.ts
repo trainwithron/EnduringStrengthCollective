@@ -9,7 +9,7 @@
 //   5  the words overlap enough to be a near miss (the importer's own fuzzy score)
 // Ties keep the order the library was given in, which the page sorts most-used first, so a coach's usual exercises come up ahead of rarely used ones.
 
-import { normalizeName, type AliasEntry } from "@/lib/exercise-matching";
+import { findLibraryVariant, normalizeName, type AliasEntry } from "@/lib/exercise-matching";
 
 export interface ExerciseSearchResult {
   name: string;
@@ -131,8 +131,13 @@ export function searchExercises(query: string, library: string[], aliases: Alias
 
 // Whether the typed text is already an exercise in the library (by name, ignoring case and punctuation), so the "Add as a new exercise" row is not offered for something that exists.
 export function isExistingExercise(query: string, library: string[]): boolean {
-  const typed = plain(query);
-  return typed !== "" && library.some((n) => plain(n) === typed);
+  return existingLibraryName(query, library) !== null;
+}
+
+// The library exercise the typed text is a spelling of ("deadlifts", "pull up", "Farmers Carry" for "Farmer's Carry"): its exact name, or null when the library has no such exercise. Lower-cased,
+// punctuation and spaces ignored, one trailing "s" ignored. A name that exists is offered, not added a second time.
+export function existingLibraryName(query: string, library: string[]): string | null {
+  return plain(query) === "" ? null : findLibraryVariant(query, library);
 }
 
 // Arrow-key movement through the rows, with the "Add" row counted as the last. -1 means nothing highlighted (the typed text is what Enter commits).

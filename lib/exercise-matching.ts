@@ -59,6 +59,22 @@ export function normalizeName(raw: string): string {
   return expanded.slice().sort().join(" ");
 }
 
+// Whether two typed names are the same exercise written differently: lower-cased, with every space and punctuation mark taken out and ONE trailing "s" dropped, so "deadlifts",
+// "Pull-Up" / "Pull Up" / "pullups" and "Step Ups" / "Step Up" read as one, and "Shoulder CARs" / "Shoulder CARS" and "Farmer's Carry" / "Farmers Carry" do too. Used when deciding whether
+// a typed or imported name is already in the library (so a second row is not made), never to rename anything.
+export function exerciseKey(raw: string): string {
+  const letters = raw.toLowerCase().replace(/[^a-z0-9]/g, "");
+  return letters.length > 1 && letters.endsWith("s") ? letters.slice(0, -1) : letters;
+}
+
+// The library entry the typed name is a spelling of: the one written exactly the same (ignoring case) if there is one, else the first with the same exerciseKey, else null.
+export function findLibraryVariant(raw: string, names: string[]): string | null {
+  const key = exerciseKey(raw);
+  if (!key) return null;
+  const lower = raw.trim().toLowerCase();
+  return names.find((n) => n.trim().toLowerCase() === lower) ?? names.find((n) => exerciseKey(n) === key) ?? null;
+}
+
 function jaccard(a: string, b: string): number {
   const setA = new Set(a.split(" ").filter(Boolean));
   const setB = new Set(b.split(" ").filter(Boolean));
@@ -94,6 +110,11 @@ export function matchExercise(
   const exact = library.find((l) => normalizeName(l.name) === normalizedRaw);
   if (exact) {
     return { exerciseName: exact.name, confidence: "exact", score: 1 };
+  }
+  // The same exercise written with different spacing, hyphens or a plural ("deadlifts" for "Deadlift").
+  const variant = findLibraryVariant(rawName, library.map((l) => l.name));
+  if (variant) {
+    return { exerciseName: variant, confidence: "exact", score: 1 };
   }
 
   let best: { name: string; score: number } | null = null;
@@ -150,7 +171,7 @@ export function matchTopN(
     seen.add(alias.exerciseName);
   }
 
-  const exact = library.find((l) => normalizeName(l.name) === normalizedRaw);
+  const exact = library.find((l) => normalizeName(l.name) === normalizedRaw) ?? library.find((l) => l.name === findLibraryVariant(rawName, library.map((x) => x.name)));
   if (exact && !seen.has(exact.name)) {
     results.push({ exerciseName: exact.name, score: 1, isAlias: false });
     seen.add(exact.name);
