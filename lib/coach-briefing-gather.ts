@@ -15,6 +15,7 @@ import { computeHabitCompliance, computeCompliancePct } from "./habits";
 import { hasEstablishedBaseline } from "./coach-briefing-baseline";
 import { isOnCooldown, COOLDOWN_DAYS } from "./coach-briefing-cooldown";
 import { extractNumbers } from "./coach-briefing-numeral-guard";
+import { shortDateLabel } from "./apply-from";
 import { isSustainedHrvSuppression, SUSTAINED_SUPPRESSION_DAYS } from "./hrv-suppression";
 import { isGoalReversal, type GoalType } from "./goal-reversal";
 import { GOAL_TYPE_LABELS } from "./goal-types";
@@ -412,12 +413,12 @@ export async function gatherCandidateSignals(
         groupId: athlete.groupId,
         kind: "quiet_client",
         description: lastLoggedAtStr
-          ? `${athlete.fullName} hasn't logged a workout since ${lastLoggedAtStr.slice(0, 10)}.`
+          ? `${athlete.fullName} hasn't logged a workout since ${shortDateLabel(lastLoggedAtStr.slice(0, 10))}.`
           : `${athlete.fullName} has never logged a workout.`,
         // The last-logged date, when present, is real given data embedded
         // verbatim in the description above — same allow-list requirement
         // as every other signal kind's numbers.
-        numericValues: lastLoggedAtStr ? [...nameNumbers, ...extractNumbers(lastLoggedAtStr.slice(0, 10))] : [...nameNumbers],
+        numericValues: lastLoggedAtStr ? [...nameNumbers, ...extractNumbers(shortDateLabel(lastLoggedAtStr.slice(0, 10)))] : [...nameNumbers],
         isStrongQuietTier: tier === "strong",
       });
     }

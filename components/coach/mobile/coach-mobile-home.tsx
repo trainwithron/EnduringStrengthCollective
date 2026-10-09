@@ -4,7 +4,9 @@ import Link from "next/link";
 import { createServerClient } from "@/lib/supabase/server";
 import { getTodaysDueRoster } from "@/lib/todays-due-roster";
 import { getTodaysWorkoutId } from "@/lib/todays-workout";
-import { computeRealIncomeInRange, computeRealMRR } from "@/lib/business-metrics";
+import { computeRealIncomeInRange } from "@/lib/business-metrics";
+import { loadCoachMrr } from "@/lib/coach-mrr";
+import { SwappableTerm } from "@/components/coach/swappable-term";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { ViewModeToggle } from "@/components/coach/view-mode-toggle";
 import { LateChangesPanel } from "@/components/coach/late-changes-panel";
@@ -40,11 +42,11 @@ export async function CoachMobileHome({
   const todayKey = dateKeyInZone(timezone);
   const weekAgoKey = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-  const [dueRoster, { data: purchaseRows }, { data: subRows }, { data: rosterRows }, needsAttentionItems] =
+  const [dueRoster, { data: purchaseRows }, coachMrr, { data: rosterRows }, needsAttentionItems] =
     await Promise.all([
       getTodaysDueRoster(supabase, { groupId }),
       supabase.from("credit_purchases").select("amount_cents, created_at").eq("group_id", groupId),
-      supabase.from("membership_subscriptions").select("price_cents, status").eq("group_id", groupId),
+      loadCoachMrr(supabase, coachId),
       supabase.from("group_memberships").select("profile_id, profiles ( full_name )").eq("group_id", groupId).eq("role", "athlete"),
       getNeedsAttentionItems(supabase, { coachId, groupIds: [groupId] }),
     ]);
@@ -55,12 +57,8 @@ export async function CoachMobileHome({
   }));
   const revenueToday = computeRealIncomeInRange(incomeEvents, todayKey, todayKey);
   const revenueWeek = computeRealIncomeInRange(incomeEvents, weekAgoKey, todayKey);
-  const mrr = computeRealMRR(
-    (subRows ?? []).map((s) => ({
-      priceCents: s.price_cents,
-      status: s.status as "active" | "past_due" | "canceled" | "incomplete" | "paused",
-    }))
-  );
+  // The same number the Business page shows (every group this coach runs; the estimate from set rates when there are no subscriptions yet).
+  const mrr = coachMrr.value;
 
   const topDue = dueRoster[0] ?? null;
   const soloAthlete =
@@ -113,7 +111,8 @@ export async function CoachMobileHome({
   }
 
   return (
-    <main className="min-h-screen bg-graphite text-chalk font-body">
+        // pb-24: the fixed bottom tabs are 64px tall; without room under the last row it sits behind them and cannot be scrolled into view.
+    <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
       <CoachMobileShell groupId={groupId} groupName={groupName}>
         {/* pt-16 (not the usual pt-8) — the fixed Spot trigger button
             (top-3, h-10, centered) sits on top of every mobile page; a
@@ -148,7 +147,7 @@ export async function CoachMobileHome({
               className="block border border-rust bg-rust/10 p-5 active:bg-rust/15 transition-colors"
             >
               <p className="font-body text-xs text-rust uppercase tracking-wide font-bold">
-                Due today
+                <SwappableTerm termKey="client" form="plural" cap /> due today
               </p>
               <p className="font-display font-bold text-2xl leading-tight mt-1 truncate">
                 {topDue.fullName}
@@ -157,7 +156,7 @@ export async function CoachMobileHome({
                 {topDue.workoutTitle ?? "Workout"}
               </p>
               <span className="inline-block mt-4 h-11 px-5 leading-[2.75rem] bg-rust text-graphite font-body font-bold text-sm">
-                Start Workout &rarr;
+                Open &rarr;
               </span>
             </Link>
 
@@ -173,7 +172,7 @@ export async function CoachMobileHome({
                       <p className="font-body text-sm text-chalk truncate">{entry.fullName}</p>
                       <p className="font-body text-xs text-steel truncate">{entry.workoutTitle ?? "Workout"}</p>
                     </div>
-                    <span className="font-body text-xs text-rust shrink-0">Log &rarr;</span>
+                    <span className="font-body text-xs text-rust shrink-0">View &rarr;</span>
                   </Link>
                 ))}
               </div>
