@@ -115,6 +115,13 @@ export function localDayBounds(timeZone: string, now: Date = new Date()): { date
   };
 }
 
+// The month it is right now in `timeZone` ("YYYY-MM") and the real instant that month began there. A month start built from the server's own clock
+// (UTC) is hours off for a US coach, so the last evening of a month counts as the next month.
+export function monthBoundsInZone(timeZone: string, now: Date = new Date()): { monthKey: string; startIso: string } {
+  const monthKey = dateKeyInZone(timeZone, now).slice(0, 7);
+  return { monthKey, startIso: zonedTimeToUtc(`${monthKey}-01`, "00:00", timeZone).toISOString() };
+}
+
 // One group's coach's stored zone (profiles.timezone), for "is it today
 // yet" checks against that group's own program schedule — the same
 // convention already used for booking/availability, extended to content

@@ -138,3 +138,22 @@ describe("getViewerDisplayTimezone", () => {
     expect(await run(undefined, null)).toBe("America/New_York");
   });
 });
+
+describe("the business page's days and months are the coach's own", () => {
+  it("the last evening of a month, Pacific, is still that month; the month began at Pacific midnight", async () => {
+    const { monthBoundsInZone, dateKeyInZone } = await import("./timezone");
+    const lateOct31 = new Date("2026-11-01T03:00:00Z"); // Oct 31, 8pm Pacific
+    expect(monthBoundsInZone("America/Los_Angeles", lateOct31)).toEqual({ monthKey: "2026-10", startIso: "2026-10-01T07:00:00.000Z" });
+    expect(monthBoundsInZone("UTC", lateOct31).monthKey).toBe("2026-11");
+    expect(dateKeyInZone("America/Los_Angeles", lateOct31)).toBe("2026-10-31");
+    // A Central reader on the same instant is in the same month but starts it an hour earlier (CDT is UTC-5).
+    expect(monthBoundsInZone("America/Chicago", lateOct31).startIso).toBe("2026-10-01T05:00:00.000Z");
+  });
+  it("the page uses the display zone for today, the month, new-this-month and income", () => {
+    const src = read("app/(coach)/groups/[groupId]/business/page.tsx");
+    expect(src).toContain("dateKeyInZone(displayZone, d)");
+    expect(src).toContain("monthBoundsInZone(displayZone)");
+    expect(src).not.toContain("today.getFullYear()");
+    expect(src).not.toContain("new Date(today.getFullYear()");
+  });
+});
