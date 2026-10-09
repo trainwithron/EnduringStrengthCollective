@@ -116,7 +116,8 @@ type Active =
   | "team-performance"
   | "messages"
   | "records"
-  | "kiosk";
+  | "kiosk"
+  | "settings";
 
 interface NavLeaf {
   key: Active;

@@ -3,6 +3,7 @@ import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { ProgressionRow } from "@/components/coach/progression-row";
+import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 
 export default async function ProgressionsPage(
   props: {
@@ -63,9 +64,12 @@ export default async function ProgressionsPage(
     (existingProgressions ?? []).map((p: any) => [p.exercise_name, p])
   );
 
+  const { data: groupRow } = await supabase.from("groups").select("name").eq("id", params.groupId).maybeSingle();
+
   return (
-    <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
-      <header className="px-5 pt-8 pb-6 border-b border-steel/20">
+    <CoachDesktopShell groupId={params.groupId} groupName={(groupRow as { name?: string } | null)?.name ?? "Coaching"} active="programs">
+    <main className="max-w-4xl pb-10">
+      <header className="pb-6 border-b border-steel/20">
         <Link
           href={`/groups/${params.groupId}/programs/${params.programId}`}
           className="font-body text-xs text-steel uppercase tracking-wide"
@@ -75,7 +79,7 @@ export default async function ProgressionsPage(
         <h1 className="font-display font-bold text-3xl leading-none mt-3 uppercase">
           Exercise Progressions
         </h1>
-        <p className="font-body text-sm text-steel mt-2 max-w-[60ch]">
+        <p className="font-body text-sm text-chalk/80 leading-relaxed mt-2 max-w-[65ch]">
           Define how each exercise evolves across weeks. Targets are computed
           from each athlete&apos;s own logged performance in this program.
         </p>
@@ -85,7 +89,7 @@ export default async function ProgressionsPage(
             exercise with both a rule set here AND coach-typed targets
             from that tool can show two different numbers for the same
             lift. This is the reciprocal note to the one on that tool. */}
-        <p className="font-body text-xs text-steel mt-3 max-w-[60ch]">
+        <p className="font-body text-sm text-steel leading-relaxed mt-3 max-w-[65ch]">
           This is a live rule that keeps adjusting from what&apos;s actually logged — different
           from &quot;Duplicate with progression&quot; in the Program Builder, which writes fixed
           weeks once and stops. If a coach-typed target and this rule&apos;s goal ever disagree for
@@ -94,7 +98,7 @@ export default async function ProgressionsPage(
         </p>
       </header>
 
-      <section className="px-5 pt-6">
+      <section className="pt-6">
         {exerciseNames.length === 0 ? (
           <p className="font-body text-sm text-steel py-6">
             No exercises in this program yet — add workouts first.
@@ -114,5 +118,6 @@ export default async function ProgressionsPage(
         )}
       </section>
     </main>
+    </CoachDesktopShell>
   );
 }

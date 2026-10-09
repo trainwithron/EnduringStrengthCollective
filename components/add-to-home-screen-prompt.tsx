@@ -51,7 +51,10 @@ export function AddToHomeScreenPrompt() {
     }
     if (isStandaloneDisplay()) return unsubscribe;
 
-    setPlatform(detectPlatform(window.navigator.userAgent));
+    const detected = detectPlatform(window.navigator.userAgent);
+    // Only on a phone or tablet: a computer has no home screen to add this to.
+    if (detected === "desktop") return unsubscribe;
+    setPlatform(detected);
     setVisible(true);
     return unsubscribe;
   }, []);
@@ -82,7 +85,7 @@ export function AddToHomeScreenPrompt() {
     <div
       role="region"
       aria-label="Add to home screen"
-      className="relative z-10 bg-surface border-b border-steel/30 px-4 py-3 flex items-start gap-3"
+      className="relative z-10 lg:hidden bg-surface border-b border-steel/30 pl-4 pr-16 py-3 flex items-start gap-3"
     >
       <div className="flex-1 min-w-0">
         <p className="font-body text-sm font-medium text-chalk">
