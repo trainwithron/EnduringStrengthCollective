@@ -29,7 +29,8 @@ describe("a typed exercise name capitalizes each word and changes nothing else",
 describe("where it is applied", () => {
   it("a typed name when it is committed, but never a name that was not changed, nor a library or alias pick", () => {
     const input = read("components/coach/exercise-name-input.tsx");
-    expect(input).toContain("onCommit?.(text === valueAtFocusRef.current ? text : capitalizeWords(text))");
+    expect(input).toContain("else if (text === valueAtFocusRef.current) onCommit?.(text);");
+    expect(input).toContain("onCommit?.(existingLibraryName(text, suggestions) ?? capitalizeWords(text))");
     expect(input).toContain("else pick(capitalizeWords(trimmed));");
     expect(input).toContain("if (alias) onCommit?.(name, alias);");
     expect(input).toContain("else onCommit?.(name);");

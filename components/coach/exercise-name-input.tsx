@@ -7,7 +7,7 @@ import type { AliasEntry } from "@/lib/exercise-matching";
 import type { DemoRow } from "@/lib/exercise-demo";
 import { builderDemoFor } from "@/lib/builder-demo";
 import { BuilderDemoThumb } from "@/components/coach/builder-demo-thumb";
-import { isExistingExercise, nextActiveIndex, searchExercises } from "@/lib/exercise-search";
+import { existingLibraryName, isExistingExercise, nextActiveIndex, searchExercises } from "@/lib/exercise-search";
 import { resolveTypedAlias } from "@/lib/exercise-alias-seed";
 import { capitalizeWords } from "@/lib/exercise-name-case";
 
@@ -93,7 +93,8 @@ export function ExerciseNameInput({
   function commitTyped(text: string) {
     const alias = resolveTypedAlias(text, suggestions, aliases);
     if (alias) onCommit?.(alias.exerciseName, alias.displayName);
-    else onCommit?.(text === valueAtFocusRef.current ? text : capitalizeWords(text));
+    else if (text === valueAtFocusRef.current) onCommit?.(text);
+    else onCommit?.(existingLibraryName(text, suggestions) ?? capitalizeWords(text));
   }
 
   function pickRow(index: number) {

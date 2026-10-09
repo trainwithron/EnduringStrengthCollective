@@ -2,6 +2,7 @@
 
 import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
+import { existingLibraryName } from "@/lib/exercise-search";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { ExerciseMediaPicker } from "./exercise-media-picker";
@@ -72,6 +73,7 @@ export function ExerciseLibraryList({
   const [equipmentAutoSuggested, setEquipmentAutoSuggested] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [alreadyThere, setAlreadyThere] = useState<string | null>(null);
   // The "required for new exercises going forward" rule
   // (corrective_exercise_biomechanical_tagging_idea.md) — held locally
   // until the exercise is actually created, since there's no row/id to
@@ -231,6 +233,14 @@ export function ExerciseLibraryList({
     // exercise_library, so there's nothing to make NOT NULL without
     // breaking the 256 exercises that predate this feature).
     if (!trimmed || newTags.length === 0) return;
+    // Already in the library under another spelling ("deadlifts" for "Deadlift"): point to it instead of making a second row.
+    const existingName = existingLibraryName(trimmed, exercises.map((e) => e.name));
+    if (existingName) {
+      setSearch(existingName);
+      setNewName("");
+      setAlreadyThere(existingName);
+      return;
+    }
     setSubmitting(true);
     const supabase = createBrowserClient();
     const { data } = await supabase
@@ -382,6 +392,11 @@ export function ExerciseLibraryList({
           Add
         </button>
       </div>
+      {alreadyThere && (
+        <p className="font-body text-xs text-steel mt-2" role="status">
+          {alreadyThere} is already in your library, so it was not added again. It is shown below.
+        </p>
+      )}
 
       {newName.trim() && (
         <div className="mb-6 max-w-3xl">
