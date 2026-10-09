@@ -874,6 +874,28 @@ for (const s of steps) {
   const errV2 = await run(`apply/${bundle.file}`);
   check("release-v: the bundle applies again after an undo" + (errV2 ? ": " + errV2 : ""), !errV2 && (await merged()));
 }
+// Release W (step 65): ONE paste. The audit functions have no fixed search path before, the bundle pins them and closes rls_auto_enable, a second run is refused naming step 65, the undo puts it back, and it applies again.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-w");
+  check("release-w: ONE bundle holds step 65", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["65"]));
+  const st65 = steps.find((x) => x.n === "65");
+  const pinned = async () => (await db.query("select proconfig is not null as ok from pg_proc where oid = 'public.audit_diff(jsonb, jsonb, text[])'::regprocedure")).rows[0].ok === true;
+  const helperOpen = async () => (await db.query("select to_regprocedure('public.rls_auto_enable()') is not null and has_function_privilege('anon', 'public.rls_auto_enable()', 'execute') as ok")).rows[0].ok === true;
+  // The platform's own helper does not exist in this scratch database; stand one in with the live permissions so the revoke has something to close.
+  await db.query("create or replace function public.rls_auto_enable() returns event_trigger language plpgsql security definer set search_path to 'pg_catalog' as $$ begin null; end $$");
+  await db.query("grant execute on function public.rls_auto_enable() to public, anon, authenticated, service_role");
+  const ew0 = await run(`apply/undo-step${st65.n}-${st65.slug}.sql`);
+  check("release-w: before the bundle runs audit_diff has no fixed search path and the helper is open" + (ew0 ? ": " + ew0 : ""), !ew0 && !(await pinned()) && (await helperOpen()));
+  const errW = await run(`apply/${bundle.file}`);
+  check("release-w bundle applies on the live-shaped state" + (errW ? ": " + errW : ""), !errW && (await pinned()) && !(await helperOpen()));
+  const againW = await run(`apply/${bundle.file}`);
+  check("release-w: a second run is refused, naming step 65 (" + againW + ")", !!againW && againW.includes("step 65 (0319) cannot run") && againW.includes("already applied"));
+  const euW = await run(`apply/undo-step${st65.n}-${st65.slug}.sql`);
+  check("release-w: the undo takes the search paths off and opens the helper again" + (euW ? ": " + euW : ""), !euW && !(await pinned()) && (await helperOpen()));
+  const errW2 = await run(`apply/${bundle.file}`);
+  check("release-w: the bundle applies again after an undo" + (errW2 ? ": " + errW2 : ""), !errW2 && (await pinned()) && !(await helperOpen()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.

@@ -1119,6 +1119,24 @@ alter table public.coach_availability_windows drop column if exists session_minu
     ],
   },
   {
+    n: "65",
+    slug: "0319",
+    title: "0319 Three database functions are hardened: the two audit helpers get a fixed search path, and the database's own row-security helper (rls_auto_enable) is closed to signed-out visitors and signed-in users",
+    migrations: ["0319"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing visible changes. The database advisor stops warning about the two audit functions' search path, and rls_auto_enable can no longer be run through the public API (it still turns row security on for a new table, as before).",
+    undo: [
+      "alter function public.audit_log_refuse_changes() reset search_path;",
+      "alter function public.audit_diff(jsonb, jsonb, text[]) reset search_path;",
+      "do $u$ begin if to_regprocedure('public.rls_auto_enable()') is not null then execute 'grant execute on function public.rls_auto_enable() to public, anon, authenticated'; end if; end $u$;",
+    ].join(String.fromCharCode(10)),
+    undoWhy: "Only if step 65 misbehaves. Takes the fixed search paths off the two audit functions and gives rls_auto_enable back to the public, signed-out visitors and signed-in users, exactly as before.",
+    rows: [
+      ["the audit functions exist (the audit trail is installed)", "to_regprocedure('public.audit_log_refuse_changes()') is not null and to_regprocedure('public.audit_diff(jsonb, jsonb, text[])') is not null"],
+      ["0319 is not already applied (audit_diff has no fixed search path yet)", "exists (select 1 from pg_proc where oid = 'public.audit_diff(jsonb, jsonb, text[])'::regprocedure and proconfig is null)"],
+    ],
+  },
+  {
     n: "64",
     slug: "merge-duplicate-exercises",
     title: "merge Coach Ron's duplicate exercises into one entry each (13 duplicates into 12 survivors, Ron's library only; every set and log row is kept; undoable)",
@@ -1402,6 +1420,7 @@ const BUNDLES = [
   { id: "release-t", name: "Release T (a program copy remembers its source; a package can open a group)", steps: ["61", "62"] },
   { id: "release-u", name: "Release U (copy names no longer stack)", steps: ["63"] },
   { id: "release-v", name: "Release V (merge Coach Ron's duplicate exercises)", steps: ["64"] },
+  { id: "release-w", name: "Release W (function search paths and the row-security helper)", steps: ["65"] },
   { id: "release-n2", name: "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)", steps: ["49", "50"] },
   { id: "release-m", name: "Release M (acceptance record is append-only)", steps: ["44"] },
 ];
@@ -1577,6 +1596,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0295", has.table("client_phase_plans")),
     m("0296", has.col("recipes", "content_hash")),
     m("0297", has.table("schedule_requests")),
+    m("0319", "exists (select 1 from pg_proc where oid = 'public.audit_diff(jsonb, jsonb, text[])'::regprocedure and proconfig is not null)"),
     m("0318", "exists (select 1 from pg_proc where proname = 'duplicate_program' and pronamespace = 'public'::regnamespace and position('v_tail' in prosrc) > 0)"),
     m("0317", has.table("package_group_access")),
     m("0316", has.col("programs", "source_program_id")),

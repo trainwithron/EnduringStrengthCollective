@@ -430,6 +430,14 @@
   "rows": 2
  },
  {
+  "n": "65",
+  "slug": "0319",
+  "migrations": [
+   "0319"
+  ],
+  "rows": 2
+ },
+ {
   "n": "64",
   "slug": "merge-duplicate-exercises",
   "migrations": [],

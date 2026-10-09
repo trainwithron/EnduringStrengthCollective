@@ -89,3 +89,4 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0316 | yes | yes | 12 | 0316 a program copy remembers its source |
 | 0317 | yes | yes | 9 | 0317 package group access |
 | 0318 | yes | yes | 10 | 0318 copy names do not stack |
+| 0319 | yes | yes | 14 | 0319 function search paths and rls_auto_enable |
