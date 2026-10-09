@@ -3,6 +3,8 @@ import { redirectOneOnOneToAnchor } from "@/lib/coach-wide-redirect";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
+import { getViewerDisplayTimezone } from "@/lib/display-timezone-server";
+import { dateKeyInZone, monthBoundsInZone } from "@/lib/timezone";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ClientRateEditor } from "@/components/coach/desktop/client-rate-editor";
 import { SwappableTerm } from "@/components/coach/swappable-term";
@@ -19,12 +21,6 @@ import {
   computeRealPausedMRR,
   computeActivePayingClients,
 } from "@/lib/business-metrics";
-
-function dateKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate()
-  ).padStart(2, "0")}`;
-}
 
 const TIER_LABELS: Record<string, string> = {
   one_on_one: "1-on-1",
@@ -105,6 +101,10 @@ export default async function BusinessDashboardPage(
     .in("group_id", groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"]);
   const totalOutstandingCredits = (creditRows ?? []).reduce((sum, r) => sum + (r.balance ?? 0), 0);
 
+  // Every day and month on this page is the coach's own (the zone their device is in), not the server's UTC.
+  const displayZone = await getViewerDisplayTimezone(supabase, user.id);
+  const dateKey = (d: Date): string => dateKeyInZone(displayZone, d);
+
   const { data: logRows } = await supabase
     .from("workout_logs")
     .select("athlete_id, created_at")
@@ -117,16 +117,15 @@ export default async function BusinessDashboardPage(
     }
   }
 
-  const today = new Date();
-  const todayKey = dateKey(today);
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+  const todayKey = dateKey(new Date());
+  const { monthKey, startIso: monthStartIso } = monthBoundsInZone(displayZone);
 
   const { count: bookingsThisMonthCount } = await supabase
     .from("bookings")
     .select("id", { count: "exact", head: true })
     .eq("coach_id", user.id)
     .eq("status", "confirmed")
-    .gte("start_at", monthStart.toISOString());
+    .gte("start_at", monthStartIso);
 
   const { data: referralRows } = await supabase
     .from("referral_partners")
@@ -144,7 +143,6 @@ export default async function BusinessDashboardPage(
   // below, not a replacement. A coach with no packages configured yet
   // simply gets 0 here and keeps seeing the estimate as their only signal.
   const safeGroupIds = groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"];
-  const monthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
 
   // v3_visual_polish_mockup_sept15.md's "Dashboard Empty State & Business
   // Tiles" mockup — a true zero (no packages ever configured) needs to
@@ -212,8 +210,7 @@ export default async function BusinessDashboardPage(
   const maxGrowthCount = Math.max(1, ...growth.map((g) => g.count));
 
   const newThisMonth = clients.filter((c) => {
-    const d = new Date(c.joinedAt);
-    return d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth();
+    return dateKey(new Date(c.joinedAt)).slice(0, 7) === monthKey;
   }).length;
 
   // Bento/hero visual identity extension (coach_dashboard_redesign_
@@ -381,7 +378,7 @@ export default async function BusinessDashboardPage(
                   <p className="font-body text-sm truncate">{c.fullName}</p>
                   <p className="font-body text-xs text-steel">
                     {c.clientTier ? TIER_LABELS[c.clientTier] ?? c.clientTier : "Tier not set"} &middot;
-                    Joined {new Date(c.joinedAt).toLocaleDateString()}
+                    Joined {new Date(c.joinedAt).toLocaleDateString("en-US", { timeZone: displayZone })}
                   </p>
                 </div>
                 <ClientRateEditor membershipId={c.membershipId} groupId={c.groupId} athleteId={c.athleteId} initialRate={c.monthlyRate} />

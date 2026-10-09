@@ -10,6 +10,7 @@ import { ExpiryHeadsUpControl } from "@/components/coach/desktop/expiry-heads-up
 import { BookingModeSelect, type BookingMode } from "@/components/coach/desktop/booking-mode-select";
 import { AvailabilityExceptionsManager } from "@/components/coach/desktop/availability-exceptions-manager";
 import { TimezoneControl } from "@/components/coach/desktop/timezone-control";
+import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 
 export default async function AvailabilityPage(
   props: {
@@ -151,7 +152,7 @@ export default async function AvailabilityPage(
 
       {reupNudgesEnabled !== null && <ReupNudgeToggle coachId={user.id} initialEnabled={reupNudgesEnabled} />}
 
-      <AvailabilityExceptionsManager coachId={user.id} initialExceptions={exceptions} />
+      <AvailabilityExceptionsManager coachId={user.id} initialExceptions={exceptions} timezone={coachProfile?.timezone ?? DEFAULT_COACH_TIMEZONE} />
 
       <AvailabilityManagerDesktop coachId={user.id} initialWindows={windows} sessionLengthEnabled={sessionLengthEnabled} initialBufferMinutes={policyRow?.buffer_minutes ?? 0} sessionTypes={(typeRows ?? []) as { id: string; name: string }[]} sessionTypeEnabled={sessionTypeEnabled} />
 

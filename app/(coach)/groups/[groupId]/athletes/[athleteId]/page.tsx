@@ -22,6 +22,7 @@ import { AssignSessionsControl } from "@/components/coach/assign-sessions-contro
 import { SessionLedgerList } from "@/components/coach/session-ledger-list";
 import { ClientSeriesPanel, type SeriesView } from "@/components/coach/client-series-panel";
 import { getGroupCoachTimezone } from "@/lib/timezone";
+import { getViewerDisplayTimezone } from "@/lib/display-timezone-server";
 import type { LedgerEntry } from "@/lib/session-ledger";
 import { GoalConfirmationControl } from "@/components/coach/goal-confirmation-control";
 import { GoalWaitingOnClient } from "@/components/coach/goal-waiting-on-client";
@@ -771,6 +772,7 @@ export default async function AthleteProfilePage(
     upcoming: upcomingBySeries.get(r.id) ?? [],
   }));
   const scheduleTimezone = await getGroupCoachTimezone(supabase, params.groupId);
+  const displayZone = await getViewerDisplayTimezone(supabase, user.id);
 
   // What the client said they need the most help with: found in the real conversation (the question the coach sent and the client's first reply), never
   // stored separately and never shown to the client. Soft: if the lookup fails nothing is shown.
@@ -850,7 +852,7 @@ export default async function AthleteProfilePage(
               {profile?.full_name ?? "Unknown"}
             </h1>
             <p className="font-body text-xs text-steel mt-1">
-              Joined {new Date(athleteMembership.joined_at).toLocaleDateString()}
+              Joined {new Date(athleteMembership.joined_at).toLocaleDateString("en-US", { timeZone: displayZone })}
               {activeProgram && (
                 <>
                   {" · "}
@@ -1045,7 +1047,7 @@ export default async function AthleteProfilePage(
                     <p key={i} className="font-body text-sm">
                       {pr.exerciseName}{" "}
                       <span className="text-steel text-xs">
-                        &middot; {new Date(pr.date).toLocaleDateString()}
+                        &middot; {new Date(pr.date).toLocaleDateString("en-US", { timeZone: displayZone })}
                       </span>
                     </p>
                   ))}
@@ -1298,7 +1300,7 @@ export default async function AthleteProfilePage(
                 <>
                   <p className="font-body text-sm text-chalk mt-2 whitespace-pre-wrap">{helpAnswer.answer}</p>
                   <p className="font-body text-xs text-steel mt-1">
-                    Their reply on {new Date(helpAnswer.answeredAt as string).toLocaleDateString("en-US", { month: "short", day: "numeric" })}. Only you see this card.
+                    Their reply on {new Date(helpAnswer.answeredAt as string).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: displayZone })}. Only you see this card.
                   </p>
                   {latestGoalRow?.status !== "proposed" && (
                     <details className="mt-3">
@@ -1311,7 +1313,7 @@ export default async function AthleteProfilePage(
                 </>
               ) : (
                 <p className="font-body text-xs text-steel mt-2">
-                  You asked on {new Date(helpAnswer.askedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}. No reply yet, and there is no need to chase it.
+                  You asked on {new Date(helpAnswer.askedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: displayZone })}. No reply yet, and there is no need to chase it.
                 </p>
               )}
             </section>
@@ -1574,7 +1576,7 @@ export default async function AthleteProfilePage(
                         {log.logged_by_coach && <CoachLoggedBadge />}
                       </span>
                       <span className="font-body text-xs text-steel shrink-0">
-                        {new Date(log.created_at).toLocaleDateString()}
+                        {new Date(log.created_at).toLocaleDateString("en-US", { timeZone: displayZone })}
                       </span>
                     </div>
                     <p className="font-body text-xs text-steel mt-0.5">

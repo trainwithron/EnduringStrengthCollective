@@ -58,6 +58,13 @@ export function zonedTimeToUtc(dateStr: string, timeStr: string, timeZone: strin
   return new Date(asIfUtc - offsetAtMs(first, timeZone));
 }
 
+// A datetime-local box's value ("YYYY-MM-DDTHH:MM") read as a wall clock in `timeZone`, as the real UTC instant. A box read with new Date(value) takes the
+// BROWSER's zone instead, so a coach typing 9:00 in Alabama for a block in their Pacific business hours would save 9:00 Central.
+export function zonedLocalInputToUtc(value: string, timeZone: string): Date {
+  const [datePart, timePart] = value.split("T");
+  return zonedTimeToUtc(datePart, timePart ?? "00:00", timeZone);
+}
+
 // The reverse direction: "what does a wall clock read right now, in
 // `timeZone`" — needed anywhere server code asks "is it today yet" for a
 // specific coach/program, since every server-rendered page and API route
@@ -106,6 +113,13 @@ export function localDayBounds(timeZone: string, now: Date = new Date()): { date
     startIso: zonedTimeToUtc(dateKey, "00:00", timeZone).toISOString(),
     endIso: zonedTimeToUtc(next, "00:00", timeZone).toISOString(),
   };
+}
+
+// The month it is right now in `timeZone` ("YYYY-MM") and the real instant that month began there. A month start built from the server's own clock
+// (UTC) is hours off for a US coach, so the last evening of a month counts as the next month.
+export function monthBoundsInZone(timeZone: string, now: Date = new Date()): { monthKey: string; startIso: string } {
+  const monthKey = dateKeyInZone(timeZone, now).slice(0, 7);
+  return { monthKey, startIso: zonedTimeToUtc(`${monthKey}-01`, "00:00", timeZone).toISOString() };
 }
 
 // One group's coach's stored zone (profiles.timezone), for "is it today
