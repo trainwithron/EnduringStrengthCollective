@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { getViewerDisplayTimezone } from "@/lib/display-timezone-server";
 import { dateKeyInZone, monthBoundsInZone } from "@/lib/timezone";
+import { headlineMrr } from "@/lib/coach-mrr";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ClientRateEditor } from "@/components/coach/desktop/client-rate-editor";
 import { SwappableTerm } from "@/components/coach/swappable-term";
@@ -257,7 +258,7 @@ export default async function BusinessDashboardPage(
       <div className="mb-4">
         <StatHeroTile
           label={realMRR > 0 ? "MRR" : "Estimated MRR"}
-          value={`$${(realMRR > 0 ? realMRR : estimatedMRR).toLocaleString()}`}
+          value={`$${headlineMrr(realMRR, estimatedMRR).value.toLocaleString()}`}
           detail={realMRR > 0 ? "From active subscriptions — the clearest signal of business health" : "From rates set below — set up packages for a real number"}
         />
         {pausedMRR > 0 && (
