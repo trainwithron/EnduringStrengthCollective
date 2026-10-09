@@ -107,6 +107,8 @@ export function ProgramCardMenu({
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       const target = e.target as Node;
+      // The in-page confirmation (Delete? Assign?) sits outside the menu, but answering it is not leaving the menu: closing here would hide the error or result the menu is about to show.
+      if (target instanceof Element && target.closest('[role="alertdialog"]')) return;
       if (
         buttonRef.current?.contains(target) ||
         menuRef.current?.contains(target)
@@ -122,7 +124,8 @@ export function ProgramCardMenu({
       setView(null);
     }
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setView(null);
+      // Escape inside the confirmation closes only the confirmation.
+      if (e.key === "Escape" && !document.querySelector('[role="alertdialog"]')) setView(null);
     }
     if (view) {
       document.addEventListener("mousedown", handleClickOutside);

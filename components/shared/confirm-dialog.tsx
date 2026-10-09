@@ -24,6 +24,7 @@ export function ConfirmDialogHost() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
+        e.stopPropagation(); // only the confirmation closes, not the sheet or menu it was opened from
         confirmStore.answer(false);
         return;
       }
