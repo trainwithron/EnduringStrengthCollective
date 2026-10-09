@@ -6,6 +6,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { notifyBookingConfirmed } from "@/lib/notify-booking-confirmed";
 import { mirrorGoogleCalendarEvent } from "@/lib/mirror-google-calendar-event";
 import { CANT_BOOK_NO_SESSIONS } from "@/lib/session-credit-copy";
+import { bookingRefusalMessage } from "@/lib/booking-refusal-copy";
 
 export function BookSlotButton({
   coachId,
@@ -44,15 +45,7 @@ export function BookSlotButton({
     });
 
     if (bookError) {
-      setError(
-        bookError.message.includes("no session credits")
-          ? CANT_BOOK_NO_SESSIONS
-          : bookError.message.includes("just taken")
-            ? "That slot was just taken. Try another."
-            : bookError.message.includes("outside your coach")
-              ? "That time is outside your coach's hours."
-              : "Couldn't book that slot."
-      );
+      setError(bookError.message.includes("no session credits") ? CANT_BOOK_NO_SESSIONS : bookingRefusalMessage(bookError.message, "Couldn't book that slot. Nothing was changed. Try again."));
       setSubmitting(false);
       router.refresh();
       return;

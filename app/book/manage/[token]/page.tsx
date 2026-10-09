@@ -18,7 +18,7 @@ export default async function ManageBookingPage(props: { params: Promise<{ token
       <main className="min-h-screen bg-graphite text-chalk font-body flex items-center justify-center px-6">
         <div className="max-w-sm text-center">
           <h1 className="font-display font-bold text-2xl uppercase">This link isn&apos;t valid</h1>
-          <p className="font-body text-sm text-steel mt-3">Check that you copied the whole link, or ask your coach for help.</p>
+          <p className="font-body text-sm text-steel mt-3">Check that you copied the whole link, or ask your coach for a new one.</p>
         </div>
       </main>
     );

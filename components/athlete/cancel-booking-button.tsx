@@ -86,11 +86,20 @@ export function CancelBookingButton({
 
   async function handleCancelSeries() {
     if (!recurringSeriesId) return;
-    if (!await confirmDialog("Cancel every remaining session in this weekly series?")) return;
+    const seriesMessage =
+      viewer === "coach"
+        ? "Cancel every remaining session in this weekly series? Anything charged for them is given back."
+        : "Cancel every remaining session in this weekly series? Each one outside your coach's cancellation window goes back to your balance.";
+    if (!await confirmDialog(seriesMessage)) return;
     setCancellingSeries(true);
+    setError(null);
     const supabase = createBrowserClient();
-    await supabase.rpc("cancel_recurring_booking_series", { p_series_id: recurringSeriesId });
+    const { error: seriesError } = await supabase.rpc("cancel_recurring_booking_series", { p_series_id: recurringSeriesId });
     setCancellingSeries(false);
+    if (seriesError) {
+      setError("That didn't cancel the series. Nothing was changed. Try again.");
+      return;
+    }
     router.refresh();
   }
 
@@ -111,7 +120,7 @@ export function CancelBookingButton({
           disabled={submitting}
           className="h-11 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
         >
-          {submitting ? "Cancelling…" : viewer === "coach" ? "Cancel" : "Booked ✓ Cancel"}
+          {submitting ? "Cancelling…" : viewer === "coach" ? "Cancel" : "Cancel session"}
         </button>
       </div>
       {error && (
