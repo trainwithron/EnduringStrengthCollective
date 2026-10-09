@@ -167,6 +167,8 @@ function CoachDesktopShellFull({
   const [teamMode, setTeamMode] = useState(false);
   const [groupKind, setGroupKind] = useState<"one_on_one" | "social" | "team" | null>(null);
   const [orgName, setOrgName] = useState<string | null>(null);
+  // In a one-on-one space the name up top is the client: this is who, so the name can open their profile.
+  const [soloClientId, setSoloClientId] = useState<string | null>(null);
   // Concept 8 "Familiar" shell redesign (coach_desktop_shell_identity_
   // redesign.md) — the rail + list panel need the viewer's own id for
   // the pinned Needs Attention strip's fetch.
@@ -184,6 +186,8 @@ function CoachDesktopShellFull({
   // ambiguous whether "Karina Ramirez" up top is a person or a team.
   useEffect(() => {
     let cancelled = false;
+    // Moving to another space: the previous client's link must not stay on the new space's name while the new one loads.
+    setSoloClientId(null);
     async function run() {
       const supabase = createBrowserClient();
       const { data } = await supabase
@@ -195,6 +199,12 @@ function CoachDesktopShellFull({
         setTeamMode(data?.team_mode ?? false);
         setGroupKind((data?.group_kind as "one_on_one" | "social" | "team" | null) ?? "team");
         setOrgName((data as any)?.organizations?.name ?? null);
+      }
+      if (data?.group_kind === "one_on_one") {
+        const { data: member } = await supabase.from("group_memberships").select("profile_id").eq("group_id", groupId).eq("role", "athlete").limit(1).maybeSingle();
+        if (!cancelled) setSoloClientId((member as { profile_id?: string } | null)?.profile_id ?? null);
+      } else if (!cancelled) {
+        setSoloClientId(null);
       }
     }
     run();
@@ -569,6 +579,12 @@ function CoachDesktopShellFull({
           )}
           {coachLevel && orgName ? (
             <WorkspaceMenu groupId={groupId} orgName={orgName} large />
+          ) : groupKind === "one_on_one" && soloClientId ? (
+            <p className="font-display font-bold text-lg md:text-2xl uppercase tracking-wide truncate">
+              <Link href={`/groups/${groupId}/athletes/${soloClientId}`} className="hover:text-rust underline-offset-4 hover:underline" title="Open this client's profile">
+                {groupName}
+              </Link>
+            </p>
           ) : (
             <p className="font-display font-bold text-lg md:text-2xl uppercase tracking-wide truncate">
               {groupName}
