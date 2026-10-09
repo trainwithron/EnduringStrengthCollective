@@ -1,18 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { localDateKey } from "@/lib/timezone";
+import { zoneLabel } from "@/lib/display-timezone";
 
 interface Slot {
   start: string;
   durationMinutes: number;
 }
 
+// The visitor's own calendar day: after about 5pm Pacific the UTC date is already tomorrow.
 function todayKey(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localDateKey();
 }
 
-function formatSlotTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+function formatSlotTime(iso: string, withZone = false): string {
+  return new Date(iso).toLocaleTimeString("en-US", withZone ? { hour: "numeric", minute: "2-digit", timeZoneName: "short" } : { hour: "numeric", minute: "2-digit" });
 }
 
 // The entire prospect-facing flow: pick a date, pick an open slot, leave
@@ -118,7 +121,7 @@ export function DiscoveryBookingFlow({ coachId }: { coachId: string }) {
             month: "long",
             day: "numeric",
           })}{" "}
-          at {formatSlotTime(confirmed.start)}
+          at {formatSlotTime(confirmed.start, true)}
           {coachName ? ` with ${coachName}` : ""}.
         </p>
         <p className="font-body text-sm text-steel mt-2">
@@ -157,6 +160,8 @@ export function DiscoveryBookingFlow({ coachId }: { coachId: string }) {
       ) : slots.length === 0 ? (
         <p className="font-body text-sm text-steel py-4">No open times this day — try another date.</p>
       ) : (
+        <>
+        <p className="font-body text-xs text-steel mb-2">Times are in {zoneLabel(Intl.DateTimeFormat().resolvedOptions().timeZone)}.</p>
         <div className="grid grid-cols-3 gap-2 mb-6">
           {slots.map((slot) => (
             <button
@@ -173,6 +178,7 @@ export function DiscoveryBookingFlow({ coachId }: { coachId: string }) {
             </button>
           ))}
         </div>
+        </>
       )}
 
       {selectedSlot && (

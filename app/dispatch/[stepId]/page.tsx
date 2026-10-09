@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
+import { getViewerDisplayTimezone } from "@/lib/display-timezone-server";
+import { formatInTimezone } from "@/lib/format-in-timezone";
 import { DispatchStepActions } from "@/components/coach/dispatch-step-actions";
 
 const GOAL_LABELS: Record<string, string> = {
@@ -39,6 +41,7 @@ export default async function DispatchStepPage(props: { params: Promise<{ stepId
     );
   }
 
+  const displayZone = await getViewerDisplayTimezone(supabase, user.id);
   const request = step.org_trainer_dispatch_requests as any;
   const isExpired = step.status === "pending" && new Date(step.expires_at).getTime() <= Date.now();
   const goalLabel =
@@ -64,7 +67,7 @@ export default async function DispatchStepPage(props: { params: Promise<{ stepId
         <div className="mt-6 border border-steel/20 p-4 space-y-2">
           <p className="font-body text-sm">
             <span className="text-steel">Requested time:</span>{" "}
-            {new Date(request.requested_start_at).toLocaleString()}
+            {formatInTimezone(request.requested_start_at, displayZone)}
           </p>
           <p className="font-body text-sm">
             <span className="text-steel">Goal:</span> {goalLabel}

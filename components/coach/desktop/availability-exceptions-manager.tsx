@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
+import { zonedLocalInputToUtc } from "@/lib/timezone";
+import { formatInTimezone } from "@/lib/format-in-timezone";
+import { zoneLabel } from "@/lib/display-timezone";
 
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -20,9 +23,12 @@ export interface AvailabilityException {
 export function AvailabilityExceptionsManager({
   coachId,
   initialExceptions,
+  timezone,
 }: {
   coachId: string;
   initialExceptions: AvailabilityException[];
+  // The coach's saved (business) zone: time off is entered and shown in it, the same zone their recurring hours are in.
+  timezone: string;
 }) {
   const [exceptions, setExceptions] = useState(initialExceptions);
   const [mode, setMode] = useState<"one_off" | "recurring">("one_off");
@@ -43,10 +49,13 @@ export function AvailabilityExceptionsManager({
         setError("Pick a start and end.");
         return;
       }
-      if (new Date(oneOffEnd) <= new Date(oneOffStart)) {
+      if (zonedLocalInputToUtc(oneOffEnd, timezone) <= zonedLocalInputToUtc(oneOffStart, timezone)) {
         setError("End must be after start.");
         return;
       }
+    } else if (!recurStart || !recurEnd || recurEnd <= recurStart) {
+      setError("End must be after start.");
+      return;
     }
     setBusy(true);
     const supabase = createBrowserClient();
@@ -56,8 +65,8 @@ export function AvailabilityExceptionsManager({
             coach_id: coachId,
             kind: "one_off",
             label: label.trim() || null,
-            start_at: new Date(oneOffStart).toISOString(),
-            end_at: new Date(oneOffEnd).toISOString(),
+            start_at: zonedLocalInputToUtc(oneOffStart, timezone).toISOString(),
+            end_at: zonedLocalInputToUtc(oneOffEnd, timezone).toISOString(),
             weekday: null,
             start_time: null,
             end_time: null,
@@ -102,9 +111,16 @@ export function AvailabilityExceptionsManager({
   }
 
   async function handleDelete(id: string) {
+    const before = exceptions;
+    setError(null);
     setExceptions((prev) => prev.filter((e) => e.id !== id));
     const supabase = createBrowserClient();
-    await supabase.from("coach_availability_exceptions").delete().eq("id", id);
+    const { error: deleteError } = await supabase.from("coach_availability_exceptions").delete().eq("id", id);
+    if (deleteError) {
+      setExceptions(before);
+      setError("Couldn't remove that — try again.");
+      return;
+    }
     router.refresh();
   }
 
@@ -115,7 +131,7 @@ export function AvailabilityExceptionsManager({
       </p>
       <p className="font-body text-xs text-steel mb-3">
         Time off is subtracted from your recurring hours — clients never see
-        it as bookable.
+        it as bookable. Times here are in {zoneLabel(timezone)}, the same as your hours.
       </p>
 
       {exceptions.length > 0 && (
@@ -128,17 +144,7 @@ export function AvailabilityExceptionsManager({
                 </p>
                 <p className="font-body text-xs text-steel">
                   {e.kind === "one_off"
-                    ? `${new Date(e.startAt!).toLocaleString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })} – ${new Date(e.endAt!).toLocaleString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                        hour: "numeric",
-                        minute: "2-digit",
-                      })}`
+                    ? `${formatInTimezone(e.startAt!, timezone)} – ${formatInTimezone(e.endAt!, timezone)}`
                     : `Every ${WEEKDAY_LABELS[e.weekday!]}, ${e.startTime!.slice(0, 5)}–${e.endTime!.slice(0, 5)}`}
                 </p>
               </div>

@@ -8,6 +8,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { clampedLeft, clampedWidth } from "@/lib/viewport-clamp";
 import { duplicateProgram } from "@/lib/program-duplication";
 import { notifyPush } from "@/lib/push-notify";
+import { localDateKey } from "@/lib/timezone";
 import { MoreVertical } from "lucide-react";
 
 const MENU_WIDTH = 256;
@@ -50,8 +51,9 @@ type View =
   | "duplicate-org"
   | "duplicate-group";
 
+// The coach's own calendar day on the device in their hand, not UTC's: after about 5pm Pacific the UTC date is already tomorrow.
 function todayDateString(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localDateKey();
 }
 
 export function ProgramCardMenu({

@@ -2,6 +2,9 @@ import Link from "next/link";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
+import { getViewerDisplayTimezone } from "@/lib/display-timezone-server";
+import { zonedTimeToUtc } from "@/lib/timezone";
+import { formatInTimezone } from "@/lib/format-in-timezone";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { AssignWorkoutForm, type WorkoutOption } from "@/components/coach/desktop/assign-workout-form";
 import { resolveDayMacros, SOURCE_LABEL, standingForDate } from "@/lib/macro-resolution";
@@ -243,13 +246,16 @@ export default async function ClientCalendarDayPage(
   // Coach's own schedule that day — bookings across every client, plus
   // recurring availability for this weekday — so assigning something for
   // this athlete doesn't happen blind to the coach's own commitments.
+  // The day runs midnight to midnight in the zone the coach is reading times in (their device's), not UTC's.
+  const displayZone = await getViewerDisplayTimezone(supabase, user.id);
+  const nextDayKey = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate() + 1)).toISOString().slice(0, 10);
   const { data: dayBookings } = await supabase
     .from("bookings")
     .select("start_at, athlete_id, profiles ( full_name )")
     .eq("coach_id", user.id)
     .eq("status", "confirmed")
-    .gte("start_at", `${params.date}T00:00:00`)
-    .lt("start_at", `${params.date}T23:59:59.999`)
+    .gte("start_at", zonedTimeToUtc(params.date, "00:00", displayZone).toISOString())
+    .lt("start_at", zonedTimeToUtc(nextDayKey, "00:00", displayZone).toISOString())
     .order("start_at", { ascending: true });
 
   const { data: availabilityWindows } = await supabase
@@ -414,10 +420,7 @@ export default async function ClientCalendarDayPage(
                   {b.profiles?.full_name ?? "A client"}
                 </span>
                 <span className="font-body text-xs text-steel">
-                  {new Date(b.start_at).toLocaleTimeString("en-US", {
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
+                  {formatInTimezone(b.start_at, displayZone, "time")}
                 </span>
               </div>
             ))}

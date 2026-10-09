@@ -3,6 +3,7 @@ import { redirectOneOnOneToAnchor } from "@/lib/coach-wide-redirect";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
+import { getViewerDisplayTimezone } from "@/lib/display-timezone-server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ClientRateEditor } from "@/components/coach/desktop/client-rate-editor";
 import { SwappableTerm } from "@/components/coach/swappable-term";
@@ -117,6 +118,7 @@ export default async function BusinessDashboardPage(
     }
   }
 
+  const displayZone = await getViewerDisplayTimezone(supabase, user.id);
   const today = new Date();
   const todayKey = dateKey(today);
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -381,7 +383,7 @@ export default async function BusinessDashboardPage(
                   <p className="font-body text-sm truncate">{c.fullName}</p>
                   <p className="font-body text-xs text-steel">
                     {c.clientTier ? TIER_LABELS[c.clientTier] ?? c.clientTier : "Tier not set"} &middot;
-                    Joined {new Date(c.joinedAt).toLocaleDateString()}
+                    Joined {new Date(c.joinedAt).toLocaleDateString("en-US", { timeZone: displayZone })}
                   </p>
                 </div>
                 <ClientRateEditor membershipId={c.membershipId} groupId={c.groupId} athleteId={c.athleteId} initialRate={c.monthlyRate} />

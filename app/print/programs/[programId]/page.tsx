@@ -5,6 +5,7 @@ import { PrintButton } from "@/components/shared/print-button";
 import { SET_ROW_SELECT, mapSetRow } from "@/lib/exercise-fields";
 import { computeScheduledDates, isLocked } from "@/lib/program-schedule";
 import { getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
+import { getViewerDisplayTimezone } from "@/lib/display-timezone-server";
 import { describePrescription, groupPrintWeeks, releasedDayIds, type PrintDay } from "@/lib/program-print";
 
 // A printable copy of a program (Ron: a coach must never be stuck in our software). Plain black on white, one line per exercise with its prescription and blank boxes to write in
@@ -73,6 +74,8 @@ export default async function PrintProgramPage(props: { params: Promise<{ progra
     forName = (group as { name?: string | null } | null)?.name?.trim() || null;
   }
 
+  const printedZone = await getViewerDisplayTimezone(supabase, user.id);
+
   return (
     <div className="print-sheet bg-white text-black min-h-screen px-8 py-6 font-body">
       <style>{`
@@ -93,7 +96,7 @@ export default async function PrintProgramPage(props: { params: Promise<{ progra
       <header className="border-b border-black pb-2 mb-4">
         <h1 className="text-2xl font-bold uppercase">{program.name}</h1>
         <p className="text-sm">
-          {forName ? `${forName} · ` : ""}Printed {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+          {forName ? `${forName} · ` : ""}Printed {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: printedZone })}
         </p>
         {program.description && <p className="text-sm mt-1">{program.description}</p>}
       </header>
