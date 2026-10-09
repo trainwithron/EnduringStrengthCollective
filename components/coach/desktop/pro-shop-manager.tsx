@@ -71,7 +71,8 @@ export function ProShopManager({ initialLinks }: { initialLinks: ProShopLink[] }
     const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
     const { error: uploadError } = await supabase.storage.from("pro-shop-images").upload(path, file);
     if (uploadError) {
-      setError(uploadError.message);
+      console.error("[pro shop image upload]", uploadError.message);
+      setError("Couldn't upload that image. Try again, or contact support if it keeps happening.");
       setUploadingImage(false);
       return;
     }

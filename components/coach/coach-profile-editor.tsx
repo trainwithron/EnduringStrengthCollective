@@ -69,7 +69,8 @@ export function CoachProfileEditor({
     const path = `${coachId}/${crypto.randomUUID()}.${ext}`;
     const { error: uploadError } = await supabase.storage.from("coach-profile-photos").upload(path, file);
     if (uploadError) {
-      setError(uploadError.message);
+      console.error("[profile photo upload]", uploadError.message);
+      setError("Couldn't upload that image. Try again, or contact support if it keeps happening.");
       setUploading(false);
       return;
     }

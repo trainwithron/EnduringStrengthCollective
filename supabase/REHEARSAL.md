@@ -90,3 +90,4 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0317 | yes | yes | 9 | 0317 package group access |
 | 0318 | yes | yes | 10 | 0318 copy names do not stack |
 | 0319 | yes | yes | 14 | 0319 function search paths and rls_auto_enable |
+| 0320 | yes | yes | 8 | 0320 image upload look rules |

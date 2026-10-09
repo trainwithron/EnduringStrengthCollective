@@ -896,6 +896,24 @@ for (const s of steps) {
   const errW2 = await run(`apply/${bundle.file}`);
   check("release-w: the bundle applies again after an undo" + (errW2 ? ": " + errW2 : ""), !errW2 && (await pinned()) && !(await helperOpen()));
 }
+// Release X (step 66): ONE paste. The look rules are absent before, the bundle adds them, a second run is refused naming step 66, the undo removes them, and it applies again.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-x");
+  check("release-x: ONE bundle holds step 66", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["66"]));
+  const st66 = steps.find((x) => x.n === "66");
+  const looks = async () => Number((await db.query("select count(*)::int as n from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = any (array['org_branding_select_owner_admin', 'coach_profile_photos_select_own', 'pro_shop_images_select_own'])")).rows[0].n);
+  const ex0 = await run(`apply/undo-step${st66.n}-${st66.slug}.sql`);
+  check("release-x: before the bundle runs there are no look rules" + (ex0 ? ": " + ex0 : ""), !ex0 && (await looks()) === 0);
+  const errX = await run(`apply/${bundle.file}`);
+  check("release-x bundle applies on the live-shaped state" + (errX ? ": " + errX : ""), !errX && (await looks()) === 3);
+  const againX = await run(`apply/${bundle.file}`);
+  check("release-x: a second run is refused, naming step 66 (" + againX + ")", !!againX && againX.includes("step 66 (0320) cannot run") && againX.includes("already applied"));
+  const euX = await run(`apply/undo-step${st66.n}-${st66.slug}.sql`);
+  check("release-x: the undo removes the three rules" + (euX ? ": " + euX : ""), !euX && (await looks()) === 0);
+  const errX2 = await run(`apply/${bundle.file}`);
+  check("release-x: the bundle applies again after an undo" + (errX2 ? ": " + errX2 : ""), !errX2 && (await looks()) === 3);
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.

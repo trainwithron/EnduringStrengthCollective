@@ -58,21 +58,10 @@ export function OrgImageUpload({
       .from("org-branding")
       .upload(path, file, { upsert: true });
     if (uploadError) {
-      // This specific error only ever means the browser's current signed-in
-      // session doesn't actually own/admin this org — verified live: the
-      // storage policy, bucket, and owner's own membership row are all
-      // correct, so a real permission gap never produces this message. The
-      // one real cause found in practice is a stale tab: the session cookie
-      // changed after signing into a different account elsewhere in the
-      // same browser, but this tab's already-rendered page still shows the
-      // org it loaded with. A raw Postgres RLS string here would only
-      // confuse a coach, not tell them what to actually do.
-      const isRlsRejection = uploadError.message.toLowerCase().includes("row-level security");
-      setError(
-        isRlsRejection
-          ? "Upload was rejected — your session may have switched accounts in another tab. Reload this page and make sure you're still signed in as this organization's owner, then try again."
-          : uploadError.message
-      );
+      // The real message goes to the console only; a raw database string would not tell a coach what to do. (It used to blame a "switched account", which was wrong: the bucket was
+      // missing its "look" rule, fixed by migration 0320.)
+      console.error("[org image upload]", uploadError.message);
+      setError("Couldn't upload that image. Try again, or contact support if it keeps happening.");
       setUploading(false);
       return;
     }

@@ -1119,6 +1119,23 @@ alter table public.coach_availability_windows drop column if exists session_minu
     ],
   },
   {
+    n: "66",
+    slug: "0320",
+    title: "0320 Image uploads work: the organization logo and app icon, the coach profile photo and the pro shop pictures were refused for everyone because their storage buckets had no rule for looking at a file's row (adds one rule per bucket, the same people who can already write)",
+    migrations: ["0320"],
+    sees: "Success. No rows returned.",
+    afterwards: "Uploading an organization logo or app icon (Organization, Branding), a coach profile photo, or a pro shop picture now works for the person who owns it. Nobody gains the right to write anywhere new.",
+    undo: [
+      "drop policy if exists org_branding_select_owner_admin on storage.objects;",
+      "drop policy if exists coach_profile_photos_select_own on storage.objects;",
+      "drop policy if exists pro_shop_images_select_own on storage.objects;",
+    ].join(String.fromCharCode(10)),
+    undoWhy: "Only if step 66 misbehaves. Removes the three new rules, which puts uploads back to how they were (refused).",
+    rows: [
+      ["0320 is not already applied (the organization logo bucket has no look rule yet)", "not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'org_branding_select_owner_admin')"],
+    ],
+  },
+  {
     n: "65",
     slug: "0319",
     title: "0319 Three database functions are hardened: the two audit helpers get a fixed search path, and the database's own row-security helper (rls_auto_enable) is closed to signed-out visitors and signed-in users",
@@ -1421,6 +1438,7 @@ const BUNDLES = [
   { id: "release-u", name: "Release U (copy names no longer stack)", steps: ["63"] },
   { id: "release-v", name: "Release V (merge Coach Ron's duplicate exercises)", steps: ["64"] },
   { id: "release-w", name: "Release W (function search paths and the row-security helper)", steps: ["65"] },
+  { id: "release-x", name: "Release X (image uploads: the missing look rules on three storage buckets)", steps: ["66"] },
   { id: "release-n2", name: "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)", steps: ["49", "50"] },
   { id: "release-m", name: "Release M (acceptance record is append-only)", steps: ["44"] },
 ];
@@ -1596,6 +1614,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0295", has.table("client_phase_plans")),
     m("0296", has.col("recipes", "content_hash")),
     m("0297", has.table("schedule_requests")),
+    m("0320", "exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'org_branding_select_owner_admin')"),
     m("0319", "exists (select 1 from pg_proc where oid = 'public.audit_diff(jsonb, jsonb, text[])'::regprocedure and proconfig is not null)"),
     m("0318", "exists (select 1 from pg_proc where proname = 'duplicate_program' and pronamespace = 'public'::regnamespace and position('v_tail' in prosrc) > 0)"),
     m("0317", has.table("package_group_access")),
