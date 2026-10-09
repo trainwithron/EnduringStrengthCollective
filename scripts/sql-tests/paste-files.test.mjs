@@ -695,6 +695,24 @@ for (const s of steps) {
   }
   check("no paste or undo file has a non-ASCII character outside a comment" + (offenders.length ? ": " + offenders.slice(0, 6).join(", ") : ""), offenders.length === 0);
 }
+// Release U (step 63): ONE paste. The copy function does not strip a client tail before, the bundle makes it, a second run is refused naming step 63, the undo puts the older function back, and it applies again.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-u");
+  check("release-u: ONE bundle holds step 63", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["63"]));
+  const st63 = steps.find((x) => x.n === "63");
+  const strips = async () => (await db.query("select position('v_tail' in prosrc) > 0 as ok from pg_proc where proname = 'duplicate_program' and pronamespace = 'public'::regnamespace")).rows[0].ok === true;
+  const eu0 = await run(`apply/undo-step${st63.n}-${st63.slug}.sql`);
+  check("release-u: before the bundle runs the copy function does not strip a client tail" + (eu0 ? ": " + eu0 : ""), !eu0 && !(await strips()));
+  const errU = await run(`apply/${bundle.file}`);
+  check("release-u bundle applies on the live-shaped state" + (errU ? ": " + errU : ""), !errU && (await strips()));
+  const againU = await run(`apply/${bundle.file}`);
+  check("release-u: a second run is refused, naming step 63 (" + againU + ")", !!againU && againU.includes("step 63 (0318) cannot run") && againU.includes("already applied"));
+  const euU = await run(`apply/undo-step${st63.n}-${st63.slug}.sql`);
+  check("release-u: the undo puts the older copy function back" + (euU ? ": " + euU : ""), !euU && !(await strips()));
+  const errU2 = await run(`apply/${bundle.file}`);
+  check("release-u: the bundle applies again after an undo" + (errU2 ? ": " + errU2 : ""), !errU2 && (await strips()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.
