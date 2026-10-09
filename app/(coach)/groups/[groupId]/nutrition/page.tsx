@@ -85,6 +85,10 @@ export default async function NutritionPage(
     // their name), and picking someone else opens THEIR group's address below, so the name on top and the client on the page are always the same person.
     const ownClient = (group as { group_kind?: string | null } | null)?.group_kind === "one_on_one" ? athletes.find((a) => a.groupId === params.groupId) ?? null : null;
     const selected = athletes.find((a) => a.profileId === searchParams.athleteId) ?? ownClient;
+    // An old bookmark or a hand-typed address for a client in another group: go to that client's own group, so the name on the top bar is theirs.
+    if (selected && selected.groupId !== params.groupId) {
+      redirect(`/groups/${selected.groupId}/nutrition?athleteId=${selected.profileId}${searchParams.tab ? `&tab=${searchParams.tab}` : ""}`);
+    }
     let selectedTier: string | null = null;
     if (selected) {
       const { data: tierRow } = await supabase

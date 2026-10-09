@@ -44,5 +44,7 @@ describe("the Nutrition page's top bar and the client on the page agree", () => 
   it("picking a client opens that client's own group, and a one-on-one group shows its own client by default", () => {
     expect(page).toContain("href={`/groups/${a.groupId}/nutrition?athleteId=${a.profileId}`}");
     expect(page).toContain('group_kind === "one_on_one" ? athletes.find((a) => a.groupId === params.groupId)');
+    expect(page).toContain("if (selected && selected.groupId !== params.groupId) {");
+    expect(page).toContain("redirect(`/groups/${selected.groupId}/nutrition?athleteId=${selected.profileId}");
   });
 });
