@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   description: "Spotlight Coaching — group training platform",
   manifest: "/manifest.webmanifest",
   // The picture a link to the app shows when it is shared (the default Spotlight image; see lib/brand.ts). The base makes the image address absolute.
-  metadataBase: new URL(configuredAppUrl() ?? "https://enduring-strength-collective.vercel.app"),
+  metadataBase: new URL(configuredAppUrl() ?? "https://spotlightcoaching.app"),
   openGraph: {
     title: "Spotlight Coaching",
     description: "Spotlight Coaching — group training platform",

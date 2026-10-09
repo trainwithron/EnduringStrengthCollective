@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { extractYoutubeId } from "@/lib/youtube";
@@ -25,7 +26,12 @@ export default async function ScanExercisePage(props: { params: Promise<{ exerci
   if (!exercise) {
     return (
       <main className="min-h-screen bg-graphite text-chalk font-body flex items-center justify-center px-6">
-        <p className="font-body text-steel text-center">This QR code isn&apos;t valid anymore.</p>
+        <div className="flex flex-col items-center gap-5">
+          <p className="font-body text-steel text-center">This QR code isn&apos;t valid anymore.</p>
+          <Link href="/" className="inline-flex items-center justify-center h-11 px-6 bg-rust text-graphite font-display font-bold uppercase tracking-wide">
+            Back home
+          </Link>
+        </div>
       </main>
     );
   }

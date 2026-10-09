@@ -1,4 +1,7 @@
+import Link from "next/link";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { canSignProofs } from "@/lib/public-booking-proof";
+import { isSendGridConfigured } from "@/lib/sendgrid";
 import { findRankedCoaches, type RankedCoachResult } from "@/lib/marketplace-browse";
 import type { GoalType } from "@/lib/marketplace-coach-ranking";
 
@@ -54,6 +57,17 @@ export default async function FindACoachPage(props: {
       goalType: goal,
       weights,
     });
+  }
+
+  // A coach card links to that coach's booking page when booking is switched on for the coach (the same condition /book/<slug> itself uses).
+  const slugByCoach = new Map<string, string>();
+  if (results.length > 0 && canSignProofs() && isSendGridConfigured()) {
+    const { data: pages } = await createServiceRoleClient()
+      .from("coach_booking_pages")
+      .select("coach_id, slug")
+      .eq("enabled", true)
+      .in("coach_id", results.map((r) => r.coachId));
+    for (const p of pages ?? []) slugByCoach.set(p.coach_id as string, p.slug as string);
   }
 
   return (
@@ -133,12 +147,16 @@ export default async function FindACoachPage(props: {
                 {scoreLabel(r) && (
                   <p className="font-body text-xs text-moss mt-2">{scoreLabel(r)}</p>
                 )}
+                {slugByCoach.get(r.coachId) && (
+                  <Link href={`/book/${slugByCoach.get(r.coachId)}`} className="inline-flex items-center h-11 mt-2 font-body text-sm text-rust underline">
+                    Book a time →
+                  </Link>
+                )}
               </div>
             ))}
             <p className="font-body text-xs text-steel pt-2">
               Ranked by a real blend of distance, program fit, and — where enough real client history
-              exists — measured outcomes. Most coaches don&apos;t have outcome data tracked yet; that&apos;s
-              expected, not an error.
+              exists — measured outcomes.
             </p>
           </div>
         )}

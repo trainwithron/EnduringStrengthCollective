@@ -8,10 +8,11 @@ import { establishSessionFromLink } from "@/lib/auth-link-client";
 import { LinkConflictNotice } from "@/components/auth/link-conflict-notice";
 import { loadStartInputs, pickStartGroup } from "@/lib/start-group";
 import { isStandaloneDisplay, isMobileUserAgent } from "@/lib/pwa";
+import { SigningInNotice } from "@/components/auth/signing-in-notice";
 
 export default function ConfirmEmailPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<SigningInNotice />}>
       <ConfirmEmailStatus />
     </Suspense>
   );
@@ -63,7 +64,7 @@ function ConfirmEmailStatus() {
   }, [router]);
 
   if (conflictWith) return <LinkConflictNotice currentEmail={conflictWith} />;
-  if (checking || hasSession) return null;
+  if (checking || hasSession) return <SigningInNotice />;
 
   return (
     <main className="min-h-screen flex items-center justify-center px-6 text-center">

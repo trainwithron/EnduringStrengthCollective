@@ -9,12 +9,13 @@ import { isPlaceholderEmail, validateClaimEmail, validateNewPassword } from "@/l
 import { loadStartInputs, pickStartGroup } from "@/lib/start-group";
 import { LegalAcceptance } from "@/components/legal/legal-acceptance";
 import { LegalLinks } from "@/components/legal/legal-links";
+import { SigningInNotice } from "@/components/auth/signing-in-notice";
 import { LEGAL_VERSIONS } from "@/lib/legal";
 import { recordLegalConsentNow } from "@/lib/legal-client";
 
 export default function SetPasswordPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<SigningInNotice />}>
       <SetPasswordForm />
     </Suspense>
   );
@@ -157,7 +158,7 @@ function SetPasswordForm() {
     router.refresh();
   }
 
-  if (checking) return null;
+  if (checking) return <SigningInNotice />;
   if (conflictWith) return <LinkConflictNotice currentEmail={conflictWith} />;
 
   if (!hasSession) {

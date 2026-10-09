@@ -6,9 +6,8 @@ import { GoogleHealthConnection } from "@/components/athlete/google-health-conne
 // Oura, Withings, Garmin, and Google Health are the real connections
 // (real OAuth + sync — see app/api/oura/, app/api/withings/,
 // app/api/garmin/, app/api/google-health/). Apple Health stays a
-// disabled "coming soon" row — it has no server API at all without a
-// companion iOS app (see the wearables scoping memory).
-const COMING_SOON_PROVIDERS = ["Apple Health"];
+// not listed — it has no server API at all without a companion iOS app
+// (see the wearables scoping memory), so a row for it could only be a dead end.
 
 export function WearablePlaceholder({
   groupId,
@@ -70,17 +69,6 @@ export function WearablePlaceholder({
           status={googleHealthStatus}
           initialError={googleHealthError}
         />
-        {COMING_SOON_PROVIDERS.map((p) => (
-          <div
-            key={p}
-            className="flex items-center justify-between h-10 px-3 border border-steel/15 opacity-50"
-          >
-            <span className="font-body text-sm">{p}</span>
-            <span className="font-body text-xs text-steel uppercase tracking-wide">
-              Coming soon
-            </span>
-          </div>
-        ))}
       </div>
     </div>
   );

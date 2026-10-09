@@ -37,7 +37,7 @@ function continuePage(action: string, message?: string) {
   return page(`<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex"><title>Continue</title>
+<meta name="robots" content="noindex"><title>Welcome to Spotlight</title>
 <style>
   :root{color-scheme:dark}
   body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;background:#1C1B1A;color:#EDE8E0;font-family:Inter,system-ui,sans-serif}
@@ -47,6 +47,7 @@ function continuePage(action: string, message?: string) {
   p.err{color:#EDE8E0;border:1px solid #D2703B;padding:10px 12px}
   button{margin-top:24px;width:100%;height:52px;border:0;background:#D2703B;color:#1C1B1A;font-size:18px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;cursor:pointer}
 </style></head><body><main>
+<p style="margin:0 0 10px;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:#D2703B">Spotlight Coaching</p>
 <h1>Welcome</h1>
 <p>Tap Continue to sign in and set up your account.</p>
 ${message ? `<p class="err">${message}</p>` : ""}
