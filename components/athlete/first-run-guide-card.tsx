@@ -20,11 +20,12 @@ import {
 import { usePushStatus } from "@/lib/use-push-status";
 import { PushNotificationToggle } from "./push-notification-toggle";
 
-const LOCAL_DISMISS_KEY = "esc-first-run-guide-dismissed";
+// Per person, so one person closing the guide on a shared phone does not hide it for the next person who signs in.
+const localDismissKey = (profileId: string) => `esc-first-run-guide-dismissed-${profileId}`;
 
-function readLocalDismissed(): boolean {
+function readLocalDismissed(profileId: string): boolean {
   try {
-    return localStorage.getItem(LOCAL_DISMISS_KEY) === "1";
+    return localStorage.getItem(localDismissKey(profileId)) === "1";
   } catch {
     return false;
   }
@@ -57,7 +58,7 @@ export function FirstRunGuideCard({
     setMounted(true);
     setPlatform(detectPlatform(navigator.userAgent));
     setStandalone(isStandaloneDisplay());
-    if (readLocalDismissed()) setDismissed(true);
+    if (readLocalDismissed(profileId)) setDismissed(true);
     startInstallPromptCapture();
     const sync = () => setCanInstallNow(!!getDeferredInstallPrompt());
     sync();
@@ -86,7 +87,7 @@ export function FirstRunGuideCard({
   async function dismiss() {
     setDismissed(true);
     try {
-      localStorage.setItem(LOCAL_DISMISS_KEY, "1");
+      localStorage.setItem(localDismissKey(profileId), "1");
     } catch {
       // Not remembered on this device; the server copy below still is.
     }

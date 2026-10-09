@@ -55,7 +55,7 @@ function SetPasswordForm() {
         }
         return supabase.auth.getUser();
       })
-      .then((got) => {
+      .then(async (got) => {
       if (!got) return;
       const user = got.data.user;
       setHasSession(!!user);
@@ -63,15 +63,16 @@ function SetPasswordForm() {
       setNeedsEmail(isPlaceholderEmail(user?.email));
       if (user) {
         // If the table is not there yet this errors and the box is simply shown, which is the safe default.
-        supabase
+        const { data, error: acceptedError } = await supabase
           .from("legal_acceptances")
           .select("id")
           .eq("profile_id", user.id)
           .eq("document", "beta_notice")
           .eq("version", LEGAL_VERSIONS.beta_notice)
-          .maybeSingle()
-          .then(({ data, error: acceptedError }) => setNeedsLegal(!!acceptedError || !data));
+          .maybeSingle();
+        setNeedsLegal(!!acceptedError || !data);
       }
+      // Only now, so the form never shows without the agreement box that belongs on it.
       setChecking(false);
     });
   }, []);

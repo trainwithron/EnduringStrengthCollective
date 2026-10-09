@@ -36,7 +36,7 @@ export function joinView(opts: {
   if (opts.mine === "waitlisted") return { action: "leave", label: "Leave waiting list", note: "You're on the waiting list. You move in if a spot opens.", disabled: opts.started };
   if (opts.started) return { action: "none", label: "Started", note: null, disabled: true };
   const left = spotsLeft(opts.capacity, opts.joined);
-  if (left === 0) return { action: "waitlist", label: "Join waiting list", note: "This class is full.", disabled: false };
+  if (left === 0) return { action: "waitlist", label: "Join waiting list", note: "This group session is full.", disabled: false };
   if ((opts.balance ?? 0) <= 0) {
     return { action: "join", label: "Join", note: "You need a session on your account to join. Your coach can add one.", disabled: true };
   }
@@ -53,7 +53,7 @@ export interface CreateInput {
 
 // Why a new class cannot be created yet, or null.
 export function createProblem(input: CreateInput, now: Date): string | null {
-  if (!input.title.trim()) return "Give the class a name.";
+  if (!input.title.trim()) return "Give the group session a name.";
   if (input.title.trim().length > 80) return "Keep the name under 80 characters.";
   const start = new Date(input.startIso);
   if (Number.isNaN(start.getTime())) return "Pick a date and time.";
@@ -68,13 +68,13 @@ export function createProblem(input: CreateInput, now: Date): string | null {
 export function friendlyGroupSessionError(message: string | undefined): string {
   const m = message ?? "";
   if (/no session credits/i.test(m)) return "You need a session on your account to join. Your coach can add one.";
-  if (/already in this class/i.test(m)) return "You're already in this class.";
-  if (/cancelled/i.test(m)) return "This class was cancelled.";
-  if (/already started/i.test(m)) return "This class has already started.";
+  if (/already in this class/i.test(m)) return "You're already in this group session.";
+  if (/cancelled/i.test(m)) return "This group session was cancelled.";
+  if (/already started/i.test(m)) return "This group session has already started.";
   if (/not a training client/i.test(m)) return "Only this coach's clients can join.";
   if (/time is already taken/i.test(m)) return "You're already booked at that time.";
   if (/future/i.test(m)) return "Pick a time in the future.";
-  if (/there are \d+ people in this class/i.test(m)) return m.replace(/^.*?there are/i, "There are");
+  if (/there are \d+ people in this class/i.test(m)) return m.replace(/^.*?there are/i, "There are").replace(/this class/i, "this group session");
   if (/not authorized/i.test(m)) return "You can't do that.";
   return "That didn't work. Try again.";
 }

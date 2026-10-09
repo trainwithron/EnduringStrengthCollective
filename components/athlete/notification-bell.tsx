@@ -72,7 +72,7 @@ export function NotificationBell({
               id: n.id,
               type: n.type,
               body: n.body,
-              linkPath: n.link_path,
+              linkPath: n.link_path ?? "/",
               createdAt: n.created_at,
               readAt: n.read_at,
             },
@@ -91,14 +91,12 @@ export function NotificationBell({
 
   async function markRead(ids: string[]) {
     if (ids.length === 0) return;
-    setItems((prev) =>
-      prev.map((n) => (ids.includes(n.id) ? { ...n, readAt: new Date().toISOString() } : n))
-    );
+    const stamp = new Date().toISOString();
+    setItems((prev) => prev.map((n) => (ids.includes(n.id) ? { ...n, readAt: stamp } : n)));
     const supabase = createBrowserClient();
-    await supabase
-      .from("notifications")
-      .update({ read_at: new Date().toISOString() })
-      .in("id", ids);
+    const { error: updateError } = await supabase.from("notifications").update({ read_at: stamp }).in("id", ids);
+    // It did not save: put them back as unread, so the badge never claims they were read when they were not.
+    if (updateError) setItems((prev) => prev.map((n) => (ids.includes(n.id) && n.readAt === stamp ? { ...n, readAt: null } : n)));
   }
 
   function handleOpenNotification(n: NotificationEntry) {

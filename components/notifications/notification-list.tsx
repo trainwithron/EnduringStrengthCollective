@@ -49,14 +49,14 @@ export function NotificationList({ initial, timezone }: { initial: CenterEntry[]
               type="button"
               onClick={() => setFilter(f)}
               aria-pressed={filter === f}
-              className={`font-body text-sm px-3 py-1.5 border ${filter === f ? "border-chalk text-chalk" : "border-steel/30 text-steel"}`}
+              className={`min-h-11 font-body text-sm px-4 border ${filter === f ? "border-chalk text-chalk" : "border-steel/30 text-steel"}`}
             >
               {f === "all" ? "All" : `Unread${unread.length > 0 ? ` (${unread.length})` : ""}`}
             </button>
           ))}
         </div>
         {unread.length > 0 && (
-          <button type="button" onClick={() => markRead(unread.map((n) => n.id))} className="font-body text-sm text-steel underline">
+          <button type="button" onClick={() => markRead(unread.map((n) => n.id))} className="min-h-11 px-2 font-body text-sm text-steel underline">
             Mark all read
           </button>
         )}
