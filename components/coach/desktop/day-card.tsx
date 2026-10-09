@@ -25,6 +25,7 @@ import { BulkEditDayPanel } from "./bulk-edit-day-panel";
 import { formatShortDate } from "@/lib/program-schedule";
 import { GripVertical, ChevronDown, ChevronUp } from "lucide-react";
 import { useSaveToastChannel } from "./save-toast-channel";
+import { capitalizeWords } from "@/lib/exercise-name-case";
 
 // Quick-add is typed fast, so a bare "Bench" for an existing "Bench
 // Press" is common — matchExercise's fuzzy threshold is deliberately
@@ -40,7 +41,8 @@ function resolveQuickAddExerciseName(typedName: string, library: string[]): stri
 
   const normalizedTyped = typedName.trim().toLowerCase();
   const prefixMatches = library.filter((name) => name.toLowerCase().startsWith(normalizedTyped));
-  return prefixMatches.length === 1 ? prefixMatches[0] : typedName;
+  // A library exercise keeps its own casing; a brand-new typed name gets a capital on each word.
+  return prefixMatches.length === 1 ? prefixMatches[0] : capitalizeWords(typedName);
 }
 
 export function DayCard({
