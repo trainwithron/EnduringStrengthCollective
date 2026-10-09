@@ -20,7 +20,6 @@ create table if not exists public.coach_sites (
 );
 
 alter table public.coach_sites enable row level security;
-revoke all on public.coach_sites from anon;
 
 drop policy if exists coach_sites_own on public.coach_sites;
 create policy coach_sites_own on public.coach_sites for all to authenticated

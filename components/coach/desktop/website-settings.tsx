@@ -154,7 +154,7 @@ export function WebsiteSettings({ coachId, slug, initial }: { coachId: string; s
 
       <div className="space-y-3">
         <p className={label}>Client reviews (up to 3)</p>
-        <p className="font-body text-xs text-steel">Short quotes your clients have agreed you may share. Add a first name.</p>
+        <p className="font-body text-xs text-steel">Only add a review a client has agreed to. Short quotes, with a first name.</p>
         {reviews.map((r, i) => (
           <div key={i} className="grid grid-cols-1 sm:grid-cols-[1fr_9rem] gap-2">
             <input value={r.quote} maxLength={SITE_LIMITS.quote} onChange={(e) => setReviews((prev) => prev.map((x, j) => (j === i ? { ...x, quote: e.target.value } : x)))} placeholder="Quote" aria-label={`Review ${i + 1} quote`} className={input} />

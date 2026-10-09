@@ -6,7 +6,7 @@ import { cleanParam } from "@/lib/public-booking-route";
 import { canSignProofs } from "@/lib/public-booking-proof";
 import { isSendGridConfigured } from "@/lib/sendgrid";
 import { DEFAULT_ORG_THEME } from "@/lib/theme";
-import { ownImagePath, reviewsFromJson, safeWebUrl, siteColors, cleanSite, type SiteBackground } from "@/lib/coach-site";
+import { ownImagePath, pickBrandOrg, reviewsFromJson, safeWebUrl, siteColors, cleanSite, type SiteBackground } from "@/lib/coach-site";
 
 export const dynamic = "force-dynamic";
 
@@ -37,11 +37,12 @@ async function load(slugParam: string, preview: boolean) {
     db.from("coach_packages").select("id, name, sessions_per_week, billing_type, sessions_granted, rate_cents").eq("coach_id", page.coach_id).eq("is_active", true).eq("is_public", true).order("sessions_per_week", { ascending: true }).limit(6),
     db.from("pro_shop_links").select("id, title, description, url, image_url").eq("coach_id", page.coach_id).eq("featured", true).order("sort_order", { ascending: true }).limit(3),
   ]);
-  // A coach who owns one organization and only helps run another shows their own: the owner role first.
-  const ownedFirst = [...(membership ?? [])].sort((a, b) => Number(b.role === "owner") - Number(a.role === "owner"))[0];
-  const { data: org } = ownedFirst?.organization_id
-    ? await db.from("organizations").select("name, accent_color, background_color, text_color, font_display, font_body, logo_url").eq("id", ownedFirst.organization_id).maybeSingle()
-    : { data: null };
+  // A coach in several organizations: one they own first, then the oldest (stable; see pickBrandOrg).
+  const orgIds = (membership ?? []).map((m) => m.organization_id as string);
+  const { data: orgRows } = orgIds.length > 0
+    ? await db.from("organizations").select("id, created_at, name, accent_color, background_color, text_color, font_display, font_body, logo_url").in("id", orgIds)
+    : { data: [] as any[] };
+  const org = pickBrandOrg((membership ?? []) as { organization_id: string; role: string }[], (orgRows ?? []) as any[]);
 
   const content = cleanSite({
     headline: site.headline ?? "",

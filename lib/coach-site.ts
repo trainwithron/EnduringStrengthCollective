@@ -116,3 +116,13 @@ export function ownImagePath(path: string | null | undefined, coachId: string): 
 export function hasSiteContent(c: SiteContent): boolean {
   return !!(c.headline || c.whoIHelp || c.whatIDo || c.whyLines.length || c.reviews.length);
 }
+
+// Which organization's branding the page wears when the coach is in several: one they OWN before one they only help run, then the oldest. Stable, so the page never changes colours
+// between visits. (A coach who owns several gets the oldest; choosing a different one would need a setting on the site.)
+export function pickBrandOrg<T extends { id: string; created_at: string | null }>(memberships: { organization_id: string; role: string }[], orgs: T[]): T | null {
+  const roleOf = new Map(memberships.map((m) => [m.organization_id, m.role]));
+  const ranked = orgs
+    .filter((o) => roleOf.has(o.id))
+    .sort((a, b) => Number(roleOf.get(b.id) === "owner") - Number(roleOf.get(a.id) === "owner") || String(a.created_at ?? "").localeCompare(String(b.created_at ?? "")) || a.id.localeCompare(b.id));
+  return ranked[0] ?? null;
+}

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { cleanSite, contrastText, hasSiteContent, ownImagePath, reviewsFromJson, safeWebUrl, siteColors } from "./coach-site";
+import { cleanSite, contrastText, hasSiteContent, ownImagePath, pickBrandOrg, reviewsFromJson, safeWebUrl, siteColors } from "./coach-site";
 
 const read = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8").replace(/\r\n/g, "\n");
 const COACH = "11111111-1111-1111-1111-111111111111";
@@ -82,5 +82,25 @@ describe("the public page and the setup screen", () => {
   it("featured shop cards: a flag the coach sets (up to 3), shown first to clients", () => {
     expect(read("components/coach/desktop/pro-shop-manager.tsx")).toContain("Feature up to 3 cards.");
     expect(read("components/athlete/pro-shop-list.tsx")).toContain("Number(!!b.featured) - Number(!!a.featured)");
+  });
+});
+
+describe("a coach in several organizations gets a stable brand", () => {
+  const orgs = [
+    { id: "b", created_at: "2026-03-01" },
+    { id: "a", created_at: "2026-01-01" },
+    { id: "c", created_at: "2026-02-01" },
+  ];
+  it("an organization they own beats one they only admin; among owned, the oldest; the same every time", () => {
+    const own = (ids: string[], admin: string[]) => [...ids.map((id) => ({ organization_id: id, role: "owner" })), ...admin.map((id) => ({ organization_id: id, role: "admin" }))];
+    expect(pickBrandOrg(own(["b", "c", "a"], []), orgs)?.id).toBe("a");
+    expect(pickBrandOrg(own(["b", "c"], ["a"]), orgs)?.id).toBe("c");
+    expect(pickBrandOrg(own([], ["a"]), orgs)?.id).toBe("a");
+    expect(pickBrandOrg(own(["c", "b", "a"], []), [...orgs].reverse())?.id).toBe("a");
+    expect(pickBrandOrg([], orgs)).toBeNull();
+  });
+  it("the page uses it and the setup screen reminds the coach about permission", () => {
+    expect(read("app/c/[slug]/page.tsx")).toContain("pickBrandOrg(");
+    expect(read("components/coach/desktop/website-settings.tsx")).toContain("Only add a review a client has agreed to.");
   });
 });
