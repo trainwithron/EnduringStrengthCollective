@@ -12,6 +12,10 @@ describe("a client's own Rest is m:ss both ways", () => {
     expect(parseRestInput("1:30")).toEqual({ ok: true, seconds: 90 });
     expect(parseRestInput("")).toEqual({ ok: true, seconds: null });
     expect(parseRestInput("soon")).toEqual({ ok: false });
+    // A bare small number is flagged so the cell asks again instead of saving 2 seconds.
+    expect(parseRestInput("2")).toMatchObject({ ok: true, bare: true });
+    expect(parseRestInput("90")).toEqual({ ok: true, seconds: 90 });
+    expect(read("components/logging/exercise-set-grid.tsx")).toContain("r.ok && !r.bare");
   });
 });
 
