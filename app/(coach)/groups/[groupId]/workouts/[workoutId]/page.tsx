@@ -5,7 +5,7 @@ import { getWorkoutOverviewData } from "@/lib/workout-overview-data";
 import { WorkoutOverviewView } from "@/components/logging/workout-overview-view";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
-import { computeScheduledDates, formatShortDate, isLocked } from "@/lib/program-schedule";
+import { computeScheduledDates, formatShortDate, isLocked, unlockDate } from "@/lib/program-schedule";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { dateKeyInZone, getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
 
@@ -118,7 +118,7 @@ export default async function WorkoutOverviewPage(
             {actingAs && <ActingAsBanner athleteFullName={actingAs.fullName} groupId={actingAs.groupId} />}
             <div className="flex-1 flex items-center justify-center px-6">
               <p className="font-body text-steel text-center max-w-[40ch]">
-                This workout unlocks on {formatShortDate(scheduledDate!)}.
+                This workout unlocks on {formatShortDate(unlockDate(scheduledDate!, program.visibility_window))}.
               </p>
             </div>
             <BottomTabBar groupId={params.groupId} activeOverride="home" />

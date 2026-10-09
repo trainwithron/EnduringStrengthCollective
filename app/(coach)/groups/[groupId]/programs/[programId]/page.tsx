@@ -11,6 +11,7 @@ import {
   formatShortDate,
   isSameDay,
   isLocked,
+  unlockDate,
   type VisibilityWindow,
 } from "@/lib/program-schedule";
 import { getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
@@ -214,7 +215,7 @@ export default async function ProgramDetailPage(
                     {locked ? (
                       <span className="font-body text-xs text-steel mt-1.5 inline-flex items-center gap-1">
                         <Lock className="w-3 h-3" />
-                        Unlocks {formatShortDate(scheduledDate!)}
+                        Unlocks {formatShortDate(unlockDate(scheduledDate!, program.visibility_window))}
                       </span>
                     ) : (
                       <Link
