@@ -101,6 +101,7 @@ describe("a coach in several organizations gets a stable brand", () => {
   });
   it("the page uses it and the setup screen reminds the coach about permission", () => {
     expect(read("app/c/[slug]/page.tsx")).toContain("pickBrandOrg(");
-    expect(read("components/coach/desktop/website-settings.tsx")).toContain("Only add a review a client has agreed to.");
+    expect(read("components/coach/desktop/website-settings.tsx")).toContain("Add 2-3 short quotes, like ones from your Google reviews, with a first name.");
+    expect(read("components/coach/desktop/website-settings.tsx")).not.toContain("agreed to");
   });
 });
