@@ -188,7 +188,8 @@ function GridCell({
       field === "rest"
         ? (() => {
             const r = parseRestInput(draft, MAX_REST_SECONDS);
-            return r.ok ? { ok: true as const, value: r.seconds } : { ok: false as const, message: "Rest needs a time like 1:30." };
+            // A bare number under 20 is probably minutes typed without a unit ("2" for 2:00), so it is asked for again rather than saved as 2 seconds.
+            return r.ok && !r.bare ? { ok: true as const, value: r.seconds } : { ok: false as const, message: "Rest needs a time like 1:30." };
           })()
         : validateSetFieldInput(field, draft);
     if (!checked.ok) {
