@@ -146,7 +146,7 @@ describe("opening a thread in place is the 'seen it' moment, and only when it is
     expect(panel).toContain('tab === "spot" || !groupId ? "flex-1 min-h-0 flex flex-col" : "hidden"');
   });
   it("the Messages tab shows an unread badge, pins the viewed client, has an All messages link, and urgent notices come from the same types as the bell", () => {
-    expect(panel).toContain("unread > 0");
+    expect(panel).toContain("unreadNow > 0");
     expect(panel).toContain("clientIdFromPath(usePathname())");
     expect(read("../components/coach/desktop/floating-messages.tsx")).toContain("All messages");
     expect(read("../components/coach/desktop/floating-messages.tsx")).toContain("withPinnedClient(");
