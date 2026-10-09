@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { computeScheduledDates, isLocked, isSameDay, type VisibilityWindow } from "./program-schedule";
+import { computeScheduledDates, isLocked, isSameDay, unlockDate, type VisibilityWindow } from "./program-schedule";
 import { getActivePrograms } from "./active-programs";
 
 // Shared program-schedule resolution for the athlete Home Day/Week/Month
@@ -81,6 +81,8 @@ export interface DayWorkoutInfo {
   status: DayWorkoutStatus;
   workoutId: string | null;
   title: string | null;
+  // For a locked workout: the day it actually opens (earlier than its own date when the program opens a week or a month ahead).
+  unlocksOn?: Date | null;
 }
 
 function startOfDay(d: Date): Date {
@@ -115,7 +117,7 @@ export function resolveDayWorkout(
     return { status: "missed", workoutId: match.workoutId, title: match.title };
   }
   if (isLocked(match.date, today, visibilityWindow)) {
-    return { status: "locked", workoutId: match.workoutId, title: match.title };
+    return { status: "locked", workoutId: match.workoutId, title: match.title, unlocksOn: unlockDate(match.date, visibilityWindow) };
   }
   return { status: "planned", workoutId: match.workoutId, title: match.title };
 }

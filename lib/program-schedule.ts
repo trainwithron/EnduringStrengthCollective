@@ -96,6 +96,16 @@ const WINDOW_DAYS: Record<VisibilityWindow, number> = {
   full: Infinity,
 };
 
+// The day a locked workout actually opens: its own date minus the days the window opens early ("Day of" = its own date; a week window opens 7 days before, a month window 30). The mirror of
+// isLocked below: on this day (and after) isLocked is false.
+export function unlockDate(scheduledDate: Date, window: VisibilityWindow = "day"): Date {
+  const d = new Date(scheduledDate);
+  d.setHours(0, 0, 0, 0);
+  if (window === "full") return d;
+  d.setDate(d.getDate() - WINDOW_DAYS[window]);
+  return d;
+}
+
 // A workout is locked when its computed date is further out than the
 // program's visibility window allows — a pacing/UX control, not a
 // security boundary (see plan notes on why this is page-level, not RLS).

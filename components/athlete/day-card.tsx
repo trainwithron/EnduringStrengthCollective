@@ -8,6 +8,11 @@ import type { DaySession } from "@/lib/program-day-contexts";
 import { computeReadinessAverage, type WellnessCheckinValues } from "@/lib/wellness";
 import type { WeightUnit } from "@/lib/units";
 
+// "Unlocks Tue, Oct 14": the day the workout really opens, which is earlier than its own date when the coach opens a week or a month ahead. Falls back to the workout's date.
+function unlockLabel(unlocksOn: Date | null | undefined, fallback: string): string {
+  return unlocksOn ? unlocksOn.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) : fallback;
+}
+
 // One date's worth of Home content. `isToday` is the one flag that
 // decides whether this renders live, write-capable controls (Start
 // Workout, the actual weight-log form, editable habit checkboxes) or a
@@ -184,7 +189,7 @@ function WorkoutSection({
                   {x.status === "missed" && <p className="font-body text-sm text-steel">Not logged.</p>}
                   {x.status === "locked" && (
                     <p className="font-body text-sm text-steel flex items-center gap-1.5">
-                      <Lock className="w-3.5 h-3.5" /> Unlocks {dateLabel}
+                      <Lock className="w-3.5 h-3.5" /> Unlocks {unlockLabel(x.unlocksOn, dateLabel)}
                     </p>
                   )}
                 </div>
@@ -291,7 +296,7 @@ function WorkoutSection({
         )}
         {workout.status === "locked" && (
           <p className="font-body text-sm text-steel flex items-center gap-1.5">
-            <Lock className="w-3.5 h-3.5" /> Unlocks {dateLabel}
+            <Lock className="w-3.5 h-3.5" /> Unlocks {unlockLabel(workout.unlocksOn, dateLabel)}
           </p>
         )}
         {workout.status === "planned" && (
