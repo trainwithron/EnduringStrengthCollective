@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTerm } from "@/components/coach/terminology-provider";
 import { useRouter } from "next/navigation";
 import { Dumbbell, Plus } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -60,6 +61,7 @@ async function getCurrentOrgId(supabase: ReturnType<typeof createBrowserClient>,
 // organization from the one the hub's header names.
 export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }: { groupId: string; onNavigated: () => void; fromHub?: boolean }) {
   const router = useRouter();
+  const term = useTerm();
   const [clients, setClients] = useState<ClientOption[] | null>(null);
   const [groups, setGroups] = useState<CoachedGroupOption[] | null>(null);
   const [orgs, setOrgs] = useState<{ id: string; name: string }[]>([]);
@@ -390,18 +392,18 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
       )}
 
       <div>
-        <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5">Clients</p>
+        <p className="font-body text-xs text-steel uppercase tracking-wide mb-1.5">{term("client", "plural", { cap: true })}</p>
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search clients…"
+          placeholder={`Search ${term("client", "plural")}…`}
           className="w-full h-9 mb-2 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust"
         />
         <div className="max-h-48 overflow-y-auto space-y-1">
           {clients === null && <p className="font-body text-sm text-steel px-1 py-2">Loading…</p>}
           {clients !== null && filteredClients.length === 0 && (
-            <p className="font-body text-sm text-steel px-1 py-2">{query.trim() ? "No match." : "No one-on-one clients yet."}</p>
+            <p className="font-body text-sm text-steel px-1 py-2">{query.trim() ? "No match." : `No one-on-one ${term("client", "plural")} yet.`}</p>
           )}
           {filteredClients.map((c) => {
             const status = clientActivityStatus(c.lastWorkoutAt);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTerm } from "@/components/coach/terminology-provider";
 import dynamic from "next/dynamic";
 import { X, Sparkles } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -51,6 +52,7 @@ export function SpotBuilderPanel({
   initialAthleteId?: string | null;
   initialAthleteName?: string | null;
 }) {
+  const term = useTerm();
   const [stage, setStage] = useState<"compact" | "expanded" | "fullscreen">(initialAthleteId ? "expanded" : "compact");
   // Explicit, coach-controlled choice — not inferred from which button
   // they tap (Ron's own correction: "just a quick button, AI or
@@ -155,7 +157,7 @@ export function SpotBuilderPanel({
             }}
             className="w-full h-9 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
           >
-            <option value="">Pick a client…</option>
+            <option value="">Pick a {term("client")}…</option>
             {(clients ?? []).map((c) => (
               <option key={c.id} value={c.id}>
                 {c.fullName}
@@ -217,11 +219,11 @@ export function SpotBuilderPanel({
 
         {initialAthleteId ? (
           <p className="font-body text-xs text-steel mb-3">
-            Building for <span className="text-chalk">{athleteName ?? "this client"}</span>
+            Building for <span className="text-chalk">{athleteName ?? `this ${term("client")}`}</span>
           </p>
         ) : (
           <div className="mb-3">
-            <label className="font-body text-xs text-steel uppercase tracking-wide">Client</label>
+            <label className="font-body text-xs text-steel uppercase tracking-wide">{term("client", "singular", { cap: true })}</label>
             <select
               value={athleteId ?? ""}
               onChange={(e) => {
@@ -231,7 +233,7 @@ export function SpotBuilderPanel({
               }}
               className="w-full h-9 mt-1 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm"
             >
-              <option value="">Pick a client…</option>
+              <option value="">Pick a {term("client")}…</option>
               {(clients ?? []).map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.fullName}

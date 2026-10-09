@@ -67,7 +67,7 @@ export function claimStatus(input: {
 
 export const CLAIM_STATUS_LABEL: Record<ClaimStatus, string> = {
   not_signed_in: "Not signed in yet",
-  invite_created: "Invite link created",
+  invite_created: "Sign-in link created",
   finishing_setup: "Link used, finishing setup",
   active: "Active",
 };

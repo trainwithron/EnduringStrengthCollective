@@ -57,11 +57,12 @@ export function BulkMacroRangeForm({
   async function handleApply() {
     if (!canApply) return;
     if (
-      !await confirmDialog(
-        `Apply these macro targets to all ${dateKeys.length} day${
+      !await confirmDialog({
+        message: `Apply these macro targets to all ${dateKeys.length} day${
           dateKeys.length === 1 ? "" : "s"
-        } from ${startDate} to ${endDate}? This replaces any existing targets already saved on those days.`
-      )
+        } from ${startDate} to ${endDate}? This replaces any existing targets already saved on those days.`,
+        confirmLabel: "Apply targets",
+      })
     ) {
       return;
     }

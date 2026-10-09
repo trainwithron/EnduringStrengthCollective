@@ -44,7 +44,7 @@ export function CancelBookingButton({
         : insideWindowHours
         ? `This is inside your coach's ${insideWindowHours}-hour window. Your coach will be told and decides whether it counts as a session. Cancel anyway?`
         : "Cancel this session? If it is outside your coach's cancellation window it goes back to your balance.";
-    if (!await confirmDialog(message)) return;
+    if (!await confirmDialog({ message, confirmLabel: "Yes, cancel", cancelLabel: "Keep it" })) return;
     setSubmitting(true);
     setError(null);
 

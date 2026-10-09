@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 
 export interface CoachPackageRow {
   id: string;
@@ -55,6 +56,8 @@ export function PackageManager({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // A failed publish toggle or deactivate, shown above the list (the form's own error is in the side panel).
+  const [rowError, setRowError] = useState<string | null>(null);
 
   const previewTotal =
     Number(ratePerSession) > 0 && Number(sessionsGranted) > 0
@@ -118,6 +121,7 @@ export function PackageManager({
 
   async function handleTogglePublic(pkg: CoachPackageRow) {
     setBusyId(pkg.id);
+    setRowError(null);
     try {
       const res = await fetch("/api/coach/packages", {
         method: "PATCH",
@@ -126,21 +130,35 @@ export function PackageManager({
       });
       if (res.ok) {
         setPackages((prev) => prev.map((p) => (p.id === pkg.id ? { ...p, isPublic: !pkg.isPublic } : p)));
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setRowError(data.error || "That didn't save. Nothing was changed. Try again.");
       }
+    } catch {
+      setRowError("That didn't save. Check your connection and try again.");
     } finally {
       setBusyId(null);
     }
   }
 
   async function handleDeactivate(id: string) {
+    if (!(await confirmDialog({ message: "Deactivate this package? New clients can no longer pick it. Anyone who already bought it keeps what they bought.", confirmLabel: "Deactivate", destructive: true }))) return;
     setBusyId(id);
+    setRowError(null);
     try {
-      await fetch("/api/coach/packages", {
+      const res = await fetch("/api/coach/packages", {
         method: "DELETE",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ packageId: id, groupId: packages.find((p) => p.id === id)?.groupId ?? groupId }),
       });
-      setPackages((prev) => prev.map((p) => (p.id === id ? { ...p, isActive: false } : p)));
+      if (res.ok) {
+        setPackages((prev) => prev.map((p) => (p.id === id ? { ...p, isActive: false } : p)));
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setRowError(data.error || "That didn't deactivate. Nothing was changed. Try again.");
+      }
+    } catch {
+      setRowError("That didn't deactivate. Check your connection and try again.");
     } finally {
       setBusyId(null);
     }
@@ -155,6 +173,11 @@ export function PackageManager({
         <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
           Your packages
         </h2>
+        {rowError && (
+          <p className="font-body text-sm text-rust mb-3" role="alert">
+            {rowError}
+          </p>
+        )}
         {active.length === 0 ? (
           <p className="font-body text-sm text-steel py-3">
             No packages yet — add your first tier on the right.

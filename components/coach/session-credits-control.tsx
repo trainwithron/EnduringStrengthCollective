@@ -23,7 +23,7 @@ export function SessionCreditsControl({
     // A balance is money the client paid for. One stray tap on a small
     // button must not add or remove a session without a second look.
     const verb = delta < 0 ? "Remove 1 session from" : "Add 1 session to";
-    if (!await confirmDialog(`${verb} this client? Their balance goes from ${balance} to ${balance + delta}.`)) {
+    if (!await confirmDialog({ message: `${verb} this client? Their balance goes from ${balance} to ${balance + delta}.`, confirmLabel: delta < 0 ? "Remove session" : "Add session" })) {
       return;
     }
 

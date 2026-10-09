@@ -8,7 +8,7 @@ import { buildClaimSms, CLAIM_STATUS_LABEL, smsHref, type ClaimStatus } from "@/
 import { CLAIM_LINK_STATE_LABEL, type ClaimLinkDetail } from "@/lib/invite-state";
 
 // The coach's per-client sign-in checklist for a client who hasn't signed in
-// yet: account created -> invite link created -> client signed in. The coach
+// yet: account created -> sign-in link created -> client signed in. The coach
 // creates the claim link when they're ready and sends it themselves (a text
 // from their own phone, or copy/paste); nothing is ever sent from here.
 export function ClientSignInPanel({
@@ -43,6 +43,8 @@ export function ClientSignInPanel({
 
   async function createLink() {
     if (busy) return;
+    // A new link replaces the one already made, so the coach is asked first (the old one stops working).
+    if (inviteCreated && !(await confirmDialog({ message: "Make a new sign-in link? The old one stops working.", confirmLabel: "Make new link" }))) return;
     setBusy(true);
     setError(null);
     try {
@@ -123,7 +125,7 @@ export function ClientSignInPanel({
 
   const steps: { label: string; done: boolean }[] = [
     { label: "Account created — you can build their programs and schedule now", done: true },
-    { label: "Invite link created", done: inviteCreated },
+    { label: "Sign-in link created", done: inviteCreated },
     { label: "Client signed in", done: false },
   ];
 
@@ -197,7 +199,7 @@ export function ClientSignInPanel({
           disabled={busy}
           className="mt-4 h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-50"
         >
-          {busy ? "Creating…" : inviteCreated ? "Make a new link (cancels the old one)" : "Create invite link"}
+          {busy ? "Creating…" : inviteCreated ? "Make a new sign-in link" : "Create sign-in link"}
         </button>
       )}
       {!link && inviteCreated && (

@@ -97,10 +97,12 @@ export function displayFor(name: string, qty: number, unit: string, metric: bool
   if (unit === "g") {
     let s = metric ? `${rounded}g` : `${rounded}g ${toOz(qty)}`;
     if (!metric) {
-      const oz = qty / 28.3495;
+      // Round the total ounces to a tenth FIRST, then split into pounds and ounces, so 15.96 oz left over reads "1 lb" and not "0 lb 16.0 oz".
+      const oz = Math.round((qty / 28.3495) * 10) / 10;
       if (oz > 16) {
         const lbs = Math.floor(oz / 16);
-        s += ` (${lbs} lb ${(oz - lbs * 16).toFixed(1)} oz)`;
+        const rest = Math.round((oz - lbs * 16) * 10) / 10;
+        s += rest === 0 ? ` (${lbs} lb)` : ` (${lbs} lb ${rest.toFixed(1)} oz)`;
       }
     }
     return s;

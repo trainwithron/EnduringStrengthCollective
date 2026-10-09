@@ -107,7 +107,7 @@ export function StandingMacroTargetCard({
       setError(parsed);
       return;
     }
-    if (scheduled.length > 0 && !await confirmDialog(scheduledConfirmMessage(scheduled))) return;
+    if (scheduled.length > 0 && !await confirmDialog({ message: scheduledConfirmMessage(scheduled), confirmLabel: "Save target" })) return;
     setBusy(true);
     const supabase = createBrowserClient();
     const {

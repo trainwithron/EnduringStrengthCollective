@@ -141,7 +141,7 @@ export function ManageBookingFlow({
                     type="button"
                     disabled={busy}
                     onClick={async () => {
-                      if (await confirmDialog(`Move your session to ${formatInTimezone(new Date(s.startIso), timezone, "dateTime")}?`)) act({ action: "reschedule", startIso: s.startIso });
+                      if (await confirmDialog({ message: `Move your session to ${formatInTimezone(new Date(s.startIso), timezone, "dateTime")}?`, confirmLabel: "Move it" })) act({ action: "reschedule", startIso: s.startIso });
                     }}
                     className="border border-steel/30 px-2 py-2 font-body text-sm text-chalk disabled:opacity-40"
                   >

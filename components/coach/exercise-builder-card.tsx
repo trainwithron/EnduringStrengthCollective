@@ -883,7 +883,7 @@ export function ExerciseBuilderCard({
                               flashSaveError(field === "time" ? "Time looks like 3:00, 3 min, 90s or 180 (up to 4:00:00)." : "Rest looks like 5:00, 3m or 90s (up to 30:00).");
                               return false;
                             }
-                            if (parsed.bare && field !== "time" && !await confirmDialog(`${parsed.seconds} means ${parsed.seconds} seconds. For minutes type ${parsed.seconds}:00 or ${parsed.seconds}m. Save ${parsed.seconds} seconds?`)) return false;
+                            if (parsed.bare && field !== "time" && !await confirmDialog({ message: `${parsed.seconds} means ${parsed.seconds} seconds. For minutes type ${parsed.seconds}:00 or ${parsed.seconds}m. Save ${parsed.seconds} seconds?`, confirmLabel: "Save" })) return false;
                             raw = parsed.seconds === null ? "" : String(parsed.seconds);
                           }
                           return set.id === firstSetId && exercise.sets.length > 1

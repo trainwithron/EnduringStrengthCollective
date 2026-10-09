@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { clampedLeft, clampedWidth } from "@/lib/viewport-clamp";
 import { duplicateProgram } from "@/lib/program-duplication";
+import { localDateKey } from "@/lib/timezone";
 import { ChevronDown } from "lucide-react";
 
 const MENU_WIDTH = 256;
@@ -48,6 +49,8 @@ export function ClientProgrammingMenu({
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
   const [sharedPrograms, setSharedPrograms] = useState<SharedProgramOption[] | null>(null);
   const [assignedPrograms, setAssignedPrograms] = useState<AssignedProgramOption[] | null>(null);
+  // The day the copy starts, the same field the Programs page's "Assign program" has.
+  const [startDate, setStartDate] = useState(localDateKey());
   const [newCopy, setNewCopy] = useState<{ id: string; name: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -126,6 +129,7 @@ export function ClientProgrammingMenu({
       createdBy: user.id,
       athleteId,
       clientName: athleteFullName,
+      startDate: startDate || undefined,
     });
 
     setBusy(false);
@@ -172,7 +176,7 @@ export function ClientProgrammingMenu({
                 }}
                 className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50"
               >
-                Assign Program
+                Assign program
               </button>
               <button
                 type="button"
@@ -203,6 +207,17 @@ export function ClientProgrammingMenu({
               <p className="font-body text-xs text-steel uppercase tracking-wide px-3 pt-2.5 pb-1.5">
                 Assign which program?
               </p>
+              <div className="px-3 pb-2">
+                <label className="font-body text-xs text-steel">
+                  Start date
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full h-8 mt-1 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"
+                  />
+                </label>
+              </div>
               <div className="max-h-72 overflow-y-auto">
                 {sharedPrograms === null && (
                   <p className="font-body text-xs text-steel px-3 py-2.5">Loading…</p>

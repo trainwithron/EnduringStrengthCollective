@@ -23,6 +23,9 @@ describe("the words and look of a confirmation come from the message", () => {
   });
   it("an ordinary question is a plain Confirm, not red", () => {
     expect(describeConfirm("Move your session to Mon, Oct 12, 5:00 PM?")).toMatchObject({ confirmLabel: "Confirm", destructive: false });
+    // A later sentence naming what is left alone does not turn a harmless question red.
+    expect(describeConfirm("Move your session to Mon, Oct 12? Nothing is cancelled or removed.")).toMatchObject({ destructive: false });
+    expect(describeConfirm("Cancel this link? Anyone who has it can no longer join.")).toMatchObject({ destructive: true });
     expect(describeConfirm("Set Sam's balance from 4 to 6? This is recorded in their session ledger.")).toMatchObject({ confirmLabel: "Confirm", destructive: false });
   });
   it("what the call says wins over what the message suggests", () => {

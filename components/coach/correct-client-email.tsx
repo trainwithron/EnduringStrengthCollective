@@ -25,9 +25,10 @@ export function CorrectClientEmail({
     if (busy) return;
     const first = clientName.split(" ")[0] || "them";
     if (
-      !await confirmDialog(
-        `Change ${first}'s sign-in email to ${email.trim()}? They will sign in and reset their password with this address from now on, and we will tell them in the app.`
-      )
+      !await confirmDialog({
+        message: `Change ${first}'s sign-in email to ${email.trim()}? They will sign in and reset their password with this address from now on, and we will tell them in the app.`,
+        confirmLabel: "Change email",
+      })
     ) {
       return;
     }

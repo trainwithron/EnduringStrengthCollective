@@ -43,7 +43,7 @@ describe("a coach-prescribed rest is the only option for that set", () => {
   it("a refused or cancelled rest entry snaps the cell back to the saved value", () => {
     expect(builder).toContain("(await onCommit(draft)) === false) setDraft(value)");
     expect(builder).toMatch(/up to 30:00\)\."\);\s*return false;/);
-    expect(builder).toContain("seconds?`)) return false;");
+    expect(builder).toContain('seconds?`, confirmLabel: "Save" })) return false;');
   });
   it("the client's own Rest cell is typed and shown as m:ss, like the coach's, under the one label 'Rest'", () => {
     const fields = src("../../lib/exercise-fields.ts");
