@@ -91,3 +91,4 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0318 | yes | yes | 10 | 0318 copy names do not stack |
 | 0319 | yes | yes | 14 | 0319 function search paths and rls_auto_enable |
 | 0320 | yes | yes | 8 | 0320 image upload look rules |
+| 0321 | yes | yes | 10 | 0321 coach website and featured shop cards |

@@ -914,6 +914,24 @@ for (const s of steps) {
   const errX2 = await run(`apply/${bundle.file}`);
   check("release-x: the bundle applies again after an undo" + (errX2 ? ": " + errX2 : ""), !errX2 && (await looks()) === 3);
 }
+// Release Y (step 67): ONE paste. No website table before, the bundle makes it, a second run is refused naming step 67, the undo drops it, and it applies again.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-y");
+  check("release-y: ONE bundle holds step 67", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["67"]));
+  const st67 = steps.find((x) => x.n === "67");
+  const has = async () => (await db.query("select to_regclass('public.coach_sites') is not null as ok")).rows[0].ok === true;
+  const ey0 = await run(`apply/undo-step${st67.n}-${st67.slug}.sql`);
+  check("release-y: before the bundle runs there is no website table" + (ey0 ? ": " + ey0 : ""), !ey0 && !(await has()));
+  const errY = await run(`apply/${bundle.file}`);
+  check("release-y bundle applies on the live-shaped state" + (errY ? ": " + errY : ""), !errY && (await has()));
+  const againY = await run(`apply/${bundle.file}`);
+  check("release-y: a second run is refused, naming step 67 (" + againY + ")", !!againY && againY.includes("step 67 (0321) cannot run") && againY.includes("already applied"));
+  const euY = await run(`apply/undo-step${st67.n}-${st67.slug}.sql`);
+  check("release-y: the undo drops the website table" + (euY ? ": " + euY : ""), !euY && !(await has()));
+  const errY2 = await run(`apply/${bundle.file}`);
+  check("release-y: the bundle applies again after an undo" + (errY2 ? ": " + errY2 : ""), !errY2 && (await has()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.

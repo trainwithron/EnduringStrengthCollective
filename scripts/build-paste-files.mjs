@@ -1119,6 +1119,22 @@ alter table public.coach_availability_windows drop column if exists session_minu
     ],
   },
   {
+    n: "67",
+    slug: "0321",
+    title: "0321 A coach's one short public website (My website): a private table for what the coach types, and a featured flag on Pro Shop cards (nothing is public until the coach publishes)",
+    migrations: ["0321"],
+    sees: "Success. No rows returned.",
+    afterwards: "Business now has My website, where a coach fills in a few short fields and switches Publish on. Pro Shop cards can be marked Featured. Nothing is public until a coach publishes, and nothing changes for anyone until then.",
+    undo: [
+      "drop table if exists public.coach_sites;",
+      "alter table public.pro_shop_links drop column if exists featured;",
+    ].join(String.fromCharCode(10)),
+    undoWhy: "Only if step 67 misbehaves. Removes the website table (and anything coaches typed into it) and the featured flag.",
+    rows: [
+      ["0321 is not already applied (there is no coach_sites table yet)", "to_regclass('public.coach_sites') is null"],
+    ],
+  },
+  {
     n: "66",
     slug: "0320",
     title: "0320 Image uploads work: the organization logo and app icon, the coach profile photo and the pro shop pictures were refused for everyone because their storage buckets had no rule for looking at a file's row (adds one rule per bucket, the same people who can already write)",
@@ -1439,6 +1455,7 @@ const BUNDLES = [
   { id: "release-v", name: "Release V (merge Coach Ron's duplicate exercises)", steps: ["64"] },
   { id: "release-w", name: "Release W (function search paths and the row-security helper)", steps: ["65"] },
   { id: "release-x", name: "Release X (image uploads: the missing look rules on three storage buckets)", steps: ["66"] },
+  { id: "release-y", name: "Release Y (a coach's public website and featured shop cards)", steps: ["67"] },
   { id: "release-n2", name: "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)", steps: ["49", "50"] },
   { id: "release-m", name: "Release M (acceptance record is append-only)", steps: ["44"] },
 ];
@@ -1614,6 +1631,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0295", has.table("client_phase_plans")),
     m("0296", has.col("recipes", "content_hash")),
     m("0297", has.table("schedule_requests")),
+    m("0321", "to_regclass('public.coach_sites') is not null"),
     m("0320", "exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'org_branding_select_owner_admin')"),
     m("0319", "exists (select 1 from pg_proc where oid = 'public.audit_diff(jsonb, jsonb, text[])'::regprocedure and proconfig is not null)"),
     m("0318", "exists (select 1 from pg_proc where proname = 'duplicate_program' and pronamespace = 'public'::regnamespace and position('v_tail' in prosrc) > 0)"),

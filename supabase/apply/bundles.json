@@ -165,6 +165,14 @@
   "file": "apply-release-x-all.sql"
  },
  {
+  "id": "release-y",
+  "name": "Release Y (a coach's public website and featured shop cards)",
+  "steps": [
+   "67"
+  ],
+  "file": "apply-release-y-all.sql"
+ },
+ {
   "id": "release-n2",
   "name": "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)",
   "steps": [

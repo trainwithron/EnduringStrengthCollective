@@ -26,7 +26,8 @@ export function ProShopList({ links }: { links: ProShopLink[] }) {
 
   return (
     <div className="space-y-3">
-      {links.map((l) => (
+      {/* Featured cards first, in a quiet row of their own order; nothing else about them changes. */}
+      {[...links].sort((a, b) => Number(!!b.featured) - Number(!!a.featured)).map((l) => (
         <button
           key={l.id}
           type="button"

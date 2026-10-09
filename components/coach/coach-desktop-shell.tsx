@@ -19,6 +19,7 @@ import {
   ClipboardList,
   Building2,
   Layers,
+  Globe,
   Link2,
   Users2,
   Home,
@@ -117,7 +118,8 @@ type Active =
   | "messages"
   | "records"
   | "kiosk"
-  | "settings";
+  | "settings"
+  | "website";
 
 interface NavLeaf {
   key: Active;
@@ -433,6 +435,7 @@ function CoachDesktopShellFull({
       items: [
         { key: "business", label: "Overview", href: `/groups/${groupId}/business`, icon: TrendingUp },
         { key: "packages", label: "Packages", href: `/groups/${groupId}/business/packages`, icon: Layers },
+        { key: "website", label: "My website", href: `/groups/${groupId}/business/website`, icon: Globe },
         { key: "availability", label: "Availability", href: `/groups/${groupId}/availability`, icon: CalendarClock },
         { key: "session-types", label: "Session Types", href: `/groups/${groupId}/business/session-types`, icon: Tag },
       ],

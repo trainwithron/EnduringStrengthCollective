@@ -83,7 +83,7 @@ export default async function ResourcesPage(
       .order("created_at", { ascending: true }),
     supabase
       .from("pro_shop_links")
-      .select("id, title, category, description, url, image_url, discount_code, discount_description, click_count")
+      .select("id, title, category, description, url, image_url, discount_code, discount_description, click_count, featured")
       .eq("coach_id", coachId)
       .order("created_at", { ascending: true }),
   ]);
@@ -109,6 +109,7 @@ export default async function ResourcesPage(
     discountCode: r.discount_code,
     discountDescription: r.discount_description,
     clickCount: r.click_count,
+    featured: !!(r as { featured?: boolean }).featured,
   }));
 
   const tabBar = (basePath: string) => (

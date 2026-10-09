@@ -61,6 +61,7 @@ export async function updateSession(request: NextRequest) {
     // real session, same gotcha already hit for /pr/ and /share/.
     pathname.startsWith("/guardian/") ||
     pathname.startsWith("/book/") ||
+    pathname.startsWith("/c/") ||
     // equipment_qr_decal_scoping_sept19.md — a walk-in scanning a gym's
     // equipment decal has no account and no session, same gotcha as
     // /book/ above.

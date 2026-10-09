@@ -61,6 +61,7 @@ from (
     ('2026100600295', 'about_you_baseline_phase_of_record', '0295_about_you_baseline_phase_of_record.sql', to_regclass('public.client_phase_plans') is not null),
     ('2026100600296', 'recipe_library_columns', '0296_recipe_library_columns.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'recipes' and column_name = 'content_hash')),
     ('2026100600297', 'schedule_requests', '0297_schedule_requests.sql', to_regclass('public.schedule_requests') is not null),
+    ('2026100600321', 'coach_site', '0321_coach_site.sql', to_regclass('public.coach_sites') is not null),
     ('2026100600320', 'storage_select_policies', '0320_storage_select_policies.sql', exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'org_branding_select_owner_admin')),
     ('2026100600319', 'function_search_paths', '0319_function_search_paths.sql', exists (select 1 from pg_proc where oid = 'public.audit_diff(jsonb, jsonb, text[])'::regprocedure and proconfig is not null)),
     ('2026100600318', 'copy_names_no_stacking', '0318_copy_names_no_stacking.sql', exists (select 1 from pg_proc where proname = 'duplicate_program' and pronamespace = 'public'::regnamespace and position('v_tail' in prosrc) > 0)),

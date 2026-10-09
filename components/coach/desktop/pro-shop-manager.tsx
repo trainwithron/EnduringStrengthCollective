@@ -15,6 +15,8 @@ export interface ProShopLink {
   discountCode: string | null;
   discountDescription: string | null;
   clickCount: number;
+  // Shown on the coach's public website (2-3 cards) and first in the client's Pro Shop.
+  featured?: boolean;
 }
 
 const CATEGORIES = [
@@ -105,7 +107,7 @@ export function ProShopManager({ initialLinks }: { initialLinks: ProShopLink[] }
         discount_code: discountCode.trim() || null,
         discount_description: discountDescription.trim() || null,
       })
-      .select("id, title, category, description, url, image_url, discount_code, discount_description, click_count")
+      .select("id, title, category, description, url, image_url, discount_code, discount_description, click_count, featured")
       .single();
 
     if (insertError) {
@@ -127,6 +129,7 @@ export function ProShopManager({ initialLinks }: { initialLinks: ProShopLink[] }
           discountCode: data.discount_code,
           discountDescription: data.discount_description,
           clickCount: data.click_count,
+          featured: !!data.featured,
         },
       ]);
     }
@@ -138,6 +141,22 @@ export function ProShopManager({ initialLinks }: { initialLinks: ProShopLink[] }
     setDiscountDescription("");
     setImageUrl(null);
     router.refresh();
+  }
+
+  async function handleFeatured(l: ProShopLink) {
+    setError(null);
+    const next = !l.featured;
+    if (next && links.filter((x) => x.featured).length >= 3) {
+      setError("Feature up to 3 cards. Turn one off first.");
+      return;
+    }
+    const supabase = createBrowserClient();
+    const { error: updateError } = await supabase.from("pro_shop_links").update({ featured: next }).eq("id", l.id);
+    if (updateError) {
+      setError("That didn't save. Nothing was changed. Try again.");
+      return;
+    }
+    setLinks((prev) => prev.map((x) => (x.id === l.id ? { ...x, featured: next } : x)));
   }
 
   async function handleDelete(id: string) {
@@ -178,6 +197,10 @@ export function ProShopManager({ initialLinks }: { initialLinks: ProShopLink[] }
                   <p className="font-body text-xs text-steel mt-1">
                     {l.clickCount} click{l.clickCount === 1 ? "" : "s"}
                   </p>
+                  <label className="inline-flex items-center gap-2 min-h-11 font-body text-xs text-chalk cursor-pointer">
+                    <input type="checkbox" checked={!!l.featured} onChange={() => handleFeatured(l)} className="w-4 h-4 accent-[#D2703B]" />
+                    Feature on my website and first in the shop
+                  </label>
                 </div>
               </div>
               <button
