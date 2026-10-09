@@ -23,3 +23,10 @@ describe("the three look-alike rail icons are now different", () => {
     expect(readFileSync(join(__dirname, "shell-rail.tsx"), "utf8")).toContain("aria-label={item.label}");
   });
 });
+
+describe("Exercise Library does not look like Programs", () => {
+  it("is a library icon, so the dumbbell is only Programs inside the Programming panel", () => {
+    expect(nav).toContain('label: "Exercise Library", href: `/groups/${groupId}/exercise-library`, icon: Library }');
+    expect(nav.match(/icon: Dumbbell/g)?.length).toBe(2); // the Programming rail icon and its Programs tab
+  });
+});

@@ -6,6 +6,7 @@ import Link from "next/link";
 import {
   LayoutGrid,
   Dumbbell,
+  Library,
   ChevronRight,
   CalendarDays,
   MessagesSquare,
@@ -424,7 +425,7 @@ function CoachDesktopShellFull({
       icon: Dumbbell,
       items: [
         { key: "programs", label: "Programs", href: ALL_PROGRAMS_HREF, icon: Dumbbell, termKey: "program", termForm: "plural" },
-        { key: "exercise-library", label: "Exercise Library", href: `/groups/${groupId}/exercise-library`, icon: Dumbbell },
+        { key: "exercise-library", label: "Exercise Library", href: `/groups/${groupId}/exercise-library`, icon: Library },
       ],
     },
     // One Nutrition area. Targets, meal plans, favorite meals and the calculator are tabs and sections inside it, not separate places in the rail.
