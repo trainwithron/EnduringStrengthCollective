@@ -279,15 +279,17 @@ async function CoachProgramBuilder({
         />
       )}
       <ProgrammingSpotterPanel programId={programId} flags={data.spotterFlags} />
-      <ProgramRoleControl
-        programId={programId}
-        initialLabel={roleInfo.label}
-        initialSortOrder={roleInfo.sortOrder}
-        available={roleInfo.available}
-      />
       <ProgramBuilderDesktop
         programId={programId}
         groupId={groupId}
+        toolbarExtra={
+          <ProgramRoleControl
+            programId={programId}
+            initialLabel={roleInfo.label}
+            initialSortOrder={roleInfo.sortOrder}
+            available={roleInfo.available}
+          />
+        }
         athleteId={data.athleteId}
         programName={data.programName}
         programDescription={data.programDescription}
