@@ -76,3 +76,22 @@ describe("where the name is committed", () => {
     expect(list.indexOf("existingLibraryName(trimmed")).toBeLessThan(list.indexOf('.from("exercise_library")\n      .insert('));
   });
 });
+
+describe("after the duplicates are merged, typing an old spelling still finds its survivor", () => {
+  const LIB = ["Conventional Deadlift", "Chin-Up", "Dip"];
+  const aliases = [
+    { rawName: "Deadlift", exerciseName: "Conventional Deadlift" },
+    { rawName: "Chin Ups", exerciseName: "Chin-Up" },
+  ];
+  it("a plural or re-spelled alias resolves to the survivor instead of making a new row", async () => {
+    const { resolveTypedAlias } = await import("./exercise-alias-seed");
+    expect(resolveTypedAlias("Deadlifts", LIB, aliases)).toEqual({ exerciseName: "Conventional Deadlift", displayName: "Deadlift" });
+    expect(resolveTypedAlias("deadlift", LIB, aliases)).toEqual({ exerciseName: "Conventional Deadlift", displayName: "Deadlift" });
+    expect(resolveTypedAlias("Chin Ups", ["Chin-Up", "Dip"], [{ rawName: "Chin Ups", exerciseName: "Chin-Up" }])).toBeNull(); // "Chin-Up" is in the library: the library check commits it
+  });
+  it("a spelling of a library exercise is left to the library check, and an unrelated name is not an alias", async () => {
+    const { resolveTypedAlias } = await import("./exercise-alias-seed");
+    expect(resolveTypedAlias("Dips", LIB, aliases)).toBeNull();
+    expect(resolveTypedAlias("Zercher Squat", LIB, aliases)).toBeNull();
+  });
+});

@@ -5,7 +5,7 @@
 // split squat, a goblet or dumbbell version, a different grip or stance is a different exercise and is never listed. A coach can add their own aliases in the usual way; those win over these.
 
 import { canonicalKey } from "@/lib/exercise-normaliser";
-import type { AliasEntry } from "@/lib/exercise-matching";
+import { exerciseKey, findLibraryVariant, type AliasEntry } from "@/lib/exercise-matching";
 
 export interface AliasGroup {
   names: string[];
@@ -67,7 +67,12 @@ export function resolveTypedAlias(typed: string, library: string[], aliases: Ali
   const k = key(t);
   // a name that is exactly an exercise in the library is just that exercise, never an alias of another
   if (library.some((n) => n.trim().toLowerCase() === t.toLowerCase())) return null;
-  const hit = aliases.find((a) => key(a.rawName) === k && library.includes(a.exerciseName));
+  // ...nor is a spelling of a library exercise ("Dips" for "Dip"): the library check handles that one.
+  if (findLibraryVariant(t, library) !== null) return null;
+  // An alias matches when it is the same name, or the same name spelled differently ("Deadlifts" for the alias "Deadlift"), so merged duplicates do not grow back as new rows.
+  const hit =
+    aliases.find((a) => key(a.rawName) === k && library.includes(a.exerciseName)) ??
+    aliases.find((a) => exerciseKey(a.rawName) === exerciseKey(t) && library.includes(a.exerciseName));
   return hit ? { exerciseName: hit.exerciseName, displayName: hit.rawName } : null;
 }
 
