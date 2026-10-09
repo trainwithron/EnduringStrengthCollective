@@ -99,6 +99,7 @@ export function FoodPreferencesEditor({
   const set = (patch: Partial<NutritionPreferences>) => onChange({ ...prefs, ...patch });
   const grams = weightLbs ? proteinGramsForWeight(prefs, weightLbs) : null;
   const otherAllergies = prefs.allergies.filter((a) => !isControlledAllergy(a));
+  const unwanted = Array.from(new Set([...prefs.intolerances, ...prefs.dislikes]));
 
   return (
     <div className="space-y-5">
@@ -114,7 +115,7 @@ export function FoodPreferencesEditor({
                 type="button"
                 aria-pressed={on}
                 onClick={() => set({ allergies: toggleAllergy(prefs.allergies, key) })}
-                className={`h-11 px-3 font-body text-sm border ${on ? "bg-rust/15 text-rust border-rust/50" : "text-steel border-steel/30"}`}
+                className={`h-9 px-2.5 font-body text-xs border ${on ? "bg-rust/15 text-rust border-rust/50" : "text-steel border-steel/30"}`}
               >
                 {ALLERGY_LABELS[key]}
               </button>
@@ -178,9 +179,29 @@ export function FoodPreferencesEditor({
         <p className="font-body text-xs text-steel/80 mt-1.5">Up to {MAX_ALLERGY_ITEMS}. Meals are checked for these words. &ldquo;May contain&rdquo; and cross-contact are not checked.</p>
       </div>
 
-      <ChipList label="Intolerances" hint="Foods that disagree with them (lactose, gluten). Kept out of plans, but not treated as an allergy." items={prefs.intolerances} onChange={(intolerances) => set({ intolerances })} placeholder="For example lactose" max={20} />
-      <ChipList label="Foods I like" items={prefs.likes} onChange={(likes) => set({ likes })} placeholder="For example salmon, rice, berries" />
-      <ChipList label="Foods I don't like" hint="Kept out of plans." items={prefs.dislikes} onChange={(dislikes) => set({ dislikes })} placeholder="For example mushrooms, liver" />
+      {/* One box for what a person wants left out. Old intolerances and old dislikes are both shown here; a new entry is saved as a dislike (both are kept out of plans, neither is an allergy),
+          and removing one removes it from whichever stored list it was in. */}
+      <ChipList
+        label="Things I don't want"
+        hint="Kept out of plans. For an allergy, use the buttons above."
+        items={unwanted}
+        onChange={(next) => set({ dislikes: next.filter((x) => !prefs.intolerances.includes(x)), intolerances: prefs.intolerances.filter((x) => next.includes(x)) })}
+        placeholder="For example mushrooms, lactose, liver"
+      />
+      <div>
+        <ChipList label="Things I do want" items={prefs.likes} onChange={(likes) => set({ likes })} placeholder="For example salmon, rice, berries" />
+        <label className="block mt-3">
+          <span className="sr-only">Anything else we should consider?</span>
+          <textarea
+            value={prefs.notes}
+            maxLength={MAX_NOTES_LENGTH}
+            rows={1}
+            onChange={(e) => set({ notes: e.target.value })}
+            className="w-full bg-graphite border border-steel/30 text-chalk px-3 py-2.5 font-body text-sm focus:outline-none focus:border-rust"
+            placeholder="Anything else we should consider?"
+          />
+        </label>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
@@ -215,23 +236,17 @@ export function FoodPreferencesEditor({
         </label>
       </div>
 
-      <label className="block">
-        <span className="font-body text-xs text-steel uppercase tracking-wide">Anything else</span>
-        <textarea
-          value={prefs.notes}
-          maxLength={MAX_NOTES_LENGTH}
-          rows={3}
-          onChange={(e) => set({ notes: e.target.value })}
-          className="mt-2 w-full bg-graphite border border-steel/30 text-chalk p-3 font-body text-sm focus:outline-none focus:border-rust"
-          placeholder="Anything about food your coach should know"
-        />
-        <span className="font-body text-xs text-steel/80">{prefs.notes.length}/{MAX_NOTES_LENGTH}</span>
-      </label>
-
       <div className="border-t border-steel/20 pt-4">
         <p className="font-body text-xs text-steel uppercase tracking-wide">{rules === "edit" ? "Rules for the numbers" : "Set by your coach"}</p>
         {rules === "edit" ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2">
+          <details className="mt-2 group">
+            <summary className="cursor-pointer list-none flex items-center justify-between gap-3 min-h-11 border border-steel/30 px-3 font-body text-sm text-chalk">
+              <span>
+                {DIET_LABELS[prefs.dietType]} - {CARB_SPLIT_LABELS[prefs.carbSplit]} - {prefs.proteinGPerLb} g/lb (floor {prefs.proteinFloorGPerLb})
+              </span>
+              <span className="font-body text-xs text-rust shrink-0">Edit</span>
+            </summary>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
             <label className="block">
               <span className="font-body text-xs text-steel">Diet type</span>
               <select value={prefs.dietType} onChange={(e) => set({ dietType: e.target.value as NutritionPreferences["dietType"] })} className={`${field} mt-1`}>
@@ -263,6 +278,7 @@ export function FoodPreferencesEditor({
               {grams && <span className="font-body text-xs text-steel/80">Below about {grams.floorG} g a day is a shortfall; between the floor and the target is a solid day</span>}
             </label>
           </div>
+          </details>
         ) : (
           <p className="font-body text-sm text-chalk mt-2">
             {DIET_LABELS[prefs.dietType]}. Protein: aim for about {prefs.proteinGPerLb} g per pound; a solid day is {prefs.proteinFloorGPerLb} g or more.

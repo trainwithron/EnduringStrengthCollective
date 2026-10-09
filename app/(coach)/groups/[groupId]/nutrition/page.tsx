@@ -69,7 +69,7 @@ export default async function NutritionPage(
   if (membership?.role === "coach" && !isActingAsOther) {
     const { data: group } = await supabase
       .from("groups")
-      .select("name, nutrition_youth_mode")
+      .select("name, nutrition_youth_mode, group_kind")
       .eq("id", params.groupId)
       .single();
 
@@ -81,7 +81,10 @@ export default async function NutritionPage(
       groupId: c.groupId,
     }));
 
-    const selected = athletes.find((a) => a.profileId === searchParams.athleteId) ?? null;
+    // The bar at the top names the group in the address. In a one-on-one client's own group that is the client, so with nothing picked that client is the one shown (not a blank next to
+    // their name), and picking someone else opens THEIR group's address below, so the name on top and the client on the page are always the same person.
+    const ownClient = (group as { group_kind?: string | null } | null)?.group_kind === "one_on_one" ? athletes.find((a) => a.groupId === params.groupId) ?? null : null;
+    const selected = athletes.find((a) => a.profileId === searchParams.athleteId) ?? ownClient;
     let selectedTier: string | null = null;
     if (selected) {
       const { data: tierRow } = await supabase
@@ -155,7 +158,7 @@ export default async function NutritionPage(
                 athletes.map((a) => (
                   <Link
                     key={a.profileId}
-                    href={`/groups/${params.groupId}/nutrition?athleteId=${a.profileId}`}
+                    href={`/groups/${a.groupId}/nutrition?athleteId=${a.profileId}`}
                     className={`block p-3 font-body text-sm ${
                       selected?.profileId === a.profileId ? "bg-rust/10 text-rust" : "text-chalk"
                     }`}
