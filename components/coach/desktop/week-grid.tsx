@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import type { DemoRow } from "@/lib/exercise-demo";
 import { NONE_COLLAPSED, allCollapsed, toggleAll, toggleCollapsed } from "@/lib/collapse-state";
 import { ClientPreviewButton } from "@/components/coach/desktop/client-preview";
@@ -79,7 +80,7 @@ export function WeekGrid({
 
   async function handleDeleteWeek() {
     if (
-      !window.confirm(
+      !await confirmDialog(
         `Delete all of Week ${weekNumber} (${days.length} ${days.length === 1 ? "day" : "days"})? This can't be undone. Any client who already logged one of these workouts keeps that history — this only removes the templates.`
       )
     ) {

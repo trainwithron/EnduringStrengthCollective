@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { localDateKey } from "@/lib/timezone";
@@ -116,7 +117,7 @@ export function ProgressPhotoJournal({ athleteId, groupId }: { athleteId: string
   }
 
   async function handleDelete(photo: PhotoRow) {
-    if (!window.confirm("Delete this photo? This can't be undone.")) return;
+    if (!await confirmDialog("Delete this photo? This can't be undone.")) return;
     setPhotos((prev) => prev.filter((p) => p.id !== photo.id));
     const supabase = createBrowserClient();
     await supabase.from("progress_photos").delete().eq("id", photo.id);

@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -45,7 +46,7 @@ export function PreferencesSection({
     const removed = saved.allergies.filter((a) => !prefs.allergies.some((b) => b.toLowerCase() === a.toLowerCase()));
     if (removed.length > 0) {
       const names = removed.map((a) => (a.toLowerCase().startsWith("other: ") ? a.slice(7) : a)).join(", ");
-      if (!window.confirm(`Remove ${names} from ${clientName}'s allergies? Meals with it will be offered to them again, and they will be told you changed their list.`)) return;
+      if (!await confirmDialog(`Remove ${names} from ${clientName}'s allergies? Meals with it will be offered to them again, and they will be told you changed their list.`)) return;
     }
     setBusy(true);
     const supabase = createBrowserClient();

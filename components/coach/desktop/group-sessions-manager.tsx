@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { addDaysToDateKey } from "@/lib/series-schedule";
@@ -201,8 +202,8 @@ export function GroupSessionsManager({
               type="button"
               className="border border-rust text-rust font-body text-xs px-3 py-1.5 disabled:opacity-40 ml-auto"
               disabled={busy !== null}
-              onClick={() => {
-                if (window.confirm(`Cancel ${c.title}? Everyone is told, and any session they used is returned.`)) {
+              onClick={async () => {
+                if (await confirmDialog(`Cancel ${c.title}? Everyone is told, and any session they used is returned.`)) {
                   run(`${c.id}-cancel`, () => call(`/api/group-sessions/${c.id}`, { action: "cancel" }));
                 }
               }}

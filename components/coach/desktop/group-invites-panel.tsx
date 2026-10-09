@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { appOriginBrowser } from "@/lib/app-url";
@@ -25,7 +26,7 @@ export function GroupInvitesPanel({ groupId, groupName, invites }: { groupId: st
   const summary = plan.current ? `works for ${plan.current.daysLeft} more ${plan.current.daysLeft === 1 ? "day" : "days"}` : "no link yet";
 
   async function call(body: Record<string, unknown>, key: string, confirmText?: string) {
-    if (confirmText && !window.confirm(confirmText)) return;
+    if (confirmText && !await confirmDialog(confirmText)) return;
     setError(null);
     setBusy(key);
     try {

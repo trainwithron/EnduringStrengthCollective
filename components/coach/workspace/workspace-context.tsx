@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -308,7 +309,7 @@ export function WorkspaceProvider({
       // Give a save that this started a moment to begin, then wait (up to 5 s) for saves still going: removing the pane would cancel them.
       await new Promise((r) => setTimeout(r, 350));
       for (let i = 0; i < 50 && (activityOf()?.inFlight ?? 0) > 0; i++) await new Promise((r) => setTimeout(r, 100));
-      if (activityOf()?.typed && !window.confirm("Close and discard what you typed? It has not been saved or sent.")) return;
+      if (activityOf()?.typed && !await confirmDialog("Close and discard what you typed? It has not been saved or sent.")) return;
       dispatch({ type: "close", id: paneId });
     })();
   }, []);

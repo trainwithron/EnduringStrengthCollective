@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Circle } from "lucide-react";
@@ -65,7 +66,7 @@ export function ClientSignInPanel({
 
   async function cancelLink() {
     if (busy) return;
-    if (!window.confirm("Cancel this sign-in link? It will stop working. You can make a new one any time.")) return;
+    if (!await confirmDialog("Cancel this sign-in link? It will stop working. You can make a new one any time.")) return;
     setBusy(true);
     setError(null);
     try {

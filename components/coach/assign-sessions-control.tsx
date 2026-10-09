@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -39,7 +40,7 @@ export function AssignSessionsControl({
       setMessage("The balance is already " + next + ".");
       return;
     }
-    if (!window.confirm(`Set ${clientName}'s balance from ${balance} to ${next}? This is recorded in their session ledger.`)) return;
+    if (!await confirmDialog(`Set ${clientName}'s balance from ${balance} to ${next}? This is recorded in their session ledger.`)) return;
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -87,7 +88,7 @@ export function AssignSessionsControl({
       return;
     }
     if (
-      !window.confirm(
+      !await confirmDialog(
         `Add ${n} session${n === 1 ? "" : "s"} to ${clientName}? Their balance goes from ${balance} to ${balance + n}.`
       )
     ) {

@@ -116,7 +116,7 @@ describe("Assistant review: fail closed, notices, banner", () => {
     expect(dayPage).toContain("hidePlanRecipes(dayMeals)");
   });
   it("the coach is asked before an allergy is removed, and sees a banner for restrictions typed only in a check-in", () => {
-    expect(coachSection).toContain("window.confirm(");
+    expect(coachSection).toContain("await confirmDialog(");
     expect(coachSection).toContain("Remove ");
     expect(coachSection).toContain("prefillFromRestrictionsText(prefs, checkinRestrictions)");
     expect(clientNutrition).toContain("checkinRestrictions=");

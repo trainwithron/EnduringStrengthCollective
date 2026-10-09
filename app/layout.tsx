@@ -7,6 +7,7 @@ import { PwaContextCookie } from "@/components/pwa-context-cookie";
 import { LoadingWatchdog } from "@/components/ui/loading-watchdog";
 import { LegalReacceptGate } from "@/components/legal/legal-reaccept-gate";
 import { TimezoneCapture } from "@/components/timezone-capture";
+import { ConfirmDialogHost } from "@/components/shared/confirm-dialog";
 import { getViewerOrgTheme } from "@/lib/org-theme-server";
 import { orgThemeToCssVars } from "@/lib/theme";
 
@@ -80,6 +81,7 @@ export default async function RootLayout({
         {children}
         <LegalReacceptGate />
         <TimezoneCapture />
+        <ConfirmDialogHost />
       </body>
     </html>
   );

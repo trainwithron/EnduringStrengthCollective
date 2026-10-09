@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -171,7 +172,7 @@ export function RecipeHubManager({
   }
 
   async function handleDeleteRecipe(id: string, name: string) {
-    if (!window.confirm(`Delete "${name}"? This can't be undone.`)) return;
+    if (!await confirmDialog(`Delete "${name}"? This can't be undone.`)) return;
     const supabase = createBrowserClient();
     await supabase.from("recipes").delete().eq("id", id);
     setRecipes((prev) => prev.filter((r) => r.id !== id));

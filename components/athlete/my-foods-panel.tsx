@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useEffect, useMemo, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { FoodLogEntry } from "./meal-checkoff-list";
@@ -163,7 +164,7 @@ function CustomFoodRowItem({ food, athleteId, groupId, logDate, slot, onLogged, 
     onLogged(entryFromRow(data as unknown as FoodLogRow));
   }
   async function remove() {
-    if (busy || !window.confirm(`Delete "${customFoodTitle(food)}"? What you already logged from it stays in your log.`)) return;
+    if (busy || !await confirmDialog(`Delete "${customFoodTitle(food)}"? What you already logged from it stays in your log.`)) return;
     setBusy(true);
     const { error: e } = await createBrowserClient().from("custom_foods").delete().eq("id", food.id);
     setBusy(false);
@@ -220,7 +221,7 @@ function SavedMealRowItem({ meal, athleteId, groupId, logDate, slot, onLogged, o
     onLogged(added);
   }
   async function remove() {
-    if (busy || !window.confirm(`Delete the saved meal "${meal.name}"? What you already logged from it stays in your log.`)) return;
+    if (busy || !await confirmDialog(`Delete the saved meal "${meal.name}"? What you already logged from it stays in your log.`)) return;
     setBusy(true);
     const { error: e } = await createBrowserClient().from("saved_meals").delete().eq("id", meal.id);
     setBusy(false);

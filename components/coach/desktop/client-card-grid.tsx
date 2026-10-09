@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { calorieSeriesWithStanding } from "@/lib/macro-resolution";
 import { fetchStandingHistories } from "@/lib/standing-macros";
 import { useEffect, useMemo, useState } from "react";
@@ -413,12 +414,12 @@ export function ClientCardGrid({
       });
   }
 
-  function handleRemove(member: RosterMember) {
+  async function handleRemove(member: RosterMember) {
     if (member.role === "coach" && isOnlyCoach) {
       setError("A group needs at least one coach.");
       return;
     }
-    if (!window.confirm(`Remove ${member.fullName} from the group?`)) return;
+    if (!await confirmDialog(`Remove ${member.fullName} from the group?`)) return;
 
     setError(null);
     // Drop the card immediately rather than waiting for the delete + a
@@ -500,7 +501,7 @@ export function ClientCardGrid({
       setError("A group needs at least one coach — deselect the coach before removing.");
       return;
     }
-    if (!window.confirm(`Remove ${targets.length} selected ${targets.length === 1 ? "athlete" : "athletes"} from the group?`)) {
+    if (!await confirmDialog(`Remove ${targets.length} selected ${targets.length === 1 ? "athlete" : "athletes"} from the group?`)) {
       return;
     }
     setBulkBusy(true);

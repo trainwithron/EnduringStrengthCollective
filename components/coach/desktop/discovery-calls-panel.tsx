@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { appOriginBrowser } from "@/lib/app-url";
@@ -39,7 +40,7 @@ export function DiscoveryCallsPanel({
   }
 
   async function handleCancel(id: string) {
-    if (!window.confirm("Cancel this discovery call?")) return;
+    if (!await confirmDialog("Cancel this discovery call?")) return;
     setBusyId(id);
     setError(null);
     const supabase = createBrowserClient();

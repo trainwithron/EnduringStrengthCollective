@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import type { DemoRow } from "@/lib/exercise-demo";
 import { NONE_COLLAPSED, allCollapsed, toggleAll, toggleCollapsed } from "@/lib/collapse-state";
 import { ClientPreviewButton } from "@/components/coach/desktop/client-preview";
@@ -348,7 +349,7 @@ export function DayCard({
 
   async function handleDeleteDay() {
     if (
-      !window.confirm(
+      !await confirmDialog(
         `Delete "${day.title}"? This can't be undone. Any client who already logged this workout keeps that history — this only removes the template.`
       )
     ) {

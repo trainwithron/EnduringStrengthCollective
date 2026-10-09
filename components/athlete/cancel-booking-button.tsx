@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -43,7 +44,7 @@ export function CancelBookingButton({
         : insideWindowHours
         ? `This is inside your coach's ${insideWindowHours}-hour window. Your coach will be told and decides whether it counts as a session. Cancel anyway?`
         : "Cancel this session? If it is outside your coach's cancellation window it goes back to your balance.";
-    if (!window.confirm(message)) return;
+    if (!await confirmDialog(message)) return;
     setSubmitting(true);
     setError(null);
 
@@ -85,7 +86,7 @@ export function CancelBookingButton({
 
   async function handleCancelSeries() {
     if (!recurringSeriesId) return;
-    if (!window.confirm("Cancel every remaining session in this weekly series?")) return;
+    if (!await confirmDialog("Cancel every remaining session in this weekly series?")) return;
     setCancellingSeries(true);
     const supabase = createBrowserClient();
     await supabase.rpc("cancel_recurring_booking_series", { p_series_id: recurringSeriesId });

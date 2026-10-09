@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -141,7 +142,7 @@ export function DailyMacrosForm({
   // is the actual undo, removing the day entirely rather than leaving a
   // stray number behind.
   async function handleClear() {
-    if (!window.confirm(`Clear the saved macro target for ${date}? This can't be undone.`)) return;
+    if (!await confirmDialog(`Clear the saved macro target for ${date}? This can't be undone.`)) return;
     setSaving(true);
     setError(null);
     const supabase = createBrowserClient();

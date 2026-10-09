@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 
 // For a client who has already signed in and whose address turned out to be wrong but
@@ -24,7 +25,7 @@ export function CorrectClientEmail({
     if (busy) return;
     const first = clientName.split(" ")[0] || "them";
     if (
-      !window.confirm(
+      !await confirmDialog(
         `Change ${first}'s sign-in email to ${email.trim()}? They will sign in and reset their password with this address from now on, and we will tell them in the app.`
       )
     ) {

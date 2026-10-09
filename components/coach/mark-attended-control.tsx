@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -96,9 +97,9 @@ export function MarkAttendedControl({
       {state === "unsettled" && (
         <button
           type="button"
-          onClick={() => {
+          onClick={async () => {
             // Not charging cannot be taken back from this screen, and the button sits next to Mark attended.
-            if (window.confirm("Don't charge for this session? It will not come off their sessions.")) run("waive_booking");
+            if (await confirmDialog("Don't charge for this session? It will not come off their sessions.")) run("waive_booking");
           }}
           disabled={busy}
           className="h-11 px-3 border border-steel/30 text-steel font-body text-xs disabled:opacity-40"

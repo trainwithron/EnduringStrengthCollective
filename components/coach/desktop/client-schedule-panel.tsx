@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -102,7 +103,7 @@ export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client
   async function adjustCredits(delta: number) {
     if (!groupId) return;
     // Money moves with one tap here, so it is asked once.
-    if (!window.confirm(`${delta > 0 ? "Add" : "Remove"} one ${noun.singular} ${delta > 0 ? "to" : "from"} ${client.fullName}?`)) return;
+    if (!await confirmDialog(`${delta > 0 ? "Add" : "Remove"} one ${noun.singular} ${delta > 0 ? "to" : "from"} ${client.fullName}?`)) return;
     setAdjusting(true);
     setError(null);
     const { data: newBalance, error: rpcError } = await createBrowserClient().rpc("adjust_session_credits", { p_athlete_id: client.athleteId, p_group_id: groupId, p_delta: delta });
@@ -117,7 +118,7 @@ export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client
   }
 
   async function cancel(b: BookingRow) {
-    if (!window.confirm("Cancel this session? Anything already taken for it goes back to their sessions.")) return;
+    if (!await confirmDialog("Cancel this session? Anything already taken for it goes back to their sessions.")) return;
     setBusyId(b.id);
     setError(null);
     const { error: cancelError } = await createBrowserClient().rpc("cancel_booking_and_refund_credit", { p_booking_id: b.id });

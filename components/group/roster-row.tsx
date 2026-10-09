@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -62,12 +63,12 @@ export function RosterRow({
       });
   }
 
-  function handleRemove() {
+  async function handleRemove() {
     if (optimisticRole === "coach" && isOnlyCoach) {
       setError("A group needs at least one coach.");
       return;
     }
-    if (!window.confirm(`Remove ${member.fullName} from the group?`)) return;
+    if (!await confirmDialog(`Remove ${member.fullName} from the group?`)) return;
 
     setError(null);
     setBusy(true);
