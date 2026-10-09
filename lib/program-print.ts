@@ -44,12 +44,23 @@ export function describePrescription(sets: ExerciseSetTarget[]): string {
   return parts.join(", ");
 }
 
+// The write-in boxes beside an exercise match what was prescribed: a timed exercise (a walk, a hold) gets Time and Rest, a distance one Distance and Time, anything else Weight and Reps.
+export function writeInBoxes(sets: ExerciseSetTarget[]): [string, string] {
+  const reps = sets.some((s) => (s.targetReps ?? "").trim() !== "");
+  const weight = sets.some((s) => s.targetWeight);
+  if (!reps && !weight && sets.some((s) => s.targetTimeSeconds)) return ["Time", "Rest"];
+  if (!reps && !weight && sets.some((s) => s.targetDistance)) return ["Dist", "Time"];
+  return ["Wt", "Reps"];
+}
+
 export interface PrintDay {
   id: string;
   title: string;
   weekNumber: number;
   dayIndex: number;
-  exercises: { name: string; prescription: string }[];
+  // The calendar day this workout falls on ("Mon, Oct 12"), when the program has a start date and training days.
+  dateLabel?: string | null;
+  exercises: { name: string; prescription: string; boxes?: [string, string] }[];
 }
 
 // The days a non-coach may print: not locked, and with exercises (a locked day comes back from the database with none).

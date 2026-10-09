@@ -86,7 +86,7 @@ export function ClientsListView({ rows }: { rows: CoachClientRow[] }) {
                 <Link href={`/groups/${c.groupId}/athletes/${c.id}`} className="flex items-center gap-3 py-2.5 px-1 hover:bg-surface/60">
                   <span className="font-body text-sm text-chalk flex-1 min-w-0 truncate">{c.fullName}</span>
                   <span className="font-body text-xs text-steel shrink-0 hidden sm:inline">{KIND_LABEL[clientKind(c)]}</span>
-                  {c.groupKind !== "one_on_one" && <span className="font-body text-xs text-steel shrink-0 hidden md:inline truncate max-w-[10rem]">{c.groupName}</span>}
+                  {c.groupKind !== "one_on_one" && <span className="font-body text-xs text-steel hidden md:inline truncate min-w-0 max-w-[22rem]">{c.groupName}</span>}
                   <span className="flex items-center justify-end gap-2 shrink-0 w-24 pr-2">
                     {c.owed > 0 && (
                       <span title="Already delivered beyond what they had" className="font-body text-[11px] text-rust">

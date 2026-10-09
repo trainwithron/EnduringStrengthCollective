@@ -19,7 +19,7 @@ import { useSaveToastChannel } from "./save-toast-channel";
 // desktop.tsx` renders both) — not a replacement for the toast, an
 // addition, since the toast's brief pulse is still a fine extra signal.
 export function SaveStatusBar() {
-  const { subscribeSaveToast, flashSaved } = useSaveToastChannel();
+  const { subscribeSaveToast } = useSaveToastChannel();
   const [status, setStatus] = useState<"idle" | "saved" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const revertTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -44,33 +44,10 @@ export function SaveStatusBar() {
     };
   }, [subscribeSaveToast]);
 
-  // Every field here already writes on its own blur/change — there's no
-  // batched "pending" state a Save button could flush. The honest click
-  // behavior splits in two: if something is actively focused, blur it to
-  // commit whatever's still being typed (that field's own blur handler
-  // then flashes its own real save/error). If nothing is focused — the
-  // exact case Ron asked for, finishing an edit, clicking elsewhere, then
-  // clicking Save for reassurance — .blur() on a non-existent focus target
-  // is a silent no-op, so flash "Saved" directly instead: there's nothing
-  // pending, everything already persisted.
-  function handleSaveClick() {
-    const active = document.activeElement;
-    if (active instanceof HTMLElement && active !== document.body) {
-      active.blur();
-    } else {
-      flashSaved();
-    }
-  }
-
+  // Every field here already writes on its own blur/change, so there is nothing for a Save button to flush; the label saying so (and "Saved" after each change) is the whole
+  // control. (The one Save left in the header belongs to the Label and Order boxes next to it, which are saved together on purpose.)
   return (
     <div className="flex items-center gap-3">
-      <button
-        type="button"
-        onClick={handleSaveClick}
-        className="h-8 px-3 border border-steel/30 text-chalk font-body text-xs font-medium active:border-rust active:text-rust transition-colors"
-      >
-        Save
-      </button>
       <span
         className={`font-body text-xs ${
           status === "error" ? "text-rust" : status === "saved" ? "text-positive" : "text-steel"

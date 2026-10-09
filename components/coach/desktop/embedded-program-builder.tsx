@@ -5,7 +5,6 @@ import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { ProgramBuilderDesktop } from "./program-builder-desktop";
 import { ProgrammingSpotterPanel } from "./programming-spotter-panel";
-import { ProgramProgressBanner } from "../program-progress-banner";
 import type { ProgramBuilderData } from "@/lib/program-builder-data";
 
 // Real feedback from Ron on the traditional layout's resizable side
@@ -93,14 +92,6 @@ export function EmbeddedProgramBuilder({ groupId }: { groupId: string }) {
       >
         Open full page &#8599;
       </Link>
-      {data.dayProgress && (
-        <ProgramProgressBanner
-          programId={programId}
-          dayNumber={data.dayProgress.dayNumber}
-          totalDays={data.dayProgress.totalDays}
-          totalVolumeLbs={data.totalVolumeLbs}
-        />
-      )}
       <ProgrammingSpotterPanel programId={programId} flags={data.spotterFlags} />
       <ProgramBuilderDesktop
         programId={data.programId}

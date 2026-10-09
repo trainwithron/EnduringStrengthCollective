@@ -3,10 +3,10 @@ import { createServerClient } from "@/lib/supabase/server";
 import { NoAccess } from "@/components/shared/no-access";
 import { PrintButton } from "@/components/shared/print-button";
 import { SET_ROW_SELECT, mapSetRow } from "@/lib/exercise-fields";
-import { computeScheduledDates, isLocked } from "@/lib/program-schedule";
+import { computeScheduledDates, formatShortDate, isLocked } from "@/lib/program-schedule";
 import { getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
 import { getViewerDisplayTimezone } from "@/lib/display-timezone-server";
-import { describePrescription, groupPrintWeeks, releasedDayIds, type PrintDay } from "@/lib/program-print";
+import { describePrescription, groupPrintWeeks, releasedDayIds, writeInBoxes, type PrintDay } from "@/lib/program-print";
 
 // A printable copy of a program (Ron: a coach must never be stuck in our software). Plain black on white, one line per exercise with its prescription and blank boxes to write in
 // what was actually done, grouped by week and day, several days across the page. No videos. The coach can print ANY program they coach, any time. A client or a member of a group program prints only
@@ -48,19 +48,25 @@ export default async function PrintProgramPage(props: { params: Promise<{ progra
       .map((e: any) => ({
         name: (e.display_name as string | null)?.trim() || (e.exercise_name as string),
         prescription: describePrescription((e.group_workout_exercise_sets ?? []).map(mapSetRow)),
+        boxes: writeInBoxes((e.group_workout_exercise_sets ?? []).map(mapSetRow)),
       })),
   }));
 
   // Who sees what: the coach everything; anyone else (a client printing their own copy, or a member of a group program) only the days already released to them. The database also hides a
   // locked day's exercises, so a day that comes back with none is left out too (the app and the database can differ by a few hours around midnight).
+  // A day prints the calendar date it falls on, when the program has a start date and training days.
+  const dates =
+    program.start_date && program.training_days && program.training_days.length > 0
+      ? computeScheduledDates(program.start_date, program.training_days, (rows ?? []).map((w: any) => ({ id: w.id as string, scheduledDate: w.scheduled_date as string | null })))
+      : new Map<string, Date>();
+  for (const d of days) {
+    const when = dates.get(d.id);
+    if (when) d.dateLabel = formatShortDate(when);
+  }
   let keep: Set<string> | undefined;
   if (!isCoach) {
     const timezone = await getGroupCoachTimezone(supabase, program.group_id);
     const today = nowInZone(timezone);
-    const dates =
-      program.start_date && program.training_days && program.training_days.length > 0
-        ? computeScheduledDates(program.start_date, program.training_days, (rows ?? []).map((w: any) => ({ id: w.id as string, scheduledDate: w.scheduled_date as string | null })))
-        : new Map<string, Date>();
     keep = releasedDayIds(days, (id) => isLocked(dates.get(id), today, program.visibility_window));
   }
   const weeks = groupPrintWeeks(days, keep);
@@ -108,7 +114,10 @@ export default async function PrintProgramPage(props: { params: Promise<{ progra
           <div className="print-week">
             {w.days.map((d) => (
               <div key={d.id} className="print-day mb-3">
-                <h3 className="text-sm font-bold">{d.title}</h3>
+                <h3 className="text-sm font-bold">
+                  {d.title}
+                  {d.dateLabel && <span className="font-normal text-gray-600"> {"\u00b7"} {d.dateLabel}</span>}
+                </h3>
                 {d.exercises.length === 0 && <p className="text-xs text-gray-600">No exercises.</p>}
                 <ul>
                   {d.exercises.map((e, i) => (
@@ -118,9 +127,9 @@ export default async function PrintProgramPage(props: { params: Promise<{ progra
                         {e.prescription && <span className="text-gray-700"> {e.prescription}</span>}
                       </span>
                       <span className="inline-flex items-center gap-1 shrink-0">
-                        <span className="text-[10px] text-gray-500">Wt</span>
+                        <span className="text-[10px] text-gray-500">{e.boxes?.[0] ?? "Wt"}</span>
                         <span className="inline-block w-12 h-5 border border-gray-500" />
-                        <span className="text-[10px] text-gray-500">Reps</span>
+                        <span className="text-[10px] text-gray-500">{e.boxes?.[1] ?? "Reps"}</span>
                         <span className="inline-block w-12 h-5 border border-gray-500" />
                       </span>
                     </li>

@@ -896,7 +896,7 @@ export function ExerciseBuilderCard({
                       type="button"
                       onClick={() => handleRemoveField(field)}
                       aria-label={`Stop tracking ${builderLabel(field, def.label)}`}
-                      className="w-6 h-9 flex items-center justify-center text-steel active:text-rust shrink-0"
+                      className="w-11 h-11 sm:w-6 sm:h-9 flex items-center justify-center text-steel active:text-rust shrink-0"
                     >
                       ×
                     </button>
@@ -912,7 +912,7 @@ export function ExerciseBuilderCard({
                 type="button"
                 onClick={() => setAddFieldOpen((v) => !v)}
                 disabled={untrackedFields.length === 0}
-                className="font-body text-xs text-steel active:text-rust transition-colors disabled:opacity-30"
+                className="min-h-11 sm:min-h-0 px-2 sm:px-0 font-body text-xs text-steel active:text-rust transition-colors disabled:opacity-30"
               >
                 + Add
               </button>
