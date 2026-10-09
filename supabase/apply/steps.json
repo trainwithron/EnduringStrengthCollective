@@ -430,6 +430,12 @@
   "rows": 2
  },
  {
+  "n": "64",
+  "slug": "merge-duplicate-exercises",
+  "migrations": [],
+  "rows": 5
+ },
+ {
   "n": "63",
   "slug": "0318",
   "migrations": [

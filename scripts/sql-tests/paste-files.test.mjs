@@ -37,6 +37,29 @@ await db.exec(`
     ('00000000-0000-4000-8000-0000000000b1', '00000000-0000-4000-8000-0000000000a2', 'athlete', '4821');
 `);
 
+const before64 = { snap: null };
+const RON64 = "136394ed-f108-4283-bcb7-310a1ac6cbc8";
+const OTHER64 = "00000000-0000-4000-8000-0000000000f1";
+const G164 = "64000000-0000-4000-8000-000000000001";
+const snapshot64 = async () =>
+  JSON.stringify(
+    (
+      await db.query(`select
+        (select coalesce(json_agg(json_build_array(created_by, name, youtube_url, category) order by created_by, name), '[]') from public.exercise_library where created_by in ('${RON64}', '${OTHER64}')) as lib,
+        (select coalesce(json_agg(json_build_array(id, exercise_name) order by id), '[]') from public.group_workout_exercises where group_id in ('${G164}', '64000000-0000-4000-8000-000000000002')) as gwe,
+        (select coalesce(json_agg(json_build_array(id, exercise_name) order by id), '[]') from public.session_exercises) as se,
+        (select coalesce(json_agg(json_build_array(coach_id, raw_name, exercise_name) order by coach_id, raw_name), '[]') from public.exercise_aliases) as al,
+        (select coalesce(json_agg(json_build_array(id, exercise_name, config) order by id), '[]') from public.exercise_progressions) as pr,
+        (select coalesce(json_agg(json_build_array(id, exercise_name, difficulty_rank) order by id), '[]') from public.movement_pattern_exercises) as mp,
+        (select coalesce(json_agg(json_build_array(id, shared_exercise_names) order by id), '[]') from public.posts where group_id = '${G164}') as po,
+        (select coalesce(json_agg(json_build_array(athlete_id, exercise_name) order by athlete_id, exercise_name), '[]') from public.athlete_training_maxes) as tm,
+        (select coalesce(json_agg(json_build_array(id, exercise_name) order by id), '[]') from public.exercise_records) as rec,
+        (select coalesce(json_agg(json_build_array(id, exercise_name_a, exercise_name_b) order by id), '[]') from public.athlete_equipment_load_ratios) as lr,
+        (select coalesce(json_agg(json_build_array(id, exercise_name) order by id), '[]') from public.game_score_entries) as gs,
+        (select count(*)::int from public.group_workout_exercise_sets) as sets`)
+    ).rows[0]
+  );
+
 // ---- the numbered steps ----
 const steps = JSON.parse(readFileSync(new URL("../../supabase/apply/steps.json", import.meta.url), "utf8"));
 for (const s of steps) {
@@ -111,12 +134,132 @@ for (const s of steps) {
     const gone = (await db.query("select to_regclass('public.client_inactive') as t")).rows[0].t;
     check("check-step23-probe.sql leaves nothing behind (0281 itself was rolled back)", gone === null);
   }
+  if (s.n === "64") {
+    // Coach Ron's library with the 13 duplicates and 12 survivors (the real names), his group and client, and every kind of place a name is stored; plus another coach with the same names who must not be touched.
+    const RON = "136394ed-f108-4283-bcb7-310a1ac6cbc8";
+    const OTHER = "00000000-0000-4000-8000-0000000000f1";
+    const G1 = "64000000-0000-4000-8000-000000000001";
+    const G2 = "64000000-0000-4000-8000-000000000002";
+    const ATH = "00000000-0000-4000-8000-0000000000a2";
+    const losers = ["Deadlift", "Conventional Deadlifts", "Band Pull-Apart", "Chin Ups", "Dips", "Dumbbell Lateral Raises", "Farmer's Carry", "Lat Pull Down", "Shoulder CARS", "Sit Ups", "Step Ups", "Bulgarian Split Squats", "Walking Lunges"];
+    const survivors = ["Conventional Deadlift", "Band Pull Apart", "Chin-Up", "Dip", "Dumbbell Lateral Raise", "Farmers Carry", "Lat Pulldown", "Shoulder CARs", "Sit-Up", "Step Up", "Bulgarian Split Squat", "Walking Lunge"];
+    const noVideo = new Set(["Bulgarian Split Squat", "Walking Lunge"]);
+    const q = (n) => "'" + n.replace(/'/g, "''") + "'";
+    await db.exec(`
+      insert into auth.users (id, email) values ('${OTHER}', 'other.coach.merge@example.com') on conflict (id) do nothing;
+      insert into public.profiles (id, full_name) values ('${RON}', 'Coach Ron') on conflict (id) do nothing;
+      insert into public.profiles (id, full_name) values ('${OTHER}', 'Other Coach') on conflict (id) do nothing;
+      insert into public.groups (id, name, created_by, organization_id) values
+        ('${G1}', 'Merge Ron group', '${RON}', 'b7318b19-a17e-4412-88f1-51d68fcf026f'),
+        ('${G2}', 'Merge Other group', '${OTHER}', 'b7318b19-a17e-4412-88f1-51d68fcf026f');
+      insert into public.group_memberships (group_id, profile_id, role) values
+        ('${G1}', '${RON}', 'coach'), ('${G1}', '${ATH}', 'athlete'), ('${G2}', '${OTHER}', 'coach');
+      insert into public.exercise_library (created_by, name, youtube_url, category) values
+        ${losers.map((n) => "('" + RON + "', " + q(n) + ", null, null)").join(", ")},
+        ${survivors.map((n) => "('" + RON + "', " + q(n) + ", " + (noVideo.has(n) ? "null" : "'https://youtube.example/" + n.replace(/[^A-Za-z]/g, "") + "'") + ", 'Legs')").join(", ")},
+        ('${OTHER}', 'Deadlift', null, 'Pull'), ('${OTHER}', 'Dips', null, null);
+      insert into public.programs (id, group_id, name, created_by) values
+        ('64000000-0000-4000-8000-0000000000a1', '${G1}', 'Merge Ron program', '${RON}'),
+        ('64000000-0000-4000-8000-0000000000a2', '${G2}', 'Merge Other program', '${OTHER}');
+      insert into public.workouts (id, program_id, group_id, title, week_number, day_index) values
+        ('64000000-0000-4000-8000-0000000000b1', '64000000-0000-4000-8000-0000000000a1', '${G1}', 'Day 1', 1, 1),
+        ('64000000-0000-4000-8000-0000000000b2', '64000000-0000-4000-8000-0000000000a2', '${G2}', 'Day 1', 1, 1);
+      insert into public.group_workout_exercises (id, workout_id, group_id, exercise_name, exercise_order, tracked_fields) values
+        ('64000000-0000-4000-8000-0000000000c1', '64000000-0000-4000-8000-0000000000b1', '${G1}', 'Deadlift', 1, array['reps']),
+        ('64000000-0000-4000-8000-0000000000c2', '64000000-0000-4000-8000-0000000000b1', '${G1}', 'Deadlift', 2, array['reps']),
+        ('64000000-0000-4000-8000-0000000000c3', '64000000-0000-4000-8000-0000000000b1', '${G1}', 'Conventional Deadlifts', 3, array['reps']),
+        ('64000000-0000-4000-8000-0000000000c4', '64000000-0000-4000-8000-0000000000b1', '${G1}', 'Dips', 4, array['reps']),
+        ('64000000-0000-4000-8000-0000000000c5', '64000000-0000-4000-8000-0000000000b1', '${G1}', 'Back Squat', 5, array['reps']),
+        ('64000000-0000-4000-8000-0000000000c6', '64000000-0000-4000-8000-0000000000b2', '${G2}', 'Deadlift', 1, array['reps']);
+      insert into public.group_workout_exercise_sets (group_workout_exercise_id, set_order, target_reps) values
+        ('64000000-0000-4000-8000-0000000000c1', 1, '5'), ('64000000-0000-4000-8000-0000000000c1', 2, '5'), ('64000000-0000-4000-8000-0000000000c4', 1, '8');
+      insert into public.athlete_sessions (id, workout_id, group_id, athlete_id, status) values
+        ('64000000-0000-4000-8000-0000000000d1', '64000000-0000-4000-8000-0000000000b1', '${G1}', '${ATH}', 'in_progress');
+      insert into public.session_exercises (session_id, exercise_name, exercise_order) values
+        ('64000000-0000-4000-8000-0000000000d1', 'Dips', 1), ('64000000-0000-4000-8000-0000000000d1', 'Back Squat', 2);
+      insert into public.exercise_aliases (coach_id, raw_name, exercise_name) values ('${RON}', 'dl', 'Deadlift'), ('${OTHER}', 'dl', 'Deadlift');
+      insert into public.exercise_progressions (program_id, group_id, exercise_name, model, config, created_by) values
+        ('64000000-0000-4000-8000-0000000000a1', '${G1}', 'Deadlift', 'linear', '{"loser": true}', '${RON}'),
+        ('64000000-0000-4000-8000-0000000000a1', '${G1}', 'Conventional Deadlift', 'linear', '{"survivor": true}', '${RON}'),
+        ('64000000-0000-4000-8000-0000000000a1', '${G1}', 'Dips', 'linear', '{"only": true}', '${RON}');
+      insert into public.movement_patterns (id, created_by, name) values ('64000000-0000-4000-8000-0000000000e1', '${RON}', 'Hinge');
+      insert into public.movement_pattern_exercises (movement_pattern_id, exercise_name, difficulty_rank) values
+        ('64000000-0000-4000-8000-0000000000e1', 'Deadlift', 1), ('64000000-0000-4000-8000-0000000000e1', 'Conventional Deadlift', 2), ('64000000-0000-4000-8000-0000000000e1', 'Step Ups', 3);
+      insert into public.exercise_records (group_id, exercise_name, tracked_field, direction, value, athlete_id, achieved_at) values
+        ('${G1}', 'Dips', 'reps', 'higher_better', 10, '${ATH}', now());
+      insert into public.athlete_training_maxes (athlete_id, exercise_name, estimated_max, source_weight, source_reps, source_rpe) values ('${ATH}', 'Dips', 100, 80, 5, 8);
+      insert into public.athlete_equipment_load_ratios (athlete_id, exercise_name_a, exercise_name_b, ratio, sample_count) values ('${ATH}', 'Dips', 'Back Squat', 0.5, 3), ('${ATH}', 'Back Squat', 'Step Ups', 0.7, 2);
+      insert into public.game_score_entries (group_id, exercise_name, athlete_id, points, logged_by) values ('${G1}', 'Dips', '${ATH}', 5, '${RON}');
+      insert into public.posts (group_id, author_id, post_type, body, shared_exercise_names) values ('${G1}', '${RON}', 'user_post', 'x', array['Dips', 'Back Squat']);
+    `);
+    before64.snap = await snapshot64();
+  }
   const base = `apply/apply-step${s.n}-${s.slug}`;
   const rows = await pre(`${base}-precheck.sql`);
   const bad = rows.filter((r) => !r.ok).map((r) => r.check_name);
   check(`step ${s.n} (${s.slug}) precheck: ${rows.length} rows, all true` + (bad.length ? ` (FALSE: ${bad.join("; ")})` : ""), rows.length === s.rows && bad.length === 0);
   e = await run(`${base}.sql`);
   check(`step ${s.n} (${s.slug}) applies` + (e ? `: ${e}` : ""), !e);
+  if (s.n === "64") {
+    const one = async (sql) => (await db.query(sql)).rows[0];
+    const RON = "136394ed-f108-4283-bcb7-310a1ac6cbc8";
+    const OTHER = "00000000-0000-4000-8000-0000000000f1";
+    const G1 = "64000000-0000-4000-8000-000000000001";
+    // (the fixture ran before the apply; its "before" picture is taken from the undo below, which must return to it)
+    const after = await one(`select
+      (select count(*)::int from public.exercise_library where created_by = '${RON}') as ron_lib,
+      (select count(*)::int from public.exercise_library where created_by = '${RON}' and name in ('Deadlift', 'Conventional Deadlifts', 'Band Pull-Apart', 'Chin Ups', 'Dips', 'Dumbbell Lateral Raises', 'Farmer''s Carry', 'Lat Pull Down', 'Shoulder CARS', 'Sit Ups', 'Step Ups', 'Bulgarian Split Squats', 'Walking Lunges')) as losers_left,
+      (select count(*)::int from public.exercise_library where created_by = '${RON}' and youtube_url is not null) as videos,
+      (select count(*)::int from public.exercise_library where created_by = '${OTHER}') as other_lib,
+      (select count(*)::int from public.group_workout_exercises where group_id = '${G1}' and exercise_name = 'Conventional Deadlift') as cd,
+      (select count(*)::int from public.group_workout_exercises where group_id = '${G1}' and exercise_name = 'Dip') as dip,
+      (select count(*)::int from public.group_workout_exercises where group_id = '${G1}' and exercise_name in ('Deadlift', 'Conventional Deadlifts', 'Dips')) as gwe_left,
+      (select count(*)::int from public.group_workout_exercises where exercise_name = 'Deadlift' and group_id = '64000000-0000-4000-8000-000000000002') as other_gwe,
+      (select count(*)::int from public.group_workout_exercise_sets) as sets,
+      (select count(*)::int from public.session_exercises where exercise_name = 'Dip') as se_dip,
+      (select count(*)::int from public.exercise_progressions where exercise_name = 'Conventional Deadlift' and config ? 'survivor') as pr_survivor,
+      (select count(*)::int from public.exercise_progressions where exercise_name in ('Deadlift', 'Dips')) as pr_losers,
+      (select count(*)::int from public.exercise_progressions where exercise_name = 'Dip' and config ? 'only') as pr_dip,
+      (select string_agg(difficulty_rank::text, ',') from public.movement_pattern_exercises where movement_pattern_id = '64000000-0000-4000-8000-0000000000e1' and exercise_name = 'Conventional Deadlift') as mp_rank,
+      (select count(*)::int from public.movement_pattern_exercises where movement_pattern_id = '64000000-0000-4000-8000-0000000000e1' and exercise_name in ('Deadlift', 'Step Ups')) as mp_left,
+      (select count(*)::int from public.movement_pattern_exercises where movement_pattern_id = '64000000-0000-4000-8000-0000000000e1' and exercise_name = 'Step Up') as mp_step,
+      (select count(*)::int from public.exercise_records where exercise_name = 'Dip') as rec,
+      (select count(*)::int from public.athlete_training_maxes where exercise_name = 'Dip') as tm,
+      (select count(*)::int from public.athlete_equipment_load_ratios where exercise_name_a = 'Dip' and exercise_name_b = 'Back Squat') as lr_a,
+      (select count(*)::int from public.athlete_equipment_load_ratios where exercise_name_b = 'Step Up') as lr_b,
+      (select count(*)::int from public.game_score_entries where exercise_name = 'Dip') as gs,
+      (select string_agg(shared_exercise_names::text, '|') from public.posts where group_id = '${G1}') as post_names,
+      (select string_agg(exercise_name, ',') from public.exercise_aliases where coach_id = '${RON}' and raw_name = 'dl') as ron_dl,
+      (select string_agg(exercise_name, ',') from public.exercise_aliases where coach_id = '${OTHER}' and raw_name = 'dl') as other_dl,
+      (select string_agg(exercise_name, ',') from public.exercise_aliases where coach_id = '${RON}' and raw_name = 'Conventional Deadlifts') as ron_alias_cds,
+      (select string_agg(exercise_name, ',') from public.exercise_aliases where coach_id = '${RON}' and raw_name = 'Farmer''s Carry') as ron_alias_fc`);
+    check("step 64: the 13 duplicates are gone from Ron's library and 12 remain (the 12 survivors plus his other entries)", after.losers_left === 0, JSON.stringify(after));
+    check("step 64: every survivor keeps its video link", after.videos === 10);
+    check("step 64: another coach's library is untouched (same two names, same rows)", after.other_lib === 2 && after.other_gwe === 1 && after.other_dl === "Deadlift");
+    check("step 64: program exercises were renamed (3 Deadlift/Conventional Deadlifts to Conventional Deadlift, Dips to Dip) and every set is kept", after.cd === 3 && after.dip === 1 && after.gwe_left === 0 && after.sets === JSON.parse(before64.snap).sets, JSON.stringify(after));
+    check("step 64: sessions, records, maxes, ratios, game scores, PR list and shared names follow", after.se_dip === 1 && after.rec === 1 && after.tm === 1 && after.lr_a === 1 && after.lr_b === 1 && after.gs === 1 && after.post_names === "{Dip,\"Back Squat\"}");
+    check("step 64: where a program or pattern already had the survivor, the survivor row is kept and the duplicate is dropped", after.pr_survivor === 1 && after.pr_losers === 0 && after.pr_dip === 1 && after.mp_rank === "2" && after.mp_left === 0 && after.mp_step === 1, JSON.stringify(after));
+    check("step 64: Ron's aliases follow, and each duplicate's name becomes an alias of its survivor", after.ron_dl === "Conventional Deadlift" && after.ron_alias_cds === "Conventional Deadlift" && after.ron_alias_fc === "Farmers Carry");
+    const log = (await db.query("select tbl, count(*)::int as n from public.exercise_merge_log group by tbl")).rows;
+    check("step 64: the log says how many rows changed per table" + " (" + JSON.stringify(log) + ")", log.length >= 10);
+    // The undo returns everything to the state the fixture started from, and the step can be applied again.
+    const afterSnap = await snapshot64();
+    const eu64 = await run("apply/undo-step64-merge-duplicate-exercises.sql");
+    const undoneSnap = await snapshot64();
+    const undoneLeft = (await db.query("select to_regclass('public.exercise_merge_log') as a, to_regclass('public.exercise_merge_deleted') as b")).rows[0];
+    check("step 64: the undo runs, drops its log tables, and returns every table to exactly what it was before the merge" + (eu64 ? ": " + eu64 : ""), !eu64 && undoneLeft.a === null && undoneLeft.b === null && undoneSnap === before64.snap && undoneSnap !== afterSnap);
+    const undone = await one(`select
+      (select count(*)::int from public.exercise_library where created_by = '${RON}' and name in ('Deadlift', 'Conventional Deadlifts', 'Dips')) as lib,
+      (select count(*)::int from public.group_workout_exercises where group_id = '${G1}' and exercise_name in ('Deadlift', 'Conventional Deadlifts', 'Dips')) as gwe,
+      (select count(*)::int from public.exercise_progressions where exercise_name in ('Deadlift', 'Dips')) as pr,
+      (select count(*)::int from public.movement_pattern_exercises where movement_pattern_id = '64000000-0000-4000-8000-0000000000e1' and exercise_name in ('Deadlift', 'Step Ups')) as mp,
+      (select string_agg(exercise_name, ',') from public.exercise_aliases where coach_id = '${RON}' and raw_name = 'dl') as ron_dl,
+      (select count(*)::int from public.exercise_aliases where coach_id = '${RON}' and raw_name = 'Conventional Deadlifts') as added_alias,
+      (select string_agg(shared_exercise_names::text, '|') from public.posts where group_id = '${G1}') as post_names`);
+    check("step 64: after the undo the duplicates, their program rows, rules and pattern rows are back and the added aliases are gone", undone.lib === 3 && undone.gwe === 4 && undone.pr === 2 && undone.mp === 2 && undone.ron_dl === "Deadlift" && undone.added_alias === 0 && undone.post_names === "{Dips,\"Back Squat\"}", JSON.stringify(undone));
+    const reapply64 = await run("apply/apply-step64-merge-duplicate-exercises.sql");
+    check("step 64: applies again after the undo and gives the same result" + (reapply64 ? ": " + reapply64 : ""), !reapply64 && (await snapshot64()) === afterSnap);
+  }
   if (Number(s.n) >= 12) {
     // The newer steps: a precheck run again flags it as already applied, the undo file runs, and the step can then be applied again.
     const again = await pre(`${base}-precheck.sql`);
@@ -712,6 +855,24 @@ for (const s of steps) {
   check("release-u: the undo puts the older copy function back" + (euU ? ": " + euU : ""), !euU && !(await strips()));
   const errU2 = await run(`apply/${bundle.file}`);
   check("release-u: the bundle applies again after an undo" + (errU2 ? ": " + errU2 : ""), !errU2 && (await strips()));
+}
+// Release V (step 64): ONE paste. At this point step 64 is applied; take it back with its undo, then the bundle applies, a second run is refused naming step 64, the undo returns it, and it applies again.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-v");
+  check("release-v: ONE bundle holds step 64", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["64"]));
+  const st64 = steps.find((x) => x.n === "64");
+  const merged = async () => (await db.query("select to_regclass('public.exercise_merge_log') is not null as ok")).rows[0].ok === true;
+  const eu0 = await run(`apply/undo-step${st64.n}-${st64.slug}.sql`);
+  check("release-v: before the bundle runs nothing is merged" + (eu0 ? ": " + eu0 : ""), !eu0 && !(await merged()));
+  const errV = await run(`apply/${bundle.file}`);
+  check("release-v bundle applies on the live-shaped state" + (errV ? ": " + errV : ""), !errV && (await merged()));
+  const againV = await run(`apply/${bundle.file}`);
+  check("release-v: a second run is refused, naming step 64 (" + againV + ")", !!againV && againV.includes("step 64 (merge-duplicate-exercises) cannot run") && againV.includes("already applied"));
+  const euV = await run(`apply/undo-step${st64.n}-${st64.slug}.sql`);
+  check("release-v: the undo returns it" + (euV ? ": " + euV : ""), !euV && !(await merged()));
+  const errV2 = await run(`apply/${bundle.file}`);
+  check("release-v: the bundle applies again after an undo" + (errV2 ? ": " + errV2 : ""), !errV2 && (await merged()));
 }
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {

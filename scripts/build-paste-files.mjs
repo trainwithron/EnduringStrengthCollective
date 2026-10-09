@@ -1119,6 +1119,25 @@ alter table public.coach_availability_windows drop column if exists session_minu
     ],
   },
   {
+    n: "64",
+    slug: "merge-duplicate-exercises",
+    title: "merge Coach Ron's duplicate exercises into one entry each (13 duplicates into 12 survivors, Ron's library only; every set and log row is kept; undoable)",
+    migrations: [],
+    warn: "A one-time data change for Coach Ron's library ONLY. It rewrites the exercise name on his programs, his clients' sessions and records, his patterns, aliases and tags, saves the old duplicate names as aliases of the survivor, and deletes the duplicate library rows. Every changed or deleted row is saved first (exercise_merge_log, exercise_merge_deleted), and the undo file puts it all back. It refuses by itself if any of the 25 library entries is missing or if a name would clash.",
+    sees: "Success. No rows returned.",
+    afterwards: "Each duplicate (for example Deadlift and Conventional Deadlifts) is now Conventional Deadlift everywhere in Ron's programs and history, typing the old name still finds it (it is an alias), and the library lists each exercise once. To see how many rows changed per table: select tbl, col, count(*) from public.exercise_merge_log group by tbl, col order by tbl, col;",
+    bodySql: readFileSync(new URL("./release-v-merge.sql", import.meta.url), "utf8").replace(/\r\n/g, "\n").replace(/\s+$/, ""),
+    undo: readFileSync(new URL("./release-v-undo.sql", import.meta.url), "utf8").replace(/\r\n/g, "\n").replace(/\s+$/, ""),
+    undoWhy: "Only if the merge is wrong. Puts every changed name back, brings the duplicate library rows back, removes the aliases the merge added, and drops the two log tables.",
+    rows: [
+      ["Coach Ron's profile exists", "exists (select 1 from public.profiles where id = '136394ed-f108-4283-bcb7-310a1ac6cbc8')"],
+      ["all 13 duplicate names are in Coach Ron's library", "(select count(*) from public.exercise_library where created_by = '136394ed-f108-4283-bcb7-310a1ac6cbc8' and name = any (array['Deadlift', 'Conventional Deadlifts', 'Band Pull-Apart', 'Chin Ups', 'Dips', 'Dumbbell Lateral Raises', 'Farmer''s Carry', 'Lat Pull Down', 'Shoulder CARS', 'Sit Ups', 'Step Ups', 'Bulgarian Split Squats', 'Walking Lunges'])) = 13"],
+      ["all 12 survivor names are in Coach Ron's library", "(select count(*) from public.exercise_library where created_by = '136394ed-f108-4283-bcb7-310a1ac6cbc8' and name = any (array['Conventional Deadlift', 'Band Pull Apart', 'Chin-Up', 'Dip', 'Dumbbell Lateral Raise', 'Farmers Carry', 'Lat Pulldown', 'Shoulder CARs', 'Sit-Up', 'Step Up', 'Bulgarian Split Squat', 'Walking Lunge'])) = 12"],
+      ["the 10 survivors that Ron's video is on still have a video", "(select count(*) from public.exercise_library where created_by = '136394ed-f108-4283-bcb7-310a1ac6cbc8' and name = any (array['Conventional Deadlift', 'Band Pull Apart', 'Chin-Up', 'Dip', 'Dumbbell Lateral Raise', 'Farmers Carry', 'Lat Pulldown', 'Shoulder CARs', 'Sit-Up', 'Step Up']) and (video_path is not null or youtube_url is not null)) = 10"],
+      ["step 64 is not already applied (the merge log is not there yet)", "to_regclass('public.exercise_merge_log') is null"],
+    ],
+  },
+  {
     n: "63",
     slug: "0318",
     title: "0318 A program copy is named \"Program - Client\" without stacking: assigning a client's copy to someone else drops the old client's tail, and a name that already ends with this client gets nothing added (the copy function only; existing programs are not renamed)",
@@ -1382,6 +1401,7 @@ const BUNDLES = [
   { id: "release-s", name: "Release S (booking hours check, grouped counts, hide demos per person, the away preset reply)", steps: ["57", "58", "59", "60"] },
   { id: "release-t", name: "Release T (a program copy remembers its source; a package can open a group)", steps: ["61", "62"] },
   { id: "release-u", name: "Release U (copy names no longer stack)", steps: ["63"] },
+  { id: "release-v", name: "Release V (merge Coach Ron's duplicate exercises)", steps: ["64"] },
   { id: "release-n2", name: "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)", steps: ["49", "50"] },
   { id: "release-m", name: "Release M (acceptance record is append-only)", steps: ["44"] },
 ];
