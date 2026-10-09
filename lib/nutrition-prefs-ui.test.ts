@@ -16,7 +16,8 @@ describe("shorter food preferences, same safety", () => {
   it("old intolerances and dislikes show in one box and stay in their own stored fields", () => {
     expect(src).toContain("Things I don't want");
     expect(src).toContain("new Set([...prefs.intolerances, ...prefs.dislikes])");
-    expect(src).toContain("set({ dislikes: next.filter((x) => !prefs.intolerances.includes(x)), intolerances: prefs.intolerances.filter((x) => next.includes(x)) })");
+    expect(src).toContain("allergyKeysOf([x]).size > 0");
+    expect(src).toContain("intolerances: [...prefs.intolerances.filter((x) => next.includes(x)), ...freshIntolerances]");
     expect(src).not.toContain("allergies: next");
   });
   it("likes renamed, the notes box replaced by a one-line prompt on the same notes field", () => {

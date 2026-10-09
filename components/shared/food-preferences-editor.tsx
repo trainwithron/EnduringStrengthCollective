@@ -20,7 +20,7 @@ import {
   toggleAllergy,
   type NutritionPreferences,
 } from "@/lib/nutrition-preferences";
-import { ALLERGEN_KEYS } from "@/lib/allergen-check";
+import { ALLERGEN_KEYS, allergyKeysOf } from "@/lib/allergen-check";
 
 const field = "w-full h-11 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust";
 
@@ -185,7 +185,16 @@ export function FoodPreferencesEditor({
         label="Things I don't want"
         hint="Kept out of plans. For an allergy, use the buttons above."
         items={unwanted}
-        onChange={(next) => set({ dislikes: next.filter((x) => !prefs.intolerances.includes(x)), intolerances: prefs.intolerances.filter((x) => next.includes(x)) })}
+        onChange={(next) => {
+          // A new entry that names an allergen food (gluten, dairy...) goes where an intolerance always went, so the rules that read intolerances (such as hiding oats for gluten) still see it.
+          const fresh = next.filter((x) => !unwanted.includes(x));
+          const freshIntolerances = fresh.filter((x) => allergyKeysOf([x]).size > 0);
+          const freshDislikes = fresh.filter((x) => allergyKeysOf([x]).size === 0);
+          set({
+            intolerances: [...prefs.intolerances.filter((x) => next.includes(x)), ...freshIntolerances],
+            dislikes: [...prefs.dislikes.filter((x) => next.includes(x) && !prefs.intolerances.includes(x)), ...freshDislikes],
+          });
+        }}
         placeholder="For example mushrooms, lactose, liver"
       />
       <div>
