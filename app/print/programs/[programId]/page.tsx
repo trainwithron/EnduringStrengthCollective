@@ -104,7 +104,7 @@ export default async function PrintProgramPage(props: { params: Promise<{ progra
         <p className="text-sm">
           {forName ? `${forName} · ` : ""}Printed {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: printedZone })}
         </p>
-        {program.description && <p className="text-sm mt-1">{program.description}</p>}
+        {program.description && <p className="text-sm mt-1"><span className="font-semibold">Description: </span>{program.description}</p>}
       </header>
 
       {weeks.length === 0 && <p className="text-sm">There are no workouts to print yet.</p>}

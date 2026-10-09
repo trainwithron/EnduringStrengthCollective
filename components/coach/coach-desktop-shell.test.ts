@@ -16,7 +16,7 @@ describe("coach desktop shell", () => {
     const navStart = shell.indexOf("const nav: NavEntry[] = [");
     const navEnd = shell.indexOf("const groupHasActiveChild");
     const nav = shell.slice(navStart, navEnd);
-    const order = ['label: "Clients"', 'label: "Calendar"', 'label: "Messages"', 'label: "Programming"', 'label: "Nutrition"', 'label: "Business"', 'label: "More tools"'];
+    const order = ['label: "Clients"', 'label: "Calendar"', 'label: "Messages"', 'label: "Programming"', 'label: "Nutrition"', 'label: "Business"', 'label: "Group"', 'label: "More tools"'];
     let last = -1;
     for (const marker of order) {
       const at = nav.indexOf(marker);
@@ -25,8 +25,23 @@ describe("coach desktop shell", () => {
     }
     // the duplicate Dashboard and the rarely used tools are not top-level any more
     expect(nav.indexOf('label: "Dashboard"')).toBe(-1);
-    expect(nav.indexOf('label: "Zapier"')).toBeGreaterThan(nav.indexOf('label: "More tools"'));
-    expect(nav.indexOf('label: "Hall of Fame"')).toBeGreaterThan(nav.indexOf('label: "More tools"'));
+    // Business holds the business tools, Group holds the group's own pages (Members first), More tools is only Support, Resources and Quick Tips
+    const at = (m: string) => nav.indexOf(m);
+    for (const m of ['label: "Booking Page"', 'label: "Waiver"', 'label: "Leads"', 'label: "Session Ledger"', 'label: "Organization"', 'label: "SMS Notifications"', 'label: "Zapier"']) {
+      expect(at(m), m).toBeGreaterThan(at('label: "Business"'));
+      expect(at(m), m).toBeLessThan(at('label: "Group"'));
+    }
+    const groupFirst = at('label: "Members"');
+    expect(groupFirst).toBeGreaterThan(at('label: "Group"'));
+    expect(groupFirst).toBeLessThan(at('label: "Group dashboard"'));
+    for (const m of ['label: "Group dashboard"', 'label: "Team Performance"', 'label: "Team Feed"', 'label: "Group Sessions"', 'label: "Challenges"', 'label: "Hall of Fame"']) {
+      expect(at(m), m).toBeGreaterThan(at('label: "Group"'));
+      expect(at(m), m).toBeLessThan(at('label: "More tools"'));
+    }
+    for (const m of ['label: "Support"', 'label: "Resources"', 'label: "Quick Tips"']) expect(at(m), m).toBeGreaterThan(at('label: "More tools"'));
+    expect(nav.slice(at('label: "More tools"')).match(/\{ key: "/g)?.length).toBe(3);
+    // Members is no longer a rail icon of its own
+    expect(nav.indexOf('{ key: "members" as const, label: "Members"')).toBeGreaterThan(at('label: "Group"'));
   });
   it("the business name is a menu and a coach-level page shows it as the title", () => {
     expect(shell).toContain("<WorkspaceMenu");

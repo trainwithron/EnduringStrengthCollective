@@ -244,7 +244,10 @@ export function ProgramBuilderDesktop({
           <SaveStatusBar />
         </div>
         {programDescription && (
-          <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">{programDescription}</p>
+          <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
+            <span className="uppercase tracking-wide text-xs">Description: </span>
+            {programDescription}
+          </p>
         )}
         <div className="flex flex-wrap gap-3 mt-4">
           <Link
