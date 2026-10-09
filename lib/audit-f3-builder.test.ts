@@ -30,6 +30,13 @@ describe("the program builder header", () => {
   });
 });
 
+describe("a program's description is labelled", () => {
+  it("is shown with a visible label in the builder and on the printed page (an unlabeled \"In Home\" read as stray text)", () => {
+    expect(read("components/coach/desktop/program-builder-desktop.tsx")).toContain("Description: ");
+    expect(read("app/print/programs/[programId]/page.tsx")).toContain("Description: ");
+  });
+});
+
 describe("exercise details and phone targets", () => {
   it("the video upload is a styled button, with small bordered Remove buttons", () => {
     const picker = read("components/coach/exercise-media-picker.tsx");

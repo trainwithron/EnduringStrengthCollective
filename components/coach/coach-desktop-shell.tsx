@@ -22,6 +22,7 @@ import {
   Globe,
   Link2,
   Users2,
+  UsersRound,
   Home,
   MonitorPlay,
   Activity,
@@ -416,7 +417,6 @@ function CoachDesktopShellFull({
     // Everything else is under "More tools". The old group Dashboard entry is gone from the rail (Home is the dashboard); it is under More tools.
     // Clients is always the coach's full list, wherever they are. A team or social group's own roster is a separate "Members" entry, shown only inside such a group.
     { key: "clients", label: "Clients", href: CLIENTS_HREF, icon: Users, badge: clientsUnread, termKey: "client", termForm: "plural" },
-    ...(showsMembers(groupKind, coachLevel) ? [{ key: "members" as const, label: "Members", href: membersHref(groupId), icon: Users2 }] : []),
     { key: "calendar", label: "Calendar", href: `/groups/${groupId}/calendar`, icon: CalendarDays },
     { key: "messages", label: "Messages", href: `/groups/${groupId}/messages`, icon: Mail, badge: messagesUnread },
     {
@@ -438,12 +438,21 @@ function CoachDesktopShellFull({
         { key: "website", label: "My website", href: `/groups/${groupId}/business/website`, icon: Globe },
         { key: "availability", label: "Availability", href: `/groups/${groupId}/availability`, icon: CalendarClock },
         { key: "session-types", label: "Session Types", href: `/groups/${groupId}/business/session-types`, icon: Tag },
+        { key: "booking-page", label: "Booking Page", href: `/groups/${groupId}/business/booking-page`, icon: Link2 },
+        { key: "waiver", label: "Waiver", href: `/groups/${groupId}/business/waiver`, icon: ClipboardList },
+        { key: "leads", label: "Leads", href: `/groups/${groupId}/business/leads`, icon: UserPlus },
+        { key: "session-ledger", label: "Session Ledger", href: `/groups/${groupId}/business/session-ledger`, icon: Wallet },
+        { key: "branding", label: "Organization", href: `/groups/${groupId}/branding`, icon: Palette },
+        { key: "sms-settings", label: "SMS Notifications", href: `/groups/${groupId}/business/sms-settings`, icon: MessageCircle },
+        { key: "zapier", label: "Zapier", href: `/groups/${groupId}/business/zapier`, icon: Zap },
       ],
     },
+    // The group's own tools. Members (a team or social group's own roster) and the team pages show only where they apply; nothing here is removed, only regrouped.
     {
-      label: "More tools",
-      icon: MoreHorizontal,
+      label: "Group",
+      icon: UsersRound,
       items: [
+        ...(showsMembers(groupKind, coachLevel) ? [{ key: "members" as const, label: "Members", href: membersHref(groupId), icon: Users2 }] : []),
         { key: "dashboard", label: "Group dashboard", href: `/groups/${groupId}/dashboard`, icon: LayoutDashboard },
         { key: "team-performance", label: "Team Performance", href: `/groups/${groupId}/team-performance`, icon: Activity },
         ...(groupKind !== null && groupKind !== "one_on_one"
@@ -455,17 +464,16 @@ function CoachDesktopShellFull({
               { key: "team-calendar" as const, label: "Team Calendar", href: `/groups/${groupId}/team/calendar`, icon: CalendarDays },
             ]
           : []),
-        { key: "waiver", label: "Waiver", href: `/groups/${groupId}/business/waiver`, icon: ClipboardList },
-        { key: "booking-page", label: "Booking Page", href: `/groups/${groupId}/business/booking-page`, icon: Link2 },
         { key: "group-sessions", label: "Group Sessions", href: `/groups/${groupId}/group-sessions`, icon: Users2 },
-        { key: "leads", label: "Leads", href: `/groups/${groupId}/business/leads`, icon: UserPlus },
-        { key: "sms-settings", label: "SMS Notifications", href: `/groups/${groupId}/business/sms-settings`, icon: MessageCircle },
-        { key: "zapier", label: "Zapier", href: `/groups/${groupId}/business/zapier`, icon: Zap },
-        { key: "session-ledger", label: "Session Ledger", href: `/groups/${groupId}/business/session-ledger`, icon: Wallet },
-        { key: "branding", label: "Organization", href: `/groups/${groupId}/branding`, icon: Palette },
-        { key: "support", label: "Support", href: `/groups/${groupId}/business/support`, icon: HeartHandshake },
         { key: "challenges", label: "Challenges", href: `/groups/${groupId}/challenges`, icon: Flag },
         { key: "records", label: "Hall of Fame", href: `/groups/${groupId}/records`, icon: Trophy },
+      ],
+    },
+    {
+      label: "More tools",
+      icon: MoreHorizontal,
+      items: [
+        { key: "support", label: "Support", href: `/groups/${groupId}/business/support`, icon: HeartHandshake },
         { key: "resources", label: "Resources", href: `/groups/${groupId}/resources`, icon: HeartHandshake },
         { key: "quick-tips", label: "Quick Tips", href: `/groups/${groupId}/quick-tips`, icon: Lightbulb },
       ],
