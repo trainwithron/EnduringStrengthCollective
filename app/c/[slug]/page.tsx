@@ -33,12 +33,14 @@ async function load(slugParam: string, preview: boolean) {
 
   const [{ data: profile }, { data: membership }, { data: packages }, { data: shop }] = await Promise.all([
     db.from("profiles").select("full_name").eq("id", page.coach_id).maybeSingle(),
-    db.from("organization_memberships").select("organization_id, role").eq("profile_id", page.coach_id).in("role", ["owner", "admin"]).limit(1).maybeSingle(),
+    db.from("organization_memberships").select("organization_id, role").eq("profile_id", page.coach_id).in("role", ["owner", "admin"]).limit(5),
     db.from("coach_packages").select("id, name, sessions_per_week, billing_type, sessions_granted, rate_cents").eq("coach_id", page.coach_id).eq("is_active", true).eq("is_public", true).order("sessions_per_week", { ascending: true }).limit(6),
     db.from("pro_shop_links").select("id, title, description, url, image_url").eq("coach_id", page.coach_id).eq("featured", true).order("sort_order", { ascending: true }).limit(3),
   ]);
-  const { data: org } = membership?.organization_id
-    ? await db.from("organizations").select("name, accent_color, background_color, text_color, font_display, font_body, logo_url").eq("id", membership.organization_id).maybeSingle()
+  // A coach who owns one organization and only helps run another shows their own: the owner role first.
+  const ownedFirst = [...(membership ?? [])].sort((a, b) => Number(b.role === "owner") - Number(a.role === "owner"))[0];
+  const { data: org } = ownedFirst?.organization_id
+    ? await db.from("organizations").select("name, accent_color, background_color, text_color, font_display, font_body, logo_url").eq("id", ownedFirst.organization_id).maybeSingle()
     : { data: null };
 
   const content = cleanSite({
