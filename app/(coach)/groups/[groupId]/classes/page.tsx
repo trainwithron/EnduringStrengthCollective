@@ -5,7 +5,7 @@ import { ClassesList, type ClassCard } from "@/components/athlete/classes-list";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { getGroupCoachTimezone } from "@/lib/timezone";
 
-// A client's Classes page: the coach's small-group sessions, spots left, one tap to join. Needs migration 0263.
+// A client's Group sessions page: the coach's small-group sessions, spots left, one tap to join. Needs migration 0263.
 export default async function ClassesPage(props: { params: Promise<{ groupId: string }> }) {
   const params = await props.params;
   const supabase = await createServerClient();
@@ -70,7 +70,7 @@ export default async function ClassesPage(props: { params: Promise<{ groupId: st
         <Link href={`/groups/${params.groupId}`} className="font-body text-xs text-steel uppercase tracking-wide">
           &larr; Home
         </Link>
-        <h1 className="font-display font-bold text-3xl uppercase leading-none mt-3">Classes</h1>
+        <h1 className="font-display font-bold text-3xl uppercase leading-none mt-3">Group sessions</h1>
         <p className="font-body text-sm text-steel mt-2">Small-group sessions with your coach. Tap to join.</p>
         <div className="mt-6">
           {notReady ? (

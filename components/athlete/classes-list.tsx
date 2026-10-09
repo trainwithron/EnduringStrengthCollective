@@ -1,5 +1,6 @@
 "use client";
 
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatInTimezone } from "@/lib/format-in-timezone";
@@ -27,6 +28,7 @@ export function ClassesList({ classes, balance, timezone, nowIso }: { classes: C
   const now = new Date(nowIso);
 
   async function act(id: string, action: "join" | "leave") {
+    if (action === "leave" && !(await confirmDialog({ message: "Leave this group session?", confirmLabel: "Leave", cancelLabel: "Stay" }))) return;
     setBusy(id);
     setMessage(null);
     try {
@@ -69,8 +71,8 @@ export function ClassesList({ classes, balance, timezone, nowIso }: { classes: C
                   onClick={() => act(c.id, view.action === "leave" ? "leave" : "join")}
                   className={
                     view.action === "leave"
-                      ? "border border-steel/40 text-chalk font-body text-sm px-4 py-2 disabled:opacity-40"
-                      : "bg-rust text-graphite font-display font-bold uppercase tracking-wide px-4 py-2 disabled:opacity-40"
+                      ? "min-h-11 border border-steel/40 text-chalk font-body text-sm px-4 disabled:opacity-40"
+                      : "min-h-11 bg-rust text-graphite font-display font-bold uppercase tracking-wide px-4 disabled:opacity-40"
                   }
                 >
                   {busy === c.id ? "One moment…" : view.label}

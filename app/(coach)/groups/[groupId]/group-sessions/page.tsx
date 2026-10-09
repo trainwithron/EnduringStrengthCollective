@@ -106,7 +106,7 @@ export default async function GroupSessionsPage(props: { params: Promise<{ group
       <div className="pb-6 border-b border-steel/20 mb-6">
         <h1 className="font-display font-bold text-3xl uppercase leading-none">Group Sessions</h1>
         <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
-          Small classes with a number of spots. Your clients see them on their Classes page and join with one tap; when it is full, the next
+          Small groups with a number of spots. Your clients see them on their Group sessions page and join with one tap; when it is full, the next
           people wait and move in if someone leaves.
         </p>
       </div>

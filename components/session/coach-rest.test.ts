@@ -45,9 +45,12 @@ describe("a coach-prescribed rest is the only option for that set", () => {
     expect(builder).toMatch(/up to 30:00\)\."\);\s*return false;/);
     expect(builder).toContain("seconds?`)) return false;");
   });
-  it("the client's own Rest cell keeps its unit: the shared label is 'Rest (s)'", () => {
+  it("the client's own Rest cell is typed and shown as m:ss, like the coach's, under the one label 'Rest'", () => {
     const fields = src("../../lib/exercise-fields.ts");
-    expect(fields).toContain('{ key: "rest", label: "Rest (s)", kind: "number" }');
+    expect(fields).toContain('{ key: "rest", label: "Rest", kind: "number" }');
+    const grid = src("../logging/exercise-set-grid.tsx");
+    expect(grid).toContain('field === "rest" && typeof v === "number" ? formatRest(v)');
+    expect(grid).toContain("parseRestInput(draft, MAX_REST_SECONDS)");
   });
   it("the interval generator writes no rest (null), never 0, when a generated week has none", () => {
     const dup = src("../coach/desktop/duplicate-week-panel.tsx");

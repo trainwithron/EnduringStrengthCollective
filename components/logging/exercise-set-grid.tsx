@@ -3,7 +3,7 @@
 import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useEffect, useRef, useState } from "react";
 import { useSetSave } from "./set-save-context";
-import { validateSetFieldInput } from "@/lib/set-field-validation";
+import { validateSetFieldInput, type SetFieldValidation } from "@/lib/set-field-validation";
 import type { SetLogEntry } from "@/lib/types";
 import {
   ACTUAL_COLUMN,
@@ -17,7 +17,7 @@ import { parseNumericReps } from "@/lib/program-card-visuals";
 import { isExerciseUnlocked, type PriorBest } from "@/lib/obstacle-unlock";
 import { Check, Lock, LockOpen } from "lucide-react";
 import { InfoTip } from "@/components/shared/info-tip";
-import { formatRest, restForSet } from "@/lib/rest-time";
+import { MAX_REST_SECONDS, formatRest, parseRestInput, restForSet } from "@/lib/rest-time";
 
 // Metrics-as-rows, sets-as-columns — one row per tracked field (Reps,
 // Weight, RPE, ...), one cell per set, scrolling horizontally instead of
@@ -116,15 +116,18 @@ function GridCell({
   const value = set[prop];
   const { save, failedIds } = useSetSave();
   const unsaved = failedIds.has(set.id);
-  const [draft, setDraft] = useState(value === null || value === undefined ? "" : String(value));
+  // A rest is typed and shown as m:ss (90 shows as 1:30), the same as the rest the coach sets; every other field is the plain number.
+  const shown = (v: unknown) => (v === null || v === undefined ? "" : field === "rest" && typeof v === "number" ? formatRest(v) : String(v));
+  const [draft, setDraft] = useState(shown(value));
   // A value that can't be saved (RPE 89, 5.5 reps) stays on screen with the
   // reason, instead of silently reverting or being saved as nonsense.
   const [invalid, setInvalid] = useState<string | null>(null);
   const def = fieldDef(field);
-  const isNumeric = def.kind === "number" || field === "reps"; // logged reps is always a real integer
+  const isNumeric = (def.kind === "number" || field === "reps") && field !== "rest"; // logged reps is always a real integer
 
   useEffect(() => {
-    setDraft(value === null || value === undefined ? "" : String(value));
+    setDraft(shown(value));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
   // Weight's placeholder is the correlating-history suggestion (already
@@ -137,12 +140,8 @@ function GridCell({
       ? parseNumericReps((set[TARGET_PROP.reps as keyof SetLogEntry] as string | null) ?? null)
       : (set[TARGET_PROP[field] as keyof SetLogEntry] as number | string | null | undefined) ?? null;
 
-  const placeholder =
-    suggestion !== null && suggestion !== undefined
-      ? field === "weight"
-        ? `${suggestion} lbs`
-        : `${suggestion} (target)`
-      : "—";
+  // Just the number: the row's label already says what it is, and a longer hint does not fit in the cell.
+  const placeholder = field === "rest" ? "m:ss" : suggestion !== null && suggestion !== undefined ? String(suggestion) : "—";
 
   // What the obstacle-unlock mechanic protects — NOT the same thing as
   // `suggestion` above, which the server deliberately nulls out the
@@ -185,7 +184,13 @@ function GridCell({
 
   function handleBlur() {
     // Focusing and leaving a cell is the athlete confirming this set.
-    const checked = validateSetFieldInput(field, draft);
+    const checked: SetFieldValidation =
+      field === "rest"
+        ? (() => {
+            const r = parseRestInput(draft, MAX_REST_SECONDS);
+            return r.ok ? { ok: true as const, value: r.seconds } : { ok: false as const, message: "Rest needs a time like 1:30." };
+          })()
+        : validateSetFieldInput(field, draft);
     if (!checked.ok) {
       setInvalid(checked.message);
       return;
@@ -213,7 +218,7 @@ function GridCell({
   if (field === "rest" && coachRest != null) {
     return (
       <div
-        className="w-16 h-10 shrink-0 flex items-center justify-center rounded-token-pill bg-surface/40 border border-steel/20 text-chalk font-body text-sm tabular-nums"
+        className="w-16 h-11 shrink-0 flex items-center justify-center rounded-token-pill bg-surface/40 border border-steel/20 text-chalk font-body text-sm tabular-nums"
         aria-label={`Rest after set ${setNumber}: ${formatRest(coachRest)}, set by your coach`}
       >
         {formatRest(coachRest)}
@@ -222,7 +227,7 @@ function GridCell({
   }
 
   return (
-    <div className="relative w-16 h-10 shrink-0">
+    <div className="relative w-16 h-11 shrink-0">
       <input
         type={isNumeric ? "number" : "text"}
         inputMode={isNumeric ? (field === "reps" ? "numeric" : "decimal") : undefined}
@@ -239,7 +244,7 @@ function GridCell({
         aria-invalid={invalid ? true : undefined}
         onBlur={handleBlur}
         {...swipe}
-        className={`w-16 h-10 rounded-token-pill font-body text-sm text-center focus:outline-none focus:border-rust disabled:opacity-60 touch-pan-y ${
+        className={`w-16 h-11 rounded-token-pill font-body text-sm text-center focus:outline-none focus:border-rust disabled:opacity-60 touch-pan-y ${
           unsaved ? "border-2 border-amber-400/70 " : ""
         }${
           invalid ? "border-2 border-rust " : ""
@@ -489,7 +494,7 @@ export function ExerciseSetGrid({
   function RowHandle({ field }: { field: TrackedField }) {
     const dragStartX = useRef<number | null>(null);
     const dragFired = useRef(false);
-    if (readOnly || sets.length < 2) return <div className="w-5 shrink-0" />;
+    if (readOnly || sets.length < 2) return <div className="w-8 shrink-0" />;
     return (
       <button
         type="button"
@@ -533,7 +538,7 @@ export function ExerciseSetGrid({
           vibrateConfirm();
           handlePropagateRow(field);
         }}
-        className="w-5 h-10 shrink-0 flex items-center justify-center touch-none cursor-grab active:cursor-grabbing group"
+        className="w-8 h-11 shrink-0 flex items-center justify-center touch-none cursor-grab active:cursor-grabbing group"
       >
         <span className="w-2.5 h-2.5 rounded-full bg-steel group-active:bg-rust group-active:scale-125 transition-transform" />
       </button>
@@ -560,7 +565,7 @@ export function ExerciseSetGrid({
       <div className="inline-flex flex-col gap-1.5 min-w-full">
         <div className="flex items-center gap-1.5">
           <div className="w-16 shrink-0" />
-          <div className="w-5 shrink-0" />
+          <div className="w-8 shrink-0" />
           {sets.map((set, i) => (
             <span key={set.id} className="w-16 shrink-0 text-center font-body text-xs text-steel">
               {i + 1}
@@ -604,7 +609,7 @@ export function ExerciseSetGrid({
 
         <div className="flex items-center gap-1.5">
           <span className="w-16 shrink-0 font-body text-xs text-steel truncate">Status</span>
-          <div className="w-5 shrink-0" />
+          <div className="w-8 shrink-0" />
           {sets.map((set) => {
             const isComplete = set.status === "completed";
             const isSkipped = set.status === "skipped";

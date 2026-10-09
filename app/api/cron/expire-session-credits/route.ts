@@ -100,9 +100,10 @@ async function handler(request: Request) {
       group_id: row.group_id,
       type: "credits_expired",
       body,
-      link_path: `/groups/${row.group_id}/settings`,
+      // The calendar is where a client's session balance shows (the settings page does not).
+      link_path: `/groups/${row.group_id}/calendar`,
     });
-    await sendPushToProfile(supabase, row.athlete_id, "Sessions expired", body, `/groups/${row.group_id}/settings`);
+    await sendPushToProfile(supabase, row.athlete_id, "Sessions expired", body, `/groups/${row.group_id}/calendar`);
 
     expiredCount++;
   }
