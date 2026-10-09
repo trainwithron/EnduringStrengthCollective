@@ -281,7 +281,7 @@ export function WeekGrid({
                 onDragEnd={() => setDraggedDayId(null)}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => handleDrop(day.id)}
-                className={`w-[320px] shrink-0 ${draggedDayId === day.id ? "opacity-50" : ""}`}
+                className={`w-[420px] max-w-full shrink-0 ${draggedDayId === day.id ? "opacity-50" : ""}`}
               >
                 <DayCard
                   day={day}
@@ -312,7 +312,7 @@ export function WeekGrid({
               type="button"
               onClick={handleAddDay}
               disabled={addDayBusy}
-              className="w-[320px] shrink-0 min-h-[120px] border border-dashed border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors disabled:opacity-40"
+              className="w-[220px] max-w-full shrink-0 min-h-[120px] border border-dashed border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors disabled:opacity-40"
             >
               + Day
             </button>

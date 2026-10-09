@@ -26,6 +26,8 @@ export function ProgrammingSpotterPanel({ programId, flags }: { programId: strin
   const [condition, setCondition] = useState("");
   const [preference, setPreference] = useState("");
   const [ignoredStopPrompt, setIgnoredStopPrompt] = useState<Set<string>>(new Set());
+  // With several suggestions the panel is one summary line; the list opens on Review.
+  const [expanded, setExpanded] = useState(false);
 
   const visible = flags.filter((f) => !handled.has(`${f.checkKind}::${f.patternKey}`));
   if (visible.length === 0) return null;
@@ -95,16 +97,29 @@ export function ProgrammingSpotterPanel({ programId, flags }: { programId: strin
           Programming Spotter
         </p>
         {visible.length > 1 && (
-          <button
-            type="button"
-            onClick={handleClearAll}
-            className="font-body text-xs text-steel uppercase tracking-wide active:text-chalk"
-          >
-            Clear all
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              aria-expanded={expanded}
+              className="font-body text-xs text-rust uppercase tracking-wide font-bold"
+            >
+              {expanded ? "Hide" : "Review"}
+            </button>
+            <button
+              type="button"
+              onClick={handleClearAll}
+              className="font-body text-xs text-steel uppercase tracking-wide active:text-chalk"
+            >
+              Clear all
+            </button>
+          </div>
         )}
       </div>
-      <div className="space-y-3">
+      {visible.length > 1 && !expanded && (
+        <p className="font-body text-sm text-chalk">{visible.length} things in this program are worth a look.</p>
+      )}
+      <div className={visible.length > 1 && !expanded ? "hidden" : "space-y-3"}>
         {visible.map((flag) => {
           const key = `${flag.checkKind}::${flag.patternKey}`;
           const busy = busyKey === key;

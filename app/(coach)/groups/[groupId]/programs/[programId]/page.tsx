@@ -271,14 +271,7 @@ async function CoachProgramBuilder({
 
   return (
     <CoachDesktopShell groupId={groupId} groupName={data.groupName} active="programs">
-      {data.dayProgress && (
-        <ProgramProgressBanner
-          programId={programId}
-          dayNumber={data.dayProgress.dayNumber}
-          totalDays={data.dayProgress.totalDays}
-          totalVolumeLbs={data.totalVolumeLbs}
-        />
-      )}
+      {/* The "Day N of M, you've moved X lbs" strip is for the client's own view of a program, not the coach's builder. */}
       <ProgrammingSpotterPanel programId={programId} flags={data.spotterFlags} />
       <ProgramBuilderDesktop
         programId={programId}

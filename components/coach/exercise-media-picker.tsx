@@ -165,7 +165,7 @@ export function ExerciseMediaPicker({
           <button
             type="button"
             onClick={handleRemoveVideo}
-            className="font-body text-xs text-steel active:text-rust transition-colors"
+            className="h-8 px-3 border border-steel/30 font-body text-xs text-steel active:border-rust active:text-rust transition-colors"
           >
             Remove
           </button>
@@ -190,16 +190,19 @@ export function ExerciseMediaPicker({
 
       {!videoPath && (
         <div>
-          <label className="font-body text-xs text-steel uppercase tracking-wide block mb-1">
+          {/* A styled button instead of the browser's raw "Choose File / No file chosen". */}
+          <label
+            className={`inline-flex items-center h-9 px-3 border border-steel/40 text-chalk font-body text-xs font-medium cursor-pointer active:border-rust active:text-rust focus-within:border-rust ${uploading ? "opacity-40 pointer-events-none" : ""}`}
+          >
             Upload video
+            <input
+              type="file"
+              accept="video/mp4,video/quicktime,video/webm"
+              onChange={handleFileChange}
+              disabled={uploading}
+              className="sr-only"
+            />
           </label>
-          <input
-            type="file"
-            accept="video/mp4,video/quicktime,video/webm"
-            onChange={handleFileChange}
-            disabled={uploading}
-            className="font-body text-xs text-steel w-full"
-          />
           {uploading && <p className="font-body text-xs text-steel mt-1">Uploading…</p>}
         </div>
       )}
@@ -230,7 +233,7 @@ export function ExerciseMediaPicker({
             setUrlDraft("");
             onChange({ youtubeUrl: null });
           }}
-          className="font-body text-xs text-steel active:text-rust transition-colors"
+          className="h-8 px-3 border border-steel/30 font-body text-xs text-steel active:border-rust active:text-rust transition-colors"
         >
           Remove YouTube link
         </button>

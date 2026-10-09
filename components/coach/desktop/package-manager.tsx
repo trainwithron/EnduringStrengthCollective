@@ -314,7 +314,7 @@ export function PackageManager({
             className="h-9 px-2 bg-surface border border-steel/30 text-chalk font-body text-xs"
           />
         </label>
-        {previewTotal && (
+        {previewTotal && name.trim() !== "" && (
           <p className="font-body text-xs text-steel">
             Client pays ${previewTotal}
             {billingType === "subscription" ? "/month" : " total"}

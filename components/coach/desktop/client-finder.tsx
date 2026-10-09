@@ -164,7 +164,7 @@ export function ClientFinder({ currentGroupId, align = "right" }: { currentGroup
                   className={`w-full text-left px-3 py-2.5 font-body text-sm text-chalk flex items-baseline justify-between gap-2 ${i === active ? "bg-graphite/60" : ""}`}
                 >
                   <span className="truncate">{c.fullName}</span>
-                  {showGroupNames && c.groupName && <span className="text-xs text-steel shrink-0 truncate max-w-[40%]">{c.groupName}</span>}
+                  {showGroupNames && c.groupName && <span className="text-xs text-steel min-w-0 truncate max-w-[60%]">{c.groupName}</span>}
                 </button>
               </li>
             ))}
