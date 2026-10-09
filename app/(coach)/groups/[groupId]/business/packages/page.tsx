@@ -4,6 +4,7 @@ import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
+import { isStripeConfigured } from "@/lib/stripe";
 import { PackageManager, type CoachPackageRow, type LinkableProgramOption } from "@/components/coach/desktop/package-manager";
 
 export default async function PackagesPage(
@@ -87,8 +88,9 @@ export default async function PackagesPage(
       <div className="pb-6 border-b border-steel/20 mb-6">
         <h1 className="font-display font-bold text-3xl uppercase leading-none">Packages</h1>
         <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
-          Define what you actually sell — a client sees these on their Billing page. Editing a
-          package&apos;s rate never changes what an existing subscriber is already paying.
+          {isStripeConfigured()
+            ? "Define what you actually sell — a client sees these on their Billing page."
+            : "Packages are for assigning to clients by hand until payments are turned on."}
         </p>
       </div>
 
