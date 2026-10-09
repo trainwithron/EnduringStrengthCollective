@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendPushToProfile } from "@/lib/send-push";
 import { formatInTimezone, timezoneForProfiles } from "@/lib/format-in-timezone";
+import { dateKeyInZone } from "@/lib/timezone";
 import { withCronRun } from "@/lib/cron-monitor";
 
 // acuity_replacement_gap_audit_sept16.md — waitlists. The instant "a
@@ -33,13 +34,12 @@ async function handler(request: Request) {
 
   let pushed = 0;
   for (const entry of toPush ?? []) {
-    const when = formatInTimezone(
-      entry.slot_start_at,
-      await timezoneForProfiles(supabase, [entry.athlete_id]),
-      "dateTime"
-    );
+    const athleteZone = await timezoneForProfiles(supabase, [entry.athlete_id]);
+    const when = formatInTimezone(entry.slot_start_at, athleteZone, "dateTime");
+    // The calendar day of the freed slot, as the client reads it, so the tap lands on that day's open times.
+    const slotDay = dateKeyInZone(athleteZone ?? "UTC", new Date(entry.slot_start_at));
     const body = `A spot just opened up for ${when} — book now before it's gone.`;
-    await sendPushToProfile(supabase, entry.athlete_id, "Waitlist spot open", body, `/groups/${entry.group_id}/calendar`);
+    await sendPushToProfile(supabase, entry.athlete_id, "Waitlist spot open", body, `/groups/${entry.group_id}/calendar/${slotDay}`);
     await supabase.from("booking_waitlist_entries").update({ push_sent_at: now.toISOString() }).eq("id", entry.id);
     pushed++;
   }

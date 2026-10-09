@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { mirrorGoogleCalendarEvent } from "@/lib/mirror-google-calendar-event";
+import { bookingRefusalMessage } from "@/lib/booking-refusal-copy";
 
 export function RescheduleSlotButton({
   bookingId,
@@ -33,16 +34,7 @@ export function RescheduleSlotButton({
     });
     setSubmitting(false);
     if (rpcError) {
-      const msg = rpcError.message ?? "";
-      setError(
-        /already asked/.test(msg)
-          ? "You already asked to move this session. Your coach has not answered yet."
-          : /outside your coach/.test(msg)
-          ? "That time is outside your coach's hours."
-          : /just taken/.test(msg)
-          ? "That slot was just taken. Try another."
-          : "That didn't send. Nothing was changed. Try again."
-      );
+      setError(bookingRefusalMessage(rpcError.message, "That didn't send. Nothing was changed. Try again."));
       router.refresh();
       return;
     }
@@ -66,7 +58,7 @@ export function RescheduleSlotButton({
     });
 
     if (rpcError) {
-      setError(/outside your coach/.test(rpcError.message ?? "") ? "That time is outside your coach's hours." : "That slot was just taken. Try another.");
+      setError(bookingRefusalMessage(rpcError.message));
       setSubmitting(false);
       router.refresh();
       return;

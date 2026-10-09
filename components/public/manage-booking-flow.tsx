@@ -74,18 +74,21 @@ export function ManageBookingFlow({
 
   const days = [...new Set((slots ?? []).map((s) => s.dateKey))];
   const times = (slots ?? []).filter((s) => s.dateKey === dateKey);
-  const cancelled = status !== "confirmed";
+  // Only a booking that was cancelled says so; one that is simply over (finished, or its time has passed) is not called cancelled.
+  const isCancelled = status === "cancelled";
+  const cancelled = isCancelled || status !== "confirmed" || new Date(startIso).getTime() < Date.now();
 
   return (
     <div className="max-w-lg mx-auto px-5 py-10">
       <p className="font-display uppercase text-sm tracking-wide text-steel">Your booking</p>
-      <h1 className="font-display font-bold text-3xl uppercase leading-none mt-2">{cancelled ? "Cancelled" : "You're booked"}</h1>
+      <h1 className="font-display font-bold text-3xl uppercase leading-none mt-2">{isCancelled ? "Cancelled" : cancelled ? "This session has passed" : "You're booked"}</h1>
       <p className="font-body text-base mt-4">
         Hi {guestName.split(" ")[0]}. {typeName ?? "Your session"} with {coachName}
         <br />
-        <span className={cancelled ? "text-steel line-through" : "text-chalk"}>{formatInTimezone(new Date(startIso), timezone, "dateTime")}</span>
+        <span className={isCancelled ? "text-steel line-through" : "text-chalk"}>{formatInTimezone(new Date(startIso), timezone, "dateTime")}</span>
       </p>
 
+      {cancelled && <p className="font-body text-sm text-steel mt-4">To book another time, contact {coachName}.</p>}
       {!cancelled && !canChange && reason && <p className="font-body text-sm text-steel mt-4">{reason}</p>}
 
       {!cancelled && canChange && mode === "view" && (

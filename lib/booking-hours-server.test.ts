@@ -18,7 +18,8 @@ describe("a client's own booking and move must stay inside the coach's hours (se
     expect(sql).not.toMatch(/revoke/i);
   });
   it("the screens turn the refusal into a plain sentence", () => {
-    expect(read("components/athlete/book-slot-button.tsx")).toContain("That time is outside your coach's hours.");
-    expect(read("components/athlete/reschedule-slot-button.tsx")).toMatch(/outside your coach[\s\S]*That time is outside your coach's hours\./);
+    expect(read("lib/booking-refusal-copy.ts")).toContain("That time is outside your coach's hours.");
+    expect(read("components/athlete/book-slot-button.tsx")).toContain("bookingRefusalMessage(");
+    expect(read("components/athlete/reschedule-slot-button.tsx")).toContain("bookingRefusalMessage(");
   });
 });

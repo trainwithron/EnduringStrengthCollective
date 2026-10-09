@@ -61,7 +61,7 @@ export function WaitlistJoinButton({
       .eq("athlete_id", athleteId)
       .eq("coach_id", coachId)
       .eq("slot_start_at", slotStartAt)
-      .eq("status", "waiting");
+      .in("status", ["waiting", "offered"]);
     setSubmitting(false);
     if (leaveError) {
       setError("Couldn't leave the waitlist.");
