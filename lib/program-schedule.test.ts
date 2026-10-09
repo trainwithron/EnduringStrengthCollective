@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeScheduledDates, isSameDay, isLocked, defaultTrainingDaysForCount } from "./program-schedule";
+import { computeScheduledDates, isSameDay, isLocked, defaultTrainingDaysForCount, unlockDate } from "./program-schedule";
 
 describe("computeScheduledDates", () => {
   it("walks forward through training days in order, skipping non-training days", () => {
@@ -97,5 +97,24 @@ describe("isLocked", () => {
 
   it("'full' never locks anything, no matter how far out", () => {
     expect(isLocked(new Date("2030-01-01T00:00:00"), today, "full")).toBe(false);
+  });
+});
+
+describe("unlockDate: the day a locked workout really opens", () => {
+  const workout = new Date("2026-10-20T00:00:00");
+  const key = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  it("day of: its own date; a week window: 7 days before; a month window: 30 days before", () => {
+    expect(key(unlockDate(workout, "day"))).toBe("2026-10-20");
+    expect(key(unlockDate(workout, "week"))).toBe("2026-10-13");
+    expect(key(unlockDate(workout, "month"))).toBe("2026-09-20");
+  });
+  it("is exactly the first day isLocked is false", () => {
+    for (const window of ["day", "week", "month"] as const) {
+      const open = unlockDate(workout, window);
+      const dayBefore = new Date(open);
+      dayBefore.setDate(dayBefore.getDate() - 1);
+      expect(isLocked(workout, open, window)).toBe(false);
+      expect(isLocked(workout, dayBefore, window)).toBe(true);
+    }
   });
 });

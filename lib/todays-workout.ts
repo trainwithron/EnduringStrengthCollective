@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { computeScheduledDates, isLocked, isSameDay } from "./program-schedule";
+import { computeScheduledDates, isLocked, isSameDay, unlockDate } from "./program-schedule";
 import { dateKeyInZone, getGroupCoachTimezone, nowInZone } from "./timezone";
 import { getActivePrograms, type ActiveProgram } from "./active-programs";
 import { buildSessionStack, type DaySessionCard, type ProgramToday, type StackFallback } from "./session-stack";
@@ -80,7 +80,7 @@ async function resolveProgramToday(
       if (next) {
         const nextDate = scheduledDateByDayId.get(next.id);
         after = isLocked(nextDate, now, program.visibilityWindow)
-          ? { kind: "locked", workoutId: next.id, unlocksOn: nextDate ?? null }
+          ? { kind: "locked", workoutId: next.id, unlocksOn: nextDate ? unlockDate(nextDate, program.visibilityWindow) : null }
           : { kind: "ready", workoutId: next.id, unlocksOn: null };
       }
       return { ...base, kind: "done_today", workoutId: todaysWorkout.id, title: todaysWorkout.title, unlocksOn: null, after };
@@ -91,7 +91,7 @@ async function resolveProgramToday(
     if (!next) return { ...base, kind: "all_done", workoutId: null, title: null, unlocksOn: null };
     const scheduledDate = scheduledDateByDayId.get(next.id);
     if (isLocked(scheduledDate, now, program.visibilityWindow)) {
-      return { ...base, kind: "locked", workoutId: next.id, title: next.title, unlocksOn: scheduledDate ?? null };
+      return { ...base, kind: "locked", workoutId: next.id, title: next.title, unlocksOn: scheduledDate ? unlockDate(scheduledDate, program.visibilityWindow) : null };
     }
     return { ...base, kind: "ready", workoutId: next.id, title: next.title, unlocksOn: null };
   }

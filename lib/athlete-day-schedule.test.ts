@@ -47,6 +47,20 @@ describe("resolveDayWorkout", () => {
     expect(result.status).toBe("locked");
   });
 
+  it("a locked workout says the day it really opens: its own date for Day of, a week or a month earlier otherwise", () => {
+    const future = new Date("2026-10-30T00:00:00");
+    const day = resolveDayWorkout(scheduled("2026-10-30"), new Set(), future, today, "day");
+    const week = resolveDayWorkout(scheduled("2026-10-30"), new Set(), future, today, "week");
+    const month = resolveDayWorkout(scheduled("2026-10-30"), new Set(), future, today, "month");
+    expect(day.status).toBe("locked");
+    expect(week.status).toBe("locked");
+    expect(month.status).toBe("locked");
+    const local = (d: Date | null | undefined) => (d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}` : null);
+    expect(local(day.unlocksOn)).toBe("2026-10-30");
+    expect(local(week.unlocksOn)).toBe("2026-10-23");
+    expect(local(month.unlocksOn)).toBe("2026-09-30");
+  });
+
   it("returns planned for a future workout inside a week visibility window", () => {
     const future = new Date("2026-09-15T00:00:00");
     const result = resolveDayWorkout(scheduled("2026-09-15"), new Set(), future, today, "week");
