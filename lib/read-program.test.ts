@@ -31,6 +31,26 @@ describe("deciding the parts from the size, before any read", () => {
   it("every part starts at a week", () => {
     for (const p of planParts(program(45))) expect(p.startsWith("Week ")).toBe(true);
   });
+  it("a 30,000-character program with no week lines is read as ONE part (never cut mid-week or mid-day)", () => {
+    const noWeeks = Array.from({ length: 500 }, (_, i) => `Squat day ${i}: Back Squat 4x5 at 70 percent with a long note to fill the line up nicely`).join("\n");
+    expect(noWeeks.length).toBeGreaterThan(READ_IN_TWO_UP_TO - 5000);
+    expect(planParts(noWeeks + "\n" + noWeeks.slice(0, 8000))).toHaveLength(1);
+  });
+  it("a program whose only week line is near the end is not cut mid-week", () => {
+    const body = Array.from({ length: 300 }, (_, i) => `Day ${i}: Back Squat 4x5 at 70 percent with a long note to fill the line up nicely`).join("\n");
+    const text = `Week 1\n${body}\nWeek 2\nDay 1: Deadlift 3x5`;
+    expect(text.length).toBeGreaterThan(READ_WHOLE_UP_TO);
+    const parts = planParts(text);
+    for (const p of parts) expect(p.startsWith("Week ")).toBe(true);
+    expect(parts.join("\n").replace(/\s+/g, " ")).toBe(text.replace(/\s+/g, " "));
+  });
+  it("with only a few week lines it makes fewer parts, each starting at a week", () => {
+    const text = [1, 2, 3].map((n) => week(n) + "\n" + Array.from({ length: 80 }, (_, i) => `extra line ${i} with some padding words here`).join("\n")).join("\n\n").repeat(1);
+    const bigText = text + "\n\n" + text.replace(/Week (\d)/g, "Week 1$1");
+    const parts = planParts(bigText);
+    expect(parts.length).toBeLessThanOrEqual(4);
+    for (const p of parts) expect(p.startsWith("Week ")).toBe(true);
+  });
 });
 
 describe("reading the parts at the same time", () => {

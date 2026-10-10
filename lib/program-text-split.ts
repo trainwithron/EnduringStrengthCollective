@@ -8,15 +8,35 @@ const MIN_SPLITTABLE = 1200;
 export const READ_WHOLE_UP_TO = 12000;
 export const READ_IN_TWO_UP_TO = 30000;
 
+// Planning the parts cuts ONLY at the start of a week ("Week 4", "Wk 4", "W4"): a part that began in the middle of a week or a day would not know which week and day it belongs to, and
+// the reader would number it from week 1 again. It picks the week starts nearest the ideal cut points (1/2, or 1/4, 1/2 and 3/4); with too few week starts it makes fewer parts, and with
+// none it does not cut at all (one read; if that is cut off the caller says so plainly).
+const WEEK_LINE = /^\s*(week|wk|w)\s*\d+/i;
+
 export function planParts(text: string): string[] {
   const t = text.trim();
   if (t.length <= READ_WHOLE_UP_TO) return [t];
-  const halves = splitProgramText(t);
-  if (!halves) return [t];
-  if (t.length <= READ_IN_TWO_UP_TO) return [halves[0], halves[1]];
-  const a = splitProgramText(halves[0]);
-  const b = splitProgramText(halves[1]);
-  return [...(a ?? [halves[0]]), ...(b ?? [halves[1]])];
+  const lines = t.split("\n");
+  const starts: number[] = [];
+  let offset = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (i > 0 && WEEK_LINE.test(lines[i])) starts.push(offset);
+    offset += lines[i].length + 1;
+  }
+  if (starts.length === 0) return [t];
+  const wanted = t.length <= READ_IN_TWO_UP_TO ? 2 : 4;
+  const n = Math.min(wanted, starts.length + 1);
+  const cuts: number[] = [];
+  for (let i = 1; i < n; i++) {
+    const ideal = (t.length * i) / n;
+    const free = starts.filter((s) => !cuts.includes(s));
+    if (free.length === 0) break;
+    cuts.push(free.reduce((best, s) => (Math.abs(s - ideal) < Math.abs(best - ideal) ? s : best)));
+  }
+  cuts.sort((a, b) => a - b);
+  const edges = [0, ...cuts, t.length];
+  const parts = edges.slice(0, -1).map((from, i) => t.slice(from, edges[i + 1]).trim()).filter(Boolean);
+  return parts.length > 0 ? parts : [t];
 }
 
 export function splitProgramText(text: string): [string, string] | null {
