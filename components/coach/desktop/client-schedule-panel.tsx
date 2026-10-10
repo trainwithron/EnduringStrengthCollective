@@ -15,6 +15,8 @@ import { coachCreditSentence } from "@/lib/credit-sentence";
 import { ledgerTotals } from "@/lib/credit-ledger-totals";
 import { pageAll } from "@/lib/page-all";
 import type { DraggedClient } from "./draggable-client-name";
+import { setClientBalance } from "@/lib/balance-input";
+import { EditableBalance } from "@/components/coach/editable-balance";
 
 interface BookingRow {
   id: string;
@@ -120,6 +122,26 @@ export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client
     load().catch(() => {});
   }
 
+  // A number typed into the sessions-left box: the same set-balance path as the Set balance box. Raising it asks nothing; lowering it asks once.
+  async function typeBalance(next: number): Promise<number | null> {
+    if (!groupId) return null;
+    if (next < balance && !await confirmDialog({ message: `Set ${client.fullName}'s ${noun.plural} from ${balance} to ${next}? This is recorded in their session ledger.`, confirmLabel: "Set balance" })) return null;
+    setAdjusting(true);
+    setError(null);
+    setAddedNote(null);
+    const result = await setClientBalance(createBrowserClient(), { athleteId: client.athleteId, groupId, target: next, current: balance });
+    setAdjusting(false);
+    if (result == null) {
+      setError("That didn't save. Nothing was changed.");
+      return null;
+    }
+    setBalance(result);
+    if (result > balance) setAddedNote(`Balance is now ${result}.`);
+    router.refresh();
+    load().catch(() => {});
+    return result;
+  }
+
   async function cancel(b: BookingRow) {
     if (!await confirmDialog("Cancel this session? Anything already taken for it goes back to their sessions.")) return;
     setBusyId(b.id);
@@ -154,7 +176,7 @@ export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client
             <button type="button" onClick={() => adjustCredits(-1)} disabled={adjusting} aria-label={`Remove a ${noun.singular} from ${client.fullName}`} className="w-6 h-6 border border-steel/30 text-steel disabled:opacity-40">
               &minus;
             </button>
-            <span className="text-chalk w-6 text-center">{balance}</span>
+            <EditableBalance value={balance} label={`${t("session", "plural", { cap: true })} left for ${client.fullName}`} className="text-chalk min-w-6 text-center" disabled={adjusting} onCommit={typeBalance} />
             <button type="button" onClick={() => adjustCredits(1)} disabled={adjusting} aria-label={`Add a ${noun.singular} to ${client.fullName}`} className="w-6 h-6 border border-steel/30 text-steel disabled:opacity-40">
               +
             </button>

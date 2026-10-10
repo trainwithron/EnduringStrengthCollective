@@ -5,6 +5,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { checkAndNotifyLowSessionBalance } from "@/lib/notify-low-session-balance";
+import { setClientBalance } from "@/lib/balance-input";
+import { EditableBalance } from "@/components/coach/editable-balance";
 
 export function SessionCreditsControl({
   athleteId,
@@ -19,6 +21,23 @@ export function SessionCreditsControl({
   const [balance, setBalance] = useState(initialBalance);
   const [error, setError] = useState<string | null>(null);
   const [addedNote, setAddedNote] = useState<string | null>(null);
+
+  // A number typed into the box: the same set-balance path as the Set balance box. Raising it asks nothing; lowering it asks once.
+  async function typeBalance(next: number): Promise<number | null> {
+    if (next < balance && !await confirmDialog({ message: `Set this client's balance from ${balance} to ${next}? This is recorded in their session ledger.`, confirmLabel: "Set balance" })) return null;
+    setError(null);
+    setAddedNote(null);
+    const result = await setClientBalance(createBrowserClient(), { athleteId, groupId, target: next, current: balance });
+    if (result == null) {
+      setError("That change didn't save. The balance is back to what it was.");
+      return null;
+    }
+    if (result > balance) setAddedNote(`Balance is now ${result}.`);
+    setBalance(result);
+    router.refresh();
+    if (next < balance) checkAndNotifyLowSessionBalance(athleteId, groupId);
+    return result;
+  }
 
   async function adjust(delta: number) {
     // A balance is money the client paid for. One stray tap on a small
@@ -75,7 +94,7 @@ export function SessionCreditsControl({
         >
           &minus;
         </button>
-        <span className="font-display text-lg min-w-6 text-center">{balance}</span>
+        <EditableBalance value={balance} label="Sessions left" className="font-display text-lg min-w-6 text-center" onCommit={typeBalance} />
         {balance < 0 && <span className="font-body text-xs text-rust">Owed {Math.abs(balance)}</span>}
         <button
           type="button"
