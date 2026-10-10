@@ -19,7 +19,7 @@ describe("package manager", () => {
 
 describe("assigning a program from a client's profile", () => {
   it("has the same start-date field as the Programs page, and one name", () => {
-    const menu = read("components/coach/client-programming-menu.tsx");
+    const menu = read("components/coach/client-program-actions.tsx");
     expect(menu).toContain("startDate: startDate || undefined");
     expect(menu).toContain("Start date");
     expect(menu).toContain("Assign program\n");

@@ -34,7 +34,7 @@ import { ClientTagAssignmentControl } from "@/components/coach/client-tag-assign
 import { DeleteClientControl } from "@/components/coach/delete-client-control";
 import { SetAsideControl } from "@/components/coach/set-aside-control";
 import { AddSocialOnlyMembershipControl } from "@/components/coach/add-social-only-membership-control";
-import { ClientProgrammingMenu } from "@/components/coach/client-programming-menu";
+import { ClientProgramActions } from "@/components/coach/client-program-actions";
 import { ClientMessagesSection } from "@/components/coach/desktop/client-messages-section";
 import { ClientCalendarSection } from "@/components/coach/desktop/client-calendar-section";
 import { MinorConsentControl } from "@/components/coach/minor-consent-control";
@@ -904,14 +904,20 @@ export default async function AthleteProfilePage(
             groupId={params.groupId}
             athleteId={params.athleteId}
             actions={
-              <div className="flex flex-wrap items-center gap-2 mb-4">
-                <ClientProgrammingMenu groupId={params.groupId} athleteId={params.athleteId} athleteFullName={profile?.full_name ?? "Client"} />
-                <Link
-                  href={`/groups/${params.groupId}/athletes/${params.athleteId}/log`}
-                  className="inline-flex items-center h-9 font-body text-xs text-chalk border border-steel/40 px-3 font-medium"
-                >
-                  Log an in-person session
-                </Link>
+              <div className="mb-4">
+                <ClientProgramActions
+                  groupId={params.groupId}
+                  athleteId={params.athleteId}
+                  athleteFullName={profile?.full_name ?? "Client"}
+                  extra={
+                    <Link
+                      href={`/groups/${params.groupId}/athletes/${params.athleteId}/log`}
+                      className="inline-flex items-center justify-center min-h-11 sm:h-9 font-body text-xs text-chalk border border-steel/40 px-3 font-medium"
+                    >
+                      Log an in-person session
+                    </Link>
+                  }
+                />
               </div>
             }
           />

@@ -4,18 +4,18 @@ import { createServerClient } from "@/lib/supabase/server";
 import { programsHrefForClient } from "@/lib/programs-scope";
 
 // The Programs tab of one client's profile: the programs made for this client (their own copies), the active one first, each opening the builder. Assigning one
-// is the "Programming" menu at the top of the profile.
+// is the "Assign program" button above the list.
 export async function ClientProgramsSection({ groupId, athleteId, actions }: { groupId: string; athleteId: string; actions?: ReactNode }) {
   const supabase = await createServerClient();
   const { data } = await supabase
     .from("programs")
-    .select("id, name, is_active, created_at")
+    .select("id, name, is_active, ai_draft, created_at")
     .eq("group_id", groupId)
     .eq("athlete_id", athleteId)
     .order("is_active", { ascending: false })
     .order("created_at", { ascending: false })
     .limit(50);
-  const programs = (data ?? []) as { id: string; name: string; is_active: boolean; created_at: string }[];
+  const programs = (data ?? []) as { id: string; name: string; is_active: boolean; ai_draft?: boolean; created_at: string }[];
   // A client with no program of their own follows the group's shared active program: show it, labelled, instead of "none".
   const { data: sharedRow } = await supabase
     .from("programs")
@@ -45,14 +45,14 @@ export async function ClientProgramsSection({ groupId, athleteId, actions }: { g
         </Link>
       )}
       {programs.length === 0 ? (
-        shared ? null : <p className="font-body text-sm text-steel">No program made for them yet. Use the Programming menu above to assign one.</p>
+        shared ? null : <p className="font-body text-sm text-steel">No program made for them yet. Use Assign program above.</p>
       ) : (
         <ul className="divide-y divide-steel/15 border-y border-steel/15">
           {programs.map((p) => (
             <li key={p.id}>
               <Link href={`/groups/${groupId}/programs/${p.id}`} className="flex items-center justify-between gap-3 py-2.5 px-1 hover:bg-surface/60">
                 <span className="font-body text-sm text-chalk truncate">{p.name}</span>
-                <span className={`font-body text-xs shrink-0 ${p.is_active ? "text-positive" : "text-steel"}`}>{p.is_active ? "Active" : "Not active"}</span>
+                <span className={`font-body text-xs shrink-0 ${p.ai_draft ? "text-rust" : p.is_active ? "text-positive" : "text-steel"}`}>{p.ai_draft ? "AI draft" : p.is_active ? "Active" : "Not active"}</span>
               </Link>
             </li>
           ))}

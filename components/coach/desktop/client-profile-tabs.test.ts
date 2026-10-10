@@ -57,7 +57,7 @@ describe("the profile page", () => {
   });
   it("no workflow is lost: assigning a program and logging an in-person session are in the Programs tab, scheduling a session and logging one are in the Calendar tab", () => {
     const programs = page.slice(page.indexOf('<div data-tab="program"'), page.indexOf('<div className="profile-grid'));
-    expect(programs).toContain("<ClientProgrammingMenu");
+    expect(programs).toContain("<ClientProgramActions");
     expect(programs).toContain("Log an in-person session");
     expect(programs).toContain("/log`");
     expect(calendarSection).toContain("Schedule a session for");

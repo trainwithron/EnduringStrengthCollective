@@ -61,7 +61,7 @@ export default async function NewProgramPage(
   const method = searchParams.method === "ai" ? "ai" : "blank";
 
   // "Build with AI for this client" (injury_pain_science_research_and_
-  // ai_gap_sept15.md) — reached from ClientProgrammingMenu with a real
+  // ai_gap_sept15.md) — reached from ClientProgramActions with a real
   // athleteId; verified against this group's own roster rather than
   // trusted at face value, same discipline as the API route's own check.
   let athleteName: string | null = null;
