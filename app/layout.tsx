@@ -10,6 +10,7 @@ import { TimezoneCapture } from "@/components/timezone-capture";
 import { ConfirmDialogHost } from "@/components/shared/confirm-dialog";
 import { getViewerOrgTheme } from "@/lib/org-theme-server";
 import { orgThemeToCssVars } from "@/lib/theme";
+import { baseFontFamilies, googleFontsHref } from "@/lib/google-fonts";
 
 export const metadata: Metadata = {
   title: "Spotlight Coaching",
@@ -57,8 +58,10 @@ export default async function RootLayout({
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        {/* eslint-disable-next-line @next/next/no-page-custom-font -- one shared stylesheet holding every selectable brand font, so a coach's font choice previews instantly. */}
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&family=Oswald:wght@500;700&family=Bebas+Neue&family=Anton&family=Roboto:wght@400;500;600&family=Work+Sans:wght@400;500;600&family=Nunito+Sans:wght@400;600;700&display=swap" />
+        {/* Only the fonts a page shows: the platform's own pair and the organization's choice. This stylesheet blocks the first paint, so it is kept small; the branding page,
+            where a coach compares every font, loads the full set itself. */}
+        {/* eslint-disable-next-line @next/next/no-page-custom-font -- the fonts are chosen per organization, so they cannot be the build-time next/font kind. */}
+        <link rel="stylesheet" href={googleFontsHref(baseFontFamilies(theme))} />
         {/* An organisation's own app icon is the ONLY tab and home-screen icon when it has one; the Spotlight default is emitted only when it has not (two sets of
             icon links would let the browser pick the default). */}
         {theme.appIconUrl ? (

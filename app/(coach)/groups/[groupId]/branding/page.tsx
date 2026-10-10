@@ -18,6 +18,7 @@ import { getOrgBillingSummary } from "@/lib/org-billing-server";
 import { isBillingEnforced } from "@/lib/org-entitlements";
 import type { ButtonShape, DisplayFont, BodyFont } from "@/lib/theme";
 import { isStripeConfigured } from "@/lib/stripe";
+import { ALL_BRAND_FONTS, googleFontsHref } from "@/lib/google-fonts";
 
 type OrgTab = "team" | "branding" | "workout-card" | "tags" | "dispatch" | "terminology" | "credits" | "plan";
 
@@ -338,6 +339,10 @@ export default async function BrandingPage(
           Only {org?.name ?? "the organization"}&apos;s owner can change branding.
         </p>
       ) : tab === "branding" ? (
+        <>
+        {/* The layout loads only the fonts a page shows; here a coach compares every one of them, so this page asks for the full set. */}
+        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+        <link rel="stylesheet" href={googleFontsHref(ALL_BRAND_FONTS)} precedence="default" />
         <BrandingForm
           organizationId={orgMembership.organization_id}
           initialButtonShape={(org?.button_shape as ButtonShape) ?? "sharp"}
@@ -350,6 +355,7 @@ export default async function BrandingPage(
           initialAppIconUrl={org?.app_icon_url ?? null}
           initialZipCode={org?.zip_code ?? null}
         />
+        </>
       ) : (
         <WorkoutCardBackgroundSettings
           organizationId={orgMembership.organization_id}

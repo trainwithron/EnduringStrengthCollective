@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // The coach's own world, scoped to ONE organization. Organizations are
@@ -25,8 +26,11 @@ function normalizeKind(kind: string | null | undefined): GroupKind {
   return kind === "one_on_one" || kind === "social" ? kind : "team";
 }
 
-// Every group this person coaches (any org), with its org.
-export async function getCoachedGroups(supabase: SupabaseClient, coachId: string): Promise<CoachedGroup[]> {
+// Every group this person coaches (any org), with its org. Within one page render (where every caller shares the request's one Supabase client) the answer is read
+// once and shared, so a page and the components under it do not each ask again; anywhere else (browser, route handlers) every call reads fresh, as before.
+export const getCoachedGroups = cache(readCoachedGroups);
+
+async function readCoachedGroups(supabase: SupabaseClient, coachId: string): Promise<CoachedGroup[]> {
   const { data } = await supabase
     .from("group_memberships")
     .select("group_id, groups ( id, name, group_kind, organization_id, organizations ( name ) )")
