@@ -21,7 +21,7 @@ import { AddClientButton } from "./add-client-button";
 import { forgetOrgGroups } from "@/lib/use-org-group-ids";
 import { BusinessMiniDashboard } from "./business-mini-dashboard";
 import { CalendarMiniView } from "./calendar-mini-view";
-import { EmbeddedProgramBuilder } from "./embedded-program-builder";
+import { ProgramPanelList } from "./program-panel-list";
 
 export interface SectionSubLink {
   key: string;
@@ -195,7 +195,7 @@ export function ShellListPanel({
             className={`h-7 font-body text-xs uppercase tracking-wide border ${
               view === "program" ? "border-rust text-rust bg-rust/10" : "border-steel/30 text-steel"
             }`}
-            title="Pin the full Program Builder, in place"
+            title="Your programs, and build a new one"
           >
             🏋 Program
           </button>
@@ -216,7 +216,7 @@ export function ShellListPanel({
         )}
         {view === "business" && <BusinessMiniDashboard groupId={groupId} />}
         {view === "calendar" && <CalendarMiniView groupId={groupId} />}
-        {view === "program" && <EmbeddedProgramBuilder groupId={groupId} />}
+        {view === "program" && <ProgramPanelList groupId={groupId} />}
       </div>
 
       {/* Drag-to-resize edge + full-collapse tab (item 3-4). */}

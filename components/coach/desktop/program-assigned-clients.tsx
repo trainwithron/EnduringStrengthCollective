@@ -50,7 +50,7 @@ export function ProgramAssignedClients({ programId, groupId, athleteId }: { prog
     setFailed(false);
     const supabase = createBrowserClient();
     const [copiesRes, membersRes, personRes] = await Promise.all([
-      supabase.from("programs").select("id, group_id, athlete_id, profiles!programs_athlete_id_fkey ( full_name )").eq("source_program_id", programId).not("athlete_id", "is", null).limit(500),
+      supabase.from("programs").select("id, group_id, athlete_id, profiles!programs_athlete_id_fkey ( full_name )").eq("source_program_id", programId).not("athlete_id", "is", null).is("archived_at", null).limit(500),
       athleteId ? Promise.resolve({ data: [], error: null }) : supabase.from("group_memberships").select("profile_id, profiles ( full_name )").eq("group_id", groupId).eq("role", "athlete").limit(1000),
       athleteId ? supabase.from("profiles").select("id, full_name").eq("id", athleteId).maybeSingle() : Promise.resolve({ data: null, error: null }),
     ]);

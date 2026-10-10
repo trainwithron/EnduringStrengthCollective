@@ -33,6 +33,7 @@ export function ClientProgramActions({ groupId, athleteId, athleteFullName, extr
       .from("programs")
       .select("id, name, created_at, ai_draft, source_program_id, profiles!programs_athlete_id_fkey ( full_name )")
       .eq("created_by", user.id)
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(300);
     if (loadError) {

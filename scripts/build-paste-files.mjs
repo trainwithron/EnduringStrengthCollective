@@ -1512,6 +1512,27 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["profiles exists", has.table("profiles")],
     ],
   },
+  {
+    n: "74",
+    slug: "0328",
+    title: "0328 Remove a program from a client's profile without deleting it: programs.archived_at; a removed program is inactive and hidden from the client like an unsigned AI draft",
+    migrations: ["0328"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for anyone. One column is added. No program is hidden until a coach removes one from a client's profile.",
+    undo: [
+      "drop policy if exists \"programs_select_members\" on public.programs;",
+      "create policy \"programs_select_members\" on public.programs for select to authenticated using (is_group_member(group_id) and (athlete_id is null or athlete_id = (select auth.uid()) or is_group_coach(group_id)) and (is_group_coach(group_id) or (not ai_draft)));",
+      "create or replace function public.is_ai_draft_program(_program_id uuid) returns boolean language sql stable security definer set search_path = public as 'select coalesce((select p.ai_draft from public.programs p where p.id = _program_id), false)';",
+      "create or replace function public.is_ai_draft_workout(_workout_id uuid) returns boolean language sql stable security definer set search_path = public as 'select coalesce((select p.ai_draft from public.workouts w join public.programs p on p.id = w.program_id where w.id = _workout_id), false)';",
+      "alter table public.programs drop constraint if exists programs_archived_is_inactive;",
+      "alter table public.programs drop column if exists archived_at;",
+    ].join(String.fromCharCode(10)),
+    undoWhy: "Only if step 74 misbehaves. Puts the two helper functions and the programs read rule back as they were and drops the column (programs that were removed from a profile become visible again to their clients).",
+    rows: [
+      ["0328 is not already applied (programs has no archived_at column yet)", has.noCol("programs", "archived_at")],
+      ["the AI draft flag exists (0324, step 70)", has.col("programs", "ai_draft")],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -1612,6 +1633,7 @@ const BUNDLES = [
   { id: "release-ad", name: "Release AD (AI builder: it learns from the changes a coach makes; run AFTER Release AC)", steps: ["71"] },
   { id: "release-ae", name: "Release AE (AI builder: the optional conversation about how you program; run AFTER Release AD)", steps: ["72"] },
   { id: "release-af", name: "Release AF (a coach's own wording for the sign-in link email)", steps: ["73"] },
+  { id: "release-ag", name: "Release AG (remove a program from a client's profile without deleting it; run AFTER Release AC)", steps: ["74"] },
   { id: "release-n2", name: "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)", steps: ["49", "50"] },
   { id: "release-m", name: "Release M (acceptance record is append-only)", steps: ["44"] },
 ];
@@ -1793,6 +1815,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0296", has.col("recipes", "content_hash")),
     m("0297", has.table("schedule_requests")),
     m("0327", has.table("coach_message_templates")),
+    m("0328", has.col("programs", "archived_at")),
     m("0326", has.table("coach_conversations")),
     m("0325", has.col("programs", "ai_snapshot")),
     m("0324", has.col("programs", "ai_draft")),

@@ -46,6 +46,7 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
     .from("programs")
     .select("id, group_id, name, is_active, ai_draft, cover_image_path, athlete_id, profiles!programs_athlete_id_fkey ( full_name ), workouts(id, group_workout_exercises(count))")
     .in("group_id", groupIds.length > 0 ? groupIds : [""])
+    .is("archived_at", null)
     .order("is_active", { ascending: false })
     .order("created_at", { ascending: false });
 
