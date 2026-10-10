@@ -29,6 +29,6 @@ describe("the hours editor shows the three numbers together", () => {
   });
   it("the Calendar page's Availability tab shows the same three numbers", () => {
     expect(read("./calendar-page-tabs.tsx")).toContain("initialBufferMinutes={initialBufferMinutes}");
-    expect(read("../../../app/(coach)/groups/[groupId]/calendar/page.tsx")).toContain("initialBufferMinutes={gapPolicy?.buffer_minutes ?? 0}");
+    expect(read("../../../components/coach/calendar-page-body.tsx")).toContain("initialBufferMinutes={gapPolicy?.buffer_minutes ?? 0}");
   });
 });

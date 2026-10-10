@@ -418,7 +418,7 @@ function CoachDesktopShellFull({
     // Everything else is under "More tools". The old group Dashboard entry is gone from the rail (Home is the dashboard); it is under More tools.
     // Clients is always the coach's full list, wherever they are. A team or social group's own roster is a separate "Members" entry, shown only inside such a group.
     { key: "clients", label: "Clients", href: CLIENTS_HREF, icon: UserRound, badge: clientsUnread, termKey: "client", termForm: "plural" },
-    { key: "calendar", label: "Calendar", href: `/groups/${groupId}/calendar`, icon: CalendarDays },
+    { key: "calendar", label: "Calendar", href: "/calendar", icon: CalendarDays },
     { key: "messages", label: "Messages", href: `/groups/${groupId}/messages`, icon: Mail, badge: messagesUnread },
     {
       label: "Programming",
