@@ -21,12 +21,12 @@ describe("nothing a developer wrote reaches a client on the share card", () => {
   it("the share page shows the caption alone", () => {
     const page = read("app/share/[postId]/page.tsx");
     expect(page).not.toContain("subcaption");
-    expect(page).toContain("{humorArchetype!.caption}");
+    expect(read("components/share/one-screen-card.tsx")).toContain("{mascot.archetype.caption}");
   });
   it("with no photo the mascot's head shows the person's initial, never an empty dashed circle", () => {
     const card = read("components/share/humor-archetype-card.tsx");
     expect(card).not.toContain("strokeDasharray");
     expect(card).toContain("{firstLetter}");
-    expect(read("app/share/[postId]/page.tsx")).toContain('initial={shared.athleteName === "An athlete" ? null : shared.athleteName}');
+    expect(read("app/share/[postId]/page.tsx")).toContain('const mascotInitial = shared.athleteName === "An athlete" ? null : shared.athleteName;');
   });
 });

@@ -5,6 +5,7 @@ import { OneScreenCard } from "@/components/share/one-screen-card";
 import { ShareActions } from "@/components/share/share-actions";
 import type { ShareImageInput, ShareImageModel } from "@/lib/share-image";
 import { pickFreshFunLine, rerollFunLine, type FunLine, type WorkoutFacts } from "@/lib/workout-fun-line";
+import type { HumorArchetype } from "@/lib/humor-archetypes";
 import { readFunMemory, rememberLine, writeFunMemory } from "@/lib/fun-line-memory";
 
 function deviceStorage() {
@@ -31,6 +32,7 @@ export function ShareScreen({
   imageInput,
   title,
   homeHref,
+  mascot,
 }: {
   postId: string;
   viewerId: string | null;
@@ -44,6 +46,7 @@ export function ShareScreen({
   imageInput: Omit<ShareImageInput, "showName" | "funLine">;
   title: string;
   homeHref: string | null;
+  mascot: { archetype: HumorArchetype; avatarUrl: string | null; initial: string | null } | null;
 }) {
   const [line, setLine] = useState<FunLine>(defaultLine);
   const canShuffle = isOwner && !!viewerId;
@@ -88,6 +91,7 @@ export function ShareScreen({
         hasPr={hasPr}
         onShuffle={canShuffle ? another : undefined}
         funLineHidden={!ready}
+        mascot={mascot}
       />
       <ShareActions input={{ ...imageInput, funLine: line.text }} title={title} homeHref={homeHref} hold={!ready} />
     </>
