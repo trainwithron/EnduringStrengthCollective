@@ -12,8 +12,8 @@ import { seededPick } from "./seeded-pick";
 
 export interface HumorArchetype {
   key: string;
+  // The one line shown under the picture. There is no second line: an earlier developer description there reached a client's screen.
   caption: string;
-  subcaption: string;
   // A 150x170 viewBox, matching every archetype below.
   bodyPaths: string; // raw <path>/<circle>/<ellipse>/<rect> children as an SVG fragment string
   faceHole: { cx: number; cy: number; r: number };
@@ -23,7 +23,6 @@ export const HUMOR_ARCHETYPES: HumorArchetype[] = [
   {
     key: "strongman",
     caption: "Absolutely Yoked",
-    subcaption: "Generic strongman archetype — no real person",
     faceHole: { cx: 75, cy: 32.4, r: 29 },
     bodyPaths: `
       <ellipse cx="75" cy="150" rx="55" ry="14" fill="#0f0e0d" opacity=".4"/>
@@ -38,7 +37,6 @@ export const HUMOR_ARCHETYPES: HumorArchetype[] = [
   {
     key: "cartoon_round",
     caption: "Inflatable Gains",
-    subcaption: "Cartoon-round archetype — different tone, same mechanism",
     faceHole: { cx: 75, cy: 30, r: 30 },
     bodyPaths: `
       <ellipse cx="75" cy="150" rx="50" ry="13" fill="#0f0e0d" opacity=".4"/>
@@ -51,7 +49,6 @@ export const HUMOR_ARCHETYPES: HumorArchetype[] = [
   {
     key: "olympic_lifter",
     caption: "Gold Medal Grind",
-    subcaption: "Overhead-lift archetype — big lift, bigger ego",
     faceHole: { cx: 75, cy: 74.8, r: 23 },
     bodyPaths: `
       <ellipse cx="75" cy="150" rx="52" ry="13" fill="#0f0e0d" opacity=".4"/>
@@ -68,7 +65,6 @@ export const HUMOR_ARCHETYPES: HumorArchetype[] = [
   {
     key: "tightrope",
     caption: "Balancing the Bulk",
-    subcaption: "Tightrope archetype — because gains take balance too",
     faceHole: { cx: 75, cy: 42.4, r: 22 },
     bodyPaths: `
       <line x1="0" y1="150" x2="150" y2="150" stroke="#5b564d" stroke-width="4"/>
@@ -81,7 +77,6 @@ export const HUMOR_ARCHETYPES: HumorArchetype[] = [
   {
     key: "boxer",
     caption: "One-Punch Pump",
-    subcaption: "Boxer archetype — knockout leg day",
     faceHole: { cx: 75, cy: 64.6, r: 22 },
     bodyPaths: `
       <ellipse cx="75" cy="150" rx="52" ry="13" fill="#0f0e0d" opacity=".4"/>
@@ -97,7 +92,6 @@ export const HUMOR_ARCHETYPES: HumorArchetype[] = [
   {
     key: "barbarian",
     caption: "Barbarian PR",
-    subcaption: "Warrior archetype — overhead press, conquered",
     faceHole: { cx: 75, cy: 34.6, r: 21 },
     bodyPaths: `
       <ellipse cx="75" cy="150" rx="54" ry="13" fill="#0f0e0d" opacity=".4"/>
@@ -113,7 +107,6 @@ export const HUMOR_ARCHETYPES: HumorArchetype[] = [
   {
     key: "knight",
     caption: "Knight of the Deadlift",
-    subcaption: "Armored archetype — the bar has been conquered",
     faceHole: { cx: 75, cy: 26, r: 26 },
     bodyPaths: `
       <ellipse cx="75" cy="150" rx="50" ry="13" fill="#0f0e0d" opacity=".4"/>
