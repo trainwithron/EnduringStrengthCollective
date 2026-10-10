@@ -103,6 +103,9 @@ export function WeekDayRow({ children }: { children: ReactNode }) {
       <div
         ref={scroller}
         data-testid="week-day-row"
+        tabIndex={0}
+        role="region"
+        aria-label="This week's days. Use the left and right arrow keys to move sideways."
         onScroll={measure}
         onMouseDown={onMouseDown}
         className="flex gap-4 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
