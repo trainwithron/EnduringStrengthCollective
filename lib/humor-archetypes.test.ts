@@ -27,6 +27,6 @@ describe("nothing a developer wrote reaches a client on the share card", () => {
     const card = read("components/share/humor-archetype-card.tsx");
     expect(card).not.toContain("strokeDasharray");
     expect(card).toContain("{firstLetter}");
-    expect(read("app/share/[postId]/page.tsx")).toContain("initial={shared.athleteName}");
+    expect(read("app/share/[postId]/page.tsx")).toContain('initial={shared.athleteName === "An athlete" ? null : shared.athleteName}');
   });
 });
