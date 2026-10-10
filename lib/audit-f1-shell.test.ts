@@ -48,7 +48,7 @@ describe("the home-screen banner and /calendar", () => {
     expect(src).toContain("pr-16");
   });
   it("/calendar on its own sends a signed-in person to their calendar", () => {
-    const src = read("app/calendar/page.tsx");
+    const src = read("app/(coach)/calendar/page.tsx");
     expect(src).toContain("/groups/${membership.group_id}/calendar");
     expect(src).toContain('redirect("/login?next=%2Fcalendar")');
   });
