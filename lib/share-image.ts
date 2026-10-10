@@ -276,7 +276,7 @@ export function planFor(format: ShareImageFormat, withMascot = false): Plan {
     // Everything below the mascot moves down to make room, and the lift rows are shorter and capped at two, so the footer still clears the story app's bottom bar.
     return {
       safeTop: 250,
-      mascotTop: 236,
+      mascotTop: 252,
       mascotH: 150,
       mascotCaptionY: 424,
       maxLifts: 2,

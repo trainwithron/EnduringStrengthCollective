@@ -120,6 +120,8 @@ describe("the mascot in the posted picture", () => {
     expect(noPhoto).toContain(">M<");
     expect(noPhoto).not.toContain("<image");
     expect(humorSvgMarkup(a, null, "<script>")).not.toContain("<script>");
+    expect(humorSvgMarkup(a, null, "Élise")).toContain(">É<");
+    expect(humorSvgMarkup(a, "data:image/png;base64,A\"B", "M")).not.toContain('A"B');
     const withPhoto = humorSvgMarkup(a, "data:image/png;base64,AAAA", "Marcus");
     expect(withPhoto).toContain('<image href="data:image/png;base64,AAAA"');
     expect(withPhoto).not.toContain(">M<");

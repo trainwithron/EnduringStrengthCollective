@@ -136,9 +136,11 @@ export function getHumorArchetype(key: string): HumorArchetype | null {
 export function humorSvgMarkup(archetype: HumorArchetype, avatarDataUrl: string | null, initial: string | null): string {
   const { cx, cy, r } = archetype.faceHole;
   const letter = (initial ?? "").trim().charAt(0).toUpperCase();
-  const safeLetter = /^[A-Z0-9]$/.test(letter) ? letter : "";
+  // Any single letter works (the screen shows it), written safely for SVG text; the photo address is escaped too.
+  const xml = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const safeLetter = xml(letter);
   const face = avatarDataUrl
-    ? `<image href="${avatarDataUrl}" x="${cx - r}" y="${cy - r}" width="${r * 2}" height="${r * 2}" clip-path="url(#face)" preserveAspectRatio="xMidYMid slice"/>`
+    ? `<image href="${xml(avatarDataUrl)}" x="${cx - r}" y="${cy - r}" width="${r * 2}" height="${r * 2}" clip-path="url(#face)" preserveAspectRatio="xMidYMid slice"/>`
     : `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#211f1c" stroke="rgba(210,112,59,.6)" stroke-width="2"/>` +
       (safeLetter
         ? `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-size="${r * 1.1}" font-weight="700" fill="#EDE8E0" font-family="Arial, sans-serif">${safeLetter}</text>`
