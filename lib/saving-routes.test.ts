@@ -19,6 +19,7 @@ function routeFiles(rel: string): string[] {
 // payment, send a push or text, or are called by another service. Every other writing route must be in SAVING_API (lib/workspace-mutation.ts), so that a save made
 // through it refreshes the other panes. A new route fails this test until it is put in one of the two places on purpose.
 const NOT_A_SAVE = new Set([
+  "/api/coach/message-template",
   "/api/admin/trivia/generate",
   "/api/ai/generate-meal-plan",
   "/api/ai/generate-program",

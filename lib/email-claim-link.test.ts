@@ -1,26 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { buildClaimEmail } from "@/lib/client-claim";
 
 const read = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8").replace(/\r\n/g, "\n");
-
-describe("the sign-in email", () => {
-  const m = buildClaimEmail("https://spotlightcoaching.app/claim/abc", "Max", "Ron Arnold");
-  it("comes from the coach's name, with the link, the 48 hour note, and an ignore line", () => {
-    expect(m.subject).toBe("Ron Arnold invited you to Spotlight Coaching");
-    expect(m.text).toContain("Hi Max,");
-    expect(m.text).toContain("Ron Arnold set up your training in Spotlight Coaching.");
-    expect(m.text).toContain("https://spotlightcoaching.app/claim/abc");
-    expect(m.text).toContain("expires in 48 hours");
-    expect(m.text).toContain("If you weren't expecting this, you can ignore this email.");
-  });
-  it("still reads well with no names", () => {
-    const n = buildClaimEmail("https://x/claim/t", "", null);
-    expect(n.subject).toBe("Your coach invited you to Spotlight Coaching");
-    expect(n.text.startsWith("Hi,")).toBe(true);
-  });
-});
 
 describe("the email route", () => {
   const route = read("app/api/clients/email-claim-link/route.ts");
@@ -62,9 +44,9 @@ describe("the buttons", () => {
     expect(add).toContain("added.hasEmail");
     expect(add).toContain("<EmailClaimLinkButton");
   });
-  it("the page passes only a hidden version of the address", () => {
+  it("the page passes the address on the account (the coach typed it) and the panel shows it whole", () => {
     const page = read("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx");
-    expect(page).toContain("emailMasked={signInEmailMasked}");
-    expect(page).toContain("maskEmail(signInEmail)");
+    expect(page).toContain("emailOnFile={signInEmailOnFile}");
+    expect(page).not.toContain("maskEmail");
   });
 });

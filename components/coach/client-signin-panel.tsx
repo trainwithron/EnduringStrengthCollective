@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 import { Check, Circle } from "lucide-react";
 import { buildClaimSms, CLAIM_STATUS_LABEL, smsHref, type ClaimStatus } from "@/lib/client-claim";
 import { CLAIM_LINK_STATE_LABEL, type ClaimLinkDetail } from "@/lib/invite-state";
-import { maskEmail } from "@/lib/mask-email";
 import { EmailClaimLinkButton } from "@/components/coach/email-claim-link-button";
+import { EmailMessageEditor } from "@/components/coach/email-message-editor";
 
 // The coach's per-client sign-in checklist for a client who hasn't signed in
 // yet: account created -> sign-in link created -> client signed in. The coach
@@ -20,7 +20,7 @@ export function ClientSignInPanel({
   status,
   linkDetail,
   coachFirstName,
-  emailMasked,
+  emailOnFile,
 }: {
   groupId: string;
   athleteId: string;
@@ -29,8 +29,8 @@ export function ClientSignInPanel({
   // What happened to the latest link: working (and for how long), expired, cancelled, or never made.
   linkDetail?: ClaimLinkDetail;
   coachFirstName?: string | null;
-  // The client's email on file with part hidden (null when they have none yet), so the link can be emailed to it.
-  emailMasked?: string | null;
+  // The client's email on file (null when they have none yet), so the link can be emailed to it.
+  emailOnFile?: string | null;
 }) {
   const router = useRouter();
   const [linkStatus, setLinkStatus] = useState<ClaimStatus>(status);
@@ -42,7 +42,7 @@ export function ClientSignInPanel({
   const [showEmail, setShowEmail] = useState(false);
   const [email, setEmail] = useState("");
   const [emailMsg, setEmailMsg] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
-  const [maskedEmail, setMaskedEmail] = useState<string | null>(emailMasked ?? null);
+  const [maskedEmail, setMaskedEmail] = useState<string | null>(emailOnFile ?? null);
   // Right after saving an address the "Email the sign-in link" button sits under the saved message instead of in the main area.
   const [justSaved, setJustSaved] = useState(false);
 
@@ -123,7 +123,7 @@ export function ClientSignInPanel({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Couldn't update the email.");
       setEmailMsg({ kind: "ok", text: "Saved. Email the sign-in link now?" });
-      setMaskedEmail(maskEmail(typeof data.email === "string" ? data.email : email.trim()));
+      setMaskedEmail(typeof data.email === "string" ? data.email : email.trim());
       setJustSaved(true);
       setEmail("");
     } catch (err) {
@@ -239,6 +239,7 @@ export function ClientSignInPanel({
             }}
           />
           <p className="font-body text-xs text-steel mt-1">Goes to {maskedEmail}.</p>
+          <EmailMessageEditor />
         </div>
       )}
       {error && (

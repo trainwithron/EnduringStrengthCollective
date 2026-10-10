@@ -1022,6 +1022,24 @@ for (const s of steps) {
   const errAE2 = await run(`apply/${bundle.file}`);
   check("release-ae: the bundle applies again after an undo" + (errAE2 ? ": " + errAE2 : ""), !errAE2 && (await has()));
 }
+// Release AF (step 73): ONE paste.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-af");
+  check("release-af: ONE bundle holds step 73", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["73"]));
+  const st73 = steps.find((x) => x.n === "73");
+  const has = async () => (await db.query("select to_regclass('public.coach_message_templates') is not null as ok")).rows[0].ok === true;
+  const eaf0 = await run(`apply/undo-step${st73.n}-${st73.slug}.sql`);
+  check("release-af: before the bundle runs there is no template table" + (eaf0 ? ": " + eaf0 : ""), !eaf0 && !(await has()));
+  const errAF = await run(`apply/${bundle.file}`);
+  check("release-af bundle applies on the live-shaped state" + (errAF ? ": " + errAF : ""), !errAF && (await has()));
+  const againAF = await run(`apply/${bundle.file}`);
+  check("release-af: a second run is refused, naming step 73 (" + againAF + ")", !!againAF && againAF.includes("step 73 (0327) cannot run") && againAF.includes("already applied"));
+  const euAF = await run(`apply/undo-step${st73.n}-${st73.slug}.sql`);
+  check("release-af: the undo removes the template table" + (euAF ? ": " + euAF : ""), !euAF && !(await has()));
+  const errAF2 = await run(`apply/${bundle.file}`);
+  check("release-af: the bundle applies again after an undo" + (errAF2 ? ": " + errAF2 : ""), !errAF2 && (await has()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.

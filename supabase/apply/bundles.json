@@ -213,6 +213,14 @@
   "file": "apply-release-ae-all.sql"
  },
  {
+  "id": "release-af",
+  "name": "Release AF (a coach's own wording for the sign-in link email)",
+  "steps": [
+   "73"
+  ],
+  "file": "apply-release-af-all.sql"
+ },
+ {
   "id": "release-n2",
   "name": "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)",
   "steps": [

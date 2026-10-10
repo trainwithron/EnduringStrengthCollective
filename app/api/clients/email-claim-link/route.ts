@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { hasLiveClaimLink, loadUnclaimedClient, mintClaimLink } from "@/lib/client-claim-server";
-import { buildClaimEmail, isPlaceholderEmail } from "@/lib/client-claim";
+import { isPlaceholderEmail } from "@/lib/client-claim";
+import { DEFAULT_CLAIM_TEMPLATE, renderTemplate, validateTemplate, type MessageTemplate } from "@/lib/message-template";
 import { appOrigin } from "@/lib/app-url";
 import { isSendGridConfigured, sendEmail } from "@/lib/sendgrid";
-import { maskEmail } from "@/lib/mask-email";
 import { rateLimitAllows, rateLimitResponse } from "@/lib/rate-limit";
 
 // A coach emails a client who has never signed in their sign-in (claim) link. It goes ONLY to the address already on the client's account, never to a
@@ -51,7 +51,14 @@ export async function POST(request: Request) {
   if (!minted.ok) return NextResponse.json({ error: "Couldn't create the link — try again." }, { status: 500 });
 
   const { data: coach } = await serviceRole.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
-  const message = buildClaimEmail(minted.link, client.fullName.split(" ")[0] ?? "", coach?.full_name ?? null);
+  // The coach's own wording if they wrote one (and it is still valid, with {link} in it); otherwise the default. Before the template table exists the read just errors and the default is used.
+  let template: MessageTemplate = DEFAULT_CLAIM_TEMPLATE;
+  const { data: custom } = await serviceRole.from("coach_message_templates").select("claim_email_subject, claim_email_body").eq("coach_id", user.id).maybeSingle();
+  if (custom) {
+    const checked = validateTemplate({ subject: custom.claim_email_subject, body: custom.claim_email_body });
+    if (checked.ok) template = checked.template;
+  }
+  const message = renderTemplate(template, { firstName: client.fullName.split(" ")[0] ?? "", coachName: coach?.full_name ?? null, link: minted.link });
   const sent = await sendEmail(email, message.subject, message.text);
   if (!sent) {
     return NextResponse.json(
@@ -59,5 +66,5 @@ export async function POST(request: Request) {
       { status: 502 }
     );
   }
-  return NextResponse.json({ ok: true, sentTo: maskEmail(email), expiresAt: minted.expiresAt });
+  return NextResponse.json({ ok: true, sentTo: email, expiresAt: minted.expiresAt });
 }

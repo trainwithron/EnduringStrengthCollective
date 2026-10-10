@@ -97,3 +97,4 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0324 | yes | yes | 17 | 0324 AI drafts cannot go live until signed off |
 | 0325 | yes | yes | 15 | 0325 AI builder learning is private to the coach |
 | 0326 | yes | yes | 14 | 0326 the coach conversation is private to the coach |
+| 0327 | yes | yes | 12 | 0327 a coach's sign-in email wording is private to the coach |

@@ -1498,6 +1498,20 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the learning settings table exists (0325, step 71)", has.table("coach_learning_settings")],
     ],
   },
+  {
+    n: "73",
+    slug: "0327",
+    title: "0327 Coach message templates: a coach's own wording for the email that carries a client's sign-in link; private to the coach",
+    migrations: ["0327"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for anyone. One private table is added. Until a coach writes their own wording the app uses its default message.",
+    undo: ["drop table if exists public.coach_message_templates;"].join(String.fromCharCode(10)),
+    undoWhy: "Only if step 73 misbehaves. Removes the table (and any custom wording coaches saved); every coach goes back to the default message.",
+    rows: [
+      ["0327 is not already applied (coach_message_templates does not exist yet)", has.noTable("coach_message_templates")],
+      ["profiles exists", has.table("profiles")],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -1597,6 +1611,7 @@ const BUNDLES = [
   { id: "release-ac", name: "Release AC (AI builder: a program the AI builds is a draft until the coach signs it off)", steps: ["70"] },
   { id: "release-ad", name: "Release AD (AI builder: it learns from the changes a coach makes; run AFTER Release AC)", steps: ["71"] },
   { id: "release-ae", name: "Release AE (AI builder: the optional conversation about how you program; run AFTER Release AD)", steps: ["72"] },
+  { id: "release-af", name: "Release AF (a coach's own wording for the sign-in link email)", steps: ["73"] },
   { id: "release-n2", name: "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)", steps: ["49", "50"] },
   { id: "release-m", name: "Release M (acceptance record is append-only)", steps: ["44"] },
 ];
@@ -1777,6 +1792,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0295", has.table("client_phase_plans")),
     m("0296", has.col("recipes", "content_hash")),
     m("0297", has.table("schedule_requests")),
+    m("0327", has.table("coach_message_templates")),
     m("0326", has.table("coach_conversations")),
     m("0325", has.col("programs", "ai_snapshot")),
     m("0324", has.col("programs", "ai_draft")),

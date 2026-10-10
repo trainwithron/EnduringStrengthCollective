@@ -44,7 +44,6 @@ import { MinorConsentControl } from "@/components/coach/minor-consent-control";
 import { ClientSignInPanel } from "@/components/coach/client-signin-panel";
 import { CorrectClientEmail } from "@/components/coach/correct-client-email";
 import { claimStatus, isPlaceholderEmail } from "@/lib/client-claim";
-import { maskEmail } from "@/lib/mask-email";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { claimLinkDetail } from "@/lib/invite-state";
 import { GuardianShareButton } from "@/components/coach/guardian-share-button";
@@ -435,12 +434,12 @@ export default async function AthleteProfilePage(
       : null,
   });
   const coachFirstName = (viewerProfile?.full_name ?? "").split(" ")[0] || null;
-  // The client's own address (never shown whole) so a not-yet-signed-in client can be emailed their link.
-  let signInEmailMasked: string | null = null;
+  // The client's address on the account, so a not-yet-signed-in client can be emailed their link (the coach typed it, or it came with the client).
+  let signInEmailOnFile: string | null = null;
   if (signInStatus !== "active") {
     const { data: signInTarget } = await createServiceRoleClient().auth.admin.getUserById(params.athleteId);
     const signInEmail = signInTarget?.user?.email ?? null;
-    signInEmailMasked = signInEmail && !isPlaceholderEmail(signInEmail) ? maskEmail(signInEmail) : null;
+    signInEmailOnFile = signInEmail && !isPlaceholderEmail(signInEmail) ? signInEmail : null;
   }
   // Same gate used everywhere else this tier's feature set is hidden —
   // group-tier clients don't get macro/meal-plan programming at all.
@@ -926,7 +925,7 @@ export default async function AthleteProfilePage(
               status={signInStatus}
               linkDetail={signInDetail}
               coachFirstName={coachFirstName}
-              emailMasked={signInEmailMasked}
+              emailOnFile={signInEmailOnFile}
             />
           )}
           </div>
