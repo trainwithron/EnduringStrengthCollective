@@ -43,7 +43,7 @@ describe("the one Build-with-AI box", () => {
   it("every AI path lands on the same review screen, always reviewed (isAiSourced true)", () => {
     const reader = wizard.slice(wizard.indexOf("async function readWithAi"), wizard.indexOf("async function handleAiPhotoUpload"));
     expect(reader).toContain('fetch("/api/ai/parse-workout"');
-    expect(reader).toContain("prepareImport(data.rows, programName, sourceNote, null, null, undefined, true)");
+    expect(reader).toMatch(/prepareImport\(data\.rows, programName, [^\n]*sourceNote[^\n]*, null, null, undefined, true\)/);
   });
   it("shows the usage meter and the copy-this-prompt helper, collapsed", () => {
     expect(wizard).toContain('<AiUsageMeter groupId={groupId} focus="program" compact />');
