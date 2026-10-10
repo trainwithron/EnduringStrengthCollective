@@ -36,7 +36,9 @@ describe("a one-on-one space has no shared program (Release AJ)", () => {
     expect(sql).toContain("athlete_id is not null or not public.is_one_on_one_group(group_id)");
     expect(sql).toContain("is_group_coach(group_id) or (not ai_draft and archived_at is null");
     // nothing is deleted; the only program update is the one-time attach of Karina's and Johann's own programs to their own clients, by exact id
-    expect(sql).not.toMatch(/delete from/);
+    // (the only delete removes the notice the attach itself would send)
+    expect(sql).not.toMatch(/delete from (?!public.notifications)/);
+    expect((sql.match(/delete from/g) ?? []).length).toBe(1);
     expect((sql.match(/update public\.programs/g) ?? []).length).toBe(1);
     expect(sql).toContain("d15055ab-acd9-47f7-aeef-31c2519b20cc");
     expect(sql).toContain("1f223214-efef-4883-bc3d-d5486854cf9e");
