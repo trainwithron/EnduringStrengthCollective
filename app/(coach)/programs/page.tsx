@@ -12,6 +12,7 @@ import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
 import { pickCoachAnchor } from "@/lib/coach-anchor";
 import { getCoachClients } from "@/lib/coach-clients";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
+import { LearnedSection } from "@/components/coach/learned-section";
 import { ALL_PROGRAMS_HREF, clientFromSearch, groupFromSearch, scopePrograms } from "@/lib/programs-scope";
 
 // The coach's Programs page: ALL of their programs, whichever group or client each one belongs to, wherever the coach is standing. It is scoped to one client only when the address says so
@@ -111,6 +112,8 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
       </div>
 
       {programsError ? <UnavailableState what="your programs" /> : <ProgramCardGrid groupId={anchor.id} programs={cards} visualsByProgramId={visualsByProgramId} />}
+
+      {!clientId && <LearnedSection supabase={supabase} coachId={user.id} />}
     </CoachDesktopShell>
   );
 }

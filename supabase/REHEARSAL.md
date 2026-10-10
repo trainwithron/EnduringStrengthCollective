@@ -95,3 +95,4 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0322 | yes | yes | 9 | 0322 deleting a client clears what points at them |
 | 0323 | yes | yes | 50 | 0323 group events cost no credit |
 | 0324 | yes | yes | 12 | 0324 AI drafts cannot go live until signed off |
+| 0325 | yes | yes | 15 | 0325 AI builder learning is private to the coach |

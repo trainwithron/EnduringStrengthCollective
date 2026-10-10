@@ -5,6 +5,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { UnavailableState } from "@/components/ui/unavailable-state";
 import { ProgramBuilderDesktop } from "@/components/coach/desktop/program-builder-desktop";
 import { AiDraftBanner } from "@/components/coach/ai-draft-banner";
+import { LearnedSuggestionCard } from "@/components/coach/learned-suggestion-card";
+import { suggestionText } from "@/lib/edit-patterns";
 import { ProgramRoleControl } from "@/components/coach/program-role-control";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import {
@@ -259,6 +261,15 @@ async function CoachProgramBuilder({
     .eq("id", programId)
     .maybeSingle();
   const isAiDraft = (roleRow as { ai_draft?: boolean } | null)?.ai_draft === true;
+  // The one quiet question after a sign-off (if there is one and it is recent): shown here, on the program that was just signed off.
+  const { data: askedRule } = await supabase
+    .from("coach_learned_rules")
+    .select("id, from_name, to_name, evidence_count, evidence_total")
+    .eq("coach_id", coachId)
+    .eq("status", "suggested")
+    .eq("asked_for_program_id", programId)
+    .gte("created_at", new Date(Date.now() - 7 * 86400000).toISOString())
+    .maybeSingle();
   const roleInfo = {
     available: !roleError,
     label: (roleRow as { label?: string | null } | null)?.label ?? null,
@@ -275,6 +286,12 @@ async function CoachProgramBuilder({
     <CoachDesktopShell groupId={groupId} groupName={data.groupName} active="programs">
       {/* The "Day N of M, you've moved X lbs" strip is for the client's own view of a program, not the coach's builder. */}
       {isAiDraft && <AiDraftBanner programId={programId} programName={data.programName} />}
+      {askedRule && (
+        <LearnedSuggestionCard
+          ruleId={askedRule.id}
+          text={suggestionText({ from: askedRule.from_name, to: askedRule.to_name, count: askedRule.evidence_count, total: askedRule.evidence_total })}
+        />
+      )}
       <ProgrammingSpotterPanel programId={programId} flags={data.spotterFlags} />
       <ProgramBuilderDesktop
         programId={programId}

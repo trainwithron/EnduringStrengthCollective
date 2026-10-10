@@ -1444,6 +1444,27 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the program copy function exists (0318)", has.fnName("duplicate_program")],
     ],
   },
+  {
+    n: "71",
+    slug: "0325",
+    title: "0325 AI builder learning: the changes a coach makes to an AI draft are noted privately, one quiet question can be asked per pattern, and what the coach said Yes to is kept in one list they can undo",
+    migrations: ["0325"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for anyone. Four private tables and a snapshot column are added. From now on, signing off an AI draft notes what the coach changed, and after enough of the same change the coach is asked once.",
+    undo: [
+      "drop table if exists public.coach_learning_settings;",
+      "drop table if exists public.coach_learned_rules;",
+      "drop table if exists public.coach_edit_events;",
+      "drop table if exists public.coach_program_signoffs;",
+      "alter table public.programs drop column if exists ai_snapshot;",
+    ].join(String.fromCharCode(10)),
+    undoWhy: "Only if step 71 misbehaves. Removes the four learning tables (and what they noted) and the snapshot column. The coach's standing preferences are not touched.",
+    rows: [
+      ["0325 is not already applied (programs has no ai_snapshot column yet)", has.noCol("programs", "ai_snapshot")],
+      ["the AI draft flag exists (0324, step 70)", has.col("programs", "ai_draft")],
+      ["the standing preferences table exists (0164)", has.table("coach_program_preferences")],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -1541,6 +1562,7 @@ const BUNDLES = [
   { id: "release-z", name: "Release Z (deleting a client no longer trips on records they created)", steps: ["68"] },
   { id: "release-ab", name: "Release AB (group events: In or Out, no session credit)", steps: ["69"] },
   { id: "release-ac", name: "Release AC (AI builder: a program the AI builds is a draft until the coach signs it off)", steps: ["70"] },
+  { id: "release-ad", name: "Release AD (AI builder: it learns from the changes a coach makes; run AFTER Release AC)", steps: ["71"] },
   { id: "release-n2", name: "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)", steps: ["49", "50"] },
   { id: "release-m", name: "Release M (acceptance record is append-only)", steps: ["44"] },
 ];
@@ -1721,6 +1743,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0295", has.table("client_phase_plans")),
     m("0296", has.col("recipes", "content_hash")),
     m("0297", has.table("schedule_requests")),
+    m("0325", has.col("programs", "ai_snapshot")),
     m("0324", has.col("programs", "ai_draft")),
     m("0323", has.col("group_sessions", "kind")),
     m("0322", "to_regprocedure('public.detach_profile_references(uuid)') is not null"),

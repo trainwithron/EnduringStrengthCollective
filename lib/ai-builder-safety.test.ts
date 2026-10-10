@@ -124,7 +124,8 @@ describe("the builder code wires it all in", () => {
   });
   it("signing off is one update, from the builder page banner or the program card, with a confirm", () => {
     const banner = read("components/coach/ai-draft-banner.tsx");
-    expect(banner).toContain("update({ ai_draft: false, is_active: true })");
+    expect(banner).toContain('fetch("/api/ai/sign-off"');
+    expect(read("app/api/ai/sign-off/route.ts")).toContain("update({ ai_draft: false, is_active: true })");
     expect(banner).toContain("Sign off and make active");
     expect(banner).toContain("confirmDialog(");
     expect(read("components/coach/program-active-toggle.tsx")).toContain("AI draft: sign off");

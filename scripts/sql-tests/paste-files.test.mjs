@@ -986,6 +986,24 @@ for (const s of steps) {
   const errAC2 = await run(`apply/${bundle.file}`);
   check("release-ac: the bundle applies again after an undo" + (errAC2 ? ": " + errAC2 : ""), !errAC2 && (await has()));
 }
+// Release AD (step 71): ONE paste, after Release AC. No snapshot column before, the bundle adds the learning tables, a second run is refused naming step 71, the undo removes them, and it applies again.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-ad");
+  check("release-ad: ONE bundle holds step 71", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["71"]));
+  const st71 = steps.find((x) => x.n === "71");
+  const has = async () => (await db.query("select to_regclass('public.coach_learned_rules') is not null as ok")).rows[0].ok === true;
+  const ead0 = await run(`apply/undo-step${st71.n}-${st71.slug}.sql`);
+  check("release-ad: before the bundle runs there are no learning tables" + (ead0 ? ": " + ead0 : ""), !ead0 && !(await has()));
+  const errAD = await run(`apply/${bundle.file}`);
+  check("release-ad bundle applies on the live-shaped state" + (errAD ? ": " + errAD : ""), !errAD && (await has()));
+  const againAD = await run(`apply/${bundle.file}`);
+  check("release-ad: a second run is refused, naming step 71 (" + againAD + ")", !!againAD && againAD.includes("step 71 (0325) cannot run") && againAD.includes("already applied"));
+  const euAD = await run(`apply/undo-step${st71.n}-${st71.slug}.sql`);
+  check("release-ad: the undo removes the learning tables" + (euAD ? ": " + euAD : ""), !euAD && !(await has()));
+  const errAD2 = await run(`apply/${bundle.file}`);
+  check("release-ad: the bundle applies again after an undo" + (errAD2 ? ": " + errAD2 : ""), !errAD2 && (await has()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.

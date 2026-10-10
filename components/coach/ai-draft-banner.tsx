@@ -3,13 +3,16 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
-import { createBrowserClient } from "@/lib/supabase/client";
 
-// Signing off an AI-built program: ONE update clears the draft flag and makes it active. Until then it is not live and no client sees it (the database refuses to make a draft
-// active any other way). Used on the program page and on the program's card.
+// Signing off an AI-built program: ONE update clears the draft flag and makes it active (done by /api/ai/sign-off, which also quietly notes what the coach changed). Until then it is
+// not live and no client sees it (the database refuses to make a draft active any other way). Used on the program page and on the program's card.
 export async function signOffProgram(programId: string): Promise<boolean> {
-  const { error } = await createBrowserClient().from("programs").update({ ai_draft: false, is_active: true }).eq("id", programId);
-  return !error;
+  try {
+    const res = await fetch("/api/ai/sign-off", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ programId }) });
+    return res.ok;
+  } catch {
+    return false;
+  }
 }
 
 export function AiDraftBanner({ programId, programName }: { programId: string; programName: string }) {

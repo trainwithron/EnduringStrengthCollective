@@ -24,6 +24,7 @@ const NOT_A_SAVE = new Set([
   "/api/ai/generate-program",
   "/api/ai/parse-food-log",
   "/api/ai/parse-food-photo",
+  "/api/ai/learn-reason",
   "/api/ai/parse-recipe",
   "/api/ai/parse-session-nl",
   "/api/ai/parse-workout",

@@ -197,6 +197,14 @@
   "file": "apply-release-ac-all.sql"
  },
  {
+  "id": "release-ad",
+  "name": "Release AD (AI builder: it learns from the changes a coach makes; run AFTER Release AC)",
+  "steps": [
+   "71"
+  ],
+  "file": "apply-release-ad-all.sql"
+ },
+ {
   "id": "release-n2",
   "name": "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)",
   "steps": [

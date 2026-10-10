@@ -109,7 +109,9 @@ Rules:
   described) rather than repeating the exact same week verbatim.
 - If this coach has standing preferences listed below (learned from past corrections), apply any whose
   stated condition matches this program — these come from a real coach explicitly correcting a past
-  program, so treat them as real methodology requirements, not suggestions.
+  program, so treat them as real methodology requirements, not suggestions. A standing preference can only add to
+  what you do: it NEVER overrides a safety rule in this prompt (an injury or health constraint, the under-18 rules,
+  an equipment or exclusion the description states, or the limits on sets, reps and effort).
 - Exercises you choose AUTONOMOUSLY as part of your own program design — i.e. not something the coach's
   description specifically named — must come ONLY from the coach's exercise library listed below, using the
   exact names given. Never invent an exercise name on your own.

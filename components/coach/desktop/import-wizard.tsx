@@ -516,6 +516,8 @@ export function ImportWizard({
     // several programs can be active at once, activation is per program.
 
     let failedWrites = 0;
+    // What the AI wrote, kept on the draft so that when the coach signs it off the app can quietly see what they changed (see /api/ai/sign-off).
+    const aiSnapshot: { week: number; day: number; order: number; name: string; sets: number; reps: string | null }[] = [];
     for (const week of weeks) {
       for (let dayIndex = 0; dayIndex < week.days.length; dayIndex++) {
         const day = week.days[dayIndex];
@@ -568,8 +570,12 @@ export function ImportWizard({
 
           const { error: setsError } = await supabase.from("group_workout_exercise_sets").insert(setsPayload);
           if (setsError) failedWrites += 1;
+          else aiSnapshot.push({ week: week.weekNumber, day: dayIndex + 1, order: exIndex, name: resolution.exerciseName, sets: setsPayload.length, reps: ex.reps });
         }
       }
+    }
+    if (importData.isAiSourced && aiSnapshot.length > 0) {
+      await supabase.from("programs").update({ ai_snapshot: aiSnapshot }).eq("id", programRow.id);
     }
 
     setSummary({
