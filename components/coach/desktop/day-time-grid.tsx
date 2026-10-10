@@ -32,6 +32,8 @@ import { CLIENT_DRAG_MIME, type DraggedClient } from "./draggable-client-name";
 import type { CalendarEventEntry } from "./calendar-grid";
 
 const UNDO_SECONDS = 8;
+// Space above the first hour so its label (centred on the hour line) is not clipped at the top of the scroller.
+const GRID_HEADROOM_PX = 12;
 
 type WindowWithType = AvailabilityWindow & { sessionTypeId?: string | null };
 
@@ -159,7 +161,7 @@ export function DayTimeGrid({
     // Opens on the day's first open hour or session instead of always at the top of the axis.
     const el = scrollerRef.current;
     if (!el || !Number.isFinite(firstBusyMin)) return;
-    el.scrollTop = Math.max(0, offsetFromMinute(firstBusyMin, range) - 24);
+    el.scrollTop = Math.max(0, offsetFromMinute(firstBusyMin, range) + GRID_HEADROOM_PX - 24);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dayKeyForScroll]);
 
@@ -379,8 +381,14 @@ export function DayTimeGrid({
 
       {error && <p className="px-3 py-2 font-body text-xs text-rust border-b border-steel/20">{error}</p>}
 
-      <div ref={scrollerRef} className="max-h-[min(560px,50vh)] overflow-y-auto">
-        <div className="flex">
+      <div
+        ref={scrollerRef}
+        tabIndex={0}
+        role="region"
+        aria-label="Day hours"
+        className="max-h-[min(560px,50vh)] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden focus-visible:outline focus-visible:outline-1 focus-visible:outline-rust"
+      >
+        <div className="flex" style={{ paddingTop: GRID_HEADROOM_PX, paddingBottom: GRID_HEADROOM_PX }}>
           <div className="relative w-14 shrink-0" style={{ height: trackHeight }} aria-hidden="true">
             {hours.map((m) => (
               <span key={m} className="absolute right-2 font-body text-[10px] text-steel -translate-y-1/2" style={{ top: offsetFromMinute(m, range) }}>
