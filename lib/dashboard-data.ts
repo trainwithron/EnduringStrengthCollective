@@ -114,6 +114,9 @@ export async function getCoachDashboardData(
     tileMetricOverrides?: Record<string, string>;
     // The coach's own time zone, so "today" is their day and not the server's (UTC). Without it the old UTC day is used.
     timezone?: string;
+    // The coach's own saved time zone, or null when they have none (the caller already read their profile). Only used to word "Next up: ... at 3:00 PM".
+    // When it is not passed the profile is read here, as before.
+    coachProfileTimezone?: string | null;
   }
 ): Promise<CoachDashboardData> {
   const { coachId, teamGroups, allGroups, tileMetricOverrides = {}, timezone } = params;
@@ -152,6 +155,9 @@ export async function getCoachDashboardData(
     { data: creditPurchaseRows },
     { data: matchedLoadSetRows },
     { data: nutritionPhaseRows },
+    inactiveKeys,
+    owedFirst,
+    { data: habitLogRows },
   ] = await Promise.all([
     supabase
       .from("group_memberships")
@@ -230,6 +236,17 @@ export async function getCoachDashboardData(
       .select("athlete_id, phase, created_at")
       .in("group_id", allGroupIds)
       .order("created_at", { ascending: false }),
+    // A client the coach has set aside as inactive (0281) is left out of every count and flag below; their data is untouched.
+    fetchInactiveKeys(supabase, allGroupIds),
+    // Clients who have run out of sessions (migration 0260 adds the hold flag; without it the select errors and is retried below without it).
+    supabase.from("session_credits").select("athlete_id, group_id, balance, payment_hold").in("group_id", allGroupIds).lte("balance", 0),
+    // The last seven days of check-offs for these groups' active habits, joined to the habit so it needs no wait for the habit list.
+    supabase
+      .from("habit_logs")
+      .select("habit_id, log_date, completed_at, client_habits!inner ( group_id, active )")
+      .in("client_habits.group_id", allGroupIds)
+      .eq("client_habits.active", true)
+      .gte("log_date", sevenDaysAgoKey),
   ]);
 
   // Most recent completed-workout date per athlete — first occurrence
@@ -310,15 +327,6 @@ export async function getCoachDashboardData(
     list.push({ id: h.id, weekdays: h.weekdays });
     habitsByAthlete.set(h.athlete_id, list);
   }
-  const habitIds = (habitRows ?? []).map((h) => h.id);
-  const { data: habitLogRows } =
-    habitIds.length > 0
-      ? await supabase
-          .from("habit_logs")
-          .select("habit_id, log_date, completed_at")
-          .in("habit_id", habitIds)
-          .gte("log_date", sevenDaysAgoKey)
-      : { data: [] as { habit_id: string; log_date: string; completed_at: string | null }[] };
 
   const windowDates: Date[] = [];
   for (let i = 0; i < 7; i++) {
@@ -343,8 +351,6 @@ export async function getCoachDashboardData(
     string,
     { profileId: string; groupId: string; groupName: string; fullName: string; monthlyRate: number | null; joinedAt: string | null; signedIn: boolean }
   >();
-  // A client the coach has set aside as inactive (0281) is left out of every count and flag below; their data is untouched.
-  const inactiveKeys = await fetchInactiveKeys(supabase, allGroupIds);
   const rateByMembership = ratesByMembership(rateRows);
   for (const row of athleteRows ?? []) {
     if (athleteByProfileId.has(row.profile_id)) continue;
@@ -363,11 +369,7 @@ export async function getCoachDashboardData(
   const athletes = [...athleteByProfileId.values()];
 
   // Clients who have run out of sessions (migration 0260 adds the hold flag; without it nobody is on hold).
-  let owedResult: any = await supabase
-    .from("session_credits")
-    .select("athlete_id, group_id, balance, payment_hold")
-    .in("group_id", allGroupIds)
-    .lte("balance", 0);
+  let owedResult: any = owedFirst;
   if (owedResult.error) {
     owedResult = await supabase.from("session_credits").select("athlete_id, group_id, balance").in("group_id", allGroupIds).lte("balance", 0);
   }
@@ -548,7 +550,7 @@ export async function getCoachDashboardData(
       } else if (bookingRows && bookingRows.length > 0) {
         const next = bookingRows[0] as any;
         // In the coach's own time zone (this runs on the server, which is UTC).
-        const nextTime = formatInTimezone(next.start_at, await timezoneForProfiles(supabase, [coachId]), "time");
+        const nextTime = formatInTimezone(next.start_at, (params.coachProfileTimezone !== undefined ? params.coachProfileTimezone : await timezoneForProfiles(supabase, [coachId])), "time");
         heroEmptyState = {
           kind: "next_session",
           text: `Next up: ${next.profiles?.full_name ?? "a client"} at ${nextTime}.`,

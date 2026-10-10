@@ -763,14 +763,12 @@ export async function CoachCalendarPageBody(
     );
   }
 
-  const { data: group } = await supabase
-    .from("groups")
-    .select("name, organization_id")
-    .eq("id", params.groupId)
-    .single();
-
-  // "Today" is the coach's today (the server runs in UTC: on a Saturday or Sunday evening in Pacific time it would already be next week).
-  const { data: earlyTzRow } = await supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle();
+  // The group and the coach's time zone do not depend on each other: one round.
+  const [{ data: group }, { data: earlyTzRow }] = await Promise.all([
+    supabase.from("groups").select("name, organization_id").eq("id", params.groupId).single(),
+    // "Today" is the coach's today (the server runs in UTC: on a Saturday or Sunday evening in Pacific time it would already be next week).
+    supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle(),
+  ]);
   const today = dateFromKey(dateKeyInZone((earlyTzRow?.timezone as string | null) ?? DEFAULT_COACH_TIMEZONE));
   const view = searchParams.view === "week" ? "week" : "month";
   const monthParam = searchParams.month;
@@ -811,7 +809,7 @@ export async function CoachCalendarPageBody(
     { data: memberships },
     { data: activePrograms },
     { data: recentLogRows },
-    { data: coachProfile },
+    { data: groupItemRows },
     { data: windowRows },
     { data: exceptionRows },
   ] = await Promise.all([
@@ -864,7 +862,14 @@ export async function CoachCalendarPageBody(
       .select("athlete_id, created_at")
       .eq("group_id", params.groupId)
       .order("created_at", { ascending: false }),
-    supabase.from("profiles").select("timezone").eq("id", user.id).maybeSingle(),
+    // Group items on the coach's calendar: every group event and every small-group class in the visible range.
+    supabase
+      .from("group_sessions")
+      .select("id, title, start_at, end_at, kind, group_id, anchor_booking_id")
+      .eq("coach_id", user.id)
+      .eq("status", "scheduled")
+      .gte("start_at", new Date(rangeStart.getTime() - 36 * 3600000).toISOString())
+      .lt("start_at", new Date(rangeEnd.getTime() + 36 * 3600000).toISOString()),
     supabase
       .from("coach_availability_windows")
       .select("id, weekday, start_time, end_time, slot_duration_minutes")
@@ -879,20 +884,91 @@ export async function CoachCalendarPageBody(
 
   // Dates and times on the COACH's clock. This page renders on the server, which runs in UTC: without the zone an evening session lands on
   // tomorrow's cell and a 6:00 AM one reads 1:00 PM.
-  const bookingTz = coachProfile?.timezone ?? DEFAULT_COACH_TIMEZONE;
+  const bookingTz = earlyTzRow?.timezone ?? DEFAULT_COACH_TIMEZONE;
   // Group items on the coach's calendar: every group event (labelled with its group's name) and every small-group class. Each one holds the coach's time with a hidden
   // booking of the coach's own; that stand-in is left out below so the item shows once, under its real name.
-  const { data: groupItemRows } = await supabase
-    .from("group_sessions")
-    .select("id, title, start_at, end_at, kind, group_id, anchor_booking_id")
-    .eq("coach_id", user.id)
-    .eq("status", "scheduled")
-    .gte("start_at", new Date(rangeStart.getTime() - 36 * 3600000).toISOString())
-    .lt("start_at", new Date(rangeEnd.getTime() + 36 * 3600000).toISOString());
   const groupItems = (groupItemRows ?? []) as { id: string; title: string; start_at: string; end_at: string; kind: string; group_id: string | null; anchor_booking_id: string | null }[];
   const anchorIds = new Set(groupItems.map((g) => g.anchor_booking_id).filter((x): x is string => !!x));
   const itemGroupIds = Array.from(new Set(groupItems.map((g) => g.group_id).filter((x): x is string => !!x)));
-  const { data: itemGroupRows } = itemGroupIds.length ? await supabase.from("groups").select("id, name").in("id", itemGroupIds) : { data: [] as { id: string; name: string }[] };
+
+  // Round 2: everything else that does not depend on the list of clients, as one batch.
+  const activeProgramIds = (activePrograms ?? []).map((p) => p.id);
+  const nowIsoForTypes = new Date().toISOString();
+  const [
+    coachClients,
+    bookingCounts,
+    attendedSessions,
+    coachedGroupsAll,
+    calendarSpotterFindings,
+    schedulingSpotterFlags,
+    sessionIndex,
+    sessionProbe,
+    { data: gapPolicy },
+    { data: typeRows },
+    typedBookings,
+    { data: windowTypeRows },
+    { data: allProgramWorkouts },
+    { data: itemGroupRows },
+  ] = await Promise.all([
+    // Every client across the coach's groups, each with their own group (a one-on-one client lives in their own group).
+    getCoachClients(supabase, user.id, params.groupId),
+    // Sessions the coach scheduled that have not happened yet (confirmed, not yet settled): they take a session when they do, so each client shows
+    // "2 left, 1 pending". A client's own workouts never appear here: they cost nothing.
+    fetchBookingCounts(supabase, { coachId: user.id }),
+    // A session the coach marked attended counts as activity too: a client trained in person with the coach is not "quiet" just because nothing was logged in the app.
+    pageAll(
+      (from, to) =>
+        supabase
+          .from("bookings")
+          .select("id, athlete_id, start_at")
+          .eq("coach_id", user.id)
+          .not("attended_at", "is", null)
+          .order("start_at", { ascending: false })
+          .order("id", { ascending: true })
+          .range(from, to),
+      { maxPages: 3 }
+    ),
+    getCoachedGroups(supabase, user.id),
+    gatherCalendarSpotterFindings(supabase, { groupId: params.groupId, coachId: user.id }),
+    gatherSchedulingSpotterFlags(supabase, {
+      coachId: user.id,
+      organizationId: group?.organization_id ?? null,
+    }),
+    fetchSessionMinutes(supabase, [user.id]),
+    // The Availability tab shows the same three numbers (slot step, session length, gap) as the Availability page; each hides itself until its database column exists.
+    supabase.from("coach_availability_windows").select("session_minutes").eq("coach_id", user.id).limit(1),
+    supabase.from("coach_booking_policies").select("buffer_minutes").eq("coach_id", user.id).maybeSingle(),
+    // Session types (Online, In person...) and each client's usual one: the type of their latest typed session, else the one type that fits their tier.
+    supabase.from("session_types").select("id, name, location_kind").eq("coach_id", user.id).order("name", { ascending: true }),
+    // Past sessions only (future ones would fill the list), newest first, a page at a time past the 1000-row cap.
+    pageAll(
+      (from, to) =>
+        supabase
+          .from("bookings")
+          .select("id, athlete_id, session_type_id, start_at")
+          .eq("coach_id", user.id)
+          .not("session_type_id", "is", null)
+          .lt("start_at", nowIsoForTypes)
+          .order("start_at", { ascending: false })
+          .order("id", { ascending: true })
+          .range(from, to),
+      { maxPages: 4 }
+    ),
+    // Which of the coach's types each window of hours is set aside for (a guide, never a block).
+    supabase.from("coach_availability_windows").select("id, session_type_id").eq("coach_id", user.id),
+    // One batched query covers every active program's workouts at once.
+    activeProgramIds.length
+      ? supabase
+          .from("workouts")
+          .select("id, title, week_number, day_index, program_id, scheduled_date")
+          .in("program_id", activeProgramIds)
+          .order("week_number", { ascending: true })
+          .order("day_index", { ascending: true })
+      : Promise.resolve({
+          data: [] as { id: string; title: string; week_number: number; day_index: number; program_id: string; scheduled_date: string | null }[],
+        }),
+    itemGroupIds.length ? supabase.from("groups").select("id, name").in("id", itemGroupIds) : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+  ]);
   const itemGroupName = new Map((itemGroupRows ?? []).map((g) => [g.id, g.name as string]));
 
   const bookingsByDateKey = new Map<string, { time: string; name: string; startMs?: number; endMs?: number }[]>();
@@ -925,18 +1001,27 @@ export async function CoachCalendarPageBody(
     });
   }
 
-  // Every client across the coach's groups, each with their own group (a one-on-one client lives in their own group).
-  const coachClients = await getCoachClients(supabase, user.id, params.groupId);
   const clientIds = coachClients.map((c) => c.id);
-  const creditRows = (
-    await Promise.all(chunk(clientIds, 100).map((ids) => supabase.from("session_credits").select("athlete_id, group_id, balance").in("athlete_id", ids)))
-  ).flatMap((r) => r.data ?? []);
+  const clientGroupIds = Array.from(new Set(coachClients.map((c) => c.groupId)));
+
+  // Round 3: what depends on who the clients are, as one batch: their session balances, who is set aside, and what the app knows about each client's start.
+  const [creditBatches, setAsideKeySet, membershipBatches] = await Promise.all([
+    Promise.all(chunk(clientIds, 100).map((ids) => supabase.from("session_credits").select("athlete_id, group_id, balance").in("athlete_id", ids))),
+    fetchInactiveKeys(supabase, clientGroupIds),
+    Promise.all(
+      chunk(clientIds, 100).map((ids) =>
+        supabase
+          .from("group_memberships")
+          .select("profile_id, group_id, joined_at, client_tier, profiles ( claimed_at )")
+          .in("profile_id", ids)
+          .in("group_id", clientGroupIds.length > 0 ? clientGroupIds : [""])
+          .eq("role", "athlete")
+      )
+    ),
+  ]);
+  const creditRows = creditBatches.flatMap((r) => r.data ?? []);
 
   const balanceByClientGroup = new Map((creditRows ?? []).map((r) => [`${r.athlete_id}:${r.group_id}`, r.balance as number]));
-
-  // Sessions the coach scheduled that have not happened yet (confirmed, not yet settled): they take a session when they do, so each client shows
-  // "2 left, 1 pending". A client's own workouts never appear here: they cost nothing.
-  const bookingCounts = await fetchBookingCounts(supabase, { coachId: user.id });
 
   const clients = coachClients.map((c) => ({
     profileId: c.id,
@@ -949,20 +1034,7 @@ export async function CoachCalendarPageBody(
 
   // Who the coach has set aside (left out of the flags and hidden in the list until asked for), and what the app knows about each client's start: when they
   // joined, whether they have signed in, and their tier (for their usual session type).
-  const clientGroupIds = Array.from(new Set(clients.map((c) => c.groupId)));
-  const setAsideKeySet = await fetchInactiveKeys(supabase, clientGroupIds);
-  const clientMembershipRows = (
-    await Promise.all(
-      chunk(clientIds, 100).map((ids) =>
-        supabase
-          .from("group_memberships")
-          .select("profile_id, group_id, joined_at, client_tier, profiles ( claimed_at )")
-          .in("profile_id", ids)
-          .in("group_id", clientGroupIds.length > 0 ? clientGroupIds : [""])
-          .eq("role", "athlete")
-      )
-    )
-  ).flatMap((r) => r.data ?? []);
+  const clientMembershipRows = membershipBatches.flatMap((r) => r.data ?? []);
   const membershipByClient = new Map(
     ((clientMembershipRows ?? []) as any[]).map((m) => [
       `${m.group_id}:${m.profile_id}`,
@@ -978,24 +1050,6 @@ export async function CoachCalendarPageBody(
   // program, sequentially, inside the loop below — a group with a dozen
   // active programs paid a dozen extra round trips on every calendar
   // load. One batched query covers every program's workouts at once.
-  const activeProgramIds = (activePrograms ?? []).map((p) => p.id);
-  const { data: allProgramWorkouts } = activeProgramIds.length
-    ? await supabase
-        .from("workouts")
-        .select("id, title, week_number, day_index, program_id, scheduled_date")
-        .in("program_id", activeProgramIds)
-        .order("week_number", { ascending: true })
-        .order("day_index", { ascending: true })
-    : {
-        data: [] as {
-          id: string;
-          title: string;
-          week_number: number;
-          day_index: number;
-          program_id: string;
-          scheduled_date: string | null;
-        }[],
-      };
   const workoutsByProgramId = new Map<string, typeof allProgramWorkouts>();
   for (const w of allProgramWorkouts ?? []) {
     const list = workoutsByProgramId.get(w.program_id) ?? [];
@@ -1045,19 +1099,6 @@ export async function CoachCalendarPageBody(
   for (const log of recentLogRows ?? []) {
     if (!lastLogByAthlete.has(log.athlete_id)) lastLogByAthlete.set(log.athlete_id, log.created_at);
   }
-  // A session the coach marked attended counts as activity too: a client trained in person with the coach is not "quiet" just because nothing was logged in the app.
-  const attendedSessions = await pageAll(
-    (from, to) =>
-      supabase
-        .from("bookings")
-        .select("id, athlete_id, start_at")
-        .eq("coach_id", user.id)
-        .not("attended_at", "is", null)
-        .order("start_at", { ascending: false })
-        .order("id", { ascending: true })
-        .range(from, to),
-    { maxPages: 3 }
-  );
   for (const s of attendedSessions.rows as { athlete_id: string; start_at: string }[]) {
     const seen = lastLogByAthlete.get(s.athlete_id);
     if (!seen || s.start_at > seen) lastLogByAthlete.set(s.athlete_id, s.start_at);
@@ -1098,20 +1139,10 @@ export async function CoachCalendarPageBody(
   });
 
   // The groups a coach can add an event to (team and social groups; a one-on-one client's space is not a group event).
-  const eventGroups = (await getCoachedGroups(supabase, user.id)).filter((g) => g.kind !== "one_on_one").map((g) => ({ id: g.id, name: g.name }));
+  const eventGroups = coachedGroupsAll.filter((g) => g.kind !== "one_on_one").map((g) => ({ id: g.id, name: g.name }));
 
-  const calendarSpotterFindings = await gatherCalendarSpotterFindings(supabase, { groupId: params.groupId, coachId: user.id });
-  const schedulingSpotterFlags = await gatherSchedulingSpotterFlags(supabase, {
-    coachId: user.id,
-    organizationId: group?.organization_id ?? null,
-  });
+  const timezone = earlyTzRow?.timezone ?? DEFAULT_COACH_TIMEZONE;
 
-  const timezone = coachProfile?.timezone ?? DEFAULT_COACH_TIMEZONE;
-
-  const sessionIndex = await fetchSessionMinutes(supabase, [user.id]);
-  // The Availability tab shows the same three numbers (slot step, session length, gap) as the Availability page; each hides itself until its database column exists.
-  const sessionProbe = await supabase.from("coach_availability_windows").select("session_minutes").eq("coach_id", user.id).limit(1);
-  const { data: gapPolicy } = await supabase.from("coach_booking_policies").select("buffer_minutes").eq("coach_id", user.id).maybeSingle();
   const availabilityWindows = (windowRows ?? []).map((w) => ({
     id: w.id,
     weekday: w.weekday,
@@ -1130,31 +1161,12 @@ export async function CoachCalendarPageBody(
     endTime: e.end_time,
   }));
 
-  // Session types (Online, In person...) and each client's usual one: the type of their latest typed session, else the one type that fits their tier.
-  const { data: typeRows } = await supabase.from("session_types").select("id, name, location_kind").eq("coach_id", user.id).order("name", { ascending: true });
   const sessionTypes = ((typeRows ?? []) as { id: string; name: string; location_kind: "in_person" | "online" | "either" | null }[]).map((t) => ({ id: t.id, name: t.name, locationKind: t.location_kind }));
-  // Past sessions only (future ones would fill the list), newest first, a page at a time past the 1000-row cap.
-  const nowIsoForTypes = new Date().toISOString();
-  const typedBookings = await pageAll(
-    (from, to) =>
-      supabase
-        .from("bookings")
-        .select("id, athlete_id, session_type_id, start_at")
-        .eq("coach_id", user.id)
-        .not("session_type_id", "is", null)
-        .lt("start_at", nowIsoForTypes)
-        .order("start_at", { ascending: false })
-        .order("id", { ascending: true })
-        .range(from, to),
-    { maxPages: 4 }
-  );
   const lastTypes = lastTypeByClient(typedBookings.rows as { athlete_id: string; session_type_id: string | null; start_at: string }[]);
   const defaultTypeByClient: Record<string, string | null> = {};
   for (const c of clients) {
     defaultTypeByClient[c.profileId] = defaultSessionTypeId({ lastTypeId: lastTypes[c.profileId], tier: membershipByClient.get(`${c.groupId}:${c.profileId}`)?.tier, types: sessionTypes });
   }
-  // Which of the coach's types each window of hours is set aside for (a guide, never a block).
-  const { data: windowTypeRows } = await supabase.from("coach_availability_windows").select("id, session_type_id").eq("coach_id", user.id);
   const windowTypeById = new Map(((windowTypeRows ?? []) as { id: string; session_type_id: string | null }[]).map((r) => [r.id, r.session_type_id]));
   const windowsWithTypes = availabilityWindows.map((w) => ({ ...w, sessionTypeId: windowTypeById.get(w.id) ?? null }));
   const selectedClientId = searchParams.client;

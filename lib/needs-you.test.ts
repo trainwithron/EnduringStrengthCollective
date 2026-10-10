@@ -280,8 +280,8 @@ describe("the wording", () => {
 describe("Home is wired as designed", () => {
   const page = readFileSync(join(__dirname, "..", "app/(coach)/dashboard/page.tsx"), "utf8").replace(/\r\n/g, "\n");
   it("the strip sits above everything else and the stack below keeps all its panels", () => {
-    expect(page.indexOf("<NeedsYouStrip")).toBeGreaterThan(-1);
-    expect(page.indexOf("<NeedsYouStrip")).toBeLessThan(page.indexOf("<YourDayPanel"));
+    expect(page.indexOf("<NeedsYouLoader")).toBeGreaterThan(-1);
+    expect(page.indexOf("<NeedsYouLoader")).toBeLessThan(page.indexOf("<YourDayPanel"));
     for (const p of ["<OrgNotificationsPanel", "<NeedsReplyPanel", "<LateChangesPanel", "<ScheduleRequestsPanel", "<ExpiryCheckInPanel", "<InactiveClientsPanel", "<ProgressLookPanel", "<NeedsPaymentPanel"]) {
       expect(page.indexOf(p)).toBeGreaterThan(page.indexOf('id="needs-stack"'));
     }
@@ -295,9 +295,12 @@ describe("Home is wired as designed", () => {
     expect(page).toContain("heroFlag: dashboardData.heroFlag");
   });
   it("a failure gathering the strip never fails the page", () => {
-    expect(page).toMatch(/try \{\s*const needsYou = await loadNeedsYouItems\(/);
-    expect(page).toContain("pickNeedsYou([], { incomplete: true })");
-    expect(page).toContain("incomplete: needsYou.failed.length > 0");
+    // The strip loads in its own component behind a Suspense, and keeps its own failure guard.
+    const loader = readFileSync(join(__dirname, "..", "components/coach/desktop/needs-you-loader.tsx"), "utf8").replace(/\r\n/g, "\n");
+    expect(page).toContain("<Suspense fallback={<NeedsYouLoading />}>");
+    expect(loader).toMatch(/try \{\s*const needsYou = await loadNeedsYouItems\(/);
+    expect(loader).toContain("pickNeedsYou([], { incomplete: true })");
+    expect(loader).toContain("incomplete: needsYou.failed.length > 0");
   });
 });
 

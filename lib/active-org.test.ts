@@ -123,6 +123,6 @@ describe("Home is scoped to the active organization everywhere", () => {
   it("the Spotter list and the Right now box are gone from Home (they were copies), and the other boxes stay", () => {
     expect(page).not.toContain("<CollectiveIntelligencePanel");
     expect(page).not.toContain("<DashboardHero");
-    for (const keep of ["<NeedsYouStrip", "<YourDayPanel", "<PulseTabs", "<DashboardTileGrid", "<NeedsReplyPanel", "<OrgNotificationsPanel", "<NeedsPaymentPanel"]) expect(page).toContain(keep);
+    for (const keep of ["<NeedsYouLoader", "<YourDayPanel", "<PulseTabs", "<DashboardTileGrid", "<NeedsReplyPanel", "<OrgNotificationsPanel", "<NeedsPaymentPanel"]) expect(page).toContain(keep);
   });
 });

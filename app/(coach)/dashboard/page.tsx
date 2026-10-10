@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { NoAccess } from "@/components/shared/no-access";
 import { cookies } from "next/headers";
 import { loadStartInputs, parseLastGroupCookie, pickStartGroup } from "@/lib/start-group";
@@ -39,9 +40,7 @@ import { StuckDesktopModeBanner } from "@/components/coach/desktop/stuck-desktop
 import { fetchInactiveKeys, inactiveKey } from "@/lib/inactive-ids";
 import { TerminologyFirstRunCard } from "@/components/coach/desktop/terminology-first-run-card";
 import { GettingStartedCard } from "@/components/coach/desktop/getting-started-card";
-import { NeedsYouStrip } from "@/components/coach/desktop/needs-you-strip";
-import { pickNeedsYou } from "@/lib/needs-you";
-import { loadNeedsYouItems } from "@/lib/needs-you-data";
+import { NeedsYouLoader, NeedsYouLoading } from "@/components/coach/desktop/needs-you-loader";
 
 interface GroupRow {
   id: string;
@@ -122,72 +121,85 @@ export default async function CoachHomePage() {
   // in this spot) sees it immediately instead of hunting for tiny text.
   const stuckInDesktopModeOnRealPhone = await isMobileUserAgent();
 
-  // A coach can own/admin more than one organization (e.g. running
-  // several client orgs at once) — fetching every row here, not just
-  // one, so Home aggregates groups across ALL of them rather than
-  // silently collapsing to just the directly-coached groups the moment
-  // there's more than one org membership.
-  const { data: orgMemberships } = await supabase
-    .from("organization_memberships")
-    .select("organization_id, role")
-    .eq("profile_id", user.id);
-
   // Home belongs to ONE organization at a time: the one the coach chose with the organization switcher (else their first). Everything on it, and every count, is that
   // organization's; another one appears only after switching to it.
-  const coachedForOrg = await getCoachedGroups(supabase, user.id);
   // The organization they last used (the switcher remembers it); with none remembered, the one with the most clients.
   const rememberedWorkspace = (await cookies()).get(LAST_WORKSPACE_GROUP_COOKIE)?.value ?? null;
+  const todayKey = new Date().toISOString().slice(0, 10);
+
+  // Round 1: everything that needs only who the coach is, as one batch.
+  const [
+    // A coach can own/admin more than one organization (e.g. running several client orgs at once) — fetching every row here, not just
+    // one, so Home aggregates groups across ALL of them rather than silently collapsing to just the directly-coached groups the moment
+    // there's more than one org membership.
+    { data: orgMemberships },
+    coachedForOrg,
+    { data: viewerProfile },
+    { data: coachProfileRow },
+    // Separate on purpose: until migration 0249 is applied this select errors and the field is just empty.
+    { data: completionMessageRow },
+    // Same merge shape GroupSwitcher already uses: every group this coach coaches, plus every group in each org where they're an owner/admin.
+    { data: coachedRows },
+    // Per-coach tile arrangement + hover-peek defaults — a real DB row, not localStorage, so it follows a coach across devices.
+    { data: layoutRow },
+    // AI Assistant Slice 2 ("Collective Intelligence") — today's briefing, if the cron has already run. RLS already scopes this to athletes this
+    // coach actually staffs, so a plain select needs no extra group filtering.
+    { data: todaysBriefing },
+    // Real org-level notifications (trainer-dispatch admin alerts, cascade offers, question replies) are inserted with group_id: null since they're
+    // inherently org-wide, not tied to one specific group. This is the one page in the app that's already cross-group by design.
+    { data: orgNotificationRows },
+  ] = await Promise.all([
+    supabase.from("organization_memberships").select("organization_id, role").eq("profile_id", user.id),
+    getCoachedGroups(supabase, user.id),
+    supabase.from("profiles").select("full_name, timezone").eq("id", user.id).maybeSingle(),
+    supabase.from("coach_profiles").select("bio, photo_url").eq("coach_id", user.id).maybeSingle(),
+    supabase.from("coach_profiles").select("completion_message").eq("coach_id", user.id).maybeSingle(),
+    supabase.from("group_memberships").select("groups ( id, name, focus_tag, group_kind, organization_id )").eq("profile_id", user.id).eq("role", "coach"),
+    supabase.from("coach_dashboard_layout").select("hidden_tiles, tile_order, tile_metric_overrides").eq("coach_id", user.id).maybeSingle(),
+    supabase.from("coach_briefings").select("id").eq("coach_id", user.id).eq("briefing_date", todayKey).maybeSingle(),
+    supabase
+      .from("notifications")
+      .select("id, type, body, link_path, created_at")
+      .eq("profile_id", user.id)
+      .is("group_id", null)
+      .is("read_at", null)
+      .order("created_at", { ascending: false })
+      .limit(20),
+  ]);
+
   const clientsByOrg = rememberedOrgId(coachedForOrg, rememberedWorkspace) ? {} : await clientCountsByOrg(supabase, coachedForOrg);
   const homeOrgId = activeOrgId(coachedForOrg, rememberedWorkspace, clientsByOrg);
   const primaryOrgMembership = (homeOrgId ? orgMemberships?.find((m) => m.organization_id === homeOrgId) : null) ?? orgMemberships?.[0] ?? null;
-  const { data: viewerProfile } = await supabase.from("profiles").select("full_name, timezone").eq("id", user.id).maybeSingle();
   // The coach's own time zone: "today" on this page is their day, not the server's.
   const coachTimezone = isValidTimeZone(viewerProfile?.timezone) ? (viewerProfile!.timezone as string) : DEFAULT_COACH_TIMEZONE;
-  const { data: coachProfileRow } = await supabase
-    .from("coach_profiles")
-    .select("bio, photo_url")
-    .eq("coach_id", user.id)
-    .maybeSingle();
-  // Separate on purpose: until migration 0249 is applied this select errors and the field is just empty.
-  const { data: completionMessageRow } = await supabase
-    .from("coach_profiles")
-    .select("completion_message")
-    .eq("coach_id", user.id)
-    .maybeSingle();
-  const { data: org } = primaryOrgMembership
-    ? await supabase
-        .from("organizations")
-        .select("name, display_name")
-        .eq("id", primaryOrgMembership.organization_id)
-        .maybeSingle()
-    : { data: null };
 
-  // Same merge shape GroupSwitcher already uses: every group this coach
-  // coaches, plus every group in each org where they're an owner/admin.
   const byId = new Map<string, GroupRow>();
-
-  const { data: coachedRows } = await supabase
-    .from("group_memberships")
-    .select("groups ( id, name, focus_tag, group_kind, organization_id )")
-    .eq("profile_id", user.id)
-    .eq("role", "coach");
   for (const row of coachedRows ?? []) {
     const g = (row as any).groups as GroupRow | null;
     if (g) byId.set(g.id, g);
   }
-
   const adminOrgIds = (orgMemberships ?? [])
     .filter((m) => m.role === "owner" || m.role === "admin")
     .map((m) => m.organization_id)
     .filter((id) => !homeOrgId || id === homeOrgId);
-  if (adminOrgIds.length > 0) {
-    const { data: allGroupRows } = await supabase
-      .from("groups")
-      .select("id, name, focus_tag, group_kind, organization_id")
-      .in("organization_id", adminOrgIds)
-      .order("name");
-    for (const g of allGroupRows ?? []) byId.set(g.id, g as GroupRow);
-  }
+
+  // Round 2: the organization's name, the groups of the organizations they administer, and today's briefing items.
+  const [{ data: org }, allGroupRows, { data: briefingItemRows }] = await Promise.all([
+    primaryOrgMembership
+      ? supabase.from("organizations").select("name, display_name").eq("id", primaryOrgMembership.organization_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    adminOrgIds.length > 0
+      ? supabase.from("groups").select("id, name, focus_tag, group_kind, organization_id").in("organization_id", adminOrgIds).order("name")
+      : Promise.resolve({ data: null }),
+    todaysBriefing
+      ? supabase
+          .from("coach_briefing_items")
+          .select("id, item_type, headline, athlete_id, group_id")
+          .eq("briefing_id", todaysBriefing.id)
+          .order("sort_order", { ascending: true })
+      : Promise.resolve({ data: null }),
+  ]);
+  for (const g of allGroupRows.data ?? []) byId.set(g.id, g as GroupRow);
 
   // Only the active organization's groups from here on (the coached groups above may span several organizations).
   for (const g of [...byId.values()]) if (inActiveOrg([g], homeOrgId).length === 0) byId.delete(g.id);
@@ -218,74 +230,35 @@ export default async function CoachHomePage() {
   const teamGroups = allGroups
     .filter((g) => g.group_kind === "team" || !g.group_kind)
     .sort((a, b) => a.name.localeCompare(b.name));
-
-  // Per-coach tile arrangement + hover-peek defaults (coach_dashboard_
-  // redesign_scoping.md's customization layer) — a real DB row, not
-  // localStorage, so it follows a coach across devices.
-  const { data: layoutRow } = await supabase
-    .from("coach_dashboard_layout")
-    .select("hidden_tiles, tile_order, tile_metric_overrides")
-    .eq("coach_id", user.id)
-    .maybeSingle();
   const tileMetricOverrides = (layoutRow?.tile_metric_overrides as Record<string, string>) ?? {};
 
-  // "N — Dual Signal" (coach_dashboard_redesign_scoping.md) — the hero
-  // flag/empty-state, per-team-group Team Pulse, stat tiles, today's
-  // bookings, and the frequency-normalized quiet-client tiers all come
-  // from one batched fetch, kept in its own lib since it's real DB
-  // orchestration (untested), pairing with the tested pure logic in
-  // lib/team-pulse.ts / lib/quiet-client-tier.ts / lib/coach-hero-priority.ts.
-  const dashboardData = await getCoachDashboardData(supabase, {
-    coachId: user.id,
-    teamGroups: teamGroups.map((g) => ({ id: g.id, name: g.name, orgName: orgNameByGroupId(g.organization_id) })),
-    allGroups: allGroups.map((g) => ({ id: g.id, name: g.name, orgName: orgNameByGroupId(g.organization_id) })),
-    tileMetricOverrides,
-    timezone: coachTimezone,
-  });
-
-  // "Has something new happened here" dot — same coach_view_state data
-  // and same signals (posts since feed_seen_at, workout_logs since
-  // clients_seen_at) already driving the sidebar's unread counts inside
-  // a group, just collapsed to a boolean for the Home card. A group with
-  // no coach_view_state row yet (never visited) gets no dot — nothing to
-  // compare against, matching the existing "don't flood on first look"
-  // rule the shell's own seeding already follows.
-  // AI Assistant Slice 2 ("Collective Intelligence") — today's briefing,
-  // if the cron has already run. RLS (coach_briefing_items_select_
-  // assigned_or_cascade) already scopes this to athletes this coach
-  // actually staffs, so a plain select needs no extra group filtering.
-  const todayKey = new Date().toISOString().slice(0, 10);
-  const { data: todaysBriefing } = await supabase
-    .from("coach_briefings")
-    .select("id")
-    .eq("coach_id", user.id)
-    .eq("briefing_date", todayKey)
-    .maybeSingle();
-  let collectiveIntelligenceItems: CollectiveIntelligenceItem[] = [];
-  if (todaysBriefing) {
-    const { data: briefingItemRows } = await supabase
-      .from("coach_briefing_items")
-      .select("id, item_type, headline, athlete_id, group_id")
-      .eq("briefing_id", todaysBriefing.id)
-      .order("sort_order", { ascending: true });
-    collectiveIntelligenceItems = (briefingItemRows ?? []).map((row) => ({
-      id: row.id,
-      itemType: row.item_type as CollectiveIntelligenceItem["itemType"],
-      headline: row.headline,
-      athleteId: row.athlete_id,
-      groupId: row.group_id,
-    }));
-  }
+  let collectiveIntelligenceItems: CollectiveIntelligenceItem[] = (briefingItemRows ?? []).map((row) => ({
+    id: row.id,
+    itemType: row.item_type as CollectiveIntelligenceItem["itemType"],
+    headline: row.headline,
+    athleteId: row.athlete_id,
+    groupId: row.group_id,
+  }));
 
   const allGroupIds = allGroups.map((g) => g.id);
   // The briefing's items name a group: only this organization's are shown.
   collectiveIntelligenceItems = collectiveIntelligenceItems.filter((i) => !i.groupId || allGroupIds.includes(i.groupId));
-  const unseenByGroup = new Map<string, boolean>();
-  if (allGroupIds.length > 0) {
+
+  const teamAndSocialIds = [...teamGroups, ...socialGroups].map((g) => g.id);
+  const soloGroupIds = soloGroups.map((g) => g.id);
+  const day = localDayBounds(coachTimezone);
+  const allGroupIdList = allGroups.map((g) => g.id);
+
+  // "Has something new happened here" dot — same coach_view_state data and same signals (posts since feed_seen_at, workout_logs since clients_seen_at)
+  // already driving the sidebar's unread counts inside a group, just collapsed to a boolean for the Home card. A group with no coach_view_state row yet
+  // (never visited) gets no dot — nothing to compare against.
+  async function loadUnseenByGroup(): Promise<Map<string, boolean>> {
+    const unseen = new Map<string, boolean>();
+    if (allGroupIds.length === 0) return unseen;
     const { data: viewStateRows } = await supabase
       .from("coach_view_state")
       .select("group_id, feed_seen_at, clients_seen_at")
-      .eq("coach_id", user.id)
+      .eq("coach_id", user!.id)
       .in("group_id", allGroupIds);
 
     const seenByGroup = new Map<string, { feed: string | null; clients: string | null }>();
@@ -302,70 +275,36 @@ export default async function CoachHomePage() {
 
       for (const groupId of visitedGroupIds) {
         const seen = seenByGroup.get(groupId)!;
-        const hasNewPost = (recentPosts ?? []).some(
-          (p) => p.group_id === groupId && (!seen.feed || p.created_at > seen.feed)
-        );
-        const hasNewLog = (recentGroupLogs ?? []).some(
-          (l) => l.group_id === groupId && (!seen.clients || l.created_at > seen.clients)
-        );
-        unseenByGroup.set(groupId, hasNewPost || hasNewLog);
+        const hasNewPost = (recentPosts ?? []).some((p) => p.group_id === groupId && (!seen.feed || p.created_at > seen.feed));
+        const hasNewLog = (recentGroupLogs ?? []).some((l) => l.group_id === groupId && (!seen.clients || l.created_at > seen.clients));
+        unseen.set(groupId, hasNewPost || hasNewLog);
       }
     }
+    return unseen;
   }
 
   // Member counts for team/social group cards.
-  const teamAndSocialIds = [...teamGroups, ...socialGroups].map((g) => g.id);
-  const memberCountByGroup = new Map<string, number>();
-  if (teamAndSocialIds.length > 0) {
-    const { data: memberRows } = await supabase
-      .from("group_memberships")
-      .select("group_id")
-      .in("group_id", teamAndSocialIds);
+  async function loadMemberCounts(): Promise<Map<string, number>> {
+    const counts = new Map<string, number>();
+    if (teamAndSocialIds.length === 0) return counts;
+    const { data: memberRows } = await supabase.from("group_memberships").select("group_id").in("group_id", teamAndSocialIds);
     for (const row of memberRows ?? []) {
-      memberCountByGroup.set(row.group_id, (memberCountByGroup.get(row.group_id) ?? 0) + 1);
+      counts.set(row.group_id, (counts.get(row.group_id) ?? 0) + 1);
     }
+    return counts;
   }
 
-  // overnight_comprehensive_polish_pass_sept19_20.md, finding #1 — real
-  // org-level notifications (trainer-dispatch admin alerts, cascade
-  // offers, question replies) are inserted with group_id: null since
-  // they're inherently org-wide, not tied to one specific group. This is
-  // the one page in the app that's already cross-group by design, so
-  // it's the natural (and now only) in-app place these can surface.
-  const { data: orgNotificationRows } = await supabase
-    .from("notifications")
-    .select("id, type, body, link_path, created_at")
-    .eq("profile_id", user.id)
-    .is("group_id", null)
-    .is("read_at", null)
-    .order("created_at", { ascending: false })
-    .limit(20);
-  const orgNotifications: OrgNotification[] = (orgNotificationRows ?? []).map((n) => ({
-    id: n.id,
-    type: n.type,
-    body: n.body,
-    linkPath: n.link_path,
-    createdAt: n.created_at,
-  }));
-
-  // "Needs a reply" — the one thing worth surfacing from a big/social
-  // group's ordinary feed chatter (per the notification-priority design):
-  // a question that's gone unanswered a while. Computed on read from
-  // real comment timestamps, no scheduled job. Deliberately excludes
-  // 1-on-1 groups — those already get prompt, direct notification on the
-  // client's own activity (see complete-workout-button.tsx), not a
-  // dashboard staleness check.
-  let needsReplyThreads: NeedsReplyThread[] = [];
-  if (teamAndSocialIds.length > 0) {
+  // "Needs a reply" — the one thing worth surfacing from a big/social group's ordinary feed chatter (per the notification-priority design): a question
+  // that's gone unanswered a while. Computed on read from real comment timestamps, no scheduled job. Deliberately excludes 1-on-1 groups — those
+  // already get prompt, direct notification on the client's own activity (see complete-workout-button.tsx), not a dashboard staleness check.
+  async function loadNeedsReplyThreads(): Promise<NeedsReplyThread[]> {
+    if (teamAndSocialIds.length === 0) return [];
     const [{ data: commentRows }, { data: dismissedRows }] = await Promise.all([
       supabase
         .from("comments")
         .select("post_id, group_id, author_id, created_at, body, profiles ( full_name )")
         .in("group_id", teamAndSocialIds),
-      supabase
-        .from("coach_dismissed_reply_alerts")
-        .select("post_id, dismissed_at")
-        .eq("coach_id", user.id),
+      supabase.from("coach_dismissed_reply_alerts").select("post_id, dismissed_at").eq("coach_id", user!.id),
     ]);
 
     const dismissedAt = new Map((dismissedRows ?? []).map((d) => [d.post_id, d.dismissed_at]));
@@ -377,56 +316,137 @@ export default async function CoachHomePage() {
         authorId: c.author_id,
         createdAt: c.created_at,
       })),
-      user.id,
+      user!.id,
       new Date(),
       8,
       dismissedAt
     );
+    if (stale.length === 0) return [];
 
-    if (stale.length > 0) {
-      const postIds = stale.map((t) => t.postId);
-      const { data: postRows } = await supabase.from("posts").select("id, channel").in("id", postIds);
-      const channelByPostId = new Map((postRows ?? []).map((p) => [p.id, p.channel]));
+    const postIds = stale.map((t) => t.postId);
+    const { data: postRows } = await supabase.from("posts").select("id, channel").in("id", postIds);
+    const channelByPostId = new Map((postRows ?? []).map((p) => [p.id, p.channel]));
 
-      // The exact comment row behind each stale thread — same (postId,
-      // createdAt) pair findThreadsNeedingReply already picked as "the
-      // latest" — so the alert can show who said what, not just a count.
-      const commentByKey = new Map(
-        (commentRows ?? []).map((c) => [`${c.post_id}:${c.created_at}`, c])
-      );
+    // The exact comment row behind each stale thread — same (postId, createdAt) pair findThreadsNeedingReply already picked as "the latest" — so the
+    // alert can show who said what, not just a count.
+    const commentByKey = new Map((commentRows ?? []).map((c) => [`${c.post_id}:${c.created_at}`, c]));
 
-      const nameByGroupId = new Map([...teamGroups, ...socialGroups].map((g) => [g.id, g.name]));
-      needsReplyThreads = stale.map((t) => {
-        const comment = commentByKey.get(`${t.postId}:${t.lastCommentAt}`) as any;
-        return {
-          postId: t.postId,
-          groupId: t.groupId,
-          groupName: nameByGroupId.get(t.groupId) ?? "Group",
-          channel: channelByPostId.get(t.postId) ?? "general",
-          authorName: comment?.profiles?.full_name ?? "Someone",
-          snippet: comment?.body ?? "",
-        };
-      });
+    const nameByGroupId = new Map([...teamGroups, ...socialGroups].map((g) => [g.id, g.name]));
+    return stale.map((t) => {
+      const comment = commentByKey.get(`${t.postId}:${t.lastCommentAt}`) as any;
+      return {
+        postId: t.postId,
+        groupId: t.groupId,
+        groupName: nameByGroupId.get(t.groupId) ?? "Group",
+        channel: channelByPostId.get(t.postId) ?? "general",
+        authorName: comment?.profiles?.full_name ?? "Someone",
+        snippet: comment?.body ?? "",
+      };
+    });
+  }
+
+  // A 1-on-1 client's group has exactly one athlete member — fetch that member's profile plus their most recent workout_logs entry, same
+  // lastLogByAthlete pattern already used on the Clients roster page.
+  async function loadSoloClientRows() {
+    if (soloGroupIds.length === 0) return null;
+    const [{ data: athleteRows }, { data: recentLogs }, inactiveKeys] = await Promise.all([
+      supabase
+        .from("group_memberships")
+        .select("group_id, profile_id, profiles ( full_name, avatar_url )")
+        .in("group_id", soloGroupIds)
+        .eq("role", "athlete"),
+      supabase.from("workout_logs").select("athlete_id, created_at").in("group_id", soloGroupIds).order("created_at", { ascending: false }),
+      fetchInactiveKeys(supabase, soloGroupIds),
+    ]);
+    return { athleteRows, recentLogs, inactiveKeys };
+  }
+
+  // Your day: today's classes (the 1-on-1 sessions are already in dashboardData). Any failure (or the group-sessions migration not applied yet)
+  // just leaves that part out.
+  async function loadTodaysClasses(): Promise<ClassSource[]> {
+    try {
+      const { data: classRows } = await supabase
+        .from("group_sessions")
+        .select("id, title, start_at, end_at, capacity")
+        .eq("kind", "class")
+        .eq("coach_id", user!.id)
+        .eq("status", "scheduled")
+        .gte("start_at", day.startIso)
+        .lt("start_at", day.endIso)
+        .order("start_at", { ascending: true });
+      const ids = (classRows ?? []).map((c: any) => c.id as string);
+      const counts = new Map<string, { joined: number; waitlisted: number }>();
+      if (ids.length > 0) {
+        const { data: countRows } = await supabase.rpc("group_session_counts", { p_session_ids: ids });
+        for (const c of (countRows ?? []) as any[]) counts.set(c.session_id, { joined: c.joined, waitlisted: c.waitlisted });
+      }
+      // The classes page lives under a group the coach coaches; any one of them opens it.
+      const classesGroupId = (allGroups.find((g) => g.group_kind !== "one_on_one") ?? allGroups[0])?.id;
+      if (!classesGroupId) return [];
+      return (classRows ?? []).map((c: any) => ({
+        id: c.id,
+        title: c.title,
+        startAt: c.start_at,
+        endAt: c.end_at,
+        capacity: c.capacity,
+        joined: counts.get(c.id)?.joined ?? 0,
+        waitlisted: counts.get(c.id)?.waitlisted ?? 0,
+        groupId: classesGroupId,
+      }));
+    } catch {
+      return [];
     }
   }
 
-  // A 1-on-1 client's group has exactly one athlete member — fetch that
-  // member's profile plus their most recent workout_logs entry, same
-  // lastLogByAthlete pattern already used on the Clients roster page.
-  const soloGroupIds = soloGroups.map((g) => g.id);
-  let clientCards: HomeClientCardData[] = [];
-  if (soloGroupIds.length > 0) {
-    const { data: athleteRows } = await supabase
-      .from("group_memberships")
-      .select("group_id, profile_id, profiles ( full_name, avatar_url )")
-      .in("group_id", soloGroupIds)
-      .eq("role", "athlete");
+  // Low-readiness check-ins from today. Any failure just leaves that part out.
+  async function loadLowReadiness(): Promise<{ athleteId: string; groupId: string; name: string }[]> {
+    try {
+      if (allGroupIdList.length === 0) return [];
+      const { data: wellnessRows } = await supabase
+        .from("wellness_checkins")
+        .select("athlete_id, group_id, sleep_quality, soreness, energy")
+        .in("group_id", allGroupIdList)
+        .eq("log_date", day.dateKey);
+      const low = (wellnessRows ?? []).filter((w: any) => isLowReadiness({ sleepQuality: w.sleep_quality, soreness: w.soreness, energy: w.energy }));
+      if (low.length === 0) return [];
+      const { data: nameRows } = await supabase.from("profiles").select("id, full_name").in("id", low.map((w: any) => w.athlete_id));
+      const nameById = new Map((nameRows ?? []).map((p: any) => [p.id, p.full_name as string]));
+      return low.map((w: any) => ({ athleteId: w.athlete_id, groupId: w.group_id, name: nameById.get(w.athlete_id) ?? "A client" }));
+    } catch {
+      return [];
+    }
+  }
 
-    const { data: recentLogs } = await supabase
-      .from("workout_logs")
-      .select("athlete_id, created_at")
-      .in("group_id", soloGroupIds)
-      .order("created_at", { ascending: false });
+  // Round 3: everything left reads only the group list, so it all runs as one batch (the "N — Dual Signal" dashboard data — hero flag/empty-state,
+  // per-team-group Team Pulse, stat tiles, today's bookings, quiet-client tiers — comes from one batched fetch in its own lib).
+  const [dashboardData, unseenByGroup, memberCountByGroup, needsReplyThreads, soloRows, todaysClasses, lowReadiness] = await Promise.all([
+    getCoachDashboardData(supabase, {
+      coachId: user.id,
+      teamGroups: teamGroups.map((g) => ({ id: g.id, name: g.name, orgName: orgNameByGroupId(g.organization_id) })),
+      allGroups: allGroups.map((g) => ({ id: g.id, name: g.name, orgName: orgNameByGroupId(g.organization_id) })),
+      tileMetricOverrides,
+      timezone: coachTimezone,
+      coachProfileTimezone: isValidTimeZone(viewerProfile?.timezone) ? (viewerProfile!.timezone as string) : null,
+    }),
+    loadUnseenByGroup(),
+    loadMemberCounts(),
+    loadNeedsReplyThreads(),
+    loadSoloClientRows(),
+    loadTodaysClasses(),
+    loadLowReadiness(),
+  ]);
+
+  const orgNotifications: OrgNotification[] = (orgNotificationRows ?? []).map((n) => ({
+    id: n.id,
+    type: n.type,
+    body: n.body,
+    linkPath: n.link_path,
+    createdAt: n.created_at,
+  }));
+
+  let clientCards: HomeClientCardData[] = [];
+  if (soloRows) {
+    const { athleteRows, recentLogs, inactiveKeys } = soloRows;
     const lastLogByAthlete = new Map<string, string>();
     for (const log of recentLogs ?? []) {
       if (!lastLogByAthlete.has(log.athlete_id)) {
@@ -434,7 +454,6 @@ export default async function CoachHomePage() {
       }
     }
 
-    const inactiveKeys = await fetchInactiveKeys(supabase, soloGroupIds);
     clientCards = (athleteRows ?? [])
       .filter((row) => !inactiveKeys.has(inactiveKey(row.group_id, row.profile_id)))
       .map((row) => {
@@ -479,64 +498,6 @@ export default async function CoachHomePage() {
 
   const orgName = org?.display_name || org?.name || "Your Coaching Business";
 
-  // Your day: today's classes (the 1-on-1 sessions are already in dashboardData), and low-readiness check-ins from today. Any failure
-  // (or the group-sessions migration not applied yet) just leaves that part out.
-  const day = localDayBounds(coachTimezone);
-  const allGroupIdList = allGroups.map((g) => g.id);
-  let todaysClasses: ClassSource[] = [];
-  try {
-    const { data: classRows } = await supabase
-      .from("group_sessions")
-      .select("id, title, start_at, end_at, capacity")
-      .eq("kind", "class")
-      .eq("coach_id", user.id)
-      .eq("status", "scheduled")
-      .gte("start_at", day.startIso)
-      .lt("start_at", day.endIso)
-      .order("start_at", { ascending: true });
-    const ids = (classRows ?? []).map((c: any) => c.id as string);
-    const counts = new Map<string, { joined: number; waitlisted: number }>();
-    if (ids.length > 0) {
-      const { data: countRows } = await supabase.rpc("group_session_counts", { p_session_ids: ids });
-      for (const c of (countRows ?? []) as any[]) counts.set(c.session_id, { joined: c.joined, waitlisted: c.waitlisted });
-    }
-    // The classes page lives under a group the coach coaches; any one of them opens it.
-    const classesGroupId = (allGroups.find((g) => g.group_kind !== "one_on_one") ?? allGroups[0])?.id;
-    if (classesGroupId) {
-      todaysClasses = (classRows ?? []).map((c: any) => ({
-        id: c.id,
-        title: c.title,
-        startAt: c.start_at,
-        endAt: c.end_at,
-        capacity: c.capacity,
-        joined: counts.get(c.id)?.joined ?? 0,
-        waitlisted: counts.get(c.id)?.waitlisted ?? 0,
-        groupId: classesGroupId,
-      }));
-    }
-  } catch {
-    todaysClasses = [];
-  }
-
-  let lowReadiness: { athleteId: string; groupId: string; name: string }[] = [];
-  try {
-    if (allGroupIdList.length > 0) {
-      const { data: wellnessRows } = await supabase
-        .from("wellness_checkins")
-        .select("athlete_id, group_id, sleep_quality, soreness, energy")
-        .in("group_id", allGroupIdList)
-        .eq("log_date", day.dateKey);
-      const low = (wellnessRows ?? []).filter((w: any) => isLowReadiness({ sleepQuality: w.sleep_quality, soreness: w.soreness, energy: w.energy }));
-      if (low.length > 0) {
-        const { data: nameRows } = await supabase.from("profiles").select("id, full_name").in("id", low.map((w: any) => w.athlete_id));
-        const nameById = new Map((nameRows ?? []).map((p: any) => [p.id, p.full_name as string]));
-        lowReadiness = low.map((w: any) => ({ athleteId: w.athlete_id, groupId: w.group_id, name: nameById.get(w.athlete_id) ?? "A client" }));
-      }
-    }
-  } catch {
-    lowReadiness = [];
-  }
-
   const yourDaySchedule = buildSchedule(user.id, dashboardData.todayBookings, todaysClasses);
   const yourDayAttention = attentionFromSources({
     replies: needsReplyThreads,
@@ -546,26 +507,19 @@ export default async function CoachHomePage() {
     notices: orgNotifications.map((n) => ({ id: n.id, body: n.body, linkPath: n.linkPath, createdAt: n.createdAt })),
   });
 
-  // "Needs you": the single most urgent item of each of three kinds, from what is already loaded above plus a few small soft reads. A failure leaves that kind out, never the page.
-  // A strip that could not be built, or built from checks that did not all succeed, never says "You're caught up."
-  let needsYouView = pickNeedsYou([], { incomplete: true });
-  try {
-    const needsYou = await loadNeedsYouItems(supabase, {
-        coachId: user.id,
-        timezone: coachTimezone,
-        now: new Date(),
-        groupIds: allGroupIdList,
-        todayBookings: dashboardData.todayBookings,
-        needsPayment: dashboardData.needsPayment,
-        lowReadiness,
-        quietTierByAthlete: dashboardData.quietTierByAthlete,
-        needsReplyThreads,
-        heroFlag: dashboardData.heroFlag,
-    });
-    needsYouView = pickNeedsYou(needsYou.items, { incomplete: needsYou.failed.length > 0 });
-  } catch (e) {
-    console.error("[dashboard] needs-you failed:", e instanceof Error ? e.message : e);
-  }
+  // "Needs you": built from what is already loaded above plus a few small soft reads, which load behind a Suspense (NeedsYouLoader) so the rest of Home does not wait for them.
+  const needsYouInput = {
+    coachId: user.id,
+    timezone: coachTimezone,
+    now: new Date(),
+    groupIds: allGroupIdList,
+    todayBookings: dashboardData.todayBookings,
+    needsPayment: dashboardData.needsPayment,
+    lowReadiness,
+    quietTierByAthlete: dashboardData.quietTierByAthlete,
+    needsReplyThreads,
+    heroFlag: dashboardData.heroFlag,
+  };
 
   // "N — Dual Signal" (coach_dashboard_redesign_scoping.md): a "Right
   // now" hero beside per-team-group Team Pulse gauges, above a bento
@@ -596,7 +550,9 @@ export default async function CoachHomePage() {
         <GettingStartedCard groupId={(allGroups.find((g) => g.group_kind !== "one_on_one") ?? allGroups[0]).id} />
       )}
 
-      <NeedsYouStrip view={needsYouView} />
+      <Suspense fallback={<NeedsYouLoading />}>
+        <NeedsYouLoader input={needsYouInput} />
+      </Suspense>
 
       <YourDayPanel schedule={yourDaySchedule} attention={yourDayAttention} timezone={coachTimezone} />
 
