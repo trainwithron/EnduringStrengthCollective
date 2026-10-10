@@ -8,6 +8,7 @@ import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { BuilderDay, BuilderExercise } from "@/lib/types";
 import { DayCard } from "./day-card";
+import { WeekDayRow } from "@/components/coach/desktop/week-day-row";
 import { DuplicateWeekPanel } from "./duplicate-week-panel";
 import { BulkEditDayPanel } from "./bulk-edit-day-panel";
 import { TARGET_PROP, type TrackedField } from "@/lib/exercise-fields";
@@ -269,10 +270,9 @@ export function WeekGrid({
 
       {expanded && (
         <div className="p-5 pt-0">
-          {/* A week is always one horizontal row — extra days scroll
-              left/right instead of wrapping to a second line, so the
-              whole week reads as a single level regardless of day count. */}
-          <div className="flex gap-4 overflow-x-auto pb-2">
+          {/* A week is always one horizontal row. The days share the width equally (each at least 300px, at most 420px), so 3 to 5 days fit without
+              scrolling on a wide screen; only when they cannot fit does the row scroll, with a thin pan strip above it. */}
+          <WeekDayRow>
             {sortedDays.map((day) => (
               <div
                 key={day.id}
@@ -281,7 +281,7 @@ export function WeekGrid({
                 onDragEnd={() => setDraggedDayId(null)}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => handleDrop(day.id)}
-                className={`w-[420px] max-w-full shrink-0 ${draggedDayId === day.id ? "opacity-50" : ""}`}
+                className={`flex-[1_1_0%] min-w-[300px] max-w-[420px] ${draggedDayId === day.id ? "opacity-50" : ""}`}
               >
                 <DayCard
                   day={day}
@@ -313,11 +313,11 @@ export function WeekGrid({
               type="button"
               onClick={handleAddDay}
               disabled={addDayBusy}
-              className="w-[220px] max-w-full shrink-0 min-h-[120px] border border-dashed border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors disabled:opacity-40"
+              className="w-[72px] shrink-0 min-h-[120px] border border-dashed border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors disabled:opacity-40"
             >
               + Day
             </button>
-          </div>
+          </WeekDayRow>
         </div>
       )}
     </div>

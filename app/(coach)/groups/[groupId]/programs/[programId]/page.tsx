@@ -278,7 +278,7 @@ async function CoachProgramBuilder({
   }
 
   return (
-    <CoachDesktopShell groupId={groupId} groupName={data.groupName} active="programs">
+    <CoachDesktopShell groupId={groupId} groupName={data.groupName} active="programs" wide>
       {/* The "Day N of M, you've moved X lbs" strip is for the client's own view of a program, not the coach's builder. */}
       {isAiDraft && <AiDraftBanner programId={programId} programName={data.programName} />}
       {askedRule && (

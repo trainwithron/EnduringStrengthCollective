@@ -154,6 +154,7 @@ function CoachDesktopShellFull({
   groupName,
   active,
   coachLevel = false,
+  wide = false,
   children,
 }: {
   groupId: string;
@@ -162,6 +163,8 @@ function CoachDesktopShellFull({
   // Home and other coach-level pages: the page belongs to the coach, not to the group used to anchor the rail's links. The business name is shown
   // instead of the group's, and no client or group identity is badged.
   coachLevel?: boolean;
+  // The page uses the full width of the screen instead of the usual 1400px column (the program builder, whose days sit side by side).
+  wide?: boolean;
   children: React.ReactNode;
 }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -739,7 +742,7 @@ function CoachDesktopShellFull({
           )}
         </div>
 
-        <main id="main-content" tabIndex={-1} className="flex-1 min-w-0 px-4 pt-6 pb-24 md:px-10 md:pt-8 lg:pb-8 lg:mr-[var(--ws-dock,0px)] max-w-[1400px] focus:outline-none">
+        <main id="main-content" tabIndex={-1} className={`flex-1 min-w-0 px-4 pt-6 pb-24 md:px-10 md:pt-8 lg:pb-8 lg:mr-[var(--ws-dock,0px)] ${wide ? "" : "max-w-[1400px]"} focus:outline-none`}>
           <PendingNoticeFlusher />
           {children}
         </main>
