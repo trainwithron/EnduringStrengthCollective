@@ -76,7 +76,11 @@ export type EraseResult = { ok: true; leftover?: string } | { ok: false; error: 
 // Does the deletion. Order matters: detach or erase what would block the delete, then the account itself, which removes the
 // rest through the database's own cascades. Stops at the first failure and says so.
 export async function eraseAccount(db: any, userId: string, opts: { eraseHistory: boolean; deleteEmptyOneOnOneGroups?: string[] }): Promise<EraseResult> {
-  const fail = (what: string, message: string): EraseResult => ({ ok: false, error: `${what}: ${message}` });
+  // The real database message goes to the server log only; a coach is told in plain words what did not happen.
+  const fail = (what: string, message: string): EraseResult => {
+    console.error("[account deletion]", what, message);
+    return { ok: false, error: `${what}. Their account was not deleted.` };
+  };
 
   if (opts.eraseHistory) {
     for (const table of HISTORY_TABLES) {
@@ -100,6 +104,16 @@ export async function eraseAccount(db: any, userId: string, opts: { eraseHistory
   for (const [table, column] of AUTHOR_COLUMNS_CLEAR) {
     const { error } = await db.from(table).update({ [column]: null }).eq(column, userId);
     if (error) return fail(`Couldn't clear ${table}`, error.message);
+  }
+
+  // Everything else that still points at this person (an invite they created and the like), found from the database's own list of such links.
+  const { error: detachError } = await db.rpc("detach_profile_references", { p_user: userId });
+  if (detachError) {
+    if (/cannot_delete/.test(detachError.message ?? "")) {
+      console.error("[account deletion]", detachError.message);
+      return { ok: false, error: "They still own shared records (a group, an organization, billing or team records), so they can't be deleted here." };
+    }
+    return fail("Couldn't clear what else belongs to them", detachError.message ?? "");
   }
 
   const { error: deleteError } = await db.auth.admin.deleteUser(userId);

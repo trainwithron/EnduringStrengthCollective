@@ -33,6 +33,10 @@ function fakeDb(failAt?: string) {
       delete: () => chain(table, "delete"),
       update: (patch: object) => chain(table, Object.keys(patch)[0] === "athlete_id" ? "update" : "update-author"),
     }),
+    rpc: async (name: string, args: { p_user: string }) => {
+      calls.push(`rpc ${name} ${args.p_user}`);
+      return { error: failAt === "rpc" ? { message: "cannot_delete: shared" } : null };
+    },
     auth: {
       admin: {
         deleteUser: async (id: string) => {

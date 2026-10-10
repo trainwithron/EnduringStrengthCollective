@@ -932,6 +932,24 @@ for (const s of steps) {
   const errY2 = await run(`apply/${bundle.file}`);
   check("release-y: the bundle applies again after an undo" + (errY2 ? ": " + errY2 : ""), !errY2 && (await has()));
 }
+// Release Z (step 68): ONE paste. No clearing function before, the bundle makes it (server-only), a second run is refused naming step 68, the undo drops it, and it applies again.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-z");
+  check("release-z: ONE bundle holds step 68", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["68"]));
+  const st68 = steps.find((x) => x.n === "68");
+  const has = async () => (await db.query("select to_regprocedure('public.detach_profile_references(uuid)') is not null as ok")).rows[0].ok === true;
+  const ez0 = await run(`apply/undo-step${st68.n}-${st68.slug}.sql`);
+  check("release-z: before the bundle runs there is no clearing function" + (ez0 ? ": " + ez0 : ""), !ez0 && !(await has()));
+  const errZ = await run(`apply/${bundle.file}`);
+  check("release-z bundle applies on the live-shaped state" + (errZ ? ": " + errZ : ""), !errZ && (await has()));
+  const againZ = await run(`apply/${bundle.file}`);
+  check("release-z: a second run is refused, naming step 68 (" + againZ + ")", !!againZ && againZ.includes("step 68 (0322) cannot run") && againZ.includes("already applied"));
+  const euZ = await run(`apply/undo-step${st68.n}-${st68.slug}.sql`);
+  check("release-z: the undo drops the functions" + (euZ ? ": " + euZ : ""), !euZ && !(await has()));
+  const errZ2 = await run(`apply/${bundle.file}`);
+  check("release-z: the bundle applies again after an undo" + (errZ2 ? ": " + errZ2 : ""), !errZ2 && (await has()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.

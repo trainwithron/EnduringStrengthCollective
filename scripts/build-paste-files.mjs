@@ -1119,6 +1119,24 @@ alter table public.coach_availability_windows drop column if exists session_minu
     ],
   },
   {
+    n: "68",
+    slug: "0322",
+    title: "0322 Deleting a client no longer fails because of a record they once created (an invite, for example): one server-only function clears everything that still points at the person, from the database's own list, and refuses only for shared records (a group or organization they own, billing, team records)",
+    migrations: ["0322"],
+    sees: "Success. No rows returned.",
+    afterwards: "Deleting a client who once created an invite (or similar) now works. A person who owns a group or organization, or has billing or team records, is still refused with a plain message. Nothing changes until a client is deleted.",
+    undo: [
+      "drop function if exists public.detach_profile_references(uuid);",
+      "drop function if exists public.profile_reference_unhandled();",
+      "drop function if exists public.profile_blocking_links();",
+      "drop function if exists public.profile_reference_policy();",
+    ].join(String.fromCharCode(10)),
+    undoWhy: "Only if step 68 misbehaves. Removes the four functions; the app then fails to delete a client who has such records, as before.",
+    rows: [
+      ["0322 is not already applied (the clearing function does not exist yet)", "to_regprocedure('public.detach_profile_references(uuid)') is null"],
+    ],
+  },
+  {
     n: "67",
     slug: "0321",
     title: "0321 A coach's one short public website (My website): a private table for what the coach types, and a featured flag on Pro Shop cards (nothing is public until the coach publishes)",
@@ -1456,6 +1474,7 @@ const BUNDLES = [
   { id: "release-w", name: "Release W (function search paths and the row-security helper)", steps: ["65"] },
   { id: "release-x", name: "Release X (image uploads: the missing look rules on three storage buckets)", steps: ["66"] },
   { id: "release-y", name: "Release Y (a coach's public website and featured shop cards)", steps: ["67"] },
+  { id: "release-z", name: "Release Z (deleting a client no longer trips on records they created)", steps: ["68"] },
   { id: "release-n2", name: "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)", steps: ["49", "50"] },
   { id: "release-m", name: "Release M (acceptance record is append-only)", steps: ["44"] },
 ];
@@ -1631,6 +1650,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0295", has.table("client_phase_plans")),
     m("0296", has.col("recipes", "content_hash")),
     m("0297", has.table("schedule_requests")),
+    m("0322", "to_regprocedure('public.detach_profile_references(uuid)') is not null"),
     m("0321", "to_regclass('public.coach_sites') is not null"),
     m("0320", "exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and policyname = 'org_branding_select_owner_admin')"),
     m("0319", "exists (select 1 from pg_proc where oid = 'public.audit_diff(jsonb, jsonb, text[])'::regprocedure and proconfig is not null)"),
