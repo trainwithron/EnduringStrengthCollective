@@ -488,6 +488,7 @@ export default async function CoachHomePage() {
     const { data: classRows } = await supabase
       .from("group_sessions")
       .select("id, title, start_at, end_at, capacity")
+      .eq("kind", "class")
       .eq("coach_id", user.id)
       .eq("status", "scheduled")
       .gte("start_at", day.startIso)

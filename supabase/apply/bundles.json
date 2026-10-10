@@ -181,6 +181,14 @@
   "file": "apply-release-z-all.sql"
  },
  {
+  "id": "release-ab",
+  "name": "Release AB (group events: In or Out, no session credit)",
+  "steps": [
+   "69"
+  ],
+  "file": "apply-release-ab-all.sql"
+ },
+ {
   "id": "release-n2",
   "name": "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)",
   "steps": [

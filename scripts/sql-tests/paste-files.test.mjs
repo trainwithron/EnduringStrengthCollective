@@ -950,6 +950,24 @@ for (const s of steps) {
   const errZ2 = await run(`apply/${bundle.file}`);
   check("release-z: the bundle applies again after an undo" + (errZ2 ? ": " + errZ2 : ""), !errZ2 && (await has()));
 }
+// Release AB (step 69): ONE paste. No event kind before, the bundle adds events (the class functions refuse them), a second run is refused naming step 69, the undo puts everything back, and it applies again.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-ab");
+  check("release-ab: ONE bundle holds step 69", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["69"]));
+  const st69 = steps.find((x) => x.n === "69");
+  const has = async () => (await db.query("select exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_sessions' and column_name = 'kind') as ok")).rows[0].ok === true;
+  const eab0 = await run(`apply/undo-step${st69.n}-${st69.slug}.sql`);
+  check("release-ab: before the bundle runs there is no event kind" + (eab0 ? ": " + eab0 : ""), !eab0 && !(await has()));
+  const errAB = await run(`apply/${bundle.file}`);
+  check("release-ab bundle applies on the live-shaped state" + (errAB ? ": " + errAB : ""), !errAB && (await has()));
+  const againAB = await run(`apply/${bundle.file}`);
+  check("release-ab: a second run is refused, naming step 69 (" + againAB + ")", !!againAB && againAB.includes("step 69 (0323) cannot run") && againAB.includes("already applied"));
+  const euAB = await run(`apply/undo-step${st69.n}-${st69.slug}.sql`);
+  check("release-ab: the undo removes the event kind" + (euAB ? ": " + euAB : ""), !euAB && !(await has()));
+  const errAB2 = await run(`apply/${bundle.file}`);
+  check("release-ab: the bundle applies again after an undo" + (errAB2 ? ": " + errAB2 : ""), !errAB2 && (await has()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.

@@ -35,6 +35,7 @@ export default async function GroupSessionsPage(props: { params: Promise<{ group
     supabase
       .from("group_sessions")
       .select("id, title, start_at, end_at, capacity, location_note, status")
+      .eq("kind", "class")
       .eq("coach_id", user.id)
       .gte("start_at", earliest)
       .order("start_at", { ascending: true })

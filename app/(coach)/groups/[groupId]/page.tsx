@@ -630,6 +630,7 @@ export default async function GroupHubPage(
       const { count } = await supabase
         .from("group_sessions")
         .select("id", { count: "exact", head: true })
+        .eq("kind", "class")
         .eq("status", "scheduled")
         .gte("start_at", new Date().toISOString());
       upcomingClasses = count ?? 0;

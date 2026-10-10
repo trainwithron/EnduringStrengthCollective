@@ -29,6 +29,7 @@ export default async function ClassesPage(props: { params: Promise<{ groupId: st
   const sessionsResult = await supabase
     .from("group_sessions")
     .select("id, title, start_at, end_at, capacity, location_note, status")
+    .eq("kind", "class")
     .gte("start_at", nowIso)
     .order("start_at", { ascending: true })
     .limit(60);
