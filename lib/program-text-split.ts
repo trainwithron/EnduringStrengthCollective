@@ -3,6 +3,22 @@
 
 const MIN_SPLITTABLE = 1200;
 
+// A long program is cut up BEFORE the first read, from its size, so the parts can be read at the same time and a big program takes about as long as one part: up to about 12,000
+// characters is read whole, up to about 30,000 in two parts, beyond that in four. (The reader's per-minute limit is 6, so at most four parts start together.)
+export const READ_WHOLE_UP_TO = 12000;
+export const READ_IN_TWO_UP_TO = 30000;
+
+export function planParts(text: string): string[] {
+  const t = text.trim();
+  if (t.length <= READ_WHOLE_UP_TO) return [t];
+  const halves = splitProgramText(t);
+  if (!halves) return [t];
+  if (t.length <= READ_IN_TWO_UP_TO) return [halves[0], halves[1]];
+  const a = splitProgramText(halves[0]);
+  const b = splitProgramText(halves[1]);
+  return [...(a ?? [halves[0]]), ...(b ?? [halves[1]])];
+}
+
 export function splitProgramText(text: string): [string, string] | null {
   const t = text.trim();
   if (t.length < MIN_SPLITTABLE) return null;

@@ -3,11 +3,13 @@ import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError, AiTruncatedError } from "@/lib/anthropic-client";
 import { AiRateLimitedError } from "@/lib/ai-usage";
 import { PROGRAM_IMPORT_SYSTEM_PROMPT, planImportRequest, normalizeRows, noRowsMessage, userTextForProgramText } from "@/lib/program-import-request";
-import { readInParts, partialMessage } from "@/lib/read-in-parts";
+import { readProgram, partialMessage } from "@/lib/read-in-parts";
 import type { ParsedImportRow } from "@/lib/workout-import-parser";
 
-// The longest answer one read may give. A long program is a long list of exercises; 8192 cut off a routine 12-week program.
+// The longest answer one read may give. A long program is a long list of exercises; 8192 cut off a routine 12-week program. A part of an already-cut-up program may ask for more, since it is
+// read next to others and a cut-off there would cost the whole job.
 const READ_MAX_TOKENS = 16000;
+const PART_MAX_TOKENS = 32000;
 // A program that still does not fit is cut in half (at a week if it can) and each half read on its own, at most twice over: five reads in all.
 const MAX_SPLIT_DEPTH = 2;
 // No new read is started if it would probably end after this many milliseconds from the start of the request (240 of the 300 seconds), and a typical read is guessed at 60 seconds until one is timed.
@@ -47,12 +49,12 @@ export async function POST(request: Request) {
   if (!plan.ok) return NextResponse.json({ error: plan.error }, { status: plan.status });
 
   // Reads one piece of text with the AI. The program is only ever read from text the coach gave: nothing is guessed.
-  const readOne = async (sourceText: string): Promise<ParsedImportRow[] | "not_a_list"> => {
+  const readOne = async (sourceText: string, opts: { big: boolean }): Promise<ParsedImportRow[] | "not_a_list"> => {
     const text = await callClaude({
       meta: { feature: plan.ok ? plan.feature : "program_import_text", userId: user!.id },
       system: PROGRAM_IMPORT_SYSTEM_PROMPT,
       userText: userTextForProgramText(sourceText),
-      maxTokens: READ_MAX_TOKENS,
+      maxTokens: opts.big ? PART_MAX_TOKENS : READ_MAX_TOKENS,
     });
     const parsed = JSON.parse(extractJson(text));
     return Array.isArray(parsed) ? normalizeRows(parsed) : "not_a_list";
@@ -64,7 +66,7 @@ export async function POST(request: Request) {
     let note: string | null = null;
     if ("sourceText" in plan && plan.sourceText) {
       // Cut off? Split in two and read each half, in order, but never start a read that would run past the time the server allows: hand back what was read instead.
-      const read = await readInParts(plan.sourceText, {
+      const read = await readProgram(plan.sourceText, {
         read: readOne,
         isTruncated: (e) => e instanceof AiTruncatedError,
         now: Date.now,
@@ -91,6 +93,10 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "The reader's answer wasn't a program list. Try again, or try a clearer copy." }, { status: 502 });
       }
       rows = normalizeRows(parsed);
+    }
+    // Nothing was read because there was no time: that is "too large", not "no program found".
+    if (rows.length === 0 && note === null && parts === 0) {
+      return NextResponse.json({ error: "This program is too large to read in one go. Try a few weeks at a time, or paste the program as text." }, { status: 413 });
     }
     if (rows.length === 0) return NextResponse.json({ error: noRowsMessage(plan.feature) }, { status: 422 });
 

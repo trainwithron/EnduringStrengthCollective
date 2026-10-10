@@ -39,7 +39,7 @@ describe("a big program is read, not refused", () => {
     expect(route).toContain("const READ_MAX_TOKENS = 16000;");
     expect(route).toContain("const MAX_SPLIT_DEPTH = 2;");
     expect(route).toContain("maxDepth: MAX_SPLIT_DEPTH");
-    expect(route).toContain("readInParts(plan.sourceText");
+    expect(route).toContain("readProgram(plan.sourceText");
     expect(read("lib/read-in-parts.ts")).toContain("splitProgramText(text)");
   });
   it("a picture or scan that is still too big gets a plain message, not 'couldn't read that right now'", () => {
