@@ -95,6 +95,8 @@ export default {
       const j = await attached(JOH);
       h.check("Karina's program (and its workout, exercise, note) now belongs to Karina", k.prog === KAR.user && k.w === 1 && k.e === 1 && k.n === 1, JSON.stringify(k));
       h.check("Johann's program belongs to Johann, not to Karina: nothing links the two", j.prog === JOH.user && j.w === 1 && j.e === 1 && j.n === 1 && j.prog !== k.prog, JSON.stringify(j));
+      const notes = await h.one("select count(*)::int as n from public.notifications where type = 'program_assigned' and profile_id in ($1, $2)", [KAR.user, JOH.user]);
+      h.check("attaching leaves no \"your coach assigned you a new program\" notice behind", notes.n === 0, String(notes.n));
       const untouched = await h.one("select athlete_id from public.programs where id = $1", [other]);
       h.check("any other no-client program is left alone", untouched.athlete_id === null);
       await h.as(KAR.user);

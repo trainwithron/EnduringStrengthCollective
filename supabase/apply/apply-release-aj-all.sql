@@ -68,6 +68,8 @@ begin
       continue;
     end if;
     update public.programs set athlete_id = r.athlete_id where id = r.program_id;
+    -- Attaching fires the "your coach assigned you a new program" notice; this is not a new program for them, so remove the notice this step just made (and only that one).
+    delete from public.notifications where profile_id = r.athlete_id and type = 'program_assigned' and link_path = '/groups/' || r.group_id || '/programs/' || r.program_id and created_at = now();
     update public.workouts set athlete_id = r.athlete_id where program_id = r.program_id and athlete_id is null;
     update public.group_workout_exercises e set athlete_id = r.athlete_id from public.workouts w where e.workout_id = w.id and w.program_id = r.program_id and e.athlete_id is null;
     update public.workout_notes n set athlete_id = r.athlete_id from public.workouts w where n.workout_id = w.id and w.program_id = r.program_id and n.athlete_id is null;
