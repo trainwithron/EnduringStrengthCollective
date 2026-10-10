@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { duplicateProgram } from "@/lib/program-duplication";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { grantLinkedGroupAccess } from "@/lib/package-group-access";
+import { athleteHasCopyOfProgram } from "@/lib/package-program-access";
 
 // Package-Program Linking (package_program_linking_scoping.md) — the
 // manual/comped enrollment path. package-assignment-control.tsx used to
@@ -56,7 +57,11 @@ export async function POST(request: Request) {
   }
 
   let programResult: { programId: string } | null = null;
-  if (pkg.default_program_id) {
+  // The program is copied only the first time: assigning the same package again, or to someone who already has a copy, never makes a second one.
+  const alreadyHasProgram = pkg.default_program_id
+    ? !!existingAssignment || (await athleteHasCopyOfProgram(supabase, { sourceProgramId: pkg.default_program_id, athleteId, groupId: pkg.group_id }))
+    : false;
+  if (pkg.default_program_id && !alreadyHasProgram) {
     const result = await duplicateProgram(supabase, {
       sourceProgramId: pkg.default_program_id,
       destinationGroupId: pkg.group_id,

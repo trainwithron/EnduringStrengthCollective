@@ -1096,6 +1096,24 @@ for (const s of steps) {
   const errAH2 = await run(`apply/${bundle.file}`);
   check("release-ah: the bundle applies again after an undo" + (errAH2 ? ": " + errAH2 : ""), !errAH2 && (await has()));
 }
+// Release AI (step 77): ONE paste.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-ai");
+  check("release-ai: ONE bundle holds step 77", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["77"]));
+  const st77 = steps.find((x) => x.n === "77");
+  const has = async () => (await db.query("select to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null as ok")).rows[0].ok === true;
+  const eai0 = await run(`apply/undo-step${st77.n}-${st77.slug}.sql`);
+  check("release-ai: before the bundle runs the functions are absent" + (eai0 ? ": " + eai0 : ""), !eai0 && !(await has()));
+  const errAI = await run(`apply/${bundle.file}`);
+  check("release-ai bundle applies on the live-shaped state" + (errAI ? ": " + errAI : ""), !errAI && (await has()));
+  const againAI = await run(`apply/${bundle.file}`);
+  check("release-ai: a second run is refused, naming step 77 (" + againAI + ")", !!againAI && againAI.includes("step 77 (0331) cannot run") && againAI.includes("already applied"));
+  const euAI = await run(`apply/undo-step${st77.n}-${st77.slug}.sql`);
+  check("release-ai: the undo removes the functions" + (euAI ? ": " + euAI : ""), !euAI && !(await has()));
+  const errAI2 = await run(`apply/${bundle.file}`);
+  check("release-ai: the bundle applies again after an undo" + (errAI2 ? ": " + errAI2 : ""), !errAI2 && (await has()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.

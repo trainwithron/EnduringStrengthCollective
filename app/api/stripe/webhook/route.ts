@@ -8,40 +8,14 @@ import {
   type CoachShare,
 } from "@/lib/revenue-splits";
 import { duplicateProgram } from "@/lib/program-duplication";
-import { programBelongsToCoach } from "@/lib/package-program-access";
+import { athleteHasCopyOfProgram, programBelongsToCoach } from "@/lib/package-program-access";
+import { endsGroupAccess, storedSubscriptionStatus } from "@/lib/subscription-status";
 import { grantLinkedGroupAccess, revokeLinkedGroupAccess } from "@/lib/package-group-access";
 import { dispatchWebhookEvent } from "@/lib/webhook-dispatch";
 import { LIFT_OFF_MONTHLY_CREDITS } from "@/lib/coach-credits";
 import { recordAiTopUp } from "@/lib/ai-topup";
 import type Stripe from "stripe";
 import type { SupabaseClient } from "@supabase/supabase-js";
-
-// A purchase puts sessions on the account. New databases record it as a purchase in the session ledger; until
-// that exists this falls back to the plain balance change, so a payment is never lost over bookkeeping.
-async function grantPurchasedCredits(
-  supabase: SupabaseClient,
-  athleteId: string,
-  groupId: string,
-  credits: number,
-  note: string
-): Promise<{ error: { message: string } | null }> {
-  const grant = await supabase.rpc("grant_session_credits", {
-    p_athlete_id: athleteId,
-    p_group_id: groupId,
-    p_delta: credits,
-    p_kind: "purchased",
-    p_note: note,
-  });
-  if (!grant.error) return { error: null };
-  const missing = /could not find the function|does not exist/i.test(grant.error.message);
-  if (!missing) return { error: grant.error };
-  const { error } = await supabase.rpc("adjust_session_credits", {
-    p_athlete_id: athleteId,
-    p_group_id: groupId,
-    p_delta: credits,
-  });
-  return { error };
-}
 
 // Package-Program Linking (package_program_linking_scoping.md) — fires
 // duplicateProgram() on genuine FIRST enrollment only, never on a
@@ -69,6 +43,8 @@ async function assignLinkedProgramIfFirstEnrollment(
   if (!pkg?.default_program_id) return;
   // Checked again at copy time: the link may predate the ownership check, and this copy runs with the service role.
   if (!(await programBelongsToCoach(supabase, pkg.coach_id, pkg.default_program_id))) return;
+  // A retried payment event (or an earlier enrollment) must never copy the program a second time.
+  if (await athleteHasCopyOfProgram(supabase, { sourceProgramId: pkg.default_program_id, athleteId, groupId })) return;
 
   await duplicateProgram(supabase, {
     sourceProgramId: pkg.default_program_id,
@@ -354,6 +330,8 @@ export async function POST(request: Request) {
 
   try {
     switch (event.type) {
+      // A delayed payment (a bank debit) completes the checkout unpaid and succeeds later: that later event is handled exactly like a paid completion.
+      case "checkout.session.async_payment_succeeded":
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
 
@@ -455,6 +433,8 @@ export async function POST(request: Request) {
         if (!athleteId || !groupId) break;
 
         if (session.mode === "payment") {
+          // Only a settled payment puts sessions on the account (a bank debit is unpaid at checkout and arrives with its own later event).
+          if (session.payment_status !== "paid") break;
           const credits = Number(session.metadata?.credits ?? 0);
           if (credits <= 0) break;
 
@@ -469,29 +449,23 @@ export async function POST(request: Request) {
                 .select("id", { count: "exact", head: true })
                 .eq("athlete_id", athleteId)
                 .eq("coach_package_id", coachPackageId)
+                .neq("stripe_event_id", event.id)
             : { count: 0 };
 
-          // Idempotency: a Stripe retry of this same event hits the
-          // unique constraint on stripe_event_id and gets treated as
-          // already-processed below, rather than crediting twice.
-          const { error: insertError } = await supabase.from("credit_purchases").insert({
-            stripe_event_id: event.id,
-            stripe_checkout_session_id: session.id,
-            athlete_id: athleteId,
-            group_id: groupId,
-            coach_package_id: coachPackageId,
-            credits_purchased: credits,
-            amount_cents: session.amount_total ?? 0,
+          // The event is recorded and the sessions are granted in ONE database step: if the grant fails the record is rolled back with it, so Stripe's retry grants again (before, the
+          // record survived a failed grant and the retry skipped it: a client paid and got nothing). A repeat of an event that was fully handled changes nothing and returns false.
+          const { data: granted, error: grantOnceError } = await supabase.rpc("grant_purchase_once", {
+            p_event_id: event.id,
+            p_session_id: session.id,
+            p_athlete_id: athleteId,
+            p_group_id: groupId,
+            p_package_id: coachPackageId,
+            p_credits: credits,
+            p_amount_cents: session.amount_total ?? 0,
+            p_note: "Package purchased",
           });
-
-          if (insertError) {
-            // Unique violation = already processed this exact event.
-            if (insertError.code === "23505") break;
-            throw insertError;
-          }
-
-          const { error: rpcError } = await grantPurchasedCredits(supabase, athleteId, groupId, credits, "Package purchased");
-          if (rpcError) throw rpcError;
+          if (grantOnceError) throw grantOnceError;
+          // Everything below is safe to run again on a retry (the transfers, the program copy and the group access each check themselves); only the outside notice is sent once.
 
           const stripeFeeCents = await getRealStripeFeeCents(stripe, session.payment_intent);
           await createRevenueSplitTransfers(
@@ -511,13 +485,15 @@ export async function POST(request: Request) {
           });
           // Access to a group the package includes (a no-op for a package without one, and for someone already in the group).
           await grantGroupAccessLogged(supabase, coachPackageId, athleteId);
-          await dispatchPackagePurchasedEvent(supabase, {
-            groupId,
-            coachPackageId,
-            athleteId,
-            creditsPurchased: credits,
-            amountCents: session.amount_total ?? 0,
-          });
+          if (granted === true) {
+            await dispatchPackagePurchasedEvent(supabase, {
+              groupId,
+              coachPackageId,
+              athleteId,
+              creditsPurchased: credits,
+              amountCents: session.amount_total ?? 0,
+            });
+          }
         } else if (session.mode === "subscription" && typeof session.subscription === "string") {
           // Checked BEFORE the upsert below — an existing row here means
           // this athlete already had a subscription for this group
@@ -619,20 +595,19 @@ export async function POST(request: Request) {
           .maybeSingle();
         if (!pkg) break;
 
-        const { error: grantError } = await supabase.from("subscription_credit_grants").insert({
-          stripe_event_id: event.id,
-          athlete_id: athleteId,
-          group_id: groupId,
-          coach_package_id: coachPackageId,
-          credits_granted: pkg.sessions_granted,
+        // Recorded and granted in one database step (see grant_purchase_once above); a repeat of a fully handled event returns false.
+        const { data: renewalGranted, error: renewalError } = await supabase.rpc("grant_subscription_credits_once", {
+          p_event_id: event.id,
+          p_athlete_id: athleteId,
+          p_group_id: groupId,
+          p_package_id: coachPackageId,
+          p_credits: pkg.sessions_granted,
+          p_note: "Membership renewed",
         });
-        if (grantError) {
-          if (grantError.code === "23505") break; // already processed this event
-          throw grantError;
-        }
+        if (renewalError) throw renewalError;
 
-        const { error: rpcError } = await grantPurchasedCredits(supabase, athleteId, groupId, pkg.sessions_granted, "Membership renewed");
-        if (rpcError) throw rpcError;
+        // A paid invoice gives back the group access a lapse took away (a no-op for someone who already has it).
+        await grantGroupAccessLogged(supabase, coachPackageId, athleteId);
 
         const invoiceStripeFeeCents = await getRealStripeFeeCentsForInvoice(stripe, invoice.id!);
         await createRevenueSplitTransfers(
@@ -644,13 +619,15 @@ export async function POST(request: Request) {
           invoice.amount_paid ?? 0,
           invoiceStripeFeeCents
         );
-        await dispatchPackagePurchasedEvent(supabase, {
-          groupId,
-          coachPackageId,
-          athleteId,
-          creditsPurchased: pkg.sessions_granted,
-          amountCents: invoice.amount_paid ?? 0,
-        });
+        if (renewalGranted === true) {
+          await dispatchPackagePurchasedEvent(supabase, {
+            groupId,
+            coachPackageId,
+            athleteId,
+            creditsPurchased: pkg.sessions_granted,
+            amountCents: invoice.amount_paid ?? 0,
+          });
+        }
         break;
       }
 
@@ -725,14 +702,8 @@ export async function POST(request: Request) {
         // meant 'active' — the exact MRR overstatement this fixes.
         // Explicit allow-list, skip the write entirely for anything else
         // rather than guessing.
-        const KNOWN_STATUSES = ["active", "past_due", "canceled", "incomplete", "paused"] as const;
-        type KnownStatus = (typeof KNOWN_STATUSES)[number];
-        const status: KnownStatus | null =
-          event.type === "customer.subscription.deleted"
-            ? "canceled"
-            : (KNOWN_STATUSES as readonly string[]).includes(subscription.status)
-              ? (subscription.status as KnownStatus)
-              : null;
+        // canceled, unpaid and a first payment that never completed (incomplete_expired) all count as LAPSED and are stored as canceled; past_due is a grace period (lib/subscription-status.ts).
+        const status = storedSubscriptionStatus(event.type, subscription.status);
         if (!status) break;
 
         // current_period_end moved off the subscription object onto each
@@ -765,7 +736,7 @@ export async function POST(request: Request) {
           { onConflict: "athlete_id,group_id" }
         );
         // A subscription that has ended ends the group access it gave. The program copy stays; the sessions follow their own expiry rule.
-        if (status === "canceled") {
+        if (endsGroupAccess(status)) {
           await revokeLinkedGroupAccess(supabase, { coachPackageId: subscription.metadata?.coach_package_id ?? null, athleteId });
         }
         break;
