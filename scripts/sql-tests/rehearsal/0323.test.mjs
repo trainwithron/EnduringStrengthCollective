@@ -66,6 +66,12 @@ export default {
       h.check("the coach who made it sees everyone's answer", (await seen(coach)).length === 2);
       h.check("a second coach of the same group sees everyone's answer", (await seen(coach2)).length === 2);
       h.check("the organization's admin (not a member of the group) sees everyone's answer and the event", (await seen(orgAdmin)).length === 2 && (await (async () => (await h.as(orgAdmin), (await h.rows("select id from public.group_sessions where id = $1", [ev])).length))()) === 1);
+      await h.asSuper();
+      await db.query("update public.group_memberships set private_from_org = true where group_id = $1 and profile_id = $2", [group, bo]);
+      h.check("an organization admin does NOT see the answer of a member made private from the organization", JSON.stringify(await seen(orgAdmin)) === JSON.stringify([ann]));
+      h.check("...while the group's own coaches still see it", (await seen(coach2)).length === 2 && (await seen(coach)).length === 2);
+      await h.asSuper();
+      await db.query("update public.group_memberships set private_from_org = false where group_id = $1 and profile_id = $2", [group, bo]);
       h.check("a plain member sees only their own answer", JSON.stringify(await seen(ann)) === JSON.stringify([ann]) && JSON.stringify(await seen(bo)) === JSON.stringify([bo]));
       h.check("a member of another group sees no answers", (await seen(outsider)).length === 0);
       await h.as(bo);
