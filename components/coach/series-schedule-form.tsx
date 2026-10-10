@@ -182,7 +182,7 @@ export function SeriesScheduleForm({
       </div>
 
       <fieldset className="space-y-2">
-        <legend className="font-body text-xs text-steel mb-1">Repeats {weekdayName && <span className="text-chalk">{weekdayName.toLowerCase()}</span>}</legend>
+        <legend className="font-body text-xs text-steel mb-1">Repeats {weekdayName && <span className="text-chalk">{weekdayName}</span>}</legend>
         <label className="flex items-center gap-2 font-body text-sm text-chalk">
           <input type="radio" name="series-mode" checked={mode === "fixed"} onChange={() => setMode("fixed")} />
           For
