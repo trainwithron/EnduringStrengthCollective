@@ -27,6 +27,7 @@ import { ChevronDown, ChevronUp, Copy, GripVertical, Trash2 } from "lucide-react
 import { useSaveToastChannel } from "./desktop/save-toast-channel";
 import { CARDIO_PRESETS, type CardioPreset } from "@/lib/cardio-presets";
 import type { RestTempoSuggestion } from "@/lib/training-intent";
+import { loggedText, prescribedSummary, type LoggedValues } from "@/lib/day-logged";
 
 export interface MovementPatternOption {
   id: string;
@@ -38,9 +39,15 @@ function TargetCell({
   kind,
   onCommit,
   label,
+  logged,
+  suggestion,
 }: {
   value: string;
   kind: "number" | "text";
+  // The number the client logged for this set (a past day): shown instead of the prescription, read-only, marked as logged. "" = nothing logged for this box.
+  logged?: string;
+  // A gray suggestion for an empty box (the same one the client sees when logging). Typing replaces it; "Use the suggested weights" under the sets takes it as the real prescription.
+  suggestion?: string;
   // Returns false when nothing was saved (the typed value was refused or the coach cancelled): the cell then goes back to the saved value.
   onCommit: (raw: string) => void | boolean | Promise<unknown>;
   label: string;
@@ -68,10 +75,22 @@ function TargetCell({
     }
   }
 
+  if (logged !== undefined) {
+    return (
+      <span
+        title="Logged by the client"
+        aria-label={`${label}, logged: ${logged || "nothing"}`}
+        className="w-12 h-9 flex items-center justify-center border border-rust/40 bg-rust/10 text-rust font-body text-xs shrink-0"
+      >
+        {logged || "–"}
+      </span>
+    );
+  }
+
   return (
     <input
       type={kind === "number" ? "number" : "text"}
-      placeholder={label.startsWith("Rest") || label.startsWith("Time") ? "m:ss" : undefined}
+      placeholder={suggestion ?? (label.startsWith("Rest") || label.startsWith("Time") ? "m:ss" : undefined)}
       inputMode={kind === "number" ? "decimal" : "text"}
       min={kind === "number" ? "0" : undefined}
       aria-label={label}
@@ -120,6 +139,8 @@ export function ExerciseBuilderCard({
   movementPatterns,
   laddersByPattern,
   restSuggestions,
+  loggedBySet,
+  suggestedWeights,
   canMoveUp,
   canMoveDown,
   onMoveUp,
@@ -152,6 +173,10 @@ export function ExerciseBuilderCard({
   // pending a real sourced number. Tap-to-fill only; never applied
   // without the coach clicking a specific suggestion.
   restSuggestions?: RestTempoSuggestion[];
+  // On a client's own program: what the client logged on this exercise, by set number (a day already done); read-only, shown in place of the prescription.
+  loggedBySet?: Record<number, LoggedValues>;
+  // On a client's own program, a day not done yet: the gray weight the client will be suggested for each set (set id -> weight). Empty weight boxes show it; one tap accepts.
+  suggestedWeights?: Record<string, number>;
   canMoveUp: boolean;
   canMoveDown: boolean;
   onMoveUp: () => void;
@@ -235,6 +260,8 @@ export function ExerciseBuilderCard({
   // same set_order — a silent duplicate invisible in the UI (found live
   // while QA-testing this exact flow: 3 visible sets, 4 rows in the DB).
   const [setsBusy, setSetsBusy] = useState(false);
+  // A day the client has already logged this exercise on: its cells show what they did (read-only) instead of the prescription.
+  const isLoggedDay = !!loggedBySet && Object.keys(loggedBySet).length > 0;
 
   async function handleNameCommit(name: string, aliasUsed?: string) {
     const trimmed = name.trim();
@@ -420,6 +447,22 @@ export function ExerciseBuilderCard({
       return;
     }
     onSetsChange(exercise.sets.map((s) => ({ ...s, [TARGET_PROP[field]]: value })));
+    flashSaved();
+  }
+
+  // The gray weight suggestions for the sets that have no weight yet, taken in one tap as the real prescription.
+  const openSuggestions = exercise.sets.filter((s) => s.targetWeight === null && suggestedWeights?.[s.id] !== undefined);
+  async function acceptSuggestedWeights() {
+    if (openSuggestions.length === 0) return;
+    const supabase = createBrowserClient();
+    const results = await Promise.all(
+      openSuggestions.map((s) => supabase.from("group_workout_exercise_sets").update({ target_weight: suggestedWeights![s.id] }).eq("id", s.id))
+    );
+    if (results.some((r) => r.error)) {
+      flashSaveError("Couldn't save the suggested weights — try again.");
+      return;
+    }
+    onSetsChange(exercise.sets.map((s) => (openSuggestions.some((o) => o.id === s.id) ? { ...s, targetWeight: suggestedWeights![s.id] } : s)));
     flashSaved();
   }
 
@@ -872,6 +915,8 @@ export function ExerciseBuilderCard({
                     {exercise.sets.map((set, i) => (
                       <TargetCell
                         key={set.id}
+                        logged={isLoggedDay ? loggedText(loggedBySet?.[set.setOrder], field) : undefined}
+                        suggestion={field === "weight" && !isLoggedDay && targetValue(set, field) === "" && suggestedWeights?.[set.id] !== undefined ? String(suggestedWeights[set.id]) : undefined}
                         value={targetValue(set, field)}
                         kind={field === "rest" || field === "time" ? "text" : def.kind}
                         label={field === "rest" || field === "time" ? `${builderLabel(field, def.label)} (m:ss), set ${i + 1}` : `${def.label}, set ${i + 1}`}
@@ -905,6 +950,18 @@ export function ExerciseBuilderCard({
               })}
             </div>
           </div>
+
+          {isLoggedDay && (
+            <p className="font-body text-xs text-steel mt-1.5">
+              <span className="text-rust uppercase tracking-wide">Logged</span>
+              {prescribedSummary(exercise.sets) ? <span> · {prescribedSummary(exercise.sets)}</span> : null}
+            </p>
+          )}
+          {openSuggestions.length > 0 && (
+            <button type="button" onClick={acceptSuggestedWeights} className="mt-1.5 min-h-11 sm:min-h-0 font-body text-xs text-rust underline underline-offset-2">
+              Use the suggested weights
+            </button>
+          )}
 
           <div className="flex items-center gap-3 flex-wrap mt-1.5">
             <div className="relative">

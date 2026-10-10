@@ -26,6 +26,7 @@ import { formatShortDate } from "@/lib/program-schedule";
 import { GripVertical, ChevronDown, ChevronUp } from "lucide-react";
 import { useSaveToastChannel } from "./save-toast-channel";
 import { capitalizeWords } from "@/lib/exercise-name-case";
+import { useDayLogged } from "./use-day-logged";
 
 // Quick-add is typed fast, so a bare "Bench" for an existing "Bench
 // Press" is common — matchExercise's fuzzy threshold is deliberately
@@ -56,6 +57,7 @@ export function DayCard({
   movementPatterns,
   laddersByPattern,
   restSuggestions,
+  athleteId = null,
   condensed = false,
   collapsed,
   onToggleCollapse,
@@ -73,6 +75,8 @@ export function DayCard({
   movementPatterns: MovementPatternOption[];
   laddersByPattern: Record<string, { exerciseName: string }[]>;
   restSuggestions?: RestTempoSuggestion[];
+  // The client this program was made for (null for a shared group program): when set and the day is open, the day also shows what the client logged, or the gray weight suggestions.
+  athleteId?: string | null;
   // Week-level "Collapse days" toggle — shows each exercise as one
   // condensed line (name + sets×reps) instead of the full editable grid.
   // Distinct from the day's own header chevron below, which hides the
@@ -86,6 +90,7 @@ export function DayCard({
   onDeleted: () => void;
 }) {
   const { flashSaved, flashSaveError } = useSaveToastChannel();
+  const dayLogged = useDayLogged(day.id, !!athleteId && !collapsed);
   const [titleDraft, setTitleDraft] = useState(day.title);
   const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -566,6 +571,8 @@ export function DayCard({
                       movementPatterns={movementPatterns}
                       laddersByPattern={laddersByPattern}
                       restSuggestions={restSuggestions}
+                      loggedBySet={dayLogged.logged[item.id]}
+                      suggestedWeights={dayLogged.suggestions}
                       canMoveUp={index > 0}
                       canMoveDown={index < sortedItems.length - 1}
                       onMoveUp={() => moveItem(sortedItems, index, -1)}

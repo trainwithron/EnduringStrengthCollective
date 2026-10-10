@@ -1,8 +1,7 @@
 import { getProgressionGoalsBatch } from "@/lib/progressions";
 import { findDemo, type DemoRow } from "@/lib/exercise-demo";
 import { DEFAULT_TRACKED_FIELDS, mapSetRow, type TrackedField } from "@/lib/exercise-fields";
-import { findCorrelatingWeightSuggestion, resolveWeightSuggestion } from "@/lib/set-suggestions";
-import { parseNumericReps } from "@/lib/program-card-visuals";
+import { PRIOR_SETS_SELECT, suggestedWeightsFromHistory } from "@/lib/suggested-weights";
 import type { ExerciseSetTarget } from "@/lib/types";
 
 export interface WorkoutOverviewExercise {
@@ -190,15 +189,7 @@ export async function getWorkoutOverviewData(
     exerciseNames.length > 0
       ? supabase
           .from("set_logs")
-          .select(
-            `
-        weight, reps, rpe, rir, set_order, completed_at,
-        session_exercises!inner (
-          exercise_name, group_workout_exercise_id,
-          athlete_sessions!inner ( athlete_id )
-        )
-      `
-          )
+          .select(PRIOR_SETS_SELECT)
           .in("session_exercises.exercise_name", exerciseNames)
           .eq("session_exercises.athlete_sessions.athlete_id", athleteId)
           .eq("status", "completed")
@@ -246,74 +237,15 @@ export async function getWorkoutOverviewData(
 
   const goalByExerciseId = goalsBatch;
 
-  // Correlating-week weight suggestion — for each historical logged set,
-  // recover what its OWN target reps/RPE/RIR actually were (not the
-  // current workout's), by looking up the template row it was logged
-  // against. Batched: one extra query for every distinct
-  // (group_workout_exercise_id) seen in history, not one per row.
-  const priorRows = (priorSetsResult.data ?? []) as any[];
-  const templateExerciseIds = Array.from(
-    new Set(
-      priorRows
-        .map((r) => r.session_exercises.group_workout_exercise_id as string | null)
-        .filter((id): id is string => !!id)
-    )
-  );
-  const { data: historicalTargetRows } = templateExerciseIds.length > 0
-    ? await supabase
-        .from("group_workout_exercise_sets")
-        .select("group_workout_exercise_id, set_order, target_reps, target_rpe, target_rir")
-        .in("group_workout_exercise_id", templateExerciseIds)
-    : { data: [] as any[] };
-
-  const targetByExerciseAndOrder = new Map<
-    string,
-    { targetReps: number | null; targetRpe: number | null; targetRir: number | null }
-  >();
-  for (const row of (historicalTargetRows ?? []) as any[]) {
-    targetByExerciseAndOrder.set(`${row.group_workout_exercise_id}::${row.set_order}`, {
-      targetReps: parseNumericReps(row.target_reps),
-      targetRpe: row.target_rpe,
-      targetRir: row.target_rir,
-    });
-  }
-
-  const historyByExerciseName = new Map<
-    string,
-    { loggedAt: string; weight: number | null; targetReps: number | null; targetRpe: number | null; targetRir: number | null }[]
-  >();
-  for (const row of priorRows) {
-    const name = row.session_exercises.exercise_name as string;
-    const templateId = row.session_exercises.group_workout_exercise_id as string | null;
-    const targets = templateId
-      ? targetByExerciseAndOrder.get(`${templateId}::${row.set_order}`)
-      : undefined;
-    const list = historyByExerciseName.get(name) ?? [];
-    list.push({
-      loggedAt: row.completed_at,
-      weight: row.weight,
-      targetReps: targets?.targetReps ?? null,
-      targetRpe: targets?.targetRpe ?? row.rpe ?? null,
-      targetRir: targets?.targetRir ?? row.rir ?? null,
-    });
-    historyByExerciseName.set(name, list);
-  }
-
-  const suggestedWeightBySetId = new Map<string, number | null>();
-  for (const ex of exercises) {
-    const history = historyByExerciseName.get(ex.exerciseName) ?? [];
-    for (const set of ex.sets) {
-      const currentTargetReps = parseNumericReps(set.targetReps);
-      const correlatingMatch = findCorrelatingWeightSuggestion(
-        history,
-        currentTargetReps,
-        set.targetRpe,
-        set.targetRir
-      );
-      const suggestion = resolveWeightSuggestion(correlatingMatch, set.targetWeight);
-      if (suggestion != null) suggestedWeightBySetId.set(set.id, suggestion);
-    }
-  }
+  // The gray weight suggestion for each set: the SAME function the coach's builder uses (lib/suggested-weights.ts), so the two cannot disagree. It reads the history already fetched above.
+  const suggestedWeightBySetId = (await suggestedWeightsFromHistory(
+    supabase,
+    exercises.map((ex) => ({
+      exerciseName: ex.exerciseName,
+      sets: ex.sets.map((set) => ({ id: set.id, targetReps: set.targetReps, targetRpe: set.targetRpe, targetRir: set.targetRir, targetWeight: set.targetWeight })),
+    })),
+    (priorSetsResult.data ?? []) as any[]
+  )) as Map<string, number | null>;
 
   const dayNotes = (workout.workout_notes ?? [])
     .slice()

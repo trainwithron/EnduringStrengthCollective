@@ -294,6 +294,7 @@ export function WeekGrid({
                   movementPatterns={movementPatterns}
                   laddersByPattern={laddersByPattern}
                   restSuggestions={restSuggestions}
+                  athleteId={athleteId}
                   condensed={daysCondensed}
                   collapsed={collapsedDayIds.has(day.id)}
                   onToggleCollapse={() => handleToggleDayCollapse(day.id)}
