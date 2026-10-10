@@ -4,7 +4,6 @@ import { NoAccess } from "@/components/shared/no-access";
 import Link from "next/link";
 import { createServerClient } from "@/lib/supabase/server";
 import { getVolumeEquivalence } from "@/lib/volume-equivalence";
-import { pickGymJoke } from "@/lib/gym-jokes";
 import { getSharedWorkout } from "@/lib/shared-workout";
 import { PrListToggle } from "@/components/share/pr-list-toggle";
 import { ShareScreen } from "@/components/share/share-screen";
@@ -14,10 +13,9 @@ import { CustomizeSharePanel } from "@/components/share/customize-share-panel";
 import { BackgroundPicker } from "@/components/share/background-picker";
 import { VolumeLiftRig } from "@/components/share/volume-lift-rig";
 import { ScenicBackground } from "@/components/share/scenic-background";
-import { HumorArchetypeCard } from "@/components/share/humor-archetype-card";
 import { pickScenicBackground, SCENIC_BACKGROUNDS } from "@/lib/scenic-backgrounds";
-import { pickHumorArchetype } from "@/lib/humor-archetypes";
 import { pickShareCardStyle } from "@/lib/share-card-style";
+import { pickHumorArchetype } from "@/lib/humor-archetypes";
 import { buildCoachCongrats, firstNameOf } from "@/lib/coach-congrats";
 
 // Deliberately public — no auth check. Every completed workout gets a
@@ -124,7 +122,6 @@ export default async function ShareWorkoutPage(
     shared.totalSetsCompleted != null && shared.totalSetsCompleted > 0
       ? getVolumeEquivalence(shared.totalVolume, params.postId)
       : null;
-  const gymJoke = pickGymJoke(new Date().toISOString().slice(0, 10));
 
   const shareTitle =
     shared.celebratePrs.length > 0
@@ -159,11 +156,13 @@ export default async function ShareWorkoutPage(
     cardStyle === "scenic" && !useOrgCustomImage
       ? personalScenicPick ?? pickScenicBackground(params.postId)
       : null;
-  const humorArchetype = cardStyle === "humor" ? pickHumorArchetype(params.postId) : null;
-  const headline = shared.celebratePrs.length > 0 ? "New PR 🎉" : "Workout Complete 💪";
 
+  // Some cards (the "humor" style) carry a mascot above the headline: the person's own photo on a cartoon body. The card and the posted picture both show it.
+  const humorArchetype = cardStyle === "humor" ? pickHumorArchetype(params.postId) : null;
+  const mascotInitial = shared.athleteName === "An athlete" ? null : shared.athleteName;
   // The one-screen card and the picture people post are built from the same model, so they always agree.
   const imageInput = {
+    mascot: humorArchetype ? { key: humorArchetype.key, caption: humorArchetype.caption, avatarUrl: shared.athleteAvatarUrl, initial: mascotInitial } : null,
     groupName: shared.groupName,
     athleteName: shared.athleteName,
     prCount: shared.celebratePrs.length,
@@ -211,59 +210,16 @@ export default async function ShareWorkoutPage(
           imageInput={imageInput}
           title={shareTitle}
           homeHref={user ? `/groups/${shared.groupId}` : null}
+          mascot={humorArchetype ? { archetype: humorArchetype, avatarUrl: shared.athleteAvatarUrl, initial: mascotInitial } : null}
         />
       </section>
 
       <section id="full-workout" className="min-h-screen flex items-center justify-center px-6 py-16">
       <div className="relative w-full max-w-sm rounded-[22px] overflow-hidden border border-chalk/[0.06] bg-gradient-to-b from-[#2E2B28] to-surface shadow-[0_1px_0_rgba(237,232,224,.05)_inset,0_22px_44px_-18px_rgba(0,0,0,.65),0_2px_10px_rgba(0,0,0,.35)] before:content-[''] before:absolute before:inset-0 before:rounded-[22px] before:shadow-[0_1px_0_rgba(237,232,224,.08)_inset] before:pointer-events-none">
-        {cardStyle === "scenic" ? (
-          <div className="relative h-[180px] px-7 pt-8 pb-5 flex flex-col justify-end text-center">
-            <div className="absolute inset-0">
-              {useOrgCustomImage ? (
-                // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL
-                <img
-                  src={shared.workoutCardBackgroundUrl!}
-                  alt=""
-                  className="absolute inset-0 w-full h-full object-cover"
-                />
-              ) : (
-                <ScenicBackground background={scenicBackground!.key} />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-graphite via-graphite/40 to-transparent" />
-            </div>
-            <div className="relative">
-              <p className="font-display uppercase text-xs tracking-[0.2em] text-rust">
-                {shared.groupName}
-              </p>
-              <h1 className="font-display font-bold text-3xl uppercase leading-tight mt-2 drop-shadow-[0_2px_6px_rgba(0,0,0,.6)]">
-                {headline}
-              </h1>
-              <p className="font-body text-lg mt-1">{shared.athleteName}</p>
-            </div>
-          </div>
-        ) : cardStyle === "humor" ? (
-          <div className="px-7 pt-6 text-center">
-            <p className="font-display uppercase text-xs tracking-[0.2em] text-rust">
-              {shared.groupName}
-            </p>
-            <div className="w-[130px] h-[147px] mx-auto mt-3">
-              <HumorArchetypeCard archetype={humorArchetype!} avatarUrl={shared.athleteAvatarUrl} initial={shared.athleteName === "An athlete" ? null : shared.athleteName} />
-            </div>
-            <p className="font-display font-bold text-2xl uppercase leading-tight mt-1">{headline}</p>
-            <p className="font-body text-lg mt-1">{shared.athleteName}</p>
-            <p className="font-body text-xs text-steel mt-1">{humorArchetype!.caption}</p>
-          </div>
-        ) : (
-          <div className="px-7 pt-8 text-center">
-            <p className="font-display uppercase text-xs tracking-[0.2em] text-rust">
-              {shared.groupName}
-            </p>
-            <h1 className="font-display font-bold text-3xl uppercase leading-tight mt-4">
-              {headline}
-            </h1>
-            <p className="font-body text-lg mt-2">{shared.athleteName}</p>
-          </div>
-        )}
+        <div className="px-7 pt-7 text-center">
+          <p className="font-display uppercase text-xs tracking-[0.2em] text-rust">{shared.groupName}</p>
+          <p className="font-body text-lg mt-1">{shared.athleteName}</p>
+        </div>
 
         <div className="px-7 pb-7">
         <div className="mt-8 pt-[22px] pb-5 border-t border-b border-steel/20">
@@ -322,8 +278,6 @@ export default async function ShareWorkoutPage(
             {shared.compoundCelebration}
           </p>
         )}
-
-        <p className="font-body text-xs text-steel mt-4">😂 {gymJoke}</p>
 
         {shared.topLifts.length > 0 && (
           <div className="mt-6">
@@ -392,30 +346,13 @@ export default async function ShareWorkoutPage(
           </div>
         )}
 
-        <div className="mt-6 space-y-2.5">
-          <a
-            href="#top"
-            className="w-full h-12 flex items-center justify-center bg-rust text-graphite font-display uppercase text-sm font-bold rounded-[14px]"
-          >
-            Share your picture
-          </a>
-          {user && (
-            <Link
-              href={`/groups/${shared.groupId}`}
-              className="w-full h-11 flex items-center justify-center border border-steel/30 text-chalk font-body text-sm font-medium active:border-rust active:text-rust transition-colors"
-            >
-              Back to Home
-            </Link>
-          )}
-          {user && viewerIsAuthor && viewerSeesFeed && (
-            <Link
-              href={`/groups/${shared.groupId}/feed`}
-              className="block text-center font-body text-xs text-steel underline underline-offset-2 pt-1"
-            >
+        {user && viewerIsAuthor && viewerSeesFeed && (
+          <div className="mt-6 text-center">
+            <Link href={`/groups/${shared.groupId}/feed`} className="font-body text-xs text-steel underline underline-offset-2">
               Team Feed
             </Link>
-          )}
-        </div>
+          </div>
+        )}
 
         {user?.id === shared.authorId && shared.broadcastLevel === "full" && (
           <CustomizeSharePanel

@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { SpotlightLockup } from "@/components/brand/spotlight-mark";
 import { RefreshCw } from "lucide-react";
 import type { ShareImageModel } from "@/lib/share-image";
+import { HumorArchetypeCard } from "@/components/share/humor-archetype-card";
+import type { HumorArchetype } from "@/lib/humor-archetypes";
 
 // The post-workout card, sized to the visible screen: nothing inside it scrolls. Sizes follow the screen's height
 // (dvh, so a phone's collapsing browser bars are accounted for) and the least important lines drop out on a short
@@ -14,6 +16,7 @@ export function OneScreenCard({
   hasPr,
   onShuffle,
   funLineHidden,
+  mascot,
 }: {
   model: ShareImageModel;
   // The scene behind the card (a scenic background or the group's own image), already positioned to fill it.
@@ -24,6 +27,8 @@ export function OneScreenCard({
   onShuffle?: () => void;
   // The line's space is kept but it is not shown while the owner's device is still choosing theirs, so the text never visibly flips after load.
   funLineHidden?: boolean;
+  // Some cards carry a mascot above the headline (the person's own photo on a cartoon body); the posted picture draws the same one.
+  mascot?: { archetype: HumorArchetype; avatarUrl: string | null; initial: string | null } | null;
 }) {
   return (
     <div
@@ -37,10 +42,18 @@ export function OneScreenCard({
 
       <div className="relative h-full flex flex-col justify-between text-center p-[clamp(14px,3dvh,28px)]">
         <div>
+          {mascot && (
+            <div className="[@media(max-height:640px)]:hidden mb-[clamp(2px,0.8dvh,8px)]">
+              <div className="h-[clamp(52px,11dvh,104px)] aspect-[150/170] mx-auto">
+                <HumorArchetypeCard archetype={mascot.archetype} avatarUrl={mascot.avatarUrl} initial={mascot.initial} />
+              </div>
+              <p className="font-body text-steel text-[clamp(10px,1.5dvh,12px)] mt-0.5">{mascot.archetype.caption}</p>
+            </div>
+          )}
           <p className="font-display uppercase text-[clamp(10px,1.6dvh,12px)] tracking-[0.2em] text-rust truncate">
             {model.brand}
           </p>
-          <h1 className="font-display font-bold uppercase leading-none mt-[clamp(6px,1.4dvh,12px)] text-[clamp(34px,7.5dvh,68px)] drop-shadow-[0_2px_6px_rgba(0,0,0,.6)]">
+          <h1 className="font-display font-bold uppercase leading-none mt-[clamp(6px,1.4dvh,12px)] text-[clamp(34px,min(7.5dvh,11.5vw),68px)] drop-shadow-[0_2px_6px_rgba(0,0,0,.6)]">
             {model.headline}
             {hasPr ? " 🎉" : ""}
           </h1>
@@ -127,7 +140,7 @@ export function OneScreenCard({
           </div>
         )}
 
-        <div>
+        <div className="pt-[clamp(8px,1.8dvh,16px)]">
           <SpotlightLockup compact />
           <p className="font-body text-[10px] text-steel tracking-wider mt-0.5">{model.dateLabel}</p>
         </div>

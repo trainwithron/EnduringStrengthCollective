@@ -1,6 +1,7 @@
 import { BRAND } from "@/lib/brand";
 import { drawSpotlightMark } from "@/lib/brand-canvas";
 import { SCENIC_SKY_STOPS, type ScenicBackgroundKey } from "@/lib/scenic-backgrounds";
+import { getHumorArchetype, humorSvgMarkup } from "@/lib/humor-archetypes";
 
 // The post-workout card as a PICTURE people can post. Everything here draws on a plain canvas so the image is
 // self-contained (no screenshot of the page, no link, no cross-site assets) and looks the same on every phone.
@@ -32,6 +33,8 @@ export interface ShareImageInput {
   background: ScenicBackgroundKey | null;
   // One light line (a volume comparison, or a joke), already chosen and seeded per workout by the caller so the same workout always shows the same one.
   funLine?: string | null;
+  // The mascot shown above the headline on some cards (key of a humor archetype, its one-line caption, the person's photo address and first name for the face).
+  mascot?: { key: string; caption: string; avatarUrl: string | null; initial: string | null } | null;
 }
 
 export interface ShareImageModel {
@@ -45,6 +48,7 @@ export interface ShareImageModel {
   dateLabel: string;
   background: ScenicBackgroundKey | null;
   funLine: string | null;
+  mascot: { caption: string } | null;
 }
 
 const WORDMARK = BRAND.wordmark;
@@ -112,6 +116,7 @@ export function buildShareImageModel(input: ShareImageInput): ShareImageModel {
       .toUpperCase(),
     background: input.background,
     funLine: input.funLine?.trim() ? input.funLine.trim() : null,
+    mascot: input.mascot ? { caption: input.mascot.caption } : null,
   };
 }
 
@@ -184,6 +189,7 @@ export interface DrawContext {
   roundRect?(x: number, y: number, w: number, h: number, r: number): void;
   rect(x: number, y: number, w: number, h: number): void;
   fill(): void;
+  drawImage?(image: unknown, x: number, y: number, w: number, h: number): void;
 }
 
 // Shrinks the text until it fits the width (never below minSize), then trims with an ellipsis if it still does not.
@@ -258,9 +264,43 @@ interface Plan {
   liftGap: number;
   footerY: number;
   margin: number;
+  // The mascot (only on cards that have one): its top, its height, and the baseline of its caption. maxLifts is 3 except where the mascot takes the room of a row.
+  mascotTop: number;
+  mascotH: number;
+  mascotCaptionY: number;
+  maxLifts: number;
 }
 
-export function planFor(format: ShareImageFormat): Plan {
+export function planFor(format: ShareImageFormat, withMascot = false): Plan {
+  if (format === "story" && withMascot) {
+    // Everything below the mascot moves down to make room, and the lift rows are shorter and capped at two, so the footer still clears the story app's bottom bar.
+    return {
+      safeTop: 250,
+      mascotTop: 252,
+      mascotH: 150,
+      mascotCaptionY: 424,
+      maxLifts: 2,
+      brandY: 470,
+      brandSize: 44,
+      headlineY: 645,
+      headlineSize: 190,
+      nameY: 735,
+      nameSize: 64,
+      statsY: 865,
+      statValueSize: 120,
+      statLabelSize: 32,
+      chipY: 1085,
+      funY: 1165,
+      funSize: 36,
+      funLineH: 46,
+      liftsTitleY: 1275,
+      liftsStartY: 1311,
+      liftRowH: 92,
+      liftGap: 14,
+      footerY: 1601,
+      margin: 90,
+    };
+  }
   if (format === "story") {
     return {
       safeTop: 250,
@@ -283,6 +323,10 @@ export function planFor(format: ShareImageFormat): Plan {
       liftGap: 14,
       footerY: 1604,
       margin: 90,
+      mascotTop: 0,
+      mascotH: 0,
+      mascotCaptionY: 0,
+      maxLifts: 3,
     };
   }
   return {
@@ -306,6 +350,10 @@ export function planFor(format: ShareImageFormat): Plan {
     liftGap: 10,
     footerY: 968,
     margin: 80,
+    mascotTop: 0,
+    mascotH: 0,
+    mascotCaptionY: 0,
+    maxLifts: 3,
   };
 }
 
@@ -345,15 +393,33 @@ function setLetterSpacing(ctx: DrawContext, px: number) {
 }
 
 // Draws the whole picture onto the context. Pure with respect to the model and the theme: same input, same picture.
-export function drawShareImage(ctx: DrawContext, format: ShareImageFormat, model: ShareImageModel, theme: ShareTheme): void {
+export function drawShareImage(
+  ctx: DrawContext,
+  format: ShareImageFormat,
+  model: ShareImageModel,
+  theme: ShareTheme,
+  // The mascot already loaded as an image (the caller makes it); without it the card is drawn without a mascot and with the normal layout.
+  assets: { mascotImage?: unknown } = {}
+): void {
   const { width: w, height: h } = SHARE_IMAGE_SIZES[format];
-  const p = planFor(format);
+  const withMascot = format === "story" && !!model.mascot && !!assets.mascotImage && typeof ctx.drawImage === "function";
+  const p = planFor(format, withMascot);
   const maxText = w - p.margin * 2;
   const display = (size: number) => `700 ${size}px ${theme.fontDisplay}`;
   const body = (size: number) => `500 ${size}px ${theme.fontBody}`;
 
   paintBackground(ctx, w, h, model, theme);
   ctx.textBaseline = "alphabetic";
+
+  if (withMascot && model.mascot) {
+    const mascotW = Math.round((p.mascotH * 150) / 170);
+    ctx.drawImage?.(assets.mascotImage, Math.round(w / 2 - mascotW / 2), p.mascotTop, mascotW, p.mascotH);
+    ctx.textAlign = "center";
+    const cap = fitText(ctx, model.mascot.caption, maxText, 32, 22, body);
+    ctx.font = body(cap.size);
+    ctx.fillStyle = theme.steel;
+    ctx.fillText(cap.text, w / 2, p.mascotCaptionY);
+  }
 
   // Brand line
   ctx.textAlign = "center";
@@ -413,14 +479,15 @@ export function drawShareImage(ctx: DrawContext, format: ShareImageFormat, model
   }
 
   // Top lifts
-  if (model.liftsTitle && model.lifts.length > 0) {
+  const shownLifts = model.lifts.slice(0, p.maxLifts);
+  if (model.liftsTitle && shownLifts.length > 0) {
     ctx.textAlign = "left";
     ctx.font = body(p.statLabelSize);
     setLetterSpacing(ctx, 4);
     ctx.fillStyle = theme.steel;
     ctx.fillText(model.liftsTitle, p.margin, p.liftsTitleY);
     setLetterSpacing(ctx, 0);
-    model.lifts.forEach((lift, i) => {
+    shownLifts.forEach((lift, i) => {
       const top = p.liftsStartY + i * (p.liftRowH + p.liftGap);
       ctx.globalAlpha = 0.09;
       ctx.fillStyle = theme.chalk;
@@ -466,6 +533,38 @@ export function drawShareImage(ctx: DrawContext, format: ShareImageFormat, model
   setLetterSpacing(ctx, 0);
 }
 
+// The mascot as a loaded image: the person's photo is fetched first and embedded (a picture drawn from SVG may not load anything from the web). Any failure
+// (no photo, blocked, slow) quietly falls back to the initial on the disc; if the mascot itself cannot load, null and the picture is made without it.
+async function loadMascotImage(mascot: NonNullable<ShareImageInput["mascot"]>): Promise<HTMLImageElement | null> {
+  const archetype = getHumorArchetype(mascot.key);
+  if (!archetype || typeof Image === "undefined") return null;
+  let avatarDataUrl: string | null = null;
+  if (mascot.avatarUrl) {
+    try {
+      const res = await fetch(mascot.avatarUrl);
+      if (res.ok) {
+        const blob = await res.blob();
+        avatarDataUrl = await new Promise<string | null>((resolve) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : null);
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(blob);
+        });
+      }
+    } catch {
+      avatarDataUrl = null;
+    }
+  }
+  const draw = (photo: string | null) =>
+    new Promise<HTMLImageElement | null>((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(humorSvgMarkup(archetype, photo, mascot.initial))}`;
+    });
+  return (await draw(avatarDataUrl)) ?? (avatarDataUrl ? await draw(null) : null);
+}
+
 // Renders the picture to a PNG. Runs in the browser only.
 export async function renderShareImageBlob(
   input: ShareImageInput,
@@ -489,7 +588,8 @@ export async function renderShareImageBlob(
     // Fonts API missing or a load failed: draw with the fallback stack.
   }
 
-  drawShareImage(ctx as unknown as DrawContext, format, buildShareImageModel(input), theme);
+  const mascotImage = format === "story" && input.mascot ? await loadMascotImage(input.mascot) : null;
+  drawShareImage(ctx as unknown as DrawContext, format, buildShareImageModel(input), theme, { mascotImage });
 
   return await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("The picture could not be saved."))), "image/png");

@@ -126,3 +126,24 @@ export const HUMOR_ARCHETYPES: HumorArchetype[] = [
 export function pickHumorArchetype(seed: string): HumorArchetype {
   return seededPick(HUMOR_ARCHETYPES, `humor:${seed}`);
 }
+
+export function getHumorArchetype(key: string): HumorArchetype | null {
+  return HUMOR_ARCHETYPES.find((a) => a.key === key) ?? null;
+}
+
+// The mascot as a standalone SVG picture, for drawing into the posted image. The face is the person's own photo (already turned into a data address by the
+// caller, because a picture drawn from SVG may not load anything from the web) or, with none, a disc with their first initial, the same as on screen.
+export function humorSvgMarkup(archetype: HumorArchetype, avatarDataUrl: string | null, initial: string | null): string {
+  const { cx, cy, r } = archetype.faceHole;
+  const letter = (initial ?? "").trim().charAt(0).toUpperCase();
+  // Any single letter works (the screen shows it), written safely for SVG text; the photo address is escaped too.
+  const xml = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const safeLetter = xml(letter);
+  const face = avatarDataUrl
+    ? `<image href="${xml(avatarDataUrl)}" x="${cx - r}" y="${cy - r}" width="${r * 2}" height="${r * 2}" clip-path="url(#face)" preserveAspectRatio="xMidYMid slice"/>`
+    : `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#211f1c" stroke="rgba(210,112,59,.6)" stroke-width="2"/>` +
+      (safeLetter
+        ? `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central" font-size="${r * 1.1}" font-weight="700" fill="#EDE8E0" font-family="Arial, sans-serif">${safeLetter}</text>`
+        : "");
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 170" width="300" height="340"><defs><clipPath id="face"><circle cx="${cx}" cy="${cy}" r="${r}"/></clipPath></defs>${archetype.bodyPaths}${face}</svg>`;
+}
