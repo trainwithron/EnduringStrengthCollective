@@ -10,6 +10,9 @@ import { fetchStandingHistory } from "@/lib/standing-macros";
 import { ClientNutrition } from "@/components/coach/nutrition/client-nutrition";
 import { ClientFoodLogOnly } from "@/components/coach/nutrition/client-food-log-only";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
+import { SectionLoading } from "@/components/coach/desktop/section-loading";
+import { ExerciseProgressionLoader } from "@/components/coach/desktop/exercise-progression-loader";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { AthleteNotesEditor } from "@/components/coach/athlete-notes-editor";
@@ -52,7 +55,6 @@ import { RosterSection } from "@/components/coach/desktop/roster-section";
 import { isUnder13 } from "@/lib/coppa";
 import { CoachLoggedBadge } from "@/components/coach-logged-badge";
 import { TrendChart } from "@/components/coach/desktop/trend-chart";
-import { ExerciseProgressionChart } from "@/components/coach/desktop/exercise-progression-chart";
 import { isHabitDueOn, computeCompliancePct } from "@/lib/habits";
 import { computeQuietTier } from "@/lib/quiet-client-tier";
 import { isLowReadiness } from "@/lib/wellness";
@@ -95,7 +97,7 @@ export default async function AthleteProfilePage(
     redirect("/login");
   }
 
-  // Wave 1 — every one of these 23 queries depends only on `params`/
+  // Wave 1 — every one of these queries depends only on `params`/
   // `user.id`, not on each other, so they run as one batch instead of
   // 23 sequential round trips. This page had grown to the worst
   // sequential-query count in the whole app (a client profile a coach
@@ -120,7 +122,6 @@ export default async function AthleteProfilePage(
     { data: privatePackageRows },
     { data: habitRows },
     { data: weightLogs },
-    { data: exerciseHistoryRows },
     { data: calorieRows },
     { data: ouraConnection },
     { data: withingsConnection },
@@ -129,6 +130,16 @@ export default async function AthleteProfilePage(
     { data: latestConfirmedEventGoal },
     { data: injuryStatusRow },
     { data: smsConsentRow },
+    latestInviteFirst,
+    { data: viewerProfile },
+    { data: ledgerRows },
+    ledgerAll,
+    profileBookingCounts,
+    seriesFirst,
+    scheduleTimezone,
+    displayZone,
+    { data: threadRows },
+    { data: coachMovementPatterns },
   ] = await Promise.all([
     supabase
       .from("group_memberships")
@@ -250,21 +261,6 @@ export default async function AthleteProfilePage(
       .eq("group_id", params.groupId)
       .order("logged_date", { ascending: false })
       .limit(20),
-    // Every real logged set for this client, grouped into a per-
-    // exercise trend — no separate schema, every set already carries
-    // its own completed_at timestamp. Capped generously (500 rows)
-    // rather than unbounded, same caution as the workout-history list.
-    supabase
-      .from("set_logs")
-      .select(
-        "weight, completed_at, session_exercises!inner ( exercise_name, session_id, athlete_sessions!inner ( athlete_id, group_id ) )"
-      )
-      .eq("session_exercises.athlete_sessions.athlete_id", params.athleteId)
-      .eq("session_exercises.athlete_sessions.group_id", params.groupId)
-      .eq("status", "completed")
-      .not("weight", "is", null)
-      .order("completed_at", { ascending: true })
-      .limit(500),
     // Coach-set calorie targets over time — deliberately the target,
     // not actual intake, since nothing in this app logs what a client
     // really ate.
@@ -337,6 +333,50 @@ export default async function AthleteProfilePage(
       .select("appointments, announcements, opted_out_at")
       .eq("athlete_id", params.athleteId)
       .maybeSingle(),
+    // The latest sign-in link for a client who has not signed in (ignored below once they have). revoked_at comes from a later
+    // database update: if that select errors it is retried without it below.
+    supabase
+      .from("client_invites")
+      .select("created_at, expires_at, used_at, revoked_at")
+      .eq("athlete_id", params.athleteId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    // The coach's own first name signs the text message they send the client.
+    supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
+    // The session ledger (migration 0246). Until it exists the select errors and the list is simply empty.
+    supabase
+      .from("session_credit_ledger")
+      .select("id, kind, amount, balance_after, note, created_at")
+      .eq("athlete_id", params.athleteId)
+      .eq("group_id", params.groupId)
+      .order("created_at", { ascending: false })
+      .limit(40),
+    // Totals come from the whole history (the list above shows only the latest).
+    pageAll((from, to) =>
+      supabase.from("session_credit_ledger").select("id, kind, amount").eq("athlete_id", params.athleteId).eq("group_id", params.groupId).order("id", { ascending: true }).range(from, to)
+    ),
+    fetchBookingCounts(supabase, { athleteId: params.athleteId, groupId: params.groupId }),
+    // Weekly schedules for this client (recurring_booking_series, 0210 + 0259). If the newer columns are not there yet this errors
+    // and is retried with the original columns below.
+    supabase
+      .from("recurring_booking_series")
+      .select("id, mode, status, weekday, start_time, duration_minutes, occurrences_total")
+      .eq("athlete_id", params.athleteId)
+      .eq("group_id", params.groupId)
+      .order("created_at", { ascending: false })
+      .limit(20),
+    getGroupCoachTimezone(supabase, params.groupId),
+    getViewerDisplayTimezone(supabase, user.id),
+    // What the client said they need the most help with: found in the real conversation, never stored separately and never shown to the client.
+    supabase
+      .from("direct_messages")
+      .select("sender_id, body, created_at")
+      .eq("group_id", params.groupId)
+      .or(`and(sender_id.eq.${user.id},recipient_id.eq.${params.athleteId}),and(sender_id.eq.${params.athleteId},recipient_id.eq.${user.id})`)
+      .order("created_at", { ascending: false })
+      .limit(200),
+    supabase.from("movement_patterns").select("id, name").eq("created_by", user.id).order("name"),
   ]);
 
   if (membership?.role !== "coach") {
@@ -367,7 +407,7 @@ export default async function AthleteProfilePage(
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
-  let latestInviteResult = await fetchLatestInvite("created_at, expires_at, used_at, revoked_at");
+  let latestInviteResult: { data: unknown; error: unknown } = profile?.claimed_at ? { data: null, error: null } : latestInviteFirst;
   if (latestInviteResult.error) latestInviteResult = await fetchLatestInvite("created_at, expires_at, used_at");
   const latestInviteRow = latestInviteResult.data as unknown as {
     created_at: string;
@@ -392,11 +432,6 @@ export default async function AthleteProfilePage(
       ? { expiresAt: latestInviteRow.expires_at, usedAt: latestInviteRow.used_at, revokedAt: latestInviteRow.revoked_at ?? null }
       : null,
   });
-  // The coach's own first name signs the text message they send the client.
-  const { data: viewerProfile } =
-    signInStatus === "active"
-      ? { data: null }
-      : await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
   const coachFirstName = (viewerProfile?.full_name ?? "").split(" ")[0] || null;
   // Same gate used everywhere else this tier's feature set is hidden —
   // group-tier clients don't get macro/meal-plan programming at all.
@@ -406,6 +441,11 @@ export default async function AthleteProfilePage(
   const activeProgram = personalProgram ?? sharedProgram;
   const isMinor = !!intake?.date_of_birth && isUnder13(intake.date_of_birth, new Date());
   const todayKeyForWave2 = new Date().toISOString().slice(0, 10);
+  // A strength-meet goal with a linked main-lift movement pattern (used by the taper notice below).
+  const isStrengthMeetGoal = latestConfirmedEventGoal?.goal_type === "powerbuilding_strongman";
+  const mainLiftPatternId = isStrengthMeetGoal
+    ? (latestConfirmedEventGoal?.main_lift_movement_pattern_id as string | null) ?? null
+    : null;
 
   // Wave 2 — each of these depends on a wave-1 result (or a pure JS
   // value derived from one), but not on each other, so they run as one
@@ -421,6 +461,8 @@ export default async function AthleteProfilePage(
     { data: withingsMetrics },
     { data: orgClientTagRows },
     { data: clientTagAssignmentRows },
+    standingHistory,
+    { data: mainLiftExerciseRows },
   ] = await Promise.all([
     activeProgram
       ? supabase.from("programs").select("training_days").eq("id", activeProgram.id).maybeSingle()
@@ -506,6 +548,16 @@ export default async function AthleteProfilePage(
       ? supabase.from("client_tags").select("id, name").eq("organization_id", group.organization_id).order("name")
       : Promise.resolve({ data: null }),
     supabase.from("client_tag_assignments").select("tag_id").eq("athlete_id", params.athleteId),
+    macrosEnabled ? fetchStandingHistory(supabase, params.athleteId, params.groupId) : Promise.resolve([]),
+    mainLiftPatternId
+      ? supabase
+          .from("movement_pattern_exercises")
+          .select("exercise_name")
+          .eq("movement_pattern_id", mainLiftPatternId)
+          .eq("tier", "A")
+          .order("exercise_name")
+          .limit(1)
+      : Promise.resolve({ data: null }),
   ]);
 
   const sharedPhotos = signedPhotoResults;
@@ -563,41 +615,12 @@ export default async function AthleteProfilePage(
   const totalHabitsDue = habitCompliance.reduce((sum, h) => sum + h.due, 0);
   const totalHabitsCompleted = habitCompliance.reduce((sum, h) => sum + h.completed, 0);
 
-  // Every real logged set for this client, grouped into a per-exercise
-  // trend — this is what "see a graph of your progress" is actually built
-  // from: no separate schema, every set already carries its own
-  // completed_at timestamp. New exercises show up here automatically the
-  // first time they're logged, with no setup needed. Capped generously
-  // (500 rows) rather than unbounded, same caution as the workout-history
-  // list above.
-  const progressionByExercise = new Map<string, Map<string, number>>();
-  for (const row of (exerciseHistoryRows ?? []) as any[]) {
-    const name = row.session_exercises.exercise_name;
-    const date = (row.completed_at as string).slice(0, 10);
-    const weight = row.weight as number;
-    const byDate = progressionByExercise.get(name) ?? new Map<string, number>();
-    // Best set of the day per exercise, same "session best" convention PR
-    // detection already uses — several sets the same day collapse to one
-    // point instead of a jagged same-day zig-zag.
-    if (!byDate.has(date) || weight > byDate.get(date)!) {
-      byDate.set(date, weight);
-    }
-    progressionByExercise.set(name, byDate);
-  }
-  const progressionData: Record<string, { date: string; value: number }[]> = {};
-  for (const [name, byDate] of progressionByExercise) {
-    progressionData[name] = Array.from(byDate.entries())
-      .map(([date, value]) => ({ date, value }))
-      .sort((a, b) => a.date.localeCompare(b.date));
-  }
-
   // Coach-set calorie targets over time — deliberately the target, not
   // actual intake, since nothing in this app logs what a client really
   // ate. Reads clean because daily_macros is one row per real calendar
   // day (upserted, never duplicated) — clearing a day via the new "Clear
   // this day" control removes it here too, so a coach testing numbers
   // doesn't leave a fake point behind.
-  const standingHistory = macrosEnabled ? await fetchStandingHistory(supabase, params.athleteId, params.groupId) : [];
   const calorieTrend = calorieSeriesWithStanding(
     (calorieRows ?? []).map((r) => ({ date: r.log_date as string, value: r.calories as number })),
     standingHistory,
@@ -651,24 +674,6 @@ export default async function AthleteProfilePage(
   // pattern. Only ever computed for that specific goal_type; an
   // endurance_event goal never reaches this branch, same as above never
   // reaching an endurance number for a strength goal.
-  const isStrengthMeetGoal = latestConfirmedEventGoal?.goal_type === "powerbuilding_strongman";
-  const mainLiftPatternId = isStrengthMeetGoal
-    ? (latestConfirmedEventGoal?.main_lift_movement_pattern_id as string | null) ?? null
-    : null;
-
-  const [{ data: coachMovementPatterns }, { data: mainLiftExerciseRows }] = await Promise.all([
-    supabase.from("movement_patterns").select("id, name").eq("created_by", user.id).order("name"),
-    mainLiftPatternId
-      ? supabase
-          .from("movement_pattern_exercises")
-          .select("exercise_name")
-          .eq("movement_pattern_id", mainLiftPatternId)
-          .eq("tier", "A")
-          .order("exercise_name")
-          .limit(1)
-      : Promise.resolve({ data: null }),
-  ]);
-
   const strengthTaperWeek =
     isStrengthMeetGoal && eventWindow
       ? computeStrengthTaperWeek(daysUntilEvent(eventWindow, todayDate))
@@ -686,19 +691,7 @@ export default async function AthleteProfilePage(
   const sorenessTrend = (wellnessRows ?? []).map((r) => ({ date: r.log_date, value: r.soreness }));
   const energyTrend = (wellnessRows ?? []).map((r) => ({ date: r.log_date, value: r.energy }));
 
-  // The session ledger (migration 0246). Until it exists the select errors and the list is simply empty.
-  const { data: ledgerRows } = await supabase
-    .from("session_credit_ledger")
-    .select("id, kind, amount, balance_after, note, created_at")
-    .eq("athlete_id", params.athleteId)
-    .eq("group_id", params.groupId)
-    .order("created_at", { ascending: false })
-    .limit(40);
-  // The plain sentence about where their sessions stand: totals from the whole history (the list above shows only the latest), booked and waiting-to-mark from the calendar.
-  const ledgerAll = await pageAll((from, to) =>
-    supabase.from("session_credit_ledger").select("id, kind, amount").eq("athlete_id", params.athleteId).eq("group_id", params.groupId).order("id", { ascending: true }).range(from, to)
-  );
-  const profileBookingCounts = await fetchBookingCounts(supabase, { athleteId: params.athleteId, groupId: params.groupId });
+  // The plain sentence about where their sessions stand: totals from the whole history (the list shows only the latest), booked and waiting-to-mark from the calendar.
   const profileCounts = profileBookingCounts.get(`${params.athleteId}:${params.groupId}`);
   const ledgerSums = ledgerTotals(ledgerAll.rows as { kind: string; amount: number }[], { prepaidAhead: profileCounts?.prepaidAhead ?? 0 });
   const ledgerEntries: LedgerEntry[] = (ledgerRows ?? []).map((r) => ({
@@ -710,16 +703,8 @@ export default async function AthleteProfilePage(
     createdAt: r.created_at as string,
   }));
 
-  // Weekly schedules for this client (recurring_booking_series, 0210 + 0259) and what is still booked ahead for each. If the
-  // newer columns are not there yet the first select errors and is retried with the original columns.
-  const scheduleColumns = "id, mode, status, weekday, start_time, duration_minutes, occurrences_total";
-  let seriesResult = await supabase
-    .from("recurring_booking_series")
-    .select(scheduleColumns)
-    .eq("athlete_id", params.athleteId)
-    .eq("group_id", params.groupId)
-    .order("created_at", { ascending: false })
-    .limit(20);
+  // What is still booked ahead for each weekly schedule. If the newer columns were not there yet the first select errored and is retried here with the original columns.
+  let seriesResult = seriesFirst;
   if (seriesResult.error) {
     seriesResult = (await supabase
       .from("recurring_booking_series")
@@ -739,26 +724,26 @@ export default async function AthleteProfilePage(
     occurrences_total: number | null;
   }[];
   const upcomingBySeries = new Map<string, { bookingId: string; startIso: string }[]>();
+  const frozenUntilById = new Map<string, string | null>();
   if (seriesRows.length > 0) {
-    const { data: upcomingRows } = await supabase
-      .from("bookings")
-      .select("id, recurring_series_id, start_at")
-      .in("recurring_series_id", seriesRows.map((r) => r.id))
-      .eq("status", "confirmed")
-      .gt("start_at", new Date().toISOString())
-      .order("start_at", { ascending: true })
-      .limit(400);
+    // The day a frozen schedule starts again (0297) is read apart from the main query so the page works before that update is applied.
+    const [{ data: upcomingRows }, { data: frozenRows }] = await Promise.all([
+      supabase
+        .from("bookings")
+        .select("id, recurring_series_id, start_at")
+        .in("recurring_series_id", seriesRows.map((r) => r.id))
+        .eq("status", "confirmed")
+        .gt("start_at", new Date().toISOString())
+        .order("start_at", { ascending: true })
+        .limit(400),
+      supabase.from("recurring_booking_series").select("id, frozen_until").in("id", seriesRows.map((r) => r.id)),
+    ]);
+    for (const f of (frozenRows ?? []) as { id: string; frozen_until: string | null }[]) frozenUntilById.set(f.id, f.frozen_until ?? null);
     for (const b of (upcomingRows ?? []) as { id: string; recurring_series_id: string; start_at: string }[]) {
       const list = upcomingBySeries.get(b.recurring_series_id) ?? [];
       list.push({ bookingId: b.id, startIso: b.start_at });
       upcomingBySeries.set(b.recurring_series_id, list);
     }
-  }
-  // The day a frozen schedule starts again (0297). Read apart from the main query so the page works before that update is applied.
-  const frozenUntilById = new Map<string, string | null>();
-  if (seriesRows.length > 0) {
-    const { data: frozenRows } = await supabase.from("recurring_booking_series").select("id, frozen_until").in("id", seriesRows.map((r) => r.id));
-    for (const f of (frozenRows ?? []) as { id: string; frozen_until: string | null }[]) frozenUntilById.set(f.id, f.frozen_until ?? null);
   }
   const scheduleViews: SeriesView[] = seriesRows.map((r) => ({
     frozenUntil: frozenUntilById.get(r.id) ?? null,
@@ -771,18 +756,8 @@ export default async function AthleteProfilePage(
     occurrencesTotal: r.occurrences_total,
     upcoming: upcomingBySeries.get(r.id) ?? [],
   }));
-  const scheduleTimezone = await getGroupCoachTimezone(supabase, params.groupId);
-  const displayZone = await getViewerDisplayTimezone(supabase, user.id);
-
   // What the client said they need the most help with: found in the real conversation (the question the coach sent and the client's first reply), never
   // stored separately and never shown to the client. Soft: if the lookup fails nothing is shown.
-  const { data: threadRows } = await supabase
-    .from("direct_messages")
-    .select("sender_id, body, created_at")
-    .eq("group_id", params.groupId)
-    .or(`and(sender_id.eq.${user.id},recipient_id.eq.${params.athleteId}),and(sender_id.eq.${params.athleteId},recipient_id.eq.${user.id})`)
-    .order("created_at", { ascending: false })
-    .limit(200);
   const helpAnswer = findHelpAnswer(
     ((threadRows ?? []) as { sender_id: string; body: string; created_at: string }[]).map((r) => ({ senderId: r.sender_id, body: r.body, createdAt: r.created_at })),
     user.id,
@@ -884,10 +859,15 @@ export default async function AthleteProfilePage(
       <div id="client-profile-body" data-active-tab={initialTab}>
         <ClientProfileTabs groupId={params.groupId} athleteId={params.athleteId} initial={initialTab} />
         <div data-tab="messages" className="mb-8">
-          {initialTab === "messages" && <ClientMessagesSection groupId={params.groupId} athleteId={params.athleteId} viewerId={user.id} clientName={profile?.full_name ?? "Client"} initialDraft={draftParam} />}
+          {initialTab === "messages" && (
+            <Suspense fallback={<SectionLoading />}>
+              <ClientMessagesSection groupId={params.groupId} athleteId={params.athleteId} viewerId={user.id} clientName={profile?.full_name ?? "Client"} initialDraft={draftParam} />
+            </Suspense>
+          )}
         </div>
         <div data-tab="calendar" className="mb-8">
           {initialTab === "calendar" && (
+            <Suspense fallback={<SectionLoading />}>
             <ClientCalendarSection
               groupId={params.groupId}
               athleteId={params.athleteId}
@@ -897,9 +877,11 @@ export default async function AthleteProfilePage(
               monthParam={monthParam}
               monthHref={(key) => `/groups/${params.groupId}/athletes/${params.athleteId}?tab=calendar&month=${key}`}
             />
+            </Suspense>
           )}
         </div>
         <div data-tab="program" className="mb-8 max-w-3xl">
+          <Suspense fallback={<SectionLoading />}>
           <ClientProgramsSection
             groupId={params.groupId}
             athleteId={params.athleteId}
@@ -921,6 +903,7 @@ export default async function AthleteProfilePage(
               </div>
             }
           />
+          </Suspense>
         </div>
 
       <div className="profile-grid grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6 lg:gap-10 items-start">
@@ -1539,7 +1522,9 @@ export default async function AthleteProfilePage(
                 <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
                   Exercise
                 </p>
-                <ExerciseProgressionChart progressionData={progressionData} />
+                <Suspense fallback={<SectionLoading />}>
+                  <ExerciseProgressionLoader athleteId={params.athleteId} groupId={params.groupId} />
+                </Suspense>
               </div>
               <div>
                 <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
@@ -1681,17 +1666,19 @@ export default async function AthleteProfilePage(
       </div>
 
       <div data-tab="nutrition" className="border-t border-steel/20 pt-6 mt-8">
-        {macrosEnabled ? (
-          <ClientNutrition
-            athleteId={params.athleteId}
-            groupId={params.groupId}
-            coachId={user.id}
-            clientName={profile?.full_name ?? "Client"}
-            variant="profile"
-          />
-        ) : (
-          <ClientFoodLogOnly athleteId={params.athleteId} groupId={params.groupId} clientName={profile?.full_name ?? "Client"} />
-        )}
+        <Suspense fallback={<SectionLoading />}>
+          {macrosEnabled ? (
+            <ClientNutrition
+              athleteId={params.athleteId}
+              groupId={params.groupId}
+              coachId={user.id}
+              clientName={profile?.full_name ?? "Client"}
+              variant="profile"
+            />
+          ) : (
+            <ClientFoodLogOnly athleteId={params.athleteId} groupId={params.groupId} clientName={profile?.full_name ?? "Client"} />
+          )}
+        </Suspense>
       </div>
       </div>
     </CoachDesktopShell>

@@ -46,6 +46,7 @@ describe("a coach on a computer has no separate message page", () => {
   it("leaving the Messages tab still closes the conversation by address, so a hidden thread never marks new messages read", () => {
     expect(tabs).toContain("router.push");
     expect(tabs).toContain("router.push");
-    expect(profile).toContain('initialTab === "messages" && <ClientMessagesSection');
+    expect(profile).toContain('initialTab === "messages" && (');
+    expect(profile).toContain('<ClientMessagesSection');
   });
 });

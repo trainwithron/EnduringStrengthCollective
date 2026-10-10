@@ -50,7 +50,8 @@ describe("the profile page", () => {
     expect(page.slice(page.indexOf("Joined {new Date"), page.indexOf("{profileFlag && ("))).toContain("activeProgram");
   });
   it("Messages and Calendar show their content right below the tabs, and only load it when that tab is open", () => {
-    expect(page).toContain('initialTab === "messages" && <ClientMessagesSection');
+    expect(page).toContain('initialTab === "messages" && (');
+    expect(page).toContain('<ClientMessagesSection');
     expect(page).toContain('initialTab === "calendar" && (');
     expect(page).toContain("<ClientCalendarSection");
     expect(page).toContain("tab=calendar&month=");
