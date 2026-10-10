@@ -10,7 +10,7 @@
 
 begin;
 
--- ===== Release AC (AI builder: a program the AI builds is a draft until the coach signs it off), step 70: 0324 AI builder safety: a program the AI builds is a draft (not active, not seen by any client) until the coach signs it off; no path can make an unsigned draft live, and a copy of a draft is a draft
+-- ===== Release AC (AI builder: a program the AI builds is a draft until the coach signs it off), step 70: 0324 AI builder safety: a program the AI builds is a draft (not active, and hidden from clients at the database level) until the coach signs it off; no path can make an unsigned draft live, and a copy of a draft is a draft
 do $g70$
 declare
   failed text;
@@ -179,6 +179,135 @@ begin
   end loop;
 
   return v_new;
+end;
+$$;
+
+-- ---- an unsigned AI draft is hidden from everyone but the coaches of its group ---------------------------------------------------------
+-- Until now only the screens hid a draft (they show active programs); a client the draft was built for could still read it through the database. Now the database itself hides a draft
+-- program, its workouts, exercises, sets, notes and progressions from members who are not coaches of the group. Coaches of the group (and the organization's owner and admins, through
+-- the read rules they already have on exercises and sets) read it as before, so copying, assigning and signing off work unchanged. After sign-off everything is visible exactly as before.
+create or replace function public.is_ai_draft_program(_program_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce((select p.ai_draft from public.programs p where p.id = _program_id), false);
+$$;
+revoke all on function public.is_ai_draft_program(uuid) from public, anon;
+grant execute on function public.is_ai_draft_program(uuid) to authenticated;
+
+create or replace function public.is_ai_draft_workout(_workout_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select coalesce((select p.ai_draft from public.workouts w join public.programs p on p.id = w.program_id where w.id = _workout_id), false);
+$$;
+revoke all on function public.is_ai_draft_workout(uuid) from public, anon;
+grant execute on function public.is_ai_draft_workout(uuid) to authenticated;
+
+drop policy "programs_select_members" on public.programs;
+create policy "programs_select_members" on public.programs for select
+  to authenticated using (
+    is_group_member(group_id)
+    and (athlete_id is null or athlete_id = (select auth.uid()) or is_group_coach(group_id))
+    and (is_group_coach(group_id) or not ai_draft)
+  );
+
+drop policy "workouts_select_members" on public.workouts;
+create policy "workouts_select_members" on public.workouts for select
+  to authenticated using (
+    is_group_member(group_id)
+    and (athlete_id is null or athlete_id = (select auth.uid()) or is_group_coach(group_id))
+    and (is_group_coach(group_id) or not public.is_ai_draft_program(program_id))
+  );
+
+drop policy "workout_notes_select_members" on public.workout_notes;
+create policy "workout_notes_select_members" on public.workout_notes for select
+  to authenticated using (
+    is_group_member(group_id)
+    and (athlete_id is null or athlete_id = (select auth.uid()) or is_group_coach(group_id))
+    and (is_group_coach(group_id) or not public.is_ai_draft_workout(workout_id))
+  );
+
+drop policy "exercise_progressions_select_members" on public.exercise_progressions;
+create policy "exercise_progressions_select_members" on public.exercise_progressions for select
+  to authenticated using (
+    public.is_group_member(group_id)
+    and (public.is_group_coach(group_id) or not public.is_ai_draft_program(program_id))
+  );
+
+-- The exercises and sets already ask this function for everyone who is not a coach of the group (content-dripping); a draft now answers no.
+create or replace function public.is_workout_visible_to_athlete(target_workout_id uuid)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_program_id uuid;
+  v_week_number int;
+  v_day_index int;
+  v_start_date date;
+  v_training_days smallint[];
+  v_visibility_window text;
+  v_ordinal int;
+  v_cursor date;
+  v_matched int := 0;
+  v_scheduled_date date;
+  v_window_days int;
+begin
+  select w.program_id, w.week_number, w.day_index
+  into v_program_id, v_week_number, v_day_index
+  from public.workouts w where w.id = target_workout_id;
+
+  if v_program_id is null then
+    return true;
+  end if;
+
+  if public.is_ai_draft_program(v_program_id) then
+    return false;
+  end if;
+
+  select p.start_date, p.training_days, coalesce(p.visibility_window, 'day')
+  into v_start_date, v_training_days, v_visibility_window
+  from public.programs p where p.id = v_program_id;
+
+  if v_start_date is null or v_training_days is null or array_length(v_training_days, 1) is null then
+    return true;
+  end if;
+
+  if v_visibility_window = 'full' then
+    return true;
+  end if;
+
+  select count(*) into v_ordinal
+  from public.workouts w2
+  where w2.program_id = v_program_id
+    and (w2.week_number, w2.day_index) <= (v_week_number, v_day_index);
+
+  v_cursor := v_start_date;
+  while v_matched < v_ordinal loop
+    if extract(dow from v_cursor)::int = any(v_training_days) then
+      v_matched := v_matched + 1;
+      exit when v_matched = v_ordinal;
+    end if;
+    v_cursor := v_cursor + 1;
+  end loop;
+  v_scheduled_date := v_cursor;
+
+  v_window_days := case v_visibility_window
+    when 'week' then 7
+    when 'month' then 30
+    else 0
+  end;
+
+  return v_scheduled_date <= (current_date + v_window_days);
 end;
 $$;
 

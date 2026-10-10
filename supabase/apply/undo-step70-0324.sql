@@ -1,6 +1,80 @@
 -- UNDO for step 70 (0324). Only if step 70 misbehaves. Puts the copy function back exactly as it was and drops the draft flag and its guard (any draft programs stay, now inactive or active as they were saved).
 -- WHAT YOU SHOULD SEE: "Success. No rows returned."   Then tell Spot, and do not run the step again until Spot says why it failed.
 begin;
+drop policy "exercise_progressions_select_members" on public.exercise_progressions;
+create policy "exercise_progressions_select_members" on public.exercise_progressions for select to authenticated using (public.is_group_member(group_id));
+drop policy "workout_notes_select_members" on public.workout_notes;
+create policy "workout_notes_select_members" on public.workout_notes for select to authenticated using (is_group_member(group_id) and (athlete_id is null or athlete_id = (select auth.uid()) or is_group_coach(group_id)));
+drop policy "workouts_select_members" on public.workouts;
+create policy "workouts_select_members" on public.workouts for select to authenticated using (is_group_member(group_id) and (athlete_id is null or athlete_id = (select auth.uid()) or is_group_coach(group_id)));
+drop policy "programs_select_members" on public.programs;
+create policy "programs_select_members" on public.programs for select to authenticated using (is_group_member(group_id) and (athlete_id is null or athlete_id = (select auth.uid()) or is_group_coach(group_id)));
+create or replace function public.is_workout_visible_to_athlete(target_workout_id uuid)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  v_program_id uuid;
+  v_week_number int;
+  v_day_index int;
+  v_start_date date;
+  v_training_days smallint[];
+  v_visibility_window text;
+  v_ordinal int;
+  v_cursor date;
+  v_matched int := 0;
+  v_scheduled_date date;
+  v_window_days int;
+begin
+  select w.program_id, w.week_number, w.day_index
+  into v_program_id, v_week_number, v_day_index
+  from public.workouts w where w.id = target_workout_id;
+
+  if v_program_id is null then
+    return true;
+  end if;
+
+  select p.start_date, p.training_days, coalesce(p.visibility_window, 'day')
+  into v_start_date, v_training_days, v_visibility_window
+  from public.programs p where p.id = v_program_id;
+
+  if v_start_date is null or v_training_days is null or array_length(v_training_days, 1) is null then
+    return true;
+  end if;
+
+  if v_visibility_window = 'full' then
+    return true;
+  end if;
+
+  select count(*) into v_ordinal
+  from public.workouts w2
+  where w2.program_id = v_program_id
+    and (w2.week_number, w2.day_index) <= (v_week_number, v_day_index);
+
+  v_cursor := v_start_date;
+  while v_matched < v_ordinal loop
+    if extract(dow from v_cursor)::int = any(v_training_days) then
+      v_matched := v_matched + 1;
+      exit when v_matched = v_ordinal;
+    end if;
+    v_cursor := v_cursor + 1;
+  end loop;
+  v_scheduled_date := v_cursor;
+
+  v_window_days := case v_visibility_window
+    when 'week' then 7
+    when 'month' then 30
+    else 0
+  end;
+
+  return v_scheduled_date <= (current_date + v_window_days);
+end;
+$$;
+drop function if exists public.is_ai_draft_workout(uuid);
+drop function if exists public.is_ai_draft_program(uuid);
 drop trigger if exists programs_guard_ai_draft on public.programs;
 drop function if exists public.guard_ai_draft_not_active();
 create or replace function public.duplicate_program(
