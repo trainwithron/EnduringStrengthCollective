@@ -93,4 +93,4 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0320 | yes | yes | 8 | 0320 image upload look rules |
 | 0321 | yes | yes | 10 | 0321 coach website and featured shop cards |
 | 0322 | yes | yes | 9 | 0322 deleting a client clears what points at them |
-| 0323 | yes | yes | 43 | 0323 group events cost no credit |
+| 0323 | yes | yes | 48 | 0323 group events cost no credit |

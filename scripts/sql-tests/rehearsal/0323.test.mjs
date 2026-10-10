@@ -24,6 +24,11 @@ export default {
       const otherGroup = await h.group(org, coach, "team", "GE other group");
       for (const p of [ann, bo, cy]) await h.member(group, p);
       await h.member(otherGroup, outsider);
+      const coach2 = await h.user("GE Coach Two");
+      await h.member(group, coach2, "coach");
+      const orgAdmin = await h.user("GE Org Admin");
+      await h.asSuper();
+      await db.query("insert into public.organization_memberships (organization_id, profile_id, role) values ($1, $2, 'admin')", [org, orgAdmin]);
 
       await h.asSuper();
       for (const p of [ann, bo, cy]) await db.query("insert into public.session_credits (athlete_id, group_id, balance) values ($1, $2, 3) on conflict (athlete_id, group_id) do update set balance = 3", [p, group]);
@@ -51,6 +56,24 @@ export default {
       h.check("a member of the group can read the event", (await h.rows("select id from public.group_sessions where id = $1", [ev])).length === 1);
       await h.as(outsider);
       h.check("someone outside the group cannot read it", (await h.rows("select id from public.group_sessions where id = $1", [ev])).length === 0);
+
+      // Who may see the answers.
+      await h.as(ann);
+      await h.one("select public.join_group_event($1, $2) as r", [ev, ann]);
+      await h.as(bo);
+      await h.one("select public.join_group_event($1, $2) as r", [ev, bo]);
+      const seen = async (who) => (await h.as(who), (await h.rows("select athlete_id from public.group_session_attendees where group_session_id = $1", [ev])).map((r) => r.athlete_id).sort());
+      h.check("the coach who made it sees everyone's answer", (await seen(coach)).length === 2);
+      h.check("a second coach of the same group sees everyone's answer", (await seen(coach2)).length === 2);
+      h.check("the organization's admin (not a member of the group) sees everyone's answer and the event", (await seen(orgAdmin)).length === 2 && (await (async () => (await h.as(orgAdmin), (await h.rows("select id from public.group_sessions where id = $1", [ev])).length))()) === 1);
+      h.check("a plain member sees only their own answer", JSON.stringify(await seen(ann)) === JSON.stringify([ann]) && JSON.stringify(await seen(bo)) === JSON.stringify([bo]));
+      h.check("a member of another group sees no answers", (await seen(outsider)).length === 0);
+      await h.as(bo);
+      await h.one("select public.leave_group_event($1, $2) as r", [ev, bo]);
+      await h.as(ann);
+      await h.one("select public.leave_group_event($1, $2) as r", [ev, ann]);
+      await h.asSuper();
+      await db.query("delete from public.group_session_attendees where group_session_id = $1", [ev]);
 
       // In, twice, costs nothing.
       await h.as(ann);
