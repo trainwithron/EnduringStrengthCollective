@@ -32,3 +32,13 @@ describe("first name on shared workout pictures (Release AL)", () => {
     expect(read("app/share/[postId]/page.tsx")).toContain('const mascotInitial = shared.athleteName === "An athlete" ? null : shared.athleteName;');
   });
 });
+
+describe("a one-on-one space's name (the client's full name) never reaches the public card", () => {
+  it("the public card, picture and link preview use the business name for a one-on-one space", () => {
+    const src = read("lib/shared-workout.ts");
+    expect(src).toContain('.select("name, organization_id, group_kind")');
+    expect(src).toContain('.select("name, workout_card_background_mode, workout_card_background_url")');
+    expect(src).toContain('!opts.fullName && (group as { group_kind?: string } | null)?.group_kind === "one_on_one"');
+    expect(src).toContain('?? "Spotlight Coaching"');
+  });
+});
