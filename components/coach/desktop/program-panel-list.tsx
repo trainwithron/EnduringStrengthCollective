@@ -30,6 +30,7 @@ export function ProgramPanelList({ groupId }: { groupId: string }) {
         .from("programs")
         .select("id, name, group_id, athlete_id, is_active, ai_draft, created_at, profiles!programs_athlete_id_fkey ( full_name )")
         .eq("created_by", user.id)
+        .is("archived_at", null)
         .or("is_active.eq.true,ai_draft.eq.true")
         .order("created_at", { ascending: false })
         .limit(300);
@@ -70,6 +71,7 @@ export function ProgramPanelList({ groupId }: { groupId: string }) {
         .from("programs")
         .select("id, name, group_id, athlete_id, is_active, ai_draft, created_at, profiles!programs_athlete_id_fkey ( full_name )")
         .eq("athlete_id", clientId!)
+        .is("archived_at", null)
         .order("created_at", { ascending: false })
         .limit(20);
       if (cancelled) return;
