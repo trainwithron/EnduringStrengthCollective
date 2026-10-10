@@ -96,3 +96,4 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0323 | yes | yes | 50 | 0323 group events cost no credit |
 | 0324 | yes | yes | 17 | 0324 AI drafts cannot go live until signed off |
 | 0325 | yes | yes | 15 | 0325 AI builder learning is private to the coach |
+| 0326 | yes | yes | 14 | 0326 the coach conversation is private to the coach |

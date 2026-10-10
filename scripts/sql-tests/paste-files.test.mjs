@@ -1004,6 +1004,24 @@ for (const s of steps) {
   const errAD2 = await run(`apply/${bundle.file}`);
   check("release-ad: the bundle applies again after an undo" + (errAD2 ? ": " + errAD2 : ""), !errAD2 && (await has()));
 }
+// Release AE (step 72): ONE paste, after Release AD.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-ae");
+  check("release-ae: ONE bundle holds step 72", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["72"]));
+  const st72 = steps.find((x) => x.n === "72");
+  const has = async () => (await db.query("select to_regclass('public.coach_conversations') is not null as ok")).rows[0].ok === true;
+  const eae0 = await run(`apply/undo-step${st72.n}-${st72.slug}.sql`);
+  check("release-ae: before the bundle runs there is no conversation table" + (eae0 ? ": " + eae0 : ""), !eae0 && !(await has()));
+  const errAE = await run(`apply/${bundle.file}`);
+  check("release-ae bundle applies on the live-shaped state" + (errAE ? ": " + errAE : ""), !errAE && (await has()));
+  const againAE = await run(`apply/${bundle.file}`);
+  check("release-ae: a second run is refused, naming step 72 (" + againAE + ")", !!againAE && againAE.includes("step 72 (0326) cannot run") && againAE.includes("already applied"));
+  const euAE = await run(`apply/undo-step${st72.n}-${st72.slug}.sql`);
+  check("release-ae: the undo removes the conversation tables" + (euAE ? ": " + euAE : ""), !euAE && !(await has()));
+  const errAE2 = await run(`apply/${bundle.file}`);
+  check("release-ae: the bundle applies again after an undo" + (errAE2 ? ": " + errAE2 : ""), !errAE2 && (await has()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.

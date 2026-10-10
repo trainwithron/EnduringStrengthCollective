@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { LearnedList, type LearnedLine } from "@/components/coach/learned-list";
+import { CoachConversation } from "@/components/coach/coach-conversation";
 import { askingLessThanBefore } from "@/lib/edit-patterns";
 
 // Server side of "What I've learned about how you coach": reads the coach's own rows (row security keeps it theirs) and hands the plain list to the screen. If the learning tables are not
@@ -29,11 +30,16 @@ export async function LearnedSection({ supabase, coachId }: { supabase: Supabase
   ];
   const questions = ((signoffsRes.data ?? []) as { questions_asked: number }[]).map((s) => s.questions_asked);
   return (
-    <LearnedList
-      lines={lines}
-      questionsEnabled={(settingsRes.data as { questions_enabled?: boolean } | null)?.questions_enabled !== false}
-      coachId={coachId}
-      askingLess={askingLessThanBefore(questions)}
-    />
+    <>
+      <LearnedList
+        lines={lines}
+        questionsEnabled={(settingsRes.data as { questions_enabled?: boolean } | null)?.questions_enabled !== false}
+        coachId={coachId}
+        askingLess={askingLessThanBefore(questions)}
+      />
+      <div className="mt-4 max-w-2xl">
+        <CoachConversation coachId={coachId} invite="none" entry />
+      </div>
+    </>
   );
 }

@@ -3,6 +3,8 @@
 import { useRef, useState, useEffect } from "react";
 import { MessageCircleQuestion, ChevronDown, ChevronUp } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
+import Link from "next/link";
+import { MicButton } from "@/components/shared/mic-button";
 
 interface ChatMessage {
   role: "coach" | "assistant";
@@ -159,6 +161,12 @@ export function ProgramChatPanel({
             {error && <p className="font-body text-xs text-rust">{error}</p>}
           </div>
 
+          <p className="px-3 pb-1 font-body text-xs text-steel">
+            <Link href="/programs#how-you-coach" className="underline">
+              Tell me how you program
+            </Link>{" "}
+            and I&apos;ll build it your way.
+          </p>
           <div className="p-3 border-t border-steel/20 flex gap-2">
             <input
               type="text"
@@ -170,6 +178,7 @@ export function ProgramChatPanel({
               placeholder={`Ask about ${programName}…`}
               className="flex-1 h-9 bg-graphite border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
             />
+            <MicButton onText={(t) => setInput((x) => (x.trim() ? `${x.trim()} ${t}` : t))} />
             <button
               type="button"
               onClick={handleSend}

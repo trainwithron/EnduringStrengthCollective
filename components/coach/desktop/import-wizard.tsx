@@ -39,6 +39,7 @@ import { generateDupProgram, generateDupSelfUpdatingProgram, DUP_WEEKLY_SCHEME }
 import { generateGzclpProgram, type GzclpLiftInput, type GzclpProgressionRule } from "@/lib/gzclp-generator";
 import { AiOutputWrongButton } from "@/components/coach/ai-output-wrong-button";
 import { validateProgramRows } from "@/lib/program-validation";
+import { MicButton } from "@/components/shared/mic-button";
 import { YOUTH_BANNER_TEXT } from "@/lib/youth-block";
 import { AiUsageMeter } from "@/components/coach/ai-usage-meter";
 import { detectImportKind } from "@/lib/import-input-kind";
@@ -1183,6 +1184,7 @@ export function ImportWizard({
         />
         <p className="font-body text-xs text-steel mt-1.5">Helpful to mention: weeks, days per week, experience level, focus, and anything to avoid.</p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
+          <MicButton onText={(t) => setAiPrompt((p) => (p.trim() ? `${p.trim()} ${t}` : t))} label="Speak the program description" />
           <button
             type="button"
             onClick={handleBoxSubmit}

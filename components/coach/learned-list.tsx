@@ -60,7 +60,7 @@ export function LearnedList({
 
   const shown = lines.filter((l) => !gone.has(l.kind + l.id));
   return (
-    <section className="mt-10 border-t border-steel/20 pt-6 max-w-2xl" aria-label="What I've learned about how you coach">
+    <section id="how-you-coach" className="mt-10 border-t border-steel/20 pt-6 max-w-2xl" aria-label="What I've learned about how you coach">
       <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-1">What I&apos;ve learned about how you coach</h2>
       <p className="font-body text-xs text-steel mb-3">
         {shown.length === 0
