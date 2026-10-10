@@ -10,6 +10,9 @@ import { duplicateProgram } from "@/lib/program-duplication";
 import { notifyPush } from "@/lib/push-notify";
 import { localDateKey } from "@/lib/timezone";
 import { MoreVertical } from "lucide-react";
+import { SearchPickList } from "@/components/coach/search-pick-list";
+import { loadAssignableClients, type AssignClient } from "@/lib/assign-clients";
+import { useTerm } from "@/components/coach/terminology-provider";
 
 const MENU_WIDTH = 256;
 // Never wider than the screen minus a margin on each side (a phone is narrower than the menu plus its margins).
@@ -17,10 +20,6 @@ function menuWidth(): number {
   return clampedWidth(MENU_WIDTH, typeof window === "undefined" ? MENU_WIDTH + 32 : window.innerWidth);
 }
 
-interface ClientOption {
-  id: string;
-  fullName: string;
-}
 interface OrgOption {
   id: string;
   name: string;
@@ -61,10 +60,13 @@ export function ProgramCardMenu({
   programName,
   groupId,
   hideAssignAndDuplicate = false,
+  aiDraft = false,
 }: {
   programId: string;
   programName: string;
   groupId: string;
+  // An AI program not signed off yet: it cannot be assigned until it is (a copy of a draft would be a draft too).
+  aiDraft?: boolean;
   // Real feedback from Ron: every action in this menu that creates a
   // NEW program and navigates into its builder (Assign to Client/
   // Position/Myself, both Duplicate variants) makes no sense from the
@@ -74,14 +76,15 @@ export function ProgramCardMenu({
   hideAssignAndDuplicate?: boolean;
 }) {
   const router = useRouter();
+  const term = useTerm();
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View | null>(null);
   // Set after a single-client assignment so the coach sees it worked before
   // anything else happens, instead of being dropped into the copy's builder.
-  const [assigned, setAssigned] = useState<{ programId: string; clientName: string } | null>(null);
+  const [assigned, setAssigned] = useState<{ programId: string; clientName: string; groupId: string } | null>(null);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
-  const [clients, setClients] = useState<ClientOption[] | null>(null);
+  const [clients, setClients] = useState<AssignClient[] | null>(null);
   const [orgs, setOrgs] = useState<OrgOption[] | null>(null);
   const [orgGroups, setOrgGroups] = useState<GroupOption[] | null>(null);
   const [positions, setPositions] = useState<PositionOption[] | null>(null);
@@ -141,19 +144,15 @@ export function ProgramCardMenu({
     };
   }, [view]);
 
+  // EVERY client of the coach, in any group they coach: a program lives in one group (a one-on-one space, say) but may be meant for a client who is somewhere else.
   async function loadClients() {
     if (clients) return;
     const supabase = createBrowserClient();
-    const { data } = await supabase
-      .from("group_memberships")
-      .select("profile_id, profiles ( id, full_name )")
-      .eq("group_id", groupId)
-      .eq("role", "athlete");
-    const options = (data ?? [])
-      .map((row: any) => ({ id: row.profiles?.id, fullName: row.profiles?.full_name }))
-      .filter((c): c is ClientOption => !!c.id)
-      .sort((a, b) => a.fullName.localeCompare(b.fullName));
-    setClients(options);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return;
+    setClients(await loadAssignableClients(supabase, user.id, groupId));
   }
 
   // Only orgs this coach owns/admins — the same permission level
@@ -283,7 +282,7 @@ export function ProgramCardMenu({
     setView("assign-position-result");
   }
 
-  async function handleAssignToClient(client: ClientOption) {
+  async function handleAssignToClient(client: AssignClient) {
     setBusy(true);
     setError(null);
     const supabase = createBrowserClient();
@@ -295,9 +294,10 @@ export function ProgramCardMenu({
       return;
     }
 
+    // The copy goes into the CLIENT'S OWN space (their one-on-one group, else the program's group if they are in it, else the first group of theirs), never assumed to be this program's group.
     const result = await duplicateProgram(supabase, {
       sourceProgramId: programId,
-      destinationGroupId: groupId,
+      destinationGroupId: client.destinationGroupId,
       createdBy: user.id,
       athleteId: client.id,
       clientName: client.fullName,
@@ -319,9 +319,9 @@ export function ProgramCardMenu({
       client.id,
       "New program",
       `Your coach assigned you a new program: ${programName} — ${client.fullName}`,
-      `/groups/${groupId}/programs/${result.programId}`
+      `/groups/${client.destinationGroupId}/programs/${result.programId}`
     );
-    setAssigned({ programId: result.programId, clientName: client.fullName });
+    setAssigned({ programId: result.programId, clientName: client.fullName, groupId: client.destinationGroupId });
     setView("assigned");
   }
 
@@ -472,15 +472,17 @@ export function ProgramCardMenu({
                 <>
                   <button
                     type="button"
+                    disabled={aiDraft}
                     onClick={() => {
                       setAssignStartDate(todayDateString());
                       setView("assign");
                       loadClients();
                     }}
-                    className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50"
+                    className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50 disabled:opacity-50"
                   >
                     Assign program
                   </button>
+                  {aiDraft && <p className="font-body text-xs text-steel px-3 pb-2">This is an AI draft. Sign it off before you assign it.</p>}
                   <button
                     type="button"
                     onClick={() => {
@@ -536,7 +538,7 @@ export function ProgramCardMenu({
           {view === "assign" && (
             <div>
               <p className="font-body text-xs text-steel uppercase tracking-wide px-3 pt-2.5 pb-1.5">
-                Assign to which client?
+                Assign to which {term("client")}?
               </p>
               <div className="px-3 pb-2">
                 <label className="font-body text-xs text-steel">
@@ -549,24 +551,17 @@ export function ProgramCardMenu({
                   />
                 </label>
               </div>
-              <div className="max-h-72 overflow-y-auto">
-                {clients === null && (
-                  <p className="font-body text-xs text-steel px-3 py-2.5">Loading…</p>
-                )}
-                {clients?.length === 0 && (
-                  <p className="font-body text-xs text-steel px-3 py-2.5">No clients in this group yet.</p>
-                )}
-                {clients?.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    disabled={busy}
-                    onClick={() => handleAssignToClient(c)}
-                    className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50 disabled:opacity-40"
-                  >
-                    {busy ? "Assigning…" : c.fullName}
-                  </button>
-                ))}
+              <div className="px-3 pb-3">
+                <SearchPickList
+                  items={clients ? clients.map((c) => ({ key: c.id, label: c.fullName, sub: c.hint })) : null}
+                  onPick={(id) => {
+                    const c = clients?.find((x) => x.id === id);
+                    if (c) void handleAssignToClient(c);
+                  }}
+                  busyKey={busy ? "busy" : null}
+                  emptyText="You have no clients yet."
+                  searchLabel={`Search your ${term("client", "plural")}`}
+                />
               </div>
             </div>
           )}
@@ -643,7 +638,7 @@ export function ProgramCardMenu({
               </p>
               <button
                 type="button"
-                onClick={() => router.push(`/groups/${groupId}/programs/${assigned.programId}`)}
+                onClick={() => router.push(`/groups/${assigned.groupId}/programs/${assigned.programId}`)}
                 className="w-full h-11 mt-2.5 bg-rust text-graphite font-body text-sm font-medium"
               >
                 Open their copy

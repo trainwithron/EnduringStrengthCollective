@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { duplicateProgram } from "@/lib/program-duplication";
 import { localDateKey } from "@/lib/timezone";
-import { filterPrograms, orderForAssign, programLabel, SEARCH_FROM, type PickableProgram } from "@/lib/assign-picker";
+import { orderForAssign, programLabel, SEARCH_FROM, type PickableProgram } from "@/lib/assign-picker";
+import { SearchPickList } from "@/components/coach/search-pick-list";
 
 // The two things a coach does from a client's Programs tab, as plain buttons above the client's list: Assign program (pick any program of theirs, one click assigns it with the same copy
 // engine as everywhere else, no confirmation) and Build with AI. An unsigned AI draft is listed but cannot be picked until it is signed off.
@@ -13,7 +14,6 @@ export function ClientProgramActions({ groupId, athleteId, athleteFullName, extr
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [programs, setPrograms] = useState<(PickableProgram & { uses: number })[] | null>(null);
-  const [query, setQuery] = useState("");
   const [startDate, setStartDate] = useState(localDateKey());
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -85,7 +85,6 @@ export function ClientProgramActions({ groupId, athleteId, athleteFullName, extr
     router.refresh();
   }
 
-  const shown = programs ? filterPrograms(programs, query) : [];
   const button = "inline-flex items-center justify-center min-h-11 sm:h-9 px-3 font-body text-xs border";
   return (
     <div>
@@ -110,37 +109,22 @@ export function ClientProgramActions({ groupId, athleteId, athleteFullName, extr
             Start date
             <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="block w-full sm:w-48 h-11 sm:h-8 mt-1 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust" />
           </label>
-          {programs && programs.length >= SEARCH_FROM && (
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search your programs"
-              aria-label="Search your programs"
-              className="block w-full h-11 sm:h-9 mb-2 bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust"
-            />
-          )}
           {error && (
             <p className="font-body text-xs text-rust mb-2" role="alert">
               {error}
             </p>
           )}
-          <div className="max-h-72 overflow-y-auto divide-y divide-steel/15 border border-steel/15">
-            {programs === null && <p className="font-body text-xs text-steel px-3 py-2.5">Loading…</p>}
-            {programs && shown.length === 0 && <p className="font-body text-xs text-steel px-3 py-2.5">{programs.length === 0 ? "You have no programs yet." : "No program matches that."}</p>}
-            {shown.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                disabled={busyId !== null || p.aiDraft}
-                onClick={() => void assign(p)}
-                className="w-full text-left px-3 py-2.5 min-h-11 hover:bg-graphite/50 disabled:opacity-50"
-              >
-                <span className="block font-body text-sm text-chalk truncate">{busyId === p.id ? "Assigning…" : p.name}</span>
-                <span className="block font-body text-xs text-steel truncate">{programLabel(p)}</span>
-              </button>
-            ))}
-          </div>
+          <SearchPickList
+            items={programs ? programs.map((p) => ({ key: p.id, label: p.name, sub: programLabel(p), disabled: p.aiDraft })) : null}
+            onPick={(id) => {
+              const p = programs?.find((x) => x.id === id);
+              if (p) void assign(p);
+            }}
+            busyKey={busyId}
+            emptyText="You have no programs yet."
+            searchFrom={SEARCH_FROM}
+            searchLabel="Search your programs"
+          />
         </div>
       )}
     </div>

@@ -64,17 +64,19 @@ describe("the client's Programs tab", () => {
   it("offers all of the coach's own programs, newest and most-copied first, with a search box once the list is long", () => {
     expect(actions).toContain('.eq("created_by", user.id)');
     expect(actions).toContain("orderForAssign(");
-    expect(actions).toContain("programs.length >= SEARCH_FROM");
+    expect(actions).toContain("searchFrom={SEARCH_FROM}");
+    expect(read("components/coach/search-pick-list.tsx")).toContain("items.length >= searchFrom");
     expect(SEARCH_FROM).toBeGreaterThan(1);
   });
   it("an unsigned AI draft is listed but cannot be picked", () => {
     expect(actions).toContain("if (busyId || program.aiDraft) return;");
-    expect(actions).toContain("disabled={busyId !== null || p.aiDraft}");
+    expect(actions).toContain("disabled: p.aiDraft");
+    expect(read("components/coach/search-pick-list.tsx")).toContain("disabled={busyKey != null || i.disabled}");
     expect(section).toContain('p.ai_draft ? "AI draft"');
   });
   it("fits a phone: buttons and rows are at least 44px, the date and search fill the width", () => {
     expect(actions).toContain("min-h-11");
     expect(actions).toContain("w-full sm:w-48");
-    expect(actions).toContain("max-h-72 overflow-y-auto");
+    expect(read("components/coach/search-pick-list.tsx")).toContain("max-h-72 overflow-y-auto");
   });
 });
