@@ -38,14 +38,13 @@ export default async function SessionTypesPage(
 
   const { data: typeRows } = await supabase
     .from("session_types")
-    .select("id, name, credit_cost")
+    .select("id, name")
     .eq("coach_id", user.id)
     .order("created_at", { ascending: true });
 
   const types: SessionTypeRow[] = (typeRows ?? []).map((t) => ({
     id: t.id,
     name: t.name,
-    creditCost: t.credit_cost,
   }));
 
   // Suggests the team set to a coach who runs a team (any group of theirs with team mode on); they can still add either set.

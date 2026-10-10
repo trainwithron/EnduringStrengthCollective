@@ -25,7 +25,8 @@ const fnFromMigration = (mig, name) => {
   const tag = m[1];
   const open = start + m.index + m[0].length;
   const end = text.indexOf(tag + ";", open) + tag.length + 1;
-  return text.slice(start, end);
+  // The paste channel garbles non-ASCII characters: a dash inside a string is written with chr(8212) instead (the same text).
+  return text.slice(start, end).split(String.fromCharCode(8212)).join("' || chr(8212) || '");
 };
 const fnFrom0248 = (name) => fnFromMigration("0248", name);
 const fnFrom0218 = (name) => fnFromMigration("0218", name);
@@ -1533,6 +1534,26 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the AI draft flag exists (0324, step 70)", has.col("programs", "ai_draft")],
     ],
   },
+  {
+    n: "75",
+    slug: "0329",
+    title: "0329 Release AA: every session costs exactly 1 credit (the session type's own cost is no longer read) and the waitlist offer shows the coach's time zone",
+    migrations: ["0329"],
+    sees: "Success. No rows returned.",
+    afterwards: "Logging a workout for a client always uses exactly 1 session credit, whatever the session type. A waitlist offer now says the time on the coach's clock. Nothing else changes.",
+    undo: [
+      "alter table public.session_types drop constraint if exists session_types_credit_cost_is_one;",
+      fnFromMigration("0236", "complete_workout_session"),
+      fnFromMigration("0218", "offer_freed_slot_to_waitlist"),
+    ].join(String.fromCharCode(10)),
+    undoWhy: "Only if step 75 misbehaves. Puts the two functions back to what they were (the session type's own cost is read again; the waitlist offer time is in UTC again) and removes the rule that a session type's cost must be 1.",
+    rows: [
+      ["0329 is not already applied (session_types has no cost-is-one rule yet)", "not exists (select 1 from pg_constraint where conname = 'session_types_credit_cost_is_one')"],
+      ["no session type has a cost other than 1 (the rule could not be added otherwise)", "not exists (select 1 from public.session_types where credit_cost <> 1)"],
+      ["complete_workout_session is the expected definition (locks the session and still reads the type's cost)", "exists (select 1 from pg_proc where proname = 'complete_workout_session' and pronamespace = 'public'::regnamespace and prosrc like '%for update%' and prosrc like '%select credit_cost into v_credit_cost%')"],
+      ["offer_freed_slot_to_waitlist is the expected definition (still words the time in UTC)", "exists (select 1 from pg_proc where proname = 'offer_freed_slot_to_waitlist' and pronamespace = 'public'::regnamespace and prosrc like '%to_char(p_start_at, ''Dy Mon DD, HH12:MI AM'')%')"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -1633,6 +1654,7 @@ const BUNDLES = [
   { id: "release-ad", name: "Release AD (AI builder: it learns from the changes a coach makes; run AFTER Release AC)", steps: ["71"] },
   { id: "release-ae", name: "Release AE (AI builder: the optional conversation about how you program; run AFTER Release AD)", steps: ["72"] },
   { id: "release-af", name: "Release AF (a coach's own wording for the sign-in link email)", steps: ["73"] },
+  { id: "release-aa", name: "Release AA (every session costs exactly 1 credit; the waitlist offer shows the coach's time zone)", steps: ["75"] },
   { id: "release-ag", name: "Release AG (remove a program from a client's profile without deleting it; run AFTER Release AC)", steps: ["74"] },
   { id: "release-n2", name: "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)", steps: ["49", "50"] },
   { id: "release-m", name: "Release M (acceptance record is append-only)", steps: ["44"] },
@@ -1815,6 +1837,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0296", has.col("recipes", "content_hash")),
     m("0297", has.table("schedule_requests")),
     m("0327", has.table("coach_message_templates")),
+    m("0329", "exists (select 1 from pg_constraint where conname = 'session_types_credit_cost_is_one')"),
     m("0328", has.col("programs", "archived_at")),
     m("0326", has.table("coach_conversations")),
     m("0325", has.col("programs", "ai_snapshot")),

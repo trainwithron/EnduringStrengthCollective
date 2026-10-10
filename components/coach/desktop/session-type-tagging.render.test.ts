@@ -50,7 +50,7 @@ describe("starter session types", () => {
     expect(personal).toContain("Team coaching: Weight room, Practice, Game");
     expect(personal).toContain("not shown on your public booking page");
     expect(read("./session-type-manager.tsx")).toContain("public_visible: false");
-    const done = renderToStaticMarkup(createElement(SessionTypeManager, { initialTypes: [{ id: "a", name: "Online", creditCost: 1 }, { id: "b", name: "In person", creditCost: 1 }] }));
+    const done = renderToStaticMarkup(createElement(SessionTypeManager, { initialTypes: [{ id: "a", name: "Online" }, { id: "b", name: "In person" }] }));
     expect(done).toContain("(added)");
   });
 });

@@ -62,6 +62,7 @@ from (
     ('2026100600296', 'recipe_library_columns', '0296_recipe_library_columns.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'recipes' and column_name = 'content_hash')),
     ('2026100600297', 'schedule_requests', '0297_schedule_requests.sql', to_regclass('public.schedule_requests') is not null),
     ('2026100600327', 'coach_message_templates', '0327_coach_message_templates.sql', to_regclass('public.coach_message_templates') is not null),
+    ('2026100600329', 'release_aa_credit_one_and_waitlist_zone', '0329_release_aa_credit_one_and_waitlist_zone.sql', exists (select 1 from pg_constraint where conname = 'session_types_credit_cost_is_one')),
     ('2026100600328', 'program_archive', '0328_program_archive.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'archived_at')),
     ('2026100600326', 'coach_conversation', '0326_coach_conversation.sql', to_regclass('public.coach_conversations') is not null),
     ('2026100600325', 'ai_builder_learning', '0325_ai_builder_learning.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'ai_snapshot')),

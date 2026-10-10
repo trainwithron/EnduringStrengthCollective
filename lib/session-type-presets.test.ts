@@ -6,12 +6,8 @@ describe("starter session types", () => {
     expect(PRESET_SETS.personal.presets.map((p) => p.name)).toEqual(["Online", "In person"]);
     expect(PRESET_SETS.team.presets.map((p) => p.name)).toEqual(["Weight room", "Practice", "Game"]);
   });
-  it("Practice and Game cost no session credit; the rest cost the usual one", () => {
-    const cost = (n: string) => PRESET_SETS.team.presets.find((p) => p.name === n)?.creditCost;
-    expect(cost("Practice")).toBe(0);
-    expect(cost("Game")).toBe(0);
-    expect(cost("Weight room")).toBe(1);
-    expect(PRESET_SETS.personal.presets.every((p) => p.creditCost === 1)).toBe(true);
+  it("no preset carries a credit cost: every session costs exactly 1, whatever its type", () => {
+    for (const set of Object.values(PRESET_SETS)) for (const p of set.presets) expect(Object.keys(p).sort()).toEqual(["locationKind", "name"]);
   });
   it("Online is online; the rest are in person", () => {
     expect(PRESET_SETS.personal.presets.find((p) => p.name === "Online")?.locationKind).toBe("online");
