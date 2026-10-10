@@ -39,14 +39,19 @@ drop policy if exists "group_sessions_select_event_member" on public.group_sessi
 create policy "group_sessions_select_event_member" on public.group_sessions for select
   to authenticated using (kind = 'event' and (public.is_group_member(group_id) or public.is_org_admin_of_group(group_id)));
 
--- Who is In, Out or waiting for an event: every coach of the group, the organization's owner and admins, the person themselves (their own row, as for classes) and the
+-- Who is In, Out or waiting for an event: every coach of the group, the organization's owner and admins (except for a member marked private from the organization), the person themselves (their own row, as for classes) and the
 -- coach who made it (already covered). A plain member sees only their own answer, never anyone else's.
 drop policy if exists "group_session_attendees_select_event_staff" on public.group_session_attendees;
 create policy "group_session_attendees_select_event_staff" on public.group_session_attendees for select
   to authenticated using (
     exists (
       select 1 from public.group_sessions s
-      where s.id = group_session_id and s.kind = 'event' and (public.is_group_coach(s.group_id) or public.is_org_admin_of_group(s.group_id))
+      where s.id = group_session_id and s.kind = 'event'
+        and (
+          public.is_group_coach(s.group_id)
+          -- The organization's owner and admins honour a client marked private from the organization, like every other read of a client's data.
+          or (public.is_org_admin_of_group(s.group_id) and not public.is_client_private_from_org(s.group_id, group_session_attendees.athlete_id))
+        )
     )
   );
 
