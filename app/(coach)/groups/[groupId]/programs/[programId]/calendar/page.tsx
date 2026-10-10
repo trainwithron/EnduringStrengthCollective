@@ -5,6 +5,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { computeScheduledDates, isSameDay, isLocked } from "@/lib/program-schedule";
 import { getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
+import { UpcomingGroupEvents } from "@/components/group/group-event-answer";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
 import { CancelBookingButton } from "@/components/athlete/cancel-booking-button";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
@@ -302,6 +303,8 @@ export default async function ProgramCalendarPage(
           </p>
         )}
       </header>
+
+      {viewingAsAthlete && <UpcomingGroupEvents athleteId={athleteId} timezone={timezone} />}
 
       {upcomingBookings.length > 0 && (
         <section className="px-5 pt-6">

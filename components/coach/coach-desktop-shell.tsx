@@ -109,6 +109,7 @@ type Active =
   | "session-types"
   | "booking-page"
   | "group-sessions"
+  | "group-calendar"
   | "session-ledger"
   | "resources"
   | "quick-tips"
@@ -465,6 +466,7 @@ function CoachDesktopShellFull({
               { key: "team-calendar" as const, label: "Team Calendar", href: `/groups/${groupId}/team/calendar`, icon: CalendarDays },
             ]
           : []),
+        { key: "group-calendar", label: "Group calendar", href: coachLevel ? "/group-calendar" : `/groups/${groupId}/group-calendar`, icon: CalendarDays },
         { key: "group-sessions", label: "Group Sessions", href: `/groups/${groupId}/group-sessions`, icon: Users2 },
         { key: "challenges", label: "Challenges", href: `/groups/${groupId}/challenges`, icon: Flag },
         { key: "records", label: "Hall of Fame", href: `/groups/${groupId}/records`, icon: Trophy },

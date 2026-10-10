@@ -218,6 +218,8 @@ export interface FeedPost {
   postType: "user_post" | "workout_summary";
   channel: FeedChannel;
   pinnedAt: string | null;
+  // A group event this announcement is about (it carries In / Out buttons), or null.
+  eventId?: string | null;
   body: string | null;
   mediaUrl: string | null;
   mediaType: string | null;

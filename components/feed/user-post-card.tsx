@@ -7,6 +7,7 @@ import { PinPostButton } from "./pin-post-button";
 import { DeletePostButton } from "./delete-post-button";
 import { renderWithMentions } from "./mention-text";
 import { Pin } from "lucide-react";
+import { EventAnswerButtons } from "@/components/group/group-event-answer";
 
 export function UserPostCard({
   post,
@@ -66,6 +67,8 @@ export function UserPostCard({
       {post.body && (
         <p className="font-body text-[15px] mb-3">{renderWithMentions(post.body)}</p>
       )}
+
+      {post.eventId && <EventAnswerButtons eventId={post.eventId} athleteId={viewerId} isCoach={isCoach} />}
 
       {post.mediaUrl && post.mediaType === "image" && (
         // eslint-disable-next-line @next/next/no-img-element

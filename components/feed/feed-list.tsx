@@ -51,7 +51,7 @@ export function FeedList({
             .from("posts")
             .select(
               `
-              id, post_type, channel, pinned_at, body, media_url, media_type, created_at, broadcast_level,
+              id, post_type, channel, pinned_at, group_session_id, body, media_url, media_type, created_at, broadcast_level,
               profiles!posts_author_id_fkey ( id, full_name, avatar_url ),
               workout_logs ( total_volume, total_sets_completed, new_prs, logged_by_coach ),
               reactions ( profile_id ),
@@ -68,6 +68,7 @@ export function FeedList({
               postType: data.post_type,
               channel: data.channel,
               pinnedAt: data.pinned_at,
+              eventId: (data as any).group_session_id ?? null,
               body: data.body,
               mediaUrl: data.media_url,
               mediaType: data.media_type,

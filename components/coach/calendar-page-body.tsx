@@ -27,6 +27,9 @@ import { getCoachClients } from "@/lib/coach-clients";
 import { coachCreditSentence } from "@/lib/credit-sentence";
 import { formatSlotTime } from "@/lib/booking-slots";
 import { getEffectiveAthlete } from "@/lib/acting-as";
+import { getCoachedGroups } from "@/lib/coach-groups";
+import { AddGroupEvent } from "@/components/coach/add-group-event";
+import { UpcomingGroupEvents } from "@/components/group/group-event-answer";
 import { computeQuietTier } from "@/lib/quiet-client-tier";
 import { gatherCalendarSpotterFindings } from "@/lib/calendar-spotter-gather";
 import { CalendarSpotterPanel } from "@/components/coach/desktop/calendar-spotter-panel";
@@ -612,6 +615,8 @@ export async function CoachCalendarPageBody(
           )}
         </header>
 
+        <UpcomingGroupEvents athleteId={athleteId} timezone={displayTz} />
+
         {upcomingBookings.length > 0 && (
           <section className="px-5 pt-6">
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
@@ -875,8 +880,31 @@ export async function CoachCalendarPageBody(
   // Dates and times on the COACH's clock. This page renders on the server, which runs in UTC: without the zone an evening session lands on
   // tomorrow's cell and a 6:00 AM one reads 1:00 PM.
   const bookingTz = coachProfile?.timezone ?? DEFAULT_COACH_TIMEZONE;
+  // Group items on the coach's calendar: every group event (labelled with its group's name) and every small-group class. Each one holds the coach's time with a hidden
+  // booking of the coach's own; that stand-in is left out below so the item shows once, under its real name.
+  const { data: groupItemRows } = await supabase
+    .from("group_sessions")
+    .select("id, title, start_at, end_at, kind, group_id, anchor_booking_id")
+    .eq("coach_id", user.id)
+    .eq("status", "scheduled")
+    .gte("start_at", new Date(rangeStart.getTime() - 36 * 3600000).toISOString())
+    .lt("start_at", new Date(rangeEnd.getTime() + 36 * 3600000).toISOString());
+  const groupItems = (groupItemRows ?? []) as { id: string; title: string; start_at: string; end_at: string; kind: string; group_id: string | null; anchor_booking_id: string | null }[];
+  const anchorIds = new Set(groupItems.map((g) => g.anchor_booking_id).filter((x): x is string => !!x));
+  const itemGroupIds = Array.from(new Set(groupItems.map((g) => g.group_id).filter((x): x is string => !!x)));
+  const { data: itemGroupRows } = itemGroupIds.length ? await supabase.from("groups").select("id, name").in("id", itemGroupIds) : { data: [] as { id: string; name: string }[] };
+  const itemGroupName = new Map((itemGroupRows ?? []).map((g) => [g.id, g.name as string]));
+
   const bookingsByDateKey = new Map<string, { time: string; name: string; startMs?: number; endMs?: number }[]>();
+  for (const g of groupItems) {
+    const d = new Date(g.start_at);
+    const key = dateKeyInZone(bookingTz, d);
+    const label = g.kind === "event" ? `${itemGroupName.get(g.group_id ?? "") ?? "Group"}: ${g.title}` : `Group session: ${g.title}`;
+    if (!bookingsByDateKey.has(key)) bookingsByDateKey.set(key, []);
+    bookingsByDateKey.get(key)!.push({ time: formatSlotTime(d, bookingTz), name: label, startMs: d.getTime(), endMs: new Date(g.end_at).getTime() });
+  }
   for (const b of (bookingRows ?? []) as any[]) {
+    if (anchorIds.has(b.id)) continue;
     const d = new Date(b.start_at);
     const key = dateKeyInZone(bookingTz, d);
     const time = formatSlotTime(d, bookingTz);
@@ -1069,6 +1097,9 @@ export async function CoachCalendarPageBody(
     quietClients: quietClients.map((c) => ({ profileId: c.profileId, fullName: c.fullName, groupId: c.groupId, tier: c.tier as "mild" | "strong", neverLogged: c.neverLogged })),
   });
 
+  // The groups a coach can add an event to (team and social groups; a one-on-one client's space is not a group event).
+  const eventGroups = (await getCoachedGroups(supabase, user.id)).filter((g) => g.kind !== "one_on_one").map((g) => ({ id: g.id, name: g.name }));
+
   const calendarSpotterFindings = await gatherCalendarSpotterFindings(supabase, { groupId: params.groupId, coachId: user.id });
   const schedulingSpotterFlags = await gatherSchedulingSpotterFlags(supabase, {
     coachId: user.id,
@@ -1177,6 +1208,8 @@ export async function CoachCalendarPageBody(
       )}
 
       <SchedulingSpotterPanel flags={schedulingSpotterFlags} availabilityHref={`${basePath}?tab=availability`} />
+
+      <AddGroupEvent groups={eventGroups} timezone={bookingTz} />
 
       <CalendarPageTabs
         coachId={user.id}

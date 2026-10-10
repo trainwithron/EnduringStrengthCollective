@@ -25,6 +25,7 @@ function mapPostRow(p: any, groupId: string, viewerId: string | null): FeedPost 
     postType: p.post_type,
     channel: p.channel,
     pinnedAt: p.pinned_at,
+    eventId: p.group_session_id ?? null,
     body: p.body,
     mediaUrl: p.media_url,
     mediaType: p.media_type,
@@ -50,7 +51,7 @@ function mapPostRow(p: any, groupId: string, viewerId: string | null): FeedPost 
 }
 
 const POST_SELECT = `
-  id, post_type, channel, pinned_at, body, media_url, media_type, created_at, broadcast_level,
+  id, post_type, channel, pinned_at, group_session_id, body, media_url, media_type, created_at, broadcast_level,
   profiles!posts_author_id_fkey ( id, full_name, avatar_url ),
   workout_logs ( total_volume, total_sets_completed, new_prs, logged_by_coach ),
   reactions ( profile_id ),
