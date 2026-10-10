@@ -27,7 +27,7 @@ describe("the beta notice version bump (2026-10-08-draft-4)", () => {
     { document: "privacy", version: "2026-10-05-placeholder-1" },
   ];
   it("asks everyone who accepted draft-3 for the beta notice and the privacy policy (its AI section changed), not the terms", () => {
-    expect(LEGAL_VERSIONS.beta_notice).toBe("2026-10-08-draft-4");
+    expect(LEGAL_VERSIONS.beta_notice).toBe("2026-10-10-draft-5");
     expect(LEGAL_VERSIONS.privacy).toBe("2026-10-08-placeholder-2");
     expect(documentsNeedingAcceptance(oldAcceptances)).toEqual(["beta_notice", "privacy"]);
   });

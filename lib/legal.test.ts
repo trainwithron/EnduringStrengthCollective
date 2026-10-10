@@ -80,6 +80,18 @@ describe("beta notice", () => {
   });
 });
 
+describe("the AI paragraph covers the AI builder's learning and conversation", () => {
+  const ai = BETA_NOTICE_PARAGRAPHS.find((p) => p.startsWith("AI is used.")) ?? "";
+  it("says what is sent when a coach builds or changes a program, explains a change, or takes part in the conversation", () => {
+    expect(ai).toContain("When a coach asks the AI to build or change a program, the request and the coach's own exercise names are sent to the AI.");
+    expect(ai).toContain("When a coach explains a change they made, the two exercise names and the coach's explanation are sent.");
+    expect(ai).toContain("In the optional coaching conversation, the coach's answers and the structure of their own programs are sent.");
+  });
+  it("says a minor's request says so but the date of birth is never sent", () => {
+    expect(ai).toContain("If a client is under 18, the request says so; the client's date of birth is never sent.");
+  });
+});
+
 describe("legalTextSnapshot", () => {
   it("is the beta notice as shown, with its version and the support address", () => {
     const snap = legalTextSnapshot("beta_notice", "help@enduringstrengthco.com")!;
