@@ -1,3 +1,4 @@
+import { isRealCoach } from "@/lib/real-coach";
 import { placeholderEmailFor } from "@/lib/client-claim";
 import { rateLimitAllows } from "@/lib/rate-limit";
 import { mirrorBookingToGoogleCalendar } from "@/lib/google-calendar-mirror-server";
@@ -28,6 +29,8 @@ export function publicBookingStore(db: any): PublicBookingStore {
         .eq("slug", slug)
         .maybeSingle();
       if (error || !data) return null;
+      // Only someone who really coaches a group has a public page.
+      if (!(await isRealCoach(db, data.coach_id))) return null;
       return {
         coachId: data.coach_id,
         slug: data.slug,

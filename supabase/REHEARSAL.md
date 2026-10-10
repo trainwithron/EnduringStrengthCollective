@@ -99,3 +99,4 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0326 | yes | yes | 14 | 0326 the coach conversation is private to the coach |
 | 0327 | yes | yes | 12 | 0327 a coach's sign-in email wording is private to the coach |
 | 0328 | yes | yes | 12 | 0328 a program removed from a client's profile is hidden from the client and kept |
+| 0330 | yes | yes | 9 | 0330 only a real coach can have a public page |
