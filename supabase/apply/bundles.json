@@ -229,6 +229,14 @@
   "file": "apply-release-aa-all.sql"
  },
  {
+  "id": "release-ah",
+  "name": "Release AH (only a real coach can have a public booking page or website)",
+  "steps": [
+   "76"
+  ],
+  "file": "apply-release-ah-all.sql"
+ },
+ {
   "id": "release-ag",
   "name": "Release AG (remove a program from a client's profile without deleting it; run AFTER Release AC)",
   "steps": [

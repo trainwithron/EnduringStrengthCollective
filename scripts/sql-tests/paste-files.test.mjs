@@ -1078,6 +1078,24 @@ for (const s of steps) {
   const errAA2 = await run(`apply/${bundle.file}`);
   check("release-aa: the bundle applies again after an undo" + (errAA2 ? ": " + errAA2 : ""), !errAA2 && (await has()));
 }
+// Release AH (step 76): ONE paste.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-ah");
+  check("release-ah: ONE bundle holds step 76", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["76"]));
+  const st76 = steps.find((x) => x.n === "76");
+  const has = async () => (await db.query("select exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%') as ok")).rows[0].ok === true;
+  const eah0 = await run(`apply/undo-step${st76.n}-${st76.slug}.sql`);
+  check("release-ah: before the bundle runs the rule has no coaching check" + (eah0 ? ": " + eah0 : ""), !eah0 && !(await has()));
+  const errAH = await run(`apply/${bundle.file}`);
+  check("release-ah bundle applies on the live-shaped state" + (errAH ? ": " + errAH : ""), !errAH && (await has()));
+  const againAH = await run(`apply/${bundle.file}`);
+  check("release-ah: a second run is refused, naming step 76 (" + againAH + ")", !!againAH && againAH.includes("step 76 (0330) cannot run") && againAH.includes("already applied"));
+  const euAH = await run(`apply/undo-step${st76.n}-${st76.slug}.sql`);
+  check("release-ah: the undo puts the rules back" + (euAH ? ": " + euAH : ""), !euAH && !(await has()));
+  const errAH2 = await run(`apply/${bundle.file}`);
+  check("release-ah: the bundle applies again after an undo" + (errAH2 ? ": " + errAH2 : ""), !errAH2 && (await has()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.

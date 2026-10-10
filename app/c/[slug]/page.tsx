@@ -1,4 +1,5 @@
 import { googleFontsHref } from "@/lib/google-fonts";
+import { isRealCoach } from "@/lib/real-coach";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createServerClient } from "@/lib/supabase/server";
@@ -20,6 +21,7 @@ async function load(slugParam: string, preview: boolean) {
   const db = createServiceRoleClient();
   const { data: page } = await db.from("coach_booking_pages").select("coach_id, slug, enabled, show_prices").eq("slug", slug).maybeSingle();
   if (!page) return null;
+  if (!(await isRealCoach(db, page.coach_id))) return null;
   const { data: site } = await db.from("coach_sites").select("*").eq("coach_id", page.coach_id).maybeSingle();
   if (!site) return null;
   let isOwner = false;

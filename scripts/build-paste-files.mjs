@@ -1554,6 +1554,26 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["offer_freed_slot_to_waitlist is the expected definition (still words the time in UTC)", "exists (select 1 from pg_proc where proname = 'offer_freed_slot_to_waitlist' and pronamespace = 'public'::regnamespace and prosrc like '%to_char(p_start_at, ''Dy Mon DD, HH12:MI AM'')%')"],
     ],
   },
+  {
+    n: "76",
+    slug: "0330",
+    title: "0330 Only a real coach can have a public booking page or a public website (the row-security rule for changing them now also requires coaching a group)",
+    migrations: ["0330"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for anyone who has a page (nobody does today). From now on an account that coaches no group cannot create or change a public page.",
+    undo: [
+      "drop policy if exists \"coach_booking_pages_coach_manage\" on public.coach_booking_pages;",
+      "create policy \"coach_booking_pages_coach_manage\" on public.coach_booking_pages for all to authenticated using (coach_id = (select auth.uid())) with check (coach_id = (select auth.uid()));",
+      "drop policy if exists coach_sites_own on public.coach_sites;",
+      "create policy coach_sites_own on public.coach_sites for all to authenticated using (coach_id = (select auth.uid())) with check (coach_id = (select auth.uid()));",
+    ].join(String.fromCharCode(10)),
+    undoWhy: "Only if step 76 misbehaves. Puts both rules back to 'your own row' (without the coaching check).",
+    rows: [
+      ["0330 is not already applied (the booking page rule does not mention coaching yet)", "not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_booking_pages' and policyname = 'coach_booking_pages_coach_manage' and with_check like '%group_memberships%')"],
+      ["both public page tables exist (0261, 0321)", "to_regclass('public.coach_booking_pages') is not null and to_regclass('public.coach_sites') is not null"],
+      ["both rules are the expected ones (your own row only)", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_booking_pages' and policyname = 'coach_booking_pages_coach_manage') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own')"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -1655,6 +1675,7 @@ const BUNDLES = [
   { id: "release-ae", name: "Release AE (AI builder: the optional conversation about how you program; run AFTER Release AD)", steps: ["72"] },
   { id: "release-af", name: "Release AF (a coach's own wording for the sign-in link email)", steps: ["73"] },
   { id: "release-aa", name: "Release AA (every session costs exactly 1 credit; the waitlist offer shows the coach's time zone)", steps: ["75"] },
+  { id: "release-ah", name: "Release AH (only a real coach can have a public booking page or website)", steps: ["76"] },
   { id: "release-ag", name: "Release AG (remove a program from a client's profile without deleting it; run AFTER Release AC)", steps: ["74"] },
   { id: "release-n2", name: "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)", steps: ["49", "50"] },
   { id: "release-m", name: "Release M (acceptance record is append-only)", steps: ["44"] },
@@ -1838,6 +1859,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0297", has.table("schedule_requests")),
     m("0327", has.table("coach_message_templates")),
     m("0329", "exists (select 1 from pg_constraint where conname = 'session_types_credit_cost_is_one')"),
+    m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0328", has.col("programs", "archived_at")),
     m("0326", has.table("coach_conversations")),
     m("0325", has.col("programs", "ai_snapshot")),
