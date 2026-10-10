@@ -237,6 +237,14 @@
   "file": "apply-release-ah-all.sql"
  },
  {
+  "id": "release-ai",
+  "name": "Release AI (a payment and its sessions are recorded in one step; run BEFORE the code that uses it deploys)",
+  "steps": [
+   "77"
+  ],
+  "file": "apply-release-ai-all.sql"
+ },
+ {
   "id": "release-ag",
   "name": "Release AG (remove a program from a client's profile without deleting it; run AFTER Release AC)",
   "steps": [

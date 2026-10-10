@@ -1574,6 +1574,24 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["both rules are the expected ones (your own row only)", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_booking_pages' and policyname = 'coach_booking_pages_coach_manage') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own')"],
     ],
   },
+  {
+    n: "77",
+    slug: "0331",
+    title: "0331 A paid session pack or membership renewal records its payment event and grants the sessions in ONE database step (a failed grant can no longer leave a handled-looking event with no sessions)",
+    migrations: ["0331"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for anyone today. Two server-only functions are added; the payment handler uses them once the new code is live.",
+    undo: [
+      "drop function if exists public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text);",
+      "drop function if exists public.grant_subscription_credits_once(text, uuid, uuid, uuid, integer, text);",
+    ].join(String.fromCharCode(10)),
+    undoWhy: "Only if step 77 misbehaves. Removes the two functions. The payment handler of the new code needs them, so undo this only together with going back to the previous code.",
+    rows: [
+      ["0331 is not already applied (grant_purchase_once does not exist yet)", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is null"],
+      ["the purchase tables exist", "to_regclass('public.credit_purchases') is not null and to_regclass('public.subscription_credit_grants') is not null"],
+      ["the session ledger grant function exists (0248)", "to_regprocedure('public.grant_session_credits(uuid, uuid, integer, text, text)') is not null"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -1676,6 +1694,7 @@ const BUNDLES = [
   { id: "release-af", name: "Release AF (a coach's own wording for the sign-in link email)", steps: ["73"] },
   { id: "release-aa", name: "Release AA (every session costs exactly 1 credit; the waitlist offer shows the coach's time zone)", steps: ["75"] },
   { id: "release-ah", name: "Release AH (only a real coach can have a public booking page or website)", steps: ["76"] },
+  { id: "release-ai", name: "Release AI (a payment and its sessions are recorded in one step; run BEFORE the code that uses it deploys)", steps: ["77"] },
   { id: "release-ag", name: "Release AG (remove a program from a client's profile without deleting it; run AFTER Release AC)", steps: ["74"] },
   { id: "release-n2", name: "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)", steps: ["49", "50"] },
   { id: "release-m", name: "Release M (acceptance record is append-only)", steps: ["44"] },
@@ -1860,6 +1879,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0327", has.table("coach_message_templates")),
     m("0329", "exists (select 1 from pg_constraint where conname = 'session_types_credit_cost_is_one')"),
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
+    m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0328", has.col("programs", "archived_at")),
     m("0326", has.table("coach_conversations")),
     m("0325", has.col("programs", "ai_snapshot")),

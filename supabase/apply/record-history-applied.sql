@@ -64,6 +64,7 @@ from (
     ('2026100600327', 'coach_message_templates', '0327_coach_message_templates.sql', to_regclass('public.coach_message_templates') is not null),
     ('2026100600329', 'release_aa_credit_one_and_waitlist_zone', '0329_release_aa_credit_one_and_waitlist_zone.sql', exists (select 1 from pg_constraint where conname = 'session_types_credit_cost_is_one')),
     ('2026100600330', 'public_page_coach_only', '0330_public_page_coach_only.sql', exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')),
+    ('2026100600331', 'purchase_grants_once', '0331_purchase_grants_once.sql', to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null),
     ('2026100600328', 'program_archive', '0328_program_archive.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'archived_at')),
     ('2026100600326', 'coach_conversation', '0326_coach_conversation.sql', to_regclass('public.coach_conversations') is not null),
     ('2026100600325', 'ai_builder_learning', '0325_ai_builder_learning.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'programs' and column_name = 'ai_snapshot')),

@@ -171,10 +171,10 @@ describe("a subscription that ends", () => {
 
 describe("wiring", () => {
   const read = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8").replace(/\r\n/g, "\n");
-  it("both ways a package is delivered grant the access, and only a cancelled subscription takes it back", () => {
+  it("a payment, a new subscription and a paid renewal grant the access, and only a lapsed subscription takes it back", () => {
     const hook = read("app/api/stripe/webhook/route.ts");
-    expect(hook.match(/grantGroupAccessLogged\(supabase, coachPackageId, athleteId\)/g)?.length).toBe(2);
-    expect(hook).toContain('if (status === "canceled") {');
+    expect(hook.match(/grantGroupAccessLogged\(supabase, coachPackageId, athleteId\)/g)?.length).toBe(3);
+    expect(hook).toContain("if (endsGroupAccess(status)) {");
     expect(hook).toContain("revokeLinkedGroupAccess(supabase");
     expect(read("app/api/coach/package-assignments/route.ts")).toContain("grantLinkedGroupAccess(createServiceRoleClient()");
   });
