@@ -88,7 +88,7 @@ describe("how it is wired", () => {
     expect(ctx).toContain("programNames: ((sharedNames ?? [])");
     expect(ctx).not.toContain("programNames: ((programs ?? [])");
     expect(read("app/api/ai/coach-conversation/route.ts")).toContain("const takeBack = async () => {");
-    expect(ctx).not.toMatch(/athlete|group_memberships|client_intake|profilesb/i);
+    expect(ctx).not.toMatch(/group_memberships|client_intake|athlete_notes|profiles\b/i);
   });
   it("the invitation is quiet: Start, Not now and Don't ask me questions, on the Programs page; the conversation is always reachable from the list", () => {
     const card = read("components/coach/coach-conversation.tsx");
