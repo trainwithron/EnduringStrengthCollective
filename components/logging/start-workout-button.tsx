@@ -49,7 +49,7 @@ export function StartWorkoutButton({
   // session gets no session_type_id — complete_workout_session() already
   // treats that as the implicit default 1-credit training session, so a
   // coach who never creates a type sees nothing different here.
-  sessionTypes?: { id: string; name: string; creditCost: number }[];
+  sessionTypes?: { id: string; name: string }[];
   // Shown in the credit choice below ("from Sawyer's balance").
   clientName?: string;
 }) {
@@ -59,7 +59,6 @@ export function StartWorkoutButton({
   // A coach logging in person never spends a session credit unless they
   // choose to here (default OFF) — see migration 0231.
   const [deductCredit, setDeductCredit] = useState(false);
-  const selectedCost = sessionTypes?.find((t) => t.id === sessionTypeId)?.creditCost ?? 1;
   const router = useRouter();
 
   async function handleStart() {
@@ -227,7 +226,7 @@ export function StartWorkoutButton({
             onChange={(e) => setDeductCredit(e.target.checked)}
             className="h-4 w-4 accent-rust"
           />
-          Use {selectedCost} session {selectedCost === 1 ? "credit" : "credits"}
+          Use 1 session credit
           {clientName ? " from " + clientName + "'s balance" : " from their balance"}
         </label>
       )}

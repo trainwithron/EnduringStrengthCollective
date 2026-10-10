@@ -221,6 +221,14 @@
   "file": "apply-release-af-all.sql"
  },
  {
+  "id": "release-aa",
+  "name": "Release AA (every session costs exactly 1 credit; the waitlist offer shows the coach's time zone)",
+  "steps": [
+   "75"
+  ],
+  "file": "apply-release-aa-all.sql"
+ },
+ {
   "id": "release-ag",
   "name": "Release AG (remove a program from a client's profile without deleting it; run AFTER Release AC)",
   "steps": [

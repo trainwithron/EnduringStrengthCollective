@@ -1058,6 +1058,26 @@ for (const s of steps) {
   const errAG2 = await run(`apply/${bundle.file}`);
   check("release-ag: the bundle applies again after an undo" + (errAG2 ? ": " + errAG2 : ""), !errAG2 && (await has()));
 }
+// Release AA (step 75): ONE paste.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-aa");
+  check("release-aa: ONE bundle holds step 75", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["75"]));
+  const st75 = steps.find((x) => x.n === "75");
+  const has = async () => (await db.query("select exists (select 1 from pg_constraint where conname = 'session_types_credit_cost_is_one') as ok")).rows[0].ok === true;
+  const eaa0 = await run(`apply/undo-step${st75.n}-${st75.slug}.sql`);
+  check("release-aa: before the bundle runs the cost rule is absent" + (eaa0 ? ": " + eaa0 : ""), !eaa0 && !(await has()));
+  const errAA = await run(`apply/${bundle.file}`);
+  check("release-aa bundle applies on the live-shaped state" + (errAA ? ": " + errAA : ""), !errAA && (await has()));
+  const againAA = await run(`apply/${bundle.file}`);
+  check("release-aa: a second run is refused, naming step 75 (" + againAA + ")", !!againAA && againAA.includes("step 75 (0329) cannot run") && againAA.includes("already applied"));
+  const euAA = await run(`apply/undo-step${st75.n}-${st75.slug}.sql`);
+  check("release-aa: the undo removes the rule and puts both functions back" + (euAA ? ": " + euAA : ""), !euAA && !(await has()));
+  const back = (await db.query("select prosrc from pg_proc where proname = 'complete_workout_session' and pronamespace = 'public'::regnamespace")).rows[0].prosrc;
+  check("release-aa: after the undo completing a workout reads the type cost again", /select credit_cost into v_credit_cost/.test(back));
+  const errAA2 = await run(`apply/${bundle.file}`);
+  check("release-aa: the bundle applies again after an undo" + (errAA2 ? ": " + errAA2 : ""), !errAA2 && (await has()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.

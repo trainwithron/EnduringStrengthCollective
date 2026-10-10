@@ -10,27 +10,22 @@ import { PRESET_SETS, missingPresets, type PresetSetKey } from "@/lib/session-ty
 export interface SessionTypeRow {
   id: string;
   name: string;
-  creditCost: number;
 }
 
 // gym_owner_multi_trainer_session_tracking_real_prospect.md — most
 // coaches never touch this at all (every session stays the implicit,
-// unnamed "training session" at cost 1). This exists only for the coach
-// who wants to log an admin/internal session (a scheduling call, a
-// non-billable check-in) without it silently spending a client's
-// pre-paid credit — set that type's cost to 0.
+// unnamed "training session"). Every session, of any type, costs exactly 1
+// credit; a type only tells kinds of sessions apart.
 export function SessionTypeManager({ initialTypes, teamMode = false }: { initialTypes: SessionTypeRow[]; teamMode?: boolean }) {
   const router = useRouter();
   const [types, setTypes] = useState(initialTypes);
   const [name, setName] = useState("");
-  const [creditCost, setCreditCost] = useState("1");
   const [busy, setBusy] = useState(false);
   const [presetError, setPresetError] = useState<string | null>(null);
 
   async function handleAdd() {
     const trimmed = name.trim();
-    const cost = Number(creditCost);
-    if (!trimmed || busy || !Number.isFinite(cost) || cost < 0) return;
+    if (!trimmed || busy) return;
     setBusy(true);
     const supabase = createBrowserClient();
     const {
@@ -42,13 +37,12 @@ export function SessionTypeManager({ initialTypes, teamMode = false }: { initial
     }
     const { data } = await supabase
       .from("session_types")
-      .insert({ coach_id: user.id, name: trimmed, credit_cost: Math.round(cost) })
-      .select("id, name, credit_cost")
+      .insert({ coach_id: user.id, name: trimmed })
+      .select("id, name")
       .single();
     if (data) {
-      setTypes((prev) => [...prev, { id: data.id, name: data.name, creditCost: data.credit_cost }]);
+      setTypes((prev) => [...prev, { id: data.id, name: data.name }]);
       setName("");
-      setCreditCost("1");
       router.refresh();
     }
     setBusy(false);
@@ -70,14 +64,14 @@ export function SessionTypeManager({ initialTypes, teamMode = false }: { initial
     }
     const { data, error } = await supabase
       .from("session_types")
-      .insert(missing.map((p) => ({ coach_id: user.id, name: p.name, credit_cost: p.creditCost, location_kind: p.locationKind, public_visible: false })))
-      .select("id, name, credit_cost");
+      .insert(missing.map((p) => ({ coach_id: user.id, name: p.name, location_kind: p.locationKind, public_visible: false })))
+      .select("id, name");
     setBusy(false);
     if (error || !data) {
       setPresetError("That didn't save. Nothing was added. Try again.");
       return;
     }
-    setTypes((prev) => [...prev, ...data.map((d) => ({ id: d.id, name: d.name, creditCost: d.credit_cost }))]);
+    setTypes((prev) => [...prev, ...data.map((d) => ({ id: d.id, name: d.name }))]);
     router.refresh();
   }
 
@@ -92,10 +86,9 @@ export function SessionTypeManager({ initialTypes, teamMode = false }: { initial
   return (
     <div className="max-w-2xl">
       <p className="font-body text-sm text-steel mb-4 max-w-[60ch]">
-        Every in-person session you log spends 1 credit by default — you never have to set anything up. Create a type
-        here to tell kinds of sessions apart (Online, In person, Practice, Game...), or an admin/internal session (a
-        scheduling call, a non-billable check-in) that spends 0. A type can be given to a window of hours on Availability,
-        and sessions booked inside those hours carry it.
+        Every session you log spends exactly 1 credit, whatever its type. Create a type here to tell kinds of sessions
+        apart (Online, In person, Practice, Game...). A type can be given to a window of hours on Availability, and sessions
+        booked inside those hours carry it.
       </p>
 
       <div className="mb-5 border border-steel/20 p-3">
@@ -119,7 +112,7 @@ export function SessionTypeManager({ initialTypes, teamMode = false }: { initial
           })}
         </div>
         <p className="font-body text-xs text-steel mt-2">
-          They are ordinary types you can rename or delete, and they are not shown on your public booking page. Practice and Game are set to cost 0 credits when you log a workout as that type. Giving hours or a booked session a type never changes what the booking costs.
+          They are ordinary types you can rename or delete, and they are not shown on your public booking page. Giving hours or a booked session a type never changes what the booking costs: every session is 1 credit.
         </p>
         {presetError && (
           <p className="font-body text-xs text-rust mt-1" role="alert">
@@ -134,9 +127,6 @@ export function SessionTypeManager({ initialTypes, teamMode = false }: { initial
             <div key={t.id} className="py-2.5 flex items-center justify-between">
               <span className="font-body text-sm">{t.name}</span>
               <div className="flex items-center gap-3">
-                <span className="font-body text-xs text-steel">
-                  {t.creditCost} {t.creditCost === 1 ? "credit" : "credits"}
-                </span>
                 <button
                   type="button"
                   onClick={() => handleDelete(t.id)}
@@ -160,17 +150,6 @@ export function SessionTypeManager({ initialTypes, teamMode = false }: { initial
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Check-in"
             className="h-10 w-56 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="font-body text-xs text-steel uppercase tracking-wide">Credit cost</label>
-          <input
-            type="number"
-            inputMode="numeric"
-            min={0}
-            value={creditCost}
-            onChange={(e) => setCreditCost(e.target.value)}
-            className="h-10 w-24 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust"
           />
         </div>
         <button

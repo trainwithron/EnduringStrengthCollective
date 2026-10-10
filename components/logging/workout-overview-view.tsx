@@ -31,7 +31,7 @@ export function WorkoutOverviewView({
   loggingForName?: string;
   loggedByCoach?: boolean;
   actingAs?: { fullName: string; groupId: string };
-  sessionTypes?: { id: string; name: string; creditCost: number }[];
+  sessionTypes?: { id: string; name: string }[];
 }) {
   const { workout, exercises, dayNotes, lastTimeByExercise, videoUrlByExerciseId, goalByExerciseId, existingSession } =
     data;

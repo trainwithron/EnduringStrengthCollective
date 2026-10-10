@@ -1,12 +1,11 @@
 // Starter session types (Ron, Oct 6): one tap adds ordinary session types the coach can rename, change or delete like any they made themselves. There is no coach
 // "kind" setting; the coach picks the set (or it is suggested from whether they run a team). They are created private (not shown on the public booking page).
-// Practice and Game cost no session credit: a team does not spend a client's prepaid session on them.
+// Every session costs exactly 1 credit, whatever its type.
 
 export type PresetSetKey = "personal" | "team";
 
 export interface SessionTypePreset {
   name: string;
-  creditCost: number;
   locationKind: "in_person" | "online";
 }
 
@@ -14,16 +13,16 @@ export const PRESET_SETS: Record<PresetSetKey, { label: string; presets: Session
   personal: {
     label: "Personal coaching",
     presets: [
-      { name: "Online", creditCost: 1, locationKind: "online" },
-      { name: "In person", creditCost: 1, locationKind: "in_person" },
+      { name: "Online", locationKind: "online" },
+      { name: "In person", locationKind: "in_person" },
     ],
   },
   team: {
     label: "Team coaching",
     presets: [
-      { name: "Weight room", creditCost: 1, locationKind: "in_person" },
-      { name: "Practice", creditCost: 0, locationKind: "in_person" },
-      { name: "Game", creditCost: 0, locationKind: "in_person" },
+      { name: "Weight room", locationKind: "in_person" },
+      { name: "Practice", locationKind: "in_person" },
+      { name: "Game", locationKind: "in_person" },
     ],
   },
 };

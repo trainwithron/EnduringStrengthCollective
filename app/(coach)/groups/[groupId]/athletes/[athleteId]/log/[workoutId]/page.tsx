@@ -55,7 +55,7 @@ export default async function LogWorkoutForClientPage(
   // session never spends a credit, so it has no use for session types.
   const { data: typeRows } = await supabase
     .from("session_types")
-    .select("id, name, credit_cost")
+    .select("id, name")
     .eq("coach_id", user.id)
     .order("created_at", { ascending: true });
 
@@ -68,7 +68,7 @@ export default async function LogWorkoutForClientPage(
       backHref={`/groups/${params.groupId}/athletes/${params.athleteId}/log`}
       loggingForName={athleteProfile?.full_name ?? "this client"}
       loggedByCoach
-      sessionTypes={(typeRows ?? []).map((t) => ({ id: t.id, name: t.name, creditCost: t.credit_cost }))}
+      sessionTypes={(typeRows ?? []).map((t) => ({ id: t.id, name: t.name }))}
     />
   );
 }
