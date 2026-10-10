@@ -1598,7 +1598,7 @@ alter table public.coach_availability_windows drop column if exists session_minu
     title: "0332 In a one-on-one space a program with no client on it is the coach's template: the client can no longer read it (nor its workouts, exercises or sets)",
     migrations: ["0332"],
     sees: "Success. No rows returned.",
-    afterwards: "A client in a one-on-one space no longer sees a no-client program in that space (for example a template the coach copied there). Programs made for the client, team and social groups, and everything a coach sees are unchanged. No program is changed or deleted.",
+    afterwards: "A client in a one-on-one space no longer sees a no-client program in that space (for example a template the coach copied there). Programs made for the client, team and social groups, and everything a coach sees are unchanged. One one-time change first: Karina Ramirez's \"4-Week Full-Body Strength Foundation\" and Johann Gorsik's \"3x_weekly_johann_program\" are attached to their own client (so each keeps seeing exactly what they see today). William Stafford's two \"Max anthony\" programs are not attached. No program is deleted.",
     undo: [
       "drop policy if exists \"programs_select_members\" on public.programs;",
       "create policy \"programs_select_members\" on public.programs for select to authenticated using (is_group_member(group_id) and (athlete_id is null or athlete_id = (select auth.uid()) or is_group_coach(group_id)) and (is_group_coach(group_id) or (not ai_draft and archived_at is null)));",
@@ -1606,7 +1606,7 @@ alter table public.coach_availability_windows drop column if exists session_minu
       "create or replace function public.is_ai_draft_workout(_workout_id uuid) returns boolean language sql stable security definer set search_path = public as 'select coalesce((select (p.ai_draft or p.archived_at is not null) from public.workouts w join public.programs p on p.id = w.program_id where w.id = _workout_id), false)';",
       "drop function if exists public.is_one_on_one_group(uuid);",
     ].join(String.fromCharCode(10)),
-    undoWhy: "Only if step 78 misbehaves. Puts the two helper functions and the programs read rule back as they were after step 74 (clients in a one-on-one space can read no-client programs there again).",
+    undoWhy: "Only if step 78 misbehaves. Puts the two helper functions and the programs read rule back as they were after step 74 (clients in a one-on-one space can read no-client programs there again). It does not un-attach Karina's and Johann's programs from their clients; that is harmless.",
     rows: [
       ["0332 is not already applied (is_one_on_one_group does not exist yet)", "to_regprocedure('public.is_one_on_one_group(uuid)') is null"],
       ["programs can be removed from a profile (0328, step 74 applied)", has.col("programs", "archived_at")],

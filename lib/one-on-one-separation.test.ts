@@ -35,7 +35,13 @@ describe("a one-on-one space has no shared program (Release AJ)", () => {
     expect(sql).toContain("p.athlete_id is null and public.is_one_on_one_group(p.group_id)");
     expect(sql).toContain("athlete_id is not null or not public.is_one_on_one_group(group_id)");
     expect(sql).toContain("is_group_coach(group_id) or (not ai_draft and archived_at is null");
-    expect(sql).not.toMatch(/delete from|update public\.programs/);
+    // nothing is deleted; the only program update is the one-time attach of Karina's and Johann's own programs to their own clients, by exact id
+    expect(sql).not.toMatch(/delete from/);
+    expect((sql.match(/update public\.programs/g) ?? []).length).toBe(1);
+    expect(sql).toContain("d15055ab-acd9-47f7-aeef-31c2519b20cc");
+    expect(sql).toContain("1f223214-efef-4883-bc3d-d5486854cf9e");
+    expect(sql).not.toContain("56d6ff8b-2b55-41dd-bcb9-e2e9e2f32c60"); // William's "Max anthony" programs are not attached
+    expect(sql).not.toContain("3d2082ef-54e9-4250-be3b-e7e93cee7ec4");
   });
 });
 

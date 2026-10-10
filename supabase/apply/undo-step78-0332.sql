@@ -1,4 +1,4 @@
--- UNDO for step 78 (0332). Only if step 78 misbehaves. Puts the two helper functions and the programs read rule back as they were after step 74 (clients in a one-on-one space can read no-client programs there again).
+-- UNDO for step 78 (0332). Only if step 78 misbehaves. Puts the two helper functions and the programs read rule back as they were after step 74 (clients in a one-on-one space can read no-client programs there again). It does not un-attach Karina's and Johann's programs from their clients; that is harmless.
 -- WHAT YOU SHOULD SEE: "Success. No rows returned."   Then tell Spot, and do not run the step again until Spot says why it failed.
 begin;
 drop policy if exists "programs_select_members" on public.programs;
