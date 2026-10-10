@@ -87,14 +87,7 @@ export function AssignSessionsControl({
       setError("Enter a whole number of sessions, 1 to 500.");
       return;
     }
-    if (
-      !await confirmDialog({
-        message: `Add ${n} session${n === 1 ? "" : "s"} to ${clientName}? Their balance goes from ${balance} to ${balance + n}.`,
-        confirmLabel: "Add sessions",
-      })
-    ) {
-      return;
-    }
+    // No "are you sure" for adding: a coach adds 1, 2 or 12 by hand for cash and gym packs. The result line below shows what happened, and the ledger and the minus button cover a slip.
     setBusy(true);
     setError(null);
     setMessage(null);

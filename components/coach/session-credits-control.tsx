@@ -18,16 +18,18 @@ export function SessionCreditsControl({
   const router = useRouter();
   const [balance, setBalance] = useState(initialBalance);
   const [error, setError] = useState<string | null>(null);
+  const [addedNote, setAddedNote] = useState<string | null>(null);
 
   async function adjust(delta: number) {
     // A balance is money the client paid for. One stray tap on a small
     // button must not add or remove a session without a second look.
-    const verb = delta < 0 ? "Remove 1 session from" : "Add 1 session to";
-    if (!await confirmDialog({ message: `${verb} this client? Their balance goes from ${balance} to ${balance + delta}.`, confirmLabel: delta < 0 ? "Remove session" : "Add session" })) {
+    // Only taking one away is asked; adding is not (the result line shows what happened).
+    if (delta < 0 && !await confirmDialog({ message: `Remove 1 session from this client? Their balance goes from ${balance} to ${balance + delta}.`, confirmLabel: "Remove session" })) {
       return;
     }
 
     setError(null);
+    setAddedNote(null);
     const before = balance;
     // Reflect the change on the button instantly — the actual write stays
     // an atomic DB-side increment (not a naive read-then-write, which
@@ -50,6 +52,7 @@ export function SessionCreditsControl({
           return;
         }
         if (typeof newBalance === "number") setBalance(newBalance);
+        if (delta > 0) setAddedNote(`Added 1.${typeof newBalance === "number" ? ` Balance is now ${newBalance}.` : ""}`);
         // The ledger and the Assign box above read the same balance; bring them up to date.
         router.refresh();
         // Only a real spend is worth checking — an increase (a manual
@@ -86,6 +89,11 @@ export function SessionCreditsControl({
       {error && (
         <p className="font-body text-xs text-rust mt-1" role="alert">
           {error}
+        </p>
+      )}
+      {addedNote && (
+        <p className="font-body text-xs text-positive mt-1" role="status">
+          {addedNote}
         </p>
       )}
     </div>

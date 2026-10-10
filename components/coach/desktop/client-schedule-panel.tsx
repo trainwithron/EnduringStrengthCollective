@@ -39,6 +39,7 @@ export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client
   const [balance, setBalance] = useState(client.balance);
   const [adjusting, setAdjusting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [addedNote, setAddedNote] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   // A session just marked attended stays in the list until the panel is opened again, so its Undo is still there.
   const [kept, setKept] = useState<Record<string, BookingRow>>({});
@@ -102,10 +103,11 @@ export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client
 
   async function adjustCredits(delta: number) {
     if (!groupId) return;
-    // Money moves with one tap here, so it is asked once.
-    if (!await confirmDialog({ message: `${delta > 0 ? "Add" : "Remove"} one ${noun.singular} ${delta > 0 ? "to" : "from"} ${client.fullName}?`, confirmLabel: delta > 0 ? "Add" : "Remove" })) return;
+    // Taking a session away removes value, so it is asked once; adding one is not (a coach adds sessions by hand for cash and gym packs), and the result is shown instead.
+    if (delta < 0 && !await confirmDialog({ message: `Remove one ${noun.singular} from ${client.fullName}?`, confirmLabel: "Remove" })) return;
     setAdjusting(true);
     setError(null);
+    setAddedNote(null);
     const { data: newBalance, error: rpcError } = await createBrowserClient().rpc("adjust_session_credits", { p_athlete_id: client.athleteId, p_group_id: groupId, p_delta: delta });
     setAdjusting(false);
     if (rpcError) {
@@ -113,6 +115,7 @@ export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client
       return;
     }
     if (typeof newBalance === "number") setBalance(newBalance);
+    if (delta > 0) setAddedNote(`Added one. ${typeof newBalance === "number" ? `Balance is now ${newBalance}.` : ""}`.trim());
     router.refresh();
     load().catch(() => {});
   }
@@ -217,6 +220,7 @@ export function ClientSchedulePanel({ client, timezone, sessionTypes }: { client
         </>
       )}
       {error && <p className="font-body text-xs text-rust mt-2">{error}</p>}
+      {addedNote && <p className="font-body text-xs text-positive mt-2" role="status">{addedNote}</p>}
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
         <Link href={`/groups/${groupId}/athletes/${client.athleteId}/calendar`} className="font-body text-xs text-rust underline underline-offset-2">
           Their calendar &rarr;

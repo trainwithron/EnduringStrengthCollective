@@ -81,8 +81,7 @@ describe("confirm questions", () => {
   it("money and schedule questions name their action instead of 'Confirm'", () => {
     const pairs: [string, string][] = [
       ["components/coach/assign-sessions-control.tsx", 'confirmLabel: "Set balance"'],
-      ["components/coach/assign-sessions-control.tsx", 'confirmLabel: "Add sessions"'],
-      ["components/coach/session-credits-control.tsx", 'confirmLabel: delta < 0 ? "Remove session" : "Add session"'],
+      ["components/coach/session-credits-control.tsx", 'confirmLabel: "Remove session"'],
       ["components/coach/correct-client-email.tsx", 'confirmLabel: "Change email"'],
       ["components/coach/desktop/bulk-macro-range-form.tsx", 'confirmLabel: "Apply targets"'],
       ["components/coach/desktop/meal-plan-generator.tsx", 'confirmLabel: "Build plan"'],
