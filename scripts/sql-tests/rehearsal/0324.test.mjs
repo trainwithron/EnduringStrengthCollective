@@ -67,10 +67,41 @@ export default {
       const open = await h.one("select has_function_privilege('authenticated', 'public.guard_ai_draft_not_active()', 'execute') as a, has_function_privilege('anon', 'public.guard_ai_draft_not_active()', 'execute') as b");
       h.check("the guard function cannot be run by a signed-in user or a visitor", open.a === false && open.b === false);
 
-      // A client can never see a draft (they are not active), and cannot change one.
+      // The database itself hides an unsigned draft, and everything under it, from the client it was built for.
+      await h.asSuper();
+      const d3 = (await db.query("insert into public.programs (group_id, name, created_by, athlete_id, is_active, ai_draft) values ($1, 'AI for Ann', $2, $3, false, true) returning id", [group, coach, ann])).rows[0].id;
+      const w3 = (await db.query("insert into public.workouts (program_id, group_id, title, week_number, day_index) values ($1, $2, 'Day 1', 1, 1) returning id", [d3, group])).rows[0].id;
+      const e3 = (await db.query("insert into public.group_workout_exercises (workout_id, group_id, exercise_name, exercise_order, tracked_fields) values ($1, $2, 'Squat', 0, array['reps']) returning id", [w3, group])).rows[0].id;
+      await db.query("insert into public.group_workout_exercise_sets (group_workout_exercise_id, set_order, target_reps) values ($1, 0, '5')", [e3]);
+      await db.query("insert into public.workout_notes (workout_id, group_id, body, position, created_by) values ($1, $2, 'note', 0, $3)", [w3, group, coach]);
+      await db.query("insert into public.exercise_progressions (program_id, group_id, exercise_name, model, config, created_by) values ($1, $2, 'Squat', 'linear', '{}'::jsonb, $3)", [d3, group, coach]).catch(() => null);
+      const counts = async () =>
+        h.one(
+          `select (select count(*) from public.programs where id = $1)::int as programs,
+                  (select count(*) from public.workouts where program_id = $1)::int as workouts,
+                  (select count(*) from public.group_workout_exercises where workout_id = $2)::int as exercises,
+                  (select count(*) from public.group_workout_exercise_sets where group_workout_exercise_id = $3)::int as sets,
+                  (select count(*) from public.workout_notes where workout_id = $2)::int as notes,
+                  (select count(*) from public.exercise_progressions where program_id = $1)::int as progressions`,
+          [d3, w3, e3]
+        );
       await h.as(ann);
-      const seen = await h.rows("select id from public.programs where id = $1 and is_active", [draft]);
-      void seen;
+      const asClient = await counts();
+      h.check("the client the draft was built for cannot read the draft program or anything under it", Object.values(asClient).every((n) => n === 0), JSON.stringify(asClient));
+      await h.as(coach);
+      const asCoach = await counts();
+      h.check("the coach of the group reads all of it", asCoach.programs === 1 && asCoach.workouts === 1 && asCoach.exercises === 1 && asCoach.sets === 1 && asCoach.notes === 1, JSON.stringify(asCoach));
+      const copyOfDraft = await tryQ(db, "select public.duplicate_program($1, $2, $3, $4, 'Ann') as id", [d3, group, coach, ann]);
+      h.check("the coach can still copy and assign a draft", !!copyOfDraft.rows?.[0]?.id, JSON.stringify(copyOfDraft));
+      h.check("...and the copy has everything under it", ((await h.one("select count(*)::int as n from public.group_workout_exercises where workout_id in (select id from public.workouts where program_id = $1)", [copyOfDraft.rows[0].id])).n) === 1);
+      await h.as(coach);
+      await db.query("update public.programs set ai_draft = false, is_active = true where id = $1", [d3]);
+      await h.as(ann);
+      const afterSignOff = await counts();
+      h.check("after sign-off the client reads the program and everything under it", afterSignOff.programs === 1 && afterSignOff.workouts === 1 && afterSignOff.exercises === 1 && afterSignOff.sets === 1 && afterSignOff.notes === 1, JSON.stringify(afterSignOff));
+
+      // A client cannot change a draft.
+      await h.as(ann);
       const write = await tryQ(db, "update public.programs set ai_draft = false, is_active = true where id = $1 returning id", [copy]);
       h.check("a client cannot sign off a draft", !!write.error || (write.rows ?? []).length === 0, JSON.stringify(write));
     },
