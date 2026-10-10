@@ -794,7 +794,8 @@ export function ImportWizard({
     processingRef.current = true;
     setStatus("working");
     setError(null);
-    setStatusLabel(workingLabel);
+    // A long pasted program may be read in parts: say so plainly instead of leaving a spinner that looks stuck.
+    setStatusLabel(typeof body.text === "string" && body.text.length > 20000 ? "This program is large, reading it in parts…" : workingLabel);
 
     try {
       const res = await fetch("/api/ai/parse-workout", {
@@ -811,7 +812,8 @@ export function ImportWizard({
         return;
       }
 
-      prepareImport(data.rows, programName, sourceNote, null, null, undefined, true);
+      const parts = typeof data.parts === "number" ? data.parts : 1;
+      prepareImport(data.rows, programName, parts > 1 ? `${sourceNote} (a large program, read in ${parts} parts)` : sourceNote, null, null, undefined, true);
     } catch (err) {
       setStatus("error");
       setError(err instanceof Error ? err.message : fallbackError);

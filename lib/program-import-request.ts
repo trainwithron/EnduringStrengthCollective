@@ -59,8 +59,8 @@ export async function extractPdfText(bytes: Uint8Array): Promise<ExtractedPdf> {
 
 export type ImportPlan =
   | { ok: true; feature: "program_import_photo"; image: { mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif"; base64Data: string }; userText: string }
-  | { ok: true; feature: "program_import_text"; userText: string }
-  | { ok: true; feature: "program_import_pdf"; userText: string; document?: { mediaType: "application/pdf"; base64Data: string } }
+  | { ok: true; feature: "program_import_text"; userText: string; sourceText: string }
+  | { ok: true; feature: "program_import_pdf"; userText: string; sourceText?: string; document?: { mediaType: "application/pdf"; base64Data: string } }
   | { ok: false; status: number; error: string };
 
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"] as const;
@@ -87,7 +87,7 @@ export async function planImportRequest(body: unknown): Promise<ImportPlan> {
     const text = b.text.trim();
     if (!text) return fail(400, "There is no text to read.");
     if (text.length > MAX_PASTE_CHARS) return fail(413, "That text is too long to read at once. Paste a few weeks at a time.");
-    return { ok: true, feature: "program_import_text", userText: userTextForProgramText(text) };
+    return { ok: true, feature: "program_import_text", userText: userTextForProgramText(text), sourceText: text };
   }
 
   if (typeof b.pdfBase64 === "string" && b.pdfBase64) {
@@ -106,7 +106,7 @@ export async function planImportRequest(body: unknown): Promise<ImportPlan> {
     }
     if (extracted.text.replace(/\s/g, "").length >= MIN_PDF_TEXT_CHARS) {
       if (extracted.text.length > MAX_PASTE_CHARS) return fail(413, "That PDF has a lot of text. Try just a few weeks at a time.");
-      return { ok: true, feature: "program_import_pdf", userText: userTextForProgramText(extracted.text) };
+      return { ok: true, feature: "program_import_pdf", userText: userTextForProgramText(extracted.text), sourceText: extracted.text };
     }
     // A scan: hand Claude the document itself to look at.
     if (extracted.pages > MAX_SCANNED_PDF_PAGES) return fail(413, `That scanned PDF has ${extracted.pages} pages. Try ${MAX_SCANNED_PDF_PAGES} or fewer.`);
