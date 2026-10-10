@@ -379,6 +379,8 @@ $$;
 grant execute on function public.waive_booking(uuid, text) to authenticated;
 
 -- ---- logging a workout settles the booking it belongs to -------------------------------------------------------
+-- SUPERSEDED (note added 2026-10-10, comment only): production runs the version in 0236_workout_session_integrity.sql, which is applied AFTER this one and adds the row lock and
+-- the safe repeat (a second call returns the existing log). The 0236 text plus the credit block below is what is live. Release AA (0329) replaced the live function from the 0236 text.
 -- The whole function is replaced (no text matching against whatever is there): this is the live definition of complete_workout_session as
 -- read on 2026-10-05 (md5 49fe3d6b3ec9ecb92f44b1087574dfb0 of pg_get_functiondef), with ONE block changed: the credit block at the end, which now
 -- settles the booking the coach logged (or follows the explicit choice made when the session was started). Everything else is unchanged.

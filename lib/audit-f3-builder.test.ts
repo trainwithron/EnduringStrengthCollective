@@ -16,7 +16,6 @@ describe("the program builder header", () => {
   });
   it("does not show the client's 'Day N of M, you've moved X lbs' strip in the coach's builder", () => {
     expect(read("app/(coach)/groups/[groupId]/programs/[programId]/page.tsx").match(/<ProgramProgressBanner/g)?.length).toBe(1); // the client's view only
-    expect(read("components/coach/desktop/embedded-program-builder.tsx")).not.toContain("ProgramProgressBanner");
   });
   it("shows the Programming Spotter as one summary line until Review is pressed", () => {
     const panel = read("components/coach/desktop/programming-spotter-panel.tsx");

@@ -10,7 +10,7 @@ export type WebhookEventType = "client_added" | "workout_completed" | "pr_hit" |
 // zero rows means this returns immediately.
 export async function dispatchWebhookEvent(
   supabase: SupabaseClient,
-  params: { coachId: string; eventType: WebhookEventType; payload: Record<string, unknown> }
+  params: { coachId: string; eventType: WebhookEventType; payload: Record<string, unknown>; dedupeKey?: string }
 ): Promise<void> {
   const { data: subscriptions } = await supabase
     .from("webhook_subscriptions")
@@ -20,13 +20,25 @@ export async function dispatchWebhookEvent(
 
   if (!subscriptions || subscriptions.length === 0) return;
 
+  // With a dedupe key the key travels in the payload as eventKey, and a subscription that already has a delivery for it is skipped: a repeated event is announced once.
+  const payload = params.dedupeKey ? { ...params.payload, eventKey: params.dedupeKey } : params.payload;
+
   for (const subscription of subscriptions) {
+    if (params.dedupeKey) {
+      const { data: already } = await supabase
+        .from("webhook_deliveries")
+        .select("id")
+        .eq("subscription_id", subscription.id)
+        .eq("payload->>eventKey", params.dedupeKey)
+        .limit(1);
+      if ((already ?? []).length > 0) continue;
+    }
     const { data: delivery } = await supabase
       .from("webhook_deliveries")
       .insert({
         subscription_id: subscription.id,
         event_type: params.eventType,
-        payload: params.payload,
+        payload,
       })
       .select("id")
       .single();
@@ -36,7 +48,7 @@ export async function dispatchWebhookEvent(
     await attemptWebhookDelivery(supabase, {
       deliveryId: delivery.id,
       targetUrl: subscription.target_url,
-      payload: params.payload,
+      payload,
       priorAttemptCount: 0,
     });
   }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { CLIENT_SHOWN, OTHERS_SHOWN, clientIdFromPath, panelProgramLabel, panelPrograms, type PanelProgramRow } from "@/lib/program-panel";
 
@@ -52,7 +52,10 @@ describe("the Program tab", () => {
   const list = read("components/coach/desktop/program-panel-list.tsx");
   it("the tab shows the list, not the whole builder", () => {
     expect(panel).toContain('{view === "program" && <ProgramPanelList groupId={groupId} />}');
-    expect(panel).not.toContain("<EmbeddedProgramBuilder");
+    expect(panel).not.toContain("EmbeddedProgramBuilder");
+    // the in-panel full builder and its data route were removed with this change
+    expect(existsSync(join(__dirname, "..", "components/coach/desktop/embedded-program-builder.tsx"))).toBe(false);
+    expect(existsSync(join(__dirname, "..", "app/api/coach/program-builder-data/route.ts"))).toBe(false);
   });
   it("has the Build a program action (the existing new-program entry), 44px rows, opens a program by one tap, and uses the coach's word for client", () => {
     expect(list).toContain("Build a program");

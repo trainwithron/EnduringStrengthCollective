@@ -75,7 +75,8 @@ async function dispatchPackagePurchasedEvent(
     athleteId,
     creditsPurchased,
     amountCents,
-  }: { groupId: string; coachPackageId: string | null; athleteId: string; creditsPurchased: number | null; amountCents: number }
+    eventKey,
+  }: { groupId: string; coachPackageId: string | null; athleteId: string; creditsPurchased: number | null; amountCents: number; eventKey: string }
 ) {
   let coachId: string | null = null;
   if (coachPackageId) {
@@ -98,6 +99,8 @@ async function dispatchPackagePurchasedEvent(
     coachId,
     eventType: "package_purchased",
     payload: { athleteId, groupId, coachPackageId, creditsPurchased, amountCents },
+    // The same Stripe event is never announced twice, however many times it is delivered, and a delivery that never went out is sent on the retry.
+    dedupeKey: eventKey,
   });
 }
 
@@ -232,16 +235,27 @@ async function createRevenueSplitTransfers(
         amount_cents: share.amountCents,
       });
       if (insertError) {
-        if (insertError.code === "23505") continue; // already transferred for this event
-        throw insertError;
+        if (insertError.code !== "23505") throw insertError;
+        // Started on an earlier attempt. If its transfer was made there is nothing to do; if the attempt stopped before the transfer was saved, it is made now (the idempotency
+        // key below means Stripe hands back the same transfer if it did go through, never a second one).
+        const { data: earlier } = await supabase
+          .from("revenue_split_transfers")
+          .select("stripe_transfer_id")
+          .eq("stripe_event_id", eventId)
+          .eq("coach_id", share.profileId)
+          .maybeSingle();
+        if (earlier?.stripe_transfer_id) continue;
       }
 
-      const transfer = await stripe.transfers.create({
-        amount: share.amountCents,
-        currency: "usd",
-        destination: member.stripe_connect_account_id,
-        transfer_group: eventId,
-      });
+      const transfer = await stripe.transfers.create(
+        {
+          amount: share.amountCents,
+          currency: "usd",
+          destination: member.stripe_connect_account_id,
+          transfer_group: eventId,
+        },
+        { idempotencyKey: `split-${eventId}-${share.profileId}` }
+      );
       await supabase
         .from("revenue_split_transfers")
         .update({ stripe_transfer_id: transfer.id })
@@ -465,7 +479,7 @@ export async function POST(request: Request) {
             p_note: "Package purchased",
           });
           if (grantOnceError) throw grantOnceError;
-          // Everything below is safe to run again on a retry (the transfers, the program copy and the group access each check themselves); only the outside notice is sent once.
+          // Everything below is safe to run again on a retry (the transfers, the program copy, the group access and the outside notice each check themselves).
 
           const stripeFeeCents = await getRealStripeFeeCents(stripe, session.payment_intent);
           await createRevenueSplitTransfers(
@@ -485,15 +499,14 @@ export async function POST(request: Request) {
           });
           // Access to a group the package includes (a no-op for a package without one, and for someone already in the group).
           await grantGroupAccessLogged(supabase, coachPackageId, athleteId);
-          if (granted === true) {
-            await dispatchPackagePurchasedEvent(supabase, {
-              groupId,
-              coachPackageId,
-              athleteId,
-              creditsPurchased: credits,
-              amountCents: session.amount_total ?? 0,
-            });
-          }
+          await dispatchPackagePurchasedEvent(supabase, {
+            groupId,
+            coachPackageId,
+            athleteId,
+            creditsPurchased: credits,
+            amountCents: session.amount_total ?? 0,
+            eventKey: event.id,
+          });
         } else if (session.mode === "subscription" && typeof session.subscription === "string") {
           // Checked BEFORE the upsert below — an existing row here means
           // this athlete already had a subscription for this group
@@ -536,6 +549,7 @@ export async function POST(request: Request) {
             athleteId,
             creditsPurchased: null,
             amountCents: session.amount_total ?? 0,
+            eventKey: event.id,
           });
         }
         break;
@@ -619,15 +633,14 @@ export async function POST(request: Request) {
           invoice.amount_paid ?? 0,
           invoiceStripeFeeCents
         );
-        if (renewalGranted === true) {
-          await dispatchPackagePurchasedEvent(supabase, {
-            groupId,
-            coachPackageId,
-            athleteId,
-            creditsPurchased: pkg.sessions_granted,
-            amountCents: invoice.amount_paid ?? 0,
-          });
-        }
+        await dispatchPackagePurchasedEvent(supabase, {
+          groupId,
+          coachPackageId,
+          athleteId,
+          creditsPurchased: pkg.sessions_granted,
+          amountCents: invoice.amount_paid ?? 0,
+          eventKey: event.id,
+        });
         break;
       }
 
