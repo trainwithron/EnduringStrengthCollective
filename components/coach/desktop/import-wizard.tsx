@@ -313,7 +313,7 @@ export function ImportWizard({
     libraryFlags: { exerciseName: string; flaggedReason: string }[] = [],
     adherenceCheck: PendingImport["adherenceCheck"] = null,
     creditCharged: boolean = false,
-    extras: { constraintFlags?: string[]; youth?: boolean } = {}
+    extras: { constraintFlags?: string[]; youth?: boolean; readNote?: string } = {}
   ) {
     setStatusLabel("Matching exercises…");
 
@@ -366,7 +366,7 @@ export function ImportWizard({
     }
 
     const trainingMaxes = new Map(dupTrainingMaxes.map((l) => [l.exerciseName.trim().toLowerCase(), l.trainingMax]));
-    const checkFlags = isAiSourced ? [...validateProgramRows(parsed, { trainingMaxes }).map((f) => f.message), ...(extras.constraintFlags ?? [])] : [];
+    const checkFlags = isAiSourced ? [...(extras.readNote ? [extras.readNote] : []), ...validateProgramRows(parsed, { trainingMaxes }).map((f) => f.message), ...(extras.constraintFlags ?? [])] : [];
 
     const pendingImport: PendingImport = {
       parsed,
@@ -813,7 +813,10 @@ export function ImportWizard({
       }
 
       const parts = typeof data.parts === "number" ? data.parts : 1;
-      prepareImport(data.rows, programName, parts > 1 ? `${sourceNote} (a large program, read in ${parts} parts)` : sourceNote, null, null, undefined, true);
+      // When there was not time to read all of a very long program, say so plainly at the top of the red list.
+      prepareImport(data.rows, programName, parts > 1 ? `${sourceNote} (a large program, read in ${parts} parts)` : sourceNote, null, null, undefined, true, [], null, false, {
+        readNote: typeof data.note === "string" && data.note ? data.note : undefined,
+      });
     } catch (err) {
       setStatus("error");
       setError(err instanceof Error ? err.message : fallbackError);

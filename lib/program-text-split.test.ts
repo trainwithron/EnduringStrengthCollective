@@ -38,9 +38,9 @@ describe("a big program is read, not refused", () => {
   it("a text read gets the big answer budget and, if still cut off, is read in two halves (at most twice over)", () => {
     expect(route).toContain("const READ_MAX_TOKENS = 16000;");
     expect(route).toContain("const MAX_SPLIT_DEPTH = 2;");
-    expect(route).toContain("err instanceof AiTruncatedError && depth < MAX_SPLIT_DEPTH");
-    expect(route).toContain("splitProgramText(sourceText)");
-    expect(route).toContain("parts: a.parts + b.parts");
+    expect(route).toContain("maxDepth: MAX_SPLIT_DEPTH");
+    expect(route).toContain("readInParts(plan.sourceText");
+    expect(read("lib/read-in-parts.ts")).toContain("splitProgramText(text)");
   });
   it("a picture or scan that is still too big gets a plain message, not 'couldn't read that right now'", () => {
     expect(route).toContain("This program is too large to read in one go. Try a few weeks at a time, or paste the program as text.");

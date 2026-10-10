@@ -169,7 +169,7 @@ describe("the route: who may call it and what it costs (Assistant's review)", ()
     expect(route).toContain("status: 403");
   });
   it("allows the long reads other AI routes allow", () => {
-    expect(route).toContain("export const maxDuration = 120;");
+    expect(route).toContain("export const maxDuration = 300;");
   });
   it("shows the coach a fixed message on a provider failure, not the provider's own text", () => {
     expect(route).toContain("Couldn't read that right now. Try again, or paste the program as text.");
