@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { hasAnyLogged, loggedText, prescribedSummary, shapeLogged } from "@/lib/day-logged";
+import { hasAnyLogged, loggedText, shapeLogged } from "@/lib/day-logged";
 import { suggestedWeightsFromHistory } from "@/lib/suggested-weights";
 
 const read = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8").replace(/\r\n/g, "\n");
@@ -33,18 +33,6 @@ describe("what the client logged, shaped for the builder", () => {
     expect(hasAnyLogged(logged)).toBe(true);
     expect(hasAnyLogged({})).toBe(false);
     expect(hasAnyLogged({ slot1: {} })).toBe(false);
-  });
-});
-
-describe("the small 'Prescribed' line", () => {
-  it("3 sets of 5 at 135 reads as one phrase", () => {
-    const s = { targetReps: "5", targetWeight: 135 };
-    expect(prescribedSummary([s, s, s])).toBe("Prescribed 3 x 5 @ 135");
-  });
-  it("different sets are listed; nothing prescribed gives nothing", () => {
-    expect(prescribedSummary([{ targetReps: "5", targetWeight: 135 }, { targetReps: "3", targetWeight: 145 }])).toBe("Prescribed 5 @ 135, 3 @ 145");
-    expect(prescribedSummary([{ targetReps: "8", targetWeight: null }])).toBe("Prescribed 1 x 8");
-    expect(prescribedSummary([{ targetReps: null, targetWeight: null }])).toBe("");
   });
 });
 
@@ -90,10 +78,11 @@ describe("how it is wired without slowing the builder", () => {
     expect(route).toContain("if (hasAnyLogged(logged)) return NextResponse.json({ logged, suggestions: {} });");
     expect(route).toContain('.eq("status", "completed")');
   });
-  it("logged cells are read-only and marked, the prescription is kept (never overwritten), and a gray suggestion is only a placeholder until the coach takes it", () => {
+  it("logged cells are read-only and marked Logged, with no 'Prescribed' line (only what the client did), the stored prescription is never overwritten, and a gray suggestion is only a placeholder until the coach takes it", () => {
     const card = read("components/coach/exercise-builder-card.tsx");
     expect(card).toContain("Logged by the client");
-    expect(card).toContain("prescribedSummary(exercise.sets)");
+    expect(card).not.toContain("prescribedSummary");
+    expect(card).not.toContain("Prescribed");
     expect(card).toContain("placeholder={suggestion ??");
     expect(card).toContain("Use the suggested weights");
     // accepting writes each set's own suggested weight to the real prescription, nothing else

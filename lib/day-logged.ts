@@ -1,6 +1,5 @@
 import { ACTUAL_COLUMN, type TrackedField } from "@/lib/exercise-fields";
 import { formatRest } from "@/lib/rest-time";
-import type { ExerciseSetTarget } from "@/lib/types";
 
 // What the coach's builder shows for a client's own program besides the prescription: the numbers the client actually logged (past days) and the gray weight suggestion (days not
 // done yet). Pure shaping; the route does the reading.
@@ -37,14 +36,4 @@ export function loggedText(values: LoggedValues | undefined, field: TrackedField
   if (v === undefined) return "";
   if ((field === "rest" || field === "time") && typeof v === "number") return v > 0 ? formatRest(v) : "";
   return String(v);
-}
-
-// "Prescribed 3 x 5 @ 135": the small line under logged sets, so the plan is never lost behind what happened. Empty when nothing was prescribed.
-export function prescribedSummary(sets: Pick<ExerciseSetTarget, "targetReps" | "targetWeight">[]): string {
-  const withTarget = sets.filter((s) => s.targetReps || s.targetWeight != null);
-  if (withTarget.length === 0) return "";
-  const part = (s: Pick<ExerciseSetTarget, "targetReps" | "targetWeight">) => `${s.targetReps ?? "?"}${s.targetWeight != null ? ` @ ${s.targetWeight}` : ""}`;
-  const parts = withTarget.map(part);
-  const same = parts.every((p) => p === parts[0]);
-  return same ? `Prescribed ${withTarget.length} x ${parts[0]}` : `Prescribed ${parts.join(", ")}`;
 }

@@ -27,7 +27,7 @@ import { ChevronDown, ChevronUp, Copy, GripVertical, Trash2 } from "lucide-react
 import { useSaveToastChannel } from "./desktop/save-toast-channel";
 import { CARDIO_PRESETS, type CardioPreset } from "@/lib/cardio-presets";
 import type { RestTempoSuggestion } from "@/lib/training-intent";
-import { loggedText, prescribedSummary, type LoggedValues } from "@/lib/day-logged";
+import { loggedText, type LoggedValues } from "@/lib/day-logged";
 
 export interface MovementPatternOption {
   id: string;
@@ -952,10 +952,7 @@ export function ExerciseBuilderCard({
           </div>
 
           {isLoggedDay && (
-            <p className="font-body text-xs text-steel mt-1.5">
-              <span className="text-rust uppercase tracking-wide">Logged</span>
-              {prescribedSummary(exercise.sets) ? <span> · {prescribedSummary(exercise.sets)}</span> : null}
-            </p>
+            <p className="font-body text-xs text-rust uppercase tracking-wide mt-1.5">Logged</p>
           )}
           {openSuggestions.length > 0 && (
             <button type="button" onClick={acceptSuggestedWeights} className="mt-1.5 min-h-11 sm:min-h-0 font-body text-xs text-rust underline underline-offset-2">
