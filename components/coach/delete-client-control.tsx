@@ -9,13 +9,18 @@ export function DeleteClientControl({
   groupId,
   athleteId,
   athleteName,
+  defaultOpen = false,
+  onCancel,
 }: {
   groupId: string;
   athleteId: string;
   athleteName: string;
+  // Opened straight to the confirm panel (from a client's menu); Cancel then calls onCancel.
+  defaultOpen?: boolean;
+  onCancel?: () => void;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [typed, setTyped] = useState("");
   const [eraseHistory, setEraseHistory] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -104,6 +109,7 @@ export function DeleteClientControl({
             setOpen(false);
             setTyped("");
             setError(null);
+            onCancel?.();
           }}
           className="font-body text-sm text-steel underline"
         >
