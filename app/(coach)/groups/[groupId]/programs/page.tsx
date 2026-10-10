@@ -47,7 +47,7 @@ export default async function ProgramsListPage(
   const { data: programs, error: programsError } = await supabase
     .from("programs")
     .select(
-      "id, name, is_active, cover_image_path, athlete_id, profiles!programs_athlete_id_fkey ( full_name ), workouts(id, group_workout_exercises(count))"
+      "id, name, is_active, ai_draft, cover_image_path, athlete_id, profiles!programs_athlete_id_fkey ( full_name ), workouts(id, group_workout_exercises(count))"
     )
     .eq("group_id", params.groupId)
     .order("is_active", { ascending: false })
@@ -57,6 +57,7 @@ export default async function ProgramsListPage(
     id: p.id,
     name: p.name,
     isActive: p.is_active,
+    aiDraft: p.ai_draft === true,
     ...programDayShape(p.workouts),
     coverImagePath: p.cover_image_path ?? null,
     athleteId: p.athlete_id,

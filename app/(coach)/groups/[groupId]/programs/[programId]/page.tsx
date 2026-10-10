@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { UnavailableState } from "@/components/ui/unavailable-state";
 import { ProgramBuilderDesktop } from "@/components/coach/desktop/program-builder-desktop";
+import { AiDraftBanner } from "@/components/coach/ai-draft-banner";
 import { ProgramRoleControl } from "@/components/coach/program-role-control";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import {
@@ -254,9 +255,10 @@ async function CoachProgramBuilder({
   // control just explains that. Nothing else depends on it.
   const { data: roleRow, error: roleError } = await supabase
     .from("programs")
-    .select("label, sort_order")
+    .select("label, sort_order, ai_draft")
     .eq("id", programId)
     .maybeSingle();
+  const isAiDraft = (roleRow as { ai_draft?: boolean } | null)?.ai_draft === true;
   const roleInfo = {
     available: !roleError,
     label: (roleRow as { label?: string | null } | null)?.label ?? null,
@@ -272,6 +274,7 @@ async function CoachProgramBuilder({
   return (
     <CoachDesktopShell groupId={groupId} groupName={data.groupName} active="programs">
       {/* The "Day N of M, you've moved X lbs" strip is for the client's own view of a program, not the coach's builder. */}
+      {isAiDraft && <AiDraftBanner programId={programId} programName={data.programName} />}
       <ProgrammingSpotterPanel programId={programId} flags={data.spotterFlags} />
       <ProgramBuilderDesktop
         programId={programId}

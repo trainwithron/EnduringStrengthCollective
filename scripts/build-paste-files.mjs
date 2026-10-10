@@ -1425,6 +1425,25 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["booking_counts exists (0313, step 58)", has.fnName("booking_counts")],
     ],
   },
+  {
+    n: "70",
+    slug: "0324",
+    title: "0324 AI builder safety: a program the AI builds is a draft (not active, not seen by any client) until the coach signs it off; no path can make an unsigned draft live, and a copy of a draft is a draft",
+    migrations: ["0324"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for any existing program. Programs the AI builds from now on are saved as drafts and only go live when the coach presses Sign off and make active.",
+    undo: [
+      "drop trigger if exists programs_guard_ai_draft on public.programs;",
+      "drop function if exists public.guard_ai_draft_not_active();",
+      fnFromMigration("0318", "duplicate_program"),
+      "alter table public.programs drop column if exists ai_draft;",
+    ].join(String.fromCharCode(10)),
+    undoWhy: "Only if step 70 misbehaves. Puts the copy function back exactly as it was and drops the draft flag and its guard (any draft programs stay, now inactive or active as they were saved).",
+    rows: [
+      ["0324 is not already applied (programs has no ai_draft column yet)", has.noCol("programs", "ai_draft")],
+      ["the program copy function exists (0318)", has.fnName("duplicate_program")],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -1521,6 +1540,7 @@ const BUNDLES = [
   { id: "release-y", name: "Release Y (a coach's public website and featured shop cards)", steps: ["67"] },
   { id: "release-z", name: "Release Z (deleting a client no longer trips on records they created)", steps: ["68"] },
   { id: "release-ab", name: "Release AB (group events: In or Out, no session credit)", steps: ["69"] },
+  { id: "release-ac", name: "Release AC (AI builder: a program the AI builds is a draft until the coach signs it off)", steps: ["70"] },
   { id: "release-n2", name: "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)", steps: ["49", "50"] },
   { id: "release-m", name: "Release M (acceptance record is append-only)", steps: ["44"] },
 ];
@@ -1590,7 +1610,12 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     ["coach_view_state", "coach_view_state"],
     ["programming_spotter_dismissals", "programming_spotter_dismissals"],
   ];
-  const lines = order.map(([k, tbl]) => `  insert into public.${tbl} select * from jsonb_populate_recordset(null::public.${tbl}, b.payload -> '${k}');`);
+  // programs.ai_draft (0324) is NOT NULL, and an older backup does not have it: a missing value is a signed-off program (false).
+  const lines = order.map(([k, tbl]) =>
+    tbl === "programs"
+      ? `  insert into public.programs select * from jsonb_populate_recordset(null::public.programs, (select coalesce(jsonb_agg(x || jsonb_build_object('ai_draft', coalesce((x ->> 'ai_draft')::boolean, false))), '[]'::jsonb) from jsonb_array_elements(b.payload -> 'programs') x));`
+      : `  insert into public.${tbl} select * from jsonb_populate_recordset(null::public.${tbl}, b.payload -> '${k}');`
+  );
   const sql = [
     "-- RESTORE for step 31 (delete-two-groups). Only if Main Group or the stray Coast to Coast group turns out to be needed again.",
     "-- Puts back, from the most recent record in cleanup_backups, both groups with their memberships, programs, progressions, workouts, exercises, sets, notes,",
@@ -1696,6 +1721,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0295", has.table("client_phase_plans")),
     m("0296", has.col("recipes", "content_hash")),
     m("0297", has.table("schedule_requests")),
+    m("0324", has.col("programs", "ai_draft")),
     m("0323", has.col("group_sessions", "kind")),
     m("0322", "to_regprocedure('public.detach_profile_references(uuid)') is not null"),
     m("0321", "to_regclass('public.coach_sites') is not null"),

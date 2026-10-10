@@ -16,7 +16,7 @@ begin
   end if;
   insert into public.groups select * from jsonb_populate_recordset(null::public.groups, b.payload -> 'groups');
   insert into public.group_memberships select * from jsonb_populate_recordset(null::public.group_memberships, b.payload -> 'memberships');
-  insert into public.programs select * from jsonb_populate_recordset(null::public.programs, b.payload -> 'programs');
+  insert into public.programs select * from jsonb_populate_recordset(null::public.programs, (select coalesce(jsonb_agg(x || jsonb_build_object('ai_draft', coalesce((x ->> 'ai_draft')::boolean, false))), '[]'::jsonb) from jsonb_array_elements(b.payload -> 'programs') x));
   insert into public.exercise_progressions select * from jsonb_populate_recordset(null::public.exercise_progressions, b.payload -> 'progressions');
   insert into public.workouts select * from jsonb_populate_recordset(null::public.workouts, b.payload -> 'workouts');
   insert into public.group_workout_exercises select * from jsonb_populate_recordset(null::public.group_workout_exercises, b.payload -> 'exercises');

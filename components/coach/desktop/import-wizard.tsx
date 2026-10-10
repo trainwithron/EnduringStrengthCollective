@@ -38,6 +38,8 @@ import { hasFlaggedMusculoskeletalConcern } from "@/lib/athlete-injury-flag";
 import { generateDupProgram, generateDupSelfUpdatingProgram, DUP_WEEKLY_SCHEME } from "@/lib/dup-generator";
 import { generateGzclpProgram, type GzclpLiftInput, type GzclpProgressionRule } from "@/lib/gzclp-generator";
 import { AiOutputWrongButton } from "@/components/coach/ai-output-wrong-button";
+import { validateProgramRows } from "@/lib/program-validation";
+import { YOUTH_BANNER_TEXT } from "@/lib/youth-block";
 import { AiUsageMeter } from "@/components/coach/ai-usage-meter";
 import { detectImportKind } from "@/lib/import-input-kind";
 import { buildImportPrompt } from "@/lib/import-prompt";
@@ -89,6 +91,8 @@ interface ImportSummary {
   // credit-metered in the first place, nothing to refund.
   isAiSourced: boolean;
   creditCharged: boolean;
+  // True for an AI program: it was saved as a draft and is not live until the coach signs it off.
+  draft: boolean;
   programId: string;
   // Days, exercises or sets that failed to save. Non-zero means the program
   // is incomplete and the coach must check it, not trust it.
@@ -139,6 +143,11 @@ interface PendingImport {
     requestedSplit: string | null;
     violations: string[];
   } | null;
+  // The red list on the review screen: things in an AI-built program that are almost certainly wrong (RPE out of range, too many sets, a repeated exercise, ...) and anything
+  // that goes against the description. Flags only; nothing is changed for the coach.
+  checkFlags: string[];
+  // True when the client is under 18: the program was built technique-first, and the review screen says so.
+  youth: boolean;
 }
 
 export function ImportWizard({
@@ -302,7 +311,8 @@ export function ImportWizard({
     isAiSourced: boolean = false,
     libraryFlags: { exerciseName: string; flaggedReason: string }[] = [],
     adherenceCheck: PendingImport["adherenceCheck"] = null,
-    creditCharged: boolean = false
+    creditCharged: boolean = false,
+    extras: { constraintFlags?: string[]; youth?: boolean } = {}
   ) {
     setStatusLabel("Matching exercises…");
 
@@ -354,6 +364,9 @@ export function ImportWizard({
       autoNewExercises.push(rawDisplay.trim());
     }
 
+    const trainingMaxes = new Map(dupTrainingMaxes.map((l) => [l.exerciseName.trim().toLowerCase(), l.trainingMax]));
+    const checkFlags = isAiSourced ? [...validateProgramRows(parsed, { trainingMaxes }).map((f) => f.message), ...(extras.constraintFlags ?? [])] : [];
+
     const pendingImport: PendingImport = {
       parsed,
       programName,
@@ -368,6 +381,8 @@ export function ImportWizard({
       creditCharged,
       libraryFlags,
       adherenceCheck,
+      checkFlags,
+      youth: extras.youth === true,
     };
 
     if (fuzzyMatches.length === 0 && !isAiSourced) {
@@ -459,7 +474,9 @@ export function ImportWizard({
         athlete_id: athleteId ?? null,
         name: programName || "Imported Program",
         description,
-        is_active: true,
+        // A program the AI built is a DRAFT: not active, not seen by any client, until the coach signs it off in the builder. Anything else (a spreadsheet, a pasted program the coach wrote) is active as before.
+        is_active: !importData.isAiSourced,
+        ai_draft: importData.isAiSourced,
         start_date: startDate,
         training_days: trainingDays,
         visibility_window: "day",
@@ -570,6 +587,7 @@ export function ImportWizard({
       injuryConsiderations,
       isAiSourced: importData.isAiSourced,
       creditCharged: importData.creditCharged,
+      draft: importData.isAiSourced,
       programId: programRow.id,
       failedWrites,
     });
@@ -740,7 +758,8 @@ export function ImportWizard({
         true,
         data.libraryFlags ?? [],
         data.adherenceCheck ?? null,
-        true
+        true,
+        { constraintFlags: Array.isArray(data.constraintFlags) ? data.constraintFlags : [], youth: data.youth === true }
       );
     } catch (err) {
       setStatus("error");
@@ -882,8 +901,23 @@ export function ImportWizard({
         <p className="font-body text-sm text-steel mb-4">
           {pending.fuzzyMatches.length > 0
             ? "These weren't an exact match to anything in your library — we guessed the closest one, but a guess can be wrong (two different exercises can share a word). Nothing has been created yet."
-            : "AI-generated content always gets a real look before it's created — this will become the athlete's active program and replace whatever they're currently on. Nothing has been created yet."}
+            : "AI-built programs are saved as a draft. Nothing reaches a client until you sign it off. Nothing has been saved yet."}
         </p>
+        {pending.isAiSourced && pending.youth && (
+          <div className="mb-4 border border-rust/40 bg-rust/5 p-3" role="note">
+            <p className="font-body text-xs text-chalk leading-snug">{YOUTH_BANNER_TEXT}</p>
+          </div>
+        )}
+        {pending.isAiSourced && pending.checkFlags.length > 0 && (
+          <div className="mb-4 border border-rust/60 bg-rust/10 p-3" role="alert">
+            <p className="font-body text-xs text-rust font-medium mb-1.5">Check these before you sign off:</p>
+            <ul className="font-body text-xs text-chalk space-y-1 list-disc list-inside">
+              {pending.checkFlags.map((f, i) => (
+                <li key={i}>{f}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         {pending.isAiSourced && pending.injuryConsiderations && (
           <div className="mb-4 border border-rust/40 bg-rust/5 p-3">
             <p className="font-body text-xs text-rust font-medium mb-1">
@@ -978,7 +1012,7 @@ export function ImportWizard({
             disabled={finalizing}
             className="h-9 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
           >
-            {finalizing ? "Creating…" : "Create program"}
+            {finalizing ? "Saving…" : pending.isAiSourced ? "Save as draft" : "Create program"}
           </button>
           <button
             type="button"
@@ -999,9 +1033,9 @@ export function ImportWizard({
   if (status === "done" && summary && doneHref) {
     return (
       <div className="border border-positive/40 bg-surface/60 p-6 max-w-lg">
-        <h3 className="font-display uppercase text-sm tracking-wide mb-2">Program generated</h3>
+        <h3 className="font-display uppercase text-sm tracking-wide mb-2">{summary.draft ? "Draft saved" : "Program generated"}</h3>
         <p className="font-body text-sm text-steel mb-2">
-          &ldquo;{summary.programName}&rdquo; was created across {summary.weekCount} week
+          &ldquo;{summary.programName}&rdquo; was {summary.draft ? "saved as a draft" : "created"} across {summary.weekCount} week
           {summary.weekCount === 1 ? "" : "s"} — {summary.matchedCount} exercise
           {summary.matchedCount === 1 ? "" : "s"} matched your existing library.
         </p>
@@ -1021,7 +1055,11 @@ export function ImportWizard({
             <p className="font-body text-xs text-chalk leading-snug">{summary.injuryConsiderations}</p>
           </div>
         )}
-        {summary.schedule ? (
+        {summary.draft ? (
+          <p className="font-body text-xs text-steel mb-4">
+            It is not live. Nothing reaches a client until you open it, check it, and press Sign off and make active.
+          </p>
+        ) : summary.schedule ? (
           <p className="font-body text-xs text-steel mb-4">
             Set as the active program, starting today and training{" "}
             {summary.schedule.trainingDays.map((d) => WEEKDAY_LABELS[d]).join("/")} — it&apos;ll

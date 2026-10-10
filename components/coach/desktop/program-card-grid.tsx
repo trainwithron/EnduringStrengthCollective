@@ -15,6 +15,8 @@ export interface ProgramCardData {
   id: string;
   name: string;
   isActive: boolean;
+  // Built by the AI and not yet signed off: not live, and Sign off replaces the Active switch.
+  aiDraft?: boolean;
   workoutCount: number;
   // Half or more of its workout days are empty: it does not match its own shape (lib/program-completeness.ts).
   looksUnfinished?: boolean;
@@ -221,7 +223,7 @@ function ProgramCard({
           <ProgramCardMenu programId={program.id} programName={program.name} groupId={groupId} />
         </div>
         <div className="mt-auto flex items-center justify-between pt-2 border-t border-steel/15">
-          <ProgramActiveToggle programId={program.id} isActive={program.isActive} />
+          <ProgramActiveToggle programId={program.id} isActive={program.isActive} aiDraft={program.aiDraft} programName={program.name} />
           <Link href={`/groups/${groupId}/programs/${program.id}`} className="font-body text-xs text-rust">
             Open &rarr;
           </Link>

@@ -189,6 +189,14 @@
   "file": "apply-release-ab-all.sql"
  },
  {
+  "id": "release-ac",
+  "name": "Release AC (AI builder: a program the AI builds is a draft until the coach signs it off)",
+  "steps": [
+   "70"
+  ],
+  "file": "apply-release-ac-all.sql"
+ },
+ {
   "id": "release-n2",
   "name": "Release N part 2 (run AFTER the release code is deployed: drops the old rate column)",
   "steps": [

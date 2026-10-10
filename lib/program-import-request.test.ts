@@ -186,6 +186,6 @@ describe("the route: who may call it and what it costs (Assistant's review)", ()
     const reader = wizard.slice(wizard.indexOf("async function readWithAi"), wizard.indexOf("async function handleAiPhotoUpload"));
     expect(reader).not.toMatch(/prepareImport\([^)]*,\s*true\s*,\s*[^)]*true\)/);
     const gen = wizard.slice(wizard.indexOf("async function handleAiGenerate"), wizard.indexOf("autoGenerateFiredRef.current = true"));
-    expect(gen).toContain("data.adherenceCheck ?? null,\n        true\n      );");
+    expect(gen).toContain("data.adherenceCheck ?? null,\n        true,\n        { constraintFlags:");
   });
 });
