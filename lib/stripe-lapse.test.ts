@@ -36,10 +36,16 @@ describe("the payment webhook", () => {
     expect(hook).toContain('if (session.payment_status !== "paid") break;');
     expect(hook).toContain('case "checkout.session.async_payment_succeeded":');
   });
-  it("a paid invoice gives the group access back, and the outside notice is sent only once per event", () => {
+  it("a paid invoice gives the group access back, and the outside notice goes out once per event even when the event is delivered again", () => {
     expect(hook).toContain("A paid invoice gives back the group access");
-    expect(hook).toContain("if (granted === true) {");
-    expect(hook).toContain("if (renewalGranted === true) {");
+    expect(hook.match(/eventKey: event.id/g)?.length).toBe(3);
+    expect(hook).toContain("dedupeKey: eventKey");
+    const dispatch = read("lib/webhook-dispatch.ts");
+    expect(dispatch).toContain('.eq("payload->>eventKey", params.dedupeKey)');
+  });
+  it("a revenue-split transfer that stopped before it was saved is made on the retry, with an idempotency key so it can never be paid twice", () => {
+    expect(hook).toContain("idempotencyKey: `split-${eventId}-${share.profileId}`");
+    expect(hook).toContain("if (earlier?.stripe_transfer_id) continue;");
   });
   it("a retried payment never copies the linked program twice", () => {
     expect(hook).toContain("athleteHasCopyOfProgram(supabase");
