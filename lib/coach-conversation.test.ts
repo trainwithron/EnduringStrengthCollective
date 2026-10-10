@@ -83,6 +83,11 @@ describe("how it is wired", () => {
   it("it knows only the coach's own programs, never a client's", () => {
     const ctx = read("lib/coach-program-context.ts");
     expect(ctx).toContain('.eq("created_by", coachId)');
+    // Names sent to the AI come only from programs with no client on them (a client's copy is named after the client).
+    expect(ctx).toContain('.is("athlete_id", null)');
+    expect(ctx).toContain("programNames: ((sharedNames ?? [])");
+    expect(ctx).not.toContain("programNames: ((programs ?? [])");
+    expect(read("app/api/ai/coach-conversation/route.ts")).toContain("const takeBack = async () => {");
     expect(ctx).not.toMatch(/athlete|group_memberships|client_intake|profilesb/i);
   });
   it("the invitation is quiet: Start, Not now and Don't ask me questions, on the Programs page; the conversation is always reachable from the list", () => {
