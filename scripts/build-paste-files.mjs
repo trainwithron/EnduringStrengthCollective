@@ -1634,6 +1634,20 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the tables the new rules sit on exist", "to_regclass('public.group_sessions') is not null and to_regclass('public.group_invites') is not null and to_regclass('public.team_games') is not null and to_regclass('public.team_practice_schedules') is not null and to_regclass('public.group_stat_fields') is not null"],
     ],
   },
+  {
+    n: "80",
+    slug: "0334",
+    title: "0334 A client can choose whether their first name is shown on their shared workout pictures (on for everyone until they switch it off)",
+    migrations: ["0334"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for anyone until a client switches it off in their own Settings. Everyone's first name keeps showing on their shared workout pictures, as it does now.",
+    undo: "alter table public.profiles drop column if exists show_name_on_share;",
+    undoWhy: "Only if step 80 misbehaves. Removes the new column (every client's name shows on shared pictures again, whatever they chose).",
+    rows: [
+      ["0334 is not already applied (profiles has no show_name_on_share yet)", "not " + has.col("profiles", "show_name_on_share")],
+      ["profiles has the earlier share-picture column (0197)", has.col("profiles", "preferred_share_background")],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -1737,6 +1751,7 @@ const BUNDLES = [
   { id: "release-aa", name: "Release AA (every session costs exactly 1 credit; the waitlist offer shows the coach's time zone)", steps: ["75"] },
   { id: "release-ah", name: "Release AH (only a real coach can have a public booking page or website)", steps: ["76"] },
   { id: "release-ai", name: "Release AI (a payment and its sessions are recorded in one step; run BEFORE the code that uses it deploys)", steps: ["77"] },
+  { id: "release-al", name: "Release AL (a client can switch their first name off shared workout pictures; run any time)", steps: ["80"] },
   { id: "release-ak", name: "Release AK (a one-on-one space stays a one-on-one space: its programs must be for its client, group-only features are refused there; run AFTER Release AJ)", steps: ["79"] },
   { id: "release-aj", name: "Release AJ (a client in a one-on-one space can no longer read that space's no-client programs; run AFTER Release AG)", steps: ["78"] },
   { id: "release-ag", name: "Release AG (remove a program from a client's profile without deleting it; run AFTER Release AC)", steps: ["74"] },
@@ -1924,6 +1939,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0329", "exists (select 1 from pg_constraint where conname = 'session_types_credit_cost_is_one')"),
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
+    m("0334", has.col("profiles", "show_name_on_share")),
     m("0333", "to_regprocedure('public.one_on_one_athlete(uuid)') is not null"),
     m("0332", "to_regprocedure('public.is_one_on_one_group(uuid)') is not null"),
     m("0328", has.col("programs", "archived_at")),

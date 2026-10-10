@@ -52,11 +52,20 @@ export async function getSharedWorkout(postId: string, opts: { fullName?: boolea
   // share_card_backgrounds_expansion_scoping_sept19.md — a per-athlete
   // pick (profiles.preferred_share_background) overrides the org-wide
   // default_rotation/custom setting above, when set to a real scenic key.
-  const { data: authorProfile } = await supabase
-    .from("profiles")
-    .select("preferred_share_background")
-    .eq("id", post.author_id)
-    .maybeSingle();
+  // show_name_on_share (0334): a client can keep their first name off their shared pictures. Read with the background so one round trip serves both; before the
+  // column exists the read falls back to the background alone and the name shows, as it always did.
+  let authorProfile = null as { preferred_share_background?: string | null; show_name_on_share?: boolean | null } | null;
+  {
+    const withName = await supabase.from("profiles").select("preferred_share_background, show_name_on_share").eq("id", post.author_id).maybeSingle();
+    if (withName.error) {
+      const plain = await supabase.from("profiles").select("preferred_share_background").eq("id", post.author_id).maybeSingle();
+      authorProfile = plain.data as { preferred_share_background?: string | null } | null;
+    } else {
+      authorProfile = withName.data as { preferred_share_background?: string | null; show_name_on_share?: boolean | null } | null;
+    }
+  }
+  // Only the public share page (the card and the picture people post) honors it; the group's own feed card shows names the way the feed always does.
+  const nameHidden = !opts.fullName && authorProfile?.show_name_on_share === false;
 
   const broadcastLevel: "full" | "prs_only" | "checkin_only" = post.broadcast_level ?? "full";
   const newPrs: string[] = broadcastLevel === "checkin_only" ? [] : workoutLog.new_prs ?? [];
@@ -406,9 +415,12 @@ export async function getSharedWorkout(postId: string, opts: { fullName?: boolea
   return {
     authorId: post.author_id as string,
     groupId: post.group_id,
-    athleteName: opts.fullName
-      ? (post.profiles as any)?.full_name ?? "An athlete"
-      : publicDisplayName((post.profiles as any)?.full_name),
+    // "An athlete" is the placeholder for an unknown name: the card, the picture, the link preview and the mascot's initial all treat it as no name.
+    athleteName: nameHidden
+      ? "An athlete"
+      : opts.fullName
+        ? (post.profiles as any)?.full_name ?? "An athlete"
+        : publicDisplayName((post.profiles as any)?.full_name),
     athleteAvatarUrl: (post.profiles as any)?.avatar_url ?? null,
     groupName: group?.name ?? "Spotlight Coaching",
     workoutCardBackgroundMode: (org?.workout_card_background_mode as "default_rotation" | "custom" | null) ?? "default_rotation",
