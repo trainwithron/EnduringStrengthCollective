@@ -91,12 +91,26 @@ export async function POST(request: Request) {
         const { conv, messages } = await load();
         if (!conv || conv.status !== "active") return NextResponse.json({ error: "This conversation is finished." }, { status: 409 });
         if (conv.readback) return NextResponse.json({ error: "Check the read-back first." }, { status: 409 });
-        await supabase.from("coach_conversation_messages").insert({ conversation_id: conv.id, coach_id: user.id, role: "coach", body: text });
+        const { data: saved } = await supabase.from("coach_conversation_messages").insert({ conversation_id: conv.id, coach_id: user.id, role: "coach", body: text }).select("id").single();
         const turns = conv.coach_turns + 1;
         await supabase.from("coach_conversations").update({ coach_turns: turns, updated_at: now() }).eq("id", conv.id);
         const history = [...messages, { role: "coach" as const, body: text }];
-        const result = await turn(history, turns >= chapter.maxCoachTurns);
-        if (!result) return NextResponse.json({ error: "I didn't catch that. Try saying it again." }, { status: 502 });
+        // If the AI cannot answer, the coach's answer is taken back out, so trying again does not repeat it or use up a turn.
+        const takeBack = async () => {
+          if (saved?.id) await supabase.from("coach_conversation_messages").delete().eq("id", saved.id);
+          await supabase.from("coach_conversations").update({ coach_turns: conv.coach_turns, updated_at: now() }).eq("id", conv.id);
+        };
+        let result;
+        try {
+          result = await turn(history, turns >= chapter.maxCoachTurns);
+        } catch (e) {
+          await takeBack();
+          throw e;
+        }
+        if (!result) {
+          await takeBack();
+          return NextResponse.json({ error: "I didn't catch that. Try saying it again." }, { status: 502 });
+        }
         if (result.done) {
           await supabase.from("coach_conversations").update({ readback: { readback: result.readback, rules: result.rules }, updated_at: now() }).eq("id", conv.id);
           await supabase.from("coach_conversation_messages").insert({ conversation_id: conv.id, coach_id: user.id, role: "assistant", body: result.readback });
