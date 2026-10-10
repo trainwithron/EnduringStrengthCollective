@@ -7,7 +7,7 @@ import { splitProgramText } from "@/lib/program-text-split";
 import type { ParsedImportRow } from "@/lib/workout-import-parser";
 
 // The longest answer one read may give. A long program is a long list of exercises; 8192 cut off a routine 12-week program.
-const READ_MAX_TOKENS = 32000;
+const READ_MAX_TOKENS = 16000;
 // A program that still does not fit is cut in half (at a week if it can) and each half read on its own, at most twice over: five reads in all.
 const MAX_SPLIT_DEPTH = 2;
 

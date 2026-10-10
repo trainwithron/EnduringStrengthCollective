@@ -36,7 +36,7 @@ describe("cutting a long program in two", () => {
 describe("a big program is read, not refused", () => {
   const route = read("app/api/ai/parse-workout/route.ts");
   it("a text read gets the big answer budget and, if still cut off, is read in two halves (at most twice over)", () => {
-    expect(route).toContain("const READ_MAX_TOKENS = 32000;");
+    expect(route).toContain("const READ_MAX_TOKENS = 16000;");
     expect(route).toContain("const MAX_SPLIT_DEPTH = 2;");
     expect(route).toContain("err instanceof AiTruncatedError && depth < MAX_SPLIT_DEPTH");
     expect(route).toContain("splitProgramText(sourceText)");
