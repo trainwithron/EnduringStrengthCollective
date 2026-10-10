@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { ClientRowMenu } from "@/components/coach/desktop/client-row-menu";
 import { LayoutGrid, List, Search } from "lucide-react";
 import { DEFAULT_CLIENTS_VIEW, readClientsView, writeClientsView, type ClientsView } from "@/lib/clients-view-pref";
 import { filterClients, filterCounts, FILTER_LABELS, clientKind, type ClientFilter, type CoachClientRow } from "@/lib/coach-client-filter";
@@ -82,8 +83,8 @@ export function ClientsListView({ rows }: { rows: CoachClientRow[] }) {
   return (
           <ul className="divide-y divide-steel/15 border-y border-steel/15">
             {rows.map((c) => (
-              <li key={`${c.id}:${c.groupId}`}>
-                <Link href={`/groups/${c.groupId}/athletes/${c.id}`} className="flex items-center gap-3 py-2.5 px-1 hover:bg-surface/60">
+              <li key={`${c.id}:${c.groupId}`} className="flex items-center">
+                <Link href={`/groups/${c.groupId}/athletes/${c.id}`} className="flex flex-1 min-w-0 items-center gap-3 py-2.5 px-1 hover:bg-surface/60">
                   <span className="font-body text-sm text-chalk flex-1 min-w-0 truncate">{c.fullName}</span>
                   <span className="font-body text-xs text-steel shrink-0 hidden sm:inline">{KIND_LABEL[clientKind(c)]}</span>
                   {c.groupKind !== "one_on_one" && <span className="font-body text-xs text-steel hidden md:inline truncate min-w-0 max-w-[22rem]">{c.groupName}</span>}
@@ -98,6 +99,7 @@ export function ClientsListView({ rows }: { rows: CoachClientRow[] }) {
                     </span>
                   </span>
                 </Link>
+                <ClientRowMenu groupId={c.groupId} athleteId={c.id} athleteName={c.fullName} setAside={!!c.setAside} />
               </li>
             ))}
           </ul>
@@ -117,10 +119,10 @@ export function ClientsCardView({ rows }: { rows: CoachClientRow[] }) {
   return (
     <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3" aria-label="Clients">
       {rows.map((c) => (
-        <li key={`${c.id}:${c.groupId}`}>
+        <li key={`${c.id}:${c.groupId}`} className="relative">
           <Link
             href={`/groups/${c.groupId}/athletes/${c.id}`}
-            className="block min-h-11 h-full border border-steel/25 bg-surface/40 hover:border-rust p-3 active:bg-surface/70"
+            className="block min-h-11 h-full border border-steel/25 bg-surface/40 hover:border-rust p-3 pr-12 active:bg-surface/70"
           >
             <span className="flex items-start gap-3">
               <span className="w-10 h-10 rounded-full bg-graphite border border-steel/30 flex items-center justify-center shrink-0 font-display text-xs" aria-hidden="true">
@@ -147,6 +149,9 @@ export function ClientsCardView({ rows }: { rows: CoachClientRow[] }) {
               </span>
             </span>
           </Link>
+          <div className="absolute top-0 right-0">
+            <ClientRowMenu groupId={c.groupId} athleteId={c.id} athleteName={c.fullName} setAside={!!c.setAside} />
+          </div>
         </li>
       ))}
     </ul>

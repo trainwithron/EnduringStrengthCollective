@@ -6,7 +6,7 @@ import { deletionBlocker, eraseAccount, loadDeletionFacts } from "@/lib/account-
 
 // A coach deletes one of their clients completely: the account, memberships and the client's own data. Allowed only for a plain
 // client account whose every group is one this coach coaches (someone who also belongs to another coach's group can only be
-// removed from this one), with the client's name typed to confirm. The coach chooses whether logged workouts and notes go too;
+// removed from this one). The coach confirms in the page first (an in-page dialog); there is no typed name any more. The coach chooses whether logged workouts and notes go too;
 // payment records are always kept, detached from the person. See lib/account-deletion.ts for exactly what is erased and kept.
 export async function POST(request: Request) {
   const supabase = await createServerClient();
@@ -21,7 +21,6 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const groupId = typeof body.groupId === "string" ? body.groupId : "";
   const athleteId = typeof body.athleteId === "string" ? body.athleteId : "";
-  const confirmName = typeof body.confirmName === "string" ? body.confirmName.trim().toLowerCase() : "";
   const eraseHistory = body.eraseHistory === true;
   if (!groupId || !athleteId) return NextResponse.json({ error: "Missing client." }, { status: 400 });
   if (athleteId === user.id) return NextResponse.json({ error: "You can't delete your own account here." }, { status: 400 });
@@ -38,10 +37,6 @@ export async function POST(request: Request) {
   const db = createServiceRoleClient();
   const { data: target } = await db.from("group_memberships").select("role").eq("group_id", groupId).eq("profile_id", athleteId).maybeSingle();
   if (target?.role !== "athlete") return NextResponse.json({ error: "That person isn't a client in this group." }, { status: 404 });
-
-  const { data: profile } = await db.from("profiles").select("full_name").eq("id", athleteId).maybeSingle();
-  const name = (profile?.full_name ?? "").trim().toLowerCase();
-  if (!name || confirmName !== name) return NextResponse.json({ error: "Type the client's name exactly to confirm." }, { status: 400 });
 
   // Every group this client is in must be one this coach coaches.
   const [{ data: theirGroups }, { data: myCoachGroups }] = await Promise.all([

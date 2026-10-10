@@ -16,6 +16,7 @@ describe("the words and look of a confirmation come from the message", () => {
       confirmLabel: "Yes, cancel",
       cancelLabel: "Keep it",
       destructive: true,
+      checkbox: null,
     });
   });
   it("closing a pane with unsaved typing discards", () => {
