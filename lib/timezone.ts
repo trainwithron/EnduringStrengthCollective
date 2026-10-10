@@ -1,3 +1,4 @@
+import { cache } from "react";
 // Booking/scheduling had no timezone handling anywhere: coach_availability
 // windows' start_time/end_time are meant as the coach's own local wall-clock
 // hours, but every call site built candidate slots with plain
@@ -127,7 +128,10 @@ export function monthBoundsInZone(timeZone: string, now: Date = new Date()): { m
 // convention already used for booking/availability, extended to content
 // visibility. Falls back to DEFAULT_COACH_TIMEZONE when unset, same as
 // every existing booking-side call site.
-export async function getGroupCoachTimezone(
+// Read once per page render (see getCoachedGroups): a page and the helpers under it share the answer instead of each asking.
+export const getGroupCoachTimezone = cache(readGroupCoachTimezone);
+
+async function readGroupCoachTimezone(
   supabase: { from: (table: string) => any },
   groupId: string
 ): Promise<string> {

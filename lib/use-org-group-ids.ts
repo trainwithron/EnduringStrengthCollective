@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { getCoachedGroups, groupsInOrgOf, type CoachedGroup } from "@/lib/coach-groups";
 
@@ -51,7 +51,10 @@ export function useOrgGroups(groupId: string): CoachedGroup[] | null {
   return groups;
 }
 
+// The SAME array every render until the groups change. The callers list it as an effect dependency (to read their data once the groups are known); a new array
+// each render made those effects run again after every render, and each run set state, which rendered again: a loop that re-read the clients' workouts, the
+// payments and the roster without stopping for as long as the page was open.
 export function useOrgGroupIds(groupId: string): string[] | null {
   const groups = useOrgGroups(groupId);
-  return groups ? groups.map((g) => g.id) : null;
+  return useMemo(() => (groups ? groups.map((g) => g.id) : null), [groups]);
 }

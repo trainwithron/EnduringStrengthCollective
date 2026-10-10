@@ -1,3 +1,4 @@
+import { googleFontsHref } from "@/lib/google-fonts";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createServerClient } from "@/lib/supabase/server";
@@ -124,6 +125,9 @@ export default async function CoachSitePage(props: { params: Promise<{ slug: str
 
   return (
     <main className="min-h-screen" style={{ background: c.bg, color: c.text, fontFamily: `'${d.fontBody}', system-ui, sans-serif` }}>
+      {/* This coach's own fonts: the layout loads only the visitor's, so a coach's public page asks for its own. */}
+      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+      <link rel="stylesheet" href={googleFontsHref([d.fontDisplay, d.fontBody])} precedence="default" />
       {!d.published && (
         <p className="text-center text-sm py-2" style={{ background: "#F2C94C", color: "#1C1B1A" }}>
           Preview only. This page is not published yet.
