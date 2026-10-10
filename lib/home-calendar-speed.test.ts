@@ -75,3 +75,9 @@ describe("the coach calendar loads in four rounds", () => {
     expect(coachPart).toContain("const [creditBatches, setAsideKeySet, membershipBatches] = await Promise.all([");
   });
 });
+
+describe("Home refreshes itself every two minutes", () => {
+  it("not every 45 seconds: each refresh re-reads the whole page", () => {
+    expect(read("components/coach/desktop/dashboard-auto-refresh.tsx")).toContain("const REFRESH_INTERVAL_MS = 120 * 1000;");
+  });
+});
