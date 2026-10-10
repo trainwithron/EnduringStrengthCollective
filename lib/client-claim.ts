@@ -85,3 +85,21 @@ export function buildClaimSms(link: string, clientFirstName: string, coachFirstN
 export function smsHref(body: string): string {
   return `sms:?&body=${encodeURIComponent(body)}`;
 }
+
+// The plain email a coach sends a client with their sign-in link (the same message as the text, but from the coach's name).
+export function buildClaimEmail(link: string, clientFirstName: string, coachName: string | null): { subject: string; text: string } {
+  const coach = coachName?.trim() || "Your coach";
+  const hi = clientFirstName ? `Hi ${clientFirstName},` : "Hi,";
+  return {
+    subject: `${coach} invited you to Spotlight Coaching`,
+    text: [
+      hi,
+      "",
+      `${coach} set up your training in Spotlight Coaching. Tap this link to sign in and get started:`,
+      "",
+      link,
+      "",
+      `The link works once and expires in ${CLAIM_LINK_LIFETIME_HOURS} hours. If you weren't expecting this, you can ignore this email.`,
+    ].join("\n"),
+  };
+}

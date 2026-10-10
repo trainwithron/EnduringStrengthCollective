@@ -7,6 +7,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { useTerm } from "@/components/coach/terminology-provider";
 import { appOriginBrowser } from "@/lib/app-url";
 import { SINGLE_LINK_NOTE } from "@/lib/invite-link-plan";
+import { EmailClaimLinkButton } from "@/components/coach/email-claim-link-button";
 
 type Step = "choose" | "one_on_one" | "group";
 type GroupMode = "name" | "link";
@@ -45,7 +46,7 @@ export function AddClientButton({
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [added, setAdded] = useState<{ groupId: string; profileId: string; name: string; inGroup: string | null } | null>(null);
+  const [added, setAdded] = useState<{ groupId: string; profileId: string; name: string; inGroup: string | null; hasEmail: boolean } | null>(null);
   const [groups, setGroups] = useState<GroupOption[] | null>(null);
   const [selectedGroupId, setSelectedGroupId] = useState("");
   const [groupMode, setGroupMode] = useState<GroupMode>("name");
@@ -133,7 +134,7 @@ export function AddClientButton({
       const res = await fetch("/api/clients/invite", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ groupId: target, fullName, email }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || `Couldn't add this ${t("client")}.`);
-      setAdded({ groupId: target, profileId: data.profileId, name: fullName, inGroup: step === "group" ? groups?.find((g) => g.id === target)?.name ?? null : null });
+      setAdded({ groupId: target, profileId: data.profileId, name: fullName, inGroup: step === "group" ? groups?.find((g) => g.id === target)?.name ?? null : null, hasEmail: email.trim().length > 0 });
       setFullName("");
       setEmail("");
       router.refresh();
@@ -223,6 +224,11 @@ export function AddClientButton({
             {added.name} added{added.inGroup ? ` to ${added.inGroup}` : ""}. Nothing was sent to them.
           </p>
           <p className="font-body text-xs text-steel mt-1.5">Build their program and schedule now. When you&apos;re ready, send their sign-in link from their profile.</p>
+          {added.hasEmail && (
+            <div className="mt-3">
+              <EmailClaimLinkButton groupId={added.groupId} athleteId={added.profileId} />
+            </div>
+          )}
           <div className="flex items-center gap-4 mt-3">
             <button type="button" onClick={() => router.push(`/groups/${added.groupId}/athletes/${added.profileId}`)} className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium">
               Open their profile

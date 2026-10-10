@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
-import { loadUnclaimedClient } from "@/lib/client-claim-server";
-import { CLAIM_LINK_LIFETIME_HOURS, generateClaimToken, hashClaimToken } from "@/lib/client-claim";
+import { loadUnclaimedClient, mintClaimLink } from "@/lib/client-claim-server";
 import { appOrigin } from "@/lib/app-url";
 
 // Mints a single-use claim link for a client who hasn't signed in yet. The
@@ -25,36 +24,12 @@ export async function POST(request: Request) {
   const client = await loadUnclaimedClient(supabase, serviceRole, user.id, groupId, athleteId);
   if (!client.ok) return NextResponse.json({ error: client.error }, { status: client.status });
 
-  // Retire earlier unused links so only the newest one works.
-  const retiredAt = new Date().toISOString();
-  const { error: retireError } = await serviceRole
-    .from("client_invites")
-    .update({ used_at: retiredAt, revoked_at: retiredAt, revoked_by: user.id })
-    .eq("athlete_id", athleteId)
-    .is("used_at", null);
-  if (retireError) {
-    // revoked_* columns not there yet: retire the old link the way this always worked.
-    await serviceRole
-      .from("client_invites")
-      .update({ used_at: retiredAt })
-      .eq("athlete_id", athleteId)
-      .is("used_at", null);
-  }
+  const minted = await mintClaimLink(serviceRole, user.id, athleteId, appOrigin(request));
+  if (!minted.ok) return NextResponse.json({ error: "Couldn't create the link — try again." }, { status: 500 });
 
-  const token = generateClaimToken();
-  const expiresAt = new Date(Date.now() + CLAIM_LINK_LIFETIME_HOURS * 60 * 60 * 1000).toISOString();
-  const { error } = await serviceRole.from("client_invites").insert({
-    athlete_id: athleteId,
-    token_hash: hashClaimToken(token),
-    created_by: user.id,
-    expires_at: expiresAt,
-  });
-  if (error) return NextResponse.json({ error: "Couldn't create the link — try again." }, { status: 500 });
-
-  const origin = appOrigin(request);
   return NextResponse.json({
-    link: `${origin}/claim/${token}`,
-    expiresAt,
+    link: minted.link,
+    expiresAt: minted.expiresAt,
     clientName: client.fullName,
   });
 }
