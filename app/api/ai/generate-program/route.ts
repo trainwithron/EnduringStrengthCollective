@@ -10,6 +10,7 @@ import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { matchExercise, matchTopN, type LibraryExercise } from "@/lib/exercise-matching";
 import { scanConstraints } from "@/lib/constraint-scan";
 import { athleteIsMinor, YOUTH_PROMPT_BLOCK } from "@/lib/youth-block";
+import { buildProgrammingProfile, libraryContext, mentionsExercise, rankLibrary, type LibraryItem } from "@/lib/builder-context";
 
 // The longest description the builder will read. A longer one is almost certainly pasted text, not a request.
 const MAX_BRIEF_CHARS = 4000;
@@ -107,6 +108,11 @@ Rules:
 - One row per exercise per day, not one row per set (a 3x8 exercise is ONE row with sets=3, reps="8").
 - Vary the program sensibly week to week (progressive overload, or the specific progression scheme
   described) rather than repeating the exact same week verbatim.
+- Coaches build a session from MOVEMENT PATTERNS, then pick an exercise for each. The exercise library below is grouped by
+  pattern with a tier (A = main lifts, B = secondary, C = accessories). When "How this coach programs" is given, follow those
+  session shapes (the order of patterns and the usual sets x reps) unless the description asks for something else, fill each
+  pattern slot with an exercise of that pattern from the library, and let the coach's standing preferences decide WHICH exercise
+  goes in a slot.
 - If this coach has standing preferences listed below (learned from past corrections), apply any whose
   stated condition matches this program — these come from a real coach explicitly correcting a past
   program, so treat them as real methodology requirements, not suggestions. A standing preference can only add to
@@ -240,13 +246,45 @@ export async function POST(request: Request) {
   // library's videos himself, so missing video is not a violation.) A
   // coach's own explicitly-named exercise is exempt (checked
   // post-generation below, not here).
-  const { data: libraryRows } = await supabase
-    .from("exercise_library")
-    .select("name")
-    .eq("created_by", user.id)
-    .order("name")
-    .limit(300);
-  const libraryNames = (libraryRows ?? []).map((r) => r.name as string);
+  const { data: libraryRows } = await supabase.from("exercise_library").select("name, category").eq("created_by", user.id).order("name").limit(3000);
+  const { data: patternRows } = await supabase
+    .from("movement_pattern_exercises")
+    .select("exercise_name, tier, movement_patterns!inner ( name, created_by )")
+    .eq("movement_patterns.created_by", user.id)
+    .limit(5000);
+  const patternByName = new Map<string, { pattern: string; tier: string | null }>();
+  for (const row of (patternRows ?? []) as any[]) {
+    if (row.movement_patterns?.name && !patternByName.has(row.exercise_name)) patternByName.set(row.exercise_name, { pattern: row.movement_patterns.name, tier: row.tier ?? null });
+  }
+  // How this coach builds a session, from their own most recent programs that are not unsigned AI drafts (week one of each).
+  const { data: recentPrograms } = await supabase.from("programs").select("id").eq("created_by", user.id).eq("ai_draft", false).order("created_at", { ascending: false }).limit(12);
+  const recentIds = (recentPrograms ?? []).map((p: any) => p.id as string);
+  const { data: recentWorkouts } = recentIds.length
+    ? await supabase
+        .from("workouts")
+        .select("program_id, group_workout_exercises ( exercise_name, exercise_order, group_workout_exercise_sets ( target_reps ) )")
+        .in("program_id", recentIds)
+        .eq("week_number", 1)
+    : { data: [] as any[] };
+  const categoryByName = new Map((libraryRows ?? []).map((r: any) => [r.name as string, (r.category as string | null) ?? null]));
+  const sessions = ((recentWorkouts ?? []) as any[]).map((w) => ({
+    exercises: ((w.group_workout_exercises ?? []) as any[])
+      .slice()
+      .sort((a, b) => a.exercise_order - b.exercise_order)
+      .map((e) => ({ name: e.exercise_name as string, sets: (e.group_workout_exercise_sets ?? []).length, reps: (e.group_workout_exercise_sets ?? [])[0]?.target_reps ?? null })),
+  }));
+  const usedCounts = new Map<string, number>();
+  for (const s of sessions) for (const e of s.exercises) usedCounts.set(e.name.toLowerCase(), (usedCounts.get(e.name.toLowerCase()) ?? 0) + 1);
+  const libraryItems: LibraryItem[] = (libraryRows ?? []).map((r: any) => ({
+    name: r.name as string,
+    category: (r.category as string | null) ?? null,
+    pattern: patternByName.get(r.name)?.pattern ?? null,
+    tier: patternByName.get(r.name)?.tier ?? null,
+  }));
+  // Every library name is kept for checking the AI's picks; only the most relevant are shown to the AI when the library is large.
+  const libraryNames = libraryItems.map((i) => i.name);
+  const shownLibrary = rankLibrary(libraryItems, prompt, usedCounts);
+  const programmingProfile = buildProgrammingProfile(sessions, (name) => patternByName.get(name)?.pattern ?? categoryByName.get(name) ?? null);
 
   // Learned from past corrections via the "Ask the AI why" chat
   // (ai_program_builder_conversational_learning_idea.md) — plain prompt
@@ -323,7 +361,8 @@ export async function POST(request: Request) {
       meta: { feature: "program_generation", userId: user.id },
       system: buildSystemPrompt(hasInjuryContext, isYouth),
       userText:
-        `Coach's exercise library (prefer these exact names where they fit):\n${libraryNames.join(", ") || "(empty — invent sensible exercise names)"}\n\n` +
+        `Coach's exercise library, grouped by movement pattern (use the exact exercise names; the pattern and tier labels in parentheses are not part of a name):\n${libraryContext(shownLibrary, libraryItems.length)}\n\n` +
+        (programmingProfile ? `How this coach programs (learned from their own programs):\n${programmingProfile}\n\n` : "") +
         `This coach's standing preferences, learned from past corrections:\n${preferencesText}\n\n` +
         `Real current training maxes for this roster (RPE-estimated from actual logged sets — only use one of these if the description names that specific athlete or is clearly for them):\n${trainingMaxesText}\n\n` +
         (injuryContextText ? `Athlete injury/health context:\n${injuryContextText}\n\n` : "") +
@@ -418,7 +457,6 @@ export async function POST(request: Request) {
     // prompt text) is exempt and is backfilled into the library by the
     // existing import flow. Video presence is deliberately not checked.
     const libraryForMatching: LibraryExercise[] = libraryNames.map((name) => ({ name }));
-    const promptLower = prompt.toLowerCase();
     const libraryFlags: { exerciseName: string; flaggedReason: string }[] = [];
 
     // An empty library gives nothing to match against — the prompt
@@ -427,7 +465,7 @@ export async function POST(request: Request) {
       libraryForMatching.length === 0
         ? rows
         : rows.map((row) => {
-            const coachNamed = promptLower.includes(row.exerciseName.trim().toLowerCase());
+            const coachNamed = mentionsExercise(prompt, row.exerciseName);
             if (coachNamed) return row;
 
             // Any exact/alias/fuzzy match is a real library entry — fuzzy
