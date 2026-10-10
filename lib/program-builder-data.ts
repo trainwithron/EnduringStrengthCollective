@@ -70,12 +70,26 @@ export async function getProgramBuilderData(
   const visibilityWindow = program.visibility_window as VisibilityWindow;
   const trainingIntent = program.training_intent as TrainingIntent | null;
 
-  const { data: group } = await supabase.from("groups").select("name").eq("id", groupId).single();
+  const hasSchedule = !!(startDate && trainingDays && trainingDays.length > 0);
 
-  const { data: workoutRows } = await supabase
-    .from("workouts")
-    .select(
-      `
+  // Everything below depends only on the program row, so it all runs as ONE batch instead of ten queries one after another.
+  const [
+    { data: group },
+    { data: workoutRows },
+    { data: libraryRows },
+    { data: aliasRows },
+    { data: patternRows },
+    { data: tierRows },
+    { data: ladderRows },
+    timezone,
+    { data: logRows },
+    spotterFlags,
+  ] = await Promise.all([
+    supabase.from("groups").select("name").eq("id", groupId).single(),
+    supabase
+      .from("workouts")
+      .select(
+        `
       id, title, week_number, day_index, scheduled_date,
       group_workout_exercises (
         id, exercise_name, display_name, exercise_order, movement_pattern_id, tracked_fields, notes,
@@ -83,15 +97,30 @@ export async function getProgramBuilderData(
       ),
       workout_notes ( id, body, position )
     `
-    )
-    .eq("program_id", programId)
-    .order("week_number", { ascending: true })
-    .order("day_index", { ascending: true });
-
-  const { data: libraryRows } = await supabase
-    .from("exercise_library")
-    .select("name, video_path, youtube_url")
-    .eq("created_by", coachId);
+      )
+      .eq("program_id", programId)
+      .order("week_number", { ascending: true })
+      .order("day_index", { ascending: true }),
+    supabase.from("exercise_library").select("name, video_path, youtube_url").eq("created_by", coachId),
+    supabase.from("exercise_aliases").select("raw_name, exercise_name").eq("coach_id", coachId),
+    supabase.from("movement_patterns").select("id, name").eq("created_by", coachId).order("name"),
+    supabase
+      .from("movement_pattern_exercises")
+      .select("exercise_name, tier, movement_patterns!inner ( created_by )")
+      .eq("movement_patterns.created_by", coachId),
+    // The coach's own ladders, filtered through the pattern's owner so it needs no wait for the pattern list.
+    supabase
+      .from("movement_pattern_exercises")
+      .select("movement_pattern_id, exercise_name, difficulty_rank, movement_patterns!inner ( created_by )")
+      .eq("movement_patterns.created_by", coachId)
+      .order("difficulty_rank", { ascending: true }),
+    // Only a scheduled program shows "Day N of M" and the volume moved, so only then are these read.
+    hasSchedule ? getGroupCoachTimezone(supabase, groupId) : Promise.resolve(null),
+    hasSchedule
+      ? supabase.from("workout_logs").select("total_volume, workouts!inner ( program_id )").eq("workouts.program_id", programId)
+      : Promise.resolve({ data: null }),
+    gatherProgrammingSpotterFlags(supabase, { programId, programName: program.name, coachId }),
+  ]);
 
   const demoRows: DemoRow[] = (libraryRows ?? []).map((row: any) => ({ name: row.name, videoPath: row.video_path, youtubeUrl: row.youtube_url }));
   // Most-used first (counted across this program's own exercises), then A to Z, so the name box's dropdown puts the coach's usual exercises ahead of rarely used ones.
@@ -103,44 +132,23 @@ export async function getProgramBuilderData(
   }
   const exerciseLibrary = sortByUsage(Array.from(new Set(demoRows.map((r) => r.name))), usage);
 
-  const { data: aliasRows } = await supabase
-    .from("exercise_aliases")
-    .select("raw_name, exercise_name")
-    .eq("coach_id", coachId);
   const exerciseAliases = (aliasRows ?? []).map((a) => ({
     rawName: a.raw_name,
     exerciseName: a.exercise_name,
   }));
 
-  const { data: patternRows } = await supabase
-    .from("movement_patterns")
-    .select("id, name")
-    .eq("created_by", coachId)
-    .order("name");
   const movementPatterns = patternRows ?? [];
 
-  const { data: tierRows } = await supabase
-    .from("movement_pattern_exercises")
-    .select("exercise_name, tier, movement_patterns!inner ( created_by )")
-    .eq("movement_patterns.created_by", coachId);
   const tierByName = new Map<string, "A" | "B" | "C" | null>();
   for (const row of (tierRows ?? []) as any[]) {
     if (!tierByName.has(row.exercise_name)) tierByName.set(row.exercise_name, row.tier);
   }
 
   const laddersByPattern: Record<string, { exerciseName: string }[]> = {};
-  const patternIds = (patternRows ?? []).map((p) => p.id);
-  if (patternIds.length > 0) {
-    const { data: ladderRows } = await supabase
-      .from("movement_pattern_exercises")
-      .select("movement_pattern_id, exercise_name, difficulty_rank")
-      .in("movement_pattern_id", patternIds)
-      .order("difficulty_rank", { ascending: true });
-    for (const row of ladderRows ?? []) {
-      const list = laddersByPattern[row.movement_pattern_id] ?? [];
-      list.push({ exerciseName: row.exercise_name });
-      laddersByPattern[row.movement_pattern_id] = list;
-    }
+  for (const row of (ladderRows ?? []) as any[]) {
+    const list = laddersByPattern[row.movement_pattern_id] ?? [];
+    list.push({ exerciseName: row.exercise_name });
+    laddersByPattern[row.movement_pattern_id] = list;
   }
 
   const days: BuilderDay[] = (workoutRows ?? []).map((w: any) => {
@@ -184,7 +192,7 @@ export async function getProgramBuilderData(
 
   let dayProgress: { dayNumber: number; totalDays: number } | null = null;
   let totalVolumeLbs = 0;
-  if (startDate && trainingDays && trainingDays.length > 0 && workoutRows && workoutRows.length > 0) {
+  if (hasSchedule && timezone && workoutRows && workoutRows.length > 0) {
     const scheduledDateByDayId = computeScheduledDates(
       startDate,
       trainingDays,
@@ -192,24 +200,12 @@ export async function getProgramBuilderData(
     );
     if (scheduledDateByDayId.size > 0) {
       const lastScheduledDate = [...scheduledDateByDayId.values()].reduce((max, d) => (d > max ? d : max));
-      const timezone = await getGroupCoachTimezone(supabase, groupId);
       dayProgress = computeProgramDayProgress(startDate, lastScheduledDate, nowInZone(timezone));
       if (dayProgress) {
-        const workoutIds = workoutRows.map((w) => w.id);
-        const { data: logRows } = await supabase
-          .from("workout_logs")
-          .select("total_volume")
-          .in("workout_id", workoutIds);
-        totalVolumeLbs = (logRows ?? []).reduce((sum, r) => sum + (r.total_volume ?? 0), 0);
+        totalVolumeLbs = (logRows ?? []).reduce((sum: number, r: any) => sum + (r.total_volume ?? 0), 0);
       }
     }
   }
-
-  const spotterFlags = await gatherProgrammingSpotterFlags(supabase, {
-    programId,
-    programName: program.name,
-    coachId,
-  });
 
   return {
     groupId,

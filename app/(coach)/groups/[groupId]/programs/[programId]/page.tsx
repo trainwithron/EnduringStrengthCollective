@@ -49,25 +49,22 @@ export default async function ProgramDetailPage(
     redirect("/login");
   }
 
-  const { data: membership } = await supabase
-    .from("group_memberships")
-    .select("role")
-    .eq("group_id", params.groupId)
-    .eq("profile_id", user.id)
-    .maybeSingle();
+  // The two reads do not depend on each other, so they run together.
+  const [{ data: membership }, { data: program }] = await Promise.all([
+    supabase.from("group_memberships").select("role").eq("group_id", params.groupId).eq("profile_id", user.id).maybeSingle(),
+    supabase
+      .from("programs")
+      .select("id, name, description, start_date, training_days, visibility_window, ai_sequencing_notes, training_intent")
+      .eq("id", params.programId)
+      .eq("group_id", params.groupId)
+      .single(),
+  ]);
 
   if (!membership) {
     return (
       <NoAccess>This program isn&apos;t available, or you don&apos;t have access to it.</NoAccess>
     );
   }
-
-  const { data: program } = await supabase
-    .from("programs")
-    .select("id, name, description, start_date, training_days, visibility_window, ai_sequencing_notes, training_intent")
-    .eq("id", params.programId)
-    .eq("group_id", params.groupId)
-    .single();
 
   if (!program) {
     return (
@@ -251,25 +248,23 @@ async function CoachProgramBuilder({
   requestedWeek: number | null;
 }) {
   const supabase = await createServerClient();
-  const data = await getProgramBuilderData(supabase, { groupId, programId, coachId });
-
-  // Label and order come from a later migration; until it is applied the read fails and the
-  // control just explains that. Nothing else depends on it.
-  const { data: roleRow, error: roleError } = await supabase
-    .from("programs")
-    .select("label, sort_order, ai_draft")
-    .eq("id", programId)
-    .maybeSingle();
+  // The builder's data, the program's label/order, and the quiet question after a sign-off do not depend on each other: one batch.
+  const [data, { data: roleRow, error: roleError }, { data: askedRule }] = await Promise.all([
+    getProgramBuilderData(supabase, { groupId, programId, coachId }),
+    // Label and order come from a later migration; until it is applied the read fails and the
+    // control just explains that. Nothing else depends on it.
+    supabase.from("programs").select("label, sort_order, ai_draft").eq("id", programId).maybeSingle(),
+    // The one quiet question after a sign-off (if there is one and it is recent): shown here, on the program that was just signed off.
+    supabase
+      .from("coach_learned_rules")
+      .select("id, from_name, to_name, evidence_count, evidence_total")
+      .eq("coach_id", coachId)
+      .eq("status", "suggested")
+      .eq("asked_for_program_id", programId)
+      .gte("created_at", new Date(Date.now() - 7 * 86400000).toISOString())
+      .maybeSingle(),
+  ]);
   const isAiDraft = (roleRow as { ai_draft?: boolean } | null)?.ai_draft === true;
-  // The one quiet question after a sign-off (if there is one and it is recent): shown here, on the program that was just signed off.
-  const { data: askedRule } = await supabase
-    .from("coach_learned_rules")
-    .select("id, from_name, to_name, evidence_count, evidence_total")
-    .eq("coach_id", coachId)
-    .eq("status", "suggested")
-    .eq("asked_for_program_id", programId)
-    .gte("created_at", new Date(Date.now() - 7 * 86400000).toISOString())
-    .maybeSingle();
   const roleInfo = {
     available: !roleError,
     label: (roleRow as { label?: string | null } | null)?.label ?? null,

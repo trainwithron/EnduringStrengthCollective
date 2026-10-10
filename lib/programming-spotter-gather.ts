@@ -51,10 +51,11 @@ export async function gatherProgrammingSpotterFlags(
 ): Promise<SpotterFlag[]> {
   const { programId, programName, coachId } = params;
 
-  const { data: workouts } = await supabase
-    .from("workouts")
-    .select("id, week_number")
-    .eq("program_id", programId);
+  // The program's days and its dismissals do not depend on each other: read together (the dismissals are simply unused if there are no days).
+  const [{ data: workouts }, { data: dismissalRows }] = await Promise.all([
+    supabase.from("workouts").select("id, week_number").eq("program_id", programId),
+    supabase.from("programming_spotter_dismissals").select("check_kind, pattern_key, dismissed_count").eq("program_id", programId),
+  ]);
   if (!workouts || workouts.length === 0) return [];
 
   const weekByWorkoutId = new Map(workouts.map((w) => [w.id, w.week_number as number]));
@@ -165,10 +166,6 @@ export async function gatherProgrammingSpotterFlags(
     });
   }
 
-  const { data: dismissalRows } = await supabase
-    .from("programming_spotter_dismissals")
-    .select("check_kind, pattern_key, dismissed_count")
-    .eq("program_id", programId);
   const dismissedTwice = new Set(
     (dismissalRows ?? []).filter((d) => d.dismissed_count >= 2).map((d) => `${d.check_kind}::${d.pattern_key}`)
   );
