@@ -1403,6 +1403,7 @@ alter table public.coach_availability_windows drop column if exists session_minu
       fnFromMigration("0263", "cancel_group_session"),
       fnFromMigration("0263", "mark_group_attendee"),
       fnFromMigration("0313", "booking_counts"),
+      "drop policy if exists \"group_session_attendees_select_event_staff\" on public.group_session_attendees;",
       "drop policy if exists \"group_sessions_select_event_member\" on public.group_sessions;",
       "drop policy if exists \"group_sessions_select_client\" on public.group_sessions;",
       "create policy \"group_sessions_select_client\" on public.group_sessions for select to authenticated using (public.is_client_of_coach(coach_id));",

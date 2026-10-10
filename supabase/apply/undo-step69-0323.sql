@@ -320,6 +320,7 @@ as $function$
   group by u.athlete_id, u.group_id
   order by u.athlete_id, u.group_id;
 $function$;
+drop policy if exists "group_session_attendees_select_event_staff" on public.group_session_attendees;
 drop policy if exists "group_sessions_select_event_member" on public.group_sessions;
 drop policy if exists "group_sessions_select_client" on public.group_sessions;
 create policy "group_sessions_select_client" on public.group_sessions for select to authenticated using (public.is_client_of_coach(coach_id));
