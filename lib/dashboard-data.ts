@@ -158,6 +158,7 @@ export async function getCoachDashboardData(
     inactiveKeys,
     owedFirst,
     { data: habitLogRows },
+    { data: groupKindRows },
   ] = await Promise.all([
     supabase
       .from("group_memberships")
@@ -247,7 +248,9 @@ export async function getCoachDashboardData(
       .in("client_habits.group_id", allGroupIds)
       .eq("client_habits.active", true)
       .gte("log_date", sevenDaysAgoKey),
+    supabase.from("groups").select("id, group_kind").in("id", allGroupIds),
   ]);
+  const oneOnOneGroupIds = new Set<string>((groupKindRows ?? []).filter((g: any) => g.group_kind === "one_on_one").map((g: any) => g.id as string));
 
   // Most recent completed-workout date per athlete — first occurrence
   // wins since logRows is already ordered newest-first.
@@ -308,7 +311,8 @@ export async function getCoachDashboardData(
   for (const p of programRows ?? []) {
     if (p.athlete_id) {
       personalTrainingDaysByAthlete.set(p.athlete_id, p.training_days);
-    } else {
+    } else if (!oneOnOneGroupIds.has(p.group_id)) {
+      // A one-on-one space has no shared program: a program with no client on it is the coach's template.
       sharedTrainingDaysByGroup.set(p.group_id, p.training_days);
     }
   }

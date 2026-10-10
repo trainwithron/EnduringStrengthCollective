@@ -10,6 +10,8 @@ export interface PickableProgram {
   clientName: string | null;
   // The program this one was copied from (programs.source_program_id), if any.
   sourceProgramId: string | null;
+  // "one_on_one" for a program in a client's own space: with no client on it, it is a template that belongs to nobody yet.
+  groupKind?: string | null;
 }
 
 export function orderForAssign(programs: PickableProgram[]): (PickableProgram & { uses: number })[] {
@@ -27,9 +29,9 @@ export function filterPrograms<T extends { name: string; clientName: string | nu
 }
 
 // The little label under a program's name.
-export function programLabel(p: { aiDraft: boolean; clientName: string | null; uses: number }): string {
+export function programLabel(p: { aiDraft: boolean; clientName: string | null; uses: number; groupKind?: string | null }): string {
   if (p.aiDraft) return "AI draft: sign off first";
-  const base = p.clientName ? `${p.clientName}'s copy` : "Shared";
+  const base = p.clientName ? `${p.clientName}'s copy` : p.groupKind === "one_on_one" ? "Not assigned to anyone" : "Shared";
   return p.uses > 0 ? `${base} · used ${p.uses} ${p.uses === 1 ? "time" : "times"}` : base;
 }
 

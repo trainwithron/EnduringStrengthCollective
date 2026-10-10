@@ -30,6 +30,9 @@ export async function POST(request: Request) {
     capacity: body.capacity === undefined || body.capacity === null || body.capacity === "" || capacityNumber === 0 ? null : capacityNumber,
   };
   if (!groupId) return NextResponse.json({ error: "Missing group." }, { status: 400 });
+  // A client's own one-on-one space is not a group: no events there (the database refuses too).
+  const { data: kindRow } = await supabase.from("groups").select("group_kind").eq("id", groupId).maybeSingle();
+  if ((kindRow as { group_kind?: string } | null)?.group_kind === "one_on_one") return NextResponse.json({ error: "Events are for groups. Book a session with this client instead." }, { status: 422 });
   const problem = eventProblem(input, new Date());
   if (problem) return NextResponse.json({ error: problem }, { status: 400 });
 

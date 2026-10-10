@@ -32,6 +32,9 @@ export async function POST(request: Request) {
     const { data: callerRow } = await supabase.from("group_memberships").select("role").eq("group_id", groupId).eq("profile_id", user.id).maybeSingle();
     if (callerRow?.role !== "coach") return NextResponse.json({ error: "Only a coach of this group can make its invite link." }, { status: 403 });
     const admin = createServiceRoleClient();
+    // A client's own one-on-one space holds one client: a link that brings someone else in is refused (the database refuses too).
+    const { data: kindRow } = await admin.from("groups").select("group_kind").eq("id", groupId).maybeSingle();
+    if ((kindRow as { group_kind?: string } | null)?.group_kind === "one_on_one") return NextResponse.json({ error: "This is one client's own space, so it has no invite link. Add the client from your Clients page." }, { status: 422 });
     // Cancel every working link of this group (a new link replaces the old one). Falls back to deleting when the cancelled-at columns are not there yet.
     const { data: working } = await admin.from("group_invites").select("id").eq("group_id", groupId).is("revoked_at", null);
     const ids = ((working ?? []) as { id: string }[]).map((r) => r.id);

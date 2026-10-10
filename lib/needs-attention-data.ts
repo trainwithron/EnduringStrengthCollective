@@ -30,8 +30,9 @@ export async function getNeedsAttentionItems(
 ): Promise<NeedsAttentionItem[]> {
   if (groupIds.length === 0) return [];
 
-  const { data: groupRows } = await supabase.from("groups").select("id, name").in("id", groupIds);
+  const { data: groupRows } = await supabase.from("groups").select("id, name, group_kind").in("id", groupIds);
   const groupNameById = new Map<string, string>((groupRows ?? []).map((g: any) => [g.id, g.name]));
+  const oneOnOneGroupIds = new Set<string>((groupRows ?? []).filter((g: any) => g.group_kind === "one_on_one").map((g: any) => g.id as string));
 
   const { data: prefsRow } = await supabase
     .from("coach_preferences")
@@ -90,14 +91,10 @@ export async function getNeedsAttentionItems(
   const athleteInfos: AthleteProgramInfo[] = [];
 
   for (const groupId of groupIds) {
-    const { data: activeProgram } = await supabase
-      .from("programs")
-      .select("id, start_date, training_days")
-      .eq("group_id", groupId)
-      .eq("is_active", true)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // In a one-on-one space only a program made for the client counts; a no-client program there is the coach's template.
+    let programQuery = supabase.from("programs").select("id, start_date, training_days").eq("group_id", groupId).eq("is_active", true);
+    if (oneOnOneGroupIds.has(groupId)) programQuery = programQuery.not("athlete_id", "is", null);
+    const { data: activeProgram } = await programQuery.order("created_at", { ascending: false }).limit(1).maybeSingle();
 
     if (!activeProgram?.start_date || !activeProgram.training_days?.length) continue;
 

@@ -430,7 +430,7 @@ export async function CoachCalendarPageBody(
     // shared only when personal comes back empty — at most one extra,
     // cheap row fetched in the common case, but it removes a real
     // sequential round trip from every athlete's calendar load.
-    const [{ data: personalProgram }, { data: sharedProgramRaw }] = await Promise.all([
+    const [{ data: personalProgram }, { data: sharedProgramRaw }, { data: kindRow }] = await Promise.all([
       supabase
         .from("programs")
         .select("id, start_date, training_days")
@@ -445,8 +445,10 @@ export async function CoachCalendarPageBody(
         .is("athlete_id", null)
         .eq("is_active", true)
         .maybeSingle(),
+      supabase.from("groups").select("group_kind").eq("id", params.groupId).maybeSingle(),
     ]);
-    const sharedProgram = personalProgram ? null : sharedProgramRaw;
+    // A one-on-one space has no shared program: a program with no client on it is the coach's template.
+    const sharedProgram = personalProgram || (kindRow as { group_kind?: string } | null)?.group_kind === "one_on_one" ? null : sharedProgramRaw;
 
     const program = personalProgram ?? sharedProgram;
     const programHasSchedule = !!(program?.start_date && program.training_days?.length);

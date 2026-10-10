@@ -245,6 +245,22 @@
   "file": "apply-release-ai-all.sql"
  },
  {
+  "id": "release-ak",
+  "name": "Release AK (a one-on-one space stays a one-on-one space: its programs must be for its client, group-only features are refused there; run AFTER Release AJ)",
+  "steps": [
+   "79"
+  ],
+  "file": "apply-release-ak-all.sql"
+ },
+ {
+  "id": "release-aj",
+  "name": "Release AJ (a client in a one-on-one space can no longer read that space's no-client programs; run AFTER Release AG)",
+  "steps": [
+   "78"
+  ],
+  "file": "apply-release-aj-all.sql"
+ },
+ {
   "id": "release-ag",
   "name": "Release AG (remove a program from a client's profile without deleting it; run AFTER Release AC)",
   "steps": [

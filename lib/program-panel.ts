@@ -5,6 +5,8 @@ export interface PanelProgramRow {
   id: string;
   name: string;
   groupId: string;
+  // "one_on_one" for a client's own space: a no-client program there is a template that belongs to nobody yet.
+  groupKind?: string | null;
   athleteId: string | null;
   // The client this program was made for, or null for a shared / template program.
   clientName: string | null;
@@ -44,9 +46,9 @@ export function panelPrograms(rows: PanelProgramRow[], clientId: string | null, 
 }
 
 // "Who it is for", under the program's name.
-export function panelProgramLabel(r: Pick<PanelProgramRow, "clientName" | "isActive" | "aiDraft">): string {
+export function panelProgramLabel(r: Pick<PanelProgramRow, "clientName" | "isActive" | "aiDraft" | "groupKind">): string {
   if (r.aiDraft) return r.clientName ? `AI draft · ${r.clientName}` : "AI draft";
-  const base = r.clientName ?? "Shared";
+  const base = r.clientName ?? (r.groupKind === "one_on_one" ? "Not assigned to anyone" : "Shared");
   return r.isActive ? base : `${base} · not active`;
 }
 

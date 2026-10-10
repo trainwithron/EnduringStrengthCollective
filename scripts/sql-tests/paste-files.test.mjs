@@ -1114,6 +1114,42 @@ for (const s of steps) {
   const errAI2 = await run(`apply/${bundle.file}`);
   check("release-ai: the bundle applies again after an undo" + (errAI2 ? ": " + errAI2 : ""), !errAI2 && (await has()));
 }
+// Release AJ (step 78): ONE paste.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-aj");
+  check("release-aj: ONE bundle holds step 78", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["78"]));
+  const st78 = steps.find((x) => x.n === "78");
+  const has = async () => (await db.query("select to_regprocedure('public.is_one_on_one_group(uuid)') is not null as ok")).rows[0].ok === true;
+  const eaj0 = await run(`apply/undo-step${st78.n}-${st78.slug}.sql`);
+  check("release-aj: before the bundle runs the helper is absent" + (eaj0 ? ": " + eaj0 : ""), !eaj0 && !(await has()));
+  const errAJ = await run(`apply/${bundle.file}`);
+  check("release-aj bundle applies on the live-shaped state" + (errAJ ? ": " + errAJ : ""), !errAJ && (await has()));
+  const againAJ = await run(`apply/${bundle.file}`);
+  check("release-aj: a second run is refused, naming step 78 (" + againAJ + ")", !!againAJ && againAJ.includes("step 78 (0332) cannot run") && againAJ.includes("already applied"));
+  const euAJ = await run(`apply/undo-step${st78.n}-${st78.slug}.sql`);
+  check("release-aj: the undo puts the rule back" + (euAJ ? ": " + euAJ : ""), !euAJ && !(await has()));
+  const errAJ2 = await run(`apply/${bundle.file}`);
+  check("release-aj: the bundle applies again after an undo" + (errAJ2 ? ": " + errAJ2 : ""), !errAJ2 && (await has()));
+}
+// Release AK (step 79): ONE paste.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-ak");
+  check("release-ak: ONE bundle holds step 79", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["79"]));
+  const st79 = steps.find((x) => x.n === "79");
+  const has = async () => (await db.query("select to_regprocedure('public.one_on_one_athlete(uuid)') is not null as ok")).rows[0].ok === true;
+  const eak0 = await run(`apply/undo-step${st79.n}-${st79.slug}.sql`);
+  check("release-ak: before the bundle runs the helper is absent" + (eak0 ? ": " + eak0 : ""), !eak0 && !(await has()));
+  const errAK = await run(`apply/${bundle.file}`);
+  check("release-ak bundle applies on the live-shaped state" + (errAK ? ": " + errAK : ""), !errAK && (await has()));
+  const againAK = await run(`apply/${bundle.file}`);
+  check("release-ak: a second run is refused, naming step 79 (" + againAK + ")", !!againAK && againAK.includes("step 79 (0333) cannot run") && againAK.includes("already applied"));
+  const euAK = await run(`apply/undo-step${st79.n}-${st79.slug}.sql`);
+  check("release-ak: the undo puts the rules back" + (euAK ? ": " + euAK : ""), !euAK && !(await has()));
+  const errAK2 = await run(`apply/${bundle.file}`);
+  check("release-ak: the bundle applies again after an undo" + (errAK2 ? ": " + errAK2 : ""), !errAK2 && (await has()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.

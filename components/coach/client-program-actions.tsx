@@ -31,7 +31,7 @@ export function ClientProgramActions({ groupId, athleteId, athleteFullName, extr
     if (!user) return;
     const { data, error: loadError } = await supabase
       .from("programs")
-      .select("id, name, created_at, ai_draft, source_program_id, profiles!programs_athlete_id_fkey ( full_name )")
+      .select("id, name, created_at, ai_draft, source_program_id, profiles!programs_athlete_id_fkey ( full_name ), groups ( group_kind )")
       .eq("created_by", user.id)
       .is("archived_at", null)
       .order("created_at", { ascending: false })
@@ -50,6 +50,7 @@ export function ClientProgramActions({ groupId, athleteId, athleteFullName, extr
           aiDraft: p.ai_draft === true,
           clientName: (p.profiles?.full_name as string | undefined) ?? null,
           sourceProgramId: (p.source_program_id as string | null) ?? null,
+          groupKind: (p.groups?.group_kind as string | undefined) ?? null,
         }))
       )
     );

@@ -64,19 +64,25 @@ export default async function NewProgramPage(
   // ai_gap_sept15.md) — reached from ClientProgramActions with a real
   // athleteId; verified against this group's own roster rather than
   // trusted at face value, same discipline as the API route's own check.
+  // In a client's own (one-on-one) space every program is for that client, so it is filled in here too (the database also fills it in).
+  let wantedAthleteId: string | undefined = searchParams.athleteId;
+  if (!wantedAthleteId && (group as { group_kind?: string } | null)?.group_kind === "one_on_one") {
+    const { data: soleAthletes } = await supabase.from("group_memberships").select("profile_id").eq("group_id", params.groupId).eq("role", "athlete");
+    if (soleAthletes?.length === 1) wantedAthleteId = soleAthletes[0].profile_id as string;
+  }
   let athleteName: string | null = null;
-  if (searchParams.athleteId) {
+  if (wantedAthleteId) {
     const { data: athleteMembership } = await supabase
       .from("group_memberships")
       .select("role, profiles ( full_name )")
       .eq("group_id", params.groupId)
-      .eq("profile_id", searchParams.athleteId)
+      .eq("profile_id", wantedAthleteId)
       .maybeSingle();
     if (athleteMembership?.role === "athlete") {
       athleteName = (athleteMembership.profiles as any)?.full_name ?? "this client";
     }
   }
-  const athleteId = athleteName ? searchParams.athleteId! : null;
+  const athleteId = athleteName ? wantedAthleteId! : null;
 
   const { data: libraryRows } =
     method === "ai"

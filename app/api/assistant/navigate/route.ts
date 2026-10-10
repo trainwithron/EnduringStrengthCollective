@@ -98,13 +98,13 @@ export async function POST(request: Request) {
   // Each client's current program (their own copy when they have one, else the group's), so "Johann's program" opens the right screen. Ids only.
   const clientPrograms: Record<string, { programId: string; groupId: string }> = {};
   if (role === "coach" && roster.length > 0) {
-    const { data: programRows } = await supabase
-      .from("programs")
-      .select("id, group_id, athlete_id")
-      .in("group_id", coachGroupIds)
-      .eq("is_active", true)
-      .limit(1000);
-    const rows = (programRows ?? []) as { id: string; group_id: string; athlete_id: string | null }[];
+    const [{ data: programRows }, { data: kindRows }] = await Promise.all([
+      supabase.from("programs").select("id, group_id, athlete_id").in("group_id", coachGroupIds).eq("is_active", true).limit(1000),
+      supabase.from("groups").select("id, group_kind").in("id", coachGroupIds),
+    ]);
+    const oneOnOneIds = new Set<string>((kindRows ?? []).filter((g: any) => g.group_kind === "one_on_one").map((g: any) => g.id as string));
+    // A one-on-one space has no shared program: a program with no client on it is the coach's template.
+    const rows = ((programRows ?? []) as { id: string; group_id: string; athlete_id: string | null }[]).filter((r) => r.athlete_id !== null || !oneOnOneIds.has(r.group_id));
     for (const c of roster) {
       const own = rows.find((r) => r.athlete_id === c.id && r.group_id === c.groupId);
       const shared = rows.find((r) => r.athlete_id === null && r.group_id === c.groupId);

@@ -30,15 +30,20 @@ export async function ClientProgramsSection({ groupId, athleteId, actions }: { g
   const removed = (removedData ?? []) as { id: string; name: string }[];
   const programs = (data ?? []) as unknown as { id: string; name: string; is_active: boolean; ai_draft?: boolean; created_at: string; profiles?: { full_name?: string | null } | null }[];
   // A client with no program of their own follows the group's shared active program: show it, labelled, instead of "none".
-  const { data: sharedRow } = await supabase
-    .from("programs")
-    .select("id, name")
-    .eq("group_id", groupId)
-    .is("athlete_id", null)
-    .eq("is_active", true)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // In a one-on-one space there is no shared program: a program with no client on it is the coach's own template, not something this client follows (and the word group does not apply).
+  const { data: kindRow } = await supabase.from("groups").select("group_kind").eq("id", groupId).maybeSingle();
+  const oneOnOne = (kindRow as { group_kind?: string | null } | null)?.group_kind === "one_on_one";
+  const { data: sharedRow } = oneOnOne
+    ? { data: null }
+    : await supabase
+        .from("programs")
+        .select("id, name")
+        .eq("group_id", groupId)
+        .is("athlete_id", null)
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
   const shared = (sharedRow ?? null) as { id: string; name: string } | null;
 
   return (

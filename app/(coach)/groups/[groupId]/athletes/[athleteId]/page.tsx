@@ -156,7 +156,7 @@ export default async function AthleteProfilePage(
       .eq("group_id", params.groupId)
       .eq("profile_id", params.athleteId)
       .maybeSingle(),
-    supabase.from("groups").select("name, organization_id").eq("id", params.groupId).single(),
+    supabase.from("groups").select("name, organization_id, group_kind").eq("id", params.groupId).single(),
     // This client's own personal program wins over the group's shared
     // one — same precedence as lib/todays-workout.ts. Both queries run
     // unconditionally rather than fetching shared only when personal
@@ -445,7 +445,8 @@ export default async function AthleteProfilePage(
   // group-tier clients don't get macro/meal-plan programming at all.
   const macrosEnabled = athleteMembership.client_tier !== "group";
 
-  const sharedProgram = personalProgram ? null : sharedProgramRaw;
+  // A one-on-one space has no shared program: a program with no client on it is the coach's template, not what this client follows.
+  const sharedProgram = personalProgram || group?.group_kind === "one_on_one" ? null : sharedProgramRaw;
   const activeProgram = personalProgram ?? sharedProgram;
   const isMinor = !!intake?.date_of_birth && isUnder13(intake.date_of_birth, new Date());
   const todayKeyForWave2 = new Date().toISOString().slice(0, 10);

@@ -28,7 +28,7 @@ export function ProgramPanelList({ groupId }: { groupId: string }) {
       if (!user) return;
       const { data, error: loadError } = await supabase
         .from("programs")
-        .select("id, name, group_id, athlete_id, is_active, ai_draft, created_at, profiles!programs_athlete_id_fkey ( full_name )")
+        .select("id, name, group_id, athlete_id, is_active, ai_draft, created_at, profiles!programs_athlete_id_fkey ( full_name ), groups ( group_kind )")
         .eq("created_by", user.id)
         .is("archived_at", null)
         .or("is_active.eq.true,ai_draft.eq.true")
@@ -45,6 +45,7 @@ export function ProgramPanelList({ groupId }: { groupId: string }) {
           id: p.id,
           name: p.name,
           groupId: p.group_id,
+          groupKind: p.groups?.group_kind ?? null,
           athleteId: p.athlete_id ?? null,
           clientName: p.profiles?.full_name ?? null,
           isActive: !!p.is_active,
@@ -69,7 +70,7 @@ export function ProgramPanelList({ groupId }: { groupId: string }) {
       const supabase = createBrowserClient();
       const { data } = await supabase
         .from("programs")
-        .select("id, name, group_id, athlete_id, is_active, ai_draft, created_at, profiles!programs_athlete_id_fkey ( full_name )")
+        .select("id, name, group_id, athlete_id, is_active, ai_draft, created_at, profiles!programs_athlete_id_fkey ( full_name ), groups ( group_kind )")
         .eq("athlete_id", clientId!)
         .is("archived_at", null)
         .order("created_at", { ascending: false })
@@ -80,6 +81,7 @@ export function ProgramPanelList({ groupId }: { groupId: string }) {
           id: p.id,
           name: p.name,
           groupId: p.group_id,
+          groupKind: p.groups?.group_kind ?? null,
           athleteId: p.athlete_id ?? null,
           clientName: p.profiles?.full_name ?? null,
           isActive: !!p.is_active,

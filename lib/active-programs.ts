@@ -46,13 +46,20 @@ export async function getActivePrograms(
       .eq("is_active", true)
       .or(`athlete_id.is.null,athlete_id.eq.${athleteId}`);
 
-  // label / sort_order come from a later migration; until it is applied the
-  // select fails, and we simply read without them (no label, oldest first).
-  let { data, error } = await run(`${BASE_COLUMNS}, label, sort_order`);
+  // In a one-on-one space (a coach and one client) a program with no client on it is the coach's template, never what the client follows: only programs made for the client count.
+  const [kindResult, firstResult] = await Promise.all([
+    supabase.from("groups").select("group_kind").eq("id", groupId).maybeSingle(),
+    // label / sort_order come from a later migration; until it is applied the
+    // select fails, and we simply read without them (no label, oldest first).
+    run(`${BASE_COLUMNS}, label, sort_order`),
+  ]);
+  const oneOnOne = (kindResult.data as { group_kind?: string | null } | null)?.group_kind === "one_on_one";
+  let { data, error } = firstResult;
   if (error) ({ data, error } = await run(BASE_COLUMNS));
   if (error || !data) return [];
 
   return (data as unknown as Row[])
+    .filter((r) => !oneOnOne || r.athlete_id !== null)
     .map<ActiveProgram>((r) => ({
       id: r.id,
       name: r.name,

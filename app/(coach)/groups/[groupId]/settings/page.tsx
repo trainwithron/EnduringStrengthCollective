@@ -121,7 +121,7 @@ export default async function SettingsPage(
         .maybeSingle(),
       supabase
         .from("groups")
-        .select("gamification_enabled, name")
+        .select("gamification_enabled, name, group_kind")
         .eq("id", params.groupId)
         .maybeSingle(),
       supabase
@@ -338,7 +338,7 @@ export default async function SettingsPage(
         )}
 
         {/* A group member's workouts post to the group feed by default (accountability); this is the clear way to turn that off. A one-on-one client has no feed, so no control. */}
-        {!isCoach && (membership as { client_tier?: string | null } | null)?.client_tier !== "one_on_one" && (
+        {!isCoach && (membership as { client_tier?: string | null } | null)?.client_tier !== "one_on_one" && (group as { group_kind?: string } | null)?.group_kind !== "one_on_one" && (
           <SettingsGroup label="Sharing to the group feed">
             <FeedBroadcastSettings
               profileId={athleteId}

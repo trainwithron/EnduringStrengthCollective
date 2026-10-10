@@ -145,7 +145,7 @@ export default async function GroupHubPage(
     // that isn't actually something to train from today.
     supabase
       .from("programs")
-      .select("id, name, cover_image_path, workouts(count)")
+      .select("id, name, athlete_id, cover_image_path, workouts(count)")
       .eq("group_id", params.groupId)
       .eq("is_active", true)
       .or(`athlete_id.is.null,athlete_id.eq.${athleteId ?? ""}`)
@@ -263,7 +263,9 @@ export default async function GroupHubPage(
   // have no manual cover photo — same "skip what won't render" guard as
   // the coach's own Programs grid.
   const coachId = roster.find((m) => m.role === "coach")?.profileId;
-  const uncoveredProgramIds = (programs ?? [])
+  // In a one-on-one space a program with no client on it is the coach's template, not the client's: only programs made for the client are listed.
+  const shownPrograms = (programs ?? []).filter((p: any) => (group as { group_kind?: string } | null)?.group_kind !== "one_on_one" || p.athlete_id !== null);
+  const uncoveredProgramIds = shownPrograms
     .filter((p: any) => !p.cover_image_path)
     .map((p: any) => p.id);
   const visualsMap = coachId
@@ -856,10 +858,10 @@ export default async function GroupHubPage(
         </h2>
         {programsError ? (
           <UnavailableState what="your programs" compact />
-        ) : programs && programs.length > 0 ? (
+        ) : shownPrograms.length > 0 ? (
           <ProgramCardList
             groupId={params.groupId}
-            programs={programs.map((p: any) => ({
+            programs={shownPrograms.map((p: any) => ({
               id: p.id,
               name: p.name,
               workoutCount: p.workouts?.[0]?.count ?? 0,
