@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useSyncExternalStore } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { confirmStore, type ConfirmOptions } from "@/lib/confirm-store";
 
 // Ask the person to confirm, in the page (not the browser's popup). Same shape as window.confirm, but awaited:
@@ -9,17 +9,25 @@ export function confirmDialog(options: string | ConfirmOptions): Promise<boolean
   return confirmStore.ask(options);
 }
 
+// The same, with a tick-box in the dialog: resolves { confirmed, checked }.
+export function confirmDialogWithChoice(options: ConfirmOptions): Promise<{ confirmed: boolean; checked: boolean }> {
+  return confirmStore.askWithChoice(options);
+}
+
 // Mounted once, in the root layout. A dimmed overlay with the message, Cancel and the confirm button (red when the action destroys something). Esc, the dimmed area and Cancel all answer no; focus starts on
 // Cancel for something destructive (so a stray Enter never deletes) and on the confirm button otherwise, and stays inside the box until it closes, then goes back to where it was.
 export function ConfirmDialogHost() {
   const request = useSyncExternalStore(confirmStore.subscribe, confirmStore.getSnapshot, () => null);
   const cancelRef = useRef<HTMLButtonElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
+  const checkRef = useRef<HTMLInputElement>(null);
   const titleId = useId();
+  const [checked, setChecked] = useState(false);
 
   useEffect(() => {
     if (!request) return;
     const before = document.activeElement as HTMLElement | null;
+    setChecked(request.checkbox?.checked ?? false);
     (request.destructive ? cancelRef.current : confirmRef.current)?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -29,7 +37,7 @@ export function ConfirmDialogHost() {
         return;
       }
       if (e.key === "Tab") {
-        const first = cancelRef.current;
+        const first = checkRef.current ?? cancelRef.current;
         const last = confirmRef.current;
         if (!first || !last) return;
         if (e.shiftKey && document.activeElement === first) {
@@ -55,6 +63,12 @@ export function ConfirmDialogHost() {
         <p id={titleId} className="font-body text-sm whitespace-pre-line break-words">
           {request.message}
         </p>
+        {request.checkbox && (
+          <label className="mt-4 flex items-start gap-2 min-h-[44px] font-body text-sm cursor-pointer">
+            <input ref={checkRef} type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} className="mt-0.5 w-5 h-5 accent-rust" />
+            <span>{request.checkbox.label}</span>
+          </label>
+        )}
         <div className="mt-5 flex flex-wrap justify-end gap-2">
           <button
             ref={cancelRef}
@@ -67,7 +81,7 @@ export function ConfirmDialogHost() {
           <button
             ref={confirmRef}
             type="button"
-            onClick={() => confirmStore.answer(true)}
+            onClick={() => confirmStore.answer(true, checked)}
             className={`min-h-[44px] px-4 font-body text-sm font-medium text-graphite focus:outline-none focus:ring-2 focus:ring-chalk/60 ${request.destructive ? "bg-rust" : "bg-chalk"}`}
           >
             {request.confirmLabel}

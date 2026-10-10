@@ -9,6 +9,8 @@ export interface ConfirmOptions {
   cancelLabel?: string;
   // Red confirm button, and the focus starts on Cancel. Taken from the message when not given (delete, remove, cancel, revoke, clear, discard, end, hold).
   destructive?: boolean;
+  // An optional tick-box in the same dialog (for example a second choice that belongs to the question). Its answer comes back with askWithChoice.
+  checkbox?: { label: string; checked?: boolean };
 }
 
 export interface ConfirmRequest {
@@ -16,6 +18,7 @@ export interface ConfirmRequest {
   confirmLabel: string;
   cancelLabel: string;
   destructive: boolean;
+  checkbox: { label: string; checked: boolean } | null;
 }
 
 const DESTRUCTIVE = /\b(delete|remove|cancel|revoke|clear|discard|end this|put all|lost|lose|can't be undone|cannot be undone)\b/i;
@@ -42,12 +45,12 @@ export function describeConfirm(options: string | ConfirmOptions): ConfirmReques
       confirmLabel = "Confirm";
     }
   }
-  return { message, confirmLabel, cancelLabel: cancelLabel ?? "Cancel", destructive };
+  return { message, confirmLabel, cancelLabel: cancelLabel ?? "Cancel", destructive, checkbox: o.checkbox ? { label: o.checkbox.label, checked: !!o.checkbox.checked } : null };
 }
 
 interface Pending {
   request: ConfirmRequest;
-  resolve: (answer: boolean) => void;
+  resolve: (answer: boolean, checked: boolean) => void;
 }
 
 export function createConfirmStore() {
@@ -61,15 +64,22 @@ export function createConfirmStore() {
   return {
     ask(options: string | ConfirmOptions): Promise<boolean> {
       return new Promise<boolean>((resolve) => {
-        queue.push({ request: describeConfirm(options), resolve });
+        queue.push({ request: describeConfirm(options), resolve: (answer) => resolve(answer) });
+        if (queue.length === 1) publish();
+      });
+    },
+    // Like ask, but also says whether the dialog's tick-box was ticked when the person confirmed.
+    askWithChoice(options: ConfirmOptions): Promise<{ confirmed: boolean; checked: boolean }> {
+      return new Promise((resolve) => {
+        queue.push({ request: describeConfirm(options), resolve: (answer, checked) => resolve({ confirmed: answer, checked }) });
         if (queue.length === 1) publish();
       });
     },
     // The dialog's answer for the one on screen; the next waiting ask (if any) shows straight after.
-    answer(value: boolean) {
+    answer(value: boolean, checked = false) {
       const current = queue.shift();
       if (!current) return;
-      current.resolve(value);
+      current.resolve(value, value && checked);
       publish();
     },
     subscribe(listener: () => void) {

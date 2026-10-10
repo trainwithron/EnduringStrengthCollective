@@ -1,36 +1,30 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { MoreVertical } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
-import { DeleteClientControl } from "@/components/coach/delete-client-control";
+import { runDeleteClient } from "@/components/coach/delete-client-flow";
 import { useTerm } from "@/components/coach/terminology-provider";
 
 // The small three-dot menu on a client's card and on a row of the Clients list: exactly two actions, the same two the client's own profile has.
 //   * Set inactive: the existing set_client_inactive call (nothing is deleted; a workout, session or message from them brings them back). A client already set aside shows "Bring back" instead.
-//   * Delete client: the existing delete dialog (typed name, history choice), opened here, not a second one.
+//   * Delete client: the one delete flow (components/coach/delete-client-flow.ts): the in-page confirm with the history tick-box.
 // It sits beside the card's link, never inside it, so opening it does not open the client.
 export function ClientRowMenu({ groupId, athleteId, athleteName, setAside = false }: { groupId: string; athleteId: string; athleteName: string; setAside?: boolean }) {
   const term = useTerm();
-  const router = useRouter();
   const boxRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!open && !deleting) return;
+    if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (open && boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setOpen(false);
-        setDeleting(false);
-      }
+      if (e.key === "Escape") setOpen(false);
     };
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
@@ -38,7 +32,7 @@ export function ClientRowMenu({ groupId, athleteId, athleteName, setAside = fals
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
     };
-  }, [open, deleting]);
+  }, [open]);
 
   async function toggleInactive() {
     setOpen(false);
@@ -56,7 +50,17 @@ export function ClientRowMenu({ groupId, athleteId, athleteName, setAside = fals
       setError("That didn't save. Nothing was changed. Try again.");
       return;
     }
-    router.refresh();
+    window.location.reload();
+  }
+
+  async function deleteClient() {
+    setOpen(false);
+    setError(null);
+    setBusy(true);
+    const result = await runDeleteClient({ groupId, athleteId, athleteName });
+    setBusy(false);
+    if (result.status === "failed") setError(result.error);
+    else if (result.status === "deleted") window.location.reload();
   }
 
   const item = "w-full text-left min-h-11 px-3 font-body text-sm text-chalk hover:bg-graphite/60 focus:bg-graphite/60 focus:outline-none";
@@ -82,10 +86,7 @@ export function ClientRowMenu({ groupId, athleteId, athleteName, setAside = fals
           <button
             type="button"
             role="menuitem"
-            onClick={() => {
-              setOpen(false);
-              setDeleting(true);
-            }}
+            onClick={() => void deleteClient()}
             className={`${item} text-rust`}
           >
             Delete {term("client")}
@@ -96,13 +97,6 @@ export function ClientRowMenu({ groupId, athleteId, athleteName, setAside = fals
         <p className="absolute right-0 top-full z-30 mt-0.5 w-56 bg-graphite border border-rust p-2 font-body text-xs text-rust" role="alert">
           {error}
         </p>
-      )}
-      {deleting && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" role="dialog" aria-modal="true" aria-label={`Delete ${athleteName}`}>
-          <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto bg-graphite">
-            <DeleteClientControl groupId={groupId} athleteId={athleteId} athleteName={athleteName} defaultOpen onCancel={() => setDeleting(false)} />
-          </div>
-        </div>
       )}
     </div>
   );
