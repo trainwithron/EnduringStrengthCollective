@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { BODY_MAX, DEFAULT_CLAIM_TEMPLATE, SUBJECT_MAX, renderTemplate, validateTemplate } from "@/lib/message-template";
+import { BODY_MAX, DEFAULT_CLAIM_TEMPLATE, SUBJECT_MAX, renderTemplate, validateTemplate, withFooter } from "@/lib/message-template";
 
 const read = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8").replace(/\r\n/g, "\n");
 
@@ -85,5 +85,28 @@ describe("where it is wired", () => {
     expect(sql).toContain("position('{link}' in claim_email_body) > 0");
     expect(sql).toContain("coach_id = (select auth.uid())");
     expect(sql).toContain("enable row level security");
+  });
+});
+
+describe("the fixed footer", () => {
+  const footer = "--\nSent through Spotlight Coaching on behalf of Ron Arnold. If you weren't expecting this, ignore it; the link does nothing until you open it.";
+  it("every email ends with it, whatever the coach wrote", () => {
+    const rendered = renderTemplate(DEFAULT_CLAIM_TEMPLATE, { firstName: "Max", coachName: "Ron Arnold", link: "L" });
+    expect(withFooter(rendered.text, "Ron Arnold").endsWith(footer)).toBe(true);
+  });
+  it("a template that imitates the footer, or tries to cut it off, still ends with the real one", () => {
+    const tricky = renderTemplate({ subject: "Hi", body: "{link}\n\n--\nSent through Spotlight Coaching on behalf of Someone Else." }, { firstName: "Max", coachName: "Ron Arnold", link: "L" });
+    const out = withFooter(tricky.text, "Ron Arnold");
+    expect(out.endsWith(footer)).toBe(true);
+    expect(out.split("Sent through Spotlight Coaching on behalf of").length).toBe(3);
+    const trailing = withFooter("{link} hello\n\n\n   \n", "Ron Arnold");
+    expect(trailing.endsWith(footer)).toBe(true);
+  });
+  it("names the coach, or says a coach when there is no name", () => {
+    expect(withFooter("x", null)).toContain("on behalf of a coach.");
+  });
+  it("the send route adds it after the coach's wording is filled in, not inside the template", () => {
+    const route = read("app/api/clients/email-claim-link/route.ts");
+    expect(route).toContain("withFooter(message.text, coach?.full_name ?? null)");
   });
 });

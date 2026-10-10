@@ -54,3 +54,14 @@ export function renderTemplate(template: MessageTemplate, values: { firstName: s
       .split("{link}").join(values.link);
   return { subject: clean(fill(template.subject), false), text: fill(template.body) };
 }
+
+// Added by the app to the end of every sign-in email AFTER the coach's wording is filled in, so a coach's own text can never remove or change it. The platform is the sender, so the
+// email always says who it is on behalf of and that the link does nothing until it is opened.
+export function claimEmailFooter(coachName: string | null): string {
+  const coach = coachName?.trim() || "a coach";
+  return `--\nSent through Spotlight Coaching on behalf of ${coach}. If you weren't expecting this, ignore it; the link does nothing until you open it.`;
+}
+
+export function withFooter(text: string, coachName: string | null): string {
+  return `${text.replace(/\s+$/, "")}\n\n${claimEmailFooter(coachName)}`;
+}

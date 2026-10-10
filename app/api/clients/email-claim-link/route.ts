@@ -3,7 +3,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { hasLiveClaimLink, loadUnclaimedClient, mintClaimLink } from "@/lib/client-claim-server";
 import { isPlaceholderEmail } from "@/lib/client-claim";
-import { DEFAULT_CLAIM_TEMPLATE, renderTemplate, validateTemplate, type MessageTemplate } from "@/lib/message-template";
+import { DEFAULT_CLAIM_TEMPLATE, renderTemplate, validateTemplate, withFooter, type MessageTemplate } from "@/lib/message-template";
 import { appOrigin } from "@/lib/app-url";
 import { isSendGridConfigured, sendEmail } from "@/lib/sendgrid";
 import { rateLimitAllows, rateLimitResponse } from "@/lib/rate-limit";
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     if (checked.ok) template = checked.template;
   }
   const message = renderTemplate(template, { firstName: client.fullName.split(" ")[0] ?? "", coachName: coach?.full_name ?? null, link: minted.link });
-  const sent = await sendEmail(email, message.subject, message.text);
+  const sent = await sendEmail(email, message.subject, withFooter(message.text, coach?.full_name ?? null));
   if (!sent) {
     return NextResponse.json(
       { error: "The email couldn't be sent. Here is the link to copy or text instead.", link: minted.link },
