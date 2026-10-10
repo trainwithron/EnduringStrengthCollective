@@ -22,10 +22,10 @@ describe("the program builder header", () => {
     expect(panel).toContain("things in this program are worth a look.");
     expect(panel).toContain('{expanded ? "Hide" : "Review"}');
   });
-  it("day cards are wider and the '+ Day' placeholder is capped", () => {
+  it("day cards share the row (300px to 420px each) and the '+ Day' placeholder is a narrow button", () => {
     const grid = read("components/coach/desktop/week-grid.tsx");
-    expect(grid).toContain("w-[420px] max-w-full shrink-0");
-    expect(grid).toContain("w-[220px] max-w-full shrink-0 min-h-[120px]");
+    expect(grid).toContain("flex-[1_1_0%] min-w-[300px] max-w-[420px]");
+    expect(grid).toContain("w-[72px] shrink-0 min-h-[120px]");
   });
 });
 
