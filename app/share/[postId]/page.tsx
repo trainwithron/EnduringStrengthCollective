@@ -247,13 +247,11 @@ export default async function ShareWorkoutPage(
               {shared.groupName}
             </p>
             <div className="w-[130px] h-[147px] mx-auto mt-3">
-              <HumorArchetypeCard archetype={humorArchetype!} avatarUrl={shared.athleteAvatarUrl} />
+              <HumorArchetypeCard archetype={humorArchetype!} avatarUrl={shared.athleteAvatarUrl} initial={shared.athleteName === "An athlete" ? null : shared.athleteName} />
             </div>
             <p className="font-display font-bold text-2xl uppercase leading-tight mt-1">{headline}</p>
             <p className="font-body text-lg mt-1">{shared.athleteName}</p>
-            <p className="font-body text-xs text-steel mt-1">
-              {humorArchetype!.caption} — {humorArchetype!.subcaption}
-            </p>
+            <p className="font-body text-xs text-steel mt-1">{humorArchetype!.caption}</p>
           </div>
         ) : (
           <div className="px-7 pt-8 text-center">
