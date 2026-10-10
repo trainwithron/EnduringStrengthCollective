@@ -6,7 +6,7 @@
 export type LegalDocument = "beta_notice" | "terms" | "privacy" | "refunds" | "waiver";
 
 export const LEGAL_VERSIONS: Record<LegalDocument, string> = {
-  beta_notice: "2026-10-10-draft-5",
+  beta_notice: "2026-10-08-draft-4",
   terms: "2026-10-05-placeholder-1",
   privacy: "2026-10-08-placeholder-2",
   refunds: "2026-10-05-placeholder-1",
