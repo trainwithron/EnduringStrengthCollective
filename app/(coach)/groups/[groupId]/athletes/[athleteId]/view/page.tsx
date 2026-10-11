@@ -3,27 +3,47 @@ import { redirect } from "next/navigation";
 import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
-import { loadCalendar, loadHistory, loadHome, loadPrograms } from "@/lib/client-preview-data";
+import { loadCalendar, loadHistory, loadHome, loadNutrition, loadPrograms } from "@/lib/client-preview-data";
+import { dayStatus, programProgress, progressLine } from "@/lib/client-preview-program";
 import { formatShortDate } from "@/lib/program-schedule";
 import { ViewAsClientLabel } from "@/components/coach/desktop/view-as-client-label";
 
 // "View as client" (desktop): the coach sees roughly what the client sees, read only, in a phone-width frame. Everything here is a plain server-rendered read: there is no form,
 // no button that saves anything and no write code at all, so nothing can change from this page. The client is named in the address and the page first checks that the viewer
 // coaches this group and that the client is an athlete in it; no impersonation cookie is used. The same rule as the client's profile page: the viewer must coach this group.
+// The tabs mirror the client's own bottom bar (Home, Calendar, Nutrition) plus History.
 
 const TABS = [
   { key: "home", label: "Home" },
-  { key: "programs", label: "Programs" },
-  { key: "history", label: "History" },
   { key: "calendar", label: "Calendar" },
+  { key: "nutrition", label: "Nutrition" },
+  { key: "history", label: "History" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
+const EMPTY = {
+  noProgram: "Nothing assigned yet",
+  noWorkouts: "No workouts yet",
+  noSchedule: "Nothing scheduled",
+  noNutrition: "No nutrition set up yet",
+  loadFailed: "Couldn't load this right now",
+} as const;
+
 const when = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+const Empty = ({ children }: { children: React.ReactNode }) => <p className="font-body text-sm text-steel border border-steel/20 p-3">{children}</p>;
+
+// A read that fails shows a plain line instead of an error page or a blank screen.
+async function safely<T>(read: () => Promise<T>): Promise<T | null> {
+  try {
+    return await read();
+  } catch {
+    return null;
+  }
+}
 
 export default async function ViewAsClientPage(props: {
   params: Promise<{ groupId: string; athleteId: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; program?: string }>;
 }) {
   const params = await props.params;
   const search = await props.searchParams;
@@ -59,74 +79,122 @@ export default async function ViewAsClientPage(props: {
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const here = `/groups/${params.groupId}/athletes/${params.athleteId}`;
+  const viewBase = `${here}/view`;
 
   let body: React.ReactNode = null;
   if (tab === "home") {
-    const home = await loadHome(supabase, params.groupId, params.athleteId);
-    const cards = home.todays.cards;
-    body = (
-      <div className="space-y-4">
-        <div>
-          <p className="font-display font-bold text-2xl uppercase leading-none">Hi, {first}</p>
-          <p className="font-body text-xs text-steel mt-1">{home.doneThisWeek} {home.doneThisWeek === 1 ? "workout" : "workouts"} done this week</p>
-        </div>
-        <div>
-          <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Today</p>
-          {home.todays.overrideWorkoutId ? (
-            <p className="font-body text-sm border border-steel/20 p-3">A workout was assigned for today.</p>
-          ) : cards.length > 0 ? (
-            <ul className="space-y-2">
-              {cards.map((c) => (
-                <li key={c.programId} className="border border-steel/20 p-3">
-                  <p className="font-body text-xs text-rust uppercase tracking-wide">{c.heading}</p>
-                  <p className="font-display font-bold text-lg uppercase leading-tight mt-0.5">{c.title}</p>
-                  <p className="font-body text-xs text-steel mt-1">{c.status === "done" ? "Done today" : "Ready to start"}</p>
-                </li>
-              ))}
-            </ul>
+    const [home, programs] = await Promise.all([safely(() => loadHome(supabase, params.groupId, params.athleteId)), safely(() => loadPrograms(supabase, params.groupId, params.athleteId))]);
+    const chosen = search.program ? (programs ?? []).find((p) => p.program.id === search.program) : null;
+
+    if (chosen) {
+      // The full program, read only: every week and day, what is done, what is available now and what unlocks later.
+      const today = new Date();
+      const weeks = Array.from(new Set(chosen.days.map((d) => d.weekNumber))).sort((a, b) => a - b);
+      body = (
+        <div className="space-y-3">
+          <Link href={`${viewBase}?tab=home`} className="font-body text-xs text-rust underline underline-offset-2">
+            Back to Home
+          </Link>
+          <p className="font-display font-bold text-xl uppercase leading-tight">{chosen.program.label ?? chosen.program.name}</p>
+          {chosen.days.length === 0 ? (
+            <Empty>{EMPTY.noWorkouts}</Empty>
           ) : (
-            <p className="font-body text-sm text-steel border border-steel/20 p-3">
-              {home.todays.fallback.status === "locked"
-                ? `Next workout unlocks ${formatShortDate(home.todays.fallback.unlocksOn)}.`
-                : home.todays.fallback.status === "no-program"
-                  ? "No program yet."
-                  : "Nothing scheduled today."}
-            </p>
+            weeks.map((w) => (
+              <div key={w} className="border border-steel/20">
+                <p className="px-3 py-2 font-body text-xs text-steel uppercase tracking-wide border-b border-steel/15">Week {w}</p>
+                <ul className="divide-y divide-steel/15">
+                  {chosen.days
+                    .filter((d) => d.weekNumber === w)
+                    .map((d) => {
+                      const status = dayStatus(d, today, chosen.program.visibilityWindow);
+                      return (
+                        <li key={d.id} className="px-3 py-2 flex items-center justify-between gap-2">
+                          <span className="font-body text-sm truncate">{d.title}</span>
+                          <span className={`font-body text-xs shrink-0 ${status === "done" ? "text-moss" : status === "available" ? "text-rust" : "text-steel"}`}>
+                            {status === "done" ? "Done" : status === "available" ? "Available" : d.date ? `Unlocks ${formatShortDate(d.date)}` : "Locked"}
+                          </span>
+                        </li>
+                      );
+                    })}
+                </ul>
+              </div>
+            ))
           )}
         </div>
-      </div>
-    );
-  } else if (tab === "programs") {
-    const programs = await loadPrograms(supabase, params.groupId, params.athleteId);
-    body =
-      programs.length === 0 ? (
-        <p className="font-body text-sm text-steel">No program yet.</p>
-      ) : (
+      );
+    } else if (!home) {
+      body = <Empty>{EMPTY.loadFailed}</Empty>;
+    } else {
+      const cards = home.todays.cards;
+      body = (
         <div className="space-y-4">
-          {programs.map(({ program, days }) => (
-            <details key={program.id} open className="border border-steel/20">
-              <summary className="px-3 py-2 cursor-pointer font-display font-bold uppercase text-sm">{program.label ?? program.name}</summary>
-              <ul className="divide-y divide-steel/15">
-                {days.map((d) => (
-                  <li key={d.id} className="px-3 py-2 flex items-center justify-between gap-2">
-                    <span className="font-body text-sm truncate">
-                      <span className="text-steel text-xs mr-1.5">W{d.weekNumber}</span>
-                      {d.title}
-                    </span>
-                    <span className="font-body text-xs text-steel shrink-0">{d.done ? "Done" : d.date ? formatShortDate(d.date) : ""}</span>
+          <div>
+            <p className="font-display font-bold text-2xl uppercase leading-none">Hi, {first}</p>
+            <p className="font-body text-xs text-steel mt-1">
+              {home.doneThisWeek} {home.doneThisWeek === 1 ? "workout" : "workouts"} done this week
+            </p>
+          </div>
+          <div>
+            <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Today</p>
+            {home.todays.overrideWorkoutId ? (
+              <Empty>A workout was assigned for today.</Empty>
+            ) : cards.length > 0 ? (
+              <ul className="space-y-2">
+                {cards.map((c) => (
+                  <li key={c.programId} className="border border-steel/20 p-3">
+                    <p className="font-body text-xs text-rust uppercase tracking-wide">{c.heading}</p>
+                    <p className="font-display font-bold text-lg uppercase leading-tight mt-0.5">{c.title}</p>
+                    <p className="font-body text-xs text-steel mt-1">{c.status === "done" ? "Done today" : "Ready to start"}</p>
                   </li>
                 ))}
-                {days.length === 0 && <li className="px-3 py-2 font-body text-xs text-steel">No workouts yet.</li>}
               </ul>
-            </details>
-          ))}
+            ) : (
+              <Empty>
+                {home.todays.fallback.status === "locked"
+                  ? `Next workout unlocks ${formatShortDate(home.todays.fallback.unlocksOn)}.`
+                  : home.todays.fallback.status === "no-program"
+                    ? EMPTY.noProgram
+                    : "Nothing scheduled today."}
+              </Empty>
+            )}
+          </div>
+          <div>
+            <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Your program</p>
+            {!programs || programs.length === 0 ? (
+              <Empty>{EMPTY.noProgram}</Empty>
+            ) : (
+              <ul className="space-y-2">
+                {programs.map(({ program, days }) => {
+                  const progress = programProgress(days);
+                  return (
+                    <li key={program.id}>
+                      <Link href={`${viewBase}?tab=home&program=${program.id}`} className="block border border-steel/20 p-3 hover:border-rust/60">
+                        <p className="font-display font-bold text-base uppercase leading-tight">{program.label ?? program.name}</p>
+                        <p className="font-body text-xs text-steel mt-1">{progressLine(progress)}</p>
+                        {progress.next && (
+                          <p className="font-body text-xs text-chalk mt-1">
+                            Next: {progress.next.title}
+                            {progress.next.date ? ` · ${formatShortDate(progress.next.date)}` : ""}
+                          </p>
+                        )}
+                        <p className="font-body text-xs text-rust mt-2">See the whole program &rarr;</p>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
         </div>
       );
+    }
   } else if (tab === "history") {
-    const logs = await loadHistory(supabase, params.groupId, params.athleteId);
+    const logs = await safely(() => loadHistory(supabase, params.groupId, params.athleteId));
     body =
-      logs.length === 0 ? (
-        <p className="font-body text-sm text-steel">No workouts logged yet.</p>
+      logs === null ? (
+        <Empty>{EMPTY.loadFailed}</Empty>
+      ) : logs.length === 0 ? (
+        <Empty>{EMPTY.noWorkouts}</Empty>
       ) : (
         <ul className="divide-y divide-steel/15 border border-steel/20">
           {logs.map((l) => (
@@ -145,11 +213,77 @@ export default async function ViewAsClientPage(props: {
           ))}
         </ul>
       );
+  } else if (tab === "nutrition") {
+    const n = await safely(() => loadNutrition(supabase, params.groupId, params.athleteId));
+    if (n === null) {
+      body = <Empty>{EMPTY.loadFailed}</Empty>;
+    } else if (!n.hasAnything) {
+      body = <Empty>{EMPTY.noNutrition}</Empty>;
+    } else {
+      const g = (v: number | null | undefined) => (v == null ? "-" : Math.round(v).toLocaleString("en-US"));
+      body = (
+        <div className="space-y-4">
+          <div>
+            <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Today&apos;s targets</p>
+            {n.target ? (
+              <div className="grid grid-cols-4 gap-2 text-center">
+                {(
+                  [
+                    ["Calories", n.target.calories, n.totals.calories],
+                    ["Protein g", n.target.proteinG, n.totals.proteinG],
+                    ["Carbs g", n.target.carbsG, n.totals.carbsG],
+                    ["Fat g", n.target.fatG, n.totals.fatG],
+                  ] as [string, number | null, number][]
+                ).map(([label, target, eaten]) => (
+                  <div key={label} className="border border-steel/20 p-2">
+                    <p className="font-display text-lg leading-none">{g(target)}</p>
+                    <p className="font-body text-[10px] text-steel mt-1">{label}</p>
+                    <p className="font-body text-[10px] text-chalk mt-1">{g(eaten)} logged</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <Empty>No targets set yet</Empty>
+            )}
+          </div>
+          <div>
+            <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Logged today</p>
+            {n.entries.length === 0 ? (
+              <Empty>Nothing logged today</Empty>
+            ) : (
+              <ul className="divide-y divide-steel/15 border border-steel/20">
+                {n.entries.map((e) => (
+                  <li key={e.id} className="px-3 py-2 flex items-center justify-between gap-2">
+                    <span className="font-body text-sm truncate">{e.description ?? "Food"}</span>
+                    <span className="font-body text-xs text-steel shrink-0">{e.calories != null ? `${Math.round(e.calories)} cal` : ""}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          {n.recent.length > 0 && (
+            <div>
+              <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Recent days</p>
+              <ul className="divide-y divide-steel/15 border border-steel/20">
+                {n.recent.map((r) => (
+                  <li key={r.date} className="px-3 py-2 flex items-center justify-between gap-2">
+                    <span className="font-body text-sm">{when(`${r.date}T12:00:00`)}</span>
+                    <span className="font-body text-xs text-steel">{Math.round(r.calories).toLocaleString("en-US")} cal</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      );
+    }
   } else {
-    const items = await loadCalendar(supabase, params.groupId, params.athleteId);
+    const items = await safely(() => loadCalendar(supabase, params.groupId, params.athleteId));
     body =
-      items.length === 0 ? (
-        <p className="font-body text-sm text-steel">Nothing scheduled in the next four weeks.</p>
+      items === null ? (
+        <Empty>{EMPTY.loadFailed}</Empty>
+      ) : items.length === 0 ? (
+        <Empty>{EMPTY.noSchedule}</Empty>
       ) : (
         <ul className="divide-y divide-steel/15 border border-steel/20">
           {items.map((i) => (
@@ -197,7 +331,7 @@ export default async function ViewAsClientPage(props: {
             {TABS.map((t) => (
               <Link
                 key={t.key}
-                href={`/groups/${params.groupId}/athletes/${params.athleteId}/view?tab=${t.key}`}
+                href={`${viewBase}?tab=${t.key}`}
                 aria-current={t.key === tab ? "page" : undefined}
                 className={`py-3 text-center font-body text-xs ${t.key === tab ? "text-rust font-semibold" : "text-steel"}`}
               >
