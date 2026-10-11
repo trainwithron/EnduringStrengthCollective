@@ -78,6 +78,16 @@ describe("outgoing email (Brevo)", () => {
       expect(line).not.toContain("Secret body text");
       expect(line).not.toContain("Secret subject");
     }
+    // Brevo's own message can echo a rejected address (or even the key): both are blanked out of the log line
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 400, text: async () => JSON.stringify({ code: "invalid_parameter", message: "Email private.person@example.com is blacklisted; key super-secret-key" }) }));
+    expect(await sendEmail("private.person@example.com", "s", "t")).toBe(false);
+    const echoed = String(errors.mock.calls[errors.mock.calls.length - 1][0]);
+    expect(echoed).toContain("HTTP 400 invalid_parameter: Email [email] is blacklisted; key [key]");
+    expect(echoed).not.toContain("private.person@example.com");
+    expect(echoed).not.toContain("super-secret-key");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 502, text: async () => "upstream error for <to=a.b@c.org>" }));
+    await sendEmail("a@b.com", "s", "t");
+    expect(String(errors.mock.calls[errors.mock.calls.length - 1][0])).not.toContain("a.b@c.org");
     // a body that is not JSON is still reported, cut short
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 502, text: async () => "Bad gateway " + "x".repeat(1000) }));
     expect(await sendEmail("a@b.com", "s", "t")).toBe(false);

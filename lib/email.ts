@@ -27,7 +27,12 @@ export async function describeBrevoFailure(res: { status: number; text(): Promis
   } catch {
     // no readable body: the status alone is still useful
   }
-  return `[email] Brevo refused the send: HTTP ${res.status}${code ? ` ${code}` : ""}${message ? `: ${message}` : ""}`.slice(0, 300);
+  // Brevo's own text can echo a value it rejected (a recipient address), so anything that looks like an email address is blanked out, and so is the key if it ever appears.
+  const apiKey = process.env.BREVO_API_KEY;
+  let line = `[email] Brevo refused the send: HTTP ${res.status}${code ? ` ${code}` : ""}${message ? `: ${message}` : ""}`;
+  if (apiKey) line = line.split(apiKey).join("[key]");
+  line = line.replace(/[^\s@"'<>]+@[^\s@"'<>]+/g, "[email]");
+  return line.slice(0, 300);
 }
 
 export async function sendEmail(to: string, subject: string, text: string): Promise<boolean> {
