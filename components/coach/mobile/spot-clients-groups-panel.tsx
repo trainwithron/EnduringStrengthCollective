@@ -434,7 +434,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
                     onClick={() => logSessionFor(c)}
                     className="flex-1 h-9 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-50 active:bg-rust/80"
                   >
-                    Log session
+                    Log their workout
                   </button>
                   <button
                     type="button"

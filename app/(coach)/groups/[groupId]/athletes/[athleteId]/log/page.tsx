@@ -2,6 +2,7 @@ import Link from "next/link";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
+import { CoachModeBar } from "@/components/coach/mobile/coach-mode-bar";
 import { getTodaysSessions, workoutResultFromSessions } from "@/lib/todays-workout";
 
 // Coach-only: the entry point for logging an in-person session on a
@@ -60,6 +61,7 @@ export default async function LogForClientPage(
   if (chooseProgram) {
     return (
       <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
+        <CoachModeBar groupId={params.groupId} clientName={athleteProfile?.full_name ?? "this client"} homeHref={`/groups/${params.groupId}`} />
         <header className="px-5 pt-8 pb-6 border-b border-steel/20">
           <Link
             href={`/groups/${params.groupId}/athletes/${params.athleteId}`}
@@ -102,6 +104,7 @@ export default async function LogForClientPage(
   if (!activeProgram) {
     return (
       <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
+        <CoachModeBar groupId={params.groupId} clientName={athleteProfile?.full_name ?? "this client"} homeHref={`/groups/${params.groupId}`} />
         <header className="px-5 pt-8 pb-6 border-b border-steel/20">
           <Link
             href={`/groups/${params.groupId}/athletes/${params.athleteId}`}

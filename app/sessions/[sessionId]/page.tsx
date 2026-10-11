@@ -20,6 +20,8 @@ import { ResumeWorkoutButton } from "@/components/session/resume-workout-button"
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { findDemo, type DemoRow } from "@/lib/exercise-demo";
 import { getReadForViewer, type ReadForViewer } from "@/lib/read-content/for-viewer";
+import { athleteIsMinor } from "@/lib/youth-block";
+import { CoachModeBar } from "@/components/coach/mobile/coach-mode-bar";
 
 export default async function SessionPage(
   props: {
@@ -512,12 +514,22 @@ export default async function SessionPage(
     read = await getReadForViewer(supabase, session.group_id, user.id, todayKey);
   }
 
+  // A coach logging this session FOR the client (not the client's own login): the coach-mode frame, with the coach's hub and one tap home, and nothing posted in the name of a client under 18.
+  const coachModeFor = session.logged_by_coach && !isOwnSession && viewerIsCoach;
+  const coachModeClient = coachModeFor
+    ? {
+        name: ((await supabase.from("profiles").select("full_name").eq("id", session.athlete_id).maybeSingle()).data as { full_name?: string | null } | null)?.full_name ?? "this client",
+        isMinor: await athleteIsMinor(supabase, session.athlete_id),
+      }
+    : null;
+  const coachHomeHref = `/groups/${session.group_id}`;
   const backHref = session.workout_id
     ? `/groups/${session.group_id}/workouts/${session.workout_id}`
     : `/groups/${session.group_id}`;
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-32">
+      {coachModeClient && <CoachModeBar groupId={session.group_id} clientName={coachModeClient.name} homeHref={coachHomeHref} />}
       <header className="px-5 pt-8 pb-6 border-b border-steel/20">
         {session.status === "in_progress" ? (
           <ExitWorkoutButton sessionId={session.id} backHref={backHref} />
@@ -565,6 +577,7 @@ export default async function SessionPage(
         lastTimeByExercise={lastTimeByExercise}
         ladderByExercise={ladderByExercise}
         raised={isOwnSession}
+        coachMode={coachModeClient ? { homeHref: coachHomeHref, clientIsMinor: coachModeClient.isMinor } : undefined}
         groupId={session.group_id}
         athleteId={session.athlete_id}
         viewerId={user.id}

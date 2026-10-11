@@ -3,6 +3,7 @@ import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 import { getWorkoutOverviewData } from "@/lib/workout-overview-data";
 import { WorkoutOverviewView } from "@/components/logging/workout-overview-view";
+import { CoachModeBar } from "@/components/coach/mobile/coach-mode-bar";
 
 export default async function LogWorkoutForClientPage(
   props: {
@@ -60,6 +61,8 @@ export default async function LogWorkoutForClientPage(
     .order("created_at", { ascending: true });
 
   return (
+    <>
+    <CoachModeBar groupId={params.groupId} clientName={athleteProfile?.full_name ?? "this client"} homeHref={`/groups/${params.groupId}`} />
     <WorkoutOverviewView
       data={data}
       groupId={params.groupId}
@@ -70,5 +73,6 @@ export default async function LogWorkoutForClientPage(
       loggedByCoach
       sessionTypes={(typeRows ?? []).map((t) => ({ id: t.id, name: t.name }))}
     />
+    </>
   );
 }
