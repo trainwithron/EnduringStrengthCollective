@@ -6,7 +6,7 @@ import { buildShareImageModel } from "@/lib/share-image";
 const read = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8").replace(/\r\n/g, "\n");
 
 describe("first name on shared workout pictures (Release AL)", () => {
-  it("the column is on for everyone by default and nothing else is touched", () => {
+  it("the column starts empty (has not chosen) and nothing else is touched", () => {
     const sql = read("supabase/migrations/0334_share_name_setting.sql");
     expect(sql).toContain("add column if not exists show_name_on_share boolean;");
     expect(sql).not.toContain("not null");
