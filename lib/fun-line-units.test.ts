@@ -14,8 +14,10 @@ describe("counts in words", () => {
     expect(countPhrase(1_800_000)).toBe("about 1.8 million");
     expect(countPhrase(4_840_000)).toBe("about 4.8 million");
   });
-  it("under two is 'about one', never a fraction or a zero", () => {
-    expect(countPhrase(1.2)).toBe("about one");
+  it("close to one is 'about one'; between 1.15 and 2 it is 2, never 'about one' for nearly double; never a fraction or a zero", () => {
+    expect(countPhrase(1.1)).toBe("about one");
+    expect(countPhrase(1.9)).toBe("2");
+    expect(countPhrase(1.5)).toBe("2");
     expect(countPhrase(0.2)).toBe("about one");
     expect(countPhrase(0)).toBe("about one");
     expect(countPhrase(Number.NaN)).toBe("about one");
@@ -43,6 +45,12 @@ describe("the weight units", () => {
     for (let i = 0; i < 200; i++) texts.add(getVolumeEquivalence(12000, `s${i}`)!.label);
     expect([...texts].some((t) => /million|thousand/.test(t))).toBe(true);
     expect([...texts].some((t) => /^\d+ /.test(t))).toBe(true);
+  });
+  it("1.9 Statues of Liberty is never called about one", () => {
+    for (let i = 0; i < 100; i++) {
+      const eq = getVolumeEquivalence(450000 * 1.9, `s${i}`)!;
+      expect(eq.label, eq.label).not.toBe("about one Statue of Liberty");
+    }
   });
   it("a volume close to one Statue of Liberty reads 'about one'", () => {
     const labels = new Set(Array.from({ length: 100 }, (_, i) => getVolumeEquivalence(450000, `s${i}`)!.label));

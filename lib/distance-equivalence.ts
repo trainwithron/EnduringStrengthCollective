@@ -17,7 +17,7 @@ interface DistanceUnit {
 export const DISTANCE_UNITS: DistanceUnit[] = [
   { key: "marathon", miles: 26.2, emoji: "🏃", source: "a marathon is 26.2 miles (42.195 km), World Athletics", times: (n) => `you'd have run ${n} marathons`, once: "you'd have run a marathon" },
   { key: "vegas-la", miles: 270, emoji: "🚗", source: "about 270 road miles, Las Vegas to Los Angeles (Google Maps / AAA road distance)", times: (n) => `you'd have driven from Las Vegas to LA ${n} times`, once: "you'd have driven from Las Vegas to LA" },
-  { key: "vegas-birmingham", miles: 1820, emoji: "🚗", source: "about 1,820 road miles, Las Vegas to Birmingham, Alabama (airmilescalculator.com 1,817; mapsofworld 1,835)", times: (n) => `you'd have driven from Las Vegas to Birmingham, Alabama ${n} times`, once: "you'd have driven from Las Vegas to Birmingham, Alabama" },
+  { key: "vegas-birmingham", miles: 1820, emoji: "🚗", source: "about 1,820 road miles, Las Vegas to Birmingham, Alabama (driving; airmilescalculator.com 1,817, mapsofworld 1,835)", times: (n) => `you'd have driven from Las Vegas to Birmingham, Alabama ${n} times`, once: "you'd have driven from Las Vegas to Birmingham, Alabama" },
   { key: "appalachian-trail", miles: 2190, emoji: "🥾", source: "the Appalachian Trail is about 2,190 miles (Appalachian Trail Conservancy)", times: (n) => `you'd have hiked the whole Appalachian Trail ${n} times`, once: "you'd have hiked the whole Appalachian Trail" },
   { key: "coast-to-coast", miles: 2800, emoji: "🗺️", source: "about 2,800 road miles, New York to Los Angeles (Google Maps)", times: (n) => `you'd have crossed the country coast to coast ${n} times`, once: "you'd have crossed the country coast to coast" },
   {

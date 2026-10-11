@@ -40,7 +40,7 @@ const REFERENCE_OBJECTS_UNSORTED: ReferenceObject[] = [
   // Medium
   { name: "a slot machine", pluralName: "slot machines", weightLbs: 200, emoji: "🎰", source: "a casino slot machine is about 200-300 lb" },
   { name: "an arcade cabinet", pluralName: "arcade cabinets", weightLbs: 270, emoji: "🕹️", source: "an upright arcade cabinet is about 250-300 lb" },
-  { name: "a sumo wrestler", pluralName: "sumo wrestlers", weightLbs: 340, emoji: "🤼", source: "Japan Sumo Association: top-division average is about 155 kg (340 lb)" },
+  { name: "a sumo wrestler", pluralName: "sumo wrestlers", weightLbs: 340, emoji: "🤼", source: "top-division average is about 155 kg (340 lb), Japan Sumo Association" },
   { name: "a grizzly bear", pluralName: "grizzly bears", weightLbs: 400, emoji: "🐻", source: "National Park Service: adult males are about 400-700 lb (400 used)" },
   { name: "a motorcycle", pluralName: "motorcycles", weightLbs: 500, emoji: "🏍️", source: "a typical touring motorcycle is about 500-800 lb" },
   { name: "a vending machine", pluralName: "vending machines", weightLbs: 700, emoji: "🥤", source: "a full drink vending machine is about 600-800 lb" },
@@ -70,6 +70,7 @@ export const REFERENCE_OBJECTS: ReferenceObject[] = REFERENCE_OBJECTS_UNSORTED.s
 // something that is nonsense to picture.
 const MIN_COUNT = 2;
 const NEAR_ONE = 0.9;
+const NEAR_ONE_TOP = 1.15;
 const MAX_COUNT = 5_000_000;
 
 const PHRASE_TEMPLATES: ((label: string, singular: string, emoji: string) => string)[] = [
@@ -96,7 +97,7 @@ export function getVolumeEquivalence(totalVolumeLbs: number, seed: string): Volu
 
   const inRange = REFERENCE_OBJECTS.filter((ref) => {
     const ratio = totalVolumeLbs / ref.weightLbs;
-    return (ratio >= MIN_COUNT && ratio <= MAX_COUNT) || (ratio >= NEAR_ONE && ratio < MIN_COUNT);
+    return (ratio >= MIN_COUNT && ratio <= MAX_COUNT) || (ratio >= NEAR_ONE && ratio <= NEAR_ONE_TOP);
   });
 
   // Nothing landed in the legible range (a volume smaller than the lightest thing or enormously large): the single unit whose count is closest to one.
@@ -118,7 +119,7 @@ export function getVolumeEquivalence(totalVolumeLbs: number, seed: string): Volu
 
   // ref.name carries its own article ("a school bus") for prose elsewhere; the count-prefixed label drops it ("38 school buses", "about one school bus").
   const singularNoArticle = ref.name.replace(/^(a|an)\s+/i, "");
-  const label = rawCount < MIN_COUNT ? `${phrase} ${singularNoArticle}` : `${phrase} ${ref.pluralName}`;
+  const label = phrase === "about one" ? `${phrase} ${singularNoArticle}` : `${phrase} ${ref.pluralName}`;
 
   const template = seededPick(PHRASE_TEMPLATES, `${seed}:phrase`);
 
