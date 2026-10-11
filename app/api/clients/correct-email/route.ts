@@ -3,7 +3,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { validateClaimEmail } from "@/lib/client-claim";
 import { rateLimitResponse } from "@/lib/rate-limit";
-import { isSendGridConfigured, sendEmail } from "@/lib/sendgrid";
+import { isEmailConfigured, sendEmail } from "@/lib/email";
 
 // A coach correcting the email on a client's account AFTER the client has
 // claimed it (a wrong-but-valid address no verification email caught). Before the
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
   // Off until the email sender is set up: the safeguard is a notice to the old address, and without mail nobody would be told.
-  if (!isSendGridConfigured()) {
+  if (!isEmailConfigured()) {
     return NextResponse.json({ error: "A signed-in client changes their own email in their Settings. This tool is off until email sending is set up." }, { status: 403 });
   }
 
@@ -96,7 +96,7 @@ export async function POST(request: Request) {
   });
 
   // Tell the OLD address too, when email can be sent: if the change was not wanted, that is where they will see it.
-  if (oldEmail && !oldEmail.endsWith("@pending.invalid") && isSendGridConfigured()) {
+  if (oldEmail && !oldEmail.endsWith("@pending.invalid") && isEmailConfigured()) {
     await sendEmail(
       oldEmail,
       "Your sign-in email was changed",

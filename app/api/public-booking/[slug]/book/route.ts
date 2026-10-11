@@ -6,7 +6,7 @@ import { canSignProofs, checkEmailProof, checkFormToken } from "@/lib/public-boo
 import { rateLimitAllows } from "@/lib/rate-limit";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendPushToProfile } from "@/lib/send-push";
-import { isSendGridConfigured, sendEmail } from "@/lib/sendgrid";
+import { isEmailConfigured, sendEmail } from "@/lib/email";
 import { formatInTimezone } from "@/lib/format-in-timezone";
 import { appOrigin } from "@/lib/app-url";
 
@@ -19,7 +19,7 @@ export async function POST(request: Request, props: { params: Promise<{ slug: st
   const slug = cleanParam(rawSlug, 40);
   if (!slug) return NextResponse.json({ error: "Not found." }, { status: 404 });
 
-  if (!canSignProofs() || !isSendGridConfigured()) {
+  if (!canSignProofs() || !isEmailConfigured()) {
     return NextResponse.json({ error: "Online booking isn't available right now." }, { status: 503 });
   }
 
@@ -72,7 +72,7 @@ export async function POST(request: Request, props: { params: Promise<{ slug: st
     // Quiet.
   }
   let emailSent = false;
-  if (isSendGridConfigured()) {
+  if (isEmailConfigured()) {
     emailSent = await sendEmail(
       result.guestEmail,
       `Your session with ${result.coachName} is booked`,

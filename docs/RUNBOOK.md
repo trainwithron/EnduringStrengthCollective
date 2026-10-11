@@ -6,7 +6,7 @@ Facts this relies on:
 - The app runs on Vercel. **A push to the repository does not deploy it**; a deploy is a deliberate `vercel --prod` (or the Vercel dashboard).
 - The database, auth and file storage are one Supabase project. **Development and production share it.** There is no staging database.
 - Migrations are plain SQL files in `supabase/migrations/`. There are no automatic "down" migrations. `supabase/MIGRATION_MAP.md` says which are applied.
-- Money moves through Stripe. Texts go through Twilio, email through SendGrid, AI through Anthropic, video through Daily.
+- Money moves through Stripe. Texts go through Twilio, email through Brevo, AI through Anthropic, video through Daily.
 
 ## 1. First five minutes: triage
 
@@ -67,7 +67,7 @@ Assume the worst: someone has it. Rotate first, investigate second.
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe dashboard, roll the key; roll the webhook signing secret on the endpoint | Update Vercel, redeploy, send a test event |
 | `ANTHROPIC_API_KEY` | Anthropic console, create a new key and delete the old | Update Vercel, redeploy. Check usage for spikes. |
 | `TWILIO_AUTH_TOKEN` | Twilio console, rotate the auth token | Update Vercel, redeploy |
-| `SENDGRID_API_KEY` | SendGrid, delete the key and create a new one | Update Vercel, redeploy |
+| `BREVO_API_KEY` | Brevo, delete the key and create a new one | Update Vercel, redeploy |
 | `DAILY_API_KEY` | Daily dashboard, create a new key | Update Vercel, redeploy |
 | `CRON_SECRET`, `GARMIN_WEBHOOK_SECRET` | Generate a new random value | Update Vercel (and Garmin's registration) and redeploy |
 | `VAPID_PRIVATE_KEY` | New key pair | Everyone's push subscriptions stop working and must be renewed; avoid unless forced |
@@ -129,4 +129,4 @@ Set these in Supabase, Authentication. Review them after any project change.
 
 - Vercel dashboard: the project's Deployments, Logs, Environment Variables, Cron Jobs (one daily job reports failures, see `/api/health` and the cron failure alerts).
 - Supabase dashboard: SQL editor, Logs, Backups, Authentication.
-- Stripe, Twilio, SendGrid, Anthropic, Daily: each provider's own status page when their calls fail.
+- Stripe, Twilio, Brevo, Anthropic, Daily: each provider's own status page when their calls fail.

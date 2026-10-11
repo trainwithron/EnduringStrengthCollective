@@ -6,7 +6,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { cleanParam } from "@/lib/public-booking-route";
 import { canSignProofs } from "@/lib/public-booking-proof";
-import { isSendGridConfigured } from "@/lib/sendgrid";
+import { isEmailConfigured } from "@/lib/email";
 import { DEFAULT_ORG_THEME } from "@/lib/theme";
 import { ownImagePath, pickBrandOrg, reviewsFromJson, safeWebUrl, siteColors, cleanSite, type SiteBackground } from "@/lib/coach-site";
 
@@ -61,7 +61,7 @@ async function load(slugParam: string, preview: boolean) {
     accentColor: org?.accent_color ?? DEFAULT_ORG_THEME.accentColor,
   };
   const publicUrl = (path: string | null) => (path ? db.storage.from("coach-profile-photos").getPublicUrl(path).data.publicUrl : null);
-  const canBook = !!page.enabled && canSignProofs() && isSendGridConfigured();
+  const canBook = !!page.enabled && canSignProofs() && isEmailConfigured();
   return {
     slug,
     coachName: (profile?.full_name as string | null) ?? "Your coach",

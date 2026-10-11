@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { canSignProofs } from "@/lib/public-booking-proof";
-import { isSendGridConfigured } from "@/lib/sendgrid";
+import { isEmailConfigured } from "@/lib/email";
 import { findRankedCoaches, type RankedCoachResult } from "@/lib/marketplace-browse";
 import type { GoalType } from "@/lib/marketplace-coach-ranking";
 
@@ -61,7 +61,7 @@ export default async function FindACoachPage(props: {
 
   // A coach card links to that coach's booking page when booking is switched on for the coach (the same condition /book/<slug> itself uses).
   const slugByCoach = new Map<string, string>();
-  if (results.length > 0 && canSignProofs() && isSendGridConfigured()) {
+  if (results.length > 0 && canSignProofs() && isEmailConfigured()) {
     const { data: pages } = await createServiceRoleClient()
       .from("coach_booking_pages")
       .select("coach_id, slug")

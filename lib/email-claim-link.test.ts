@@ -16,7 +16,7 @@ describe("the email route", () => {
     expect(route).toContain("isPlaceholderEmail(email)");
   });
   it("says plainly when email sending is not set up, and limits 5 a day per client", () => {
-    expect(route).toContain("isSendGridConfigured()");
+    expect(route).toContain("isEmailConfigured()");
     expect(route).toContain("Email sending isn't set up yet");
     expect(route).toContain("`email-claim-link:${athleteId}`, 5, 24 * 3600");
   });

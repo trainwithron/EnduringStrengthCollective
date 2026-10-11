@@ -3,7 +3,7 @@ import { cleanParam, limitByIp, publicStore } from "@/lib/public-booking-route";
 import { normalizeEmail } from "@/lib/public-booking";
 import { canSignProofs, checkFormToken, emailCodeNow } from "@/lib/public-booking-proof";
 import { rateLimitAllows } from "@/lib/rate-limit";
-import { isSendGridConfigured, sendEmail } from "@/lib/sendgrid";
+import { isEmailConfigured, sendEmail } from "@/lib/email";
 
 // Emails a six-digit code to the address a visitor typed, so a booking is only ever tied to an inbox they can read. The message
 // is fixed text: nothing the visitor typed (not even their name) goes into it, so this cannot be used to send someone else's words.
@@ -11,7 +11,7 @@ import { isSendGridConfigured, sendEmail } from "@/lib/sendgrid";
 export async function POST(request: Request, props: { params: Promise<{ slug: string }> }) {
   const { slug: rawSlug } = await props.params;
   const slug = cleanParam(rawSlug, 40);
-  if (!slug || !canSignProofs() || !isSendGridConfigured()) return NextResponse.json({ error: "Online booking isn't available right now." }, { status: 503 });
+  if (!slug || !canSignProofs() || !isEmailConfigured()) return NextResponse.json({ error: "Online booking isn't available right now." }, { status: 503 });
 
   const limited = await limitByIp(request, "pb-code-ip", 10, 3600);
   if (limited) return limited;

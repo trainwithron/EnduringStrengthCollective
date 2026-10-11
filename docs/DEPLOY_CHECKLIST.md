@@ -13,7 +13,7 @@ In Vercel, project `enduring-strength-collective`, Settings, Environment Variabl
 - `NEXT_PUBLIC_SUPPORT_EMAIL`: the address people write to for help and privacy questions. **Baked in when the site is built.** Not set yet (the legal pages say a contact address is being added).
 - `NEXT_PUBLIC_APP_URL`: the address the site really lives at. Optional; it matters for printed QR decals.
 - `VAPID_SUBJECT`: `mailto:` plus your own contact email.
-- `SENDGRID_API_KEY` and `SENDGRID_FROM_EMAIL`: leave unset to keep public booking closed.
+- `BREVO_API_KEY` and `BREVO_FROM_EMAIL` (optional `BREVO_FROM_NAME`): leave unset to keep email and public booking closed.
 
 ## 3. Push and deploy (Claude does this on Ron's own typed word)
 

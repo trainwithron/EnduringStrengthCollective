@@ -4,7 +4,7 @@
 // Basic-auth'd with AccountSid:AuthToken, form-urlencoded body. No SDK
 // dependency needed for a plain outbound send — one fetch call, same
 // "raw REST over the official npm package" choice already made for
-// SendGrid (lib/sendgrid.ts) and consistent with this app's existing
+// Brevo (lib/email.ts) and consistent with this app's existing
 // Garmin/Google Health integrations.
 //
 // Self-serve, no OAuth/partner-approval gate (unlike Garmin) — the one

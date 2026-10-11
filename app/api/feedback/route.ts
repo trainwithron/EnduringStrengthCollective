@@ -3,7 +3,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { rateLimitResponse } from "@/lib/rate-limit";
 import { sendPushToProfile } from "@/lib/send-push";
-import { isSendGridConfigured, sendEmail } from "@/lib/sendgrid";
+import { isEmailConfigured, sendEmail } from "@/lib/email";
 
 // A short "report a problem or suggest something" note from a signed-in person. Recorded with the page and device, then the
 // platform admin is told right away (a push, and an email when a sender is configured). If the table is not there yet the
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
   const preview = message.length > 140 ? `${message.slice(0, 140)}...` : message;
   for (const admin of admins ?? []) {
     await sendPushToProfile(serviceRole, admin.id as string, headline, preview, "/admin/feedback").catch(() => 0);
-    if (isSendGridConfigured()) {
+    if (isEmailConfigured()) {
       const { data: authUser } = await serviceRole.auth.admin.getUserById(admin.id as string);
       const to = authUser?.user?.email;
       if (to) {

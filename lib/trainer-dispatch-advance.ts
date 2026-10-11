@@ -4,7 +4,7 @@ import { findAndRankAvailableTrainers } from "./trainer-dispatch-gather";
 import { computeStepExpiry, findMatchingSlotForTrainer, resolveLocalDateForInstant, type GoalType } from "./trainer-dispatch";
 import { resolveBlockedRangesForDate, type AvailabilityWindow } from "./booking-slots";
 import { sendPushToProfile } from "./send-push";
-import { sendEmail } from "./sendgrid";
+import { isEmailConfigured, sendEmail } from "./email";
 import { DEFAULT_COACH_TIMEZONE } from "./timezone";
 import { formatInTimezone } from "@/lib/format-in-timezone";
 
@@ -210,7 +210,7 @@ export async function acceptDispatchStep(supabase: SupabaseClient, stepId: strin
 }
 
 function sendEmailConfigured(): boolean {
-  return Boolean(process.env.SENDGRID_API_KEY && process.env.SENDGRID_FROM_EMAIL);
+  return isEmailConfigured();
 }
 
 export async function declineDispatchStep(supabase: SupabaseClient, stepId: string): Promise<{ ok: boolean; error?: string }> {

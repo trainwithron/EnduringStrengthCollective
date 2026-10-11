@@ -5,7 +5,7 @@ import { hasLiveClaimLink, loadUnclaimedClient, mintClaimLink } from "@/lib/clie
 import { isPlaceholderEmail } from "@/lib/client-claim";
 import { DEFAULT_CLAIM_TEMPLATE, renderTemplate, validateTemplate, withFooter, type MessageTemplate } from "@/lib/message-template";
 import { appOrigin } from "@/lib/app-url";
-import { isSendGridConfigured, sendEmail } from "@/lib/sendgrid";
+import { isEmailConfigured, sendEmail } from "@/lib/email";
 import { rateLimitAllows, rateLimitResponse } from "@/lib/rate-limit";
 
 // A coach emails a client who has never signed in their sign-in (claim) link. It goes ONLY to the address already on the client's account, never to a
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
   if (!email || isPlaceholderEmail(email)) {
     return NextResponse.json({ error: "This client has no email address on file yet. Add one first." }, { status: 400 });
   }
-  if (!isSendGridConfigured()) {
+  if (!isEmailConfigured()) {
     return NextResponse.json({ error: "Email sending isn't set up yet. Copy the link or text it instead.", notConfigured: true }, { status: 503 });
   }
 

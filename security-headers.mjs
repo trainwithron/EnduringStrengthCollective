@@ -8,7 +8,7 @@
 //   * Images and media: this site, data/blob URIs and any https source: coaches paste logo, link-preview and exercise images
 //     from anywhere, and uploaded photos and videos come from Supabase storage.
 //   * Network calls from the browser: this site, Supabase (data, storage and realtime websockets) and Daily (video calls).
-//     Everything else (Stripe, Twilio, SendGrid, Anthropic, Google, Oura...) is called from the server, not the browser.
+//     Everything else (Stripe, Twilio, Brevo, Anthropic, Google, Oura...) is called from the server, not the browser.
 //   * Frames: YouTube (exercise videos) and Daily (video calls) only. Nobody may frame this site (frame-ancestors 'none'), EXCEPT the coach's own pages
 //     (/groups/..., /clients, /dashboard), which the site itself may frame so the workspace can show one coach page inside another (frame-ancestors 'self',
 //     X-Frame-Options SAMEORIGIN, and 'self' added to frame-src). Another site can still never frame any page.

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { sendPushToProfile } from "@/lib/send-push";
-import { isSendGridConfigured, sendEmail } from "@/lib/sendgrid";
+import { isEmailConfigured, sendEmail } from "@/lib/email";
 import { shouldAlertForFailures } from "@/lib/cron-jobs";
 import { trackAiRun, everyAiCallFailed } from "@/lib/ai-run-stats";
 
@@ -15,7 +15,7 @@ export async function alertPlatformAdmins(subject: string, body: string): Promis
     const { data: admins } = await db.from("profiles").select("id").eq("is_platform_admin", true);
     for (const admin of admins ?? []) {
       await sendPushToProfile(db, admin.id as string, subject, body.slice(0, 160), "/admin/health").catch(() => 0);
-      if (isSendGridConfigured()) {
+      if (isEmailConfigured()) {
         const { data: authUser } = await db.auth.admin.getUserById(admin.id as string);
         const to = authUser?.user?.email;
         if (to) await sendEmail(to, subject, body).catch(() => false);

@@ -32,7 +32,7 @@ describe("pages a signed-out or brand-new person lands on", () => {
   });
   it("find-a-coach links a coach to their booking page only when booking is on, and drops the 'not an error' line", () => {
     const src = read("app/find-a-coach/page.tsx");
-    expect(src).toContain("canSignProofs() && isSendGridConfigured()");
+    expect(src).toContain("canSignProofs() && isEmailConfigured()");
     expect(src).toContain(".eq(\"enabled\", true)");
     expect(src).toContain("/book/${slugByCoach.get(r.coachId)}");
     expect(src).not.toContain("expected, not an error");
