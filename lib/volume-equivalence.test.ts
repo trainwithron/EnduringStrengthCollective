@@ -17,13 +17,13 @@ describe("getVolumeEquivalence", () => {
     expect(labels.size).toBeGreaterThan(1);
   });
 
-  it("keeps the resolved count in a legible, readable range", () => {
-    for (let i = 0; i < 20; i++) {
-      const result = getVolumeEquivalence(8000, `seed-${i}`)!;
-      expect(result.count).toBeGreaterThan(0);
-      // A legible comparison is never a huge or vanishing count — the
-      // 0.5x-12x candidate filter should keep this well within reason.
-      expect(result.count).toBeLessThan(20);
+  it("never says a count under two (it is 'about one' or a bigger count), and never a fraction", () => {
+    for (const volume of [0.4, 3, 40, 900, 8000, 12345, 90000, 450000, 800000]) {
+      for (let i = 0; i < 20; i++) {
+        const result = getVolumeEquivalence(volume, `seed-${i}`)!;
+        expect(result.count).toBeGreaterThanOrEqual(1);
+        expect(result.label, result.label).not.toMatch(/(^|s)0.|NaN|undefined|d.d(?! (thousand|million|billion))/);
+      }
     }
   });
 
