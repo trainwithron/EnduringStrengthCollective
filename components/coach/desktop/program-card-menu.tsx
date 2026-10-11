@@ -246,7 +246,7 @@ export function ProgramCardMenu({
     ) {
       return;
     }
-    if (aiDraft && !(await signOffProgram(programId))) {
+    if (aiDraft && !(await signOffProgram(programId, { activate: false }))) {
       setError(APPROVE_AND_ASSIGN_FAILED);
       return;
     }

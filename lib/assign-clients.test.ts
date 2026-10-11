@@ -84,7 +84,7 @@ describe("the card menu uses it", () => {
     expect(menu).not.toContain("disabled={aiDraft}");
     expect(menu).toContain("ensureApproved({ aiDraft, programId, programName, target: client.fullName })");
     expect(menu).toContain('ensureApproved({ aiDraft, programId, programName, target: "yourself" })');
-    expect(menu).toContain("if (aiDraft && !(await signOffProgram(programId)))");
+    expect(menu).toContain("if (aiDraft && !(await signOffProgram(programId, { activate: false })))");
     expect(read("components/coach/desktop/program-card-grid.tsx")).toContain("aiDraft={program.aiDraft}");
   });
   it("adding has no confirmation popup on the single-client path", () => {

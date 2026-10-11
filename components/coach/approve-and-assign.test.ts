@@ -5,7 +5,7 @@ import { join } from "node:path";
 const confirmDialog = vi.fn();
 const signOffProgram = vi.fn();
 vi.mock("@/components/shared/confirm-dialog", () => ({ confirmDialog: (o: unknown) => confirmDialog(o) }));
-vi.mock("@/components/coach/ai-draft-banner", () => ({ signOffProgram: (id: string) => signOffProgram(id) }));
+vi.mock("@/components/coach/ai-draft-banner", () => ({ signOffProgram: (id: string, options?: unknown) => signOffProgram(id, options) }));
 
 import { APPROVE_AND_ASSIGN_LABEL, approveAndAssignMessage, ensureApproved } from "@/components/coach/approve-and-assign";
 
@@ -34,7 +34,8 @@ describe("approve and assign an AI draft in one confirmation", () => {
     expect(await ensureApproved({ aiDraft: true, programId: "p1", programName: "Block", target: "Karina" })).toBe("ok");
     expect(confirmDialog).toHaveBeenCalledTimes(1);
     expect(confirmDialog).toHaveBeenCalledWith({ message: 'Approve "Block" and assign it to Karina?', confirmLabel: "Approve and assign" });
-    expect(signOffProgram).toHaveBeenCalledWith("p1");
+    // approved WITHOUT making the original active: only the assigned copy goes live
+    expect(signOffProgram).toHaveBeenCalledWith("p1", { activate: false });
   });
 
   it("if the coach says no, nothing is signed off and nothing may be assigned", async () => {
@@ -47,6 +48,16 @@ describe("approve and assign an AI draft in one confirmation", () => {
     confirmDialog.mockResolvedValue(true);
     signOffProgram.mockResolvedValue(false);
     expect(await ensureApproved({ aiDraft: true, programId: "p1", programName: "Block", target: "Karina" })).toBe("failed");
+  });
+
+  it("the sign-off route activates by default (the banner is unchanged) and only skips activating when asked", () => {
+    const route = read("app/api/ai/sign-off/route.ts");
+    expect(route).toContain("const activate = body.activate !== false;");
+    expect(route).toContain(".update(activate ? { ai_draft: false, is_active: true } : { ai_draft: false })");
+    const banner = read("components/coach/ai-draft-banner.tsx");
+    expect(banner).toContain("options.activate === false ? { programId, activate: false } : { programId }");
+    expect(banner).toContain("await signOffProgram(programId);");
+    expect(read("components/coach/desktop/program-card-menu.tsx")).toContain("signOffProgram(programId, { activate: false })");
   });
 
   it("every assign path that can meet a draft goes through it, and the database guard and the sign-off route are untouched", () => {

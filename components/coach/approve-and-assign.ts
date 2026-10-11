@@ -14,5 +14,6 @@ export function approveAndAssignMessage(programName: string, target: string): st
 export async function ensureApproved(args: { aiDraft: boolean; programId: string; programName: string; target: string }): Promise<"ok" | "cancelled" | "failed"> {
   if (!args.aiDraft) return "ok";
   if (!(await confirmDialog({ message: approveAndAssignMessage(args.programName, args.target), confirmLabel: APPROVE_AND_ASSIGN_LABEL }))) return "cancelled";
-  return (await signOffProgram(args.programId)) ? "ok" : "failed";
+  // Approved, but the original stays an inactive library program: only the copy that is assigned goes live (for the client, not for a whole group).
+  return (await signOffProgram(args.programId, { activate: false })) ? "ok" : "failed";
 }

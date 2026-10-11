@@ -80,7 +80,7 @@ describe("how it is wired", () => {
   const sql = read("supabase/migrations/0325_ai_builder_learning.sql");
 
   it("signing off makes the program active in one update, and learning can never block it", () => {
-    expect(signoff).toContain('update({ ai_draft: false, is_active: true })');
+    expect(signoff).toContain('{ ai_draft: false, is_active: true }');
     expect(signoff).toContain("// Learning is quiet and never blocks the sign-off.");
     expect(signoff).toContain("if (!program.ai_draft) return NextResponse.json({ ok: true, suggestion: null });");
   });

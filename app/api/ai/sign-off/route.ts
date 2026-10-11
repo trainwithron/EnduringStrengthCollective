@@ -15,6 +15,9 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => ({}));
   const programId = typeof body.programId === "string" ? body.programId : "";
+  // The Sign off button makes the program active too (the default). Approving a draft in order to ASSIGN it sends activate: false: the program is approved but stays an inactive library
+  // program, and only the copy that is assigned to the client goes live.
+  const activate = body.activate !== false;
   if (!programId) return NextResponse.json({ error: "Missing program." }, { status: 400 });
 
   const { data: program } = await supabase.from("programs").select("id, group_id, ai_draft, ai_snapshot").eq("id", programId).maybeSingle();
@@ -23,7 +26,7 @@ export async function POST(request: Request) {
   if (membership?.role !== "coach") return NextResponse.json({ error: "Only the coach can sign off a program." }, { status: 403 });
   if (!program.ai_draft) return NextResponse.json({ ok: true, suggestion: null });
 
-  const { error: updateError } = await supabase.from("programs").update({ ai_draft: false, is_active: true }).eq("id", programId);
+  const { error: updateError } = await supabase.from("programs").update(activate ? { ai_draft: false, is_active: true } : { ai_draft: false }).eq("id", programId);
   if (updateError) return NextResponse.json({ error: "That didn't save. The program is still a draft." }, { status: 500 });
 
   let suggestion: { id: string; text: string } | null = null;

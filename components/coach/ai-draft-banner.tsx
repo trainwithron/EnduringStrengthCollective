@@ -6,9 +6,10 @@ import { confirmDialog } from "@/components/shared/confirm-dialog";
 
 // Signing off an AI-built program: ONE update clears the draft flag and makes it active (done by /api/ai/sign-off, which also quietly notes what the coach changed). Until then it is
 // not live and no client sees it (the database refuses to make a draft active any other way). Used on the program page and on the program's card.
-export async function signOffProgram(programId: string): Promise<boolean> {
+// activate: false approves the draft WITHOUT making the original active (used when approving in order to assign a copy to a client).
+export async function signOffProgram(programId: string, options: { activate?: boolean } = {}): Promise<boolean> {
   try {
-    const res = await fetch("/api/ai/sign-off", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ programId }) });
+    const res = await fetch("/api/ai/sign-off", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(options.activate === false ? { programId, activate: false } : { programId }) });
     return res.ok;
   } catch {
     return false;
