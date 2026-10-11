@@ -1150,6 +1150,24 @@ for (const s of steps) {
   const errAK2 = await run(`apply/${bundle.file}`);
   check("release-ak: the bundle applies again after an undo" + (errAK2 ? ": " + errAK2 : ""), !errAK2 && (await has()));
 }
+// Release AL (step 80): ONE paste.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-al");
+  check("release-al: ONE bundle holds step 80", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["80"]));
+  const st80 = steps.find((x) => x.n === "80");
+  const has = async () => (await db.query("select exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'show_name_on_share') as ok")).rows[0].ok === true;
+  const eal0 = await run(`apply/undo-step${st80.n}-${st80.slug}.sql`);
+  check("release-al: before the bundle runs the column is absent" + (eal0 ? ": " + eal0 : ""), !eal0 && !(await has()));
+  const errAL = await run(`apply/${bundle.file}`);
+  check("release-al bundle applies on the live-shaped state" + (errAL ? ": " + errAL : ""), !errAL && (await has()));
+  const againAL = await run(`apply/${bundle.file}`);
+  check("release-al: a second run is refused, naming step 80 (" + againAL + ")", !!againAL && againAL.includes("step 80 (0334) cannot run") && againAL.includes("already applied"));
+  const euAL = await run(`apply/undo-step${st80.n}-${st80.slug}.sql`);
+  check("release-al: the undo removes the column" + (euAL ? ": " + euAL : ""), !euAL && !(await has()));
+  const errAL2 = await run(`apply/${bundle.file}`);
+  check("release-al: the bundle applies again after an undo" + (errAL2 ? ": " + errAL2 : ""), !errAL2 && (await has()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.

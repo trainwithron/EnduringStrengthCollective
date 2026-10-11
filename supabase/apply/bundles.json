@@ -245,6 +245,14 @@
   "file": "apply-release-ai-all.sql"
  },
  {
+  "id": "release-al",
+  "name": "Release AL (a client can switch their first name off shared workout pictures; run any time)",
+  "steps": [
+   "80"
+  ],
+  "file": "apply-release-al-all.sql"
+ },
+ {
   "id": "release-ak",
   "name": "Release AK (a one-on-one space stays a one-on-one space: its programs must be for its client, group-only features are refused there; run AFTER Release AJ)",
   "steps": [

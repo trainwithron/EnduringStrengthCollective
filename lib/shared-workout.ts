@@ -1,4 +1,5 @@
 import { publicDisplayName } from "@/lib/public-name";
+import { resolveShowName } from "@/lib/share-name";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { estimateOneRepMax } from "@/lib/one-rep-max";
 import { parseNumericPaceSecondsPerUnit, formatPaceSecondsToClock } from "@/lib/progression-models";
@@ -32,7 +33,7 @@ export async function getSharedWorkout(postId: string, opts: { fullName?: boolea
 
   const { data: group } = await supabase
     .from("groups")
-    .select("name, organization_id")
+    .select("name, organization_id, group_kind")
     .eq("id", post.group_id)
     .maybeSingle();
 
@@ -44,7 +45,7 @@ export async function getSharedWorkout(postId: string, opts: { fullName?: boolea
   const { data: org } = group?.organization_id
     ? await supabase
         .from("organizations")
-        .select("workout_card_background_mode, workout_card_background_url")
+        .select("name, workout_card_background_mode, workout_card_background_url")
         .eq("id", group.organization_id)
         .maybeSingle()
     : { data: null };
@@ -52,11 +53,28 @@ export async function getSharedWorkout(postId: string, opts: { fullName?: boolea
   // share_card_backgrounds_expansion_scoping_sept19.md — a per-athlete
   // pick (profiles.preferred_share_background) overrides the org-wide
   // default_rotation/custom setting above, when set to a real scenic key.
-  const { data: authorProfile } = await supabase
-    .from("profiles")
-    .select("preferred_share_background")
-    .eq("id", post.author_id)
-    .maybeSingle();
+  // show_name_on_share (0334): a client can keep their first name off their shared pictures. Read with the background so one round trip serves both; before the
+  // column exists the read falls back to the background alone and the name shows, as it always did.
+  let authorProfile = null as { preferred_share_background?: string | null; show_name_on_share?: boolean | null } | null;
+  let nameColumnThere = false;
+  {
+    const withName = await supabase.from("profiles").select("preferred_share_background, show_name_on_share").eq("id", post.author_id).maybeSingle();
+    if (withName.error) {
+      const plain = await supabase.from("profiles").select("preferred_share_background").eq("id", post.author_id).maybeSingle();
+      authorProfile = plain.data as { preferred_share_background?: string | null } | null;
+    } else {
+      authorProfile = withName.data as { preferred_share_background?: string | null; show_name_on_share?: boolean | null } | null;
+      nameColumnThere = true;
+    }
+  }
+  // No choice made yet (null): the default depends on age (off under 18, on for an adult or an unknown age), from the intake form's date of birth.
+  let authorDob: string | null = null;
+  if (nameColumnThere && !opts.fullName && (authorProfile?.show_name_on_share === null || authorProfile?.show_name_on_share === undefined)) {
+    const { data: intake } = await supabase.from("client_intake").select("date_of_birth").eq("athlete_id", post.author_id).maybeSingle();
+    authorDob = (intake as { date_of_birth?: string | null } | null)?.date_of_birth ?? null;
+  }
+  // Only the public share page (the card and the picture people post) honors it; the group's own feed card shows names the way the feed always does.
+  const nameHidden = !opts.fullName && nameColumnThere && !resolveShowName(authorProfile?.show_name_on_share, authorDob);
 
   const broadcastLevel: "full" | "prs_only" | "checkin_only" = post.broadcast_level ?? "full";
   const newPrs: string[] = broadcastLevel === "checkin_only" ? [] : workoutLog.new_prs ?? [];
@@ -406,11 +424,15 @@ export async function getSharedWorkout(postId: string, opts: { fullName?: boolea
   return {
     authorId: post.author_id as string,
     groupId: post.group_id,
-    athleteName: opts.fullName
-      ? (post.profiles as any)?.full_name ?? "An athlete"
-      : publicDisplayName((post.profiles as any)?.full_name),
+    // "An athlete" is the placeholder for an unknown name: the card, the picture, the link preview and the mascot's initial all treat it as no name.
+    athleteName: nameHidden
+      ? "An athlete"
+      : opts.fullName
+        ? (post.profiles as any)?.full_name ?? "An athlete"
+        : publicDisplayName((post.profiles as any)?.full_name),
     athleteAvatarUrl: (post.profiles as any)?.avatar_url ?? null,
-    groupName: group?.name ?? "Spotlight Coaching",
+    // A one-on-one space is named after the client (their full name), so on the PUBLIC card, picture and link preview the business name stands in for it, always.
+    groupName: !opts.fullName && (group as { group_kind?: string } | null)?.group_kind === "one_on_one" ? ((org as { name?: string } | null)?.name ?? "Spotlight Coaching") : group?.name ?? "Spotlight Coaching",
     workoutCardBackgroundMode: (org?.workout_card_background_mode as "default_rotation" | "custom" | null) ?? "default_rotation",
     workoutCardBackgroundUrl: org?.workout_card_background_url ?? null,
     preferredShareBackground: authorProfile?.preferred_share_background ?? null,
