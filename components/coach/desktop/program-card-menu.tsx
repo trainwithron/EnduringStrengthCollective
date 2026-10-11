@@ -1,6 +1,7 @@
 "use client";
 
 import { confirmDialog } from "@/components/shared/confirm-dialog";
+import { scrollIsInsideMenu } from "@/lib/menu-scroll";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -125,7 +126,9 @@ export function ProgramCardMenu({
     // Closes on scroll rather than re-tracking position continuously —
     // simple and matches how most dropdown menus behave when the page
     // moves under them.
-    function handleScroll() {
+    // Only the PAGE (or something outside the menu) scrolling closes it; scrolling the menu's own list, such as a long client list, must not.
+    function handleScroll(e: Event) {
+      if (scrollIsInsideMenu(menuRef.current, e.target)) return;
       setView(null);
     }
     function handleKeyDown(e: KeyboardEvent) {
