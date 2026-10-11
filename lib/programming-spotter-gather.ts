@@ -7,6 +7,7 @@ import {
   detectVolumeConcentration,
   detectRedundancy,
   detectFlatRepeat,
+  isRepRange,
   detectMissingPatternCoverage,
   detectBiomechRedundancy,
   type SpotterExerciseEntry,
@@ -64,7 +65,7 @@ export async function gatherProgrammingSpotterFlags(
   const { data: exerciseRows } = await supabase
     .from("group_workout_exercises")
     .select(
-      "id, workout_id, exercise_name, exercise_order, group_workout_exercise_sets ( set_order, target_reps, target_weight, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance )"
+      "id, workout_id, exercise_name, exercise_order, group_workout_exercise_sets ( set_order, target_reps, target_weight, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance, rep_min, rep_max )"
     )
     .in("workout_id", workoutIds);
 
@@ -157,6 +158,8 @@ export async function gatherProgrammingSpotterFlags(
       // stored setting) — the byte-identical-targets check itself is the
       // real signal here.
       hasProgressionModel: false,
+      // A rep range (6-8) is the progression itself, so it is never a "flat repeat".
+      repsAreRange: sets.some((s) => isRepRange(s.target_reps, s.rep_min, s.rep_max)),
     });
 
     biomechEntries.push({

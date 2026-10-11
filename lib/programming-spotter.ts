@@ -180,6 +180,15 @@ export interface FlatRepeatEntry {
   weekNumber: number;
   targetsFingerprint: string; // caller builds this from every tracked field it cares about
   hasProgressionModel: boolean;
+  // The reps are a RANGE (6-8, or a minimum and maximum that differ). A range is itself the progression (double progression: the prescription stays and the client moves inside
+  // it), so the same targets week after week is not a flat repeat. Fixed numbers (5x5) are still checked.
+  repsAreRange?: boolean;
+}
+
+// True when a set's reps are a range: "6-8" (a dash, an en dash or "to" between two numbers), or a structured minimum and maximum that differ.
+export function isRepRange(targetReps: string | null | undefined, repMin?: number | null, repMax?: number | null): boolean {
+  if (repMin != null && repMax != null && repMin !== repMax) return true;
+  return /\d\s*(?:[-–—]|to)\s*\d/i.test(targetReps ?? "");
 }
 
 export interface FlatRepeatFlag {
@@ -193,7 +202,7 @@ const MIN_FLAT_REPEAT_WEEKS = 4;
 export function detectFlatRepeat(entries: FlatRepeatEntry[]): FlatRepeatFlag[] {
   const byExercise = new Map<string, FlatRepeatEntry[]>();
   for (const e of entries) {
-    if (e.hasProgressionModel) continue;
+    if (e.hasProgressionModel || e.repsAreRange) continue;
     const list = byExercise.get(e.exerciseName) ?? [];
     list.push(e);
     byExercise.set(e.exerciseName, list);

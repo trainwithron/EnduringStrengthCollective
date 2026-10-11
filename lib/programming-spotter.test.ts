@@ -3,6 +3,7 @@ import {
   detectVolumeConcentration,
   detectRedundancy,
   detectFlatRepeat,
+  isRepRange,
   detectMissingPatternCoverage,
   detectBiomechRedundancy,
   type SpotterExerciseEntry,
@@ -235,5 +236,37 @@ describe("detectBiomechRedundancy", () => {
     expect(flags).toEqual([
       { tagKey: "hip_extension", weekNumber: 1, exerciseNames: ["B", "C", "Compound Lift"] },
     ]);
+  });
+});
+
+describe("a rep range is the progression, not a flat repeat", () => {
+  const flat = (week: number, repsAreRange?: boolean) => ({ exerciseName: "Pulldown", weekNumber: week, targetsFingerprint: "8-12|", hasProgressionModel: false, repsAreRange });
+
+  it("does not flag the same range (6-8, 8-12, 6-10) held for four weeks", () => {
+    expect(detectFlatRepeat([1, 2, 3, 4].map((w) => flat(w, true)))).toEqual([]);
+  });
+
+  it("still flags fixed numbers held for four weeks (5x5 at 185)", () => {
+    const entries = [1, 2, 3, 4].map((w) => flat(w, false));
+    expect(detectFlatRepeat(entries)).toEqual([{ exerciseName: "Pulldown", weekCount: 4, weeks: [1, 2, 3, 4] }]);
+    // an entry with no repsAreRange given (older callers) behaves as fixed
+    expect(detectFlatRepeat([1, 2, 3, 4].map((w) => flat(w))).length).toBe(1);
+  });
+
+  it("recognises a range written as 6-8, 6 - 8, 6–8, 6 to 8, or a differing min and max", () => {
+    for (const reps of ["6-8", "8-12", "6 - 10", "6–8", "6 to 8", "10-12 each side"]) expect(isRepRange(reps), reps).toBe(true);
+    expect(isRepRange(null, 6, 8)).toBe(true);
+    expect(isRepRange("8", 6, 8)).toBe(true);
+  });
+
+  it("does not take a fixed number, AMRAP, a time or empty reps for a range", () => {
+    for (const reps of ["5", "8", "AMRAP", "30s", "", null, undefined]) expect(isRepRange(reps as string | null | undefined), String(reps)).toBe(false);
+    expect(isRepRange("8", 8, 8)).toBe(false);
+    expect(isRepRange(null, null, null)).toBe(false);
+  });
+
+  it("an exercise with a mix (some sets a range) is not flagged, since it carries a range", () => {
+    const sets = [{ r: "8-10" }, { r: "8" }];
+    expect(sets.some((s) => isRepRange(s.r))).toBe(true);
   });
 });
