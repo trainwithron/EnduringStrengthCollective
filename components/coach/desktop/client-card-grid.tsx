@@ -854,6 +854,13 @@ export function ClientCardGrid({
                   >
                     Log
                   </Link>
+                  <Link
+                    href={`/groups/${groupId}/athletes/${member.profileId}/view`}
+                    className="hidden lg:inline font-body text-xs text-rust"
+                    title="See what this client sees (read only)"
+                  >
+                    View
+                  </Link>
                   <button
                     type="button"
                     onClick={() => handleRemove(member)}
