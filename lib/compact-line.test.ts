@@ -78,6 +78,7 @@ describe("the builder wiring", () => {
     expect(day).toContain("formatCompactLine(item.sets, item.trackedFields, loggedWeight)");
     const grid = read("components/coach/desktop/week-grid.tsx");
     expect(grid).toContain("min-w-[220px] max-w-[300px]");
+    expect(grid).toContain("editingCompactIds.has(day.id)");
     expect(grid).toContain("min-w-[300px] max-w-[420px]");
     expect(grid).toContain('"Full view" : "Compact view"');
     expect(grid).toContain("writeCompact(window.localStorage, programId, weekNumber, next)");

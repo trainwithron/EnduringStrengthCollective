@@ -4,7 +4,7 @@ import { confirmDialog } from "@/components/shared/confirm-dialog";
 import type { DemoRow } from "@/lib/exercise-demo";
 import { NONE_COLLAPSED, allCollapsed, toggleAll, toggleCollapsed } from "@/lib/collapse-state";
 import { ClientPreviewButton } from "@/components/coach/desktop/client-preview";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { BuilderDay, BuilderItem, BuilderExercise, BuilderNote } from "@/lib/types";
@@ -60,6 +60,7 @@ export function DayCard({
   athleteId = null,
   condensed = false,
   onToggleCondensed,
+  onCompactEditorChange,
   collapsed,
   onToggleCollapse,
   onUpdate,
@@ -82,6 +83,8 @@ export function DayCard({
   // button in the day's header) or for the whole week (the week's "Compact view"). Distinct from the day's own header chevron below, which hides the exercise list entirely.
   condensed?: boolean;
   onToggleCondensed?: () => void;
+  // Tells the week when one of this day's compact lines is open as an editor, so the week can give the day a normal-width column while it is.
+  onCompactEditorChange?: (open: boolean) => void;
   // Owned by WeekGrid. Each day opens and closes on its own: opening one never closes another.
   collapsed: boolean;
   onToggleCollapse: () => void;
@@ -109,6 +112,12 @@ export function DayCard({
   const [collapsedExerciseIds, setCollapsedExerciseIds] = useState<ReadonlySet<string>>(NONE_COLLAPSED);
   // In the compact view: the exercises the coach has opened to edit in place.
   const [openCompactIds, setOpenCompactIds] = useState<ReadonlySet<string>>(NONE_COLLAPSED);
+  const compactEditorOpen = condensed && openCompactIds.size > 0;
+  useEffect(() => {
+    onCompactEditorChange?.(compactEditorOpen);
+    // Reported when it changes; the callback itself is not a trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compactEditorOpen]);
   const exerciseIds = day.items.filter((i) => i.kind === "exercise").map((i) => i.id);
   const [quickEntryDraft, setQuickEntryDraft] = useState("");
   const [quickEntryError, setQuickEntryError] = useState<string | null>(null);

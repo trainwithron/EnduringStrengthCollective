@@ -74,6 +74,17 @@ export function WeekGrid({
       // No storage: nothing remembered.
     }
   }, [programId, weekNumber]);
+  // Compact days with an exercise open as an editor get a normal-width column, since the editor is built for it.
+  const [editingCompactIds, setEditingCompactIds] = useState<ReadonlySet<string>>(new Set());
+  function setCompactEditor(dayId: string, open: boolean) {
+    setEditingCompactIds((prev) => {
+      if (prev.has(dayId) === open) return prev;
+      const next = new Set(prev);
+      if (open) next.add(dayId);
+      else next.delete(dayId);
+      return next;
+    });
+  }
   function setCompactIds(next: Set<string>) {
     setCompactIdsState(next);
     try {
@@ -299,7 +310,7 @@ export function WeekGrid({
                 onDragEnd={() => setDraggedDayId(null)}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => handleDrop(day.id)}
-                className={`flex-[1_1_0%] ${compactIds.has(day.id) ? "min-w-[220px] max-w-[300px]" : "min-w-[300px] max-w-[420px]"} ${draggedDayId === day.id ? "opacity-50" : ""}`}
+                className={`flex-[1_1_0%] ${compactIds.has(day.id) && !editingCompactIds.has(day.id) ? "min-w-[220px] max-w-[300px]" : "min-w-[300px] max-w-[420px]"} ${draggedDayId === day.id ? "opacity-50" : ""}`}
               >
                 <DayCard
                   day={day}
@@ -315,6 +326,7 @@ export function WeekGrid({
                   athleteId={athleteId}
                   condensed={compactIds.has(day.id)}
                   onToggleCondensed={() => setCompactIds(toggleDay(new Set(compactIds), day.id))}
+                  onCompactEditorChange={(open) => setCompactEditor(day.id, open)}
                   collapsed={collapsedDayIds.has(day.id)}
                   onToggleCollapse={() => handleToggleDayCollapse(day.id)}
                   onUpdate={(patch) =>
