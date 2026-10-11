@@ -65,6 +65,7 @@ from (
     ('2026100600329', 'release_aa_credit_one_and_waitlist_zone', '0329_release_aa_credit_one_and_waitlist_zone.sql', exists (select 1 from pg_constraint where conname = 'session_types_credit_cost_is_one')),
     ('2026100600330', 'public_page_coach_only', '0330_public_page_coach_only.sql', exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')),
     ('2026100600331', 'purchase_grants_once', '0331_purchase_grants_once.sql', to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null),
+    ('2026100600335', 'assign_program_to_client', '0335_assign_program_to_client.sql', to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)') is not null),
     ('2026100600334', 'share_name_setting', '0334_share_name_setting.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'show_name_on_share')),
     ('2026100600333', 'one_on_one_separation', '0333_one_on_one_separation.sql', to_regprocedure('public.one_on_one_athlete(uuid)') is not null),
     ('2026100600332', 'one_on_one_private_programs', '0332_one_on_one_private_programs.sql', to_regprocedure('public.is_one_on_one_group(uuid)') is not null),

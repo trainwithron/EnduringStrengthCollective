@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { APPROVE_AND_ASSIGN_FAILED, ensureApproved } from "@/components/coach/approve-and-assign";
+import { APPROVE_AND_ASSIGN_FAILED, ensureSignedOff } from "@/components/coach/approve-and-assign";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { duplicateProgram } from "@/lib/program-duplication";
+import { assignProgramToClient } from "@/lib/program-duplication";
 import { localDateKey } from "@/lib/timezone";
 import { orderForAssign, programLabel, SEARCH_FROM, type PickableProgram } from "@/lib/assign-picker";
 import { SearchPickList } from "@/components/coach/search-pick-list";
@@ -59,10 +59,8 @@ export function ClientProgramActions({ groupId, athleteId, athleteFullName, extr
 
   async function assign(program: PickableProgram) {
     if (busyId) return;
-    // An AI draft: ONE confirmation approves it (the existing sign-off) and assigns it.
-    const approved = await ensureApproved({ aiDraft: program.aiDraft, programId: program.id, programName: program.name, target: athleteFullName });
-    if (approved === "cancelled") return;
-    if (approved === "failed") {
+    // An AI draft: the click IS the approval (the existing sign-off runs first, without making the original active).
+    if ((await ensureSignedOff({ aiDraft: program.aiDraft, programId: program.id })) === "failed") {
       setError(APPROVE_AND_ASSIGN_FAILED);
       return;
     }
@@ -76,10 +74,10 @@ export function ClientProgramActions({ groupId, athleteId, athleteFullName, extr
       setBusyId(null);
       return;
     }
-    const result = await duplicateProgram(supabase, {
+    // A program with no client on it that nothing depends on becomes this client's program (no copy is left behind); any other program is copied, as before.
+    const result = await assignProgramToClient(supabase, {
       sourceProgramId: program.id,
       destinationGroupId: groupId,
-      createdBy: user.id,
       athleteId,
       clientName: athleteFullName,
       startDate: startDate || undefined,

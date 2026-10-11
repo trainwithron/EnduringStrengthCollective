@@ -1648,6 +1648,22 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["profiles has the earlier share-picture column (0197)", has.col("profiles", "preferred_share_background")],
     ],
   },
+  {
+    n: "81",
+    slug: "0335",
+    title: "0335 Assigning a program that belongs to no client to ONE client attaches it to that client (no copy is left behind)",
+    migrations: ["0335"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes by itself. After the app update, assigning a template (a program with no client on it, nobody has used) to one client makes it that client's program instead of making a copy and leaving the original in the library. Any other assignment copies, as before.",
+    undo: "drop function if exists public.assign_program_to_client(uuid, uuid, uuid, text, date);",
+    undoWhy: "Only if step 81 misbehaves. Removes the new function (assigning then always makes a copy, as before). Nothing already assigned changes.",
+    rows: [
+      ["0335 is not already applied (assign_program_to_client does not exist yet)", "to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)') is null"],
+      ["the program copy function exists", has.fn("duplicate_program(uuid, uuid, uuid, uuid, text, date)")],
+      ["programs can be removed from a profile (archived_at exists, 0328)", has.col("programs", "archived_at")],
+      ["the tables the attach checks exist", "to_regclass('public.workout_logs') is not null and to_regclass('public.athlete_sessions') is not null and to_regclass('public.workout_assignments') is not null and to_regclass('public.challenges') is not null and to_regclass('public.exercise_progressions') is not null"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -1751,6 +1767,7 @@ const BUNDLES = [
   { id: "release-aa", name: "Release AA (every session costs exactly 1 credit; the waitlist offer shows the coach's time zone)", steps: ["75"] },
   { id: "release-ah", name: "Release AH (only a real coach can have a public booking page or website)", steps: ["76"] },
   { id: "release-ai", name: "Release AI (a payment and its sessions are recorded in one step; run BEFORE the code that uses it deploys)", steps: ["77"] },
+  { id: "release-am", name: "Release AM (assigning an unused no-client program to one client attaches it instead of copying it; run any time)", steps: ["81"] },
   { id: "release-al", name: "Release AL (a client can switch their first name off shared workout pictures; run any time)", steps: ["80"] },
   { id: "release-ak", name: "Release AK (a one-on-one space stays a one-on-one space: its programs must be for its client, group-only features are refused there; run AFTER Release AJ)", steps: ["79"] },
   { id: "release-aj", name: "Release AJ (a client in a one-on-one space can no longer read that space's no-client programs; run AFTER Release AG)", steps: ["78"] },
@@ -1939,6 +1956,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0329", "exists (select 1 from pg_constraint where conname = 'session_types_credit_cost_is_one')"),
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
+    m("0335", "to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)') is not null"),
     m("0334", has.col("profiles", "show_name_on_share")),
     m("0333", "to_regprocedure('public.one_on_one_athlete(uuid)') is not null"),
     m("0332", "to_regprocedure('public.is_one_on_one_group(uuid)') is not null"),

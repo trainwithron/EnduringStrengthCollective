@@ -7,9 +7,8 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { clampedLeft, clampedWidth } from "@/lib/viewport-clamp";
-import { duplicateProgram } from "@/lib/program-duplication";
-import { APPROVE_AND_ASSIGN_FAILED, APPROVE_AND_ASSIGN_LABEL, approveAndAssignMessage, ensureApproved } from "@/components/coach/approve-and-assign";
-import { signOffProgram } from "@/components/coach/ai-draft-banner";
+import { assignProgramToClient, duplicateProgram } from "@/lib/program-duplication";
+import { APPROVE_AND_ASSIGN_FAILED, ensureSignedOff } from "@/components/coach/approve-and-assign";
 import { notifyPush } from "@/lib/push-notify";
 import { localDateKey } from "@/lib/timezone";
 import { MoreVertical } from "lucide-react";
@@ -234,19 +233,18 @@ export function ProgramCardMenu({
       .filter((a) => !!a.id);
     if (athletes.length === 0) return;
 
-    // An AI draft: the same one confirmation approves it and assigns it (the sign-off is the existing one).
-    const names = athletes.map((a) => a.fullName).join(", ");
     if (
       !await confirmDialog({
-        message: aiDraft
-          ? `${approveAndAssignMessage(programName, `all ${athletes.length} athletes on ${position.name}`)}\n\n${names}`
-          : `Assign "${programName}" to all ${athletes.length} athletes on ${position.name}?\n\n${names}`,
-        confirmLabel: aiDraft ? APPROVE_AND_ASSIGN_LABEL : "Assign",
+        message: `Assign "${programName}" to all ${athletes.length} athletes on ${position.name}?\n\n${athletes
+          .map((a) => a.fullName)
+          .join(", ")}`,
+        confirmLabel: "Assign",
       })
     ) {
       return;
     }
-    if (aiDraft && !(await signOffProgram(programId, { activate: false }))) {
+    // An AI draft: the coach's click IS the approval (the existing sign-off runs first, without making the original active).
+    if ((await ensureSignedOff({ aiDraft, programId })) === "failed") {
       setError(APPROVE_AND_ASSIGN_FAILED);
       return;
     }
@@ -294,9 +292,8 @@ export function ProgramCardMenu({
   }
 
   async function handleAssignToClient(client: AssignClient) {
-    const approved = await ensureApproved({ aiDraft, programId, programName, target: client.fullName });
-    if (approved === "cancelled") return;
-    if (approved === "failed") {
+    // An AI draft: the click on Assign IS the approval (the existing sign-off runs first, without making the original active).
+    if ((await ensureSignedOff({ aiDraft, programId })) === "failed") {
       setError(APPROVE_AND_ASSIGN_FAILED);
       return;
     }
@@ -312,10 +309,10 @@ export function ProgramCardMenu({
     }
 
     // The copy goes into the CLIENT'S OWN space (their one-on-one group, else the program's group if they are in it, else the first group of theirs), never assumed to be this program's group.
-    const result = await duplicateProgram(supabase, {
+    // A program with no client on it that nothing depends on becomes this client's program (no copy is left behind); any other program is copied, as before.
+    const result = await assignProgramToClient(supabase, {
       sourceProgramId: programId,
       destinationGroupId: client.destinationGroupId,
-      createdBy: user.id,
       athleteId: client.id,
       clientName: client.fullName,
       startDate: assignStartDate || undefined,
@@ -343,9 +340,7 @@ export function ProgramCardMenu({
   }
 
   async function handleAssignToSelf() {
-    const approved = await ensureApproved({ aiDraft, programId, programName, target: "yourself" });
-    if (approved === "cancelled") return;
-    if (approved === "failed") {
+    if ((await ensureSignedOff({ aiDraft, programId })) === "failed") {
       setError(APPROVE_AND_ASSIGN_FAILED);
       return;
     }

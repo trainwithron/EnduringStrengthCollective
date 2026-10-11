@@ -245,6 +245,14 @@
   "file": "apply-release-ai-all.sql"
  },
  {
+  "id": "release-am",
+  "name": "Release AM (assigning an unused no-client program to one client attaches it instead of copying it; run any time)",
+  "steps": [
+   "81"
+  ],
+  "file": "apply-release-am-all.sql"
+ },
+ {
   "id": "release-al",
   "name": "Release AL (a client can switch their first name off shared workout pictures; run any time)",
   "steps": [

@@ -31,7 +31,7 @@ describe("the list a coach assigns from", () => {
     expect(programLabel({ aiDraft: false, clientName: "Ann", uses: 0 })).toBe("Ann's copy");
     expect(programLabel({ aiDraft: false, clientName: null, uses: 3 })).toBe("Shared · used 3 times");
     expect(programLabel({ aiDraft: false, clientName: null, uses: 1 })).toBe("Shared · used 1 time");
-    expect(programLabel({ aiDraft: true, clientName: null, uses: 0 })).toBe("AI draft: approved when you assign");
+    expect(programLabel({ aiDraft: true, clientName: null, uses: 0 })).toBe("AI draft: signed off when you assign");
   });
 });
 
@@ -54,7 +54,7 @@ describe("the client's Programs tab", () => {
     expect(actions).toContain("/programs/new?method=ai&athleteId=${athleteId}");
   });
   it("assigning is one click with the existing copy engine, a start date that defaults to today, and no confirmation popup", () => {
-    expect(actions).toContain("duplicateProgram(supabase, {");
+    expect(actions).toContain("assignProgramToClient(supabase, {");
     expect(actions).toContain("const [startDate, setStartDate] = useState(localDateKey());");
     expect(actions).toContain("startDate: startDate || undefined");
     expect(actions).not.toContain("confirmDialog");
@@ -68,9 +68,9 @@ describe("the client's Programs tab", () => {
     expect(read("components/coach/search-pick-list.tsx")).toContain("items.length >= searchFrom");
     expect(SEARCH_FROM).toBeGreaterThan(1);
   });
-  it("an unsigned AI draft can be picked: one confirmation approves it and assigns it", () => {
+  it("an unsigned AI draft can be picked: the click signs it off and assigns it", () => {
     expect(actions).toContain("if (busyId) return;");
-    expect(actions).toContain("ensureApproved({ aiDraft: program.aiDraft, programId: program.id, programName: program.name, target: athleteFullName })");
+    expect(actions).toContain("ensureSignedOff({ aiDraft: program.aiDraft, programId: program.id })");
     expect(actions).not.toContain("disabled: p.aiDraft");
     expect(section).toContain('p.ai_draft ? "AI draft"');
   });
