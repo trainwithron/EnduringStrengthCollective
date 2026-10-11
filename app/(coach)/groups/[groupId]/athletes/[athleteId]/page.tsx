@@ -1,4 +1,5 @@
 import { isSendGridConfigured } from "@/lib/sendgrid";
+import { ViewAsClientLink } from "@/components/coach/desktop/view-as-client-label";
 import { SendSignInLinkButton } from "@/components/coach/send-signin-link-button";
 import { ClientProfileTabs } from "@/components/coach/desktop/client-profile-tabs";
 import { ClientProgramsSection } from "@/components/coach/desktop/client-programs-section";
@@ -901,12 +902,17 @@ export default async function AthleteProfilePage(
                   athleteId={params.athleteId}
                   athleteFullName={profile?.full_name ?? "Client"}
                   extra={
-                    <Link
-                      href={`/groups/${params.groupId}/athletes/${params.athleteId}/log`}
-                      className="inline-flex items-center justify-center min-h-11 sm:h-9 font-body text-xs text-chalk border border-steel/40 px-3 font-medium"
-                    >
-                      Log an in-person session
-                    </Link>
+                    <>
+                      <span className="hidden lg:inline-flex">
+                        <ViewAsClientLink href={`/groups/${params.groupId}/athletes/${params.athleteId}/view`} />
+                      </span>
+                      <Link
+                        href={`/groups/${params.groupId}/athletes/${params.athleteId}/log`}
+                        className="inline-flex items-center justify-center min-h-11 sm:h-9 font-body text-xs text-chalk border border-steel/40 px-3 font-medium"
+                      >
+                        Log an in-person session
+                      </Link>
+                    </>
                   }
                 />
               </div>
