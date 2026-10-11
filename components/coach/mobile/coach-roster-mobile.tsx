@@ -219,7 +219,7 @@ function RosterRow({
               onClick={close}
               className="font-body text-sm text-rust min-h-11 inline-flex items-center"
             >
-              Log a session
+              Log their workout
             </Link>
             <Link
               href={`/groups/${groupId}/messages/${member.profileId}`}

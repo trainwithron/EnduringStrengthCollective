@@ -39,11 +39,15 @@ export function CompleteWorkoutButton({
   allSetsResolved,
   disabled,
   raised,
+  coachMode,
 }: {
   sessionId: string;
   allSetsResolved: boolean;
   disabled: boolean;
   raised?: boolean;
+  // Set when a coach is logging this session FOR a client (not the client's own login): finishing goes straight back to the coach's home instead of the client's share card, and
+  // no feed post is made in the name of a client under 18.
+  coachMode?: { homeHref: string; clientIsMinor: boolean };
 }) {
   const [submitting, setSubmitting] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -143,7 +147,7 @@ export function CompleteWorkoutButton({
             .eq("post_type", "workout_summary")
             .maybeSingle()
         : { data: null };
-      finishNavigation(existingPost ? `/share/${existingPost.id}` : `/groups/${existingSession.group_id}`);
+      finishNavigation(coachMode ? coachMode.homeHref : existingPost ? `/share/${existingPost.id}` : `/groups/${existingSession.group_id}`);
       return;
     }
 
@@ -257,7 +261,7 @@ export function CompleteWorkoutButton({
     // itself — not just read live — so the card renders consistently even
     // if they change this setting later.
     const shouldPost =
-      broadcastLevel !== "private" && !(broadcastLevel === "prs_only" && newPrs.length === 0);
+      broadcastLevel !== "private" && !(broadcastLevel === "prs_only" && newPrs.length === 0) && !coachMode?.clientIsMinor;
     // A "checkin only" post never reveals PR content, so it never belongs
     // in the PR Board channel even when a PR genuinely happened.
     const channel = broadcastLevel !== "checkin_only" && newPrs.length > 0 ? "pr_board" : "general";
@@ -293,7 +297,8 @@ export function CompleteWorkoutButton({
     // moment a client (or a coach logging in-person) gets after finishing.
     // The card is built from the workout itself when there is no feed post (a client who keeps their workouts off the group feed, or a one-on-one client).
     let navHref = `/groups/${result.group_id}`;
-    if (postId) navHref = `/share/${postId}`;
+    if (coachMode) navHref = coachMode.homeHref;
+    else if (postId) navHref = `/share/${postId}`;
     else {
       // The link is signed by the server, so only the client (or their coach) can make it.
       try {

@@ -905,7 +905,8 @@ export default async function AthleteProfilePage(
                       href={`/groups/${params.groupId}/athletes/${params.athleteId}/log`}
                       className="inline-flex items-center justify-center min-h-11 sm:h-9 font-body text-xs text-chalk border border-steel/40 px-3 font-medium"
                     >
-                      Log an in-person session
+                      <span className="lg:hidden">Log their workout</span>
+                      <span className="hidden lg:inline">Log an in-person session</span>
                     </Link>
                   }
                 />

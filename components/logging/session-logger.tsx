@@ -25,6 +25,7 @@ export function SessionLogger({
   lastTimeByExercise,
   ladderByExercise,
   raised,
+  coachMode,
   groupId,
   athleteId,
   viewerId,
@@ -44,6 +45,7 @@ export function SessionLogger({
   lastTimeByExercise: Record<string, { weight: number; reps: number }>;
   ladderByExercise: Record<string, string[]>;
   raised?: boolean;
+  coachMode?: { homeHref: string; clientIsMinor: boolean };
   groupId: string;
   athleteId: string;
   viewerId: string | null;
@@ -381,6 +383,7 @@ export function SessionLogger({
           allSetsResolved={allSetsResolved}
           disabled={false}
           raised={raised}
+          coachMode={coachMode}
         />
       )}
       </section>
