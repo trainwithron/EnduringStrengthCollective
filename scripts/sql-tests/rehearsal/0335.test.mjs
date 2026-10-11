@@ -99,6 +99,17 @@ export default {
       await h.asSuper();
       h.check("the copy of a draft is still a draft and not active", (await h.one(`select ai_draft as d, is_active as a from public.programs where id = $1`, [copy4.assigned_program_id])).d === true);
 
+      // 6b. the program a coach package hands to each buyer is COPIED, never turned into one client's personal program
+      const pkgProg = await build(team, "Package program", { active: false });
+      await db.query(`insert into public.coach_packages (coach_id, group_id, name, sessions_per_week, billing_type, sessions_granted, rate_cents, default_program_id) values ($1, $2, 'Pkg', 1, 'one_time', 4, 1000, $3)`, [coach, team, pkgProg.prog]);
+      await h.as(coach);
+      const copy5 = await h.one(`select * from public.assign_program_to_client($1, $2, $3, 'Will', null)`, [pkgProg.prog, solo, will]);
+      h.check("a program a coach package depends on is copied, not attached", copy5.was_attached === false);
+
+      // 6c. a client must be an athlete in the destination group
+      await h.as(coach);
+      await h.expectError("a client who is not in the destination group is refused", () => db.query(`select * from public.assign_program_to_client($1, $2, $3, 'Nobody', null)`, [lib.prog, solo, bea]), /not in that group/i);
+
       // 7. a coach of another organization cannot attach or copy this program
       await h.asSuper();
       const lib2 = await build(team, "Guarded library", { active: false });

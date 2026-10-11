@@ -39,7 +39,7 @@ $g81$;
 -- public.assign_program_to_client(program, destination group, client, client name, start date) returns (assigned_program_id, was_attached):
 --   ATTACHED (was_attached = true) when the program has no client on it AND nothing else depends on it: it is not an unsigned AI draft, it is either a template in a one-on-one space (which no
 --     client can read) or an inactive library program (never the shared program a team is following), and nobody has logged, been scheduled or been assigned any of its workouts, and no
---     challenge points at it. Then, in ONE step: the program, its workouts, exercises, notes and progression rules move into the client's space (the destination group), the client's id goes
+--     challenge points at it, and it is not the program a coach package hands to each buyer (coach_packages.default_program_id), and no client has a personal exercise override on it. Then, in ONE step: the program, its workouts, exercises, notes and progression rules move into the client's space (the destination group), the client's id goes
 --     on the program, workouts, exercises and notes, and the program is made active (the client is assigned it), which also sends the client the usual "your coach assigned you a new
 --     program" notice. Sets hang off exercises and need no change.
 --   COPIED (was_attached = false) in every other case: it simply calls duplicate_program, exactly as assigning always did (the original stays where it is). That includes a program that already
@@ -66,6 +66,10 @@ begin
   if p_athlete_id is null then
     raise exception 'A client is required.';
   end if;
+  -- The client must be an athlete in the group the program is going to (a loose id would otherwise get the program and the "assigned" notice).
+  if not exists (select 1 from public.group_memberships gm where gm.group_id = p_destination_group_id and gm.profile_id = p_athlete_id and gm.role = 'athlete') then
+    raise exception 'That client is not in that group.';
+  end if;
 
   select * into src from public.programs where id = p_program_id for update;
   if not found then
@@ -81,6 +85,8 @@ begin
      and not exists (select 1 from public.workouts w join public.athlete_sessions s on s.workout_id = w.id where w.program_id = src.id)
      and not exists (select 1 from public.workouts w join public.workout_assignments a on a.workout_id = w.id where w.program_id = src.id)
      and not exists (select 1 from public.challenges c where c.program_id = src.id)
+     and not exists (select 1 from public.coach_packages cp where cp.default_program_id = src.id)
+     and not exists (select 1 from public.workouts w join public.group_workout_exercises e on e.workout_id = w.id join public.athlete_exercise_overrides o on o.group_workout_exercise_id = e.id where w.program_id = src.id)
   then
     update public.programs
        set athlete_id = p_athlete_id,

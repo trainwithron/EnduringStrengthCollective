@@ -88,6 +88,9 @@ describe("assign to ONE client: attach when nothing depends on the program, else
     expect(sql).toContain("(v_kind = 'one_on_one' or src.is_active = false)");
     for (const table of ["workout_logs", "athlete_sessions", "workout_assignments", "challenges"]) expect(sql).toContain(table);
     for (const table of ["public.workouts set", "public.group_workout_exercises e set", "public.workout_notes n set", "public.exercise_progressions set"]) expect(sql).toContain(table);
+    expect(sql).toContain("coach_packages cp where cp.default_program_id = src.id");
+    expect(sql).toContain("athlete_exercise_overrides o");
+    expect(sql).toContain("That client is not in that group.");
     expect(sql).toContain("is_active = true");
     expect(sql).toContain("public.duplicate_program(");
     expect(sql).not.toMatch(/delete from/);
