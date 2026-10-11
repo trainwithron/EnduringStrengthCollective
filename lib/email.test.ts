@@ -13,6 +13,7 @@ beforeEach(() => {
   }
 });
 afterEach(() => {
+  vi.restoreAllMocks();
   for (const k of KEYS) {
     if (saved[k] === undefined) delete process.env[k];
     else process.env[k] = saved[k];
@@ -58,10 +59,55 @@ describe("outgoing email (Brevo)", () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).sender.name).toBe("Coach Ron");
   });
 
+  it("logs one line with Brevo's status, code and message when it refuses, and never the key, the recipient or the text", async () => {
+    process.env.BREVO_API_KEY = "super-secret-key";
+    process.env.BREVO_FROM_EMAIL = "noreply@x.com";
+    const errors = vi.spyOn(console, "error").mockImplementation(() => {});
+    const cases: [number, string, string][] = [
+      [401, JSON.stringify({ code: "unauthorized", message: "Key not found" }), "HTTP 401 unauthorized: Key not found"],
+      [403, JSON.stringify({ code: "permission_denied", message: "Your account is not activated" }), "HTTP 403 permission_denied: Your account is not activated"],
+      [400, JSON.stringify({ code: "invalid_parameter", message: "sender is not valid" }), "HTTP 400 invalid_parameter: sender is not valid"],
+    ];
+    for (const [status, body, expected] of cases) {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status, text: async () => body }));
+      expect(await sendEmail("private.person@example.com", "Secret subject", "Secret body text")).toBe(false);
+      const line = String(errors.mock.calls[errors.mock.calls.length - 1][0]);
+      expect(line).toContain(expected);
+      expect(line).not.toContain("super-secret-key");
+      expect(line).not.toContain("private.person@example.com");
+      expect(line).not.toContain("Secret body text");
+      expect(line).not.toContain("Secret subject");
+    }
+    // Brevo's own message can echo a rejected address (or even the key): both are blanked out of the log line
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 400, text: async () => JSON.stringify({ code: "invalid_parameter", message: "Email private.person@example.com is blacklisted; key super-secret-key" }) }));
+    expect(await sendEmail("private.person@example.com", "s", "t")).toBe(false);
+    const echoed = String(errors.mock.calls[errors.mock.calls.length - 1][0]);
+    expect(echoed).toContain("HTTP 400 invalid_parameter: Email [email] is blacklisted; key [key]");
+    expect(echoed).not.toContain("private.person@example.com");
+    expect(echoed).not.toContain("super-secret-key");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 502, text: async () => "upstream error for <to=a.b@c.org>" }));
+    await sendEmail("a@b.com", "s", "t");
+    expect(String(errors.mock.calls[errors.mock.calls.length - 1][0])).not.toContain("a.b@c.org");
+    // a body that is not JSON is still reported, cut short
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 502, text: async () => "Bad gateway " + "x".repeat(1000) }));
+    expect(await sendEmail("a@b.com", "s", "t")).toBe(false);
+    const long = String(errors.mock.calls[errors.mock.calls.length - 1][0]);
+    expect(long).toContain("HTTP 502");
+    expect(long.length).toBeLessThanOrEqual(300);
+    // a thrown request logs only the kind of failure
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("connect to api.brevo.com for private.person@example.com failed")));
+    expect(await sendEmail("private.person@example.com", "s", "t")).toBe(false);
+    const thrown = String(errors.mock.calls[errors.mock.calls.length - 1][0]);
+    expect(thrown).toContain("Brevo request failed: Error");
+    expect(thrown).not.toContain("private.person@example.com");
+    errors.mockRestore();
+  });
+
   it("reports false when Brevo refuses or the network fails, and never throws", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
     process.env.BREVO_API_KEY = "k";
     process.env.BREVO_FROM_EMAIL = "noreply@x.com";
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 401 }));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 401, text: async () => "" }));
     expect(await sendEmail("a@b.com", "s", "t")).toBe(false);
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
     expect(await sendEmail("a@b.com", "s", "t")).toBe(false);
