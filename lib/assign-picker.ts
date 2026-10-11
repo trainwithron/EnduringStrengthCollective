@@ -1,5 +1,5 @@
 // The list a coach picks from when assigning a program to a client: every program they made, the ones used most as templates first (most copies made from them), then the newest.
-// An unsigned AI draft is shown but cannot be picked. Pure; no database.
+// An unsigned AI draft can be picked: the coach then approves it and assigns it in one confirmation. Pure; no database.
 
 export interface PickableProgram {
   id: string;
@@ -30,7 +30,7 @@ export function filterPrograms<T extends { name: string; clientName: string | nu
 
 // The little label under a program's name.
 export function programLabel(p: { aiDraft: boolean; clientName: string | null; uses: number; groupKind?: string | null }): string {
-  if (p.aiDraft) return "AI draft: sign off first";
+  if (p.aiDraft) return "AI draft: approved when you assign";
   const base = p.clientName ? `${p.clientName}'s copy` : p.groupKind === "one_on_one" ? "Not assigned to anyone" : "Shared";
   return p.uses > 0 ? `${base} · used ${p.uses} ${p.uses === 1 ? "time" : "times"}` : base;
 }

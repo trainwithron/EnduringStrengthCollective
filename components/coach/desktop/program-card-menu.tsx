@@ -8,6 +8,8 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { clampedLeft, clampedWidth } from "@/lib/viewport-clamp";
 import { duplicateProgram } from "@/lib/program-duplication";
+import { APPROVE_AND_ASSIGN_FAILED, APPROVE_AND_ASSIGN_LABEL, approveAndAssignMessage, ensureApproved } from "@/components/coach/approve-and-assign";
+import { signOffProgram } from "@/components/coach/ai-draft-banner";
 import { notifyPush } from "@/lib/push-notify";
 import { localDateKey } from "@/lib/timezone";
 import { MoreVertical } from "lucide-react";
@@ -232,14 +234,20 @@ export function ProgramCardMenu({
       .filter((a) => !!a.id);
     if (athletes.length === 0) return;
 
+    // An AI draft: the same one confirmation approves it and assigns it (the sign-off is the existing one).
+    const names = athletes.map((a) => a.fullName).join(", ");
     if (
       !await confirmDialog({
-        message: `Assign "${programName}" to all ${athletes.length} athletes on ${position.name}?\n\n${athletes
-          .map((a) => a.fullName)
-          .join(", ")}`,
-        confirmLabel: "Assign",
+        message: aiDraft
+          ? `${approveAndAssignMessage(programName, `all ${athletes.length} athletes on ${position.name}`)}\n\n${names}`
+          : `Assign "${programName}" to all ${athletes.length} athletes on ${position.name}?\n\n${names}`,
+        confirmLabel: aiDraft ? APPROVE_AND_ASSIGN_LABEL : "Assign",
       })
     ) {
+      return;
+    }
+    if (aiDraft && !(await signOffProgram(programId))) {
+      setError(APPROVE_AND_ASSIGN_FAILED);
       return;
     }
 
@@ -286,6 +294,12 @@ export function ProgramCardMenu({
   }
 
   async function handleAssignToClient(client: AssignClient) {
+    const approved = await ensureApproved({ aiDraft, programId, programName, target: client.fullName });
+    if (approved === "cancelled") return;
+    if (approved === "failed") {
+      setError(APPROVE_AND_ASSIGN_FAILED);
+      return;
+    }
     setBusy(true);
     setError(null);
     const supabase = createBrowserClient();
@@ -329,6 +343,12 @@ export function ProgramCardMenu({
   }
 
   async function handleAssignToSelf() {
+    const approved = await ensureApproved({ aiDraft, programId, programName, target: "yourself" });
+    if (approved === "cancelled") return;
+    if (approved === "failed") {
+      setError(APPROVE_AND_ASSIGN_FAILED);
+      return;
+    }
     setBusy(true);
     setError(null);
     const supabase = createBrowserClient();
@@ -475,7 +495,6 @@ export function ProgramCardMenu({
                 <>
                   <button
                     type="button"
-                    disabled={aiDraft}
                     onClick={() => {
                       setAssignStartDate(todayDateString());
                       setView("assign");
@@ -485,7 +504,6 @@ export function ProgramCardMenu({
                   >
                     Assign program
                   </button>
-                  {aiDraft && <p className="font-body text-xs text-steel px-3 pb-2">This is an AI draft. Sign it off before you assign it.</p>}
                   <button
                     type="button"
                     onClick={() => {

@@ -80,9 +80,11 @@ describe("the card menu uses it", () => {
     expect(menu).toContain("/groups/${assigned.groupId}/programs/${assigned.programId}");
     expect(menu).not.toContain(".eq(\"group_id\", groupId)\n      .eq(\"role\", \"athlete\");\n    const options");
   });
-  it("an unsigned AI draft cannot be assigned from the card", () => {
-    expect(menu).toContain("disabled={aiDraft}");
-    expect(menu).toContain("Sign it off before you assign it.");
+  it("an unsigned AI draft is approved and assigned with ONE confirmation from the card, never silently", () => {
+    expect(menu).not.toContain("disabled={aiDraft}");
+    expect(menu).toContain("ensureApproved({ aiDraft, programId, programName, target: client.fullName })");
+    expect(menu).toContain('ensureApproved({ aiDraft, programId, programName, target: "yourself" })');
+    expect(menu).toContain("if (aiDraft && !(await signOffProgram(programId)))");
     expect(read("components/coach/desktop/program-card-grid.tsx")).toContain("aiDraft={program.aiDraft}");
   });
   it("adding has no confirmation popup on the single-client path", () => {

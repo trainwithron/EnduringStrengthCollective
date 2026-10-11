@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { APPROVE_AND_ASSIGN_FAILED, ensureApproved } from "@/components/coach/approve-and-assign";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { duplicateProgram } from "@/lib/program-duplication";
@@ -57,7 +58,14 @@ export function ClientProgramActions({ groupId, athleteId, athleteFullName, extr
   }
 
   async function assign(program: PickableProgram) {
-    if (busyId || program.aiDraft) return;
+    if (busyId) return;
+    // An AI draft: ONE confirmation approves it (the existing sign-off) and assigns it.
+    const approved = await ensureApproved({ aiDraft: program.aiDraft, programId: program.id, programName: program.name, target: athleteFullName });
+    if (approved === "cancelled") return;
+    if (approved === "failed") {
+      setError(APPROVE_AND_ASSIGN_FAILED);
+      return;
+    }
     setBusyId(program.id);
     setError(null);
     const supabase = createBrowserClient();
@@ -117,7 +125,7 @@ export function ClientProgramActions({ groupId, athleteId, athleteFullName, extr
             </p>
           )}
           <SearchPickList
-            items={programs ? programs.map((p) => ({ key: p.id, label: p.name, sub: programLabel(p), disabled: p.aiDraft })) : null}
+            items={programs ? programs.map((p) => ({ key: p.id, label: p.name, sub: programLabel(p) })) : null}
             onPick={(id) => {
               const p = programs?.find((x) => x.id === id);
               if (p) void assign(p);

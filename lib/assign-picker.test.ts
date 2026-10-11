@@ -31,7 +31,7 @@ describe("the list a coach assigns from", () => {
     expect(programLabel({ aiDraft: false, clientName: "Ann", uses: 0 })).toBe("Ann's copy");
     expect(programLabel({ aiDraft: false, clientName: null, uses: 3 })).toBe("Shared · used 3 times");
     expect(programLabel({ aiDraft: false, clientName: null, uses: 1 })).toBe("Shared · used 1 time");
-    expect(programLabel({ aiDraft: true, clientName: null, uses: 0 })).toBe("AI draft: sign off first");
+    expect(programLabel({ aiDraft: true, clientName: null, uses: 0 })).toBe("AI draft: approved when you assign");
   });
 });
 
@@ -68,10 +68,10 @@ describe("the client's Programs tab", () => {
     expect(read("components/coach/search-pick-list.tsx")).toContain("items.length >= searchFrom");
     expect(SEARCH_FROM).toBeGreaterThan(1);
   });
-  it("an unsigned AI draft is listed but cannot be picked", () => {
-    expect(actions).toContain("if (busyId || program.aiDraft) return;");
-    expect(actions).toContain("disabled: p.aiDraft");
-    expect(read("components/coach/search-pick-list.tsx")).toContain("disabled={busyKey != null || i.disabled}");
+  it("an unsigned AI draft can be picked: one confirmation approves it and assigns it", () => {
+    expect(actions).toContain("if (busyId) return;");
+    expect(actions).toContain("ensureApproved({ aiDraft: program.aiDraft, programId: program.id, programName: program.name, target: athleteFullName })");
+    expect(actions).not.toContain("disabled: p.aiDraft");
     expect(section).toContain('p.ai_draft ? "AI draft"');
   });
   it("fits a phone: buttons and rows are at least 44px, the date and search fill the width", () => {
