@@ -23,6 +23,7 @@ import { TerminologyChooser } from "@/components/coach/desktop/terminology-choos
 import { SettingsGroup } from "@/components/shared/settings-group";
 import { ExportDataButton } from "@/components/athlete/export-data-button";
 import { FeedBroadcastSettings } from "@/components/athlete/feed-broadcast-settings";
+import { resolveShowName } from "@/lib/share-name";
 import { ShowNameOnShareToggle } from "@/components/athlete/show-name-on-share-toggle";
 import { DeleteAccountButton } from "@/components/athlete/delete-account-button";
 import { GamificationToggle } from "@/components/coach/gamification-toggle";
@@ -135,7 +136,9 @@ export default async function SettingsPage(
   // The first-name-on-shared-pictures switch (0334). Read on its own so a database that does not have the column yet still shows the whole page (the switch is just left out).
   const shareNameRead = await supabase.from("profiles").select("show_name_on_share").eq("id", athleteId).maybeSingle();
   const showNameAvailable = !shareNameRead.error;
-  const showNameOn = (shareNameRead.data as { show_name_on_share?: boolean | null } | null)?.show_name_on_share !== false;
+  // With no choice made yet the box shows what the default is for them: off under 18, on for an adult or when no date of birth is on file.
+  const ownDob = shareNameRead.error ? null : ((await supabase.from("client_intake").select("date_of_birth").eq("athlete_id", athleteId).maybeSingle()).data as { date_of_birth?: string | null } | null)?.date_of_birth ?? null;
+  const showNameOn = resolveShowName((shareNameRead.data as { show_name_on_share?: boolean | null } | null)?.show_name_on_share, ownDob);
 
   let packages: PackageOption[] = [];
   if (!isCoach) {

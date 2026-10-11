@@ -9,7 +9,7 @@ export default {
       const bob = await h.user("SN Bob");
       await h.asSuper();
       const def = await h.one("select show_name_on_share as v from public.profiles where id = $1", [ann]);
-      h.check("the name shows by default for an existing client", def.v === true);
+      h.check("an existing client has not chosen yet (empty), so the age default applies and nothing needs filling in", def.v === null);
       await h.as(ann);
       const mine = await h.rows("update public.profiles set show_name_on_share = false where id = $1 returning show_name_on_share as v", [ann]);
       h.check("a client can switch their own name off", mine.length === 1 && mine[0].v === false);
@@ -20,7 +20,7 @@ export default {
       const kept = await h.one("select show_name_on_share as v from public.profiles where id = $1", [ann]);
       h.check("the choice stays as the client set it", kept.v === false);
       const bobDefault = await h.one("select show_name_on_share as v from public.profiles where id = $1", [bob]);
-      h.check("and nobody else's changed", bobDefault.v === true);
+      h.check("and nobody else's changed", bobDefault.v === null);
     },
   },
 };

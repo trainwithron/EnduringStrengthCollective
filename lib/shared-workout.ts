@@ -1,4 +1,5 @@
 import { publicDisplayName } from "@/lib/public-name";
+import { resolveShowName } from "@/lib/share-name";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { estimateOneRepMax } from "@/lib/one-rep-max";
 import { parseNumericPaceSecondsPerUnit, formatPaceSecondsToClock } from "@/lib/progression-models";
@@ -55,6 +56,7 @@ export async function getSharedWorkout(postId: string, opts: { fullName?: boolea
   // show_name_on_share (0334): a client can keep their first name off their shared pictures. Read with the background so one round trip serves both; before the
   // column exists the read falls back to the background alone and the name shows, as it always did.
   let authorProfile = null as { preferred_share_background?: string | null; show_name_on_share?: boolean | null } | null;
+  let nameColumnThere = false;
   {
     const withName = await supabase.from("profiles").select("preferred_share_background, show_name_on_share").eq("id", post.author_id).maybeSingle();
     if (withName.error) {
@@ -62,10 +64,17 @@ export async function getSharedWorkout(postId: string, opts: { fullName?: boolea
       authorProfile = plain.data as { preferred_share_background?: string | null } | null;
     } else {
       authorProfile = withName.data as { preferred_share_background?: string | null; show_name_on_share?: boolean | null } | null;
+      nameColumnThere = true;
     }
   }
+  // No choice made yet (null): the default depends on age (off under 18, on for an adult or an unknown age), from the intake form's date of birth.
+  let authorDob: string | null = null;
+  if (nameColumnThere && !opts.fullName && (authorProfile?.show_name_on_share === null || authorProfile?.show_name_on_share === undefined)) {
+    const { data: intake } = await supabase.from("client_intake").select("date_of_birth").eq("athlete_id", post.author_id).maybeSingle();
+    authorDob = (intake as { date_of_birth?: string | null } | null)?.date_of_birth ?? null;
+  }
   // Only the public share page (the card and the picture people post) honors it; the group's own feed card shows names the way the feed always does.
-  const nameHidden = !opts.fullName && authorProfile?.show_name_on_share === false;
+  const nameHidden = !opts.fullName && nameColumnThere && !resolveShowName(authorProfile?.show_name_on_share, authorDob);
 
   const broadcastLevel: "full" | "prs_only" | "checkin_only" = post.broadcast_level ?? "full";
   const newPrs: string[] = broadcastLevel === "checkin_only" ? [] : workoutLog.new_prs ?? [];
