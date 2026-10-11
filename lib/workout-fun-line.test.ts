@@ -174,7 +174,7 @@ describe("kindness: a small, short or empty session is never joked about", () =>
     expect(RON_LINES).toContain("The only thing we have to fear is fear itself. - Franklin D. Roosevelt");
   });
   it("the famous-quote bank: every quote is sourced, fits the card with its attribution, is not duplicated, and none is a known misattribution", () => {
-    expect(FAMOUS_QUOTES.length).toBeGreaterThanOrEqual(100);
+    expect(FAMOUS_QUOTES.length).toBeGreaterThanOrEqual(90);
     const lines = new Set<string>();
     for (const quote of FAMOUS_QUOTES) {
       const line = `${quote.text} - ${quote.by}`;

@@ -1,4 +1,5 @@
 import { getVolumeEquivalence } from "./volume-equivalence";
+import { getDistanceEquivalence } from "./distance-equivalence";
 import { GYM_JOKES } from "./gym-jokes";
 import { FAMOUS_QUOTE_LINES } from "./famous-quotes";
 import { hashSeed, seededRandom } from "./seeded-pick";
@@ -177,8 +178,10 @@ export const ABSURD_LINES: string[] = [...GYM_JOKES, ...QUOTES, ...FAMOUS_QUOTE_
 
 const FITS = (s: string) => s.length <= MAX_FUN_LINE_CHARS;
 
-// How many different volume comparisons to offer from one workout's pounds (each a different object).
-const EQUIV_VARIANTS = 12;
+// How many different volume comparisons to offer from one workout's pounds (each a different unit), and how many "if those pounds were miles" lines join them (2 of 12:
+// about one in six of the comparisons).
+const EQUIV_VARIANTS = 10;
+const MILES_VARIANTS = 2;
 
 // Every line this workout could show, with its kind and stable id. Exposed so a test can render every template at edge values.
 export function funLinePool(f: WorkoutFacts): FunLine[] {
@@ -204,6 +207,13 @@ export function funLinePool(f: WorkoutFacts): FunLine[] {
       if (eq && !seen.has(eq.id) && FITS(eq.text)) {
         seen.add(eq.id);
         out.push({ id: eq.id, kind: "equiv", text: eq.text });
+      }
+    }
+    for (let i = 0; i < MILES_VARIANTS; i++) {
+      const miles = getDistanceEquivalence(f.totalVolume, `miles-${i}`);
+      if (miles && !seen.has(miles.id) && FITS(miles.text)) {
+        seen.add(miles.id);
+        out.push({ id: miles.id, kind: "equiv", text: miles.text });
       }
     }
   }
