@@ -10,6 +10,26 @@ export function isEmailConfigured(): boolean {
   return Boolean(process.env.BREVO_API_KEY && process.env.BREVO_FROM_EMAIL);
 }
 
+// One line for the server log when Brevo refuses a send: the HTTP status and Brevo's own error code and message (for example "401 unauthorized: Key not found", "400
+// invalid_parameter: sender not valid"). It never contains the API key, the recipient or the message text, and it is cut short so a surprising response cannot flood the log.
+export async function describeBrevoFailure(res: { status: number; text(): Promise<string> }): Promise<string> {
+  let code = "";
+  let message = "";
+  try {
+    const raw = await res.text();
+    try {
+      const parsed = JSON.parse(raw) as { code?: unknown; message?: unknown };
+      if (typeof parsed.code === "string") code = parsed.code;
+      if (typeof parsed.message === "string") message = parsed.message;
+    } catch {
+      message = raw;
+    }
+  } catch {
+    // no readable body: the status alone is still useful
+  }
+  return `[email] Brevo refused the send: HTTP ${res.status}${code ? ` ${code}` : ""}${message ? `: ${message}` : ""}`.slice(0, 300);
+}
+
 export async function sendEmail(to: string, subject: string, text: string): Promise<boolean> {
   const apiKey = process.env.BREVO_API_KEY;
   const from = process.env.BREVO_FROM_EMAIL;
@@ -30,8 +50,14 @@ export async function sendEmail(to: string, subject: string, text: string): Prom
         textContent: text,
       }),
     });
-    return res.ok;
-  } catch {
+    if (!res.ok) {
+      console.error(await describeBrevoFailure(res));
+      return false;
+    }
+    return true;
+  } catch (e) {
+    // Only the kind of failure (never the request, which holds the recipient and the key).
+    console.error(`[email] Brevo request failed: ${e instanceof Error ? e.name : "error"}`);
     return false;
   }
 }
