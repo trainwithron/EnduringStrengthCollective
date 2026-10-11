@@ -4,7 +4,8 @@ import { confirmDialog } from "@/components/shared/confirm-dialog";
 import type { DemoRow } from "@/lib/exercise-demo";
 import { NONE_COLLAPSED, allCollapsed, toggleAll, toggleCollapsed } from "@/lib/collapse-state";
 import { ClientPreviewButton } from "@/components/coach/desktop/client-preview";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { readCompact, toggleDay, toggleWeek, writeCompact } from "@/lib/compact-days";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { BuilderDay, BuilderExercise } from "@/lib/types";
 import { DayCard } from "./day-card";
@@ -63,7 +64,24 @@ export function WeekGrid({
   const [draggedDayId, setDraggedDayId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [daysCondensed, setDaysCondensed] = useState(false);
+  // Which days are in the compact view. Remembered in this browser for this program and week (never saved to the program); read after the first paint so the server and the
+  // browser agree on what they draw first.
+  const [compactIds, setCompactIdsState] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    try {
+      setCompactIdsState(readCompact(window.localStorage, programId, weekNumber));
+    } catch {
+      // No storage: nothing remembered.
+    }
+  }, [programId, weekNumber]);
+  function setCompactIds(next: Set<string>) {
+    setCompactIdsState(next);
+    try {
+      writeCompact(window.localStorage, programId, weekNumber, next);
+    } catch {
+      // No storage: it still works for this visit.
+    }
+  }
   // Every day opens and closes on its own: opening Day 2 leaves Day 1 open, so two or more days can be on screen together while the next one is built. (This used to be an accordion that closed
   // the others, which is why only one day would stay open.) Everything starts open; nothing here is saved.
   const [collapsedDayIds, setCollapsedDayIds] = useState<ReadonlySet<string>>(NONE_COLLAPSED);
@@ -220,11 +238,11 @@ export function WeekGrid({
         </button>
         <button
           type="button"
-          onClick={() => setDaysCondensed((v) => !v)}
-          title="Toggles each day card's own display density — separate from the Week toggle above, which shows or hides this week's days entirely."
+          onClick={() => setCompactIds(toggleWeek(new Set(compactIds), dayIds))}
+          title="Switches every day of this week between one line per exercise and the full editor. A single day can be switched on its own from its header."
           className="font-body text-xs text-steel active:text-rust transition-colors shrink-0"
         >
-          {daysCondensed ? "Full view" : "Compact view"}
+          {dayIds.length > 0 && dayIds.every((id) => compactIds.has(id)) ? "Full view" : "Compact view"}
         </button>
         <button
           type="button"
@@ -281,7 +299,7 @@ export function WeekGrid({
                 onDragEnd={() => setDraggedDayId(null)}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => handleDrop(day.id)}
-                className={`flex-[1_1_0%] min-w-[300px] max-w-[420px] ${draggedDayId === day.id ? "opacity-50" : ""}`}
+                className={`flex-[1_1_0%] ${compactIds.has(day.id) ? "min-w-[220px] max-w-[300px]" : "min-w-[300px] max-w-[420px]"} ${draggedDayId === day.id ? "opacity-50" : ""}`}
               >
                 <DayCard
                   day={day}
@@ -295,7 +313,8 @@ export function WeekGrid({
                   laddersByPattern={laddersByPattern}
                   restSuggestions={restSuggestions}
                   athleteId={athleteId}
-                  condensed={daysCondensed}
+                  condensed={compactIds.has(day.id)}
+                  onToggleCondensed={() => setCompactIds(toggleDay(new Set(compactIds), day.id))}
                   collapsed={collapsedDayIds.has(day.id)}
                   onToggleCollapse={() => handleToggleDayCollapse(day.id)}
                   onUpdate={(patch) =>

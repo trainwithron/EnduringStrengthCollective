@@ -13,7 +13,6 @@ import {
   SET_ROW_SELECT,
   mapSetRow,
   TARGET_PROP,
-  formatCondensedSets,
   type TrackedField,
 } from "@/lib/exercise-fields";
 import { parseQuickEntry, quickNote } from "@/lib/quick-entry";
@@ -23,7 +22,8 @@ import type { RestTempoSuggestion } from "@/lib/training-intent";
 import { TextNoteCard } from "../text-note-card";
 import { BulkEditDayPanel } from "./bulk-edit-day-panel";
 import { formatShortDate } from "@/lib/program-schedule";
-import { GripVertical, ChevronDown, ChevronUp } from "lucide-react";
+import { GripVertical, ChevronDown, ChevronUp, StickyNote, Video } from "lucide-react";
+import { formatCompactLine } from "@/lib/compact-line";
 import { useSaveToastChannel } from "./save-toast-channel";
 import { capitalizeWords } from "@/lib/exercise-name-case";
 import { useDayLogged } from "./use-day-logged";
@@ -59,6 +59,7 @@ export function DayCard({
   restSuggestions,
   athleteId = null,
   condensed = false,
+  onToggleCondensed,
   collapsed,
   onToggleCollapse,
   onUpdate,
@@ -77,11 +78,10 @@ export function DayCard({
   restSuggestions?: RestTempoSuggestion[];
   // The client this program was made for (null for a shared group program): when set and the day is open, the day also shows what the client logged, or the gray weight suggestions.
   athleteId?: string | null;
-  // Week-level "Collapse days" toggle — shows each exercise as one
-  // condensed line (name + sets×reps) instead of the full editable grid.
-  // Distinct from the day's own header chevron below, which hides the
-  // exercise list entirely.
+  // The compact view: each exercise is ONE line (name, sets x reps, weight when there is one); tapping a line opens its normal editor in place. Switched per day (the small
+  // button in the day's header) or for the whole week (the week's "Compact view"). Distinct from the day's own header chevron below, which hides the exercise list entirely.
   condensed?: boolean;
+  onToggleCondensed?: () => void;
   // Owned by WeekGrid. Each day opens and closes on its own: opening one never closes another.
   collapsed: boolean;
   onToggleCollapse: () => void;
@@ -107,6 +107,8 @@ export function DayCard({
   // ever reaching for the mouse.
   // Which of this day's exercise cards are collapsed (on screen only, never saved). Everything starts open, and a new exercise is added open.
   const [collapsedExerciseIds, setCollapsedExerciseIds] = useState<ReadonlySet<string>>(NONE_COLLAPSED);
+  // In the compact view: the exercises the coach has opened to edit in place.
+  const [openCompactIds, setOpenCompactIds] = useState<ReadonlySet<string>>(NONE_COLLAPSED);
   const exerciseIds = day.items.filter((i) => i.kind === "exercise").map((i) => i.id);
   const [quickEntryDraft, setQuickEntryDraft] = useState("");
   const [quickEntryError, setQuickEntryError] = useState<string | null>(null);
@@ -395,6 +397,61 @@ export function DayCard({
     );
   }
 
+  // One exercise's full editor. Used by the normal view and, in the compact view, by an exercise the coach opens inline.
+  function renderExerciseCard(item: BuilderExercise, sortedItems: BuilderItem[], index: number) {
+    return (
+                    <ExerciseBuilderCard
+                      exercise={item}
+                      collapsed={collapsedExerciseIds.has(item.id)}
+                      onToggleCollapse={() => setCollapsedExerciseIds((prev) => toggleCollapsed(prev, item.id))}
+                      workoutId={day.id}
+                      groupId={groupId}
+                      exerciseLibrary={exerciseLibrary}
+                      exerciseAliases={exerciseAliases}
+                      exerciseTierByName={exerciseTierByName}
+                      demoLibrary={demoLibrary}
+                      movementPatterns={movementPatterns}
+                      laddersByPattern={laddersByPattern}
+                      restSuggestions={restSuggestions}
+                      loggedBySet={dayLogged.logged[item.id]}
+                      suggestedWeights={dayLogged.suggestions}
+                      canMoveUp={index > 0}
+                      canMoveDown={index < sortedItems.length - 1}
+                      onMoveUp={() => moveItem(sortedItems, index, -1)}
+                      onMoveDown={() => moveItem(sortedItems, index, 1)}
+                      onUpdate={(patch) =>
+                        onItemsChange(day.items.map((i) => (i.id === item.id ? { ...i, ...patch } : i)))
+                      }
+                      onSetsChange={(sets) =>
+                        onItemsChange(
+                          day.items.map((i) =>
+                            i.id === item.id && i.kind === "exercise" ? { ...i, sets } : i
+                          )
+                        )
+                      }
+                      // A patch and a full sets replacement made back-to-back in
+                      // the same handler (e.g. removing a tracked field, or
+                      // applying a cardio preset) would otherwise race: both
+                      // onUpdate and onSetsChange close over this same render's
+                      // `day.items`, so the second call always overwrites the
+                      // first's change instead of composing with it — found
+                      // live while verifying the Energy System preset (set
+                      // count updated, but tracked_fields visibly reverted).
+                      // This single combined callback computes both fields in
+                      // one map pass instead of two sequential ones.
+                      onFieldsAndSetsChange={(trackedFields, sets) =>
+                        onItemsChange(
+                          day.items.map((i) =>
+                            i.id === item.id && i.kind === "exercise" ? { ...i, trackedFields, sets } : i
+                          )
+                        )
+                      }
+                      onDeleted={() => onItemsChange(day.items.filter((i) => i.id !== item.id))}
+                      onDuplicated={(newExercise) => insertAfter(item.id, newExercise)}
+                    />
+    );
+  }
+
   return (
     <div className="border border-steel/20 bg-surface/40 rounded-token-lg flex flex-col">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-4 py-3 border-b border-steel/20 bg-surface">
@@ -424,6 +481,17 @@ export function DayCard({
             className="font-body text-xs text-steel active:text-rust transition-colors shrink-0 min-h-11 sm:min-h-0 px-1"
           >
             {allCollapsed(collapsedExerciseIds, exerciseIds) ? "Expand all" : "Collapse all"}
+          </button>
+        )}
+        {onToggleCondensed && (
+          <button
+            type="button"
+            onClick={onToggleCondensed}
+            aria-pressed={condensed}
+            title={condensed ? "Show this day in full" : "Show this day as one line per exercise"}
+            className={`font-body text-xs transition-colors shrink-0 min-h-11 sm:min-h-0 px-1 ${condensed ? "text-rust" : "text-steel active:text-rust"}`}
+          >
+            {condensed ? "Full" : "Compact"}
           </button>
         )}
         <ClientPreviewButton days={[day]} heading={day.title || `Day ${day.dayIndex + 1}`} label="Preview" demoLibrary={demoLibrary} />
@@ -484,32 +552,57 @@ export function DayCard({
       )}
 
       {!collapsed && condensed && (
-        <div className="flex-1 p-3">
+        <div className="flex-1 p-2">
           {(() => {
             const sortedItems = day.items.slice().sort((a, b) => a.order - b.order);
             if (sortedItems.length === 0) {
-              return <p className="font-body text-xs text-steel py-1">No exercises yet.</p>;
+              return <p className="font-body text-xs text-steel py-1 px-1">No exercises yet.</p>;
             }
             return (
-              <div className="divide-y divide-steel/15">
-                {sortedItems.map((item) =>
-                  item.kind === "exercise" ? (
-                    <div key={item.id} className="py-2 flex items-center justify-between gap-2">
-                      <span className="font-body text-sm truncate">
-                        {item.exerciseName || "Untitled exercise"}
-                      </span>
-                      <span className="font-body text-xs text-steel shrink-0">
-                        {formatCondensedSets(item.sets, item.trackedFields)}
-                      </span>
-                    </div>
-                  ) : (
-                    <div key={item.id} className="py-2">
-                      <span className="font-body text-xs text-steel italic truncate block">
-                        {item.body || "Note"}
-                      </span>
-                    </div>
-                  )
-                )}
+              <div className="divide-y divide-steel/15" data-testid="compact-day-list">
+                {sortedItems.map((item, index) => {
+                  if (item.kind === "note") {
+                    return (
+                      <div key={item.id} className="py-1.5 px-1 flex items-center gap-1.5 min-w-0" title={item.body}>
+                        <StickyNote className="w-3.5 h-3.5 text-steel shrink-0" aria-hidden="true" />
+                        <span className="font-body text-xs text-steel italic truncate">{item.body || "Note"}</span>
+                      </div>
+                    );
+                  }
+                  if (openCompactIds.has(item.id)) {
+                    return (
+                      <div key={item.id} className="py-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setOpenCompactIds((prev) => toggleCollapsed(prev, item.id))}
+                          className="font-body text-xs text-steel active:text-rust min-h-9 px-1"
+                        >
+                          Close editor
+                        </button>
+                        {renderExerciseCard(item, sortedItems, index)}
+                      </div>
+                    );
+                  }
+                  const loggedFirst = Object.values(dayLogged.logged[item.id] ?? {})[0]?.weight;
+                  const loggedWeight = loggedFirst != null && Number.isFinite(Number(loggedFirst)) ? Number(loggedFirst) : null;
+                  const hasVideo =
+                    !!item.videoPath || !!item.youtubeUrl || demoLibrary.some((demo) => demo.name.toLowerCase() === item.exerciseName.toLowerCase() && (demo.videoPath || demo.youtubeUrl));
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setOpenCompactIds((prev) => toggleCollapsed(prev, item.id))}
+                      aria-expanded={false}
+                      title="Open this exercise to edit it"
+                      className="w-full flex items-center gap-1.5 py-2 px-1 min-h-9 text-left active:bg-surface/60"
+                    >
+                      <span className="font-body text-sm truncate flex-1 min-w-0">{item.displayName || item.exerciseName || "Untitled exercise"}</span>
+                      {item.notes && <StickyNote className="w-3.5 h-3.5 text-steel shrink-0" aria-label="Has a coach note" />}
+                      {hasVideo && <Video className="w-3.5 h-3.5 text-steel shrink-0" aria-label="Has a demo video" />}
+                      <span className="font-body text-xs text-steel shrink-0 [font-variant-numeric:tabular-nums]">{formatCompactLine(item.sets, item.trackedFields, loggedWeight)}</span>
+                    </button>
+                  );
+                })}
               </div>
             );
           })()}
@@ -558,55 +651,7 @@ export function DayCard({
                     </p>
                   )}
                   {item.kind === "exercise" ? (
-                    <ExerciseBuilderCard
-                      exercise={item}
-                      collapsed={collapsedExerciseIds.has(item.id)}
-                      onToggleCollapse={() => setCollapsedExerciseIds((prev) => toggleCollapsed(prev, item.id))}
-                      workoutId={day.id}
-                      groupId={groupId}
-                      exerciseLibrary={exerciseLibrary}
-                      exerciseAliases={exerciseAliases}
-                      exerciseTierByName={exerciseTierByName}
-                      demoLibrary={demoLibrary}
-                      movementPatterns={movementPatterns}
-                      laddersByPattern={laddersByPattern}
-                      restSuggestions={restSuggestions}
-                      loggedBySet={dayLogged.logged[item.id]}
-                      suggestedWeights={dayLogged.suggestions}
-                      canMoveUp={index > 0}
-                      canMoveDown={index < sortedItems.length - 1}
-                      onMoveUp={() => moveItem(sortedItems, index, -1)}
-                      onMoveDown={() => moveItem(sortedItems, index, 1)}
-                      onUpdate={(patch) =>
-                        onItemsChange(day.items.map((i) => (i.id === item.id ? { ...i, ...patch } : i)))
-                      }
-                      onSetsChange={(sets) =>
-                        onItemsChange(
-                          day.items.map((i) =>
-                            i.id === item.id && i.kind === "exercise" ? { ...i, sets } : i
-                          )
-                        )
-                      }
-                      // A patch and a full sets replacement made back-to-back in
-                      // the same handler (e.g. removing a tracked field, or
-                      // applying a cardio preset) would otherwise race: both
-                      // onUpdate and onSetsChange close over this same render's
-                      // `day.items`, so the second call always overwrites the
-                      // first's change instead of composing with it — found
-                      // live while verifying the Energy System preset (set
-                      // count updated, but tracked_fields visibly reverted).
-                      // This single combined callback computes both fields in
-                      // one map pass instead of two sequential ones.
-                      onFieldsAndSetsChange={(trackedFields, sets) =>
-                        onItemsChange(
-                          day.items.map((i) =>
-                            i.id === item.id && i.kind === "exercise" ? { ...i, trackedFields, sets } : i
-                          )
-                        )
-                      }
-                      onDeleted={() => onItemsChange(day.items.filter((i) => i.id !== item.id))}
-                      onDuplicated={(newExercise) => insertAfter(item.id, newExercise)}
-                    />
+                    renderExerciseCard(item, sortedItems, index)
                   ) : (
                     <TextNoteCard
                       noteId={item.id}

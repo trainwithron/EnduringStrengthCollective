@@ -24,7 +24,8 @@ describe("the program builder header", () => {
   });
   it("day cards share the row (300px to 420px each) and the '+ Day' placeholder is a narrow button", () => {
     const grid = read("components/coach/desktop/week-grid.tsx");
-    expect(grid).toContain("flex-[1_1_0%] min-w-[300px] max-w-[420px]");
+    expect(grid).toContain("flex-[1_1_0%]");
+    expect(grid).toContain("min-w-[300px] max-w-[420px]");
     expect(grid).toContain("w-[72px] shrink-0 min-h-[120px]");
   });
 });

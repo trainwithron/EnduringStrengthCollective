@@ -43,7 +43,8 @@ describe("the program builder uses the full width", () => {
   it("a week's days share the width equally (at least 300px, at most 420px) inside the pan row, and + Day is narrow", () => {
     const grid = read("components/coach/desktop/week-grid.tsx");
     expect(grid).toContain("<WeekDayRow>");
-    expect(grid).toContain("flex-[1_1_0%] min-w-[300px] max-w-[420px]");
+    expect(grid).toContain("flex-[1_1_0%]");
+    expect(grid).toContain("min-w-[300px] max-w-[420px]");
     expect(grid).toContain("w-[72px] shrink-0");
     expect(grid).not.toContain("w-[420px] max-w-full shrink-0");
     const row = read("components/coach/desktop/week-day-row.tsx");
