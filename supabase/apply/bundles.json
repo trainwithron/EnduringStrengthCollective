@@ -245,6 +245,14 @@
   "file": "apply-release-ai-all.sql"
  },
  {
+  "id": "release-an",
+  "name": "Release AN (the 'what do you call your people' card is asked once, for good; run any time)",
+  "steps": [
+   "82"
+  ],
+  "file": "apply-release-an-all.sql"
+ },
+ {
   "id": "release-am",
   "name": "Release AM (assigning an unused no-client program to one client attaches it instead of copying it; run any time)",
   "steps": [

@@ -126,7 +126,6 @@ export default async function CoachHomePage() {
   // The organization they last used (the switcher remembers it); with none remembered, the one with the most clients.
   const rememberedWorkspace = (await cookies()).get(LAST_WORKSPACE_GROUP_COOKIE)?.value ?? null;
   const todayKey = new Date().toISOString().slice(0, 10);
-
   // Round 1: everything that needs only who the coach is, as one batch.
   const [
     // A coach can own/admin more than one organization (e.g. running several client orgs at once) — fetching every row here, not just
@@ -136,6 +135,9 @@ export default async function CoachHomePage() {
     coachedForOrg,
     { data: viewerProfile },
     { data: coachProfileRow },
+    // Has this coach already answered "What do you call your people?" (migration 0336)? Its own select, in this same batch (no extra round), so a database without the column yet leaves the rest
+    // of Home alone: an error here means unknown (null), and the card then relies on this browser's memory only.
+    askedRead,
     // Separate on purpose: until migration 0249 is applied this select errors and the field is just empty.
     { data: completionMessageRow },
     // Same merge shape GroupSwitcher already uses: every group this coach coaches, plus every group in each org where they're an owner/admin.
@@ -153,6 +155,7 @@ export default async function CoachHomePage() {
     getCoachedGroups(supabase, user.id),
     supabase.from("profiles").select("full_name, timezone").eq("id", user.id).maybeSingle(),
     supabase.from("coach_profiles").select("bio, photo_url").eq("coach_id", user.id).maybeSingle(),
+    supabase.from("profiles").select("terminology_asked_at").eq("id", user.id).maybeSingle(),
     supabase.from("coach_profiles").select("completion_message").eq("coach_id", user.id).maybeSingle(),
     supabase.from("group_memberships").select("groups ( id, name, focus_tag, group_kind, organization_id )").eq("profile_id", user.id).eq("role", "coach"),
     supabase.from("coach_dashboard_layout").select("hidden_tiles, tile_order, tile_metric_overrides").eq("coach_id", user.id).maybeSingle(),
@@ -544,7 +547,7 @@ export default async function CoachHomePage() {
         <MarkAllSeenButton groupIds={allGroupIds} />
       </div>
 
-      {allGroups[0] && <TerminologyFirstRunCard groupId={allGroups[0].id} />}
+      {allGroups[0] && <TerminologyFirstRunCard groupId={allGroups[0].id} askedOnServer={askedRead.error ? null : !!(askedRead.data as { terminology_asked_at?: string | null } | null)?.terminology_asked_at} />}
 
       {clientCards.length === 0 && teamCards.length === 0 && socialCards.length === 0 && allGroups[0] && (
         <GettingStartedCard groupId={(allGroups.find((g) => g.group_kind !== "one_on_one") ?? allGroups[0]).id} />

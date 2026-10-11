@@ -1186,6 +1186,24 @@ for (const s of steps) {
   const errAM2 = await run(`apply/${bundle.file}`);
   check("release-am: the bundle applies again after an undo" + (errAM2 ? ": " + errAM2 : ""), !errAM2 && (await has()));
 }
+// Release AN (step 82): ONE paste.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-an");
+  check("release-an: ONE bundle holds step 82", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["82"]));
+  const st82 = steps.find((x) => x.n === "82");
+  const has = async () => (await db.query("select exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'terminology_asked_at') as ok")).rows[0].ok === true;
+  const ean0 = await run(`apply/undo-step${st82.n}-${st82.slug}.sql`);
+  check("release-an: before the bundle runs the column is absent" + (ean0 ? ": " + ean0 : ""), !ean0 && !(await has()));
+  const errAN = await run(`apply/${bundle.file}`);
+  check("release-an bundle applies on the live-shaped state" + (errAN ? ": " + errAN : ""), !errAN && (await has()));
+  const againAN = await run(`apply/${bundle.file}`);
+  check("release-an: a second run is refused, naming step 82 (" + againAN + ")", !!againAN && againAN.includes("step 82 (0336) cannot run") && againAN.includes("already applied"));
+  const euAN = await run(`apply/undo-step${st82.n}-${st82.slug}.sql`);
+  check("release-an: the undo removes the column" + (euAN ? ": " + euAN : ""), !euAN && !(await has()));
+  const errAN2 = await run(`apply/${bundle.file}`);
+  check("release-an: the bundle applies again after an undo" + (errAN2 ? ": " + errAN2 : ""), !errAN2 && (await has()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.

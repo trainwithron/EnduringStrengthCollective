@@ -1664,6 +1664,20 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the tables the attach checks exist", "to_regclass('public.workout_logs') is not null and to_regclass('public.athlete_sessions') is not null and to_regclass('public.workout_assignments') is not null and to_regclass('public.challenges') is not null and to_regclass('public.exercise_progressions') is not null"],
     ],
   },
+  {
+    n: "82",
+    slug: "0336",
+    title: "0336 The 'What do you call your people?' card is asked once, for good (remembered on the coach's profile; every coach already here counts as answered)",
+    migrations: ["0336"],
+    sees: "Success. No rows returned.",
+    afterwards: "Every coach who is already in the app is marked as having answered, so none of them see the card again, and it no longer comes back on a new browser or device. A coach who joins later is asked once.",
+    undo: "alter table public.profiles drop column if exists terminology_asked_at;",
+    undoWhy: "Only if step 82 misbehaves. Removes the column (the card goes back to being remembered by each browser only).",
+    rows: [
+      ["0336 is not already applied (profiles has no terminology_asked_at yet)", has.noCol("profiles", "terminology_asked_at")],
+      ["coaches are recorded in group_memberships", has.col("group_memberships", "role")],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -1767,6 +1781,7 @@ const BUNDLES = [
   { id: "release-aa", name: "Release AA (every session costs exactly 1 credit; the waitlist offer shows the coach's time zone)", steps: ["75"] },
   { id: "release-ah", name: "Release AH (only a real coach can have a public booking page or website)", steps: ["76"] },
   { id: "release-ai", name: "Release AI (a payment and its sessions are recorded in one step; run BEFORE the code that uses it deploys)", steps: ["77"] },
+  { id: "release-an", name: "Release AN (the 'what do you call your people' card is asked once, for good; run any time)", steps: ["82"] },
   { id: "release-am", name: "Release AM (assigning an unused no-client program to one client attaches it instead of copying it; run any time)", steps: ["81"] },
   { id: "release-al", name: "Release AL (a client can switch their first name off shared workout pictures; run any time)", steps: ["80"] },
   { id: "release-ak", name: "Release AK (a one-on-one space stays a one-on-one space: its programs must be for its client, group-only features are refused there; run AFTER Release AJ)", steps: ["79"] },
@@ -1956,6 +1971,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0329", "exists (select 1 from pg_constraint where conname = 'session_types_credit_cost_is_one')"),
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
+    m("0336", has.col("profiles", "terminology_asked_at")),
     m("0335", "to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)') is not null"),
     m("0334", has.col("profiles", "show_name_on_share")),
     m("0333", "to_regprocedure('public.one_on_one_athlete(uuid)') is not null"),

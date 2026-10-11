@@ -8,7 +8,7 @@ import { capFirst } from "@/lib/term-text";
 
 // "What do you call your people?" (Ron, Oct 6): the word is chosen once, here (the first-run card on Home and the coach's Settings), and then it reads as plain
 // text everywhere. One tap on a button applies it coach-wide; "Something else" takes your own word.
-function Chooser({ moreHref }: { moreHref?: string }) {
+function Chooser({ moreHref, onChosen }: { moreHref?: string; onChosen?: () => void }) {
   const { overrides, setOverride } = useTerminology();
   const [custom, setCustom] = useState(false);
   const [customText, setCustomText] = useState("");
@@ -31,6 +31,7 @@ function Chooser({ moreHref }: { moreHref?: string }) {
               setCustom(false);
               if (o.id === "default") setOverride("client", null);
               else setOverride("client", { kind: "preset", value: o.id });
+              onChosen?.();
             }}
             className={`h-11 px-4 border font-body text-sm ${o.selected ? "border-rust text-rust" : "border-steel/30 text-chalk"}`}
           >
@@ -54,6 +55,7 @@ function Chooser({ moreHref }: { moreHref?: string }) {
             const text = customText.trim();
             if (!text) return;
             setOverride("client", { kind: "custom", value: text });
+            onChosen?.();
             setCustom(false);
             setCustomText("");
           }}
@@ -87,12 +89,13 @@ function Chooser({ moreHref }: { moreHref?: string }) {
 }
 
 // It uses the page's own vocabulary when the page has one (so the whole screen updates at once), and brings its own otherwise (Settings on a phone).
-export function TerminologyChooser({ groupId, moreHref }: { groupId?: string; moreHref?: string }) {
+// onChosen: called when the coach picks ANY word (the default included), so the first-run card can count that as the answer.
+export function TerminologyChooser({ groupId, moreHref, onChosen }: { groupId?: string; moreHref?: string; onChosen?: () => void }) {
   const { mounted } = useTerminology();
-  if (mounted) return <Chooser moreHref={moreHref} />;
+  if (mounted) return <Chooser moreHref={moreHref} onChosen={onChosen} />;
   return (
     <TerminologyProvider groupId={groupId}>
-      <Chooser moreHref={moreHref} />
+      <Chooser moreHref={moreHref} onChosen={onChosen} />
     </TerminologyProvider>
   );
 }
