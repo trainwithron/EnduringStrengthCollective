@@ -23,7 +23,8 @@ describe("assigning a program from a client's profile", () => {
     expect(menu).toContain("startDate: startDate || undefined");
     expect(menu).toContain("Start date");
     expect(menu).toContain("Assign program\n");
-    expect(read("components/coach/desktop/program-card-menu.tsx")).toContain("Assign program\n");
+    expect(read("components/coach/desktop/program-assign-panel.tsx")).toContain("Start date");
+    expect(read("components/coach/desktop/program-card-menu.tsx")).toContain("Assign…");
     expect(read("components/coach/desktop/program-card-menu.tsx")).not.toContain("Assign to Client\n");
   });
 });

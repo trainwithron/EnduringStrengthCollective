@@ -5,15 +5,11 @@ import { join } from "node:path";
 const read = (rel: string) => readFileSync(join(__dirname, "..", "..", rel), "utf8").replace(/\r\n/g, "\n");
 
 describe("Assign cannot run twice from a quick double click", () => {
-  const menu = read("components/coach/desktop/program-card-menu.tsx");
-  it("the program menu's three assign handlers all go through one in-flight guard set before the first await", () => {
-    expect(menu).toContain("const assigning = useRef(false);");
-    expect(menu).toContain("return once(() => assignToPosition(position));");
-    expect(menu).toContain("return once(() => assignToClient(client));");
-    expect(menu).toContain("return once(assignToSelf);");
-    const once = menu.slice(menu.indexOf("async function once("), menu.indexOf("const [error"));
-    expect(once.indexOf("assigning.current = true")).toBeLessThan(once.indexOf("await run()"));
-    expect(once).toContain("finally");
+  const panel = read("components/coach/desktop/program-assign-panel.tsx");
+  it("the Assign panel's button is guarded by busy, set before the first await", () => {
+    expect(panel).toContain("if (busy || count === 0) return;");
+    expect(panel.indexOf("setBusy(true);\n    setError(null);\n    setMessage(null);")).toBeLessThan(panel.indexOf("await ensureSignedOff("));
+    expect(panel).toContain("disabled={busy || count === 0}");
   });
   it("the client's Programs-tab picker has the same guard", () => {
     const actions = read("components/coach/client-program-actions.tsx");
@@ -23,12 +19,10 @@ describe("Assign cannot run twice from a quick double click", () => {
 });
 
 describe("the assigned message matches what happened", () => {
-  const menu = read("components/coach/desktop/program-card-menu.tsx");
-  it("an attached program says it is theirs now; a copy still says they have their own copy", () => {
-    expect(menu).toContain("attached: result.attached");
-    expect(menu).toContain("They have been notified. This program is theirs now.");
-    expect(menu).toContain("They have been notified and now have their own copy.");
-    expect(menu).toContain('assigned.attached ? "Open their program" : "Open their copy"');
+  const panel = read("components/coach/desktop/program-assign-panel.tsx");
+  it("says how many people got their own version, and lists the failures", () => {
+    expect(panel).toContain("Assigned to ${ok} ${ok === 1 ? \"person\" : \"people\"}.");
+    expect(panel).toContain("Couldn't assign to");
   });
 });
 

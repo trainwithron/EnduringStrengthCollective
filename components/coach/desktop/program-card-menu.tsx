@@ -7,15 +7,11 @@ import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { clampedLeft, clampedWidth } from "@/lib/viewport-clamp";
-import { assignProgramToClient, duplicateProgram } from "@/lib/program-duplication";
-import { APPROVE_AND_ASSIGN_FAILED, ensureSignedOff } from "@/components/coach/approve-and-assign";
-import { notifyPush } from "@/lib/push-notify";
-import { localDateKey } from "@/lib/timezone";
+import { duplicateProgram } from "@/lib/program-duplication";
+import { ProgramAssignPanel } from "@/components/coach/desktop/program-assign-panel";
+import { assignedBlockMessage, loadAssignedTo } from "@/lib/program-assigned";
 import { MoreVertical } from "lucide-react";
 import { hideProgramMessage } from "@/lib/program-archive";
-import { SearchPickList } from "@/components/coach/search-pick-list";
-import { loadAssignableClients, type AssignClient } from "@/lib/assign-clients";
-import { useTerm } from "@/components/coach/terminology-provider";
 
 const MENU_WIDTH = 256;
 // Never wider than the screen minus a margin on each side (a phone is narrower than the menu plus its margins).
@@ -31,32 +27,11 @@ interface GroupOption {
   id: string;
   name: string;
 }
-interface PositionOption {
-  id: string;
-  name: string;
-  athleteCount: number;
-}
-interface BulkAssignResult {
-  succeeded: number;
-  total: number;
-  failedNames: string[];
-  positionName: string;
-}
-
 type View =
   | "menu"
-  | "assign"
-  | "assign-self"
-  | "assign-position"
-  | "assign-position-result"
-  | "assigned"
+  | "duplicate"
   | "duplicate-org"
   | "duplicate-group";
-
-// The coach's own calendar day on the device in their hand, not UTC's: after about 5pm Pacific the UTC date is already tomorrow.
-function todayDateString(): string {
-  return localDateKey();
-}
 
 export function ProgramCardMenu({
   programId,
@@ -88,34 +63,15 @@ export function ProgramCardMenu({
   onRename?: () => void;
 }) {
   const router = useRouter();
-  const term = useTerm();
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<View | null>(null);
-  // Set after a single-client assignment so the coach sees it worked before
-  // anything else happens, instead of being dropped into the copy's builder.
-  const [assigned, setAssigned] = useState<{ programId: string; clientName: string; groupId: string; attached: boolean } | null>(null);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
-  const [clients, setClients] = useState<AssignClient[] | null>(null);
   const [orgs, setOrgs] = useState<OrgOption[] | null>(null);
   const [orgGroups, setOrgGroups] = useState<GroupOption[] | null>(null);
-  const [positions, setPositions] = useState<PositionOption[] | null>(null);
-  const [assignProgress, setAssignProgress] = useState<string | null>(null);
-  const [bulkResult, setBulkResult] = useState<BulkAssignResult | null>(null);
+  const [assignOpen, setAssignOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  // Set BEFORE the first await of an assign (the sign-off), so a second click while it runs cannot start a second assign: state updates too late for that.
-  const assigning = useRef(false);
-  async function once(run: () => Promise<void>) {
-    if (assigning.current) return;
-    assigning.current = true;
-    try {
-      await run();
-    } finally {
-      assigning.current = false;
-    }
-  }
   const [error, setError] = useState<string | null>(null);
-  const [assignStartDate, setAssignStartDate] = useState(todayDateString());
 
   // Rendered through a portal (see the return below) instead of a plain
   // absolutely-positioned child — every program card wraps its content in
@@ -124,12 +80,9 @@ export function ProgramCardMenu({
   // trigger button, worse on smaller card sizes. A portal to <body>,
   // positioned from the trigger's real screen coordinates, escapes that
   // ancestor entirely.
-  // The plain Assign button on a program in the library (no client yet): opens the same assign step as the menu's "Assign program".
+  // The plain Assign button on a program in the library (no client yet): opens the same Assign panel as the menu's "Assign…".
   function openAssign() {
-    openMenu();
-    setAssignStartDate(todayDateString());
-    setView("assign");
-    loadClients();
+    setAssignOpen(true);
   }
 
   function openMenu() {
@@ -177,17 +130,6 @@ export function ProgramCardMenu({
     };
   }, [view]);
 
-  // EVERY client of the coach, in any group they coach: a program lives in one group (a one-on-one space, say) but may be meant for a client who is somewhere else.
-  async function loadClients() {
-    if (clients) return;
-    const supabase = createBrowserClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return;
-    setClients(await loadAssignableClients(supabase, user.id, groupId));
-  }
-
   // Only orgs this coach owns/admins — the same permission level
   // components/coach/desktop/group-switcher.tsx already checks for
   // switching between groups. Duplicating into a group you merely coach
@@ -222,204 +164,6 @@ export function ProgramCardMenu({
       .order("name");
     setOrgGroups(data ?? []);
     setView("duplicate-group");
-  }
-
-  // Same "load positions with real players, ignore empty ones" shape
-  // already used by the position-aware leaderboard and Team Depth Chart —
-  // this menu doesn't pre-check whether any exist before showing the
-  // button (same as "Duplicate to another organization →" below), it
-  // just shows an empty state once loaded.
-  async function loadPositions() {
-    if (positions) return;
-    const supabase = createBrowserClient();
-    const [{ data: posRows }, { data: memberRows }] = await Promise.all([
-      supabase.from("group_positions").select("id, name, sort_order").eq("group_id", groupId).order("sort_order"),
-      supabase
-        .from("group_memberships")
-        .select("position_id")
-        .eq("group_id", groupId)
-        .eq("role", "athlete")
-        .not("position_id", "is", null),
-    ]);
-    const countByPosition = new Map<string, number>();
-    for (const m of memberRows ?? []) {
-      countByPosition.set(m.position_id, (countByPosition.get(m.position_id) ?? 0) + 1);
-    }
-    const options = (posRows ?? [])
-      .map((p) => ({ id: p.id, name: p.name, athleteCount: countByPosition.get(p.id) ?? 0 }))
-      .filter((p) => p.athleteCount > 0);
-    setPositions(options);
-  }
-
-  function handleAssignToPosition(position: PositionOption) {
-    return once(() => assignToPosition(position));
-  }
-
-  async function assignToPosition(position: PositionOption) {
-    const supabase = createBrowserClient();
-    const { data: memberRows } = await supabase
-      .from("group_memberships")
-      .select("profile_id, profiles ( full_name )")
-      .eq("group_id", groupId)
-      .eq("position_id", position.id)
-      .eq("role", "athlete");
-    const athletes = (memberRows ?? [])
-      .map((row: any) => ({ id: row.profile_id, fullName: row.profiles?.full_name ?? "Unknown" }))
-      .filter((a) => !!a.id);
-    if (athletes.length === 0) return;
-
-    if (
-      !await confirmDialog({
-        message: `Assign "${programName}" to all ${athletes.length} athletes on ${position.name}?\n\n${athletes
-          .map((a) => a.fullName)
-          .join(", ")}`,
-        confirmLabel: "Assign",
-      })
-    ) {
-      return;
-    }
-    // An AI draft: the coach's click IS the approval (the existing sign-off runs first, without making the original active).
-    if ((await ensureSignedOff({ aiDraft, programId })) === "failed") {
-      setError(APPROVE_AND_ASSIGN_FAILED);
-      return;
-    }
-
-    setBusy(true);
-    setError(null);
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      setBusy(false);
-      return;
-    }
-
-    let succeeded = 0;
-    const failedNames: string[] = [];
-    for (let i = 0; i < athletes.length; i++) {
-      const athlete = athletes[i];
-      setAssignProgress(`Assigning ${i + 1} of ${athletes.length}…`);
-      const result = await duplicateProgram(supabase, {
-        sourceProgramId: programId,
-        destinationGroupId: groupId,
-        createdBy: user.id,
-        athleteId: athlete.id,
-        clientName: athlete.fullName,
-        startDate: assignStartDate || undefined,
-      });
-      if ("error" in result) {
-        failedNames.push(athlete.fullName);
-      } else {
-        succeeded++;
-        notifyPush(
-          athlete.id,
-          "New program",
-          `Your coach assigned you a new program: ${programName} — ${athlete.fullName}`,
-          `/groups/${groupId}/programs/${result.programId}`
-        );
-      }
-    }
-
-    setBusy(false);
-    setAssignProgress(null);
-    setBulkResult({ succeeded, total: athletes.length, failedNames, positionName: position.name });
-    setView("assign-position-result");
-  }
-
-  function handleAssignToClient(client: AssignClient) {
-    return once(() => assignToClient(client));
-  }
-
-  async function assignToClient(client: AssignClient) {
-    // An AI draft: the click on Assign IS the approval (the existing sign-off runs first, without making the original active).
-    if ((await ensureSignedOff({ aiDraft, programId })) === "failed") {
-      setError(APPROVE_AND_ASSIGN_FAILED);
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    const supabase = createBrowserClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      setBusy(false);
-      return;
-    }
-
-    // The copy goes into the CLIENT'S OWN space (their one-on-one group, else the program's group if they are in it, else the first group of theirs), never assumed to be this program's group.
-    // A program with no client on it that nothing depends on becomes this client's program (no copy is left behind); any other program is copied, as before.
-    const result = await assignProgramToClient(supabase, {
-      sourceProgramId: programId,
-      destinationGroupId: client.destinationGroupId,
-      athleteId: client.id,
-      clientName: client.fullName,
-      startDate: assignStartDate || undefined,
-    });
-
-    setBusy(false);
-    if ("error" in result) {
-      setError(result.error);
-      return;
-    }
-    // Mirrors notify_on_program_assigned (migration 0071) — the DB
-    // trigger already writes the in-app notification row for this same
-    // insert; a trigger can't also fire the push itself, so this fires
-    // it right after the duplication it already knows succeeded. Uses
-    // the same suffixed name (lib/program-duplication.ts) the trigger
-    // itself reads off the new row, not the source program's plain name.
-    notifyPush(
-      client.id,
-      "New program",
-      `Your coach assigned you a new program: ${programName} — ${client.fullName}`,
-      `/groups/${client.destinationGroupId}/programs/${result.programId}`
-    );
-    setAssigned({ programId: result.programId, clientName: client.fullName, groupId: client.destinationGroupId, attached: result.attached });
-    setView("assigned");
-  }
-
-  function handleAssignToSelf() {
-    return once(assignToSelf);
-  }
-
-  async function assignToSelf() {
-    if ((await ensureSignedOff({ aiDraft, programId })) === "failed") {
-      setError(APPROVE_AND_ASSIGN_FAILED);
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    const supabase = createBrowserClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      setBusy(false);
-      return;
-    }
-
-    // The coach's own training lives in their personal space (one set that follows them into every organization), made the first time it is needed.
-    const { data: spaceId, error: spaceError } = await supabase.rpc("ensure_personal_space");
-    if (!spaceId) {
-      setBusy(false);
-      setError(spaceError?.message?.includes("Only coaches") ? "Only coaches have a personal space." : "Couldn't set that up. Try again.");
-      return;
-    }
-    // Attaches when the program qualifies (no copy is left behind), otherwise makes a copy, like assigning to any client.
-    const result = await assignProgramToClient(supabase, {
-      sourceProgramId: programId,
-      destinationGroupId: spaceId as string,
-      athleteId: user.id,
-      startDate: assignStartDate || undefined,
-    });
-
-    setBusy(false);
-    if ("error" in result) {
-      setError(result.error);
-      return;
-    }
-    // Lands in the coach's own client app, with the program ready to run.
-    router.push(`/my-training/open?group=${spaceId}`);
   }
 
   async function handleDuplicateSameGroup() {
@@ -514,6 +258,12 @@ export function ProgramCardMenu({
   }
 
   async function handleDelete() {
+    // A program that people have their own versions of is not deleted from under them: remove it from them first, or hide it.
+    const assignedCount = (await loadAssignedTo(createBrowserClient(), programId)).length;
+    if (assignedCount > 0) {
+      setError(assignedBlockMessage(assignedCount));
+      return;
+    }
     if (!await confirmDialog(`Delete "${programName}"? Any real logged history stays intact.`)) return;
     setBusy(true);
     setError(null);
@@ -543,6 +293,10 @@ export function ProgramCardMenu({
       >
         <MoreVertical className="w-4 h-4" />
       </button>
+
+      {assignOpen && (
+        <ProgramAssignPanel programId={programId} programName={programName} groupId={groupId} aiDraft={aiDraft} onClose={() => setAssignOpen(false)} onChanged={() => router.refresh()} />
+      )}
 
       {view && position && createPortal(
         <div
@@ -575,52 +329,19 @@ export function ProgramCardMenu({
                   <button
                     type="button"
                     onClick={() => {
-                      setAssignStartDate(todayDateString());
-                      setView("assign");
-                      loadClients();
-                    }}
-                    className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50 disabled:opacity-50"
-                  >
-                    Assign program
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAssignStartDate(todayDateString());
-                      setView("assign-position");
-                      loadPositions();
+                      setView(null);
+                      setAssignOpen(true);
                     }}
                     className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50"
                   >
-                    Assign to Position →
+                    Assign…
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setAssignStartDate(todayDateString());
-                      setView("assign-self");
-                    }}
+                    onClick={() => setView("duplicate")}
                     className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50"
                   >
-                    Assign to Myself
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={handleDuplicateSameGroup}
-                    className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50 disabled:opacity-40"
-                  >
-                    {busy ? "Duplicating…" : "Duplicate"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setView("duplicate-org");
-                      loadOrgs();
-                    }}
-                    className="w-full text-left px-3 py-2.5 font-body text-xs text-steel hover:bg-graphite/50"
-                  >
-                    Duplicate to another organization →
+                    Duplicate…
                   </button>
                 </>
               )}
@@ -645,151 +366,26 @@ export function ProgramCardMenu({
             </div>
           )}
 
-          {view === "assign" && (
+          {view === "duplicate" && (
             <div>
-              <p className="font-body text-xs text-steel uppercase tracking-wide px-3 pt-2.5 pb-1.5">
-                Assign to which {term("client")}?
-              </p>
-              <div className="px-3 pb-2">
-                <label className="font-body text-xs text-steel">
-                  Start date
-                  <input
-                    type="date"
-                    value={assignStartDate}
-                    onChange={(e) => setAssignStartDate(e.target.value)}
-                    className="w-full h-8 mt-1 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"
-                  />
-                </label>
-              </div>
-              <div className="px-3 pb-3">
-                <SearchPickList
-                  items={clients ? clients.map((c) => ({ key: c.id, label: c.fullName, sub: c.hint })) : null}
-                  onPick={(id) => {
-                    const c = clients?.find((x) => x.id === id);
-                    if (c) void handleAssignToClient(c);
-                  }}
-                  busyKey={busy ? "busy" : null}
-                  emptyText="You have no clients yet."
-                  searchLabel={`Search your ${term("client", "plural")}`}
-                />
-              </div>
-            </div>
-          )}
-
-          {view === "assign-self" && (
-            <div className="p-3">
-              <p className="font-body text-xs text-steel uppercase tracking-wide pb-1.5">
-                Assign to yourself
-              </p>
-              <label className="font-body text-xs text-steel">
-                Start date
-                <input
-                  type="date"
-                  value={assignStartDate}
-                  onChange={(e) => setAssignStartDate(e.target.value)}
-                  className="w-full h-8 mt-1 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"
-                />
-              </label>
+              <p className="font-body text-xs text-steel uppercase tracking-wide px-3 pt-2.5 pb-1.5">Duplicate &ldquo;{programName}&rdquo;</p>
               <button
                 type="button"
                 disabled={busy}
-                onClick={handleAssignToSelf}
-                className="w-full h-8 mt-2.5 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
+                onClick={handleDuplicateSameGroup}
+                className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50 disabled:opacity-40"
               >
-                {busy ? "Assigning…" : "Assign & open"}
-              </button>
-            </div>
-          )}
-
-          {view === "assign-position" && (
-            <div>
-              <p className="font-body text-xs text-steel uppercase tracking-wide px-3 pt-2.5 pb-1.5">
-                Assign to which position?
-              </p>
-              <div className="px-3 pb-2">
-                <label className="font-body text-xs text-steel">
-                  Start date
-                  <input
-                    type="date"
-                    value={assignStartDate}
-                    onChange={(e) => setAssignStartDate(e.target.value)}
-                    className="w-full h-8 mt-1 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs focus:outline-none focus:border-rust"
-                  />
-                </label>
-              </div>
-              <div className="max-h-72 overflow-y-auto">
-                {positions === null && (
-                  <p className="font-body text-xs text-steel px-3 py-2.5">Loading…</p>
-                )}
-                {positions?.length === 0 && (
-                  <p className="font-body text-xs text-steel px-3 py-2.5">
-                    No positions with players assigned yet — set this up from the Team page.
-                  </p>
-                )}
-                {positions?.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    disabled={busy}
-                    onClick={() => handleAssignToPosition(p)}
-                    className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50 disabled:opacity-40"
-                  >
-                    {busy ? assignProgress ?? "Assigning…" : `${p.name} (${p.athleteCount})`}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {view === "assigned" && assigned && (
-            <div className="p-3">
-              <p className="font-body text-sm text-chalk">
-                {assigned.attached
-                  ? `Assigned to ${assigned.clientName}. They have been notified. This program is theirs now.`
-                  : `Assigned to ${assigned.clientName}. They have been notified and now have their own copy.`}
-              </p>
-              <button
-                type="button"
-                onClick={() => router.push(`/groups/${assigned.groupId}/programs/${assigned.programId}`)}
-                className="w-full h-11 mt-2.5 bg-rust text-graphite font-body text-sm font-medium"
-              >
-                {assigned.attached ? "Open their program" : "Open their copy"}
+                {busy ? "Duplicating…" : "In my library"}
               </button>
               <button
                 type="button"
                 onClick={() => {
-                  setView(null);
-                  setAssigned(null);
-                  router.refresh();
+                  setView("duplicate-org");
+                  loadOrgs();
                 }}
-                className="w-full h-11 mt-1.5 border border-steel/30 text-steel font-body text-sm"
+                className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50"
               >
-                Done
-              </button>
-            </div>
-          )}
-
-          {view === "assign-position-result" && bulkResult && (
-            <div className="p-3">
-              <p className="font-body text-sm text-chalk">
-                Assigned to {bulkResult.succeeded} of {bulkResult.total} athletes on{" "}
-                {bulkResult.positionName}.
-              </p>
-              {bulkResult.failedNames.length > 0 && (
-                <p className="font-body text-xs text-rust mt-1.5">
-                  Failed: {bulkResult.failedNames.join(", ")}
-                </p>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  setView(null);
-                  setBulkResult(null);
-                  router.refresh();
-                }}
-                className="w-full h-8 mt-2.5 bg-rust text-graphite font-body text-xs font-medium"
-              >
-                Done
+                In another organization →
               </button>
             </div>
           )}

@@ -69,27 +69,20 @@ describe("a program in one group, a client in another", () => {
   });
 });
 
-describe("the card menu uses it", () => {
-  const menu = read("components/coach/desktop/program-card-menu.tsx");
+describe("the Assign panel uses it", () => {
+  const panel = read("components/coach/desktop/program-assign-panel.tsx");
   it("lists all the coach's clients, searchable, in the coach's own word, and copies into the client's own space", () => {
-    expect(menu).toContain("loadAssignableClients(supabase, user.id, groupId)");
-    expect(menu).toContain("<SearchPickList");
-    expect(menu).toContain('term("client")');
-    expect(menu).toContain("destinationGroupId: client.destinationGroupId,");
-    expect(menu).toContain("/groups/${client.destinationGroupId}/programs/${result.programId}");
-    expect(menu).toContain("/groups/${assigned.groupId}/programs/${assigned.programId}");
-    expect(menu).not.toContain(".eq(\"group_id\", groupId)\n      .eq(\"role\", \"athlete\");\n    const options");
+    expect(panel).toContain("loadAssignableClients(supabase, user.id, groupId)");
+    expect(panel).toContain('type="search"');
+    expect(panel).toContain('term("client", "plural")');
+    expect(panel).toContain("destinationGroupId: c.destinationGroupId");
+    expect(panel).toContain("/groups/${dest}/programs/${result.programId}");
   });
   it("an unsigned AI draft is signed off by the click on Assign (no extra dialog) and then assigned", () => {
-    expect(menu).not.toContain("disabled={aiDraft}");
-    expect(menu).toContain("ensureSignedOff({ aiDraft, programId })");
+    expect(panel).toContain("ensureSignedOff({ aiDraft, programId })");
     expect(read("components/coach/desktop/program-card-grid.tsx")).toContain("aiDraft={program.aiDraft}");
   });
-  it("adding has no confirmation popup on the single-client path", () => {
-    const single = menu.slice(menu.indexOf("async function handleAssignToClient"), menu.indexOf("async function handleAssignToSelf"));
-    expect(single).not.toContain("confirmDialog");
-  });
-  it("the client's profile uses the very same picker", () => {
+  it("the client's profile has its own single-client picker", () => {
     expect(read("components/coach/client-program-actions.tsx")).toContain("<SearchPickList");
   });
 });
