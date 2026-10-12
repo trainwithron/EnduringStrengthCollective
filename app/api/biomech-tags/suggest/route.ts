@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, isAiConfigured, extractJson, AiNotConfiguredError, AiTruncatedError } from "@/lib/anthropic-client";
-import { AiRateLimitedError } from "@/lib/ai-usage";
+import { AiRateLimitedError, aiInputTooLong } from "@/lib/ai-usage";
 import { parseBiomechTagSuggestions } from "@/lib/biomech-tag-suggestions";
 
 // AI-assisted suggest-and-confirm biomech-tag classifier
@@ -36,6 +36,8 @@ export async function POST(request: Request) {
   if (!exerciseName || typeof exerciseName !== "string" || !exerciseName.trim()) {
     return NextResponse.json({ error: "exerciseName is required." }, { status: 400 });
   }
+  const tooLong = aiInputTooLong("biomech_tag_suggest", exerciseName);
+  if (tooLong) return NextResponse.json({ error: tooLong }, { status: 400 });
 
   const { data: vocabRows } = await supabase
     .from("biomech_tags")

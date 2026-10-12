@@ -20,6 +20,9 @@ export async function POST(request: Request) {
 
   const limited = await rateLimitResponse("email-claim-link", user.id, 30, 3600);
   if (limited) return limited;
+  // The platform's own sender is used, so there is also a daily ceiling per coach.
+  const limitedDay = await rateLimitResponse("email-claim-link-day", user.id, 60, 86400);
+  if (limitedDay) return limitedDay;
 
   const body = await request.json().catch(() => ({}));
   const groupId = typeof body.groupId === "string" ? body.groupId : "";

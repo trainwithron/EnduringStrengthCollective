@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 // and the coach panel that suggested the link is gone. These guard against it being quietly reopened.
 const page = readFileSync(new URL("../app/book/[coachId]/page.tsx", import.meta.url), "utf8");
 const api = readFileSync(new URL("../app/api/discovery-availability/[coachId]/route.ts", import.meta.url), "utf8");
+const book = readFileSync(new URL("../app/api/public/discovery-book/route.ts", import.meta.url), "utf8");
 const availability = readFileSync(new URL("../app/(coach)/groups/[groupId]/availability/page.tsx", import.meta.url), "utf8");
 
 describe("old discovery-call page is closed", () => {
@@ -16,6 +17,12 @@ describe("old discovery-call page is closed", () => {
     expect(api).toContain("const CLOSED = true;");
     expect(api.indexOf("if (CLOSED)")).toBeGreaterThan(-1);
     expect(api.indexOf("if (CLOSED)")).toBeLessThan(api.indexOf("createServiceRoleClient()"));
+  });
+  it("the booking POST is closed too, before any rate limit or database work", () => {
+    expect(book).toContain("const CLOSED = true;");
+    expect(book.indexOf("if (CLOSED)")).toBeGreaterThan(-1);
+    expect(book.indexOf("if (CLOSED)")).toBeLessThan(book.indexOf("request.json()"));
+    expect(book.indexOf("if (CLOSED)")).toBeLessThan(book.indexOf("createServiceRoleClient()"));
   });
   it("the Availability page no longer shows the discovery panel or its link", () => {
     expect(availability).not.toContain("DiscoveryCallsPanel");

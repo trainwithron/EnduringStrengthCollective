@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // already exists (the foreign key from migration 0255). Before the fix the route recorded it first, so it was never recorded.
 const state = vi.hoisted(() => ({ calls: [] as string[], profiles: new Set<string>(), recorded: [] as string[], failLegal: false }));
 
-vi.mock("@/lib/rate-limit", () => ({ rateLimitResponse: async () => null, clientIp: () => "203.0.113.5" }));
+vi.mock("@/lib/rate-limit", () => ({ rateLimitResponse: async () => null, rateLimitAllows: async () => true, clientIp: () => "203.0.113.5" }));
 vi.mock("@/lib/app-url", () => ({ appOrigin: () => "https://app.test" }));
 vi.mock("@/lib/org-creation", () => ({ createOrganization: async () => ({ groupId: "g1" }) }));
 vi.mock("@supabase/supabase-js", () => ({ createClient: () => ({ auth: { resend: async () => ({ error: null }) } }) }));

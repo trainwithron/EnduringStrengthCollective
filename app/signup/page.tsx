@@ -71,6 +71,7 @@ export default function SignupPage() {
             We sent a confirmation link to <span className="text-chalk">{submittedEmail}</span>. Click it
             to activate your account and sign in — your organization is already set up and waiting.
           </p>
+          <p className="font-body text-xs text-steel mt-3">If you already have an account, <a href="/login" className="text-rust underline underline-offset-2">sign in</a> instead.</p>
           <button type="button" onClick={resend} className="font-body text-sm text-rust underline underline-offset-2 mt-4">
             Send the email again
           </button>

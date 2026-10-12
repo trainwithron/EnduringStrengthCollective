@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { toFriendlyAuthEmailError } from "@/lib/auth-email-error";
 import { appOrigin } from "@/lib/app-url";
+import { rateLimitResponse } from "@/lib/rate-limit";
 
 // Which org-level role an invite can grant. "owner" is set once at
 // org creation and never assigned through this flow.
@@ -14,6 +15,12 @@ export async function POST(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
+  // Each call creates an account and sends an invitation email to an address that never asked for it, so it is limited per person, per hour and per day.
+  const limitedHour = await rateLimitResponse("coach-invite-hour", user.id, 10, 3600);
+  if (limitedHour) return limitedHour;
+  const limitedDay = await rateLimitResponse("coach-invite-day", user.id, 30, 86400);
+  if (limitedDay) return limitedDay;
 
   const { groupId, fullName, email, orgRole } = await request.json();
   const trimmedName = typeof fullName === "string" ? fullName.trim() : "";

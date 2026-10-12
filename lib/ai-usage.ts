@@ -81,6 +81,8 @@ export const AI_INPUT_LIMITS: Partial<Record<AiFeature, number>> = {
   session_nl: 2000,
   program_chat: 2000,
   ci_chat_router: 1000,
+  video_checkin_summary: 3000,
+  biomech_tag_suggest: 120,
 };
 
 // A plain message to show when the text is too long, or null when it is fine.

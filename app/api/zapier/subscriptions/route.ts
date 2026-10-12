@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { resolveCoachFromApiKey } from "@/lib/resolve-coach-from-api-key";
+import { isSafeWebhookUrl } from "@/lib/webhook-url";
 
 const VALID_EVENT_TYPES = ["client_added", "workout_completed", "pr_hit", "package_purchased"];
 
@@ -17,6 +18,9 @@ export async function POST(request: Request) {
   const { event, target_url } = await request.json();
   if (!VALID_EVENT_TYPES.includes(event) || typeof target_url !== "string" || !target_url) {
     return NextResponse.json({ error: "Missing or invalid event/target_url." }, { status: 400 });
+  }
+  if (!isSafeWebhookUrl(target_url)) {
+    return NextResponse.json({ error: "target_url must be a public https address." }, { status: 400 });
   }
 
   const { data, error } = await serviceRole

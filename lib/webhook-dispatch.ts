@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isSafeWebhookUrl, WEBHOOK_TIMEOUT_MS } from "@/lib/webhook-url";
 
 export type WebhookEventType = "client_added" | "workout_completed" | "pr_hit" | "package_purchased";
 
@@ -66,15 +67,21 @@ export async function attemptWebhookDelivery(
   params: { deliveryId: string; targetUrl: string; payload: Record<string, unknown>; priorAttemptCount: number }
 ): Promise<boolean> {
   let delivered = false;
-  try {
-    const res = await fetch(params.targetUrl, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(params.payload),
-    });
-    delivered = res.ok;
-  } catch {
-    delivered = false;
+  // The address is checked again right before the call (a coach can write the table directly), the call gives up after a few seconds, and a redirect is not followed: this runs inside
+  // the Stripe webhook and other requests that must not hang on someone else's slow server, and it must never be made to reach an address inside our own network.
+  if (isSafeWebhookUrl(params.targetUrl)) {
+    try {
+      const res = await fetch(params.targetUrl, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(params.payload),
+        redirect: "error",
+        signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS),
+      });
+      delivered = res.ok;
+    } catch {
+      delivered = false;
+    }
   }
 
   await supabase

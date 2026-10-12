@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { createOrganization } from "@/lib/org-creation";
 import { toFriendlyAuthEmailError } from "@/lib/auth-email-error";
-import { rateLimitResponse, clientIp } from "@/lib/rate-limit";
+import { rateLimitResponse, rateLimitAllows, clientIp } from "@/lib/rate-limit";
 import { SIGNUP_DOCUMENTS } from "@/lib/legal";
 import { recordLegalAcceptances } from "@/lib/legal-record";
 import { appOrigin } from "@/lib/app-url";
@@ -54,6 +54,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
   }
 
+  // Also limited per email address, so one person's inbox can't be filled with confirmation mails from many addresses.
+  if (!(await rateLimitAllows(`coach-signup-email:${trimmedEmail.toLowerCase()}`, 3, 3600))) {
+    return NextResponse.json({ error: "Too many requests for that email. Please wait a while and try again." }, { status: 429 });
+  }
+
   const serviceRole = createServiceRoleClient();
   const origin = appOrigin(request);
 
@@ -64,6 +69,10 @@ export async function POST(request: Request) {
     user_metadata: { full_name: trimmedName },
   });
 
+  if (createError && /already registered|already exists|already been registered/i.test(createError.message)) {
+    // The same answer as a brand-new address, so this form can't be used to find out who has an account. (No email goes out and nothing is created; the page tells the person to sign in if they already have one.)
+    return NextResponse.json({ pendingConfirmation: true, confirmationEmailSent: true, legalRecorded: true });
+  }
   if (createError || !created?.user) {
     const { error, status } = toFriendlyAuthEmailError(createError?.message ?? "Couldn't create your account.");
     return NextResponse.json({ error }, { status });
@@ -75,7 +84,8 @@ export async function POST(request: Request) {
     .from("profiles")
     .insert({ id: newUserId, full_name: trimmedName });
   if (profileError) {
-    return NextResponse.json({ error: `Couldn't create your profile: ${profileError.message}` }, { status: 502 });
+    console.error("signup: couldn't create the profile:", profileError.message);
+    return NextResponse.json({ error: "Couldn't create your profile. Please try again." }, { status: 502 });
   }
 
   // Record what they agreed to (version, time, address, device). This has to come AFTER the profile exists: the acceptance row points at the
@@ -121,9 +131,7 @@ export async function POST(request: Request) {
     // waiting. Their account exists either way and the page offers to send it again.
     return NextResponse.json({ groupId, pendingConfirmation: true, confirmationEmailSent: !resendError, legalRecorded });
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Couldn't set up your organization." },
-      { status: 502 }
-    );
+    console.error("signup: couldn't set up the organization:", err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: "Couldn't set up your organization. Please try again." }, { status: 502 });
   }
 }

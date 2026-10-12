@@ -6,7 +6,12 @@ import { validateDiscoveryBooking } from "@/lib/public-forms";
 // A visitor books a discovery call with a coach (no account). The database function used to be callable straight from the visitor's
 // browser by anyone, with any coach id, at any time, as often as they liked. Now this route checks the request first, limits how often
 // one address and one email can ask, makes sure the person is really a coach, then calls the function with the server's own access.
+const CLOSED = true;
+
 export async function POST(request: Request) {
+  // Closed with the old discovery-call page (Ron, Oct 6): until now this route stayed open, so anyone could plant "confirmed" blocks on any coach's calendar (they count as busy time for every booking). The code below is kept so it
+  // can be switched back on by removing this line; if it ever is, it must first check the coach's open hours and require the same emailed-code proof as the public booking page.
+  if (CLOSED) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const body = await request.json().catch(() => ({}));
   const checked = validateDiscoveryBooking(body);
   if (!checked.ok) return NextResponse.json({ error: checked.error }, { status: 400 });

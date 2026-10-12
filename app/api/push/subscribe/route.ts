@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { isAllowedPushEndpoint } from "@/lib/push-endpoint";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 export async function POST(request: Request) {
   const supabase = await createServerClient();
@@ -17,6 +18,9 @@ export async function POST(request: Request) {
   if (!isAllowedPushEndpoint(endpoint) || typeof p256dh !== "string" || typeof authKey !== "string" || p256dh.length > 200 || authKey.length > 100) {
     return NextResponse.json({ error: "That notification address isn't supported." }, { status: 400 });
   }
+
+  // One device, one person: if this device was last subscribed as somebody else (they signed out without it being removed), that older subscription goes. Done by the server, since the person can't touch another's rows.
+  await createServiceRoleClient().from("push_subscriptions").delete().eq("endpoint", endpoint).neq("profile_id", user.id);
 
   const { error } = await supabase.from("push_subscriptions").upsert(
     { profile_id: user.id, endpoint, p256dh, auth_key: authKey },

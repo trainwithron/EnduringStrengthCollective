@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError } from "@/lib/anthropic-client";
 import { AiRateLimitedError, aiInputTooLong } from "@/lib/ai-usage";
+import { userIsCoach } from "@/lib/user-is-coach";
 
 // Replaces the manual "+ New recipe → fill in every ingredient by hand"
 // flow (live_walkthrough_round2_findings.md — Ron's own read, backed by
@@ -51,6 +52,9 @@ export async function POST(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
+  // A coach tool: a client's or a stranger's call would be billed to someone else's budget (or to no budget at all).
+  if (!(await userIsCoach(supabase, user.id))) return NextResponse.json({ error: "Only coaches can use this." }, { status: 403 });
 
   if (!isAiConfigured()) {
     return NextResponse.json(

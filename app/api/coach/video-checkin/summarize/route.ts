@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, isAiConfigured, AiNotConfiguredError, extractJson } from "@/lib/anthropic-client";
-import { AiRateLimitedError } from "@/lib/ai-usage";
+import { AiRateLimitedError, aiInputTooLong } from "@/lib/ai-usage";
 
 // Turns a coach's rough, typed bullet notes (jotted during/after
 // recording a video check-in) into a polished summary + a real action
@@ -25,10 +25,12 @@ export async function POST(request: Request) {
 
   const body = await request.json();
   const groupId: string | undefined = body?.groupId;
-  const notes: string | undefined = body?.notes;
+  const notes: string | undefined = typeof body?.notes === "string" ? body.notes : undefined;
   if (!groupId || !notes || !notes.trim()) {
     return NextResponse.json({ error: "Missing groupId or notes." }, { status: 400 });
   }
+  const tooLong = aiInputTooLong("video_checkin_summary", notes);
+  if (tooLong) return NextResponse.json({ error: tooLong }, { status: 400 });
 
   const { data: membership } = await supabase
     .from("group_memberships")

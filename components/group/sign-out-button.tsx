@@ -6,6 +6,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { clearWorkspaceStorage } from "@/lib/workspace-layout";
 import { clearAllNoteDrafts } from "@/lib/note-draft";
 import { clearAllFunLineMemory } from "@/lib/fun-line-memory";
+import { unsubscribeFromPush } from "@/lib/push-client";
 
 export function SignOutButton() {
   const [signingOut, setSigningOut] = useState(false);
@@ -14,6 +15,8 @@ export function SignOutButton() {
   async function handleSignOut() {
     setSigningOut(true);
     const supabase = createBrowserClient();
+    // This device stops getting this person's notifications (the next person to sign in here would otherwise be sent them). Done while still signed in; a failure must not block signing out.
+    await unsubscribeFromPush().catch(() => undefined);
     await supabase.auth.signOut();
     clearWorkspaceStorage(window.localStorage);
     // A shared phone must not keep someone's unsaved exercise notes (they can be about pain or injury).
