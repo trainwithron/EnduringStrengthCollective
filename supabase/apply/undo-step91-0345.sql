@@ -36,5 +36,17 @@ drop policy if exists "membership_subscriptions_select_org_owner" on public.memb
 drop policy if exists "coach_quick_payments_select_org_owner" on public.coach_quick_payments;
 drop policy if exists "workout_logs_select_org_owner" on public.workout_logs;
 drop policy if exists "group_memberships_select_org_owner" on public.group_memberships;
+drop policy if exists "athlete_notes_select_org_owner" on public.athlete_notes;
+drop policy if exists "client_intake_select_org_owner" on public.client_intake;
+drop policy if exists "daily_macros_select_org_owner" on public.daily_macros;
+drop policy if exists "meal_plans_select_org_owner" on public.meal_plans;
+drop policy if exists "food_log_entries_select_org_owner" on public.food_log_entries;
+drop policy if exists "client_macro_targets_select_org_owner" on public.client_macro_targets;
+drop policy if exists "client_macro_target_history_select_org_owner" on public.client_macro_target_history;
+drop policy if exists "nutrition_checkins_select_org_owner" on public.nutrition_checkins;
+drop policy if exists "nutrition_phases_select_org_owner" on public.nutrition_phases;
+drop policy if exists "client_phase_plans_select_org_owner" on public.client_phase_plans;
+drop policy if exists "nutrition_checkin_suggestions_select_org_owner" on public.nutrition_checkin_suggestions;
+drop policy if exists "direct_messages_select_org_owner" on public.direct_messages;
 drop function if exists public.can_see_profile(uuid);
 commit;

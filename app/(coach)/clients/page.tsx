@@ -6,7 +6,7 @@ import { CoachClientsList } from "@/components/coach/desktop/coach-clients-list"
 import { AddClientButton } from "@/components/coach/desktop/add-client-button";
 import { SwappableTerm } from "@/components/coach/swappable-term";
 import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
-import { getActiveAnchor } from "@/lib/active-anchor";
+import { CHOOSE_ORGANIZATION_PATH, getActiveAnchor } from "@/lib/active-anchor";
 import { getCoachClients } from "@/lib/coach-clients";
 import { fetchInactiveKeys, inactiveKey } from "@/lib/inactive-ids";
 import { buildCreditPicture, fetchBookingCounts } from "@/lib/credit-picture";
@@ -24,6 +24,7 @@ export default async function CoachClientsPage() {
   if (!user) redirect("/login");
 
   const active = await getActiveAnchor(supabase, user.id);
+  if (active?.needsChoice) redirect(`${CHOOSE_ORGANIZATION_PATH}?next=/clients`);
   const groups = active?.groups ?? [];
   const anchor = active?.anchor ?? null;
   if (!anchor) {

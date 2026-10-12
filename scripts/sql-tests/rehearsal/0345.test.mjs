@@ -119,6 +119,8 @@ export default {
       h.check("the owner of organization A sees its programs, clients, bookings and payments", ownerSees.programs >= 2 && ownerSees.bookings >= 1 && ownerSees.credit_purchases >= 1 && ownerSees.membership_subscriptions >= 1 && ownerSees.coach_quick_payments >= 1, JSON.stringify(ownerSees));
       h.check("...and every name in it", (await namesVisible(aPeople)) === aPeople.length);
 
+      h.check("...including client intake, coach notes, messages and nutrition records", ownerSees.client_intake >= 1 && ownerSees.athlete_notes >= 1 && ownerSees.direct_messages >= 1 && ownerSees.daily_macros >= 1, JSON.stringify(ownerSees));
+
       await h.as(aAdmin);
       const adminSees = await visibleA();
       h.check("an admin of organization A sees no more than the owner", total(adminSees) <= total(ownerSees), `${total(adminSees)} vs ${total(ownerSees)}`);
@@ -144,6 +146,29 @@ export default {
       await h.as(c3);
       const solo3 = await visibleA();
       h.check("a solo client sees their own program, booking and messages, not the team's data", solo3.bookings >= 1 && solo3.direct_messages >= 1 && solo3.posts === 0, JSON.stringify(solo3));
+
+      // ---- a client who is private from the organization stays private from its owner and admin ------------------
+      await h.asSuper();
+      await db.query(`update public.group_memberships set private_from_org = true where group_id = $1 and profile_id = $2`, [s4, c4]);
+      await db.query(`insert into public.daily_macros (athlete_id, group_id, log_date, created_by) values ($1, $2, current_date, $3)`, [c4, s4, aCoach2]);
+      await db.query(`insert into public.athlete_notes (group_id, created_by, athlete_id) values ($1, $2, $3)`, [s4, aCoach2, c4]);
+      await db.query(`insert into public.direct_messages (group_id, sender_id, recipient_id, body) values ($1, $2, $3, 'private hello')`, [s4, aCoach2, c4]);
+      await db.query(`insert into public.client_intake (athlete_id, group_id) values ($1, $2)`, [c4, s4]);
+      const private4 = async () => ({
+        macros: (await db.query(`select count(*)::int as n from public.daily_macros where athlete_id = $1`, [c4])).rows[0].n,
+        notes: (await db.query(`select count(*)::int as n from public.athlete_notes where athlete_id = $1`, [c4])).rows[0].n,
+        messages: (await db.query(`select count(*)::int as n from public.direct_messages where group_id = $1`, [s4])).rows[0].n,
+        intake: (await db.query(`select count(*)::int as n from public.client_intake where athlete_id = $1`, [c4])).rows[0].n,
+        sessionsRows: (await db.query(`select count(*)::int as n from public.group_memberships where group_id = $1 and profile_id = $2`, [s4, c4])).rows[0].n,
+      });
+      for (const [label, uid] of [["the owner", aOwner], ["an admin", aAdmin]]) {
+        await h.as(uid);
+        const p = await private4();
+        h.check(`${label} sees none of a private-from-organization client's macros, notes, messages, intake or membership`, p.macros === 0 && p.notes === 0 && p.messages === 0 && p.intake === 0 && p.sessionsRows === 0, JSON.stringify(p));
+      }
+      await h.as(aCoach2);
+      const own4 = await private4();
+      h.check("...while that client's own coach still sees everything of theirs", own4.macros >= 1 && own4.notes >= 1 && own4.messages >= 1 && own4.intake >= 1, JSON.stringify(own4));
 
       // ---- no way around it through the lookup functions ---------------------------------
       await h.as(bOwner);

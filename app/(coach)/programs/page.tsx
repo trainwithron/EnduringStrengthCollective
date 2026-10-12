@@ -9,7 +9,7 @@ import { ProgramCardGrid, type ProgramCardData } from "@/components/coach/deskto
 import { SwappableTerm } from "@/components/coach/swappable-term";
 import { computeProgramCardVisuals } from "@/lib/program-card-data";
 import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
-import { getActiveAnchor } from "@/lib/active-anchor";
+import { CHOOSE_ORGANIZATION_PATH, getActiveAnchor } from "@/lib/active-anchor";
 import { getCoachClients } from "@/lib/coach-clients";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { LearnedSection } from "@/components/coach/learned-section";
@@ -30,6 +30,7 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
 
   // The organization the coach chose stays chosen: this page stands on its group, never on the first group by name across every organization.
   const active = await getActiveAnchor(supabase, user.id);
+  if (active?.needsChoice) redirect(`${CHOOSE_ORGANIZATION_PATH}?next=/programs`);
   const groups = active?.groups ?? [];
   const anchor = active?.anchor ?? null;
   if (!anchor) {

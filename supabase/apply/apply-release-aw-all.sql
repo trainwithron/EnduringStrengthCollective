@@ -258,6 +258,46 @@ drop policy if exists "group_memberships_select_org_owner" on public.group_membe
 create policy "group_memberships_select_org_owner" on public.group_memberships for select
   to authenticated using (public.is_org_admin_of_group(group_id) and (role <> 'athlete' or not public.is_client_private_from_org(group_id, profile_id)));
 
+-- 2c. ...and, per Ron ("the owner sees everything in the organization because they own it"), the organization's own clients' messages, coach notes, intake forms and nutrition records. Read only, never a
+-- client who is private from the organization. NOT widened: a coach's own AI conversations and learned rules, and the per-exercise session notes a coach keeps (session_exercise_coach_notes: they have
+-- no client column to apply the private-from-organization rule to, so they stay the coach's own working notes).
+drop policy if exists "athlete_notes_select_org_owner" on public.athlete_notes;
+create policy "athlete_notes_select_org_owner" on public.athlete_notes for select
+  to authenticated using (public.is_org_admin_of_group(group_id) and (athlete_id is null or not public.is_client_private_from_org(group_id, athlete_id)));
+drop policy if exists "client_intake_select_org_owner" on public.client_intake;
+create policy "client_intake_select_org_owner" on public.client_intake for select
+  to authenticated using (public.is_org_admin_of_group(group_id) and (athlete_id is null or not public.is_client_private_from_org(group_id, athlete_id)));
+drop policy if exists "daily_macros_select_org_owner" on public.daily_macros;
+create policy "daily_macros_select_org_owner" on public.daily_macros for select
+  to authenticated using (public.is_org_admin_of_group(group_id) and (athlete_id is null or not public.is_client_private_from_org(group_id, athlete_id)));
+drop policy if exists "meal_plans_select_org_owner" on public.meal_plans;
+create policy "meal_plans_select_org_owner" on public.meal_plans for select
+  to authenticated using (public.is_org_admin_of_group(group_id) and (athlete_id is null or not public.is_client_private_from_org(group_id, athlete_id)));
+drop policy if exists "food_log_entries_select_org_owner" on public.food_log_entries;
+create policy "food_log_entries_select_org_owner" on public.food_log_entries for select
+  to authenticated using (public.is_org_admin_of_group(group_id) and (athlete_id is null or not public.is_client_private_from_org(group_id, athlete_id)));
+drop policy if exists "client_macro_targets_select_org_owner" on public.client_macro_targets;
+create policy "client_macro_targets_select_org_owner" on public.client_macro_targets for select
+  to authenticated using (public.is_org_admin_of_group(group_id) and (athlete_id is null or not public.is_client_private_from_org(group_id, athlete_id)));
+drop policy if exists "client_macro_target_history_select_org_owner" on public.client_macro_target_history;
+create policy "client_macro_target_history_select_org_owner" on public.client_macro_target_history for select
+  to authenticated using (public.is_org_admin_of_group(group_id) and (athlete_id is null or not public.is_client_private_from_org(group_id, athlete_id)));
+drop policy if exists "nutrition_checkins_select_org_owner" on public.nutrition_checkins;
+create policy "nutrition_checkins_select_org_owner" on public.nutrition_checkins for select
+  to authenticated using (public.is_org_admin_of_group(group_id) and (athlete_id is null or not public.is_client_private_from_org(group_id, athlete_id)));
+drop policy if exists "nutrition_phases_select_org_owner" on public.nutrition_phases;
+create policy "nutrition_phases_select_org_owner" on public.nutrition_phases for select
+  to authenticated using (public.is_org_admin_of_group(group_id) and (athlete_id is null or not public.is_client_private_from_org(group_id, athlete_id)));
+drop policy if exists "client_phase_plans_select_org_owner" on public.client_phase_plans;
+create policy "client_phase_plans_select_org_owner" on public.client_phase_plans for select
+  to authenticated using (public.is_org_admin_of_group(group_id) and (athlete_id is null or not public.is_client_private_from_org(group_id, athlete_id)));
+drop policy if exists "nutrition_checkin_suggestions_select_org_owner" on public.nutrition_checkin_suggestions;
+create policy "nutrition_checkin_suggestions_select_org_owner" on public.nutrition_checkin_suggestions for select
+  to authenticated using (public.is_org_admin_of_group(group_id) and (athlete_id is null or not public.is_client_private_from_org(group_id, athlete_id)));
+drop policy if exists "direct_messages_select_org_owner" on public.direct_messages;
+create policy "direct_messages_select_org_owner" on public.direct_messages for select
+  to authenticated using (public.is_org_admin_of_group(group_id) and not public.is_client_private_from_org(group_id, sender_id) and not public.is_client_private_from_org(group_id, recipient_id));
+
 -- 3. Who has which tag: the organization's owner and admins, or the coach of that client (not every coach of the organization).
 drop policy if exists "client_tag_assignments_select_org_member" on public.client_tag_assignments;
 create policy "client_tag_assignments_select_org_member" on public.client_tag_assignments for select

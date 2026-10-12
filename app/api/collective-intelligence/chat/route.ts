@@ -128,7 +128,7 @@ export async function POST(request: Request) {
 
   // Ask Spot answers about the organization the coach is in (the one they chose), never every organization they run.
   const activeAnchor = await getActiveAnchor(supabase, user.id);
-  const orgGroupIds = activeAnchor ? activeAnchor.groups.filter((g) => g.orgId === activeAnchor.orgId).map((g) => g.id) : [];
+  const orgGroupIds = activeAnchor && !activeAnchor.needsChoice ? activeAnchor.groups.filter((g) => g.orgId === activeAnchor.orgId).map((g) => g.id) : [];
 
   // Step 1 — router. Decides WHAT to look up; never states a fact itself.
   let requestedLookups: RouterLookupRequest[] = [];

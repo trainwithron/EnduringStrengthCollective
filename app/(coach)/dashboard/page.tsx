@@ -170,6 +170,8 @@ export default async function CoachHomePage() {
       .limit(20),
   ]);
 
+  // More than one organization and none remembered: ask which one, rather than guessing the biggest (lib/active-anchor.ts).
+  if (!rememberedOrgId(coachedForOrg, rememberedWorkspace) && new Set(coachedForOrg.map((g) => g.orgId)).size > 1) redirect("/choose-organization?next=/dashboard");
   const clientsByOrg = rememberedOrgId(coachedForOrg, rememberedWorkspace) ? {} : await clientCountsByOrg(supabase, coachedForOrg);
   const homeOrgId = activeOrgId(coachedForOrg, rememberedWorkspace, clientsByOrg);
   const primaryOrgMembership = (homeOrgId ? orgMemberships?.find((m) => m.organization_id === homeOrgId) : null) ?? orgMemberships?.[0] ?? null;
