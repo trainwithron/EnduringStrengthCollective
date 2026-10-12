@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { inOrg, orgIdOfGroup } from "@/lib/org-of-group";
 import { redirectOneOnOneToAnchor } from "@/lib/coach-wide-redirect";
 import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
@@ -69,7 +70,7 @@ export default async function AvailabilityPage(
   const typeResult = await supabase.from("coach_availability_windows").select("id, session_type_id").eq("coach_id", user.id);
   const sessionTypeEnabled = !typeResult.error;
   const typeById = new Map(((typeResult.data ?? []) as { id: string; session_type_id: string | null }[]).map((r) => [r.id, r.session_type_id]));
-  const { data: typeRows } = await supabase.from("session_types").select("id, name").eq("coach_id", user.id).order("created_at", { ascending: true });
+  const { data: typeRows } = await inOrg(supabase.from("session_types").select("id, name").eq("coach_id", user.id), await orgIdOfGroup(supabase, params.groupId)).order("created_at", { ascending: true });
 
   const windows = (windowRows ?? []).map((w) => ({
     id: w.id,

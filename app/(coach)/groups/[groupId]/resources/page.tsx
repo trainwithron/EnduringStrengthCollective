@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { inOrg, orgIdOfGroup } from "@/lib/org-of-group";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
@@ -75,17 +76,23 @@ export default async function ResourcesPage(
     coachId = coachMembership?.profile_id ?? user.id;
   }
 
+  // The shop and the partners are the organization's: the one the page's group is in.
+  const organizationId = await orgIdOfGroup(supabase, params.groupId);
   const [{ data: referralRows }, { data: shopRows }] = await Promise.all([
-    supabase
-      .from("referral_partners")
-      .select("id, name, specialty, description, booking_url, discount_code, discount_description, click_count")
-      .eq("coach_id", coachId)
-      .order("created_at", { ascending: true }),
-    supabase
-      .from("pro_shop_links")
-      .select("id, title, category, description, url, image_url, discount_code, discount_description, click_count, featured")
-      .eq("coach_id", coachId)
-      .order("created_at", { ascending: true }),
+    inOrg(
+      supabase
+        .from("referral_partners")
+        .select("id, name, specialty, description, booking_url, discount_code, discount_description, click_count")
+        .eq("coach_id", coachId),
+      organizationId
+    ).order("created_at", { ascending: true }),
+    inOrg(
+      supabase
+        .from("pro_shop_links")
+        .select("id, title, category, description, url, image_url, discount_code, discount_description, click_count, featured")
+        .eq("coach_id", coachId),
+      organizationId
+    ).order("created_at", { ascending: true }),
   ]);
 
   const partners: ReferralPartner[] = (referralRows ?? []).map((r) => ({
@@ -152,9 +159,9 @@ export default async function ResourcesPage(
         </div>
         {tabBar(`/groups/${params.groupId}/resources`)}
         {tab === "referrals" ? (
-          <ReferralDirectoryManager initialPartners={partners} />
+          <ReferralDirectoryManager initialPartners={partners} organizationId={organizationId} />
         ) : (
-          <ProShopManager initialLinks={links} />
+          <ProShopManager initialLinks={links} organizationId={organizationId} />
         )}
       </CoachDesktopShell>
     );

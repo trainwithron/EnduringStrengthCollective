@@ -11,7 +11,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 // navigates straight into this real day view; this is where "add a
 // to-do/event" actually belongs now, with real room instead of a
 // 3-input hover popup.
-export function AddDayEventForm({ coachId, dateKey }: { coachId: string; dateKey: string }) {
+export function AddDayEventForm({ coachId, dateKey, organizationId }: { coachId: string; dateKey: string; organizationId: string | null }) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [time, setTime] = useState("");
@@ -23,6 +23,7 @@ export function AddDayEventForm({ coachId, dateKey }: { coachId: string; dateKey
     const supabase = createBrowserClient();
     await supabase.from("calendar_events").insert({
       coach_id: coachId,
+      organization_id: organizationId,
       title: title.trim(),
       event_date: dateKey,
       event_time: time || null,

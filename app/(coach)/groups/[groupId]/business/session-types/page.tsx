@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { inOrg, orgIdOfGroup } from "@/lib/org-of-group";
 import { redirectOneOnOneToAnchor } from "@/lib/coach-wide-redirect";
 import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
@@ -36,11 +37,8 @@ export default async function SessionTypesPage(
 
   const { data: group } = await supabase.from("groups").select("name").eq("id", params.groupId).single();
 
-  const { data: typeRows } = await supabase
-    .from("session_types")
-    .select("id, name")
-    .eq("coach_id", user.id)
-    .order("created_at", { ascending: true });
+  const typesOrgId = await orgIdOfGroup(supabase, params.groupId);
+  const { data: typeRows } = await inOrg(supabase.from("session_types").select("id, name").eq("coach_id", user.id), typesOrgId).order("created_at", { ascending: true });
 
   const types: SessionTypeRow[] = (typeRows ?? []).map((t) => ({
     id: t.id,
@@ -56,7 +54,7 @@ export default async function SessionTypesPage(
       <div className="pb-6 border-b border-steel/20 mb-6">
         <h1 className="font-display font-bold text-3xl uppercase leading-none">Session Types</h1>
       </div>
-      <SessionTypeManager initialTypes={types} teamMode={teamMode} />
+      <SessionTypeManager initialTypes={types} teamMode={teamMode} organizationId={typesOrgId} />
     </CoachDesktopShell>
   );
 }

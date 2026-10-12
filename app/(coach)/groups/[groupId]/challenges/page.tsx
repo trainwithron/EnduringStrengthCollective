@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { inOrg, orgIdOfGroup } from "@/lib/org-of-group";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
@@ -63,13 +64,16 @@ export default async function ChallengesPage(
 
   if (isCoach && !showMobileView) {
     // Independent of each other — none needs another's result.
+    const challengeOrgId = await orgIdOfGroup(supabase, params.groupId);
     const [{ data: group }, { data: challengeRows }, { data: programRows }] = await Promise.all([
       supabase.from("groups").select("name").eq("id", params.groupId).single(),
-      supabase
-        .from("challenges")
-        .select("id, name, status, start_date, duration_weeks, entry_fee_cents, program_id, programs ( name )")
-        .eq("coach_id", user.id)
-        .order("created_at", { ascending: false }),
+      inOrg(
+        supabase
+          .from("challenges")
+          .select("id, name, status, start_date, duration_weeks, entry_fee_cents, program_id, programs ( name )")
+          .eq("coach_id", user.id),
+        challengeOrgId
+      ).order("created_at", { ascending: false }),
       // Only shared (non-personal) active programs — the same set a
       // challenge, which runs for a whole cohort at once, could sensibly
       // bundle with.
@@ -158,13 +162,16 @@ export default async function ChallengesPage(
   const coachId = coachMembership?.profile_id;
   const joinedChallengeIds = new Set((myParticipantRows ?? []).map((p) => p.challenge_id));
 
+  const openChallengesOrgId = await orgIdOfGroup(supabase, params.groupId);
   const { data: openChallenges } = coachId
-    ? await supabase
-        .from("challenges")
-        .select("id, name, description, status, start_date, duration_weeks, entry_fee_cents")
-        .eq("coach_id", coachId)
-        .neq("status", "draft")
-        .order("start_date", { ascending: false })
+    ? await inOrg(
+        supabase
+          .from("challenges")
+          .select("id, name, description, status, start_date, duration_weeks, entry_fee_cents")
+          .eq("coach_id", coachId)
+          .neq("status", "draft"),
+        openChallengesOrgId
+      ).order("start_date", { ascending: false })
     : { data: [] };
 
   return (

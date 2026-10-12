@@ -1,4 +1,5 @@
 import { fetchSessionMinutes, sessionMinutesFor } from "@/lib/availability-windows";
+import { inOrg, orgIdOfGroup } from "@/lib/org-of-group";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
@@ -102,6 +103,7 @@ export async function CoachCalendarPageBody(
 
   // Only the organization this calendar is in: another organization's sessions never appear on it (Ron's rule: inside an organization, nothing from another one is visible).
   const orgGroupIds = groupsInOrgOf(await getCoachedGroups(supabase, user.id), params.groupId).map((g) => g.id);
+  const bodyOrgId = await orgIdOfGroup(supabase, params.groupId);
 
   const { data: membership } = await supabase
     .from("group_memberships")
@@ -817,11 +819,10 @@ export async function CoachCalendarPageBody(
     // Custom events + acted-on suggestions this coach has on the
     // calendar in the visible range — same coach-wide-not-group-scoped
     // model as bookings above.
-    supabase
-      .from("calendar_events")
-      .select("id, title, event_date, event_time, event_type, status")
-      .eq("coach_id", user.id)
-      .neq("status", "dismissed")
+    inOrg(
+      supabase.from("calendar_events").select("id, title, event_date, event_time, event_type, status").eq("coach_id", user.id).neq("status", "dismissed"),
+      bodyOrgId
+    )
       .gte("event_date", dateKey(rangeStart))
       .lt("event_date", dateKey(rangeEnd))
       .order("event_time", { ascending: true }),
@@ -928,7 +929,7 @@ export async function CoachCalendarPageBody(
     supabase.from("coach_availability_windows").select("session_minutes").eq("coach_id", user.id).limit(1),
     supabase.from("coach_booking_policies").select("buffer_minutes").eq("coach_id", user.id).maybeSingle(),
     // Session types (Online, In person...) and each client's usual one: the type of their latest typed session, else the one type that fits their tier.
-    supabase.from("session_types").select("id, name, location_kind").eq("coach_id", user.id).order("name", { ascending: true }),
+    inOrg(supabase.from("session_types").select("id, name, location_kind").eq("coach_id", user.id), bodyOrgId).order("name", { ascending: true }),
     // Past sessions only (future ones would fill the list), newest first, a page at a time past the 1000-row cap.
     pageAll(
       (from, to) =>

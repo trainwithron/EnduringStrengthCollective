@@ -62,6 +62,29 @@ end
 $$;
 revoke execute on function public.fill_coach_row_organization() from public, anon, authenticated;
 
+-- A reminder about one client (a suggestion linked to an athlete) belongs to the organization where the coach coaches that client; any other entry gets the coach's usual organization.
+create or replace function public.fill_calendar_event_organization()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  if new.organization_id is null and new.linked_athlete_id is not null then
+    select g.organization_id into new.organization_id
+    from public.group_memberships gm_a
+    join public.group_memberships gm_c on gm_c.group_id = gm_a.group_id and gm_c.profile_id = new.coach_id and gm_c.role = 'coach'
+    join public.groups g on g.id = gm_a.group_id
+    where gm_a.profile_id = new.linked_athlete_id and gm_a.role = 'athlete'
+    limit 1;
+  end if;
+  if new.organization_id is null then
+    new.organization_id := public.default_org_for_coach(new.coach_id);
+  end if;
+  return new;
+end
+$$;
+revoke execute on function public.fill_calendar_event_organization() from public, anon, authenticated;
+
 do $$
 declare
   t text;
@@ -74,6 +97,9 @@ begin
   end loop;
 end
 $$;
+
+drop trigger if exists calendar_events_fill_organization on public.calendar_events;
+create trigger calendar_events_fill_organization before insert on public.calendar_events for each row execute function public.fill_calendar_event_organization();
 
 -- Existing rows: a challenge takes its program's organization; everything else the coach's usual one.
 update public.challenges c set organization_id = g.organization_id

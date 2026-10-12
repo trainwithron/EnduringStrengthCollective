@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { inOrg, orgIdOfGroup } from "@/lib/org-of-group";
 import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 import { isMemberOfGroup, NOT_IN_GROUP_MESSAGE } from "@/lib/athlete-in-group";
@@ -59,11 +60,7 @@ export default async function LogWorkoutForClientPage(
   // gym_owner_multi_trainer_session_tracking_real_prospect.md — only
   // fetched for the coach-logged path; an athlete's own self-started
   // session never spends a credit, so it has no use for session types.
-  const { data: typeRows } = await supabase
-    .from("session_types")
-    .select("id, name")
-    .eq("coach_id", user.id)
-    .order("created_at", { ascending: true });
+  const { data: typeRows } = await inOrg(supabase.from("session_types").select("id, name").eq("coach_id", user.id), await orgIdOfGroup(supabase, params.groupId)).order("created_at", { ascending: true });
 
   return (
     <>

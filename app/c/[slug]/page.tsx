@@ -34,11 +34,9 @@ async function load(slugParam: string, preview: boolean) {
   }
   if (!site.published && !isOwner) return null;
 
-  const [{ data: profile }, { data: membership }, { data: packages }, { data: shop }] = await Promise.all([
+  const [{ data: profile }, { data: membership }] = await Promise.all([
     db.from("profiles").select("full_name").eq("id", page.coach_id).maybeSingle(),
     db.from("organization_memberships").select("organization_id, role").eq("profile_id", page.coach_id).in("role", ["owner", "admin"]).limit(5),
-    db.from("coach_packages").select("id, name, sessions_per_week, billing_type, sessions_granted, rate_cents").eq("coach_id", page.coach_id).eq("is_active", true).eq("is_public", true).order("sessions_per_week", { ascending: true }).limit(6),
-    db.from("pro_shop_links").select("id, title, description, url, image_url").eq("coach_id", page.coach_id).eq("featured", true).order("sort_order", { ascending: true }).limit(3),
   ]);
   // A coach in several organizations: one they own first, then the oldest (stable; see pickBrandOrg).
   const orgIds = (membership ?? []).map((m) => m.organization_id as string);
@@ -46,6 +44,15 @@ async function load(slugParam: string, preview: boolean) {
     ? await db.from("organizations").select("id, created_at, name, accent_color, background_color, text_color, font_display, font_body, logo_url").in("id", orgIds)
     : { data: [] as any[] };
   const org = pickBrandOrg((membership ?? []) as { organization_id: string; role: string }[], (orgRows ?? []) as any[]);
+  // The page belongs to that organization, so the packages and the shop on it are that organization's only.
+  const { data: orgGroupRows } = org ? await db.from("groups").select("id").eq("organization_id", org.id) : { data: [] as { id: string }[] };
+  const orgGroupIdList = (orgGroupRows ?? []).map((g) => g.id);
+  const [{ data: packages }, { data: shop }] = await Promise.all([
+    db.from("coach_packages").select("id, name, sessions_per_week, billing_type, sessions_granted, rate_cents").eq("coach_id", page.coach_id).in("group_id", orgGroupIdList.length > 0 ? orgGroupIdList : ["00000000-0000-0000-0000-000000000000"]).eq("is_active", true).eq("is_public", true).order("sessions_per_week", { ascending: true }).limit(6),
+    org
+      ? db.from("pro_shop_links").select("id, title, description, url, image_url").eq("coach_id", page.coach_id).eq("organization_id", org.id).eq("featured", true).order("sort_order", { ascending: true }).limit(3)
+      : Promise.resolve({ data: [] as { id: string; title: string; description: string | null; url: string; image_url: string | null }[] }),
+  ]);
 
   const content = cleanSite({
     headline: site.headline ?? "",

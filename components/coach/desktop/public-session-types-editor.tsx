@@ -26,7 +26,7 @@ function priceToCents(value: string): number | null {
 
 // Which of the coach's session types are offered on the public page, and what a visitor sees: length, where it happens, a
 // short description and an optional price. Each change saves as you leave the field.
-export function PublicSessionTypesEditor({ initialTypes }: { initialTypes: PublicTypeEditRow[] }) {
+export function PublicSessionTypesEditor({ initialTypes , organizationId}: { initialTypes: PublicTypeEditRow[] ; organizationId: string | null}) {
   const [types, setTypes] = useState(initialTypes);
   const [newName, setNewName] = useState("");
   const [busy, setBusy] = useState(false);
@@ -56,7 +56,7 @@ export function PublicSessionTypesEditor({ initialTypes }: { initialTypes: Publi
     }
     const { data, error } = await supabase
       .from("session_types")
-      .insert({ coach_id: user.id, name, credit_cost: 1, duration_minutes: 60, location_kind: "in_person", public_visible: true, sort_order: types.length })
+      .insert({ coach_id: user.id, organization_id: organizationId, name, credit_cost: 1, duration_minutes: 60, location_kind: "in_person", public_visible: true, sort_order: types.length })
       .select("id, name, duration_minutes, location_kind, location_text, description, display_price_cents, public_visible")
       .single();
     setBusy(false);

@@ -31,7 +31,7 @@ const CATEGORIES = [
 const ALLOWED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
-export function ProShopManager({ initialLinks }: { initialLinks: ProShopLink[] }) {
+export function ProShopManager({ initialLinks, organizationId }: { initialLinks: ProShopLink[]; organizationId: string | null }) {
   const router = useRouter();
   const [links, setLinks] = useState(initialLinks);
   const [title, setTitle] = useState("");
@@ -99,6 +99,7 @@ export function ProShopManager({ initialLinks }: { initialLinks: ProShopLink[] }
       .from("pro_shop_links")
       .insert({
         coach_id: user.id,
+        organization_id: organizationId,
         title: title.trim(),
         category,
         description: description.trim() || null,

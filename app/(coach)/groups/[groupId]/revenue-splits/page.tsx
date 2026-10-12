@@ -89,6 +89,7 @@ export default async function RevenueSplitsPage(
   const { data: challengeRows } = await supabase
     .from("challenges")
     .select("id, entry_fee_cents")
+    .eq("organization_id", orgMembership.organization_id)
     .in("coach_id", coachIds.length > 0 ? coachIds : ["00000000-0000-0000-0000-000000000000"])
     .neq("status", "draft");
 

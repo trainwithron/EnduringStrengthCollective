@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { inOrg, orgIdOfGroup } from "@/lib/org-of-group";
 import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
 import { redirectOneOnOneToAnchor } from "@/lib/coach-wide-redirect";
 import { NoAccess } from "@/components/shared/no-access";
@@ -122,16 +123,11 @@ export default async function BusinessDashboardPage(
     .eq("status", "confirmed")
     .gte("start_at", monthStartIso);
 
-  const { data: referralRows } = await supabase
-    .from("referral_partners")
-    .select("click_count")
-    .eq("coach_id", user.id);
+  const organizationId = await orgIdOfGroup(supabase, params.groupId);
+  const { data: referralRows } = await inOrg(supabase.from("referral_partners").select("click_count").eq("coach_id", user.id), organizationId);
   const totalReferralClicks = (referralRows ?? []).reduce((sum, r) => sum + (r.click_count ?? 0), 0);
 
-  const { data: proShopRows } = await supabase
-    .from("pro_shop_links")
-    .select("click_count")
-    .eq("coach_id", user.id);
+  const { data: proShopRows } = await inOrg(supabase.from("pro_shop_links").select("click_count").eq("coach_id", user.id), organizationId);
   const totalProShopClicks = (proShopRows ?? []).reduce((sum, r) => sum + (r.click_count ?? 0), 0);
 
   // Real, Stripe-sourced figures — additive to the manual-rate estimate

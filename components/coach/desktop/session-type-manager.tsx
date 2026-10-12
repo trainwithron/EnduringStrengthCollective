@@ -16,7 +16,7 @@ export interface SessionTypeRow {
 // coaches never touch this at all (every session stays the implicit,
 // unnamed "training session"). Every session, of any type, costs exactly 1
 // credit; a type only tells kinds of sessions apart.
-export function SessionTypeManager({ initialTypes, teamMode = false }: { initialTypes: SessionTypeRow[]; teamMode?: boolean }) {
+export function SessionTypeManager({ initialTypes, teamMode = false , organizationId}: { initialTypes: SessionTypeRow[]; teamMode?: boolean ; organizationId: string | null}) {
   const router = useRouter();
   const [types, setTypes] = useState(initialTypes);
   const [name, setName] = useState("");
@@ -37,7 +37,7 @@ export function SessionTypeManager({ initialTypes, teamMode = false }: { initial
     }
     const { data } = await supabase
       .from("session_types")
-      .insert({ coach_id: user.id, name: trimmed })
+      .insert({ coach_id: user.id, organization_id: organizationId, name: trimmed })
       .select("id, name")
       .single();
     if (data) {
@@ -64,7 +64,7 @@ export function SessionTypeManager({ initialTypes, teamMode = false }: { initial
     }
     const { data, error } = await supabase
       .from("session_types")
-      .insert(missing.map((p) => ({ coach_id: user.id, name: p.name, location_kind: p.locationKind, public_visible: false })))
+      .insert(missing.map((p) => ({ coach_id: user.id, organization_id: organizationId, name: p.name, location_kind: p.locationKind, public_visible: false })))
       .select("id, name");
     setBusy(false);
     if (error || !data) {

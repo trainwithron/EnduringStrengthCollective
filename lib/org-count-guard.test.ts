@@ -42,17 +42,10 @@ const REVIEWED = new Set([
   "app/api/discovery-availability/[coachId]/route.ts::discovery_bookings",
   "lib/series-store.ts::discovery_bookings",
   "lib/trainer-dispatch-advance.ts::discovery_bookings",
-  // the public mini site shows the coach's packages and shop; becomes per organization with the Pro Shop work
-  "app/c/[slug]/page.tsx::coach_packages",
-  "app/c/[slug]/page.tsx::pro_shop_links",
   "components/shared/coach-profile-popup.tsx::pro_shop_links",
-  // OPEN, waiting on the per-organization migration for coach-level tables (shop links, referral partners, challenges): they have no group or organization column yet
-  "app/(coach)/groups/[groupId]/resources/page.tsx::referral_partners",
+  // limited to the page group's organization by inOrg(...) wrapped around the query on the line before (migration 0350), which this line-based scan cannot see
   "app/(coach)/groups/[groupId]/resources/page.tsx::pro_shop_links",
-  "app/(coach)/groups/[groupId]/business/page.tsx::referral_partners",
-  "app/(coach)/groups/[groupId]/business/page.tsx::pro_shop_links",
   "app/(coach)/groups/[groupId]/challenges/page.tsx::challenges",
-  "app/(coach)/groups/[groupId]/revenue-splits/page.tsx::challenges",
 ]);
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -66,7 +59,7 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 // A read is limited when its own query (from .from("table") to the end of the statement) filters the group, the organization, or one row by id.
-const LIMITED = /\.(in|eq)\("group_id"|organization_id|\.eq\("id"|\.in\("id"|\.in\("(?:booking_id|athlete_id)"|\.eq\("(?:booking_id|athlete_id)"|\.single\(\)/;
+const LIMITED = /\.(in|eq)\("group_id"|organization_id|inOrg\(|\.eq\("id"|\.in\("id"|\.in\("(?:booking_id|athlete_id)"|\.eq\("(?:booking_id|athlete_id)"|\.single\(\)/;
 
 describe("no count or list is every organization's rows for a coach in several", () => {
   const offenders: string[] = [];

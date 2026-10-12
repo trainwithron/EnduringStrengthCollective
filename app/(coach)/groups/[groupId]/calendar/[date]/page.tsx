@@ -1,4 +1,5 @@
 import { fetchSessionMinutes, sessionMinutesFor } from "@/lib/availability-windows";
+import { inOrg, orgIdOfGroup } from "@/lib/org-of-group";
 import { orgGroupIdsOf } from "@/lib/coach-groups";
 import Link from "next/link";
 import { NoAccess } from "@/components/shared/no-access";
@@ -522,6 +523,7 @@ export default async function CoachDayDetailPage(
   // primary suspect in athlete_app_loading_time_investigation_sept14.md
   // (19 sequential awaits, zero Promise.all) and was never touched by
   // that earlier pass.
+  const pageOrgId = await orgIdOfGroup(supabase, params.groupId);
   const [
     { data: group },
     { data: viewerProfile },
@@ -539,13 +541,10 @@ export default async function CoachDayDetailPage(
     // hour-by-hour view so a coach sees everything they've got going on
     // (not just bookable slots) in one place, matching what the month/
     // week grid already surfaces per-cell.
-    supabase
-      .from("calendar_events")
-      .select("id, title, event_time")
-      .eq("coach_id", user.id)
-      .eq("event_date", params.date)
-      .neq("status", "dismissed")
-      .order("event_time", { ascending: true }),
+    inOrg(
+      supabase.from("calendar_events").select("id, title, event_time").eq("coach_id", user.id).eq("event_date", params.date).neq("status", "dismissed"),
+      pageOrgId
+    ).order("event_time", { ascending: true }),
     clientId
       ? supabase
           .from("group_memberships")
@@ -592,7 +591,7 @@ export default async function CoachDayDetailPage(
   ]);
 
   // The coach's session types and each booked session's type (migration 0261 / 0289). Soft: if the lookup fails the type control simply does not appear.
-  const { data: coachTypeRows } = await supabase.from("session_types").select("id, name").eq("coach_id", user.id).order("created_at", { ascending: true });
+  const { data: coachTypeRows } = await inOrg(supabase.from("session_types").select("id, name").eq("coach_id", user.id), pageOrgId).order("created_at", { ascending: true });
   const coachTypes = (coachTypeRows ?? []) as { id: string; name: string }[];
   const typeByBooking = new Map<string, string | null>();
   if (coachTypes.length > 0 && (bookingRows ?? []).length > 0) {
@@ -755,7 +754,7 @@ export default async function CoachDayDetailPage(
         timeZone={timezone}
       />
 
-      <AddDayEventForm coachId={user.id} dateKey={params.date} />
+      <AddDayEventForm coachId={user.id} dateKey={params.date} organizationId={pageOrgId} />
 
       {dayEventRows && dayEventRows.length > 0 && (
         <div className="mb-6 max-w-lg">

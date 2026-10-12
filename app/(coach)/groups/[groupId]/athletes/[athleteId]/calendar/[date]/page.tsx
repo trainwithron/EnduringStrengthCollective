@@ -1,4 +1,5 @@
 import { loadAssignableWorkouts } from "@/lib/assignable-workouts";
+import { inOrg, orgIdOfGroup } from "@/lib/org-of-group";
 import { orgGroupIdsOf } from "@/lib/coach-groups";
 import { getAthleteCurrentProgram } from "@/lib/active-programs";
 import Link from "next/link";
@@ -260,8 +261,9 @@ export default async function ClientCalendarDayPage(
   // coach_identity_bio_social_link_pinning_scoping_sept19.md — this
   // client's own Pro Shop links (to pick from) and whatever's already
   // pinned to this exact day.
+  const shopOrgId = await orgIdOfGroup(supabase, params.groupId);
   const [{ data: proShopLinkRows }, { data: dayPinRows }] = await Promise.all([
-    supabase.from("pro_shop_links").select("id, title").eq("coach_id", user.id).order("sort_order"),
+    (inOrg(supabase.from("pro_shop_links").select("id, title").eq("coach_id", user.id), shopOrgId) as any).order("sort_order") as Promise<{ data: { id: string; title: string }[] | null }>,
     supabase
       .from("pro_shop_link_day_pins")
       .select("id, link_id, pro_shop_links ( title )")

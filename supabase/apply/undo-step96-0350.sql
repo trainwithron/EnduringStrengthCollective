@@ -37,6 +37,7 @@ drop trigger if exists challenges_fill_organization on public.challenges;
 drop trigger if exists calendar_events_fill_organization on public.calendar_events;
 drop trigger if exists session_types_fill_organization on public.session_types;
 drop trigger if exists discovery_bookings_fill_organization on public.discovery_bookings;
+drop function if exists public.fill_calendar_event_organization();
 drop function if exists public.fill_coach_row_organization();
 drop function if exists public.client_of_coach_in_org(uuid, uuid);
 drop function if exists public.coach_in_org(uuid);

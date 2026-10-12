@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { inOrg, orgIdOfGroup } from "@/lib/org-of-group";
 import { redirectOneOnOneToAnchor } from "@/lib/coach-wide-redirect";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
@@ -31,14 +32,18 @@ export default async function BookingPageSettingsPage(props: { params: Promise<{
     );
   }
 
+  const typesOrgId = await orgIdOfGroup(supabase, params.groupId);
   const [{ data: group }, { data: profile }, pageResult, typesResult, { count: windowCount }] = await Promise.all([
     supabase.from("groups").select("name").eq("id", params.groupId).single(),
     supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
     supabase.from("coach_booking_pages").select("slug, enabled, headline, intro, show_prices").eq("coach_id", user.id).maybeSingle(),
-    supabase
-      .from("session_types")
-      .select("id, name, duration_minutes, location_kind, location_text, description, display_price_cents, public_visible, sort_order")
-      .eq("coach_id", user.id)
+    inOrg(
+      supabase
+        .from("session_types")
+        .select("id, name, duration_minutes, location_kind, location_text, description, display_price_cents, public_visible, sort_order")
+        .eq("coach_id", user.id),
+      typesOrgId
+    )
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true }),
     supabase.from("coach_availability_windows").select("id", { count: "exact", head: true }).eq("coach_id", user.id),
@@ -102,7 +107,7 @@ export default async function BookingPageSettingsPage(props: { params: Promise<{
 
           <section>
             <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">Sessions people can book</h2>
-            <PublicSessionTypesEditor initialTypes={types} />
+            <PublicSessionTypesEditor initialTypes={types} organizationId={typesOrgId} />
           </section>
         </div>
       )}

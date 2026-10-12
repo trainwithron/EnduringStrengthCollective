@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { orgIdOfGroup } from "@/lib/org-of-group";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 
@@ -54,10 +55,12 @@ export function ChallengeCreator({
       return;
     }
 
+    const organizationId = await orgIdOfGroup(supabase, groupId);
     const { data: challenge, error: insertError } = await supabase
       .from("challenges")
       .insert({
         coach_id: user.id,
+        organization_id: organizationId,
         name: name.trim(),
         description: description.trim() || null,
         start_date: startDate,

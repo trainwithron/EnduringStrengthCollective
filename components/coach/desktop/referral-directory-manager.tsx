@@ -25,7 +25,7 @@ const SPECIALTIES = [
   "Other",
 ];
 
-export function ReferralDirectoryManager({ initialPartners }: { initialPartners: ReferralPartner[] }) {
+export function ReferralDirectoryManager({ initialPartners, organizationId }: { initialPartners: ReferralPartner[]; organizationId: string | null }) {
   const router = useRouter();
   const [partners, setPartners] = useState(initialPartners);
   const [name, setName] = useState("");
@@ -51,6 +51,7 @@ export function ReferralDirectoryManager({ initialPartners }: { initialPartners:
       .from("referral_partners")
       .insert({
         coach_id: user.id,
+        organization_id: organizationId,
         name: name.trim(),
         specialty,
         description: description.trim() || null,
