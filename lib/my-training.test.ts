@@ -133,3 +133,19 @@ describe("Personal space: only coaches, and no briefings for it", () => {
     expect(read("app/api/cron/coach-digest/route.ts")).toContain("if (!g?.organization_id) continue;");
   });
 });
+
+describe("The coach's own profile shows only what is theirs", () => {
+  const page = read("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx");
+  it("hides the client-only items on their own profile: the quiet nudges, sign-in help, the Joined line, and says Set a goal", () => {
+    expect(page).toContain('!selfView && signInStatus === "active" && quietTier === "strong"');
+    expect(page).toContain('!selfView && signInStatus === "active" && quietTier === "mild"');
+    expect(page).toContain('{!selfView && signInStatus !== "active" && (');
+    expect(page).toContain('{!selfView && signInStatus === "active" && (');
+    expect(page).toContain("{!selfView && <>Joined ");
+    expect(page).toContain('{selfView ? "Set a goal" : "Suggest a goal"}');
+  });
+  it("every read on the page is for the one athlete in the one group named in the address (the space holds nobody else)", () => {
+    expect(page).toContain('.eq("group_id", params.groupId)');
+    expect(page).toContain('.eq("profile_id", params.athleteId)');
+  });
+});

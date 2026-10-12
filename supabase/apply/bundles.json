@@ -269,6 +269,22 @@
   "file": "apply-release-bm-all.sql"
  },
  {
+  "id": "release-bl",
+  "name": "Release BL (four exercises added to Coach Ron's library for the FitPros history; run any time)",
+  "steps": [
+   "106"
+  ],
+  "file": "apply-release-bl-all.sql"
+ },
+ {
+  "id": "release-bk",
+  "name": "Release BK (move Coach Ron's own training into his personal space; run AFTER he has opened Coach Ron (you) once and removed the programs he does not want)",
+  "steps": [
+   "105"
+  ],
+  "file": "apply-release-bk-all.sql"
+ },
+ {
   "id": "release-bj",
   "name": "Release BJ (a personal space for each person, outside any organization; run BEFORE the code that goes with it is live)",
   "steps": [

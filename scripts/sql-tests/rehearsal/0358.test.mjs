@@ -84,6 +84,10 @@ export default {
       await db.query("insert into public.notifications (profile_id, group_id, type, body, link_path) values ($1, $2, 'program_assigned', 'y', '/')", [coach, gA]);
       h.check("a notification filed under the personal space is dropped, one under an organization group is kept", (await count("notifications", "body = 'x'")) === 0 && (await count("notifications", "body = 'y'")) === 1);
 
+      // ---- no other person's data can be filed in it ----------------------------------------------------
+      await h.as(coach);
+      await h.expectError("a row about another person cannot be filed in the personal space", () => db.query("insert into public.wellness_checkins (athlete_id, group_id, sleep_quality, soreness, energy, log_date) values ($1, $2, 3, 3, 3, current_date + 2)", [stranger, ps]), /not a member/i);
+
       // ---- no one else can be seated, and it cannot be moved ---------------------------------------------
       await h.as(coach);
       await h.expectError("the person cannot seat anyone else in their personal space", () => db.query("insert into public.group_memberships (group_id, profile_id, role) values ($1, $2, 'athlete')", [ps, stranger]), /belongs to one person|row-level security|policy/i);

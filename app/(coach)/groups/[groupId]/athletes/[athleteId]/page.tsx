@@ -807,16 +807,17 @@ export default async function AthleteProfilePage(
     })
   ) {
     profileFlag = "Logged low readiness today.";
-  } else if (signInStatus === "active" && quietTier === "strong") {
+  } else if (!selfView && signInStatus === "active" && quietTier === "strong") {
     // Not for someone who has not signed in yet: a client added a minute ago has not "gone quiet".
     profileFlag = "Has gone quiet — worth a personal check-in.";
-  } else if (signInStatus === "active" && quietTier === "mild") {
+  } else if (!selfView && signInStatus === "active" && quietTier === "mild") {
     profileFlag = "Hasn't logged in a while.";
   } else if (habitCompliancePct != null && habitCompliancePct < 50) {
     profileFlag = `Missed ${totalHabitsDue - totalHabitsCompleted} habit${totalHabitsDue - totalHabitsCompleted === 1 ? "" : "s"} this week.`;
   }
 
   // The coach's own profile lives in their personal space, which is in no organization: the coach rail around it stays on the organization they have open.
+  // The coach's own profile lives in their personal space, which is in no organization: the page around it is the normal coach page of the organization they have open.
   let shellGroupId = params.groupId;
   let shellGroupName = group?.name ?? "Coaching";
   if (selfView) {
@@ -854,10 +855,10 @@ export default async function AthleteProfilePage(
               {profile?.full_name ?? "Unknown"}
             </h1>
             <p className="font-body text-xs text-steel mt-1">
-              Joined {new Date(athleteMembership.joined_at).toLocaleDateString("en-US", { timeZone: displayZone })}
+              {!selfView && <>Joined {new Date(athleteMembership.joined_at).toLocaleDateString("en-US", { timeZone: displayZone })}</>}
               {activeProgram && (
                 <>
-                  {" · "}
+                  {!selfView && " · "}
                   <Link href={`/groups/${params.groupId}/programs/${activeProgram.id}`} className="hover:text-chalk underline underline-offset-2">
                     {activeProgram.name}
                   </Link>
@@ -942,7 +943,7 @@ export default async function AthleteProfilePage(
       <div className="profile-grid grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-6 lg:gap-10 items-start">
         <div className="space-y-8 min-w-0">
           <div data-tab="overview">
-          {signInStatus !== "active" && (
+          {!selfView && signInStatus !== "active" && (
             <ClientSignInPanel
               groupId={params.groupId}
               athleteId={params.athleteId}
@@ -955,7 +956,7 @@ export default async function AthleteProfilePage(
           )}
           </div>
           <div data-tab="overview">
-          {signInStatus === "active" && (
+          {!selfView && signInStatus === "active" && (
             <>
               {/* Off until the email sender is set up (Oct 7): the safeguard for this tool is a notice to the OLD address, and mail is not on yet, so a coach
                   could otherwise change a signed-in client's login with nobody told. The client changes their own email in their Settings. */}
@@ -1348,7 +1349,7 @@ export default async function AthleteProfilePage(
           {latestGoalRow?.status !== "proposed" && (
             <section>
               <details className="border border-steel/20 p-3">
-                <summary className="font-body text-xs text-steel uppercase tracking-wide font-bold cursor-pointer">Suggest a goal</summary>
+                <summary className="font-body text-xs text-steel uppercase tracking-wide font-bold cursor-pointer">{selfView ? "Set a goal" : "Suggest a goal"}</summary>
                 <div className="mt-3">
                   <GoalProposalForm athleteId={params.athleteId} groupId={params.groupId} suggestedBy={user.id} />
                 </div>

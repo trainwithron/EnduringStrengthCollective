@@ -194,12 +194,58 @@ for (const s of steps) {
     `);
     before64.snap = await snapshot64();
   }
+  if (s.n === "105") {
+    // Coach Ron's own training in The Enduring Strength Collective: one program to move, one he removed first (stays), their workouts and lines, a session, its log, a wellness check-in,
+    // a session in another person's space (stays), and his personal space (made by his first click on Coach Ron (you)).
+    await db.exec(`
+      insert into public.organizations (id, slug, name, owner_id) values ('b0000000-0000-4000-8000-000000000001', 'bk-esc', 'Enduring Strength Co. (test)', '00000000-0000-4000-8000-0000000000a1') on conflict (id) do nothing;
+      insert into public.groups (id, name, created_by, organization_id) values
+        ('b0000000-0000-4000-8000-0000000000e1', 'The Enduring Strength Collective', '136394ed-f108-4283-bcb7-310a1ac6cbc8', 'b0000000-0000-4000-8000-000000000001'),
+        ('b0000000-0000-4000-8000-0000000000e2', 'Karina Ramirez', '136394ed-f108-4283-bcb7-310a1ac6cbc8', 'b0000000-0000-4000-8000-000000000001');
+      insert into public.group_memberships (group_id, profile_id, role) values
+        ('b0000000-0000-4000-8000-0000000000e1', '136394ed-f108-4283-bcb7-310a1ac6cbc8', 'coach'),
+        ('b0000000-0000-4000-8000-0000000000e2', '136394ed-f108-4283-bcb7-310a1ac6cbc8', 'coach');
+      insert into public.groups (id, name, created_by, organization_id, group_kind) values ('b0000000-0000-4000-8000-0000000000f1', 'Coach Ron', '136394ed-f108-4283-bcb7-310a1ac6cbc8', null, 'one_on_one');
+      insert into public.group_memberships (group_id, profile_id, role) values ('b0000000-0000-4000-8000-0000000000f1', '136394ed-f108-4283-bcb7-310a1ac6cbc8', 'coach');
+      insert into public.programs (id, group_id, name, created_by, athlete_id, is_active, archived_at) values
+        ('b0000000-0000-4000-8000-0000000000a1', 'b0000000-0000-4000-8000-0000000000e1', 'christmas_abs_program', '136394ed-f108-4283-bcb7-310a1ac6cbc8', '136394ed-f108-4283-bcb7-310a1ac6cbc8', true, null),
+        ('b0000000-0000-4000-8000-0000000000a2', 'b0000000-0000-4000-8000-0000000000e1', 'Jeff Z', '136394ed-f108-4283-bcb7-310a1ac6cbc8', '136394ed-f108-4283-bcb7-310a1ac6cbc8', false, now());
+      insert into public.workouts (id, program_id, group_id, athlete_id, title, week_number, day_index) values
+        ('b0000000-0000-4000-8000-0000000000b1', 'b0000000-0000-4000-8000-0000000000a1', 'b0000000-0000-4000-8000-0000000000e1', '136394ed-f108-4283-bcb7-310a1ac6cbc8', 'Day 1', 1, 1),
+        ('b0000000-0000-4000-8000-0000000000b2', 'b0000000-0000-4000-8000-0000000000a2', 'b0000000-0000-4000-8000-0000000000e1', '136394ed-f108-4283-bcb7-310a1ac6cbc8', 'Day 1', 1, 1);
+      insert into public.group_workout_exercises (id, workout_id, group_id, athlete_id, exercise_name, exercise_order, tracked_fields) values
+        ('b0000000-0000-4000-8000-0000000000c1', 'b0000000-0000-4000-8000-0000000000b1', 'b0000000-0000-4000-8000-0000000000e1', '136394ed-f108-4283-bcb7-310a1ac6cbc8', 'Plank', 1, array['time']),
+        ('b0000000-0000-4000-8000-0000000000c2', 'b0000000-0000-4000-8000-0000000000b2', 'b0000000-0000-4000-8000-0000000000e1', '136394ed-f108-4283-bcb7-310a1ac6cbc8', 'Plank', 1, array['time']);
+      insert into public.athlete_sessions (id, workout_id, group_id, athlete_id, status) values
+        ('b0000000-0000-4000-8000-0000000000d1', 'b0000000-0000-4000-8000-0000000000b1', 'b0000000-0000-4000-8000-0000000000e1', '136394ed-f108-4283-bcb7-310a1ac6cbc8', 'completed'),
+        ('b0000000-0000-4000-8000-0000000000d2', null, 'b0000000-0000-4000-8000-0000000000e2', '136394ed-f108-4283-bcb7-310a1ac6cbc8', 'completed');
+      insert into public.workout_logs (session_id, athlete_id, group_id, workout_id) values ('b0000000-0000-4000-8000-0000000000d1', '136394ed-f108-4283-bcb7-310a1ac6cbc8', 'b0000000-0000-4000-8000-0000000000e1', 'b0000000-0000-4000-8000-0000000000b1');
+      insert into public.wellness_checkins (athlete_id, group_id, sleep_quality, soreness, energy) values ('136394ed-f108-4283-bcb7-310a1ac6cbc8', 'b0000000-0000-4000-8000-0000000000e1', 4, 2, 5);
+    `);
+  }
   const base = `apply/apply-step${s.n}-${s.slug}`;
   const rows = await pre(`${base}-precheck.sql`);
   const bad = rows.filter((r) => !r.ok).map((r) => r.check_name);
   check(`step ${s.n} (${s.slug}) precheck: ${rows.length} rows, all true` + (bad.length ? ` (FALSE: ${bad.join("; ")})` : ""), rows.length === s.rows && bad.length === 0);
   e = await run(`${base}.sql`);
   check(`step ${s.n} (${s.slug}) applies` + (e ? `: ${e}` : ""), !e);
+  if (s.n === "105") {
+    const one = async (sql) => (await db.query(sql)).rows[0];
+    const PS = "b0000000-0000-4000-8000-0000000000f1";
+    const ESC = "b0000000-0000-4000-8000-0000000000e1";
+    const moved = await one(`select
+      (select count(*)::int from public.programs where group_id = '${PS}' and id = 'b0000000-0000-4000-8000-0000000000a1') as prog,
+      (select count(*)::int from public.workouts where group_id = '${PS}' and id = 'b0000000-0000-4000-8000-0000000000b1') as wk,
+      (select count(*)::int from public.group_workout_exercises where group_id = '${PS}' and id = 'b0000000-0000-4000-8000-0000000000c1') as line,
+      (select count(*)::int from public.athlete_sessions where group_id = '${PS}' and id = 'b0000000-0000-4000-8000-0000000000d1') as sess,
+      (select count(*)::int from public.workout_logs where group_id = '${PS}') as log,
+      (select count(*)::int from public.wellness_checkins where group_id = '${PS}') as well,
+      (select count(*)::int from public.programs where group_id = '${ESC}' and id = 'b0000000-0000-4000-8000-0000000000a2') as removed_stays,
+      (select count(*)::int from public.workouts where group_id = '${ESC}' and id = 'b0000000-0000-4000-8000-0000000000b2') as removed_wk_stays,
+      (select count(*)::int from public.athlete_sessions where group_id = 'b0000000-0000-4000-8000-0000000000e2' and id = 'b0000000-0000-4000-8000-0000000000d2') as other_space_session_stays`);
+    check("step 105 moved the program, its workout and line, the session, the log and the wellness check-in into the personal space: " + JSON.stringify(moved), moved.prog === 1 && moved.wk === 1 && moved.line === 1 && moved.sess === 1 && moved.log === 1 && moved.well === 1);
+    check("step 105 left the removed program, its workout and the session in another person's space where they were", moved.removed_stays === 1 && moved.removed_wk_stays === 1 && moved.other_space_session_stays === 1);
+  }
   if (s.n === "64") {
     const one = async (sql) => (await db.query(sql)).rows[0];
     const RON = "136394ed-f108-4283-bcb7-310a1ac6cbc8";
@@ -1559,6 +1605,47 @@ await run(`apply/undo-step94-0348.sql`);
   check("release-bj: the undo removes the function" + (euBJ ? ": " + euBJ : ""), !euBJ && !(await has()));
   const errBJ2 = await run(`apply/${bundle.file}`);
   check("release-bj: the bundle applies again after an undo" + (errBJ2 ? ": " + errBJ2 : ""), !errBJ2 && (await has()));
+  // Release BK (step 105) and Release BL (step 106): one paste each. At this point both are applied; take them back with their undos, then each bundle applies, a second run is refused, the undo returns it, and it applies again.
+  {
+    const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+    const bk = bundles.find((b) => b.id === "release-bk");
+    const bl = bundles.find((b) => b.id === "release-bl");
+    check("release-bk / release-bl: one bundle each (steps 105 and 106)", !!bk && !!bl && JSON.stringify(bk.steps) === JSON.stringify(["105"]) && JSON.stringify(bl.steps) === JSON.stringify(["106"]));
+    const st105 = steps.find((x) => x.n === "105");
+    const st106 = steps.find((x) => x.n === "106");
+    const PS = "b0000000-0000-4000-8000-0000000000f1";
+    const ESC = "b0000000-0000-4000-8000-0000000000e1";
+    const inSpace = async () => Number((await db.query(`select count(*)::int as n from public.programs where id = 'b0000000-0000-4000-8000-0000000000a1' and group_id = '${PS}'`)).rows[0].n) === 1;
+    const inEsc = async () => Number((await db.query(`select count(*)::int as n from public.programs where id = 'b0000000-0000-4000-8000-0000000000a1' and group_id = '${ESC}'`)).rows[0].n) === 1;
+    const euBK = await run(`apply/undo-step${st105.n}-${st105.slug}.sql`);
+    check("release-bk: the undo puts the program, workouts, session, log and check-in back in the Collective and drops the log" + (euBK ? ": " + euBK : ""), !euBK && (await inEsc()) && (await db.query("select to_regclass('public.personal_space_move_log') is null as ok")).rows[0].ok === true
+      && Number((await db.query(`select count(*)::int as n from public.wellness_checkins where group_id = '${ESC}'`)).rows[0].n) === 1 && Number((await db.query(`select count(*)::int as n from public.group_workout_exercises where group_id = '${ESC}' and id = 'b0000000-0000-4000-8000-0000000000c1'`)).rows[0].n) === 1);
+    const errBK = await run(`apply/${bk.file}`);
+    check("release-bk bundle applies" + (errBK ? ": " + errBK : ""), !errBK && (await inSpace()));
+    const againBK = await run(`apply/${bk.file}`);
+    check("release-bk: a second run is refused, naming step 105", !!againBK && againBK.includes("step 105 (move-ron-personal-training) cannot run") && againBK.includes("already applied"));
+    const euBK2 = await run(`apply/undo-step${st105.n}-${st105.slug}.sql`);
+    check("release-bk: the undo returns it" + (euBK2 ? ": " + euBK2 : ""), !euBK2 && (await inEsc()));
+    // Refused while the personal space does not exist.
+    await db.exec(`alter table public.group_memberships disable trigger group_memberships_guard_personal_space`);
+    await db.exec(`update public.groups set created_by = '00000000-0000-4000-8000-0000000000a1' where id = '${PS}'`);
+    const noSpace = await run(`apply/${bk.file}`);
+    check("release-bk: refused with nothing changed while Coach Ron has no personal space", !!noSpace && noSpace.includes("cannot run") && (await inEsc()));
+    await db.exec(`update public.groups set created_by = '136394ed-f108-4283-bcb7-310a1ac6cbc8' where id = '${PS}'`);
+    await db.exec(`alter table public.group_memberships enable trigger group_memberships_guard_personal_space`);
+    const errBK3 = await run(`apply/${bk.file}`);
+    check("release-bk: the bundle applies again after an undo" + (errBK3 ? ": " + errBK3 : ""), !errBK3 && (await inSpace()));
+
+    const lib = async () => Number((await db.query("select count(*)::int as n from public.exercise_library where created_by = '136394ed-f108-4283-bcb7-310a1ac6cbc8' and name in ('Sissy Squat', 'Thoracic Extension (Quadruped)', 'Handcuff W Rotation', 'Incline Iso Lateral Chest Press')")).rows[0].n);
+    const aliases = async () => Number((await db.query("select count(*)::int as n from public.exercise_aliases where coach_id = '136394ed-f108-4283-bcb7-310a1ac6cbc8' and raw_name in ('Sissy Squats', 'Thoracic Extensions (Quadruped)')")).rows[0].n);
+    check("release-bl: step 106 added the four exercises and the two spelling aliases", (await lib()) === 4 && (await aliases()) === 2);
+    const euBL = await run(`apply/undo-step${st106.n}-${st106.slug}.sql`);
+    check("release-bl: the undo removes them" + (euBL ? ": " + euBL : ""), !euBL && (await lib()) === 0 && (await aliases()) === 0);
+    const errBL = await run(`apply/${bl.file}`);
+    check("release-bl bundle applies" + (errBL ? ": " + errBL : ""), !errBL && (await lib()) === 4);
+    const againBL = await run(`apply/${bl.file}`);
+    check("release-bl: a second run is refused, naming step 106", !!againBL && againBL.includes("step 106 (add-fitpros-exercises) cannot run") && againBL.includes("already applied"));
+  }
   await run(`apply/undo-step${st104.n}-${st104.slug}.sql`);
   await run(`apply/undo-step${st94b.n}-${st94b.slug}.sql`);
 }
