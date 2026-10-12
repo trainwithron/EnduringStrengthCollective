@@ -34,7 +34,7 @@ describe("Remove from this profile", () => {
     expect(section).toMatch(/<\/Link>\s*<ClientProgramMenu/);
   });
   it("an unsigned AI draft can be removed from the profile (it has no Make active, which needs a sign-off)", () => {
-    expect(menu).toContain("{!aiDraft && (");
+    expect(menu).toContain("{!aiDraft && !self && (");
   });
   it("a removed program leaves the list, the pickers and the side panel, and sits in a 'Removed programs (n)' fold with Put back", () => {
     const section = read("components/coach/desktop/client-programs-section.tsx");
