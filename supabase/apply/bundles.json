@@ -285,6 +285,14 @@
   "file": "apply-release-bk-all.sql"
  },
  {
+  "id": "release-bo",
+  "name": "Release BO (removes two empty stray Rob Derrick groups; run any time)",
+  "steps": [
+   "109"
+  ],
+  "file": "apply-release-bo-all.sql"
+ },
+ {
   "id": "release-bj",
   "name": "Release BJ (a personal space for each person, outside any organization; run BEFORE the code that goes with it is live)",
   "steps": [

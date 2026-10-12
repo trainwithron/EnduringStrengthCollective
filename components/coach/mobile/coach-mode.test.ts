@@ -40,11 +40,13 @@ describe("coach mode: a coach logging a workout for a client on the phone", () =
       expect(src).not.toContain("acting_as");
     }
   });
-  it("the phone entry points say Log their workout (the desktop wording is unchanged)", () => {
+  it("the phone entry points say Log their workout (and the desktop profile does not offer it)", () => {
     expect(read("components/coach/mobile/coach-roster-mobile.tsx")).toContain("Log their workout");
     expect(read("components/coach/mobile/spot-clients-groups-panel.tsx")).toContain("Log their workout");
     const profile = read("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx");
-    expect(profile).toContain('<span className="lg:hidden">Log their workout</span>');
-    expect(profile).toContain('<span className="hidden lg:inline">Log an in-person session</span>');
+    expect(profile).toContain("Log their workout");
+    expect(profile).toContain('className="lg:hidden inline-flex');
+    // the desktop profile no longer offers it
+    expect(profile).not.toContain("Log an in-person session");
   });
 });

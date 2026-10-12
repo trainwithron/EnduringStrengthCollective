@@ -10,7 +10,7 @@ import { orderForAssign, programLabel, SEARCH_FROM, type PickableProgram } from 
 import { SearchPickList } from "@/components/coach/search-pick-list";
 
 // The two things a coach does from a client's Programs tab, as plain buttons above the client's list: Assign program (pick any program of theirs, one click assigns it with the same copy
-// engine as everywhere else, no confirmation) and Build with AI. An unsigned AI draft is listed but cannot be picked until it is signed off.
+// engine as everywhere else, no confirmation) and Build program (the normal builder; the AI is an option inside it). An unsigned AI draft is listed but cannot be picked until it is signed off.
 export function ClientProgramActions({ groupId, athleteId, athleteFullName, extra }: { groupId: string; athleteId: string; athleteFullName: string; extra?: ReactNode }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -110,8 +110,8 @@ export function ClientProgramActions({ groupId, athleteId, athleteFullName, extr
         <button type="button" onClick={() => (open ? setOpen(false) : void openPicker())} aria-expanded={open} className={`${button} text-rust border-rust`}>
           Assign program
         </button>
-        <button type="button" onClick={() => router.push(`/groups/${groupId}/programs/new?method=ai&athleteId=${athleteId}`)} className={`${button} text-chalk border-steel/40`}>
-          Build with AI
+        <button type="button" onClick={() => router.push(`/groups/${groupId}/programs/new?athleteId=${athleteId}`)} className={`${button} text-chalk border-steel/40`}>
+          Build program
         </button>
         {extra}
       </div>

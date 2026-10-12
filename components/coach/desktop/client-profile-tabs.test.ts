@@ -27,7 +27,10 @@ describe("the tab strip", () => {
   it("every tab is a button on this page (none leaves the profile), and the strip wraps instead of scrolling", () => {
     const html = renderToStaticMarkup(createElement(ClientProfileTabs, { groupId: "g1", athleteId: "a1", initial: "overview" }));
     expect((html.match(/<button/g) ?? []).length).toBe(8);
-    expect(html).not.toContain("<a ");
+    // History is the one link: its own page (exercise history and the FitPros import)
+    expect((html.match(/<a /g) ?? []).length).toBe(1);
+    expect(html).toContain('href="/groups/g1/athletes/a1/history"');
+    expect(html).toContain(">History<");
     expect(html).toContain("flex-wrap");
     expect(html).not.toContain("overflow-x-auto");
     expect(html).toContain('aria-pressed="true"');
@@ -59,7 +62,8 @@ describe("the profile page", () => {
   it("no workflow is lost: assigning a program and logging an in-person session are in the Programs tab, scheduling a session and logging one are in the Calendar tab", () => {
     const programs = page.slice(page.indexOf('<div data-tab="program"'), page.indexOf('<div className="profile-grid'));
     expect(programs).toContain("<ClientProgramActions");
-    expect(programs).toContain("Log an in-person session");
+    expect(programs).not.toContain("Log an in-person session");
+    expect(programs).toContain("Log their workout");
     expect(programs).toContain("/log`");
     expect(calendarSection).toContain("Schedule a session for");
     expect(calendarSection).toContain("scheduleFor=");

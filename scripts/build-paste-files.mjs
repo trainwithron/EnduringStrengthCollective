@@ -2095,6 +2095,23 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["0359 is not already applied (the function does not leave out import stamps yet)", "position('12:00:17' in pg_get_functiondef(to_regprocedure('public.recompute_training_max()'))) = 0"],
     ],
   },
+  {
+    n: "109",
+    slug: "remove-empty-rob-derrick-groups",
+    title: "remove the two empty one-on-one groups named Rob Derrick left behind by the failed add-client attempts (both have no members, programs, sessions, posts or invites); undoable",
+    migrations: [],
+    warn: "A one-time data change that deletes exactly two EMPTY groups by id (e2425435-950a-409d-8d4e-e24d92f21652 and 568e84b6-b85c-476c-b160-7b6b64e21caa). It stops with nothing changed if either one has any member, program, session, post or invite.",
+    sees: "Success. No rows returned.",
+    afterwards: "The two stray Rob Derrick groups are gone. Nothing else changes. To see what was removed:  select row->>'id', row->>'name', row->>'created_at' from public.orphan_group_cleanup_log;",
+    bodySql: "create table public.orphan_group_cleanup_log (\n  id bigserial primary key,\n  row jsonb not null,\n  cleaned_at timestamptz not null default now()\n);\nalter table public.orphan_group_cleanup_log enable row level security;\nrevoke all on public.orphan_group_cleanup_log from anon, authenticated;\n\ndo $clean$\ndeclare\n  v_ids constant uuid[] := array['e2425435-950a-409d-8d4e-e24d92f21652', '568e84b6-b85c-476c-b160-7b6b64e21caa']::uuid[];\nbegin\n  if (select count(*) from public.groups where id = any (v_ids) and name = 'Rob Derrick' and group_kind = 'one_on_one') <> 2 then\n    raise exception 'Expected exactly the two empty Rob Derrick groups.';\n  end if;\n  if exists (select 1 from public.group_memberships where group_id = any (v_ids))\n     or exists (select 1 from public.programs where group_id = any (v_ids))\n     or exists (select 1 from public.athlete_sessions where group_id = any (v_ids))\n     or exists (select 1 from public.posts where group_id = any (v_ids))\n     or exists (select 1 from public.group_invites where group_id = any (v_ids)) then\n    raise exception 'One of the Rob Derrick groups is not empty; nothing was removed.';\n  end if;\n  insert into public.orphan_group_cleanup_log (row) select to_jsonb(g) from public.groups g where g.id = any (v_ids);\n  delete from public.groups where id = any (v_ids);\nend;\n$clean$;",
+    undo: "insert into public.groups select * from jsonb_populate_recordset(null::public.groups, (select coalesce(jsonb_agg(row), '[]'::jsonb) from public.orphan_group_cleanup_log));\ndrop table public.orphan_group_cleanup_log;",
+    undoWhy: "Only if the cleanup was wrong. Puts the two empty groups back exactly as they were (from the log) and drops the log.",
+    rows: [
+      ["both stray groups exist", "(select count(*) from public.groups where id in ('e2425435-950a-409d-8d4e-e24d92f21652', '568e84b6-b85c-476c-b160-7b6b64e21caa') and name = 'Rob Derrick' and group_kind = 'one_on_one') = 2"],
+      ["neither has a member, program, session, post or invite", "not exists (select 1 from public.group_memberships where group_id in ('e2425435-950a-409d-8d4e-e24d92f21652', '568e84b6-b85c-476c-b160-7b6b64e21caa')) and not exists (select 1 from public.programs where group_id in ('e2425435-950a-409d-8d4e-e24d92f21652', '568e84b6-b85c-476c-b160-7b6b64e21caa')) and not exists (select 1 from public.athlete_sessions where group_id in ('e2425435-950a-409d-8d4e-e24d92f21652', '568e84b6-b85c-476c-b160-7b6b64e21caa')) and not exists (select 1 from public.posts where group_id in ('e2425435-950a-409d-8d4e-e24d92f21652', '568e84b6-b85c-476c-b160-7b6b64e21caa')) and not exists (select 1 from public.group_invites where group_id in ('e2425435-950a-409d-8d4e-e24d92f21652', '568e84b6-b85c-476c-b160-7b6b64e21caa'))"],
+      ["step 109 is not already applied (the cleanup log is not there yet)", "to_regclass('public.orphan_group_cleanup_log') is null"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -2203,6 +2220,7 @@ const BUNDLES = [
   { id: "release-bm", name: "Release BM (imported history weights do not set training maxes; run BEFORE importing FitPros history)", steps: ["107"] },
   { id: "release-bl", name: "Release BL (four exercises added to Coach Ron's library for the FitPros history; run any time)", steps: ["106"] },
   { id: "release-bk", name: "Release BK (move Coach Ron's own training into his personal space; run AFTER he has opened Coach Ron (you) once and removed the programs he does not want)", steps: ["105"] },
+  { id: "release-bo", name: "Release BO (removes two empty stray Rob Derrick groups; run any time)", steps: ["109"] },
   { id: "release-bj", name: "Release BJ (a personal space for each person, outside any organization; run BEFORE the code that goes with it is live)", steps: ["104"] },
   { id: "release-bg", name: "Release BG (coach assessments on a client's profile; run BEFORE the code that goes with it is live)", steps: ["101"] },
   { id: "release-bf", name: "Release BF (the money settings on organization memberships are the server's; shares never total over 100 percent; run BEFORE the code that goes with it is live)", steps: ["100"] },
