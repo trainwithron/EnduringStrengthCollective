@@ -1783,6 +1783,25 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["every table the rule covers has the person and group columns", TENANT_TABLES.map((t) => has.col(t, "athlete_id") + " and " + has.col(t, "group_id")).join(" and ")],
     ],
   },
+  {
+    n: "87",
+    slug: "0341",
+    title: "0341 A coach package can only be created, changed or removed by the server (a client could file their own package with thousands of sessions and pay for a cheap one)",
+    migrations: ["0341"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for normal use: the packages screen already saves through the server. Nobody can write the packages table straight from a browser any more. Reading is unchanged and existing packages are untouched.",
+    undo: [
+      'create policy "coach_packages_insert_coach" on public.coach_packages for insert to authenticated with check (coach_id = (select auth.uid()));',
+      'create policy "coach_packages_update_coach" on public.coach_packages for update to authenticated using (coach_id = (select auth.uid())) with check (coach_id = (select auth.uid()));',
+      'create policy "coach_packages_delete_coach" on public.coach_packages for delete to authenticated using (coach_id = (select auth.uid()));',
+    ].join("\n"),
+    undoWhy: "Only if step 87 misbehaves (for example the packages screen can no longer save). Puts back the three write rules exactly as they were.",
+    rows: [
+      ["0341 is not already applied (the old write rules are still there)", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_packages' and policyname = 'coach_packages_insert_coach')"],
+      ["the update and delete rules are still there too", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_packages' and policyname = 'coach_packages_update_coach') and exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_packages' and policyname = 'coach_packages_delete_coach')"],
+      ["the packages table has its group and session columns", has.col("coach_packages", "group_id") + " and " + has.col("coach_packages", "sessions_granted")],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -1888,6 +1907,7 @@ const BUNDLES = [
   { id: "release-ai", name: "Release AI (a payment and its sessions are recorded in one step; run BEFORE the code that uses it deploys)", steps: ["77"] },
   { id: "release-ap", name: "Release AP (parent-view links only for under-13 clients of the coach, and they expire; internal training-partner functions closed; run any time)", steps: ["84"] },
   { id: "release-ao", name: "Release AO (assigning attaches a program only inside one organization; run any time, after Release AM)", steps: ["83"] },
+  { id: "release-as", name: "Release AS (coach packages can only be written by the server; run any time)", steps: ["87"] },
   { id: "release-ar", name: "Release AR (tenant safety: a coach can only file rows about people in that group; clients move only inside one organization; run any time)", steps: ["86"] },
   { id: "release-aq", name: "Release AQ (a transformation card can only use the athlete's own photos and milestone, never for a client under 18; run any time)", steps: ["85"] },
   { id: "release-an", name: "Release AN (the 'what do you call your people' card is asked once, for good; run any time)", steps: ["82"] },
@@ -2081,6 +2101,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
+    m("0341", "not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_packages' and policyname = 'coach_packages_insert_coach')"),
     m("0340", has.fn("enforce_athlete_in_group()")),
     m("0339", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'transformation_cards' and policyname = 'transformation_cards_insert_own')"),
     m("0337", "position('v_src_org' in pg_get_functiondef(to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)'))) > 0"),

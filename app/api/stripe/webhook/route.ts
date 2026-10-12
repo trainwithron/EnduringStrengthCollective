@@ -523,7 +523,8 @@ export async function POST(request: Request) {
             .eq("group_id", groupId)
             .maybeSingle();
 
-          await supabase.from("membership_subscriptions").upsert(
+          // A failed write must not be answered with "received": Stripe would never try again and a paying client would have no subscription.
+          const { error: newSubscriptionError } = await supabase.from("membership_subscriptions").upsert(
             {
               athlete_id: athleteId,
               group_id: groupId,
@@ -535,6 +536,7 @@ export async function POST(request: Request) {
             },
             { onConflict: "athlete_id,group_id" }
           );
+          if (newSubscriptionError) throw newSubscriptionError;
 
           await assignLinkedProgramIfFirstEnrollment(supabase, {
             coachPackageId,
@@ -609,13 +611,18 @@ export async function POST(request: Request) {
           .maybeSingle();
         if (!pkg) break;
 
+        // What the subscriber bought: the credit count written on the subscription at checkout. A coach editing the package later makes a new price for NEW subscribers only, so the live package row must
+        // not decide what an existing subscriber gets. A subscription made before the count was written falls back to the package's current number, as it always did.
+        const boughtCredits = Number(subscription.metadata?.credits);
+        const renewalCredits = Number.isInteger(boughtCredits) && boughtCredits > 0 ? boughtCredits : pkg.sessions_granted;
+
         // Recorded and granted in one database step (see grant_purchase_once above); a repeat of a fully handled event returns false.
         const { data: renewalGranted, error: renewalError } = await supabase.rpc("grant_subscription_credits_once", {
           p_event_id: event.id,
           p_athlete_id: athleteId,
           p_group_id: groupId,
           p_package_id: coachPackageId,
-          p_credits: pkg.sessions_granted,
+          p_credits: renewalCredits,
           p_note: "Membership renewed",
         });
         if (renewalError) throw renewalError;
@@ -637,7 +644,7 @@ export async function POST(request: Request) {
           groupId,
           coachPackageId,
           athleteId,
-          creditsPurchased: pkg.sessions_granted,
+          creditsPurchased: renewalCredits,
           amountCents: invoice.amount_paid ?? 0,
           eventKey: event.id,
         });
@@ -688,7 +695,7 @@ export async function POST(request: Request) {
                 : null;
           if (!liftOffStatus) break;
           const liftOffPeriodEndUnix = subscription.items.data[0]?.current_period_end;
-          await supabase.from("lift_off_subscriptions").upsert(
+          const { error: liftOffError } = await supabase.from("lift_off_subscriptions").upsert(
             {
               coach_id: coachId,
               stripe_subscription_id: subscription.id,
@@ -698,6 +705,7 @@ export async function POST(request: Request) {
             },
             { onConflict: "coach_id" }
           );
+          if (liftOffError) throw liftOffError;
           break;
         }
 
@@ -732,7 +740,21 @@ export async function POST(request: Request) {
         // absent. Null on every other event type, including resume.
         const resumesAtUnix = subscription.pause_collection?.resumes_at ?? null;
 
-        await supabase.from("membership_subscriptions").upsert(
+        // An event about an OLDER subscription (the client cancelled one and bought another, and the first one's end arrives late) must not overwrite the current one: it would mark a paying client lapsed
+        // and take their group access away. Ignored when the row belongs to a different subscription that is still running.
+        const { data: currentRow, error: currentRowError } = await supabase
+          .from("membership_subscriptions")
+          .select("stripe_subscription_id, status")
+          .eq("athlete_id", athleteId)
+          .eq("group_id", groupId)
+          .maybeSingle();
+        if (currentRowError) throw currentRowError;
+        if (currentRow && currentRow.stripe_subscription_id && currentRow.stripe_subscription_id !== subscription.id && currentRow.status !== "canceled") {
+          console.error("stripe webhook: ignored an event for an older subscription than the current one");
+          break;
+        }
+
+        const { error: subscriptionUpsertError } = await supabase.from("membership_subscriptions").upsert(
           {
             athlete_id: athleteId,
             group_id: groupId,
@@ -748,6 +770,7 @@ export async function POST(request: Request) {
           },
           { onConflict: "athlete_id,group_id" }
         );
+        if (subscriptionUpsertError) throw subscriptionUpsertError;
         // A subscription that has ended ends the group access it gave. The program copy stays; the sessions follow their own expiry rule.
         if (endsGroupAccess(status)) {
           await revokeLinkedGroupAccess(supabase, { coachPackageId: subscription.metadata?.coach_package_id ?? null, athleteId });

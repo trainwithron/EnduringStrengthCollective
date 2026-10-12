@@ -97,13 +97,13 @@ export async function POST(request: Request) {
               coach_package_id: pkg.id,
               credits: String(pkg.sessions_granted),
             }
-          : { athlete_id: user.id, group_id: groupId, coach_package_id: pkg.id },
+          : { athlete_id: user.id, group_id: groupId, coach_package_id: pkg.id, credits: String(pkg.sessions_granted) },
       // Subscriptions need the same metadata on the subscription object
       // itself — checkout.session.completed for a subscription doesn't
       // carry it through to the customer.subscription.* events later.
       subscription_data:
         kind === "subscription"
-          ? { metadata: { athlete_id: user.id, group_id: groupId, coach_package_id: pkg.id } }
+          ? { metadata: { athlete_id: user.id, group_id: groupId, coach_package_id: pkg.id, credits: String(pkg.sessions_granted) } }
           : undefined,
     });
 

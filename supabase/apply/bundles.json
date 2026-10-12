@@ -261,6 +261,14 @@
   "file": "apply-release-ao-all.sql"
  },
  {
+  "id": "release-as",
+  "name": "Release AS (coach packages can only be written by the server; run any time)",
+  "steps": [
+   "87"
+  ],
+  "file": "apply-release-as-all.sql"
+ },
+ {
   "id": "release-ar",
   "name": "Release AR (tenant safety: a coach can only file rows about people in that group; clients move only inside one organization; run any time)",
   "steps": [
