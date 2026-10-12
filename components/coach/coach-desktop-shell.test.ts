@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 
 // The desktop rail is coach-level and short (Ron, Oct 6): Home keeps it, a client's group never becomes Home's anchor, the business name is a real menu,
-// and the advanced tools sit under More tools. Source-level guards so a later edit cannot bring the old behavior back.
+// and the settings and help sit under Settings. Source-level guards so a later edit cannot bring the old behavior back.
 const shell = readFileSync(new URL("./coach-desktop-shell.tsx", import.meta.url), "utf8");
 const dashboard = readFileSync(new URL("../../app/(coach)/dashboard/page.tsx", import.meta.url), "utf8");
 const finder = readFileSync(new URL("./desktop/client-finder.tsx", import.meta.url), "utf8");
@@ -12,34 +12,46 @@ describe("coach desktop shell", () => {
     expect(shell).toContain('groupKind === "one_on_one") return;');
     expect(shell).toContain("last_group=");
   });
-  it("the top-level rail is Clients, Calendar, Messages, Programming, Nutrition, Business, then More tools", () => {
+  it("the rail is Clients, Calendar, Messages, then the groups Coaching, Business, Group and Settings (no More tools)", () => {
     const navStart = shell.indexOf("const nav: NavEntry[] = [");
     const navEnd = shell.indexOf("const groupHasActiveChild");
     const nav = shell.slice(navStart, navEnd);
-    const order = ['label: "Clients"', 'label: "Calendar"', 'label: "Messages"', 'label: "Programming"', 'label: "Nutrition"', 'label: "Business"', 'label: "Group"', 'label: "More tools"'];
+    const order = ['label: "Clients"', 'label: "Calendar"', 'label: "Messages"', 'label: "Coaching"', 'label: "Business"', 'label: "Group"', 'label: "Settings"'];
     let last = -1;
     for (const marker of order) {
       const at = nav.indexOf(marker);
       expect(at, marker).toBeGreaterThan(last);
       last = at;
     }
-    // the duplicate Dashboard and the rarely used tools are not top-level any more
+    expect(nav).not.toContain("More tools");
     expect(nav.indexOf('label: "Dashboard"')).toBe(-1);
-    // Business holds the business tools, Group holds the group's own pages (Members first), More tools is only Support, Resources and Quick Tips
     const at = (m: string) => nav.indexOf(m);
-    for (const m of ['label: "Booking Page"', 'label: "Waiver"', 'label: "Leads"', 'label: "Session Ledger"', 'label: "Organization"', 'label: "SMS Notifications"', 'label: "Zapier"']) {
+    // Coaching: Programs, Exercise Library, Nutrition
+    for (const m of ['label: "Programs"', 'label: "Exercise Library"', 'label: "Nutrition"']) {
+      expect(at(m), m).toBeGreaterThan(at('label: "Coaching"'));
+      expect(at(m), m).toBeLessThan(at('label: "Business"'));
+    }
+    // Business holds the business tools, Pro Shop and Referrals (the Resources page), and for the platform admin only Organizations and Marketplace ranking
+    for (const m of ['label: "Booking Page"', 'label: "Waiver"', 'label: "Leads"', 'label: "Session Ledger"', 'label: "Organization"', 'label: "SMS Notifications"', 'label: "Zapier"', 'label: "Pro Shop and Referrals"', 'label: "Marketplace ranking"']) {
       expect(at(m), m).toBeGreaterThan(at('label: "Business"'));
       expect(at(m), m).toBeLessThan(at('label: "Group"'));
     }
+    expect(nav).toContain("...(isPlatformAdmin");
+    // Group holds the group's own pages (Members first)
     const groupFirst = at('label: "Members"');
     expect(groupFirst).toBeGreaterThan(at('label: "Group"'));
     expect(groupFirst).toBeLessThan(at('label: "Group dashboard"'));
     for (const m of ['label: "Group dashboard"', 'label: "Team Performance"', 'label: "Team Feed"', 'label: "Group Sessions"', 'label: "Challenges"', 'label: "Hall of Fame"']) {
       expect(at(m), m).toBeGreaterThan(at('label: "Group"'));
-      expect(at(m), m).toBeLessThan(at('label: "More tools"'));
+      expect(at(m), m).toBeLessThan(at('label: "Settings"'));
     }
-    for (const m of ['label: "Support"', 'label: "Resources"', 'label: "Quick Tips"']) expect(at(m), m).toBeGreaterThan(at('label: "More tools"'));
-    expect(nav.slice(at('label: "More tools"')).match(/\{ key: "/g)?.length).toBe(3);
+    // Settings: Account, Display Mode, Kiosk Check-In, Support, Quick Tips, and the Support Inbox for the platform admin only
+    for (const m of ['label: "Account"', 'label: "Display Mode"', 'label: "Kiosk Check-In"', 'label: "Support"', 'label: "Quick Tips"', 'label: "Support Inbox"']) expect(at(m), m).toBeGreaterThan(at('label: "Settings"'));
+    // the footer keeps only the workspace switcher, Report a problem, Download app and Sign out
+    expect(shell).not.toContain('title="Display Mode"');
+    expect(shell).not.toContain('title="Kiosk Check-In"');
+    expect(shell).toContain("<FeedbackButton");
+    expect(shell).toContain("<SignOutButton");
     // Members is no longer a rail icon of its own
     expect(nav.indexOf('{ key: "members" as const, label: "Members"')).toBeGreaterThan(at('label: "Group"'));
   });

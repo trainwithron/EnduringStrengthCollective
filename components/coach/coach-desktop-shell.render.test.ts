@@ -21,7 +21,7 @@ import { CoachDesktopShell } from "./coach-desktop-shell";
 const render = (props: { groupId: string; groupName: string }) =>
   renderToStaticMarkup(createElement(CoachDesktopShell, { ...props, active: "home", coachLevel: true } as never, createElement("div", null, "HOME CONTENT")));
 
-const RAIL = ["Clients", "Calendar", "Messages", "Programming", "Nutrition", "Business", "More tools"];
+const RAIL = ["Clients", "Calendar", "Messages", "Coaching", "Business", "Settings"];
 
 describe("Home's desktop rail", () => {
   const cases: [string, { groupId: string; groupName: string }][] = [
