@@ -1864,6 +1864,32 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the tables the new rules read exist", "to_regclass('public.training_partner_profiles') is not null and to_regclass('public.training_partner_requests') is not null and to_regclass('public.session_credits') is not null and to_regclass('public.client_tag_assignments') is not null and to_regclass('public.wearable_connections') is not null"],
     ],
   },
+  {
+    n: "92",
+    slug: "0346",
+    title: "0346 A coach using the app as their own client can do everything a client can: nutrition phase plans, macro-target feedback and transformation cards no longer require the athlete role; 'Assign to Myself' attaches the program",
+    migrations: ["0346"],
+    sees: "Success. No rows returned.",
+    afterwards: "A coach in 'My training' can keep nutrition phases for themselves, send feedback on their own macro target, make transformation cards, and assign a program to themselves (it becomes theirs, not a copy, when it qualifies). Nothing changes for clients. Run AFTER Release AW.",
+    undo: [
+      "drop policy if exists \"client_phase_plans_coach_manage\" on public.client_phase_plans;",
+      "create policy \"client_phase_plans_coach_manage\" on public.client_phase_plans for all to authenticated using (is_group_coach(group_id)) with check ((is_group_coach(group_id) AND (EXISTS ( SELECT 1 FROM group_memberships gm WHERE ((gm.group_id = client_phase_plans.group_id) AND (gm.profile_id = client_phase_plans.athlete_id) AND (gm.role = 'athlete'::member_role))))));",
+      "drop policy if exists \"client_nutrition_feedback_insert_client\" on public.client_nutrition_feedback;",
+      "create policy \"client_nutrition_feedback_insert_client\" on public.client_nutrition_feedback for insert to authenticated with check (((athlete_id = ( SELECT auth.uid() AS uid)) AND (status = 'new'::text) AND (handled_by IS NULL) AND (handled_at IS NULL) AND (EXISTS ( SELECT 1 FROM group_memberships gm WHERE ((gm.group_id = client_nutrition_feedback.group_id) AND (gm.profile_id = client_nutrition_feedback.athlete_id) AND (gm.role = 'athlete'::member_role)))) AND (EXISTS ( SELECT 1 FROM client_macro_target_history h WHERE ((h.athlete_id = client_nutrition_feedback.athlete_id) AND (h.group_id = client_nutrition_feedback.group_id) AND (h.effective_from = client_nutrition_feedback.target_effective_from))))));",
+      "drop policy if exists \"transformation_cards_insert_own\" on public.transformation_cards;",
+      "create policy \"transformation_cards_insert_own\" on public.transformation_cards for insert to authenticated with check (((athlete_id = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1 FROM group_memberships gm WHERE ((gm.group_id = transformation_cards.group_id) AND (gm.profile_id = ( SELECT auth.uid() AS uid)) AND (gm.role = 'athlete'::member_role)))) AND ((before_photo_id IS NULL) OR (EXISTS ( SELECT 1 FROM progress_photos p WHERE ((p.id = transformation_cards.before_photo_id) AND (p.athlete_id = ( SELECT auth.uid() AS uid)))))) AND ((after_photo_id IS NULL) OR (EXISTS ( SELECT 1 FROM progress_photos p WHERE ((p.id = transformation_cards.after_photo_id) AND (p.athlete_id = ( SELECT auth.uid() AS uid)))))) AND ((milestone_id IS NULL) OR (EXISTS ( SELECT 1 FROM transformation_milestones m WHERE ((m.id = transformation_cards.milestone_id) AND (m.athlete_id = ( SELECT auth.uid() AS uid)))))) AND (NOT (EXISTS ( SELECT 1 FROM client_intake ci WHERE ((ci.athlete_id = ( SELECT auth.uid() AS uid)) AND (ci.date_of_birth > ((CURRENT_DATE - '18 years'::interval))::date)))))));",
+      "drop policy if exists \"transformation_cards_update_own\" on public.transformation_cards;",
+      "create policy \"transformation_cards_update_own\" on public.transformation_cards for update to authenticated using ((athlete_id = ( SELECT auth.uid() AS uid))) with check (((athlete_id = ( SELECT auth.uid() AS uid)) AND (EXISTS ( SELECT 1 FROM group_memberships gm WHERE ((gm.group_id = transformation_cards.group_id) AND (gm.profile_id = ( SELECT auth.uid() AS uid)) AND (gm.role = 'athlete'::member_role)))) AND ((before_photo_id IS NULL) OR (EXISTS ( SELECT 1 FROM progress_photos p WHERE ((p.id = transformation_cards.before_photo_id) AND (p.athlete_id = ( SELECT auth.uid() AS uid)))))) AND ((after_photo_id IS NULL) OR (EXISTS ( SELECT 1 FROM progress_photos p WHERE ((p.id = transformation_cards.after_photo_id) AND (p.athlete_id = ( SELECT auth.uid() AS uid)))))) AND ((milestone_id IS NULL) OR (EXISTS ( SELECT 1 FROM transformation_milestones m WHERE ((m.id = transformation_cards.milestone_id) AND (m.athlete_id = ( SELECT auth.uid() AS uid))))))));",
+      fnFromMigration("0337", "assign_program_to_client"),
+      "revoke execute on function public.assign_program_to_client(uuid, uuid, uuid, text, date) from public, anon;",
+      "grant execute on function public.assign_program_to_client(uuid, uuid, uuid, text, date) to authenticated, service_role;",
+    ].join("\n"),
+    undoWhy: "Only if step 92 misbehaves. Puts back the three athlete-only rules and the assign function exactly as they were.",
+    rows: [
+      ["0346 is not already applied (the nutrition phase rule still requires the athlete role)", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'client_phase_plans' and policyname = 'client_phase_plans_coach_manage' and position('''athlete''::member_role' in with_check) > 0)"],
+      ["the assign function and the three tables exist", "to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)') is not null and to_regclass('public.client_phase_plans') is not null and to_regclass('public.client_nutrition_feedback') is not null and to_regclass('public.transformation_cards') is not null"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -1969,6 +1995,7 @@ const BUNDLES = [
   { id: "release-ai", name: "Release AI (a payment and its sessions are recorded in one step; run BEFORE the code that uses it deploys)", steps: ["77"] },
   { id: "release-ap", name: "Release AP (parent-view links only for under-13 clients of the coach, and they expire; internal training-partner functions closed; run any time)", steps: ["84"] },
   { id: "release-ao", name: "Release AO (assigning attaches a program only inside one organization; run any time, after Release AM)", steps: ["83"] },
+  { id: "release-ax", name: "Release AX (a coach using the app as their own client can do everything a client can; Assign to Myself attaches; run AFTER Release AW)", steps: ["92"] },
   { id: "release-aw", name: "Release AW (the organization walls: names and client content readable only inside the organization; run AFTER the code that goes with it is live)", steps: ["91"] },
   { id: "release-av", name: "Release AV (a coach can still tidy up an existing row of someone who left the group; run AFTER Release AR)", steps: ["90"] },
   { id: "release-au", name: "Release AU (a coach credit pack or Lift Off grant is recorded and added in one step; run BEFORE the code that uses it deploys)", steps: ["89"] },
@@ -2167,6 +2194,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
+    m("0346", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'client_phase_plans' and policyname = 'client_phase_plans_coach_manage' and position('''athlete''::member_role' in with_check) = 0)"),
     m("0345", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'profiles' and policyname = 'profiles_select_visible')"),
     m("0344", "position('v_had_row' in pg_get_functiondef(to_regprocedure('public.enforce_athlete_in_group()'))) > 0"),
     m("0343", "to_regprocedure('public.grant_coach_credit_pack_once(text, text, uuid, integer, integer)') is not null"),

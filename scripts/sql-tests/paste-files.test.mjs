@@ -1377,6 +1377,24 @@ for (const s of steps) {
   const errAW2 = await run(`apply/${bundle.file}`);
   check("release-aw: the bundle applies again after an undo" + (errAW2 ? ": " + errAW2 : ""), !errAW2 && (await has()));
 }
+// Release AX (step 92): ONE paste.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-ax");
+  check("release-ax: ONE bundle holds step 92", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["92"]));
+  const st92 = steps.find((x) => x.n === "92");
+  const has = async () => (await db.query("select exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'client_phase_plans' and policyname = 'client_phase_plans_coach_manage' and position('''athlete''::member_role' in with_check) = 0) as ok")).rows[0].ok === true;
+  const eax0 = await run(`apply/undo-step${st92.n}-${st92.slug}.sql`);
+  check("release-ax: before the bundle runs the athlete-only rules are back" + (eax0 ? ": " + eax0 : ""), !eax0 && !(await has()));
+  const errAX = await run(`apply/${bundle.file}`);
+  check("release-ax bundle applies on the live-shaped state" + (errAX ? ": " + errAX : ""), !errAX && (await has()));
+  const againAX = await run(`apply/${bundle.file}`);
+  check("release-ax: a second run is refused, naming step 92 (" + againAX + ")", !!againAX && againAX.includes("step 92 (0346) cannot run") && againAX.includes("already applied"));
+  const euAX = await run(`apply/undo-step${st92.n}-${st92.slug}.sql`);
+  check("release-ax: the undo puts the old rules back" + (euAX ? ": " + euAX : ""), !euAX && !(await has()));
+  const errAX2 = await run(`apply/${bundle.file}`);
+  check("release-ax: the bundle applies again after an undo" + (errAX2 ? ": " + errAX2 : ""), !errAX2 && (await has()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.

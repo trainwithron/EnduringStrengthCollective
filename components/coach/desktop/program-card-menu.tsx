@@ -378,10 +378,10 @@ export function ProgramCardMenu({
       return;
     }
 
-    const result = await duplicateProgram(supabase, {
+    // Attaches when the program qualifies (no copy is left behind), otherwise makes a copy, like assigning to any client.
+    const result = await assignProgramToClient(supabase, {
       sourceProgramId: programId,
       destinationGroupId: groupId,
-      createdBy: user.id,
       athleteId: user.id,
       startDate: assignStartDate || undefined,
     });

@@ -261,6 +261,14 @@
   "file": "apply-release-ao-all.sql"
  },
  {
+  "id": "release-ax",
+  "name": "Release AX (a coach using the app as their own client can do everything a client can; Assign to Myself attaches; run AFTER Release AW)",
+  "steps": [
+   "92"
+  ],
+  "file": "apply-release-ax-all.sql"
+ },
+ {
   "id": "release-aw",
   "name": "Release AW (the organization walls: names and client content readable only inside the organization; run AFTER the code that goes with it is live)",
   "steps": [
