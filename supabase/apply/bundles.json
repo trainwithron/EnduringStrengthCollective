@@ -261,6 +261,14 @@
   "file": "apply-release-ao-all.sql"
  },
  {
+  "id": "release-bb",
+  "name": "Release BB (Pro Shop links, referral partners, challenges, calendar entries, session types and discovery prospects per organization; run BEFORE the code that goes with it is live)",
+  "steps": [
+   "96"
+  ],
+  "file": "apply-release-bb-all.sql"
+ },
+ {
   "id": "release-ba",
   "name": "Release BA (switch the organization-wall request header rule ON; run AFTER Release AZ and the code that sends the header)",
   "steps": [

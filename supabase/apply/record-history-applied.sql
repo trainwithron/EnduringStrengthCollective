@@ -66,6 +66,7 @@ from (
     ('2026100600330', 'public_page_coach_only', '0330_public_page_coach_only.sql', exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')),
     ('2026100600331', 'purchase_grants_once', '0331_purchase_grants_once.sql', to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null),
     ('2026100600338', 'guardian_links_scoped', '0338_guardian_links_scoped.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'guardian_links' and column_name = 'expires_at')),
+    ('2026100600350', 'coach_tables_per_organization', '0350_coach_tables_per_organization.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'pro_shop_links' and column_name = 'organization_id')),
     ('2026100600349', 'org_wall_header_on', '0349_org_wall_header_on.sql', position('select true' in pg_get_functiondef(to_regprocedure('public.org_wall_header_enabled()'))) > 0),
     ('2026100600348', 'org_wall_request_header', '0348_org_wall_request_header.sql', to_regprocedure('public.request_workspace_org()') is not null),
     ('2026100600347', 'briefing_per_organization', '0347_briefing_per_organization.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_briefings' and column_name = 'organization_id')),

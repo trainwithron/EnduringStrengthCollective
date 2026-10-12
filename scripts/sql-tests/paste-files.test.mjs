@@ -1444,6 +1444,24 @@ await run(`apply/undo-step94-0348.sql`);
   check("release-az: the bundle applies again after an undo" + (errAZ2 ? ": " + errAZ2 : ""), !errAZ2 && (await installed()));
   await run(`apply/undo-step${st94.n}-${st94.slug}.sql`);
 }
+// Release BB (step 96): ONE paste.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-bb");
+  check("release-bb: ONE bundle holds step 96", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["96"]));
+  const st96 = steps.find((x) => x.n === "96");
+  const has = async () => (await db.query("select exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'pro_shop_links' and column_name = 'organization_id') as ok")).rows[0].ok === true;
+  const ebb0 = await run(`apply/undo-step${st96.n}-${st96.slug}.sql`);
+  check("release-bb: before the bundle runs the shop links have no organization" + (ebb0 ? ": " + ebb0 : ""), !ebb0 && !(await has()));
+  const errBB = await run(`apply/${bundle.file}`);
+  check("release-bb bundle applies on the live-shaped state" + (errBB ? ": " + errBB : ""), !errBB && (await has()));
+  const againBB = await run(`apply/${bundle.file}`);
+  check("release-bb: a second run is refused, naming step 96", !!againBB && againBB.includes("step 96 (0350) cannot run") && againBB.includes("already applied"));
+  const euBB = await run(`apply/undo-step${st96.n}-${st96.slug}.sql`);
+  check("release-bb: the undo puts the old rules back" + (euBB ? ": " + euBB : ""), !euBB && !(await has()));
+  const errBB2 = await run(`apply/${bundle.file}`);
+  check("release-bb: the bundle applies again after an undo" + (errBB2 ? ": " + errBB2 : ""), !errBB2 && (await has()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.
