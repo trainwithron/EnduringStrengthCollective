@@ -3,7 +3,7 @@ import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { computeScheduledDates, isSameDay, isLocked } from "@/lib/program-schedule";
-import { getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
+import { dateKeyInZone, getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { UpcomingGroupEvents } from "@/components/group/group-event-answer";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
@@ -321,7 +321,7 @@ export default async function ProgramCalendarPage(
                   </span>
                   <CancelBookingButton
                     bookingId={b.id}
-                    rescheduleHref={`${backHref}/calendar/${dateKey(start)}?reschedule=${b.id}`}
+                    rescheduleHref={`${backHref}/calendar/${dateKeyInZone(timezone, start)}?reschedule=${b.id}`}
                   />
                 </div>
               );

@@ -109,3 +109,13 @@ describe("recap and notes", () => {
     expect(read("app/(coach)/groups/[groupId]/programs/[programId]/page.tsx")).toContain("aiDraft={isAiDraft}");
   });
 });
+
+describe("calendars use the business time zone for today and for the reschedule day", () => {
+  it("the phone and client calendars no longer read the server's UTC clock", () => {
+    const body = read("components/coach/calendar-page-body.tsx");
+    expect(body).toContain("const generalToday = dateFromKey(dateKeyInZone(coachTz));");
+    expect(body).toContain("const today = dateFromKey(dateKeyInZone(displayTz));");
+    expect(body).toContain("${basePath}/${dateKeyInZone(displayTz, start)}?reschedule=${b.id}");
+    expect(read("app/(coach)/groups/[groupId]/programs/[programId]/calendar/page.tsx")).toContain("dateKeyInZone(timezone, start)");
+  });
+});

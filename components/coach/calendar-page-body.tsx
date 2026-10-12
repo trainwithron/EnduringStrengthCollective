@@ -195,7 +195,7 @@ export async function CoachCalendarPageBody(
 
       // The general calendar: this month, every client's sessions on their day (on the coach's clock). It is what the Calendar tab
       // always opens; one client is chosen afterwards, never first.
-      const generalToday = new Date();
+      const generalToday = dateFromKey(dateKeyInZone(coachTz));
       const generalMonthMatch = /^(\d{4})-(\d{2})$/.exec(searchParams.month ?? "");
       const gYear = generalMonthMatch ? Number(generalMonthMatch[1]) : generalToday.getFullYear();
       const gMonthIndex = generalMonthMatch ? Math.min(11, Math.max(0, Number(generalMonthMatch[2]) - 1)) : generalToday.getMonth();
@@ -323,7 +323,7 @@ export async function CoachCalendarPageBody(
       );
     }
 
-    const today = new Date();
+    const today = dateFromKey(dateKeyInZone(coachTz));
     const monthMatch = /^(\d{4})-(\d{2})$/.exec(searchParams.month ?? "");
     const year = monthMatch ? Number(monthMatch[1]) : today.getFullYear();
     const monthIndex = monthMatch ? Math.min(11, Math.max(0, Number(monthMatch[2]) - 1)) : today.getMonth();
@@ -494,7 +494,7 @@ export async function CoachCalendarPageBody(
       upcomingBookings = bookingRows ?? [];
     }
 
-    const today = new Date();
+    const today = dateFromKey(dateKeyInZone(displayTz));
     const view = searchParams.view === "week" ? "week" : "month";
     const monthParam = searchParams.month;
     let year = today.getFullYear();
@@ -612,7 +612,7 @@ export async function CoachCalendarPageBody(
                     </span>
                     <CancelBookingButton
                       bookingId={b.id}
-                      rescheduleHref={`${basePath}/${dateKey(start)}?reschedule=${b.id}`}
+                      rescheduleHref={`${basePath}/${dateKeyInZone(displayTz, start)}?reschedule=${b.id}`}
                     />
                   </div>
                 );
