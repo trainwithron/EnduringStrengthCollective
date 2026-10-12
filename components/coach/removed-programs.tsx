@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 
 // A quiet fold at the bottom of a client's Programs tab: the programs taken off their profile. "Put back" makes the program visible again; it stays inactive until the coach makes it active.
-export function RemovedPrograms({ programs }: { programs: { id: string; name: string }[] }) {
+export function RemovedPrograms({ programs, label = "Removed programs" }: { programs: { id: string; name: string }[]; label?: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -30,7 +30,7 @@ export function RemovedPrograms({ programs }: { programs: { id: string; name: st
   return (
     <div className="mt-4">
       <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="min-h-11 font-body text-xs text-steel underline underline-offset-2">
-        Removed programs ({programs.length})
+        {label} ({programs.length})
       </button>
       {open && (
         <ul className="divide-y divide-steel/15 border-y border-steel/15">

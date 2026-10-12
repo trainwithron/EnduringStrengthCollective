@@ -16,13 +16,14 @@ describe("Remove from this profile", () => {
   const menu = read("components/coach/client-program-menu.tsx");
   it("the row's menu offers Make inactive / Make active (the existing switch) and Remove from this profile, and never a delete", () => {
     expect(menu).toContain('{isActive ? "Make inactive" : "Make active"}');
-    expect(menu).toContain("Remove from this profile");
+    expect(menu).toContain("Remove from ");
     expect(menu).toContain('.update({ is_active: !isActive })');
     expect(menu).not.toContain(".delete()");
   });
   it("removing keeps everything: it only sets archived_at, and makes the program inactive in the same update", () => {
     expect(menu).toContain('.update({ is_active: false, archived_at: new Date().toISOString() })');
     expect(menu).toContain("removeProgramMessage(programName, clientName)");
+    expect(menu).toContain("removeOwnProgramMessage(programName)");
     expect(menu).toContain("confirmDialog(");
   });
   it("is a 44px target, closes on outside click and Escape, and sits beside the row's link so it never opens the program", () => {
@@ -41,7 +42,7 @@ describe("Remove from this profile", () => {
     expect(section).toContain('.not("archived_at", "is", null)');
     expect(section).toContain("<RemovedPrograms programs={removed} />");
     const fold = read("components/coach/removed-programs.tsx");
-    expect(fold).toContain("Removed programs ({programs.length})");
+    expect(fold).toContain("{label} ({programs.length})");
     expect(fold).toContain("Put back");
     expect(fold).toContain('.update({ archived_at: null })');
     expect(fold).not.toContain("is_active: true");

@@ -485,8 +485,9 @@ export default async function SessionPage(
         .from("wellness_checkins")
         .select("id")
         .eq("athlete_id", session.athlete_id)
-        .eq("group_id", session.group_id)
         .eq("log_date", todayKey)
+        // One check-in per person per day, whichever group it was answered in.
+        .limit(1)
         .maybeSingle(),
     ]);
     const todayForWeekday = new Date(`${todayKey}T00:00:00`);

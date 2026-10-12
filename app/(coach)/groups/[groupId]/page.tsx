@@ -498,8 +498,10 @@ export default async function GroupHubPage(
             .from("wellness_checkins")
             .select("sleep_quality, soreness, energy")
             .eq("athlete_id", athleteId)
-            .eq("group_id", params.groupId)
             .eq("log_date", todayKey)
+            // One check-in per person per day, whichever group it was answered in; the newest counts.
+            .order("created_at", { ascending: false })
+            .limit(1)
             .maybeSingle(),
           // AI Assistant Slice 5 — when this athlete last answered a life-
           // impact reflection (not just was shown one), to drive the
@@ -763,7 +765,7 @@ export default async function GroupHubPage(
               {isToday && <HomeThread lines={homeThreadLines} />}
               {isToday && aboutYouNeeded && !isCoach && !isActingAsOther && <AboutYouCard groupId={params.groupId} athleteId={athleteId} />}
               {reupState && <ReupCard state={reupState} />}
-              {isToday && <OtherProgramsCard programs={(myTraining?.mine ?? []).filter((p) => p.groupId !== params.groupId)} />}
+              {isToday && <OtherProgramsCard programs={myTraining?.mine ?? []} />}
               {scheduleCard && <MyScheduleCard groupId={params.groupId} state={scheduleCard} />}
               {isToday && !isCoach && !isActingAsOther && (
                 // The one place a client reaches their coach: it was three taps deep (Settings, More, Messages).

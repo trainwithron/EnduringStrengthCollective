@@ -12,6 +12,7 @@ import { APPROVE_AND_ASSIGN_FAILED, ensureSignedOff } from "@/components/coach/a
 import { notifyPush } from "@/lib/push-notify";
 import { localDateKey } from "@/lib/timezone";
 import { MoreVertical } from "lucide-react";
+import { hideProgramMessage } from "@/lib/program-archive";
 import { SearchPickList } from "@/components/coach/search-pick-list";
 import { loadAssignableClients, type AssignClient } from "@/lib/assign-clients";
 import { useTerm } from "@/components/coach/terminology-provider";
@@ -64,6 +65,7 @@ export function ProgramCardMenu({
   hideAssignAndDuplicate = false,
   aiDraft = false,
   showAssignButton = false,
+  canHide = false,
 }: {
   programId: string;
   programName: string;
@@ -79,6 +81,8 @@ export function ProgramCardMenu({
   hideAssignAndDuplicate?: boolean;
   // A program in the library (no client, not active): a plain Assign button beside the menu.
   showAssignButton?: boolean;
+  // A library program (no client on it) can be tucked away without deleting it.
+  canHide?: boolean;
 }) {
   const router = useRouter();
   const term = useTerm();
@@ -483,6 +487,22 @@ export function ProgramCardMenu({
     router.push(`/groups/${destinationGroupId}/programs/${result.programId}`);
   }
 
+  // Tidies the library without deleting anything: the program, its workouts and every log stay, and it can be put back from Hidden programs on the Programs page.
+  async function handleHide() {
+    if (!(await confirmDialog(hideProgramMessage(programName)))) return;
+    setBusy(true);
+    setError(null);
+    const supabase = createBrowserClient();
+    // Inactive and hidden in the same update: the database refuses a hidden program that is still active.
+    const { error: hideError } = await supabase.from("programs").update({ is_active: false, archived_at: new Date().toISOString() }).eq("id", programId);
+    setBusy(false);
+    if (hideError) {
+      setError("Couldn't hide it. Try again.");
+      return;
+    }
+    router.refresh();
+  }
+
   async function handleDelete() {
     if (!await confirmDialog(`Delete "${programName}"? Any real logged history stays intact.`)) return;
     setBusy(true);
@@ -581,6 +601,16 @@ export function ProgramCardMenu({
                     Duplicate to another organization →
                   </button>
                 </>
+              )}
+              {canHide && (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={handleHide}
+                  className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50 disabled:opacity-40 border-t border-steel/15"
+                >
+                  Hide
+                </button>
               )}
               <button
                 type="button"

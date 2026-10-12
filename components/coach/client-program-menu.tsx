@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { MoreVertical } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
-import { removeProgramMessage } from "@/lib/program-archive";
+import { removeOwnProgramMessage, removeProgramMessage } from "@/lib/program-archive";
 
 // The small three-dot menu on a program row in a client's Programs tab. It never opens the program (it sits beside the row's link, not inside it). "Make inactive / Make active" is
 // the existing switch. "Remove from this profile" takes the copy off the client's profile without deleting anything: the program, its workouts and every log stay, the client no
@@ -16,12 +16,15 @@ export function ClientProgramMenu({
   clientName,
   isActive,
   aiDraft,
+  self = false,
 }: {
   programId: string;
   programName: string;
   clientName: string;
   isActive: boolean;
   aiDraft: boolean;
+  // The person's own list in My training: one option only, "Remove from my profile".
+  self?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -64,7 +67,7 @@ export function ClientProgramMenu({
 
   async function removeFromProfile() {
     if (busy) return;
-    if (!(await confirmDialog({ message: removeProgramMessage(programName, clientName), confirmLabel: "Remove" }))) return;
+    if (!(await confirmDialog({ message: self ? removeOwnProgramMessage(programName) : removeProgramMessage(programName, clientName), confirmLabel: "Remove" }))) return;
     setBusy(true);
     setError(null);
     const supabase = createBrowserClient();
@@ -94,13 +97,13 @@ export function ClientProgramMenu({
       </button>
       {open && (
         <div role="menu" className="absolute right-0 top-11 z-30 w-56 border border-steel/30 bg-surface shadow-lg">
-          {!aiDraft && (
+          {!aiDraft && !self && (
             <button type="button" role="menuitem" disabled={busy} onClick={toggleActive} className={`${item} text-chalk`}>
               {isActive ? "Make inactive" : "Make active"}
             </button>
           )}
-          <button type="button" role="menuitem" disabled={busy} onClick={removeFromProfile} className={`${item} text-rust ${aiDraft ? "" : "border-t border-steel/15"}`}>
-            Remove from this profile
+          <button type="button" role="menuitem" disabled={busy} onClick={removeFromProfile} className={`${item} text-rust ${aiDraft || self ? "" : "border-t border-steel/15"}`}>
+            {self ? "Remove from my profile" : `Remove from ${clientName.trim() || "this client"}`}
           </button>
           {error && (
             <p className="px-3 py-2 font-body text-xs text-rust" role="alert">

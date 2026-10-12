@@ -16,6 +16,8 @@ export interface MyProgramRow {
   programName: string;
   groupId: string;
   groupName: string;
+  // Made for this person, so they can take it off their own list; a program a group shares with everyone is not theirs to remove.
+  personal: boolean;
 }
 
 export interface MyMembershipRow extends StartMembership {
@@ -44,7 +46,7 @@ export function myPrograms(userId: string, memberships: MyMembershipRow[], progr
     const personal = p.athlete_id === userId;
     const sharedForMe = p.athlete_id === null && m.role === "athlete" && m.group_kind !== "one_on_one";
     if (!personal && !sharedForMe) continue;
-    mine.push({ programId: p.id, programName: p.name, groupId: p.group_id, groupName: m.group_name });
+    mine.push({ programId: p.id, programName: p.name, groupId: p.group_id, groupName: m.group_name, personal });
   }
   return mine.sort((a, b) => a.groupName.localeCompare(b.groupName) || a.programName.localeCompare(b.programName) || a.programId.localeCompare(b.programId));
 }

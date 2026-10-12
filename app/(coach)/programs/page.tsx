@@ -14,6 +14,7 @@ import { getCoachClients } from "@/lib/coach-clients";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { LearnedSection } from "@/components/coach/learned-section";
 import { ConversationInviteSection } from "@/components/coach/conversation-section";
+import { RemovedPrograms } from "@/components/coach/removed-programs";
 import { ALL_PROGRAMS_HREF, clientFromSearch, groupFromSearch, scopePrograms } from "@/lib/programs-scope";
 
 // The coach's Programs page: ALL of their programs, whichever group or client each one belongs to, wherever the coach is standing. It is scoped to one client only when the address says so
@@ -52,6 +53,19 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
     .is("archived_at", null)
     .order("is_active", { ascending: false })
     .order("created_at", { ascending: false });
+
+  // Library programs the coach tucked away (kept, with every log): a quiet fold at the bottom with Put back.
+  const { data: hiddenRows } = clientId
+    ? { data: [] }
+    : await supabase
+        .from("programs")
+        .select("id, name")
+        .in("group_id", groupIds.length > 0 ? groupIds : [""])
+        .is("athlete_id", null)
+        .not("archived_at", "is", null)
+        .order("archived_at", { ascending: false })
+        .limit(50);
+  const hidden = (hiddenRows ?? []) as { id: string; name: string }[];
 
   const all: ProgramCardData[] = (programs ?? []).map((p: any) => ({
     id: p.id,
@@ -119,6 +133,8 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
       {!clientId && <ConversationInviteSection supabase={supabase} coachId={user.id} />}
 
       {programsError ? <UnavailableState what="your programs" /> : <ProgramCardGrid groupId={anchor.id} programs={cards} visualsByProgramId={visualsByProgramId} />}
+
+      {!clientId && <RemovedPrograms programs={hidden} label="Hidden programs" />}
 
       {!clientId && <LearnedSection supabase={supabase} coachId={user.id} />}
     </CoachDesktopShell>
