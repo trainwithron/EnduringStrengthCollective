@@ -14,7 +14,7 @@ select check_name, ok from (
     and p.prorettype not in ('trigger'::regtype, 'event_trigger'::regtype)
     and has_function_privilege('authenticated', p.oid, 'execute')
     and p.prosrc !~* '(auth\.uid\(\) *(=|<>|!=)|auth\.uid\(\) is (not )?(null|distinct)|auth\.role\(\) *(=|<>)|auth\.role\(\) is|is_group_coach|is_org_admin_of_group|is_platform_admin|is_group_member|is_org_member|is_coach_of_athlete)'
-    and p.proname <> all (array['coach_ai_multiplier', 'coach_client_steps', 'get_invite_info', 'has_valid_group_invite', 'athlete_in_org', 'can_view_org_branding', 'join_group_with_invite', 'set_sms_consent', 'request_workspace_org', 'group_in_active_org', 'default_org_for_coach', 'coach_in_org', 'client_of_coach_in_org', 'attach_refund_reason', 'refund_coach_credit', 'group_session_counts'])
+    and p.proname <> all (array['coach_ai_multiplier', 'coach_client_steps', 'get_invite_info', 'has_valid_group_invite', 'athlete_in_org', 'can_view_org_branding', 'join_group_with_invite', 'set_sms_consent', 'request_workspace_org', 'group_in_active_org', 'coach_in_org', 'client_of_coach_in_org', 'attach_refund_reason', 'refund_coach_credit', 'group_session_counts'])
     and p.proname not like 'is\_%'
     and p.proname not like 'training\_partner%'
     and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e'))),
@@ -27,7 +27,7 @@ select 'UNREVIEWED signed-in-callable function: ' || p.oid::regprocedure::text, 
     and p.prorettype not in ('trigger'::regtype, 'event_trigger'::regtype)
     and has_function_privilege('authenticated', p.oid, 'execute')
     and p.prosrc !~* '(auth\.uid\(\) *(=|<>|!=)|auth\.uid\(\) is (not )?(null|distinct)|auth\.role\(\) *(=|<>)|auth\.role\(\) is|is_group_coach|is_org_admin_of_group|is_platform_admin|is_group_member|is_org_member|is_coach_of_athlete)'
-    and p.proname <> all (array['coach_ai_multiplier', 'coach_client_steps', 'get_invite_info', 'has_valid_group_invite', 'athlete_in_org', 'can_view_org_branding', 'join_group_with_invite', 'set_sms_consent', 'request_workspace_org', 'group_in_active_org', 'default_org_for_coach', 'coach_in_org', 'client_of_coach_in_org', 'attach_refund_reason', 'refund_coach_credit', 'group_session_counts'])
+    and p.proname <> all (array['coach_ai_multiplier', 'coach_client_steps', 'get_invite_info', 'has_valid_group_invite', 'athlete_in_org', 'can_view_org_branding', 'join_group_with_invite', 'set_sms_consent', 'request_workspace_org', 'group_in_active_org', 'coach_in_org', 'client_of_coach_in_org', 'attach_refund_reason', 'refund_coach_credit', 'group_session_counts'])
     and p.proname not like 'is\_%'
     and p.proname not like 'training\_partner%'
     and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')

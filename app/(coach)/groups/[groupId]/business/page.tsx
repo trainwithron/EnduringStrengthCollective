@@ -123,6 +123,8 @@ export default async function BusinessDashboardPage(
     .select("id", { count: "exact", head: true })
     .in("group_id", groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"])
     .eq("status", "confirmed")
+    // a coach counts their own sessions; the owner or an admin counts every coach's
+    .match(scope.organizationWide ? {} : { coach_id: user.id })
     .gte("start_at", monthStartIso);
 
   const organizationId = await orgIdOfGroup(supabase, params.groupId);
@@ -145,8 +147,8 @@ export default async function BusinessDashboardPage(
   const { count: packageCount } = await supabase
     .from("coach_packages")
     .select("id", { count: "exact", head: true })
-    .eq("coach_id", user.id)
-    .in("group_id", safeGroupIds);
+    .in("group_id", safeGroupIds)
+    .match(scope.organizationWide ? {} : { coach_id: user.id });
   const hasBillingSetUp = (packageCount ?? 0) > 0;
 
   const { data: purchaseRows } = await supabase

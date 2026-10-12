@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { asWorkspaceGroupId, decodeWorkspaceCookie, groupIdFromPath } from "@/lib/workspace-header";
+import { asWorkspaceGroupId, decodeWorkspaceCookie, groupIdFromPath, pathSendsNoWorkspace } from "@/lib/workspace-header";
 
 const G = "060017b5-e613-4204-a101-c6a14c3a9630";
 const read = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8").replace(/\r\n/g, "\n");
@@ -25,6 +25,13 @@ describe("the workspace a request names", () => {
     expect(groupIdFromPath(`/groups/${G}`)).toBe(G);
     expect(groupIdFromPath("/dashboard")).toBeNull();
     expect(groupIdFromPath("/groups/new")).toBeNull();
+  });
+});
+
+describe("pages that open a person's own rows send no workspace", () => {
+  it("sessions, My training, notifications and printed programs are on the list; group pages are not", () => {
+    for (const p of ["/sessions/abc", "/sessions/abc/recap", "/my-training", "/my-training/open", "/notifications", "/print/programs/x"]) expect(pathSendsNoWorkspace(p), p).toBe(true);
+    for (const p of [`/groups/${G}/business`, "/dashboard", "/programs", "/clients"]) expect(pathSendsNoWorkspace(p), p).toBe(false);
   });
 });
 

@@ -84,6 +84,7 @@ $$;
 create or replace function public.fill_coach_row_organization()
 returns trigger
 language plpgsql
+security definer
 set search_path = public
 as $$
 begin
@@ -99,6 +100,7 @@ revoke execute on function public.fill_coach_row_organization() from public, ano
 create or replace function public.fill_calendar_event_organization()
 returns trigger
 language plpgsql
+security definer
 set search_path = public
 as $$
 begin
@@ -195,10 +197,11 @@ drop policy if exists "discovery_bookings_coach_manage" on public.discovery_book
 create policy "discovery_bookings_coach_manage" on public.discovery_bookings for all to authenticated
   using (coach_id = (select auth.uid()) and public.coach_in_org(organization_id)) with check (coach_id = (select auth.uid()) and public.coach_in_org(organization_id));
 
-revoke execute on function public.default_org_for_coach(uuid) from public, anon;
+-- default_org_for_coach answers for ANY coach id, so it is for the two insert triggers (which run as the table owner) and the server only, never a signed-in person.
+revoke execute on function public.default_org_for_coach(uuid) from public, anon, authenticated;
 revoke execute on function public.coach_in_org(uuid) from public, anon;
 revoke execute on function public.client_of_coach_in_org(uuid, uuid) from public, anon;
-grant execute on function public.default_org_for_coach(uuid) to authenticated, service_role;
+grant execute on function public.default_org_for_coach(uuid) to service_role;
 grant execute on function public.coach_in_org(uuid) to authenticated, service_role;
 grant execute on function public.client_of_coach_in_org(uuid, uuid) to authenticated, service_role;
 

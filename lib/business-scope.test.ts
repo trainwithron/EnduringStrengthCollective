@@ -14,7 +14,7 @@ describe("Business totals: a coach counts their own, the owner or an admin count
   it("the Business page and the MRR number both read it, and the sessions count is not limited to the viewer's own sessions", () => {
     const page = read("app/(coach)/groups/[groupId]/business/page.tsx");
     expect(page).toContain("loadBusinessScope(supabase, user.id, params.groupId)");
-    expect(page).not.toMatch(/from\("bookings"\)[\s\S]{0,120}\.eq\("coach_id", user\.id\)[\s\S]{0,80}\.in\("group_id", groupIds/);
+    expect(page).toContain("scope.organizationWide ? {} : { coach_id: user.id }");
     expect(read("lib/coach-mrr.ts")).toContain("loadBusinessScope(supabase, coachId, groupId)");
   });
 });
