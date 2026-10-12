@@ -38,8 +38,11 @@ export function PackageManager({
   initialPackages,
   linkablePrograms,
   accessGroups = [],
+  siteLinkBase = null,
 }: {
   groupId: string;
+  // The public page's address (for example https://app/c/my-name); with it a public package shows a link a coach can paste on their own website.
+  siteLinkBase?: string | null;
   initialPackages: CoachPackageRow[];
   linkablePrograms: LinkableProgramOption[];
   accessGroups?: AccessGroupOption[];
@@ -200,7 +203,18 @@ export function PackageManager({
             <tbody>
               {active.map((p) => (
                 <tr key={p.id} className="border-b border-steel/15">
-                  <td className="py-3 font-body text-sm">{p.name}</td>
+                  <td className="py-3 font-body text-sm">
+                    {p.name}
+                    {p.isPublic && siteLinkBase && (
+                      <button
+                        type="button"
+                        onClick={() => navigator.clipboard?.writeText(`${siteLinkBase}#package-${p.id}`)}
+                        className="block min-h-11 font-body text-xs text-steel underline underline-offset-2"
+                      >
+                        Copy link for your website
+                      </button>
+                    )}
+                  </td>
                   <td className="py-3 font-body text-sm text-steel">{p.sessionsPerWeek}x/week</td>
                   <td className="py-3 font-body text-sm text-steel">
                     {p.billingType === "subscription" ? "Subscription" : "One-time"}

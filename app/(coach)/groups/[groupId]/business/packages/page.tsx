@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { configuredAppUrl } from "@/lib/app-url";
 import { redirectOneOnOneToAnchor } from "@/lib/coach-wide-redirect";
 import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
@@ -52,6 +53,10 @@ export default async function PackagesPage(
     .in("group_id", orgGroupIds)
     .order("sessions_per_week", { ascending: true });
 
+  // The coach's public page address, so a public package can be linked from their own website.
+  const { data: sitePage } = await supabase.from("coach_booking_pages").select("slug, enabled").eq("coach_id", user.id).maybeSingle();
+  const appUrl = configuredAppUrl();
+  const siteLinkBase = appUrl && sitePage?.enabled && sitePage.slug ? `${appUrl}/c/${sitePage.slug}` : null;
   const packages: CoachPackageRow[] = (packageRows ?? []).map((p) => ({
     id: p.id,
     groupId: p.group_id,
@@ -94,7 +99,7 @@ export default async function PackagesPage(
         </p>
       </div>
 
-      <PackageManager groupId={params.groupId} initialPackages={packages} linkablePrograms={linkablePrograms} accessGroups={accessGroups} />
+      <PackageManager groupId={params.groupId} initialPackages={packages} linkablePrograms={linkablePrograms} accessGroups={accessGroups} siteLinkBase={siteLinkBase} />
     </CoachDesktopShell>
   );
 }

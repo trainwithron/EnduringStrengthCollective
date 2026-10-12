@@ -1,4 +1,5 @@
 import { googleFontsHref } from "@/lib/google-fonts";
+import { ShopCard } from "@/components/shared/shop-card";
 import { isRealCoach } from "@/lib/real-coach";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -218,7 +219,7 @@ export default async function CoachSitePage(props: { params: Promise<{ slug: str
           <h2 className="text-xl font-bold uppercase" style={heading}>Programs and packages</h2>
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
             {d.packages.map((p) => (
-              <div key={p.id} className="p-4" style={{ background: c.card }}>
+              <div key={p.id} id={`package-${p.id}`} className="p-4 scroll-mt-4" style={{ background: c.card }}>
                 <p className="font-semibold">{p.name}</p>
                 <p className="text-sm mt-1" style={{ color: c.muted }}>
                   {p.sessions_per_week}x a week &middot; {p.billing_type === "subscription" ? "monthly" : "one time"}
@@ -234,16 +235,16 @@ export default async function CoachSitePage(props: { params: Promise<{ slug: str
       {d.shop.length > 0 && (
         <section className={section}>
           <h2 className="text-xl font-bold uppercase" style={heading}>From the shop</h2>
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
             {d.shop.map((s) => (
-              <a key={s.id} href={s.url as string} target="_blank" rel="noopener noreferrer" className="block p-3 min-h-11" style={{ background: c.card }}>
-                {s.image && (
-                  // eslint-disable-next-line @next/next/no-img-element -- outbound shop image chosen by the coach.
-                  <img src={s.image} alt="" className="w-full h-28 object-cover mb-2" />
-                )}
-                <span className="font-semibold">{s.title}</span>
-                {s.description && <span className="block text-sm mt-1" style={{ color: c.muted }}>{s.description}</span>}
-              </a>
+              <ShopCard
+                key={s.id}
+                title={s.title}
+                description={s.description}
+                imageUrl={s.image}
+                href={s.url as string}
+                colors={{ card: c.card, text: c.text, muted: c.muted, accent: c.accent, accentText: c.bg }}
+              />
             ))}
           </div>
         </section>

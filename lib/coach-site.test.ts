@@ -59,8 +59,10 @@ describe("the public page and the setup screen", () => {
     expect(page).not.toMatch(/gtag|analytics|pixel|athlete|full_name.*athlete/i);
     expect(page).toContain('.eq("is_public", true)');
     expect(page).toContain('.eq("featured", true)');
-    expect(page).toContain('rel="noopener noreferrer"');
-    expect(page).toContain('target="_blank"');
+    // the outbound shop cards are the shared storefront card, which opens each link in a new tab with rel noopener noreferrer
+    expect(page).toContain("<ShopCard");
+    expect(read("components/shared/shop-card.tsx")).toContain('rel="noopener noreferrer"');
+    expect(read("components/shared/shop-card.tsx")).toContain('target="_blank"');
   });
   it("has no Buy button (a visitor has no account); the one call to action is Book a consultation, only when booking is on", () => {
     expect(page).toContain("Book a consultation");
@@ -81,7 +83,7 @@ describe("the public page and the setup screen", () => {
   });
   it("featured shop cards: a flag the coach sets (up to 3), shown first to clients", () => {
     expect(read("components/coach/desktop/pro-shop-manager.tsx")).toContain("Feature up to 3 cards.");
-    expect(read("components/athlete/pro-shop-list.tsx")).toContain("Number(!!b.featured) - Number(!!a.featured)");
+    expect(read("components/athlete/pro-shop-list.tsx")).toContain("usable.filter((l) => l.featured)");
   });
 });
 

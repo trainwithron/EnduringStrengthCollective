@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { ShopCard, ShopGrid } from "@/components/shared/shop-card";
+import { safeWebUrl } from "@/lib/coach-site";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { Trash2 } from "lucide-react";
@@ -167,8 +169,28 @@ export function ProShopManager({ initialLinks, organizationId }: { initialLinks:
     router.refresh();
   }
 
+  const previewLinks = [...links].filter((l) => safeWebUrl(l.url)).sort((a, b) => Number(!!b.featured) - Number(!!a.featured)).slice(0, 4);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 lg:gap-8 items-start">
+      <div>
+      {previewLinks.length > 0 && (
+        <section className="mb-6" aria-label="How clients see your shop">
+          <h3 className="font-body text-xs text-steel uppercase tracking-wide mb-2">How clients see it</h3>
+          <ShopGrid>
+            {previewLinks.map((l) => (
+              <ShopCard
+                key={l.id}
+                title={l.title}
+                description={l.description}
+                imageUrl={safeWebUrl(l.imageUrl)}
+                href={safeWebUrl(l.url) as string}
+                note={l.discountDescription}
+              />
+            ))}
+          </ShopGrid>
+        </section>
+      )}
       <div className="divide-y divide-steel/15">
         {links.length === 0 ? (
           <p className="font-body text-sm text-steel py-2">No Pro Shop links added yet.</p>
@@ -215,6 +237,7 @@ export function ProShopManager({ initialLinks, organizationId }: { initialLinks:
             </div>
           ))
         )}
+      </div>
       </div>
 
       <div className="border border-steel/20 p-4 space-y-2.5">
