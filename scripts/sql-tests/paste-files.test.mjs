@@ -1317,6 +1317,24 @@ for (const s of steps) {
   const errAT2 = await run(`apply/${bundle.file}`);
   check("release-at: the bundle applies again after an undo" + (errAT2 ? ": " + errAT2 : ""), !errAT2 && (await has()));
 }
+// Release AU (step 89): ONE paste.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-au");
+  check("release-au: ONE bundle holds step 89", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["89"]));
+  const st89 = steps.find((x) => x.n === "89");
+  const has = async () => (await db.query("select to_regprocedure('public.grant_coach_credit_pack_once(text, text, uuid, integer, integer)') is not null as ok")).rows[0].ok === true;
+  const eau0 = await run(`apply/undo-step${st89.n}-${st89.slug}.sql`);
+  check("release-au: before the bundle runs the functions are absent" + (eau0 ? ": " + eau0 : ""), !eau0 && !(await has()));
+  const errAU = await run(`apply/${bundle.file}`);
+  check("release-au bundle applies on the live-shaped state" + (errAU ? ": " + errAU : ""), !errAU && (await has()));
+  const againAU = await run(`apply/${bundle.file}`);
+  check("release-au: a second run is refused, naming step 89 (" + againAU + ")", !!againAU && againAU.includes("step 89 (0343) cannot run") && againAU.includes("already applied"));
+  const euAU = await run(`apply/undo-step${st89.n}-${st89.slug}.sql`);
+  check("release-au: the undo removes the functions" + (euAU ? ": " + euAU : ""), !euAU && !(await has()));
+  const errAU2 = await run(`apply/${bundle.file}`);
+  check("release-au: the bundle applies again after an undo" + (errAU2 ? ": " + errAU2 : ""), !errAU2 && (await has()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.

@@ -19,6 +19,24 @@ export interface ActiveProgram {
   visibilityWindow: VisibilityWindow;
 }
 
+// The one program to show for a client on a page that shows one: their own personal program with a schedule first, then a shared one with a schedule, then any personal one, then the first.
+// It never returns another client's personal program or a coach's hidden template (getActivePrograms leaves those out), which is what picking "the newest active program of the group" got wrong.
+export async function getAthleteCurrentProgram(
+  supabase: SupabaseClient,
+  groupId: string,
+  athleteId: string
+): Promise<{ id: string; name: string; start_date: string | null; training_days: number[] | null } | null> {
+  const programs = await getActivePrograms(supabase, groupId, athleteId);
+  const scheduled = (p: ActiveProgram) => !!(p.startDate && p.trainingDays?.length);
+  const chosen =
+    programs.find((p) => p.athleteId === athleteId && scheduled(p)) ??
+    programs.find(scheduled) ??
+    programs.find((p) => p.athleteId === athleteId) ??
+    programs[0] ??
+    null;
+  return chosen ? { id: chosen.id, name: chosen.name, start_date: chosen.startDate, training_days: chosen.trainingDays } : null;
+}
+
 const BASE_COLUMNS = "id, name, created_at, athlete_id, start_date, training_days, visibility_window";
 
 interface Row {

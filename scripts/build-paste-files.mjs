@@ -1818,6 +1818,23 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the two coach-count functions exist", has.fn("coach_ai_multiplier(uuid)") + " and " + has.fn("coach_client_steps(uuid)")],
     ],
   },
+  {
+    n: "89",
+    slug: "0343",
+    title: "0343 A coach's credit pack or Lift Off grant is recorded and added in one step (a failed add is retried instead of lost)",
+    migrations: ["0343"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing visible changes. Two new server-only functions exist. After the app update, a coach who pays for a credit pack or a Lift Off month always gets the credits, even if the first attempt hit a database error. Run this paste BEFORE the code that uses it deploys; until the code deploys nothing uses it.",
+    undo: [
+      "drop function if exists public.grant_coach_credit_pack_once(text, text, uuid, integer, integer);",
+      "drop function if exists public.grant_lift_off_credits_once(text, uuid, integer);",
+    ].join("\n"),
+    undoWhy: "Only if step 89 misbehaves. Removes the two functions. Do NOT undo after the new app code is live (it would then fail to grant credits); undo only before, or deploy the previous code first.",
+    rows: [
+      ["0343 is not already applied (the credit-pack function does not exist yet)", "to_regprocedure('public.grant_coach_credit_pack_once(text, text, uuid, integer, integer)') is null"],
+      ["the credit adjust function and both record tables exist", has.fn("adjust_coach_credits(uuid, integer)") + " and to_regclass('public.coach_credit_purchases') is not null and to_regclass('public.lift_off_credit_grants') is not null"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -1923,6 +1940,7 @@ const BUNDLES = [
   { id: "release-ai", name: "Release AI (a payment and its sessions are recorded in one step; run BEFORE the code that uses it deploys)", steps: ["77"] },
   { id: "release-ap", name: "Release AP (parent-view links only for under-13 clients of the coach, and they expire; internal training-partner functions closed; run any time)", steps: ["84"] },
   { id: "release-ao", name: "Release AO (assigning attaches a program only inside one organization; run any time, after Release AM)", steps: ["83"] },
+  { id: "release-au", name: "Release AU (a coach credit pack or Lift Off grant is recorded and added in one step; run BEFORE the code that uses it deploys)", steps: ["89"] },
   { id: "release-at", name: "Release AT (private lookup functions closed to other people; run any time)", steps: ["88"] },
   { id: "release-as", name: "Release AS (coach packages can only be written by the server; run any time)", steps: ["87"] },
   { id: "release-ar", name: "Release AR (tenant safety: a coach can only file rows about people in that group; clients move only inside one organization; run any time)", steps: ["86"] },
@@ -2118,6 +2136,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
+    m("0343", "to_regprocedure('public.grant_coach_credit_pack_once(text, text, uuid, integer, integer)') is not null"),
     m("0342", "not has_function_privilege('authenticated', 'public.coach_ai_multiplier(uuid)', 'execute')"),
     m("0341", "not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_packages' and policyname = 'coach_packages_insert_coach')"),
     m("0340", has.fn("enforce_athlete_in_group()")),

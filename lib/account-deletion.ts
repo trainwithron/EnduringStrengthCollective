@@ -173,7 +173,17 @@ export async function eraseAccount(db: any, userId: string, opts: { eraseHistory
   // sessions), so it is only removed when the coach chose to erase history. Otherwise it stays, renamed, so the records the coach
   // kept still have somewhere to live and no name of the person remains.
   for (const groupId of opts.deleteEmptyOneOnOneGroups ?? []) {
-    if (opts.eraseHistory) {
+    // The coach's own rows filed in this space (template programs with no client on them, coach packages) would be deleted with it. The space is kept (renamed) instead.
+    const [{ count: templates }, { count: packages }] = await Promise.all([
+      db.from("programs").select("id", { count: "exact", head: true }).eq("group_id", groupId).is("athlete_id", null),
+      db.from("coach_packages").select("id", { count: "exact", head: true }).eq("group_id", groupId),
+    ]);
+    const holdsCoachRows = (templates ?? 0) > 0 || (packages ?? 0) > 0;
+    if (opts.eraseHistory && holdsCoachRows) {
+      const { error } = await db.from("groups").update({ name: "Former client" }).eq("id", groupId);
+      leftover = (leftover ? leftover + " " : "") + "Their space was kept (renamed Former client) because it still holds your template programs or packages.";
+      if (error) leftover += " It could not be renamed.";
+    } else if (opts.eraseHistory) {
       const { error } = await db.from("groups").delete().eq("id", groupId);
       if (error) leftover = (leftover ? leftover + " " : "") + "Their account is gone, but their empty space could not be removed (payment records still point at it). It stays under the name Former client.";
       if (error) await db.from("groups").update({ name: "Former client" }).eq("id", groupId);

@@ -1,3 +1,5 @@
+import { loadAssignableWorkouts } from "@/lib/assignable-workouts";
+import { getAthleteCurrentProgram } from "@/lib/active-programs";
 import Link from "next/link";
 import { createServerClient } from "@/lib/supabase/server";
 import { resolveDayMacros, standingForDate } from "@/lib/macro-resolution";
@@ -61,14 +63,7 @@ export async function ClientCalendarSection({
 
   // Program-computed schedule (read-only reference — the shared group
   // program keeps working exactly as it does today).
-  const { data: program } = await supabase
-    .from("programs")
-    .select("id, start_date, training_days")
-    .eq("group_id", groupId)
-    .eq("is_active", true)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const program = await getAthleteCurrentProgram(supabase, groupId, athleteId);
 
   const workoutByDateKey = new Map<string, { id: string; title: string }>();
   let loggedIds = new Set<string>();
@@ -123,17 +118,7 @@ export async function ClientCalendarSection({
   // active one) for the expanded panel's "assign a specific workout"
   // dropdown — same list the dedicated day page already offers, fetched
   // once here instead of per day.
-  const { data: allWorkouts } = await supabase
-    .from("workouts")
-    .select("id, title, week_number, day_index, programs ( name )")
-    .eq("group_id", groupId)
-    .order("week_number", { ascending: true })
-    .order("day_index", { ascending: true });
-
-  const workoutOptions: WorkoutOption[] = (allWorkouts ?? []).map((w: any) => ({
-    id: w.id,
-    label: `${w.programs?.name ?? "Program"} — Wk ${w.week_number} Day ${w.day_index + 1}: ${w.title}`,
-  }));
+  const workoutOptions: WorkoutOption[] = await loadAssignableWorkouts(supabase, groupId, athleteId);
 
   // This client's habits + this month's check-off status.
   const { data: latestWeightRow } = macrosEnabled

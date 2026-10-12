@@ -39,3 +39,20 @@ describe("money safety", () => {
     expect(webhook.indexOf("currentRow.stripe_subscription_id !== subscription.id")).toBeLessThan(webhook.indexOf("const { error: subscriptionUpsertError }"));
   });
 });
+
+describe("a coach's credit grants are recorded and added in one step", () => {
+  const webhook = read("app/api/stripe/webhook/route.ts");
+  it("the webhook uses the one-step functions, not a record followed by a separate add", () => {
+    expect(webhook).toContain('supabase.rpc("grant_coach_credit_pack_once"');
+    expect(webhook).toContain('supabase.rpc("grant_lift_off_credits_once"');
+    expect(webhook).not.toContain('from("coach_credit_purchases").insert');
+    expect(webhook).not.toContain('from("lift_off_credit_grants").insert');
+  });
+  it("the functions record and add inside one function, and only the server can run them", () => {
+    const sql = read("supabase/migrations/0343_coach_credit_grants_once.sql");
+    expect(sql.match(/perform public\.adjust_coach_credits/g)?.length).toBe(2);
+    expect(sql).toContain("on conflict (stripe_event_id) do nothing");
+    expect(sql).toContain("revoke execute on function public.grant_coach_credit_pack_once(text, text, uuid, integer, integer) from public, anon, authenticated;");
+    expect(sql).toContain("grant execute on function public.grant_lift_off_credits_once(text, uuid, integer) to service_role;");
+  });
+});

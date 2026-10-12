@@ -20,7 +20,7 @@ export default async function SessionRecapPage(props: { params: Promise<{ sessio
 
   const { data: session } = await supabase
     .from("athlete_sessions")
-    .select("id, group_id, athlete_id, status")
+    .select("id, group_id, athlete_id, status, workout_id")
     .eq("id", params.sessionId)
     .maybeSingle();
 
@@ -63,9 +63,20 @@ export default async function SessionRecapPage(props: { params: Promise<{ sessio
   // ignores that resolver's own athlete-facing visibility-window lock:
   // a coach planning ahead here isn't subject to the same pacing gate a
   // client's own app view is.
-  const { data: personalProgram } = await supabase
+  // The program the finished session belonged to comes first (a client with a main plan and a newer mobility plan must not get the wrong plan's next workout). Only when that can't be found does it
+  // fall back to the newest active personal program, then the group's shared one.
+  const { data: sessionWorkout } = (session as { workout_id?: string | null }).workout_id
+    ? await supabase.from("workouts").select("program_id").eq("id", (session as { workout_id: string }).workout_id).maybeSingle()
+    : { data: null };
+  const { data: sessionProgram } = sessionWorkout?.program_id
+    ? await supabase.from("programs").select("id, athlete_id").eq("id", sessionWorkout.program_id).eq("group_id", session.group_id).maybeSingle()
+    : { data: null };
+
+  const { data: personalProgram } = sessionProgram
+    ? { data: null }
+    : await supabase
     .from("programs")
-    .select("id")
+    .select("id, athlete_id")
     .eq("group_id", session.group_id)
     .eq("athlete_id", session.athlete_id)
     .eq("is_active", true)
@@ -73,11 +84,11 @@ export default async function SessionRecapPage(props: { params: Promise<{ sessio
     .limit(1)
     .maybeSingle();
 
-  const { data: sharedProgram } = personalProgram
+  const { data: sharedProgram } = sessionProgram || personalProgram
     ? { data: null }
     : await supabase
         .from("programs")
-        .select("id")
+        .select("id, athlete_id")
         .eq("group_id", session.group_id)
         .is("athlete_id", null)
         .eq("is_active", true)
@@ -85,7 +96,9 @@ export default async function SessionRecapPage(props: { params: Promise<{ sessio
         .limit(1)
         .maybeSingle();
 
-  const program = personalProgram ?? sharedProgram;
+  const program = sessionProgram ?? personalProgram ?? sharedProgram;
+  // A program shared by the whole group can't be changed here for one client: every change would land on everyone's program.
+  const programIsShared = !!program && (program as { athlete_id?: string | null }).athlete_id == null;
   let nextWorkoutId: string | null = null;
 
   if (program) {
@@ -155,6 +168,7 @@ export default async function SessionRecapPage(props: { params: Promise<{ sessio
       groupId={session.group_id}
       coachId={user.id}
       patternCheckFoundSomething={patternCheck ? patternCheck.found_something : null}
+      programIsShared={programIsShared}
     />
   );
 }

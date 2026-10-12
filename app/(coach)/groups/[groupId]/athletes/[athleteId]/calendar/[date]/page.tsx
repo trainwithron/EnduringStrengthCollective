@@ -1,3 +1,5 @@
+import { loadAssignableWorkouts } from "@/lib/assignable-workouts";
+import { getAthleteCurrentProgram } from "@/lib/active-programs";
 import Link from "next/link";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
@@ -77,14 +79,7 @@ export default async function ClientCalendarDayPage(
 
   // Program-computed workout for this date (read-only reference — the
   // shared group program keeps working exactly as it does today).
-  const { data: program } = await supabase
-    .from("programs")
-    .select("id, start_date, training_days")
-    .eq("group_id", params.groupId)
-    .eq("is_active", true)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const program = await getAthleteCurrentProgram(supabase, params.groupId, params.athleteId);
 
   let programWorkoutTitle: string | null = null;
   if (program?.start_date && program.training_days?.length) {
@@ -113,17 +108,7 @@ export default async function ClientCalendarDayPage(
   // Every workout in this group, for the "assign a specific workout"
   // dropdown — spans every program, not just the active one, so a coach
   // can pull in something from an older program too.
-  const { data: allWorkouts } = await supabase
-    .from("workouts")
-    .select("id, title, week_number, day_index, programs ( name )")
-    .eq("group_id", params.groupId)
-    .order("week_number", { ascending: true })
-    .order("day_index", { ascending: true });
-
-  const workoutOptions: WorkoutOption[] = (allWorkouts ?? []).map((w: any) => ({
-    id: w.id,
-    label: `${w.programs?.name ?? "Program"} — Wk ${w.week_number} Day ${w.day_index + 1}: ${w.title}`,
-  }));
+  const workoutOptions: WorkoutOption[] = await loadAssignableWorkouts(supabase, params.groupId, params.athleteId);
 
   const { data: assignment } = await supabase
     .from("workout_assignments")

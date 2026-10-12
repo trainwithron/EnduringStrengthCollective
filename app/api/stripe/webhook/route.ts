@@ -383,23 +383,16 @@ export async function POST(request: Request) {
             const credits = Number(session.metadata?.credits ?? 0);
             if (credits <= 0) break;
 
-            const { error: insertError } = await supabase.from("coach_credit_purchases").insert({
-              stripe_event_id: event.id,
-              stripe_checkout_session_id: session.id,
-              coach_id: coachId,
-              credits_purchased: credits,
-              amount_cents: session.amount_total ?? 0,
-            });
-            if (insertError) {
-              if (insertError.code === "23505") break; // already processed this event
-              throw insertError;
-            }
-
-            const { error: rpcError } = await supabase.rpc("adjust_coach_credits", {
+            // Recorded and added in ONE database step: if the credits can't be added the record is rolled back with them, so Stripe's retry grants again (before, the record survived a failed add and
+            // the retry stopped there: the coach paid and got nothing). A repeat of an event that was fully handled changes nothing.
+            const { error: packError } = await supabase.rpc("grant_coach_credit_pack_once", {
+              p_event_id: event.id,
+              p_session_id: session.id,
               p_coach_id: coachId,
-              p_delta: credits,
+              p_credits: credits,
+              p_amount_cents: session.amount_total ?? 0,
             });
-            if (rpcError) throw rpcError;
+            if (packError) throw packError;
           } else if (typeof session.subscription === "string") {
             await supabase.from("lift_off_subscriptions").upsert(
               {
@@ -581,21 +574,13 @@ export async function POST(request: Request) {
           const coachId = subscription.metadata?.coach_id;
           if (!coachId) break;
 
-          const { error: grantError } = await supabase.from("lift_off_credit_grants").insert({
-            stripe_event_id: event.id,
-            coach_id: coachId,
-            credits_granted: LIFT_OFF_MONTHLY_CREDITS,
-          });
-          if (grantError) {
-            if (grantError.code === "23505") break; // already processed this event
-            throw grantError;
-          }
-
-          const { error: rpcError } = await supabase.rpc("adjust_coach_credits", {
+          // Recorded and added in one database step (see grant_coach_credit_pack_once above).
+          const { error: liftOffGrantError } = await supabase.rpc("grant_lift_off_credits_once", {
+            p_event_id: event.id,
             p_coach_id: coachId,
-            p_delta: LIFT_OFF_MONTHLY_CREDITS,
+            p_credits: LIFT_OFF_MONTHLY_CREDITS,
           });
-          if (rpcError) throw rpcError;
+          if (liftOffGrantError) throw liftOffGrantError;
           break;
         }
 

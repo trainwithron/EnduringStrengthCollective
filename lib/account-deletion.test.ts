@@ -19,7 +19,7 @@ describe("deletionBlocker", () => {
 });
 
 // A recording stand-in for the database client: every call is logged in order.
-function fakeDb(failAt?: string, filesFor: Record<string, string> = {}) {
+function fakeDb(failAt?: string, filesFor: Record<string, string> = {}, coachRows: Record<string, number> = {}) {
   const calls: string[] = [];
   const storageRemoved: { bucket: string; paths: string[] }[] = [];
   const chain = (table: string, op: string) => ({
@@ -33,9 +33,10 @@ function fakeDb(failAt?: string, filesFor: Record<string, string> = {}) {
     storageRemoved,
     from: (table: string) => ({
       select: (column: string) => ({
-        eq: async (col: string) => {
+        eq: (col: string) => {
           calls.push(`select ${table}.${column}`);
-          return { data: filesFor[table] ? [{ [column]: filesFor[table] }] : [], error: null };
+          const result = { data: filesFor[table] ? [{ [column]: filesFor[table] }] : [], error: null, count: coachRows[table] ?? 0 };
+          return Object.assign(Promise.resolve(result), { is: async () => result });
         },
       }),
       delete: () => chain(table, "delete"),
@@ -134,5 +135,15 @@ describe("their uploaded photos and videos go with the account", () => {
     const r = await eraseAccount(db, "u1", { eraseHistory: false });
     expect(r.ok).toBe(true);
     expect(r.ok && r.leftover).toMatch(/could not be removed from storage/);
+  });
+});
+
+describe("a space that still holds the coach's own rows is kept", () => {
+  it("keeps (renames) the one-on-one space instead of deleting it with the client, and says so", async () => {
+    const { db, calls } = fakeDb(undefined, {}, { programs: 2 });
+    const r = await eraseAccount(db, "u1", { eraseHistory: true, deleteEmptyOneOnOneGroups: ["g9"] });
+    expect(calls).not.toContain("delete groups.id");
+    expect(calls).toContain("update-author groups.id");
+    expect(r.ok && r.leftover).toMatch(/kept \(renamed Former client\)/);
   });
 });

@@ -3,6 +3,7 @@ import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { isMemberOfGroup, NOT_IN_GROUP_MESSAGE } from "@/lib/athlete-in-group";
+import { getAthleteCurrentProgram } from "@/lib/active-programs";
 import { CoachModeBar } from "@/components/coach/mobile/coach-mode-bar";
 import { getTodaysSessions, workoutResultFromSessions } from "@/lib/todays-workout";
 
@@ -97,14 +98,8 @@ export default async function LogForClientPage(
     );
   }
 
-  const { data: activeProgram } = await supabase
-    .from("programs")
-    .select("id, name")
-    .eq("group_id", params.groupId)
-    .eq("is_active", true)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // This client's program (never another client's personal program or the coach's hidden template).
+  const activeProgram = await getAthleteCurrentProgram(supabase, params.groupId, params.athleteId);
 
   if (!activeProgram) {
     return (

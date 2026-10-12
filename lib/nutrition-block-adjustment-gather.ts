@@ -1,3 +1,4 @@
+import { getAthleteCurrentProgram } from "@/lib/active-programs";
 // Training-block-aware macro suggestion — data-orchestration layer (real
 // Supabase queries, no unit tests of its own, same convention as
 // lib/programming-spotter-gather.ts — only the pure
@@ -102,14 +103,7 @@ export async function gatherMacroSuggestion(
   // sparkline (its map isn't exported, so the query is repeated here,
   // scoped to one program). Shared group program only, matching the
   // day page's own program resolution.
-  const { data: program } = await supabase
-    .from("programs")
-    .select("id, start_date, training_days")
-    .eq("group_id", groupId)
-    .eq("is_active", true)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const program = await getAthleteCurrentProgram(supabase, groupId, athleteId);
   if (!program?.start_date || !program.training_days?.length) return null;
 
   const { data: workouts } = await supabase

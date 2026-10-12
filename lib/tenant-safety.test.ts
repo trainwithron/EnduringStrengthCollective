@@ -64,3 +64,48 @@ describe("private lookups and forged post links", () => {
     expect(sql).toContain("revoke execute on function public.coach_client_steps(uuid) from public, anon, authenticated;");
   });
 });
+
+describe("a page that shows one program for a client resolves it for the CLIENT", () => {
+  it("the client's Calendar tab reads all their active programs, so two active programs no longer blank it", () => {
+    const body = read("components/coach/calendar-page-body.tsx");
+    expect(body).toContain("await getActivePrograms(supabase, params.groupId, athleteId)");
+    expect(body).toContain("scheduledPrograms.find((p) => p.athleteId === athleteId) ?? scheduledPrograms[0]");
+  });
+  it("the coach pages for one client use that client's program, never the newest of the group", () => {
+    for (const f of [
+      "app/(coach)/groups/[groupId]/athletes/[athleteId]/log/page.tsx",
+      "components/coach/desktop/client-calendar-section.tsx",
+      "app/(coach)/groups/[groupId]/athletes/[athleteId]/calendar/[date]/page.tsx",
+      "lib/nutrition-block-adjustment-gather.ts",
+    ]) {
+      expect(read(f)).toContain("getAthleteCurrentProgram(");
+    }
+  });
+  it("a workout made for one client is not opened for another", () => {
+    expect(read("lib/workout-overview-data.ts")).toContain("if (workout.athlete_id && workout.athlete_id !== athleteId) return null;");
+  });
+});
+
+describe("recap and notes", () => {
+  it("a coach's private note is never pre-filled into the note the athlete sees; it is shown as read-only help with an explicit button", () => {
+    const row = read("components/coach/desktop/next-workout-exercise-row.tsx");
+    expect(row).toContain('useState(exercise.notes ?? "")');
+    expect(row).not.toContain("exercise.notes ?? carriedForwardNote?.body");
+    expect(row).toContain("if (override === undefined && !noteTouched) return;");
+    expect(row).toContain("Note for this exercise (the athlete sees it)");
+    expect(row).toContain("Your private note from");
+    expect(row).toContain("Use it as the note the athlete sees");
+  });
+  it("Up next follows the finished session's own program, and a group-shared program is read-only there", () => {
+    const page = read("app/sessions/[sessionId]/recap/page.tsx");
+    expect(page).toContain("const program = sessionProgram ?? personalProgram ?? sharedProgram;");
+    expect(page).toContain("programIsShared={programIsShared}");
+    const view = read("components/coach/desktop/recap-and-up-next.tsx");
+    expect(view).toContain("readOnly={programIsShared}");
+    expect(view).toContain("so it can't be changed here for just");
+  });
+  it("assigning from the builder of an AI draft signs it off first, like the program cards", () => {
+    expect(read("components/coach/desktop/program-builder-desktop.tsx")).toContain("aiDraft={aiDraft}");
+    expect(read("app/(coach)/groups/[groupId]/programs/[programId]/page.tsx")).toContain("aiDraft={isAiDraft}");
+  });
+});

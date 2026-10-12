@@ -27,6 +27,7 @@ import { getCoachClients } from "@/lib/coach-clients";
 import { coachCreditSentence } from "@/lib/credit-sentence";
 import { formatSlotTime } from "@/lib/booking-slots";
 import { getEffectiveAthlete } from "@/lib/acting-as";
+import { getActivePrograms } from "@/lib/active-programs";
 import { getCoachedGroups } from "@/lib/coach-groups";
 import { AddGroupEvent } from "@/components/coach/add-group-event";
 import { UpcomingGroupEvents } from "@/components/group/group-event-answer";
@@ -421,36 +422,13 @@ export async function CoachCalendarPageBody(
   }
 
   if (showMobileView) {
-    // A personal program assigned to this athlete wins over the group's
-    // shared one — same precedence as lib/todays-workout.ts. Two queries,
-    // not one `athlete_id = X or athlete_id is null` filter, since both
-    // could be simultaneously active and .maybeSingle() would error on
-    // more than one row.
-    // Both queries run unconditionally in parallel rather than fetching
-    // shared only when personal comes back empty — at most one extra,
-    // cheap row fetched in the common case, but it removes a real
-    // sequential round trip from every athlete's calendar load.
-    const [{ data: personalProgram }, { data: sharedProgramRaw }, { data: kindRow }] = await Promise.all([
-      supabase
-        .from("programs")
-        .select("id, start_date, training_days")
-        .eq("group_id", params.groupId)
-        .eq("athlete_id", athleteId)
-        .eq("is_active", true)
-        .maybeSingle(),
-      supabase
-        .from("programs")
-        .select("id, start_date, training_days")
-        .eq("group_id", params.groupId)
-        .is("athlete_id", null)
-        .eq("is_active", true)
-        .maybeSingle(),
-      supabase.from("groups").select("group_kind").eq("id", params.groupId).maybeSingle(),
-    ]);
-    // A one-on-one space has no shared program: a program with no client on it is the coach's template.
-    const sharedProgram = personalProgram || (kindRow as { group_kind?: string } | null)?.group_kind === "one_on_one" ? null : sharedProgramRaw;
-
-    const program = personalProgram ?? sharedProgram;
+    // Several programs can be active at once (a main plan and a mobility plan, or a personal plan and the group's shared one). Every active program for this athlete is read, one-on-one rules
+    // included (a one-on-one space has no shared program: a program with no client on it is the coach's template), and the calendar opens the first one that has a schedule, a personal
+    // program ahead of a shared one. (This used to ask for "the" active program, which errors when there are two and left the whole Calendar tab without workouts.)
+    const activePrograms = await getActivePrograms(supabase, params.groupId, athleteId);
+    const scheduledPrograms = activePrograms.filter((p) => p.startDate && p.trainingDays?.length);
+    const chosen = scheduledPrograms.find((p) => p.athleteId === athleteId) ?? scheduledPrograms[0] ?? null;
+    const program = chosen ? { id: chosen.id, start_date: chosen.startDate, training_days: chosen.trainingDays } : null;
     const programHasSchedule = !!(program?.start_date && program.training_days?.length);
 
     if (program && programHasSchedule) {

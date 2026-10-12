@@ -26,7 +26,9 @@ function EditableTargetCell({
   kind,
   label,
   onCommit,
+  disabled = false,
 }: {
+  disabled?: boolean;
   setId: string;
   value: string;
   kind: "number" | "text";
@@ -50,6 +52,7 @@ function EditableTargetCell({
       inputMode={kind === "number" ? "decimal" : undefined}
       min={kind === "number" ? "0" : undefined}
       aria-label={label}
+      disabled={disabled}
       value={draft}
       onFocus={() => setTouched(true)}
       onChange={(e) => {
@@ -76,22 +79,18 @@ export function NextWorkoutExerciseRow({
   exercise,
   carriedForwardNote,
   onSwap,
+  readOnly = false,
 }: {
+  readOnly?: boolean;
   exercise: WorkoutOverviewExercise;
   carriedForwardNote?: { body: string; date: string };
   onSwap: (exerciseId: string, currentName: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [sets, setSets] = useState(exercise.sets);
-  // The exercise's own existing `notes` column (already used for
-  // template-level coach notes elsewhere in the builder) is the real,
-  // already-saved value once it has content. Until then, the carried-
-  // forward note from this athlete's most recent session with this
-  // exercise is shown as the same kind of grayed, editable suggestion —
-  // saving writes through to that same existing column, reusing it
-  // rather than inventing new schema for a note on a workout that
-  // hasn't started yet.
-  const [noteDraft, setNoteDraft] = useState(exercise.notes ?? carriedForwardNote?.body ?? "");
+  // The exercise's own `notes` column is what the ATHLETE sees on this exercise. The field starts with what is already saved there and nothing else: the coach's private note from the last
+  // session is shown below it as read-only help (it used to be pre-filled here and was saved to the athlete-visible column just by clicking in and out of the field).
+  const [noteDraft, setNoteDraft] = useState(exercise.notes ?? "");
   const [noteTouched, setNoteTouched] = useState(Boolean(exercise.notes));
 
   const fields = orderTrackedFields(exercise.trackedFields);
@@ -110,10 +109,13 @@ export function NextWorkoutExerciseRow({
     );
   }
 
-  async function commitNote() {
-    if (noteDraft === (exercise.notes ?? "")) return;
+  async function commitNote(override?: string) {
+    // Only what the coach actually typed or chose to use is saved.
+    const value = override ?? noteDraft;
+    if (override === undefined && !noteTouched) return;
+    if (value === (exercise.notes ?? "")) return;
     const supabase = createBrowserClient();
-    await supabase.from("group_workout_exercises").update({ notes: noteDraft }).eq("id", exercise.id);
+    await supabase.from("group_workout_exercises").update({ notes: value }).eq("id", exercise.id);
   }
 
   return (
@@ -132,16 +134,18 @@ export function NextWorkoutExerciseRow({
             {expanded ? <ChevronUp className="w-4 h-4 text-steel" /> : <ChevronDown className="w-4 h-4 text-steel" />}
           </span>
         </button>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onSwap(exercise.id, exercise.exerciseName);
-          }}
-          className="font-body text-xs text-rust shrink-0"
-        >
-          Swap
-        </button>
+        {!readOnly && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSwap(exercise.id, exercise.exerciseName);
+            }}
+            className="font-body text-xs text-rust shrink-0"
+          >
+            Swap
+          </button>
+        )}
       </div>
 
       {expanded && (
@@ -173,6 +177,7 @@ export function NextWorkoutExerciseRow({
                             kind={fieldDef(f).kind}
                             label={`${fieldDef(f).label} for set ${i + 1}`}
                             onCommit={(raw) => commitSetField(set.id, f, raw)}
+                            disabled={readOnly}
                           />
                         </td>
                       );
@@ -185,7 +190,7 @@ export function NextWorkoutExerciseRow({
 
           <div>
             <label className="font-body text-xs text-steel uppercase tracking-wide block mb-1">
-              Note for this exercise
+              Note for this exercise (the athlete sees it)
             </label>
             <input
               type="text"
@@ -195,16 +200,32 @@ export function NextWorkoutExerciseRow({
                 setNoteTouched(true);
                 setNoteDraft(e.target.value);
               }}
-              onBlur={commitNote}
-              placeholder="Coach-only — never visible to the athlete"
+              onBlur={() => commitNote()}
+              disabled={readOnly}
+              placeholder="Shown to the athlete on this exercise"
               className={`w-full h-9 bg-graphite border border-steel/30 px-2 font-body text-xs focus:outline-none focus:border-rust ${
                 noteTouched ? "text-chalk" : "text-steel italic"
               }`}
             />
             {isCarriedForward && (
-              <p className="font-body text-xs text-steel mt-1">
-                Carried forward from {new Date(carriedForwardNote!.date).toLocaleDateString()}&apos;s note
-              </p>
+              <div className="mt-1">
+                <p className="font-body text-xs text-steel">
+                  Your private note from {new Date(carriedForwardNote!.date).toLocaleDateString()}: {carriedForwardNote!.body}
+                </p>
+                {!readOnly && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNoteTouched(true);
+                    setNoteDraft(carriedForwardNote!.body);
+                    void commitNote(carriedForwardNote!.body);
+                  }}
+                  className="font-body text-xs text-rust underline underline-offset-2 mt-0.5"
+                >
+                  Use it as the note the athlete sees
+                </button>
+                )}
+              </div>
             )}
           </div>
         </div>

@@ -41,6 +41,7 @@ export function ProgramBuilderDesktop({
   initialExpandedWeek = null,
   embedded = false,
   toolbarExtra,
+  aiDraft = false,
 }: {
   programId: string;
   groupId: string;
@@ -90,6 +91,8 @@ export function ProgramBuilderDesktop({
   embedded?: boolean;
   // Extra controls for the button row under the name (the program page puts the label and order box here). Not given in the embedded copy.
   toolbarExtra?: React.ReactNode;
+  // The program is an unsigned AI draft: assigning it from here signs it off first, as the program cards do.
+  aiDraft?: boolean;
 }) {
   // Own channel per mount — fixes a real bug (see lib/save-toast.ts's
   // createSaveToastChannel doc comment): the full-page builder and an
@@ -236,6 +239,7 @@ export function ProgramBuilderDesktop({
             programId={programId}
             programName={name}
             groupId={groupId}
+            aiDraft={aiDraft}
             hideAssignAndDuplicate={embedded}
           />
         </div>

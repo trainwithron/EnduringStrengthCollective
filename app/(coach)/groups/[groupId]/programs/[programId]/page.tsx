@@ -291,6 +291,7 @@ async function CoachProgramBuilder({
       <ProgramBuilderDesktop
         programId={programId}
         groupId={groupId}
+        aiDraft={isAiDraft}
         toolbarExtra={
           <ProgramRoleControl
             programId={programId}

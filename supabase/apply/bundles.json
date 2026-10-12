@@ -261,6 +261,14 @@
   "file": "apply-release-ao-all.sql"
  },
  {
+  "id": "release-au",
+  "name": "Release AU (a coach credit pack or Lift Off grant is recorded and added in one step; run BEFORE the code that uses it deploys)",
+  "steps": [
+   "89"
+  ],
+  "file": "apply-release-au-all.sql"
+ },
+ {
   "id": "release-at",
   "name": "Release AT (private lookup functions closed to other people; run any time)",
   "steps": [

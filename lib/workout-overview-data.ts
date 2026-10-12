@@ -57,7 +57,7 @@ export async function getWorkoutOverviewData(
         .from("workouts")
         .select(
           `
-      id, title, notes, program_id,
+      id, title, notes, program_id, athlete_id,
       group_workout_exercises (
         id, exercise_name, display_name, exercise_order, movement_pattern_id, tracked_fields, notes,
         group_workout_exercise_sets ( id, set_order, target_reps, target_weight, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance )
@@ -86,6 +86,8 @@ export async function getWorkoutOverviewData(
     ]);
 
   if (!workout) return null;
+  // A workout made for one client is never opened for another (a coach logging for the wrong client, or a stranger's id in the address).
+  if (workout.athlete_id && workout.athlete_id !== athleteId) return null;
 
   const templateExercises = (workout.group_workout_exercises ?? [])
     .slice()

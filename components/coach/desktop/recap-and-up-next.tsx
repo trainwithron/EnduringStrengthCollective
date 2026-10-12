@@ -29,12 +29,15 @@ export function RecapAndUpNext({
   groupId,
   coachId,
   patternCheckFoundSomething,
+  programIsShared = false,
 }: {
   recap: SessionRecap;
   nextWorkout: NextWorkout | null;
   carriedForwardNotes: Record<string, { body: string; date: string }>;
   groupId: string;
   coachId: string;
+  // The next workout belongs to a program the whole group follows: shown, but not editable here (a change would reach everyone).
+  programIsShared?: boolean;
   // Session Pattern Spotter's "checked, clear" indicator
   // (habit_spotter_and_post_workout_coach_page_research_sept19.md) —
   // null = no check has run yet for this session (a real possibility if
@@ -245,7 +248,7 @@ export function RecapAndUpNext({
             <div className="flex items-center justify-between gap-3">
               <h2 className="font-display font-bold text-xl uppercase leading-none">{nextWorkout.title}</h2>
               <span className="font-body text-xs text-rust uppercase tracking-wide border border-rust/40 rounded-token-pill px-2 py-1">
-                Editable draft
+                {programIsShared ? "Group program" : "Editable draft"}
               </span>
             </div>
 
@@ -256,13 +259,15 @@ export function RecapAndUpNext({
                   exercise={ex}
                   carriedForwardNote={carriedForwardNotes[ex.exerciseName]}
                   onSwap={openSwap}
+                  readOnly={programIsShared}
                 />
               ))}
             </div>
 
             <p className="font-body text-xs text-steel mt-5">
-              Every change here writes directly to {recap.athleteName}&apos;s actual next workout — the
-              same program the app will show them, adjusted for what just happened today.
+              {programIsShared
+                ? `This is the program the whole group follows, so it can't be changed here for just ${recap.athleteName}. Give them their own copy from their profile to change it for them.`
+                : `Every change here writes directly to ${recap.athleteName}'s actual next workout — the same program the app will show them, adjusted for what just happened today.`}
             </p>
             <button
               type="button"
