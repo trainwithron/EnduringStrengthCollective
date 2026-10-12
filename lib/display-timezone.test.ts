@@ -83,8 +83,8 @@ describe("today means the coach's own day", () => {
     expect(localDateKey(new Date(2026, 9, 9, 0, 5))).toBe("2026-10-09");
   });
   it("the assign start date and the discovery date use it, not the UTC date", () => {
-    const menu = read("components/coach/desktop/program-card-menu.tsx");
-    expect(menu).toContain("return localDateKey();");
+    const menu = read("components/coach/desktop/program-assign-panel.tsx");
+    expect(menu).toContain("useState(localDateKey())");
     expect(menu).not.toContain("new Date().toISOString().slice(0, 10)");
     const flow = read("components/public/discovery-booking-flow.tsx");
     expect(flow).toContain("return localDateKey();");

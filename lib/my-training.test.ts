@@ -68,10 +68,10 @@ describe("the pieces are wired", () => {
       expect(src).toContain("Start your own workout");
     }
   });
-  it("Assign to Myself files the program in the coach's personal space and lands in their own client app", () => {
-    const menu = read("components/coach/desktop/program-card-menu.tsx");
-    expect(menu).toContain('supabase.rpc("ensure_personal_space")');
-    expect(menu).toContain("router.push(`/my-training/open?group=${spaceId}`);");
+  it("Assign (Me) files the program in the coach's personal space", () => {
+    const panel = read("components/coach/desktop/program-assign-panel.tsx");
+    expect(panel).toContain('supabase.rpc("ensure_personal_space")');
+    expect(panel).toContain("destinationGroupId: dest as string");
   });
   it("the coach's own client app has no bar or nav entry of its own: the normal Viewing-as bar, and Home lists the person's programs", () => {
     const banner = read("components/athlete/acting-as-banner.tsx");
@@ -126,7 +126,7 @@ describe("Personal space: only coaches, and no briefings for it", () => {
   it("the database refuses a non-coach, and the page and Assign to Myself say so calmly", () => {
     expect(read("supabase/migrations/0358_personal_space.sql")).toContain("Only coaches have a personal space.");
     expect(read("app/my-space/route.ts")).toContain("Only coaches have a personal space.");
-    expect(read("components/coach/desktop/program-card-menu.tsx")).toContain("Only coaches have a personal space.");
+    expect(read("components/coach/desktop/program-assign-panel.tsx")).toContain("Only coaches have a personal space.");
   });
   it("the daily briefing and the digest skip a group with no organization", () => {
     expect(read("app/api/cron/coach-briefing/route.ts")).toContain("if (!organizationId) continue;");

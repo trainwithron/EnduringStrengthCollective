@@ -53,25 +53,17 @@ export async function duplicateProgram(
   return { programId: data as string };
 }
 
-// Assigning a program to ONE client. A program that belongs to no client yet and that nothing depends on (an unused template or library program) is ATTACHED: it becomes the client's
-// program and no copy is left behind. Every other case is a copy, exactly as duplicateProgram makes (the original stays where it is). Decided and done in one all-or-nothing database
-// step (public.assign_program_to_client, migration 0335). Use duplicateProgram for several people at once, "Assign to Myself", a position or the plain Duplicate.
+// Assigning a program to ONE person. It ALWAYS makes that person's own independent version (an instance: own progress, own edits, no overlap with anyone else's) and the library program stays
+// as the one visible entry. The instance keeps the program's own name (no client name is added). A program that is an AI draft must be signed off first by the caller (a copy of a draft is a draft).
 export async function assignProgramToClient(
   supabase: SupabaseClient,
-  { sourceProgramId, destinationGroupId, athleteId, clientName, startDate }: { sourceProgramId: string; destinationGroupId: string; athleteId: string; clientName?: string; startDate?: string }
+  { sourceProgramId, destinationGroupId, athleteId, startDate }: { sourceProgramId: string; destinationGroupId: string; athleteId: string; startDate?: string }
 ): Promise<{ programId: string; attached: boolean } | { error: string }> {
-  const { data, error } = await supabase
-    .rpc("assign_program_to_client", {
-      p_program_id: sourceProgramId,
-      p_destination_group_id: destinationGroupId,
-      p_athlete_id: athleteId,
-      p_client_name: clientName ?? null,
-      p_start_date: startDate ?? null,
-    })
-    .single();
-  const row = data as { assigned_program_id?: string; was_attached?: boolean } | null;
-  if (error || !row?.assigned_program_id) {
-    return { error: error?.message ?? "Couldn't assign the program." };
-  }
-  return { programId: row.assigned_program_id, attached: row.was_attached === true };
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Sign in again to assign this program." };
+  const result = await duplicateProgram(supabase, { sourceProgramId, destinationGroupId, createdBy: user.id, athleteId, startDate });
+  if ("error" in result) return { error: result.error };
+  return { programId: result.programId, attached: false };
 }

@@ -24,6 +24,10 @@ export interface ProgramCardData {
   coverImagePath: string | null;
   athleteId: string | null;
   athleteName: string | null;
+  // The library program a client's own version was made from (set on a client's version only).
+  sourceProgramId?: string | null;
+  // How many people have their own version of this library program.
+  assignedCount?: number;
   // The group the program belongs to, when the page lists programs from more than one group (the coach-level Programs page). Otherwise the grid's own group.
   groupId?: string;
 }
@@ -219,6 +223,9 @@ function ProgramCard({
             <p className="font-body text-xs text-steel mt-0.5">
               {program.workoutCount} {program.workoutCount === 1 ? "workout" : "workouts"}
             </p>
+            {!program.athleteId && (program.assignedCount ?? 0) > 0 && (
+              <p className="font-body text-xs text-steel mt-0.5">Assigned to ({program.assignedCount})</p>
+            )}
             {program.athleteName && (
               <p className="font-body text-xs text-rust mt-0.5 truncate">
                 {program.athleteName}&apos;s program

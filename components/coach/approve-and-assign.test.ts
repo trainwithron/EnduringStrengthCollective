@@ -37,49 +37,42 @@ describe("assigning an AI draft: the click on Assign is the approval", () => {
     const menu = read("components/coach/desktop/program-card-menu.tsx");
     expect(menu).not.toContain("Approve and assign");
     expect(menu).not.toContain("approveAndAssignMessage");
-    // the position flow keeps its own existing confirm, labelled Assign
-    expect(menu).toContain('confirmLabel: "Assign"');
   });
 
   it("every assign path that can meet a draft signs it off first through the one helper, and the sign-off route and guard are untouched", () => {
-    const menu = read("components/coach/desktop/program-card-menu.tsx");
-    expect((menu.match(/ensureSignedOff\(/g) ?? []).length).toBe(3);
+    const panel = read("components/coach/desktop/program-assign-panel.tsx");
+    expect((panel.match(/ensureSignedOff\(/g) ?? []).length).toBe(1);
+    expect(read("components/coach/desktop/program-card-menu.tsx")).not.toContain("ensureSignedOff(");
     expect(read("components/coach/client-program-actions.tsx")).toContain("ensureSignedOff({ aiDraft: program.aiDraft, programId: program.id })");
     expect(read("components/coach/ai-draft-banner.tsx")).toContain('fetch("/api/ai/sign-off"');
     expect(read("app/api/ai/sign-off/route.ts")).toContain("const activate = body.activate !== false;");
   });
 });
 
-describe("assign to ONE client: attach when nothing depends on the program, else copy (migration 0335)", () => {
-  it("calls the one database step and reports whether it attached", async () => {
+describe("assigning always gives the person their own version (the library program stays)", () => {
+  it("makes a copy through the one copy step, with no client name added, and reports it was not attached", async () => {
     const calls: { name: string; args: Record<string, unknown> }[] = [];
-    const fake = (row: unknown, error: unknown = null) => ({
-      rpc: (name: string, args: Record<string, unknown>) => {
+    const fake = (data: unknown, error: unknown = null) => ({
+      auth: { getUser: async () => ({ data: { user: { id: "coach" } } }) },
+      rpc: async (name: string, args: Record<string, unknown>) => {
         calls.push({ name, args });
-        return { single: async () => ({ data: row, error }) };
+        return { data, error };
       },
     });
-    const attached = await assignProgramToClient(fake({ assigned_program_id: "p1", was_attached: true }) as never, { sourceProgramId: "p1", destinationGroupId: "g", athleteId: "a", clientName: "Will", startDate: "2026-12-01" });
-    expect(attached).toEqual({ programId: "p1", attached: true });
-    expect(calls[0]).toEqual({ name: "assign_program_to_client", args: { p_program_id: "p1", p_destination_group_id: "g", p_athlete_id: "a", p_client_name: "Will", p_start_date: "2026-12-01" } });
-    const copied = await assignProgramToClient(fake({ assigned_program_id: "p2", was_attached: false }) as never, { sourceProgramId: "p1", destinationGroupId: "g", athleteId: "a" });
+    const copied = await assignProgramToClient(fake("p2") as never, { sourceProgramId: "p1", destinationGroupId: "g", athleteId: "a", startDate: "2026-12-01" });
     expect(copied).toEqual({ programId: "p2", attached: false });
+    expect(calls[0]).toEqual({ name: "duplicate_program", args: { p_source_program_id: "p1", p_destination_group_id: "g", p_created_by: "coach", p_athlete_id: "a", p_client_name: null, p_start_date: "2026-12-01" } });
     const failed = await assignProgramToClient(fake(null, { message: "nope" }) as never, { sourceProgramId: "p1", destinationGroupId: "g", athleteId: "a" });
     expect(failed).toEqual({ error: "nope" });
   });
 
-  it("only the single-client paths attach; a position, several people, Assign to Myself, Duplicate and the package auto-assign still copy", () => {
-    const menu = read("components/coach/desktop/program-card-menu.tsx");
-    const single = menu.slice(menu.indexOf("async function assignToClient"), menu.indexOf("async function assignToSelf"));
-    expect(single).toContain("assignProgramToClient(supabase");
-    const position = menu.slice(menu.indexOf("async function assignToPosition"), menu.indexOf("async function assignToClient"));
-    expect(position).toContain("duplicateProgram(supabase");
-    expect(position).not.toContain("assignProgramToClient");
-    const self = menu.slice(menu.indexOf("async function assignToSelf"));
-    expect(self.slice(0, 2000)).toContain("assignProgramToClient(supabase");
-    expect(self.slice(0, 2000)).toContain("ensure_personal_space");
-    expect(read("app/api/coach/package-assignments/route.ts")).toContain("duplicateProgram(");
+  it("the Assign panel, the client's Programs tab and the package auto-assign all copy; nothing attaches any more", () => {
+    expect(read("components/coach/desktop/program-assign-panel.tsx")).toContain("assignProgramToClient(supabase");
     expect(read("components/coach/client-program-actions.tsx")).toContain("assignProgramToClient(supabase");
+    expect(read("app/api/coach/package-assignments/route.ts")).toContain("duplicateProgram(");
+    const lib = read("lib/program-duplication.ts");
+    expect(lib).toContain("duplicateProgram(supabase, { sourceProgramId, destinationGroupId, createdBy: user.id, athleteId, startDate })");
+    expect(lib).not.toContain('rpc("assign_program_to_client"');
   });
 
   it("the database step: attach only a no-client, non-draft program that is a one-on-one template or inactive, with no history; it moves the children and activates; otherwise it copies", () => {

@@ -15,6 +15,7 @@ import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { LearnedSection } from "@/components/coach/learned-section";
 import { ConversationInviteSection } from "@/components/coach/conversation-section";
 import { RemovedPrograms } from "@/components/coach/removed-programs";
+import { countAssignedTo } from "@/lib/program-assigned";
 import { ALL_PROGRAMS_HREF, clientFromSearch, groupFromSearch, scopePrograms } from "@/lib/programs-scope";
 
 // The coach's Programs page: ALL of their programs, whichever group or client each one belongs to, wherever the coach is standing. It is scoped to one client only when the address says so
@@ -48,7 +49,7 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
   const groupIds = inOrg.map((g) => g.id);
   const { data: programs, error: programsError } = await supabase
     .from("programs")
-    .select("id, group_id, name, is_active, ai_draft, cover_image_path, athlete_id, profiles!programs_athlete_id_fkey ( full_name ), workouts(id, group_workout_exercises(count))")
+    .select("id, group_id, name, is_active, ai_draft, cover_image_path, athlete_id, source_program_id, profiles!programs_athlete_id_fkey ( full_name ), workouts(id, group_workout_exercises(count))")
     .in("group_id", groupIds.length > 0 ? groupIds : [""])
     .is("archived_at", null)
     .order("is_active", { ascending: false })
@@ -76,6 +77,7 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
     coverImagePath: p.cover_image_path ?? null,
     athleteId: p.athlete_id,
     athleteName: p.profiles?.full_name ?? null,
+    sourceProgramId: p.source_program_id ?? null,
     groupId: p.group_id,
   }));
 
@@ -96,8 +98,14 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
     }
   }
 
-  const cards = scopePrograms(all, clientId, clientGroupId);
-  const uncoveredProgramIds = cards.filter((c) => !c.coverImagePath).map((c) => c.id);
+  // The library page lists programs with no client on them. A client's own version of a library program (it has a source) is never a card here: it is reached from the client's profile and from
+  // the program's "Assigned to". Programs built straight for one client (no source) sit in one collapsed fold. Scoped to one client (?client=), the client's own programs show as before.
+  const scoped = scopePrograms(all, clientId, clientGroupId);
+  const cards = clientId ? scoped : scoped.filter((c) => !c.athleteId);
+  const oneClientCards = clientId ? [] : scoped.filter((c) => c.athleteId && !c.sourceProgramId);
+  const assignedCounts = clientId ? new Map<string, number>() : await countAssignedTo(supabase, cards.map((c) => c.id));
+  for (const c of cards) c.assignedCount = assignedCounts.get(c.id) ?? 0;
+  const uncoveredProgramIds = [...cards, ...oneClientCards].filter((c) => !c.coverImagePath).map((c) => c.id);
   const visualsMap = await computeProgramCardVisuals(supabase, uncoveredProgramIds, user.id);
   const visualsByProgramId = Object.fromEntries(visualsMap);
 
@@ -133,6 +141,15 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
       {!clientId && <ConversationInviteSection supabase={supabase} coachId={user.id} />}
 
       {programsError ? <UnavailableState what="your programs" /> : <ProgramCardGrid groupId={anchor.id} programs={cards} visualsByProgramId={visualsByProgramId} />}
+
+      {!clientId && oneClientCards.length > 0 && (
+        <details className="mt-8">
+          <summary className="font-body text-sm text-steel cursor-pointer min-h-11 flex items-center">Programs made for one client ({oneClientCards.length})</summary>
+          <div className="mt-3">
+            <ProgramCardGrid groupId={anchor.id} programs={oneClientCards} visualsByProgramId={visualsByProgramId} />
+          </div>
+        </details>
+      )}
 
       {!clientId && <RemovedPrograms programs={hidden} label="Hidden programs" />}
 

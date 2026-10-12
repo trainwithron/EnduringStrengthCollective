@@ -85,12 +85,11 @@ export function ClientProgramActions({ groupId, athleteId, athleteFullName, extr
       setBusyId(null);
       return;
     }
-    // A program with no client on it that nothing depends on becomes this client's program (no copy is left behind); any other program is copied, as before.
+    // The client gets their own version of the program; the program in the library stays as it is.
     const result = await assignProgramToClient(supabase, {
       sourceProgramId: program.id,
       destinationGroupId: groupId,
       athleteId,
-      clientName: athleteFullName,
       startDate: startDate || undefined,
     });
     setBusyId(null);
