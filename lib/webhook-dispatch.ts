@@ -68,7 +68,7 @@ export async function attemptWebhookDelivery(
 ): Promise<boolean> {
   let delivered = false;
   // The address is checked again right before the call (a coach can write the table directly), the call gives up after a few seconds, and a redirect is not followed: this runs inside
-  // the Stripe webhook and other requests that must not hang on someone else's slow server, and it must never be made to reach an address inside our own network.
+  // the Stripe webhook and other requests that must not hang on someone else's slow server, and it should not be made to reach an address inside our own network (a name that only resolves to a private address is not caught by the address check; the call is a one-way post whose answer is never shown).
   if (isSafeWebhookUrl(params.targetUrl)) {
     try {
       const res = await fetch(params.targetUrl, {

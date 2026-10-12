@@ -1835,6 +1835,20 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the credit adjust function and both record tables exist", has.fn("adjust_coach_credits(uuid, integer)") + " and to_regclass('public.coach_credit_purchases') is not null and to_regclass('public.lift_off_credit_grants') is not null"],
     ],
   },
+  {
+    n: "90",
+    slug: "0344",
+    title: "0344 The 'person must belong to the group' rule still lets a coach tidy up an existing row of someone who has since left (refunds and settlements)",
+    migrations: ["0344"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for normal use. A coach refunding or settling a session for a client who has since left the group no longer gets 'That person is not a member of this group'. A first row about someone who never belonged to the group is still refused. Run AFTER Release AR.",
+    undo: fnFromMigration("0340", "enforce_athlete_in_group"),
+    undoWhy: "Only if step 90 misbehaves. Puts back the first version of the rule (no exception for existing rows).",
+    rows: [
+      ["0344 is not already applied (the rule has no exception for existing rows yet)", "to_regprocedure('public.enforce_athlete_in_group()') is not null and position('v_had_row' in pg_get_functiondef(to_regprocedure('public.enforce_athlete_in_group()'))) = 0"],
+      ["Release AR is applied (the rule exists)", "to_regprocedure('public.enforce_athlete_in_group()') is not null"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -1940,6 +1954,7 @@ const BUNDLES = [
   { id: "release-ai", name: "Release AI (a payment and its sessions are recorded in one step; run BEFORE the code that uses it deploys)", steps: ["77"] },
   { id: "release-ap", name: "Release AP (parent-view links only for under-13 clients of the coach, and they expire; internal training-partner functions closed; run any time)", steps: ["84"] },
   { id: "release-ao", name: "Release AO (assigning attaches a program only inside one organization; run any time, after Release AM)", steps: ["83"] },
+  { id: "release-av", name: "Release AV (a coach can still tidy up an existing row of someone who left the group; run AFTER Release AR)", steps: ["90"] },
   { id: "release-au", name: "Release AU (a coach credit pack or Lift Off grant is recorded and added in one step; run BEFORE the code that uses it deploys)", steps: ["89"] },
   { id: "release-at", name: "Release AT (private lookup functions closed to other people; run any time)", steps: ["88"] },
   { id: "release-as", name: "Release AS (coach packages can only be written by the server; run any time)", steps: ["87"] },
@@ -2136,6 +2151,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
+    m("0344", "position('v_had_row' in pg_get_functiondef(to_regprocedure('public.enforce_athlete_in_group()'))) > 0"),
     m("0343", "to_regprocedure('public.grant_coach_credit_pack_once(text, text, uuid, integer, integer)') is not null"),
     m("0342", "not has_function_privilege('authenticated', 'public.coach_ai_multiplier(uuid)', 'execute')"),
     m("0341", "not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_packages' and policyname = 'coach_packages_insert_coach')"),

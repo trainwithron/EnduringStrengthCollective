@@ -61,6 +61,15 @@ export function storagePathOf(value: string | null | undefined, bucket: string):
   }
 }
 
+// A person can write the path stored on their own row, so a path is only removed when it sits where this person's own uploads go (progress photos: their id first; check-in videos: group, then their id).
+// The other buckets are filed by group and a random name, which a person cannot point at someone else's file by accident.
+export function pathBelongsToPerson(bucket: string, path: string, userId: string): boolean {
+  const parts = path.split("/");
+  if (bucket === "progress-photos") return parts[0] === userId;
+  if (bucket === "coach-video-checkins") return parts[1] === userId;
+  return true;
+}
+
 export interface DeletionFacts {
   isPlatformAdmin: boolean;
   coachGroupCount: number;
@@ -115,7 +124,7 @@ export async function eraseAccount(db: any, userId: string, opts: { eraseHistory
     if (error) return fail("Couldn't list their photos and videos", error.message);
     for (const row of data ?? []) {
       const path = storagePathOf((row as Record<string, string | null>)[f.column], f.bucket);
-      if (path) files.set(f.bucket, (files.get(f.bucket) ?? new Set<string>()).add(path));
+      if (path && pathBelongsToPerson(f.bucket, path, userId)) files.set(f.bucket, (files.get(f.bucket) ?? new Set<string>()).add(path));
     }
   }
 

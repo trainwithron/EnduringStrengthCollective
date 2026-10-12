@@ -147,3 +147,14 @@ describe("a space that still holds the coach's own rows is kept", () => {
     expect(r.ok && r.leftover).toMatch(/kept \(renamed Former client\)/);
   });
 });
+
+import { pathBelongsToPerson } from "@/lib/account-deletion";
+describe("only a person's own upload paths are removed with them", () => {
+  it("progress photos sit under their id; check-in videos under group then their id", () => {
+    expect(pathBelongsToPerson("progress-photos", "u1/a.jpg", "u1")).toBe(true);
+    expect(pathBelongsToPerson("progress-photos", "someone-else/a.jpg", "u1")).toBe(false);
+    expect(pathBelongsToPerson("coach-video-checkins", "g1/u1/v.webm", "u1")).toBe(true);
+    expect(pathBelongsToPerson("coach-video-checkins", "g1/u2/v.webm", "u1")).toBe(false);
+    expect(pathBelongsToPerson("post-media", "g1/x.png", "u1")).toBe(true);
+  });
+});

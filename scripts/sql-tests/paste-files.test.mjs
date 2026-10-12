@@ -1335,6 +1335,30 @@ for (const s of steps) {
   const errAU2 = await run(`apply/${bundle.file}`);
   check("release-au: the bundle applies again after an undo" + (errAU2 ? ": " + errAU2 : ""), !errAU2 && (await has()));
 }
+// Release AV (step 90): ONE paste; needs Release AR's function, so it is applied on top of it and left as it was.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-av");
+  check("release-av: ONE bundle holds step 90", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["90"]));
+  const st90 = steps.find((x) => x.n === "90");
+  const has = async () => (await db.query("select position('v_had_row' in pg_get_functiondef(to_regprocedure('public.enforce_athlete_in_group()'))) > 0 as ok")).rows[0].ok === true;
+  const arBundle = bundles.find((b) => b.id === "release-ar");
+  const st86 = steps.find((x) => x.n === "86");
+  const erAR = await run(`apply/${arBundle.file}`);
+  check("release-av: Release AR is applied first" + (erAR ? ": " + erAR : ""), !erAR);
+  const eav0 = await run(`apply/undo-step${st90.n}-${st90.slug}.sql`);
+  check("release-av: before the bundle runs the first version of the rule is in place" + (eav0 ? ": " + eav0 : ""), !eav0 && !(await has()));
+  const errAV = await run(`apply/${bundle.file}`);
+  check("release-av bundle applies on top of Release AR" + (errAV ? ": " + errAV : ""), !errAV && (await has()));
+  const againAV = await run(`apply/${bundle.file}`);
+  check("release-av: a second run is refused, naming step 90 (" + againAV + ")", !!againAV && againAV.includes("step 90 (0344) cannot run") && againAV.includes("already applied"));
+  const euAV = await run(`apply/undo-step${st90.n}-${st90.slug}.sql`);
+  check("release-av: the undo puts the first version back" + (euAV ? ": " + euAV : ""), !euAV && !(await has()));
+  const errAV2 = await run(`apply/${bundle.file}`);
+  check("release-av: the bundle applies again after an undo" + (errAV2 ? ": " + errAV2 : ""), !errAV2 && (await has()));
+  const euAR3 = await run(`apply/undo-step${st86.n}-${st86.slug}.sql`);
+  check("release-av: Release AR is taken off again at the end" + (euAR3 ? ": " + euAR3 : ""), !euAR3);
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.
