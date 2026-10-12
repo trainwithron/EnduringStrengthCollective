@@ -15,12 +15,15 @@ export function ProgramActiveToggle({
   isActive,
   aiDraft = false,
   programName = "this program",
+  unassigned = false,
 }: {
   programId: string;
   isActive: boolean;
   // An AI-built program that is not signed off yet: the switch becomes "Draft: sign off", which makes it active in one step (a draft can never be made active any other way).
   aiDraft?: boolean;
   programName?: string;
+  // Not for one client: while it is not active it is simply in the coach's library (nobody sees it), not "inactive".
+  unassigned?: boolean;
 }) {
   const [optimisticActive, setOptimisticActive] = useState(isActive);
   const router = useRouter();
@@ -55,11 +58,12 @@ export function ProgramActiveToggle({
     <button
       type="button"
       onClick={handleToggle}
+      title={!optimisticActive && unassigned ? "Nobody sees this yet. Tap to make it active for the group." : undefined}
       className={`font-body text-xs shrink-0 transition-colors ${
         optimisticActive ? "text-moss active:text-steel" : "text-steel active:text-rust"
       }`}
     >
-      {optimisticActive ? "Active" : "Set active"}
+      {optimisticActive ? "Active" : unassigned ? "In your library" : "Set active"}
     </button>
   );
 }

@@ -1462,6 +1462,24 @@ await run(`apply/undo-step94-0348.sql`);
   const errBB2 = await run(`apply/${bundle.file}`);
   check("release-bb: the bundle applies again after an undo" + (errBB2 ? ": " + errBB2 : ""), !errBB2 && (await has()));
 }
+// Release BC (step 97): ONE paste.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-bc");
+  check("release-bc: ONE bundle holds step 97", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["97"]));
+  const st97 = steps.find((x) => x.n === "97");
+  const has = async () => (await db.query("select position('p_athlete_id is null then false' in pg_get_functiondef(to_regprocedure('public.duplicate_program(uuid, uuid, uuid, uuid, text, date)'))) > 0 as ok")).rows[0].ok === true;
+  const ebc0 = await run(`apply/undo-step${st97.n}-${st97.slug}.sql`);
+  check("release-bc: before the bundle runs Duplicate comes out active" + (ebc0 ? ": " + ebc0 : ""), !ebc0 && !(await has()));
+  const errBC = await run(`apply/${bundle.file}`);
+  check("release-bc bundle applies" + (errBC ? ": " + errBC : ""), !errBC && (await has()));
+  const againBC = await run(`apply/${bundle.file}`);
+  check("release-bc: a second run is refused, naming step 97", !!againBC && againBC.includes("step 97 (0351) cannot run") && againBC.includes("already applied"));
+  const euBC = await run(`apply/undo-step${st97.n}-${st97.slug}.sql`);
+  check("release-bc: the undo puts the old Duplicate back" + (euBC ? ": " + euBC : ""), !euBC && !(await has()));
+  const errBC2 = await run(`apply/${bundle.file}`);
+  check("release-bc: the bundle applies again after an undo" + (errBC2 ? ": " + errBC2 : ""), !errBC2 && (await has()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.

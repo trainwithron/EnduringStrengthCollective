@@ -1958,6 +1958,20 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the helper is_client_of_coach exists", has.fnName("is_client_of_coach")],
     ],
   },
+  {
+    n: "97",
+    slug: "0351",
+    title: "0351 Duplicate makes an unassigned library program: a copy that is not for a client comes out not active, so no team or client sees it until the coach assigns it or sets it active",
+    migrations: ["0351"],
+    sees: "Success. No rows returned.",
+    afterwards: "Duplicate (same group, another group, another organization) now puts a copy in the coach's library instead of making it live. A copy made for one client (Assign) is unchanged. Nothing existing is changed.",
+    undo: fnFromMigration("0324", "duplicate_program"),
+    undoWhy: "Only if step 97 misbehaves. Puts back the earlier Duplicate, which came out active.",
+    rows: [
+      ["0351 is not already applied (Duplicate still comes out active)", "position('p_athlete_id is null then false' in pg_get_functiondef(to_regprocedure('public.duplicate_program(uuid, uuid, uuid, uuid, text, date)'))) = 0"],
+      ["Duplicate exists", "to_regprocedure('public.duplicate_program(uuid, uuid, uuid, uuid, text, date)') is not null"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -2063,6 +2077,7 @@ const BUNDLES = [
   { id: "release-ai", name: "Release AI (a payment and its sessions are recorded in one step; run BEFORE the code that uses it deploys)", steps: ["77"] },
   { id: "release-ap", name: "Release AP (parent-view links only for under-13 clients of the coach, and they expire; internal training-partner functions closed; run any time)", steps: ["84"] },
   { id: "release-ao", name: "Release AO (assigning attaches a program only inside one organization; run any time, after Release AM)", steps: ["83"] },
+  { id: "release-bc", name: "Release BC (Duplicate makes an unassigned library program; run BEFORE the code that goes with it is live)", steps: ["97"] },
   { id: "release-bb", name: "Release BB (Pro Shop links, referral partners, challenges, calendar entries, session types and discovery prospects per organization; run BEFORE the code that goes with it is live)", steps: ["96"] },
   { id: "release-ba", name: "Release BA (switch the organization-wall request header rule ON; run AFTER Release AZ and the code that sends the header)", steps: ["95"] },
   { id: "release-az", name: "Release AZ (defense in depth for the organization walls, installed switched off; run BEFORE the code that sends the header)", steps: ["94"] },
@@ -2266,6 +2281,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
+    m("0351", "position('p_athlete_id is null then false' in pg_get_functiondef(to_regprocedure('public.duplicate_program(uuid, uuid, uuid, uuid, text, date)'))) > 0"),
     m("0350", has.col("pro_shop_links", "organization_id")),
     m("0349", "position('select true' in pg_get_functiondef(to_regprocedure('public.org_wall_header_enabled()'))) > 0"),
     m("0348", "to_regprocedure('public.request_workspace_org()') is not null"),

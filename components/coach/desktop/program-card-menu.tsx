@@ -199,6 +199,8 @@ export function ProgramCardMenu({
       .from("groups")
       .select("id, name")
       .eq("organization_id", orgId)
+      // A copy goes to a team or social group, never into a client's own one-on-one space.
+      .neq("group_kind", "one_on_one")
       .order("name");
     setOrgGroups(data ?? []);
     setView("duplicate-group");

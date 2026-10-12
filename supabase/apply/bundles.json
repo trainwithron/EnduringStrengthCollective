@@ -261,6 +261,14 @@
   "file": "apply-release-ao-all.sql"
  },
  {
+  "id": "release-bc",
+  "name": "Release BC (Duplicate makes an unassigned library program; run BEFORE the code that goes with it is live)",
+  "steps": [
+   "97"
+  ],
+  "file": "apply-release-bc-all.sql"
+ },
+ {
   "id": "release-bb",
   "name": "Release BB (Pro Shop links, referral partners, challenges, calendar entries, session types and discovery prospects per organization; run BEFORE the code that goes with it is live)",
   "steps": [

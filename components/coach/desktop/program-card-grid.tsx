@@ -223,7 +223,7 @@ function ProgramCard({
           <ProgramCardMenu programId={program.id} programName={program.name} groupId={groupId} aiDraft={program.aiDraft} />
         </div>
         <div className="mt-auto flex items-center justify-between pt-2 border-t border-steel/15">
-          <ProgramActiveToggle programId={program.id} isActive={program.isActive} aiDraft={program.aiDraft} programName={program.name} />
+          <ProgramActiveToggle programId={program.id} isActive={program.isActive} aiDraft={program.aiDraft} programName={program.name} unassigned={!program.athleteId} />
           <Link href={`/groups/${groupId}/programs/${program.id}`} className="font-body text-xs text-rust">
             Open &rarr;
           </Link>
