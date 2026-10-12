@@ -1,4 +1,5 @@
 import { isEmailConfigured } from "@/lib/email";
+import { sorenessShown } from "@/lib/wellness";
 import { ClientAssessmentsSection } from "@/components/coach/desktop/client-assessments-section";
 import { ViewAsClientLink } from "@/components/coach/desktop/view-as-client-label";
 import { SendSignInLinkButton } from "@/components/coach/send-signin-link-button";
@@ -700,7 +701,8 @@ export default async function AthleteProfilePage(
       : null;
 
   const sleepQualityTrend = (wellnessRows ?? []).map((r) => ({ date: r.log_date, value: r.sleep_quality }));
-  const sorenessTrend = (wellnessRows ?? []).map((r) => ({ date: r.log_date, value: r.soreness }));
+  // Shown the way the check-in asks it: 1 = Fresh ... 5 = Very sore (stored the other way round, so it is flipped here).
+  const sorenessTrend = (wellnessRows ?? []).map((r) => ({ date: r.log_date, value: sorenessShown(r.soreness) }));
   const energyTrend = (wellnessRows ?? []).map((r) => ({ date: r.log_date, value: r.energy }));
 
   // The plain sentence about where their sessions stand: totals from the whole history (the list shows only the latest), booked and waiting-to-mark from the calendar.
@@ -1641,7 +1643,7 @@ export default async function AthleteProfilePage(
                 </div>
                 <div>
                   <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">
-                    Soreness (higher = fresher)
+                    Soreness (higher = more sore)
                   </p>
                   <TrendChart
                     points={sorenessTrend}
