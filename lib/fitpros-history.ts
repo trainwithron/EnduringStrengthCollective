@@ -314,12 +314,14 @@ export const IMPORT_MARKER_LAST_SECOND = 19;
 
 export function markerTimestamp(date: string, nthOfDay: number): string {
   const second = IMPORT_MARKER_FIRST_SECOND + Math.min(nthOfDay, IMPORT_MARKER_LAST_SECOND - IMPORT_MARKER_FIRST_SECOND);
-  return `${date}T12:00:${String(second).padStart(2, "0")}`;
+  // Written as UTC explicitly, so the stored time is the same whatever time zone the database session runs in.
+  return `${date}T12:00:${String(second).padStart(2, "0")}Z`;
 }
 
 export function isImportMarker(startedAt: string | null | undefined): boolean {
   if (!startedAt) return false;
-  const m = /T\d{2}:\d{2}:(\d{2})/.exec(startedAt);
+  // Only the exact stamp the import writes counts: noon, no minutes, and the marker second (so no other historical entry can be mistaken for one).
+  const m = /T12:00:(\d{2})(?:\.0+)?(?:Z|[+-]00(?::?00)?)?$/.exec(startedAt);
   if (!m) return false;
   const second = Number(m[1]);
   return second >= IMPORT_MARKER_FIRST_SECOND && second <= IMPORT_MARKER_LAST_SECOND;

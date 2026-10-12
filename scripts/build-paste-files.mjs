@@ -2046,6 +2046,20 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the organization wall function and the groups table exist", "to_regprocedure('public.group_in_active_org(uuid)') is not null and to_regclass('public.groups') is not null"],
     ],
   },
+  {
+    n: "107",
+    slug: "0359",
+    title: "0359 Weights from a history import (the FitPros import) no longer set training maxes, so an old number from another app cannot steer what a client, above all a minor, is prescribed",
+    migrations: ["0359"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes on screen. Live workouts and the coach's own quick-entry and spreadsheet history still set training maxes exactly as before; sets under a FitPros import (stamped noon, 00 minutes, 17 to 19 seconds) are left out.",
+    undo: fnFromMigration("0171", "recompute_training_max"),
+    undoWhy: "Only if step 107 misbehaves. Puts the training-max trigger function back as it was (imported sets would raise maxes again).",
+    rows: [
+      ["the training-max trigger function exists", "to_regprocedure('public.recompute_training_max()') is not null"],
+      ["0359 is not already applied (the function does not leave out import stamps yet)", "position('12:00:17' in pg_get_functiondef(to_regprocedure('public.recompute_training_max()'))) = 0"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -2151,6 +2165,7 @@ const BUNDLES = [
   { id: "release-ai", name: "Release AI (a payment and its sessions are recorded in one step; run BEFORE the code that uses it deploys)", steps: ["77"] },
   { id: "release-ap", name: "Release AP (parent-view links only for under-13 clients of the coach, and they expire; internal training-partner functions closed; run any time)", steps: ["84"] },
   { id: "release-ao", name: "Release AO (assigning attaches a program only inside one organization; run any time, after Release AM)", steps: ["83"] },
+  { id: "release-bm", name: "Release BM (imported history weights do not set training maxes; run BEFORE importing FitPros history)", steps: ["107"] },
   { id: "release-bj", name: "Release BJ (a personal space for each person, outside any organization; run BEFORE the code that goes with it is live)", steps: ["104"] },
   { id: "release-bg", name: "Release BG (coach assessments on a client's profile; run BEFORE the code that goes with it is live)", steps: ["101"] },
   { id: "release-bf", name: "Release BF (the money settings on organization memberships are the server's; shares never total over 100 percent; run BEFORE the code that goes with it is live)", steps: ["100"] },
@@ -2360,6 +2375,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
+    m("0359", "position('12:00:17' in pg_get_functiondef(to_regprocedure('public.recompute_training_max()'))) > 0"),
     m("0358", "to_regprocedure('public.ensure_personal_space()') is not null"),
     m("0355", "to_regclass('public.client_assessments') is not null"),
     m("0354", "to_regprocedure('public.guard_organization_share_total()') is not null"),

@@ -113,7 +113,7 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
 
   async function undo() {
     if (busy) return;
-    if (!(await confirmDialog({ message: `Remove the ${existing.length} workout${existing.length === 1 ? "" : "s"} imported from FitPros for ${athleteName}? Anything else in their history stays.`, confirmLabel: "Remove import", destructive: true }))) return;
+    if (!(await confirmDialog({ message: `Remove the ${existing.length} workout${existing.length === 1 ? "" : "s"} imported from FitPros for ${athleteName}? Anything else in their history stays. Training maxes the import raised are not lowered.`, confirmLabel: "Remove import", destructive: true }))) return;
     setBusy(true);
     const supabase = createBrowserClient();
     const result = await undoFitprosImport(supabase, groupId, athleteId);

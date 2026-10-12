@@ -114,8 +114,8 @@ describe("Matching to the program", () => {
 
 describe("Recognising an import again", () => {
   it("stamps the Nth workout of a day with its own marker second, and only those seconds count", () => {
-    expect(markerTimestamp("2026-09-03", 0)).toBe("2026-09-03T12:00:17");
-    expect(markerTimestamp("2026-09-03", 1)).toBe("2026-09-03T12:00:18");
+    expect(markerTimestamp("2026-09-03", 0)).toBe("2026-09-03T12:00:17Z");
+    expect(markerTimestamp("2026-09-03", 1)).toBe("2026-09-03T12:00:18Z");
     expect(isImportMarker("2026-09-03T12:00:18+00:00")).toBe(true);
     expect(isImportMarker("2026-09-03T12:00:00+00:00")).toBe(false);
     expect(isImportMarker(null)).toBe(false);
@@ -149,5 +149,17 @@ describe("The importer writes history only, and says so", () => {
     expect(ui).toContain("nothing is saved until you press Import");
     expect(ui).toContain("Undo this import");
     expect(ui).toContain("Move the program start to");
+  });
+});
+
+describe("Only the import's own stamp counts as an import", () => {
+  it("a historical entry at another time (or the same seconds at another minute or hour) is never taken for one", () => {
+    expect(isImportMarker("2026-09-03T12:00:17+00:00")).toBe(true);
+    expect(isImportMarker("2026-09-03T12:00:19")).toBe(true);
+    expect(isImportMarker("2026-09-03T12:00:00+00:00")).toBe(false);
+    expect(isImportMarker("2026-09-03T12:00:20+00:00")).toBe(false);
+    expect(isImportMarker("2026-09-03T09:30:18+00:00")).toBe(false);
+    expect(isImportMarker("2026-09-03T12:05:17+00:00")).toBe(false);
+    expect(isImportMarker("2026-09-03T12:00:17-07:00")).toBe(false);
   });
 });

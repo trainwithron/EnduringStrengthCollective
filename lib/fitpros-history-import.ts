@@ -75,7 +75,7 @@ export async function listImportedSessions(supabase: SupabaseClient, groupId: st
     const started = row.started_at as string | null;
     if (!isImportMarker(started)) continue;
     const date = (started as string).slice(0, 10);
-    const second = Number(/T\d{2}:\d{2}:(\d{2})/.exec(started as string)?.[1] ?? IMPORT_MARKER_FIRST_SECOND);
+    const second = Number(/T12:00:(\d{2})/.exec(started as string)?.[1] ?? IMPORT_MARKER_FIRST_SECOND);
     out.push({ id: row.id as string, key: `${date}#${second - IMPORT_MARKER_FIRST_SECOND}` });
   }
   return out;
@@ -102,7 +102,7 @@ export async function runFitprosImport(
     }
     const nth = Number(keys[i].split("#")[1]);
     const started = markerTimestamp(w.date, nth);
-    const completed = w.durationSeconds ? new Date(new Date(`${started}Z`).getTime() + w.durationSeconds * 1000).toISOString() : started;
+    const completed = w.durationSeconds ? new Date(new Date(started).getTime() + w.durationSeconds * 1000).toISOString() : started;
     const { data: session, error: sessionError } = await supabase
       .from("athlete_sessions")
       .insert({
