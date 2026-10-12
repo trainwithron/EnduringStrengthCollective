@@ -6,7 +6,7 @@ import { CoachClientsList } from "@/components/coach/desktop/coach-clients-list"
 import { AddClientButton } from "@/components/coach/desktop/add-client-button";
 import { SwappableTerm } from "@/components/coach/swappable-term";
 import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
-import { pickCoachAnchor } from "@/lib/coach-anchor";
+import { getActiveAnchor } from "@/lib/active-anchor";
 import { getCoachClients } from "@/lib/coach-clients";
 import { fetchInactiveKeys, inactiveKey } from "@/lib/inactive-ids";
 import { buildCreditPicture, fetchBookingCounts } from "@/lib/credit-picture";
@@ -23,8 +23,9 @@ export default async function CoachClientsPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const groups = await getCoachedGroups(supabase, user.id);
-  const anchor = pickCoachAnchor(groups);
+  const active = await getActiveAnchor(supabase, user.id);
+  const groups = active?.groups ?? [];
+  const anchor = active?.anchor ?? null;
   if (!anchor) {
     return (
       <NoAccess>

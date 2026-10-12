@@ -47,6 +47,7 @@ import { FeedbackButton } from "@/components/feedback/feedback-button";
 import { ClientFinder } from "@/components/coach/desktop/client-finder";
 import { HeaderNotificationBell } from "@/components/notifications/header-bell";
 import { WorkspaceMenu } from "@/components/coach/desktop/workspace-menu";
+import { LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/coach-groups";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { TerminologyProvider } from "@/components/coach/terminology-provider";
 import { SwappableTerm } from "@/components/coach/swappable-term";
@@ -282,6 +283,8 @@ function CoachDesktopShellFull({
       document.cookie = `last_group=${encodeURIComponent(
         JSON.stringify({ id: groupId, name: groupName })
       )}; path=/; max-age=${60 * 60 * 24 * 90}`;
+      // The same group is the remembered WORKSPACE: the organization a coach is working in stays chosen when they go to Programs, Calendar, Clients or Messages (lib/active-anchor.ts).
+      document.cookie = `${LAST_WORKSPACE_GROUP_COOKIE}=${encodeURIComponent(groupId)}; path=/; max-age=${60 * 60 * 24 * 90}`;
     } catch {
       // Non-fatal — Home just falls back to its minimal shell.
     }

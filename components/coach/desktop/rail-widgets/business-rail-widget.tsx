@@ -1,5 +1,6 @@
 "use client";
 
+import { activeOrgGroupsFor } from "@/lib/active-org-groups";
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import {
@@ -62,11 +63,12 @@ export function BusinessRailWidget({ groupId }: { groupId: string }) {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      const [{ data: layoutRow }, { data: coachedGroups }] = await Promise.all([
+      const [{ data: layoutRow }, coachedGroups] = await Promise.all([
         supabase.from("coach_dashboard_layout").select("business_widget_metrics").eq("coach_id", user.id).maybeSingle(),
-        supabase.from("group_memberships").select("group_id").eq("profile_id", user.id).eq("role", "coach"),
+        activeOrgGroupsFor(supabase, user.id, groupId),
       ]);
-      const groupIds = (coachedGroups ?? []).map((g) => g.group_id);
+      // Only the organization the coach is in: never another organization's clients or income.
+      const groupIds = (coachedGroups ?? []).map((g) => g.id);
       const safeGroupIds = groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"];
       const resolvedPicks = resolveTopBusinessMetrics(layoutRow?.business_widget_metrics ?? []);
 

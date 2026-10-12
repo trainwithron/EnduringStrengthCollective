@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
 import { redirectOneOnOneToAnchor } from "@/lib/coach-wide-redirect";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
@@ -60,14 +61,8 @@ export default async function BusinessDashboardPage(
     .eq("id", params.groupId)
     .single();
 
-  // Every group this coach runs — the business view spans the whole
-  // coaching business, not just whichever group happens to be open.
-  const { data: coachedGroups } = await supabase
-    .from("group_memberships")
-    .select("group_id")
-    .eq("profile_id", user.id)
-    .eq("role", "coach");
-  const groupIds = (coachedGroups ?? []).map((g) => g.group_id);
+  // Every group this coach runs IN THIS ORGANIZATION: the business view spans the whole business of the organization that is open, never another organization's clients or income.
+  const groupIds = (groupsInOrgOf(await getCoachedGroups(supabase, user.id), params.groupId)).map((g) => g.id);
 
   const { data: memberRows } = await supabase
     .from("group_memberships")

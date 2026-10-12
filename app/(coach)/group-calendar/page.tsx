@@ -5,7 +5,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { SwappableTerm } from "@/components/coach/swappable-term";
 import { getCoachedGroups } from "@/lib/coach-groups";
-import { pickCoachAnchor } from "@/lib/coach-anchor";
+import { getActiveAnchor } from "@/lib/active-anchor";
 
 // The Group tab's calendar, from a coach-level page: it never guesses a group. With one group it goes straight to that group's calendar; with several, the coach picks
 // which first, so a calendar can never show the wrong group's name.
@@ -16,9 +16,11 @@ export default async function PickGroupCalendarPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const all = await getCoachedGroups(supabase, user.id);
+  // Only the active organization's groups (another organization's groups appear after switching to it).
+  const active = await getActiveAnchor(supabase, user.id);
+  const all = active ? active.groups.filter((g) => g.orgId === active.orgId) : [];
   const groups = all.filter((g) => g.kind !== "one_on_one").sort((a, b) => a.name.localeCompare(b.name));
-  const anchor = pickCoachAnchor(all);
+  const anchor = active?.anchor ?? null;
   if (!anchor) return <NoAccess>Only coaches have a group calendar.</NoAccess>;
   if (groups.length === 1) redirect(`/groups/${groups[0].id}/group-calendar`);
 

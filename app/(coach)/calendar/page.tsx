@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase/server";
 import { getCoachedGroups } from "@/lib/coach-groups";
-import { pickCoachAnchor } from "@/lib/coach-anchor";
+import { getActiveAnchor } from "@/lib/active-anchor";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { loadStartInputs, parseLastGroupCookie, pickStartGroup } from "@/lib/start-group";
 import { CoachCalendarPageBody } from "@/components/coach/calendar-page-body";
@@ -20,7 +20,7 @@ export default async function CoachCalendarRoute(props: { searchParams: Promise<
   } = await supabase.auth.getUser();
   if (!user) redirect("/login?next=%2Fcalendar");
 
-  const anchor = pickCoachAnchor(await getCoachedGroups(supabase, user.id));
+  const anchor = (await getActiveAnchor(supabase, user.id))?.anchor ?? null;
   if (anchor) {
     if (await prefersAthleteStyleView()) {
       const qs = new URLSearchParams();

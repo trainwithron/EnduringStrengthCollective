@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
-import { ACTING_AS_COOKIE } from "@/lib/acting-as";
+import { ACTING_AS_COOKIE, ACTING_AS_SELF_COOKIE } from "@/lib/acting-as";
 
 // Writes only set which athlete id a page queries with — the actual
 // read/write still runs through the signed-in coach's own RLS-scoped
@@ -29,11 +29,20 @@ export async function POST(request: Request) {
     path: "/",
     maxAge: 60 * 60 * 12,
   });
+  // Acting as yourself is not impersonation: the bar then says "My training".
+  response.cookies.set(ACTING_AS_SELF_COOKIE, athleteId === user.id ? "1" : "", {
+    httpOnly: false,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: athleteId === user.id ? 60 * 60 * 12 : 0,
+  });
   return response;
 }
 
 export async function DELETE() {
   const response = NextResponse.json({ ok: true });
   response.cookies.set(ACTING_AS_COOKIE, "", { path: "/", maxAge: 0 });
+  response.cookies.set(ACTING_AS_SELF_COOKIE, "", { path: "/", maxAge: 0 });
   return response;
 }

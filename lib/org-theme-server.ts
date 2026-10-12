@@ -48,6 +48,21 @@ export async function getViewerOrgTheme(groupId?: string): Promise<OrgTheme> {
     // same last_group cookie CoachDesktopShell keeps current on every
     // mount, so at least the coach's most recently viewed group's org
     // themes the rest of the app instead of an arbitrary one.
+    // The organization the coach CHOSE (the workspace switcher and visiting a group both remember it) themes everything, including the coach-level pages that are not under a group.
+    if (!organizationId) {
+      const workspaceRaw = (await cookies()).get("last_workspace_group")?.value;
+      if (workspaceRaw) {
+        let workspaceGroupId = workspaceRaw;
+        try {
+          workspaceGroupId = decodeURIComponent(workspaceRaw);
+        } catch {
+          // use it as it is
+        }
+        const { data: group } = await supabase.from("groups").select("organization_id").eq("id", workspaceGroupId).maybeSingle();
+        organizationId = group?.organization_id ?? null;
+      }
+    }
+
     if (!organizationId) {
       const lastGroupCookie = (await cookies()).get("last_group")?.value;
       if (lastGroupCookie) {

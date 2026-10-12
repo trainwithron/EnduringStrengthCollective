@@ -14,9 +14,9 @@ describe("the coach's MRR is one number everywhere", () => {
   });
   it("the phone Home and the Business page both read it through the shared function", () => {
     const phone = read("components/coach/mobile/coach-mobile-home.tsx");
-    expect(phone).toContain("loadCoachMrr(supabase, coachId)");
+    expect(phone).toContain("loadCoachMrr(supabase, coachId, groupId)");
     expect(phone).not.toContain("computeRealMRR");
-    expect(read("lib/coach-mrr.ts")).toContain('.eq("role", "coach")'); // every group the coach runs, as Business does
+    expect(read("lib/coach-mrr.ts")).toContain("groupsInOrgOf(await getCoachedGroups(supabase, coachId), groupId)"); // every group the coach runs in THIS organization, as Business does
     expect(read("app/(coach)/groups/[groupId]/business/page.tsx")).toContain("headlineMrr(realMRR, estimatedMRR).value");
   });
 });

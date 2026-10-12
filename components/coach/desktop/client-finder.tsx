@@ -1,5 +1,6 @@
 "use client";
 
+import { activeOrgGroupsFor } from "@/lib/active-org-groups";
 import { withArticle } from "@/lib/article";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -35,8 +36,8 @@ export function ClientFinder({ currentGroupId, align = "right" }: { currentGroup
       const { data: auth } = await supabase.auth.getUser();
       const me = auth.user?.id;
       if (!me) return;
-      const { data: mine } = await supabase.from("group_memberships").select("group_id").eq("profile_id", me).eq("role", "coach");
-      const groupIds = (mine ?? []).map((m: any) => m.group_id as string);
+      // Only the organization the coach is in (the page's group, or on Home the organization they chose): never another organization's clients in the search.
+      const groupIds = (await activeOrgGroupsFor(supabase, me, currentGroupId)).map((g) => g.id);
       if (groupIds.length === 0) {
         if (!cancelled) setClients([]);
         return;

@@ -46,7 +46,7 @@ export async function CoachMobileHome({
     await Promise.all([
       getTodaysDueRoster(supabase, { groupId }),
       supabase.from("credit_purchases").select("amount_cents, created_at").eq("group_id", groupId),
-      loadCoachMrr(supabase, coachId),
+      loadCoachMrr(supabase, coachId, groupId),
       supabase.from("group_memberships").select("profile_id, profiles ( full_name )").eq("group_id", groupId).eq("role", "athlete"),
       getNeedsAttentionItems(supabase, { coachId, groupIds: [groupId] }),
     ]);

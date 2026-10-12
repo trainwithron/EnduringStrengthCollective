@@ -1,5 +1,6 @@
 "use client";
 
+import { activeOrgGroupsFor } from "@/lib/active-org-groups";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -38,8 +39,8 @@ export function PanePicker() {
       const { data: auth } = await supabase.auth.getUser();
       const me = auth.user?.id;
       if (!me) return;
-      const { data: mine } = await supabase.from("group_memberships").select("group_id").eq("profile_id", me).eq("role", "coach");
-      const groupIds = (mine ?? []).map((m: { group_id: string }) => m.group_id);
+      // Only the organization the workspace is in.
+      const groupIds = (await activeOrgGroupsFor(supabase, me, ws?.groupId ?? null)).map((g) => g.id);
       if (groupIds.length === 0) {
         if (!cancelled) setClients([]);
         return;

@@ -57,6 +57,8 @@ import {
   type ProgramDayContext,
 } from "@/lib/program-day-contexts";
 import type { RosterMember } from "@/lib/types";
+import { loadMyTraining } from "@/lib/my-training";
+import { OtherProgramsCard } from "@/components/athlete/other-programs-card";
 import type { TodayMacros, TodayHabit } from "@/components/athlete/today-widget";
 import type { WeightLogEntry } from "@/components/athlete/weight-log-widget";
 
@@ -113,6 +115,9 @@ export default async function GroupHubPage(
   // visit pays for this. Notifications used to be a fifth entry here, but
   // it now needs this group's own organization_id first (see below), so
   // it's fetched separately once that's known.
+  // The person's programs in every group they belong to, read alongside the rest (only their own Home uses it: "Your other programs").
+  const myTrainingPromise = user && athleteId === user.id ? loadMyTraining(supabase, user.id).catch(() => null) : Promise.resolve(null);
+
   const [
     { data: group, error: groupError },
     { data: memberships },
@@ -200,6 +205,7 @@ export default async function GroupHubPage(
     return a.fullName.localeCompare(b.fullName);
   });
 
+  const myTraining = await myTrainingPromise;
   const isCoach = roster.some((m) => m.profileId === user?.id && m.role === "coach");
   // A coach on a phone — installed app or just a browser tab — sees the
   // same lightweight experience an athlete gets: logging their own
@@ -757,6 +763,7 @@ export default async function GroupHubPage(
               {isToday && <HomeThread lines={homeThreadLines} />}
               {isToday && aboutYouNeeded && !isCoach && !isActingAsOther && <AboutYouCard groupId={params.groupId} athleteId={athleteId} />}
               {reupState && <ReupCard state={reupState} />}
+              {isToday && <OtherProgramsCard programs={(myTraining?.mine ?? []).filter((p) => p.groupId !== params.groupId)} />}
               {scheduleCard && <MyScheduleCard groupId={params.groupId} state={scheduleCard} />}
               {isToday && !isCoach && !isActingAsOther && (
                 // The one place a client reaches their coach: it was three taps deep (Settings, More, Messages).

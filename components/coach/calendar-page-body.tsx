@@ -28,7 +28,7 @@ import { coachCreditSentence } from "@/lib/credit-sentence";
 import { formatSlotTime } from "@/lib/booking-slots";
 import { getEffectiveAthlete } from "@/lib/acting-as";
 import { getActivePrograms } from "@/lib/active-programs";
-import { getCoachedGroups } from "@/lib/coach-groups";
+import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
 import { AddGroupEvent } from "@/components/coach/add-group-event";
 import { UpcomingGroupEvents } from "@/components/group/group-event-answer";
 import { computeQuietTier } from "@/lib/quiet-client-tier";
@@ -99,6 +99,9 @@ export async function CoachCalendarPageBody(
   } = await supabase.auth.getUser();
 
   if (!user) redirect("/login");
+
+  // Only the organization this calendar is in: another organization's sessions never appear on it (Ron's rule: inside an organization, nothing from another one is visible).
+  const orgGroupIds = groupsInOrgOf(await getCoachedGroups(supabase, user.id), params.groupId).map((g) => g.id);
 
   const { data: membership } = await supabase
     .from("group_memberships")
@@ -182,6 +185,7 @@ export async function CoachCalendarPageBody(
         .from("bookings")
         .select("id, start_at, profiles!bookings_athlete_id_fkey ( full_name )")
         .eq("coach_id", user.id)
+        .in("group_id", orgGroupIds)
         .eq("status", "confirmed")
         .gte("start_at", new Date().toISOString())
         .lt("start_at", upcomingRangeEnd.toISOString())
@@ -208,6 +212,7 @@ export async function CoachCalendarPageBody(
         .from("bookings")
         .select("id, start_at, profiles!bookings_athlete_id_fkey ( full_name )")
         .eq("coach_id", user.id)
+        .in("group_id", orgGroupIds)
         .eq("status", "confirmed")
         .gte("start_at", new Date(gMonthStart.getTime() - 86400000).toISOString())
         .lt("start_at", new Date(gMonthEnd.getTime() + 86400000).toISOString())
@@ -340,6 +345,7 @@ export async function CoachCalendarPageBody(
       .from("bookings")
       .select("id, start_at")
       .eq("coach_id", user.id)
+      .in("group_id", orgGroupIds)
       .eq("athlete_id", selected.id)
       .eq("group_id", params.groupId)
       .eq("status", "confirmed")
@@ -801,6 +807,7 @@ export async function CoachCalendarPageBody(
       .from("bookings")
       .select("id, start_at, end_at, athlete_id, profiles!bookings_athlete_id_fkey ( full_name )")
       .eq("coach_id", user.id)
+      .in("group_id", orgGroupIds)
       .eq("status", "confirmed")
       // Padded by a day and a half each side: the grid's cells are the coach's days, the server's midnights are UTC, and a Pacific evening session on the
       // last day of a month would otherwise fall past the end of the range and appear on no month at all. The cell keys decide where each one shows.
@@ -847,6 +854,7 @@ export async function CoachCalendarPageBody(
       .from("group_sessions")
       .select("id, title, start_at, end_at, kind, group_id, anchor_booking_id")
       .eq("coach_id", user.id)
+      .in("group_id", orgGroupIds)
       .eq("status", "scheduled")
       .gte("start_at", new Date(rangeStart.getTime() - 36 * 3600000).toISOString())
       .lt("start_at", new Date(rangeEnd.getTime() + 36 * 3600000).toISOString()),
@@ -902,6 +910,7 @@ export async function CoachCalendarPageBody(
           .from("bookings")
           .select("id, athlete_id, start_at")
           .eq("coach_id", user.id)
+          .in("group_id", orgGroupIds)
           .not("attended_at", "is", null)
           .order("start_at", { ascending: false })
           .order("id", { ascending: true })
@@ -927,6 +936,7 @@ export async function CoachCalendarPageBody(
           .from("bookings")
           .select("id, athlete_id, session_type_id, start_at")
           .eq("coach_id", user.id)
+          .in("group_id", orgGroupIds)
           .not("session_type_id", "is", null)
           .lt("start_at", nowIsoForTypes)
           .order("start_at", { ascending: false })
