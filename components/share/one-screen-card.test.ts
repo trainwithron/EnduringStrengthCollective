@@ -34,12 +34,12 @@ describe("one-screen card rules", () => {
   });
   it("the fun line is fresh per card and remembered on the client's device, and the picture follows the same line", () => {
     const screen = readFileSync(new URL("./share-screen.tsx", import.meta.url), "utf8");
-    expect(screen).toContain("pickFreshFunLine(facts, memory.recent)");
-    expect(screen).toContain("rerollFunLine(facts, memory.recent, line.id)");
+    expect(screen).toContain("pickFreshFunLine(facts, memory.recent, Math.random, [], { faith: faithOn })");
+    expect(screen).toContain("rerollFunLine(facts, memory.recent, line.id, Math.random, { faith: faithOn })");
     expect(screen).toContain("funLine: line.text");
     expect(screen).toContain("isOwner && !!viewerId");
     expect(page).toContain("<ShareScreen");
-    expect(page).toContain("pickSeededFunLine(funFacts, params.postId)");
+    expect(page).toContain("pickSeededFunLine(funFacts, params.postId, { faith: shared.authorFaithOn })");
   });
   it("the page gives the card the visible screen and keeps the rest below it", () => {
     expect(page).toContain("h-[100dvh]");

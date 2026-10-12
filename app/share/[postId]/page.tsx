@@ -187,7 +187,7 @@ export default async function ShareWorkoutPage(
     prCount: shared.celebratePrs.length,
     totalWorkoutCount: shared.totalWorkoutCount,
   };
-  const defaultFunLine = pickSeededFunLine(funFacts, params.postId);
+  const defaultFunLine = pickSeededFunLine(funFacts, params.postId, { faith: shared.authorFaithOn });
   const screenModel = buildShareImageModel({ ...imageInput, showName: true });
   const screenBackground = useOrgCustomImage ? (
     // eslint-disable-next-line @next/next/no-img-element -- external Supabase Storage URL
@@ -204,6 +204,7 @@ export default async function ShareWorkoutPage(
           viewerId={user?.id ?? null}
           isOwner={viewerIsAuthor}
           facts={funFacts}
+          faithOn={shared.authorFaithOn}
           defaultLine={defaultFunLine}
           model={screenModel}
           background={screenBackground}

@@ -427,8 +427,13 @@ export async function getSharedWorkout(postId: string, opts: { fullName?: boolea
     );
   }
 
+  // The author's faith setting (Read during rest, on unless they turned it off): decides whether the card's light line may be a Bible verse, on the public link too.
+  const { data: readRow } = await supabase.from("read_settings").select("faith_track").eq("athlete_id", post.author_id).maybeSingle();
+  const authorFaithOn = (readRow as { faith_track?: boolean | null } | null)?.faith_track !== false;
+
   return {
     authorId: post.author_id as string,
+    authorFaithOn,
     groupId: post.group_id,
     // "An athlete" is the placeholder for an unknown name: the card, the picture, the link preview and the mascot's initial all treat it as no name.
     // The name and group name a stranger would see: the same on the public page, and what the in-app "Share as image" picture uses even when the card shows the full names.

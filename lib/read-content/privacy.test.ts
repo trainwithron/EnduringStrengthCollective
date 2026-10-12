@@ -10,6 +10,8 @@ const ALLOWED = new Set([
   "app/api/account/export/route.ts",
   "components/athlete/read-during-rest-toggle.tsx",
   "components/session/read-slot.tsx",
+  // the shared workout card reads ONLY the yes/no faith switch (server side) to keep Bible lines off the card, and its public link, of anyone who turned them off
+  "lib/shared-workout.ts",
 ]);
 
 function walk(dir: string, out: string[]) {

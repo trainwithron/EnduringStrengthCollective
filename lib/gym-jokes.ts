@@ -20,6 +20,20 @@ export const GYM_JOKES: string[] = [
   "Deadlifts are the only job where picking things up is the entire job description. 📋",
   "Rest days are when the muscles do the real work. The couch just gets the credit. 🛋️",
   "Some people count sheep. Lifters count reps, and somehow it's more fun. 🐑",
+  "What goes down hopefully goes back up. Just stand up.",
+  "Why do lifters make great friends? Because they're always there to lift you up. (Never gonna give you up. 🎤)",
+  "Foam roller? More like a human rolling pin.",
+];
+
+// King James Bible (public domain), shown with the reference. They appear only for a client whose faith setting is on (Read during rest, "faith track": on by default, one tap to turn off),
+// and never on the public card of anyone who turned it off (lib/workout-fun-line.ts takes the setting; the share page reads the author's).
+export const FAITH_LINES: string[] = [
+  "They that wait upon the LORD shall renew their strength. (Isaiah 40:31)",
+  "Whatsoever ye do, do it heartily. (Colossians 3:23)",
+  "Iron sharpeneth iron. (Proverbs 27:17)",
+  "Let us not be weary in well doing. (Galatians 6:9)",
+  "Let us run with patience the race that is set before us. (Hebrews 12:1)",
+  "Bodily exercise profiteth little: but godliness is profitable unto all things. (1 Timothy 4:8)",
 ];
 
 export function pickGymJoke(seed: string): string {

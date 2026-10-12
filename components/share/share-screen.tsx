@@ -24,6 +24,7 @@ export function ShareScreen({
   viewerId,
   isOwner,
   facts,
+  faithOn,
   defaultLine,
   model,
   background,
@@ -38,6 +39,7 @@ export function ShareScreen({
   viewerId: string | null;
   isOwner: boolean;
   facts: WorkoutFacts;
+  faithOn: boolean;
   defaultLine: FunLine;
   model: ShareImageModel;
   background: ReactNode;
@@ -65,7 +67,7 @@ export function ShareScreen({
       setReady(true);
       return;
     }
-    const fresh = pickFreshFunLine(facts, memory.recent);
+    const fresh = pickFreshFunLine(facts, memory.recent, Math.random, [], { faith: faithOn });
     writeFunMemory(storage, viewerId, rememberLine(memory, postId, fresh));
     setLine(fresh);
     setReady(true);
@@ -77,7 +79,7 @@ export function ShareScreen({
     if (!viewerId) return;
     const storage = deviceStorage();
     const memory = readFunMemory(storage, viewerId);
-    const next = rerollFunLine(facts, memory.recent, line.id);
+    const next = rerollFunLine(facts, memory.recent, line.id, Math.random, { faith: faithOn });
     writeFunMemory(storage, viewerId, rememberLine(memory, postId, next));
     setLine(next);
   }

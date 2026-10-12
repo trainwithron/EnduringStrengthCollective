@@ -1,6 +1,6 @@
 import { getVolumeEquivalence } from "./volume-equivalence";
 import { getDistanceEquivalence } from "./distance-equivalence";
-import { GYM_JOKES } from "./gym-jokes";
+import { FAITH_LINES, GYM_JOKES } from "./gym-jokes";
 import { FAMOUS_QUOTE_LINES } from "./famous-quotes";
 import { hashSeed, seededRandom } from "./seeded-pick";
 
@@ -184,7 +184,11 @@ const EQUIV_VARIANTS = 10;
 const MILES_VARIANTS = 2;
 
 // Every line this workout could show, with its kind and stable id. Exposed so a test can render every template at edge values.
-export function funLinePool(f: WorkoutFacts): FunLine[] {
+// `faith`: the client's faith setting (on by default). Off, the Bible lines are not in the pool at all, so they cannot appear on that client's card or its public link.
+export interface PoolOptions {
+  faith?: boolean;
+}
+export function funLinePool(f: WorkoutFacts, opts: PoolOptions = {}): FunLine[] {
   const out: FunLine[] = [];
   const small = isSmallSession(f);
 
@@ -219,6 +223,7 @@ export function funLinePool(f: WorkoutFacts): FunLine[] {
   }
 
   for (const text of ABSURD_LINES) if (FITS(text)) out.push({ id: lineId("absurd", text), kind: "absurd", text });
+  if (opts.faith !== false) for (const text of FAITH_LINES) if (FITS(text)) out.push({ id: lineId("absurd", text), kind: "absurd", text });
   return out;
 }
 
@@ -236,8 +241,8 @@ function randomOf<T>(items: T[], rand: () => number): T {
 // Picks a line for this workout that is not among the client's recent lines (at most RECENT_WINDOW, newest first or last: only membership matters, except for the
 // all-used fallback below, which prefers the line seen longest ago, so `recent` is oldest-first). `avoid` adds ids to skip (the line on screen when the client taps
 // "Another one"). The kind with the fewest recent lines is the most likely, so the kinds spread out. Always returns a line.
-export function pickFreshFunLine(f: WorkoutFacts, recent: RecentLine[], rand: () => number = Math.random, avoid: string[] = []): FunLine {
-  const pool = funLinePool(f);
+export function pickFreshFunLine(f: WorkoutFacts, recent: RecentLine[], rand: () => number = Math.random, avoid: string[] = [], opts: PoolOptions = {}): FunLine {
+  const pool = funLinePool(f, opts);
   if (pool.length === 0) return NICE_WORK; // never empty today (the absurd bank is always there), but a pick must not crash if it ever is
   const window = recent.slice(-RECENT_WINDOW);
   const recentIds = new Set(window.map((r) => r.id));
@@ -276,11 +281,11 @@ export function pickFreshFunLine(f: WorkoutFacts, recent: RecentLine[], rand: ()
 }
 
 // The repeatable pick (same facts and seed, same line): what someone who is not the client sees, and the server's first render.
-export function pickSeededFunLine(f: WorkoutFacts, seed: string): FunLine {
-  return pickFreshFunLine(f, [], seededRandom(seed));
+export function pickSeededFunLine(f: WorkoutFacts, seed: string, opts: PoolOptions = {}): FunLine {
+  return pickFreshFunLine(f, [], seededRandom(seed), [], opts);
 }
 
 // "Another one": a different line from the one showing, still avoiding the recent window.
-export function rerollFunLine(f: WorkoutFacts, recent: RecentLine[], currentId: string, rand: () => number = Math.random): FunLine {
-  return pickFreshFunLine(f, recent, rand, [currentId]);
+export function rerollFunLine(f: WorkoutFacts, recent: RecentLine[], currentId: string, rand: () => number = Math.random, opts: PoolOptions = {}): FunLine {
+  return pickFreshFunLine(f, recent, rand, [currentId], opts);
 }
