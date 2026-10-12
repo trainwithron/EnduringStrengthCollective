@@ -72,7 +72,7 @@ describe("the client's Programs tab", () => {
     expect(actions).toContain("if (busyId || assigning.current) return;");
     expect(actions).toContain("ensureSignedOff({ aiDraft: program.aiDraft, programId: program.id })");
     expect(actions).not.toContain("disabled: p.aiDraft");
-    expect(section).toContain('p.ai_draft ? "AI draft"');
+    expect(read("components/coach/client-program-row.tsx")).toContain('program.ai_draft ? "AI draft"');
   });
   it("fits a phone: buttons and rows are at least 44px, the date and search fill the width", () => {
     expect(actions).toContain("min-h-11");

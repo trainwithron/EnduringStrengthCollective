@@ -17,6 +17,7 @@ export function ClientProgramMenu({
   isActive,
   aiDraft,
   self = false,
+  onRename,
 }: {
   programId: string;
   programName: string;
@@ -25,6 +26,8 @@ export function ClientProgramMenu({
   aiDraft: boolean;
   // The person's own list in My training: one option only, "Remove from my profile".
   self?: boolean;
+  // Opens the name for editing in place (on the row that holds this menu).
+  onRename?: () => void;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -98,6 +101,20 @@ export function ClientProgramMenu({
       </button>
       {open && (
         <div role="menu" className="absolute right-0 top-11 z-30 w-56 border border-steel/30 bg-surface shadow-lg">
+          {onRename && (
+            <button
+              type="button"
+              role="menuitem"
+              disabled={busy}
+              onClick={() => {
+                setOpen(false);
+                onRename();
+              }}
+              className={`${item} text-chalk`}
+            >
+              Rename
+            </button>
+          )}
           {!aiDraft && !self && (
             <button type="button" role="menuitem" disabled={busy} onClick={toggleActive} className={`${item} text-chalk`}>
               {isActive ? "Make inactive" : "Make active"}

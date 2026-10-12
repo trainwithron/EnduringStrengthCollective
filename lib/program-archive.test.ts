@@ -30,8 +30,8 @@ describe("Remove from this profile", () => {
     expect(menu).toContain("w-11 h-11");
     expect(menu).toContain('e.key === "Escape"');
     expect(menu).toContain('document.addEventListener("mousedown", onDown)');
-    const section = read("components/coach/desktop/client-programs-section.tsx");
-    expect(section).toMatch(/<\/Link>\s*<ClientProgramMenu/);
+    const row = read("components/coach/client-program-row.tsx");
+    expect(row).toMatch(/<\/Link>\s*\)\}\s*<ClientProgramMenu/);
   });
   it("an unsigned AI draft can be removed from the profile (it has no Make active, which needs a sign-off)", () => {
     expect(menu).toContain("{!aiDraft && !self && (");

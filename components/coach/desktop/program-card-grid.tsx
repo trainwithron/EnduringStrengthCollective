@@ -7,6 +7,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { ProgramActiveToggle } from "@/components/coach/program-active-toggle";
 import { CardSizeToggle } from "@/components/coach/desktop/card-size-toggle";
 import { ProgramCardMenu } from "@/components/coach/desktop/program-card-menu";
+import { ProgramNameInput } from "@/components/coach/program-name-input";
 import { ProgramCardVisual } from "@/components/coach/desktop/program-card-visual";
 import { readCardSize, writeCardSize, type CardSize } from "@/lib/card-size";
 import type { ProgramCardVisualData } from "@/lib/program-card-data";
@@ -124,6 +125,7 @@ function ProgramCard({
   const [coverPath, setCoverPath] = useState(program.coverImagePath);
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [renaming, setRenaming] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -201,6 +203,9 @@ function ProgramCard({
 
       <div className="p-3 flex flex-col gap-2 flex-1">
         <div className="flex items-start justify-between gap-2">
+          {renaming ? (
+            <ProgramNameInput programId={program.id} initial={program.name} onDone={() => setRenaming(false)} className="min-w-0 flex-1" />
+          ) : (
           <Link href={`/groups/${groupId}/programs/${program.id}`} className="min-w-0 flex-1">
             <p className={`font-body font-medium ${titleSize} text-chalk truncate`}>
               {program.name}
@@ -220,7 +225,8 @@ function ProgramCard({
               </p>
             )}
           </Link>
-          <ProgramCardMenu programId={program.id} programName={program.name} groupId={groupId} aiDraft={program.aiDraft} canHide={!program.athleteId && !program.isActive} showAssignButton={!program.athleteId && !program.isActive && !program.aiDraft} />
+          )}
+          <ProgramCardMenu onRename={() => setRenaming(true)} programId={program.id} programName={program.name} groupId={groupId} aiDraft={program.aiDraft} canHide={!program.athleteId && !program.isActive} showAssignButton={!program.athleteId && !program.isActive && !program.aiDraft} />
         </div>
         <div className="mt-auto flex items-center justify-between pt-2 border-t border-steel/15">
           <ProgramActiveToggle programId={program.id} isActive={program.isActive} aiDraft={program.aiDraft} programName={program.name} unassigned={!program.athleteId} />
