@@ -32,6 +32,9 @@ export function RevenueSplitEditor({
     Object.fromEntries(coaches.map((c) => [c.profileId, c.revenueSharePct.toString()]))
   );
   const [connecting, setConnecting] = useState(false);
+  // What is saved for each person, so a refused share can go back to it.
+  const [savedShares, setSavedShares] = useState<Record<string, string>>(shares);
+  const [shareError, setShareError] = useState<string | null>(null);
   const [connectError, setConnectError] = useState<string | null>(null);
 
   async function handleConnectStripe() {
@@ -60,15 +63,36 @@ export function RevenueSplitEditor({
     coaches.map((c) => ({ ...c, revenueSharePct: parseFloat(shares[c.profileId]) || 0 }))
   );
 
-  async function persistShare(profileId: string, value: string) {
+  // Typing only changes what is shown; the share is saved when the box is left. The shares of one organization can never add up to more than 100%: the screen says so before saving, and the
+  // database refuses it too.
+  function typeShare(profileId: string, value: string) {
     setShares((prev) => ({ ...prev, [profileId]: value }));
+    setShareError(null);
+  }
+
+  async function persistShare(profileId: string) {
     if (!isOwner) return;
+    const value = shares[profileId] ?? "0";
+    const next = parseFloat(value) || 0;
+    if (value === savedShares[profileId]) return;
+    const others = coaches.reduce((sum, c) => sum + (c.profileId === profileId ? 0 : parseFloat(shares[c.profileId]) || 0), 0);
+    if (next < 0 || next > 100 || others + next > 100) {
+      setShareError("These shares add up to more than 100%. Lower one to save.");
+      setShares((prev) => ({ ...prev, [profileId]: savedShares[profileId] }));
+      return;
+    }
     const supabase = createBrowserClient();
-    await supabase
+    const { error } = await supabase
       .from("organization_memberships")
-      .update({ revenue_share_pct: parseFloat(value) || 0 })
+      .update({ revenue_share_pct: next })
       .eq("organization_id", organizationId)
       .eq("profile_id", profileId);
+    if (error) {
+      setShareError(/more than 100/.test(error.message) ? "These shares add up to more than 100%. Lower one to save." : "That didn't save. Nothing was changed. Try again.");
+      setShares((prev) => ({ ...prev, [profileId]: savedShares[profileId] }));
+      return;
+    }
+    setSavedShares((prev) => ({ ...prev, [profileId]: value }));
     router.refresh();
   }
 
@@ -104,7 +128,8 @@ export function RevenueSplitEditor({
                     min={0}
                     max={100}
                     value={shares[share.profileId]}
-                    onChange={(e) => persistShare(share.profileId, e.target.value)}
+                    onChange={(e) => typeShare(share.profileId, e.target.value)}
+                    onBlur={() => persistShare(share.profileId)}
                     disabled={!isOwner}
                     className="w-16 h-8 bg-graphite border border-steel/30 text-chalk px-2 font-body text-xs disabled:opacity-50"
                   />
@@ -135,6 +160,11 @@ export function RevenueSplitEditor({
             );
           })}
         </div>
+        {shareError && (
+          <p className="font-body text-xs text-rust mt-2" role="alert">
+            {shareError}
+          </p>
+        )}
         {totalSharePct !== 100 && (
           <p className="font-body text-xs text-amber-500 mt-2">
             Coach shares add up to {totalSharePct}%, not 100% —{" "}

@@ -261,6 +261,14 @@
   "file": "apply-release-ao-all.sql"
  },
  {
+  "id": "release-bf",
+  "name": "Release BF (the money settings on organization memberships are the server's; shares never total over 100 percent; run BEFORE the code that goes with it is live)",
+  "steps": [
+   "100"
+  ],
+  "file": "apply-release-bf-all.sql"
+ },
+ {
   "id": "release-be",
   "name": "Release BE (a coach can ask for notice before a client pauses or ends a schedule; run BEFORE the code that goes with it is live)",
   "steps": [

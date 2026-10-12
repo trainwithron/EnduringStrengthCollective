@@ -2004,6 +2004,20 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the schedule-request function exists", has.fn("request_schedule_change(uuid, text, date, date, text)")],
     ],
   },
+  {
+    n: "100",
+    slug: "0354",
+    title: "0354 The money settings on an organization membership are the server's: the connected Stripe account can no longer be written by an owner or anyone signed in, and the shares in an organization can never add up to more than 100 percent",
+    migrations: ["0354"],
+    sees: "Success. No rows returned.",
+    afterwards: "A coach still connects their own Stripe account through the Connect screen, and an organization owner still sets each member's role and revenue share; nobody signed in can change a member's connected account any more. A share that would take the total over 100% is refused with 'These shares add up to more than 100%. Lower one to save.' A new organization's owner starts with the whole share (100%). Nothing existing changes.",
+    undo: "drop trigger if exists organization_memberships_share_total on public.organization_memberships;\ndrop function if exists public.guard_organization_share_total();\ngrant insert, update on public.organization_memberships to authenticated, anon;",
+    undoWhy: "Only if step 100 misbehaves. Puts back the broad write rights on memberships (so an owner could again write the connected account) and removes the 100% rule.",
+    rows: [
+      ["0354 is not already applied (the share-total rule does not exist yet)", "to_regprocedure('public.guard_organization_share_total()') is null"],
+      ["the memberships table has the money columns", has.col("organization_memberships", "stripe_connect_account_id") + " and " + has.col("organization_memberships", "revenue_share_pct")],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -2109,6 +2123,7 @@ const BUNDLES = [
   { id: "release-ai", name: "Release AI (a payment and its sessions are recorded in one step; run BEFORE the code that uses it deploys)", steps: ["77"] },
   { id: "release-ap", name: "Release AP (parent-view links only for under-13 clients of the coach, and they expire; internal training-partner functions closed; run any time)", steps: ["84"] },
   { id: "release-ao", name: "Release AO (assigning attaches a program only inside one organization; run any time, after Release AM)", steps: ["83"] },
+  { id: "release-bf", name: "Release BF (the money settings on organization memberships are the server's; shares never total over 100 percent; run BEFORE the code that goes with it is live)", steps: ["100"] },
   { id: "release-be", name: "Release BE (a coach can ask for notice before a client pauses or ends a schedule; run BEFORE the code that goes with it is live)", steps: ["99"] },
   { id: "release-bd", name: "Release BD (joining an organization needs the person's OK; invitations and leave; run BEFORE the code that goes with it is live)", steps: ["98"] },
   { id: "release-bc", name: "Release BC (Duplicate makes an unassigned library program; run BEFORE the code that goes with it is live)", steps: ["97"] },
@@ -2315,6 +2330,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
+    m("0354", "to_regprocedure('public.guard_organization_share_total()') is not null"),
     m("0353", has.col("coach_booking_policies", "schedule_change_notice_days")),
     m("0352", "to_regclass('public.organization_invites') is not null"),
     m("0351", "position('p_athlete_id is null then false' in pg_get_functiondef(to_regprocedure('public.duplicate_program(uuid, uuid, uuid, uuid, text, date)'))) > 0"),

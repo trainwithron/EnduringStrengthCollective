@@ -1516,6 +1516,24 @@ await run(`apply/undo-step94-0348.sql`);
   const errBE2 = await run(`apply/${bundle.file}`);
   check("release-be: the bundle applies again after an undo" + (errBE2 ? ": " + errBE2 : ""), !errBE2 && (await has()));
 }
+// Release BF (step 100): ONE paste.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-bf");
+  check("release-bf: ONE bundle holds step 100", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["100"]));
+  const st100 = steps.find((x) => x.n === "100");
+  const has = async () => (await db.query("select to_regprocedure('public.guard_organization_share_total()') is not null as ok")).rows[0].ok === true;
+  const ebf0 = await run(`apply/undo-step${st100.n}-${st100.slug}.sql`);
+  check("release-bf: before the bundle runs there is no share-total rule" + (ebf0 ? ": " + ebf0 : ""), !ebf0 && !(await has()));
+  const errBF = await run(`apply/${bundle.file}`);
+  check("release-bf bundle applies" + (errBF ? ": " + errBF : ""), !errBF && (await has()));
+  const againBF = await run(`apply/${bundle.file}`);
+  check("release-bf: a second run is refused, naming step 100", !!againBF && againBF.includes("step 100 (0354) cannot run") && againBF.includes("already applied"));
+  const euBF = await run(`apply/undo-step${st100.n}-${st100.slug}.sql`);
+  check("release-bf: the undo puts the old rights back" + (euBF ? ": " + euBF : ""), !euBF && !(await has()));
+  const errBF2 = await run(`apply/${bundle.file}`);
+  check("release-bf: the bundle applies again after an undo" + (errBF2 ? ": " + errBF2 : ""), !errBF2 && (await has()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.
