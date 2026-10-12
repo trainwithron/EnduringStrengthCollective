@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { parseDuration, parseFitprosExport, planFitprosImport, weekOfDate, summarizePlan, markerTimestamp, isImportMarker, importKeys, normalizeExerciseName, type ProgramWorkoutInfo } from "@/lib/fitpros-history";
 
 const SAMPLE = `# FitPros export
@@ -126,8 +128,6 @@ describe("Recognising an import again", () => {
 });
 
 describe("The importer writes history only, and says so", () => {
-  const { readFileSync } = require("node:fs") as typeof import("node:fs");
-  const { join } = require("node:path") as typeof import("node:path");
   const src = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8").replace(/\r\n/g, "\n");
   it("never writes a workout log, a personal record, a credit, a post or a notification", () => {
     const code = src("lib/fitpros-history-import.ts");
