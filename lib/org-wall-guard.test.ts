@@ -148,11 +148,11 @@ describe("assistant, bell, notifications page and digest stay in one organizatio
   });
   it("the coach's bell and notifications page list only the open organization's notifications", () => {
     const bell = read2("components/athlete/notification-bell.tsx");
-    expect(bell).toContain("query.in(\"group_id\"");
-    expect(bell).toContain("if (scopeIds && !scopeIds.includes(n.group_id)) return;");
+    expect(bell).toContain("group_id.is.null,group_id.in.");
+    expect(bell).toContain("if (scopeIds && n.group_id && !scopeIds.includes(n.group_id)) return;");
     expect(read2("components/coach/coach-desktop-shell.tsx")).toContain("<HeaderNotificationBell scopeGroupId={groupId} />");
     const page = read2("app/notifications/page.tsx");
-    expect(page).toContain("orgGroupIds.has(n.group_id)");
+    expect(page).toContain("!n.group_id || orgGroupIds.has(n.group_id)");
   });
   it("the daily digest is one push per coach PER organization, labeled when the coach runs several", () => {
     const digest = read2("app/api/cron/coach-digest/route.ts");

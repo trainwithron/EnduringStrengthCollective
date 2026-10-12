@@ -38,7 +38,7 @@ export default async function NotificationsPage() {
     if (active?.needsChoice) redirect(`${CHOOSE_ORGANIZATION_PATH}?next=/notifications`);
     if (active) {
       const orgGroupIds = new Set(active.groups.filter((g) => g.orgId === active.orgId).map((g) => g.id));
-      visibleRows = visibleRows.filter((n: any) => n.group_id && orgGroupIds.has(n.group_id));
+      visibleRows = visibleRows.filter((n: any) => (!n.group_id || orgGroupIds.has(n.group_id)));
     }
   }
 

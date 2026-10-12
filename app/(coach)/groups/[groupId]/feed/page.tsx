@@ -31,7 +31,7 @@ function mapPostRow(p: any, groupId: string, viewerId: string | null): FeedPost 
     mediaType: p.media_type,
     createdAt: p.created_at,
     author: {
-      id: p.profiles.id,
+      id: p.profiles?.id ?? p.author_id,
       fullName: p.profiles?.full_name ?? "Former member",
       avatarUrl: p.profiles?.avatar_url ?? null,
     },
@@ -52,6 +52,7 @@ function mapPostRow(p: any, groupId: string, viewerId: string | null): FeedPost 
 
 const POST_SELECT = `
   id, post_type, channel, pinned_at, group_session_id, body, media_url, media_type, created_at, broadcast_level,
+  author_id,
   profiles!posts_author_id_fkey ( id, full_name, avatar_url ),
   workout_logs ( total_volume, total_sets_completed, new_prs, logged_by_coach ),
   reactions ( profile_id ),

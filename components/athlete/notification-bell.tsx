@@ -58,7 +58,8 @@ export function NotificationBell({
       .from("notifications")
       .select("id, type, body, link_path, read_at, created_at")
       .eq("profile_id", viewerId);
-    if (scopeIds) query = query.in("group_id", scopeIds.length > 0 ? scopeIds : ["00000000-0000-0000-0000-000000000000"]);
+    // Notifications that belong to no group (a training-partner request, for example) stay visible in every organization's bell.
+    if (scopeIds) query = scopeIds.length > 0 ? query.or(`group_id.is.null,group_id.in.(${scopeIds.join(",")})`) : query.is("group_id", null);
     query
       .order("created_at", { ascending: false })
       .limit(20)
@@ -88,7 +89,7 @@ export function NotificationBell({
         (payload) => {
           const n = payload.new as any;
           // Another organization's notification is not added to this organization's bell.
-          if (scopeIds && !scopeIds.includes(n.group_id)) return;
+          if (scopeIds && n.group_id && !scopeIds.includes(n.group_id)) return;
           setItems((prev) => [
             {
               id: n.id,
