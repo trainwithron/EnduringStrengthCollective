@@ -8,6 +8,10 @@ import { pickGymJoke } from "@/lib/gym-jokes";
 interface SharedWorkoutData {
   groupName: string;
   athleteName: string;
+  // What a stranger would see: the exported picture uses these, never the full names the card shows inside the app.
+  publicGroupName: string;
+  publicAthleteName: string;
+  canShare: boolean;
   broadcastLevel: "full" | "prs_only" | "checkin_only";
   totalVolume: number | null;
   totalSetsCompleted: number | null;
@@ -25,6 +29,7 @@ export function WorkoutCardExpanded({ postId }: { postId: string }) {
   const [data, setData] = useState<SharedWorkoutData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -46,6 +51,9 @@ export function WorkoutCardExpanded({ postId }: { postId: string }) {
     if (!cardRef.current) return;
     setCapturing(true);
     try {
+      // Swap in the public names for the capture, then back.
+      setExporting(true);
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       const blob = await toBlob(cardRef.current, { pixelRatio: 2 });
       if (!blob) throw new Error("capture failed");
       const file = new File([blob], "workout-card.png", { type: "image/png" });
@@ -65,6 +73,7 @@ export function WorkoutCardExpanded({ postId }: { postId: string }) {
     } catch {
       setError("Couldn't create the image — try again.");
     } finally {
+      setExporting(false);
       setCapturing(false);
     }
   }
@@ -87,12 +96,12 @@ export function WorkoutCardExpanded({ postId }: { postId: string }) {
         className="border border-rust/40 bg-surface p-6 text-center"
       >
         <p className="font-display uppercase text-xs tracking-[0.2em] text-rust">
-          {data.groupName}
+          {exporting ? data.publicGroupName : data.groupName}
         </p>
         <h3 className="font-display font-bold text-2xl uppercase leading-tight mt-3">
           {data.celebratePrs.length > 0 ? "New PR 🎉" : "Workout Complete 💪"}
         </h3>
-        <p className="font-body text-base mt-1">{data.athleteName}</p>
+        <p className="font-body text-base mt-1">{exporting ? data.publicAthleteName : data.athleteName}</p>
 
         {data.totalVolume != null && (
           <div className="mt-5 pb-4 border-b border-steel/20">
@@ -187,14 +196,16 @@ export function WorkoutCardExpanded({ postId }: { postId: string }) {
         </p>
       </div>
 
-      <button
-        type="button"
-        onClick={handleShareScreenshot}
-        disabled={capturing}
-        className="w-full h-10 mt-3 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
-      >
-        {capturing ? "Preparing image…" : "Share as image"}
-      </button>
+      {data.canShare && (
+        <button
+          type="button"
+          onClick={handleShareScreenshot}
+          disabled={capturing}
+          className="w-full h-10 mt-3 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
+        >
+          {capturing ? "Preparing image…" : "Share as image"}
+        </button>
+      )}
     </div>
   );
 }

@@ -17,11 +17,13 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const params = await props.params;
   const shared = await getSharedTransformationCard(params.cardId);
-  if (!shared) return { title: "Card not found" };
+  // Personal and health-adjacent: never listed by search engines.
+  const robots = { index: false, follow: false };
+  if (!shared) return { title: "Card not found", robots };
 
   const title = `${shared.athleteName} is down ${shared.totalLossLbs} lbs 🎉`;
   const description = `Training with ${shared.groupName}.`;
-  return { title, description, openGraph: { title, description, images: BRAND_OG_IMAGES } };
+  return { title, description, robots, openGraph: { title, description, images: BRAND_OG_IMAGES } };
 }
 
 export default async function ShareTransformationCardPage(

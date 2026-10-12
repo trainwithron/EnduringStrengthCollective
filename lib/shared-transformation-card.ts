@@ -1,4 +1,5 @@
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { loadShareIdentity } from "@/lib/share-identity";
 import { getDirectComparison, getBonusAnimalLine } from "@/lib/transformation-joke-bank";
 
 // Transformation Cards — the public celebration surface. Same "public
@@ -22,27 +23,22 @@ export async function getSharedTransformationCard(cardId: string) {
 
   if (!card) return null;
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name")
-    .eq("id", card.athlete_id)
-    .maybeSingle();
-  const { data: group } = await supabase
-    .from("groups")
-    .select("name")
-    .eq("id", card.group_id)
-    .maybeSingle();
+  // The name a stranger sees follows the client's own setting and the under-18 default; a one-on-one space shows the business name; nothing is shown for a client under 18.
+  const identity = await loadShareIdentity(supabase, card.athlete_id, card.group_id);
+  if (identity.isMinor) return null;
 
   const totalLossLbs = Math.round((card.starting_weight - card.current_weight) * 10) / 10;
   const seed = card.milestone_id ?? card.id;
 
   let beforePhotoUrl: string | null = null;
   let afterPhotoUrl: string | null = null;
+  // A photo is only ever signed when it is THIS athlete's own (a card could name someone else's photo id).
   if (card.before_photo_id) {
     const { data: photo } = await supabase
       .from("progress_photos")
       .select("storage_path")
       .eq("id", card.before_photo_id)
+      .eq("athlete_id", card.athlete_id)
       .maybeSingle();
     if (photo) {
       const { data: signed } = await supabase.storage
@@ -56,6 +52,7 @@ export async function getSharedTransformationCard(cardId: string) {
       .from("progress_photos")
       .select("storage_path")
       .eq("id", card.after_photo_id)
+      .eq("athlete_id", card.athlete_id)
       .maybeSingle();
     if (photo) {
       const { data: signed } = await supabase.storage
@@ -67,8 +64,8 @@ export async function getSharedTransformationCard(cardId: string) {
 
   return {
     id: card.id,
-    athleteName: profile?.full_name ?? "An athlete",
-    groupName: group?.name ?? "Spotlight Coaching",
+    athleteName: identity.athleteName,
+    groupName: identity.groupName,
     totalLossLbs,
     windowStartDate: card.window_start_date as string,
     windowEndDate: card.window_end_date as string,

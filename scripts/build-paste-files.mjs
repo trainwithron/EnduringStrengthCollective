@@ -1726,6 +1726,27 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the three training-partner functions exist", has.fn("training_partner_is_minor(uuid)") + " and " + has.fn("training_partner_intake_incomplete(uuid)") + " and " + has.fn("training_partner_org_restricted(uuid)") + " and " + has.fn("training_partner_is_restricted(uuid)")],
     ],
   },
+  {
+    n: "85",
+    slug: "0339",
+    title: "0339 A transformation card can only use the athlete's own photos and milestone, in a group they are a client of, and is never made for a client under 18",
+    migrations: ["0339"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for normal use. Cards that already exist are untouched. A card can no longer be saved with someone else's photo or a group the person is not a client of, and cannot be made for a client under 18.",
+    undo: [
+      'drop policy if exists "transformation_cards_insert_own" on public.transformation_cards;',
+      'drop policy if exists "transformation_cards_update_own" on public.transformation_cards;',
+      'drop policy if exists "transformation_cards_delete_own" on public.transformation_cards;',
+      'drop policy if exists "transformation_cards_write_own" on public.transformation_cards;',
+      'create policy "transformation_cards_write_own" on public.transformation_cards for all to authenticated using (athlete_id = (select auth.uid())) with check (athlete_id = (select auth.uid()));',
+    ].join("\n"),
+    undoWhy: "Only if step 85 misbehaves. Puts back the earlier single rule (an athlete can write their own cards, with no check on the photo or group).",
+    rows: [
+      ["0339 is not already applied (the new insert rule is absent)", "not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'transformation_cards' and policyname = 'transformation_cards_insert_own')"],
+      ["the earlier card write rule is in place", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'transformation_cards' and policyname = 'transformation_cards_write_own')"],
+      ["the tables the new rule checks exist", "to_regclass('public.progress_photos') is not null and to_regclass('public.transformation_milestones') is not null and to_regclass('public.client_intake') is not null"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -1831,6 +1852,7 @@ const BUNDLES = [
   { id: "release-ai", name: "Release AI (a payment and its sessions are recorded in one step; run BEFORE the code that uses it deploys)", steps: ["77"] },
   { id: "release-ap", name: "Release AP (parent-view links only for under-13 clients of the coach, and they expire; internal training-partner functions closed; run any time)", steps: ["84"] },
   { id: "release-ao", name: "Release AO (assigning attaches a program only inside one organization; run any time, after Release AM)", steps: ["83"] },
+  { id: "release-aq", name: "Release AQ (a transformation card can only use the athlete's own photos and milestone, never for a client under 18; run any time)", steps: ["85"] },
   { id: "release-an", name: "Release AN (the 'what do you call your people' card is asked once, for good; run any time)", steps: ["82"] },
   { id: "release-am", name: "Release AM (assigning an unused no-client program to one client attaches it instead of copying it; run any time)", steps: ["81"] },
   { id: "release-al", name: "Release AL (a client can switch their first name off shared workout pictures; run any time)", steps: ["80"] },
@@ -2022,6 +2044,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
+    m("0339", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'transformation_cards' and policyname = 'transformation_cards_insert_own')"),
     m("0337", "position('v_src_org' in pg_get_functiondef(to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)'))) > 0"),
     m("0336", has.col("profiles", "terminology_asked_at")),
     m("0335", "to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)') is not null"),

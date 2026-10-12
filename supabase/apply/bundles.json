@@ -261,6 +261,14 @@
   "file": "apply-release-ao-all.sql"
  },
  {
+  "id": "release-aq",
+  "name": "Release AQ (a transformation card can only use the athlete's own photos and milestone, never for a client under 18; run any time)",
+  "steps": [
+   "85"
+  ],
+  "file": "apply-release-aq-all.sql"
+ },
+ {
   "id": "release-an",
   "name": "Release AN (the 'what do you call your people' card is asked once, for good; run any time)",
   "steps": [

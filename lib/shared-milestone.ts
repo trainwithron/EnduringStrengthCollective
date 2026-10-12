@@ -1,4 +1,5 @@
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
+import { loadShareIdentity } from "@/lib/share-identity";
 
 // Milestone Celebrations, flagship — the public celebration surface for
 // a reverse-diet milestone. Deliberately reads through the service-role
@@ -27,19 +28,10 @@ export async function getSharedMilestone(milestoneId: string) {
     return null;
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name")
-    .eq("id", event.athlete_id)
-    .maybeSingle();
-  const { data: group } = await supabase
-    .from("groups")
-    .select("name")
-    .eq("id", event.group_id)
-    .maybeSingle();
-
-  const athleteName = profile?.full_name ?? "An athlete";
-  const groupName = group?.name ?? "Spotlight Coaching";
+  // The name a stranger sees follows the client's own setting and the under-18 default; a one-on-one space shows the business name; nothing is shown for a client under 18.
+  const identity = await loadShareIdentity(supabase, event.athlete_id, event.group_id);
+  if (identity.isMinor) return null;
+  const { athleteName, groupName } = identity;
 
   if (event.milestone_type === "reverse_diet") {
     const detail = event.detail as {

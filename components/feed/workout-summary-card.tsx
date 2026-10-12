@@ -101,12 +101,12 @@ export function WorkoutSummaryCard({
               {hasPrs ? "New personal record set" : "Checked in"}
             </p>
           )}
-          <div onClick={(e) => e.stopPropagation()}>
-            <ShareWorkoutButton
-              postId={post.id}
-              title={`${post.author.fullName} just finished a workout! 💪`}
-            />
-          </div>
+          {/* Only the person who did the workout (or the coach) can share it, and the share title carries no name: the link's own page shows the name the person chose. */}
+          {(isCoach || viewerId === post.author.id) && (
+            <div onClick={(e) => e.stopPropagation()}>
+              <ShareWorkoutButton postId={post.id} title="Just finished a workout! 💪" />
+            </div>
+          )}
         </div>
 
         {hasPrs && (

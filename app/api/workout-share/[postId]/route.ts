@@ -23,5 +23,11 @@ export async function GET(_request: Request, props: { params: Promise<{ postId: 
   const shared = await getSharedWorkout(params.postId, { fullName: true });
   if (!shared) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  return NextResponse.json(shared);
+  // Only the person who did the workout, or the group's coach, can make a picture of it to post elsewhere.
+  let canShare = shared.authorId === user.id;
+  if (!canShare) {
+    const { data: membership } = await supabase.from("group_memberships").select("role").eq("group_id", shared.groupId).eq("profile_id", user.id).maybeSingle();
+    canShare = membership?.role === "coach";
+  }
+  return NextResponse.json({ ...shared, canShare });
 }

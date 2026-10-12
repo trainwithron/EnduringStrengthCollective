@@ -2,6 +2,7 @@ import Link from "next/link";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
+import { athleteIsMinor } from "@/lib/youth-block";
 import {
   TransformationCardCreator,
   type JournalPhotoOption,
@@ -26,6 +27,11 @@ export default async function NewTransformationCardPage(
 
   if (!user) {
     redirect("/login");
+  }
+
+  // Public cards are never made for a client under 18.
+  if (await athleteIsMinor(supabase, user.id)) {
+    return <NoAccess>Transformation cards aren&apos;t available for members under 18.</NoAccess>;
   }
 
   const milestoneId = searchParams.milestone;

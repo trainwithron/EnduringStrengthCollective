@@ -26,11 +26,13 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const params = await props.params;
   const shared = await getSharedMilestone(params.milestoneId);
-  if (!shared) return { title: "Milestone not found" };
+  // Personal and health-adjacent: never listed by search engines.
+  const robots = { index: false, follow: false };
+  if (!shared) return { title: "Milestone not found", robots };
 
   const title = cardTitle(shared);
   const description = `Training with ${shared.groupName}.`;
-  return { title, description, openGraph: { title, description, images: BRAND_OG_IMAGES } };
+  return { title, description, robots, openGraph: { title, description, images: BRAND_OG_IMAGES } };
 }
 
 export default async function ShareMilestonePage(

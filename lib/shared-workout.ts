@@ -73,8 +73,14 @@ export async function getSharedWorkout(postId: string, opts: { fullName?: boolea
     const { data: intake } = await supabase.from("client_intake").select("date_of_birth").eq("athlete_id", post.author_id).maybeSingle();
     authorDob = (intake as { date_of_birth?: string | null } | null)?.date_of_birth ?? null;
   }
-  // Only the public share page (the card and the picture people post) honors it; the group's own feed card shows names the way the feed always does.
-  const nameHidden = !opts.fullName && nameColumnThere && !resolveShowName(authorProfile?.show_name_on_share, authorDob);
+  // The public share page (the card and the picture people post) honors it. The group's own feed card shows names the way the feed always does, but the picture exported from it uses the
+  // public values below, so the dob is read for that case too.
+  if (nameColumnThere && opts.fullName && (authorProfile?.show_name_on_share === null || authorProfile?.show_name_on_share === undefined)) {
+    const { data: intake } = await supabase.from("client_intake").select("date_of_birth").eq("athlete_id", post.author_id).maybeSingle();
+    authorDob = (intake as { date_of_birth?: string | null } | null)?.date_of_birth ?? null;
+  }
+  const publicNameHidden = nameColumnThere && !resolveShowName(authorProfile?.show_name_on_share, authorDob);
+  const nameHidden = !opts.fullName && publicNameHidden;
 
   const broadcastLevel: "full" | "prs_only" | "checkin_only" = post.broadcast_level ?? "full";
   const newPrs: string[] = broadcastLevel === "checkin_only" ? [] : workoutLog.new_prs ?? [];
@@ -425,6 +431,9 @@ export async function getSharedWorkout(postId: string, opts: { fullName?: boolea
     authorId: post.author_id as string,
     groupId: post.group_id,
     // "An athlete" is the placeholder for an unknown name: the card, the picture, the link preview and the mascot's initial all treat it as no name.
+    // The name and group name a stranger would see: the same on the public page, and what the in-app "Share as image" picture uses even when the card shows the full names.
+    publicAthleteName: publicNameHidden ? "An athlete" : publicDisplayName((post.profiles as any)?.full_name),
+    publicGroupName: (group as { group_kind?: string } | null)?.group_kind === "one_on_one" ? ((org as { name?: string } | null)?.name ?? "Spotlight Coaching") : group?.name ?? "Spotlight Coaching",
     athleteName: nameHidden
       ? "An athlete"
       : opts.fullName

@@ -21,7 +21,8 @@ describe("first name on shared workout pictures (Release AL)", () => {
   });
   it("the public card and picture follow the setting, the group's own feed card does not", () => {
     const src = read("lib/shared-workout.ts");
-    expect(src).toContain("const nameHidden = !opts.fullName && nameColumnThere && !resolveShowName(authorProfile?.show_name_on_share, authorDob);");
+    expect(src).toContain("const publicNameHidden = nameColumnThere && !resolveShowName(authorProfile?.show_name_on_share, authorDob);");
+    expect(src).toContain("const nameHidden = !opts.fullName && publicNameHidden;");
     expect(src).toContain('nameHidden\n      ? "An athlete"');
   });
   it("with no name the picture carries no name and no initial", () => {

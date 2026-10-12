@@ -99,6 +99,8 @@ export default async function ShareWorkoutPage(
     ]);
     // One-on-one clients do not have a Team Feed to continue to.
     viewerSeesFeed = viewerMembership?.client_tier !== "one_on_one";
+    // The line is for the athlete alone, so it uses their own real first name, whatever the public card shows (the card's name can be hidden, and would read "An").
+    const { data: ownProfile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
     if (coachRow) {
       const coachProfile = coachRow.profiles as unknown as { full_name: string | null } | null;
       // Until migration 0249 is applied this select errors and the default line is used.
@@ -110,7 +112,7 @@ export default async function ShareWorkoutPage(
       coachCongrats = {
         coachFirstName: firstNameOf(coachProfile?.full_name) || "Your coach",
         text: buildCoachCongrats({
-          athleteFirstName: firstNameOf(shared.athleteName),
+          athleteFirstName: firstNameOf(ownProfile?.full_name),
           customMessage: (customRow?.completion_message as string | null | undefined) ?? null,
           hadPr: shared.celebratePrs.length > 0,
         }),
