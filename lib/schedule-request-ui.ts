@@ -15,6 +15,9 @@ export interface SeriesForUi {
   timezone: string | null;
   frozenUntil: string | null; // "YYYY-MM-DD"
   endsOn: string | null;
+  // The coach's rule for pausing or ending (days of notice; 0 = none) and their own words, when they set them.
+  noticeDays?: number;
+  noticeText?: string | null;
 }
 
 export interface RequestForUi {

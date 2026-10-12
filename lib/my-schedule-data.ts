@@ -17,7 +17,7 @@ export interface MyScheduleData {
 }
 
 export async function loadMySchedule(supabase: SupabaseClient, groupId: string, athleteId: string, now: Date = new Date()): Promise<MyScheduleData> {
-  const columns = "id, weekday, start_time, duration_minutes, status, timezone, ends_on";
+  const columns = "id, coach_id, weekday, start_time, duration_minutes, status, timezone, ends_on";
   let seriesResult = await supabase
     .from("recurring_booking_series")
     .select(`${columns}, frozen_until`)
@@ -46,6 +46,20 @@ export async function loadMySchedule(supabase: SupabaseClient, groupId: string, 
       endsOn: r.ends_on ?? null,
     })
   );
+  // The coach's notice rule, if they set one (before the database update that adds it, the lookup simply returns nothing).
+  const coachIds = Array.from(new Set(((seriesResult.data ?? []) as any[]).map((r) => r.coach_id).filter(Boolean)));
+  if (coachIds.length > 0) {
+    const { data: policyRows } = await supabase.from("coach_booking_policies").select("coach_id, schedule_change_notice_days, schedule_change_notice_text").in("coach_id", coachIds);
+    const byCoach = new Map(((policyRows ?? []) as any[]).map((p) => [p.coach_id, p]));
+    const coachOf = new Map(((seriesResult.data ?? []) as any[]).map((r) => [r.id, r.coach_id]));
+    for (const r of rows) {
+      const p = byCoach.get(coachOf.get(r.id));
+      if (p) {
+        r.noticeDays = p.schedule_change_notice_days ?? 0;
+        r.noticeText = p.schedule_change_notice_text ?? null;
+      }
+    }
+  }
   // Running and paused schedules; an ended one only when nothing else is left (then it reads "Ended <date>").
   const running = rows.filter((s) => s.status !== "ended");
   const shown = running.length > 0 ? running : rows.slice(0, 1);

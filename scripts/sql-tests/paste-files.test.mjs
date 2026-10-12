@@ -1498,6 +1498,24 @@ await run(`apply/undo-step94-0348.sql`);
   const errBD2 = await run(`apply/${bundle.file}`);
   check("release-bd: the bundle applies again after an undo" + (errBD2 ? ": " + errBD2 : ""), !errBD2 && (await has()));
 }
+// Release BE (step 99): ONE paste.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-be");
+  check("release-be: ONE bundle holds step 99", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["99"]));
+  const st99 = steps.find((x) => x.n === "99");
+  const has = async () => (await db.query("select exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_booking_policies' and column_name = 'schedule_change_notice_days') as ok")).rows[0].ok === true;
+  const ebe0 = await run(`apply/undo-step${st99.n}-${st99.slug}.sql`);
+  check("release-be: before the bundle runs there is no notice setting" + (ebe0 ? ": " + ebe0 : ""), !ebe0 && !(await has()));
+  const errBE = await run(`apply/${bundle.file}`);
+  check("release-be bundle applies" + (errBE ? ": " + errBE : ""), !errBE && (await has()));
+  const againBE = await run(`apply/${bundle.file}`);
+  check("release-be: a second run is refused, naming step 99", !!againBE && againBE.includes("step 99 (0353) cannot run") && againBE.includes("already applied"));
+  const euBE = await run(`apply/undo-step${st99.n}-${st99.slug}.sql`);
+  check("release-be: the undo puts the old function back" + (euBE ? ": " + euBE : ""), !euBE && !(await has()));
+  const errBE2 = await run(`apply/${bundle.file}`);
+  check("release-be: the bundle applies again after an undo" + (errBE2 ? ": " + errBE2 : ""), !errBE2 && (await has()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.

@@ -1986,6 +1986,24 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the memberships table has the owner's insert rule", has.policy("organization_memberships", "org_memberships_insert_owner")],
     ],
   },
+  {
+    n: "99",
+    slug: "0353",
+    title: "0353 A coach can ask for notice before a client pauses, freezes or ends a weekly schedule, and can add their own wording",
+    migrations: ["0353"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for a coach who sets nothing (the default is no notice). A coach who sets days of notice on the Availability page: a client's pause, freeze or end request for a sooner date is refused with the earliest date in plain words, and the client sees the coach's words.",
+    undo: [
+      fnFromMigration("0297", "request_schedule_change"),
+      "alter table public.coach_booking_policies drop column if exists schedule_change_notice_text;",
+      "alter table public.coach_booking_policies drop column if exists schedule_change_notice_days;",
+    ].join("\n"),
+    undoWhy: "Only if step 99 misbehaves. Puts back the earlier request function and removes the two columns (a notice a coach had set is lost).",
+    rows: [
+      ["0353 is not already applied (no notice column yet)", has.noCol("coach_booking_policies", "schedule_change_notice_days")],
+      ["the schedule-request function exists", has.fn("request_schedule_change(uuid, text, date, date, text)")],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -2091,6 +2109,7 @@ const BUNDLES = [
   { id: "release-ai", name: "Release AI (a payment and its sessions are recorded in one step; run BEFORE the code that uses it deploys)", steps: ["77"] },
   { id: "release-ap", name: "Release AP (parent-view links only for under-13 clients of the coach, and they expire; internal training-partner functions closed; run any time)", steps: ["84"] },
   { id: "release-ao", name: "Release AO (assigning attaches a program only inside one organization; run any time, after Release AM)", steps: ["83"] },
+  { id: "release-be", name: "Release BE (a coach can ask for notice before a client pauses or ends a schedule; run BEFORE the code that goes with it is live)", steps: ["99"] },
   { id: "release-bd", name: "Release BD (joining an organization needs the person's OK; invitations and leave; run BEFORE the code that goes with it is live)", steps: ["98"] },
   { id: "release-bc", name: "Release BC (Duplicate makes an unassigned library program; run BEFORE the code that goes with it is live)", steps: ["97"] },
   { id: "release-bb", name: "Release BB (Pro Shop links, referral partners, challenges, calendar entries, session types and discovery prospects per organization; run BEFORE the code that goes with it is live)", steps: ["96"] },
@@ -2296,6 +2315,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
+    m("0353", has.col("coach_booking_policies", "schedule_change_notice_days")),
     m("0352", "to_regclass('public.organization_invites') is not null"),
     m("0351", "position('p_athlete_id is null then false' in pg_get_functiondef(to_regprocedure('public.duplicate_program(uuid, uuid, uuid, uuid, text, date)'))) > 0"),
     m("0350", has.col("pro_shop_links", "organization_id")),

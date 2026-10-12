@@ -121,8 +121,11 @@ function ScheduleCard({ groupId, item, canRequest }: { groupId: string; item: Sc
 function RequestSheet({ kind, series, onClose, onSent }: { kind: RequestKind; series: SeriesForUi; onClose: () => void; onSent: () => void }) {
   const copy = SHEET_COPY[kind];
   const today = todayKey(series.timezone);
-  const [effectiveOn, setEffectiveOn] = useState(today);
-  const [resumeOn, setResumeOn] = useState(addDays(today, 14));
+  // The coach may ask for notice before a pause or an end: the earliest day is today plus that many days.
+  const notice = series.noticeDays ?? 0;
+  const earliest = notice > 0 ? addDays(today, notice) : today;
+  const [effectiveOn, setEffectiveOn] = useState(earliest);
+  const [resumeOn, setResumeOn] = useState(addDays(earliest, 14));
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -168,7 +171,7 @@ function RequestSheet({ kind, series, onClose, onSent }: { kind: RequestKind; se
           <input
             type="date"
             value={effectiveOn}
-            min={today}
+            min={earliest}
             onChange={(e) => {
               setEffectiveOn(e.target.value);
               if (kind === "freeze" && e.target.value && resumeOn <= e.target.value) setResumeOn(addDays(e.target.value, 14));
@@ -177,6 +180,9 @@ function RequestSheet({ kind, series, onClose, onSent }: { kind: RequestKind; se
           />
         </label>
         <p className="font-body text-xs text-steel mt-1">Your sessions on or before this day stay on your calendar.</p>
+        {notice > 0 && (
+          <p className="font-body text-xs text-chalk mt-1">{series.noticeText?.trim() || `Your coach asks for ${notice} day${notice === 1 ? "" : "s"} of notice.`}</p>
+        )}
 
         {kind === "freeze" && (
           <div className="mt-5">
