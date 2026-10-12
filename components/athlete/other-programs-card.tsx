@@ -17,7 +17,7 @@ export function OtherProgramsCard({ programs }: { programs: MyProgramRow[] }) {
               <span className="font-display font-bold text-lg uppercase leading-tight truncate text-chalk">{p.programName}</span>
               <span className="font-body text-xs text-steel shrink-0">{p.groupName}</span>
             </Link>
-            {p.personal && <ClientProgramMenu programId={p.programId} programName={p.programName} clientName="" isActive aiDraft self />}
+            {p.canRemove && <ClientProgramMenu programId={p.programId} programName={p.programName} clientName="" isActive aiDraft self />}
           </li>
         ))}
       </ul>

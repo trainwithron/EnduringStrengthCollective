@@ -82,3 +82,15 @@ describe("the pieces are wired", () => {
     expect(read("app/(coach)/groups/[groupId]/page.tsx")).toContain("OtherProgramsCard");
   });
 });
+
+describe("Removing a program from my list", () => {
+  it("is offered only for a program made for the person in a group where they are the coach (the database lets only a coach change a program)", () => {
+    const rows = myPrograms("u", [m("g1", "coach", "team", "A"), m("g2", "athlete", "team", "B")], [p("a", "g1", "u"), p("b", "g2", "u"), p("c", "g2", null)]);
+    const by = Object.fromEntries(rows.map((r) => [r.programId, r.canRemove]));
+    expect(by).toEqual({ a: true, b: false, c: false });
+  });
+  it("treats an update that changed nothing as a failure, and Hide is kept off an active shared program", () => {
+    expect(read("components/coach/client-program-menu.tsx")).toContain("removed.length === 0");
+    expect(read("components/coach/desktop/program-card-grid.tsx")).toContain("canHide={!program.athleteId && !program.isActive}");
+  });
+});

@@ -72,9 +72,10 @@ export function ClientProgramMenu({
     setError(null);
     const supabase = createBrowserClient();
     // Inactive and removed in the same update: the database refuses a removed program that is still active.
-    const { error: updateError } = await supabase.from("programs").update({ is_active: false, archived_at: new Date().toISOString() }).eq("id", programId);
+    const { data: removed, error: updateError } = await supabase.from("programs").update({ is_active: false, archived_at: new Date().toISOString() }).eq("id", programId).select("id");
     setBusy(false);
-    if (updateError) {
+    // Row security matches zero rows without an error when the person may not change it, so an empty result is a failure too.
+    if (updateError || !removed || removed.length === 0) {
       setError("Couldn't remove it. Try again.");
       return;
     }
