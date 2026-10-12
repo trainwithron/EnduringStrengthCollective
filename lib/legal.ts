@@ -6,9 +6,9 @@
 export type LegalDocument = "beta_notice" | "terms" | "privacy" | "refunds" | "waiver";
 
 export const LEGAL_VERSIONS: Record<LegalDocument, string> = {
-  beta_notice: "2026-10-08-draft-4",
-  terms: "2026-10-05-placeholder-1",
-  privacy: "2026-10-08-placeholder-2",
+  beta_notice: "2026-10-12-draft-5",
+  terms: "2026-10-12-placeholder-2",
+  privacy: "2026-10-12-placeholder-3",
   refunds: "2026-10-05-placeholder-1",
   waiver: "2026-10-05-draft-1",
 };
@@ -41,7 +41,8 @@ export const BETA_NOTICE_PARAGRAPHS: string[] = [
   "Early software. Spotlight Coaching is in beta. Features can change, break or be removed, and data could be lost. Keep your own backups of anything important.",
   "Not medical advice. Programs, nutrition numbers, readiness scores, injury flags and AI suggestions are coaching tools, not diagnosis or treatment. Check with a doctor before starting or changing training, especially with any injury or health condition.",
   "AI is used. Some tools send text, and in a few cases photos, to an AI provider (Anthropic). When a coach asks Spot questions or gets a daily briefing, the request can include client names and details such as training results, readiness and wellness check-ins, wearable readings and goals. When a coach asks for a program, it can include the names and strength numbers of the coach's clients and, for a client with an injury or health concern, a note about it. When a meal is described or photographed to log it, or a meal suggestion is written, the request can include the photo, nutrition numbers and food allergies or dislikes. A workout or recipe imported from text or a photo is sent as typed or pictured. When a coach asks the AI to build or change a program, the request and the coach's own exercise names are sent to the AI. When a coach explains a change they made, the two exercise names and the coach's explanation are sent. In the optional coaching conversation, the coach's answers and the structure of their own programs are sent. If a client is under 18, the request says so; the client's date of birth is never sent. Messages between you and your coach, email, phone number, date of birth, body weight and progress photos are not sent. AI output is a draft for the coach to review.",
-  "Your data. We store the info you enter: profile, date of birth, health questionnaire, weight, wellness check-ins, nutrition logs, messages and any photos you choose to share. Your coach can see data in your group. The people who run your coach's organization can see your training data, wearable readings and posts, and the scheduling and billing details your coach keeps for you. During the beta the platform operator can also read training data, wearable readings and posts across organizations to give support. Your coach can mark you private from both, which hides your training and wearable data but not posts or scheduling and billing details. People who run the platform can also reach stored data when that is needed to keep the service running. You can download or delete your account in Settings, but some records, such as workout logs, may stay with your coach.",
+  "Your data. We store the info you enter: profile, date of birth, health questionnaire, weight, wellness check-ins, nutrition logs, messages and any photos you choose to share. Your coach can see data in your group. The people who run your coach's organization can see your training data, wearable readings and posts, and the scheduling and billing details your coach keeps for you. Your coach can mark you private from the organization, which hides your training and wearable data but not posts or scheduling and billing details. People who run the platform can reach stored data only when needed to keep the service running. You can download or delete your account in Settings, but some records, such as workout logs, may stay with your coach.",
+  "Who can see what. The owner and admins of an organization can read its clients' messages, coach notes, intake forms, nutrition records, programs, bookings and payments, except for a client the coach has marked private from the organization. A coach sees only their own clients. Nobody sees another organization's data.",
   "Help search. When the app's help search can't answer a question, we keep the wording of that question to improve it, with names, email addresses, links and long numbers removed as best we can. It is not linked to your account.",
   "Texts are optional. Text messages are off unless you turn them on. Reply STOP to stop and HELP for help.",
   "No minors' real data yet. Please don't enter real data for anyone under 18 until we confirm consent, privacy and safeguarding steps.",
@@ -62,13 +63,13 @@ export const PLACEHOLDER_SECTIONS: Record<"terms" | "privacy" | "refunds", { hea
     },
     {
       heading: "In the meantime",
-      body: "Your coach is responsible for the coaching they give you. The app is a tool for logging training and staying in touch. It does not give medical advice.",
+      body: "Your coach is responsible for the coaching they give you. The app is a tool for logging training and staying in touch. It does not give medical advice. The owner and admins of an organization can read its clients' messages, coach notes, intake forms, nutrition records, programs, bookings and payments, except for a client the coach has marked private from the organization. A coach sees only their own clients. Nobody sees another organization's data.",
     },
   ],
   privacy: [
     {
       heading: "What we keep",
-      body: "The full privacy policy is being prepared. In short: the app stores the details you and your coach enter (your name, email, training and nutrition logs, messages and, if you use them, wearable data) so it can work. Your coach and the people who run your coach's organization can see what is relevant to coaching you.",
+      body: "The full privacy policy is being prepared. In short: the app stores the details you and your coach enter (your name, email, training and nutrition logs, messages and, if you use them, wearable data) so it can work. Your coach and the people who run your coach's organization can see what is relevant to coaching you. The owner and admins of an organization can read its clients' messages, coach notes, intake forms, nutrition records, programs, bookings and payments, except for a client the coach has marked private from the organization. A coach sees only their own clients. Nobody sees another organization's data.",
     },
     {
       heading: "AI features",

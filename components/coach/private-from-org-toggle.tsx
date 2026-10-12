@@ -54,7 +54,7 @@ export function PrivateFromOrgToggle({
       <p className="font-body text-xs text-steel mt-1 max-w-[50ch]">
         Off by default — an org owner/admin above you can normally see this
         client&apos;s full session history. Turning this on hides it from org
-        owners and admins who don&apos;t coach this client. An owner who opens
+        owners and admins who don&apos;t coach this client, including their messages, coach notes, intake and nutrition records. Nobody outside the organization can see any of it either way. An owner who opens
         this client&apos;s group themselves becomes a coach there and can still
         see it.
       </p>

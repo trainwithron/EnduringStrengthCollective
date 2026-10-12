@@ -42,5 +42,5 @@ Push and deploy only on Ron's own word. Before each deploy:
    - **/find-a-coach**: since migration 0256, an organization is listed publicly only after its owner or admin switches listing on.
    - Clients who are signed in on a placeholder address are sent back to "choose your password" from any group page.
    - Client screens say "sessions" where they said "credits".
-   - Everyone signed in is asked once to accept the beta notice, terms and privacy policy (a version bump in lib/legal.ts asks again).
+   - Everyone signed in is asked once to accept the beta notice, terms and privacy policy (a version bump in lib/legal.ts asks again). The 2026-10-12 bump (beta notice draft-5, terms placeholder-2, privacy placeholder-3) adds "who can see what": The owner and admins of an organization can read its clients' messages, coach notes, intake forms, nutrition records, programs, bookings and payments, except for a client the coach has marked private from the organization. A coach sees only their own clients. Nobody sees another organization's data. Lawyer list: the same wording must be in the final privacy policy and terms.
 6. **After deploying**: open the live site signed in as the sandbox coach and as the sandbox client; check Home, the calendar and one booking; `/api/health` says ok.

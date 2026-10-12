@@ -11,6 +11,7 @@ describe("beta notice", () => {
       "Not medical advice",
       "AI is used",
       "Your data",
+      "Who can see what",
       "Help search",
       "Texts are optional",
       "No minors' real data yet",
@@ -37,18 +38,19 @@ describe("beta notice", () => {
     expect(ai).toContain("draft for the coach to review");
   });
 
-  it("names everyone who can see a client's data, including the platform operator during the beta", () => {
+  it("names everyone who can see a client's data, and says the owner and admins of an organization can read its clients' records", () => {
     const data = BETA_NOTICE_PARAGRAPHS[3];
     expect(data).toContain("Your coach can see data in your group");
     expect(data).toContain("people who run your coach's organization can see your training data, wearable readings and posts, and the scheduling and billing details your coach keeps for you");
-    expect(data).toContain("platform operator");
-    expect(data).toContain("training data, wearable readings and posts");
-    expect(data).toContain("Your coach can mark you private from both, which hides your training and wearable data but not posts or scheduling and billing details");
-    expect(data).toContain("keep the service running");
+    expect(data).not.toContain("platform operator");
+    expect(data).toContain("Your coach can mark you private from the organization, which hides your training and wearable data but not posts or scheduling and billing details");
+    expect(data).toContain("People who run the platform can reach stored data only when needed to keep the service running.");
+    const who = BETA_NOTICE_PARAGRAPHS[4];
+    expect(who).toBe("Who can see what. The owner and admins of an organization can read its clients' messages, coach notes, intake forms, nutrition records, programs, bookings and payments, except for a client the coach has marked private from the organization. A coach sees only their own clients. Nobody sees another organization's data.");
   });
 
   it("says that unanswered help-search questions are kept, with names removed", () => {
-    const help = BETA_NOTICE_PARAGRAPHS[4];
+    const help = BETA_NOTICE_PARAGRAPHS[5];
     expect(help).toContain("can't answer a question");
     expect(help).toContain("names, email addresses, links and long numbers removed");
     expect(help).toContain("not linked to your account");

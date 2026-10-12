@@ -17,6 +17,9 @@ export function LegalAcceptance({
         This app is an early version (a beta). It will change, and it is not medical advice. Please keep your own notes
         of anything important.
       </p>
+      <p className="font-body text-xs text-steel leading-snug mt-2">
+        {"The owner and admins of an organization can read its clients' messages, coach notes, intake forms, nutrition records, programs, bookings and payments, except for a client the coach has marked private from the organization. A coach sees only their own clients. Nobody sees another organization's data."}
+      </p>
       <label htmlFor={id} className="flex items-start gap-2 mt-3 cursor-pointer">
         <input
           id={id}
