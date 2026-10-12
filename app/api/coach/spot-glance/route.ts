@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { orgGroupIdsOf } from "@/lib/coach-groups";
 import { createServerClient } from "@/lib/supabase/server";
 import { computeRealMRR } from "@/lib/business-metrics";
 
@@ -91,6 +92,7 @@ export async function GET(request: Request) {
       .from("bookings")
       .select("id, start_at, profiles!bookings_athlete_id_fkey ( full_name )")
       .eq("coach_id", user.id)
+      .in("group_id", await orgGroupIdsOf(supabase, user.id, groupId))
       .eq("status", "confirmed")
       .gte("start_at", new Date().toISOString())
       .order("start_at", { ascending: true })

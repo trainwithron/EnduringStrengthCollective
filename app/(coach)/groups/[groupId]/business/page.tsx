@@ -118,6 +118,7 @@ export default async function BusinessDashboardPage(
     .from("bookings")
     .select("id", { count: "exact", head: true })
     .eq("coach_id", user.id)
+    .in("group_id", groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"])
     .eq("status", "confirmed")
     .gte("start_at", monthStartIso);
 
@@ -146,7 +147,8 @@ export default async function BusinessDashboardPage(
   const { count: packageCount } = await supabase
     .from("coach_packages")
     .select("id", { count: "exact", head: true })
-    .eq("coach_id", user.id);
+    .eq("coach_id", user.id)
+    .in("group_id", safeGroupIds);
   const hasBillingSetUp = (packageCount ?? 0) > 0;
 
   const { data: purchaseRows } = await supabase
@@ -212,7 +214,7 @@ export default async function BusinessDashboardPage(
       <div className="pb-6 border-b border-steel/20 mb-6">
         <h1 className="font-display font-bold text-3xl uppercase leading-none">Business</h1>
         <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
-          A snapshot across every group you coach.{" "}
+          A snapshot of this organization.{" "}
           {realMRR > 0 || realIncomeThisMonth > 0
             ? "Income and MRR below are real, from your connected packages."
             : "Set up packages to see real income and MRR here — until then, the manual rate estimate below is your only signal."}

@@ -1,4 +1,5 @@
 import { loadAssignableWorkouts } from "@/lib/assignable-workouts";
+import { orgGroupIdsOf } from "@/lib/coach-groups";
 import { getAthleteCurrentProgram } from "@/lib/active-programs";
 import Link from "next/link";
 import { NoAccess } from "@/components/shared/no-access";
@@ -238,10 +239,12 @@ export default async function ClientCalendarDayPage(
   // The day runs midnight to midnight in the zone the coach is reading times in (their device's), not UTC's.
   const displayZone = await getViewerDisplayTimezone(supabase, user.id);
   const nextDayKey = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate() + 1)).toISOString().slice(0, 10);
+  const orgGroupIds = await orgGroupIdsOf(supabase, user.id, params.groupId);
   const { data: dayBookings } = await supabase
     .from("bookings")
     .select("start_at, athlete_id, profiles ( full_name )")
     .eq("coach_id", user.id)
+    .in("group_id", orgGroupIds)
     .eq("status", "confirmed")
     .gte("start_at", zonedTimeToUtc(params.date, "00:00", displayZone).toISOString())
     .lt("start_at", zonedTimeToUtc(nextDayKey, "00:00", displayZone).toISOString())

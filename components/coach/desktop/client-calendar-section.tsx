@@ -1,4 +1,5 @@
 import { loadAssignableWorkouts } from "@/lib/assignable-workouts";
+import { orgGroupIdsOf } from "@/lib/coach-groups";
 import { getAthleteCurrentProgram } from "@/lib/active-programs";
 import Link from "next/link";
 import { createServerClient } from "@/lib/supabase/server";
@@ -191,6 +192,7 @@ export async function ClientCalendarSection({
     .from("bookings")
     .select("start_at")
     .eq("coach_id", coachId)
+    .in("group_id", await orgGroupIdsOf(supabase, coachId, groupId))
     .eq("status", "confirmed")
     .gte("start_at", firstOfMonth.toISOString())
     .lt("start_at", new Date(year, monthIndex + 1, 1).toISOString());

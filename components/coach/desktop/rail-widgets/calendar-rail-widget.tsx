@@ -1,5 +1,6 @@
 "use client";
 
+import { activeOrgGroupsFor } from "@/lib/active-org-groups";
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { RailWidgetHeader, RailWidgetRow, RailWidgetDeeperLink, RailWidgetEmpty, RailWidgetLoading } from "./rail-widget-shell";
@@ -31,6 +32,7 @@ export function CalendarRailWidget({ groupId }: { groupId: string }) {
       } = await supabase.auth.getUser();
       if (!user) return;
 
+      const orgGroupIds = (await activeOrgGroupsFor(supabase, user.id, groupId)).map((g) => g.id);
       const now = new Date();
       const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
@@ -39,6 +41,7 @@ export function CalendarRailWidget({ groupId }: { groupId: string }) {
         .from("bookings")
         .select("id, start_at, profiles!bookings_athlete_id_fkey ( full_name )")
         .eq("coach_id", user.id)
+        .in("group_id", orgGroupIds.length > 0 ? orgGroupIds : ["00000000-0000-0000-0000-000000000000"])
         .eq("status", "confirmed")
         .gte("start_at", startOfDay.toISOString())
         .lt("start_at", endOfDay.toISOString())

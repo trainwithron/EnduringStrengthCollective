@@ -59,6 +59,12 @@ export function groupsInOrgOf(groups: CoachedGroup[], groupId: string): CoachedG
   return orgId ? groups.filter((g) => g.orgId === orgId) : [];
 }
 
+// The ids of the coach's groups in the same organization as `groupId` (always includes `groupId` itself). The scope for any count, list or total shown on a coach page: one organization, never all of them.
+export async function orgGroupIdsOf(supabase: SupabaseClient, coachId: string, groupId: string): Promise<string[]> {
+  const ids = groupsInOrgOf(await getCoachedGroups(supabase, coachId), groupId).map((g) => g.id);
+  return ids.includes(groupId) ? ids : [groupId, ...ids];
+}
+
 // Distinct orgs the coach coaches in.
 export function coachedOrgs(groups: CoachedGroup[]): { id: string; name: string }[] {
   const byId = new Map<string, string>();

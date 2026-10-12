@@ -1,5 +1,6 @@
 "use client";
 
+import { activeOrgGroupsFor } from "@/lib/active-org-groups";
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 
@@ -29,6 +30,7 @@ export function DaySchedulePanel({ date }: { date: string }) {
       } = await supabase.auth.getUser();
       if (!user) return;
 
+      const orgGroupIds = (await activeOrgGroupsFor(supabase, user.id, null)).map((g) => g.id);
       const weekday = new Date(`${date}T00:00:00`).getDay();
 
       const [{ data: bookingRows }, { data: availabilityRows }] = await Promise.all([
@@ -36,6 +38,7 @@ export function DaySchedulePanel({ date }: { date: string }) {
           .from("bookings")
           .select("start_at, profiles ( full_name )")
           .eq("coach_id", user.id)
+          .in("group_id", orgGroupIds.length > 0 ? orgGroupIds : ["00000000-0000-0000-0000-000000000000"])
           .eq("status", "confirmed")
           .gte("start_at", `${date}T00:00:00`)
           .lt("start_at", `${date}T23:59:59.999`)

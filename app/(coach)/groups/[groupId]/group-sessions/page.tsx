@@ -3,7 +3,7 @@ import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { GroupSessionsManager, type ClassRow, type ClientOption } from "@/components/coach/desktop/group-sessions-manager";
-import { getCoachedGroups } from "@/lib/coach-groups";
+import { getCoachedGroups, orgGroupIdsOf } from "@/lib/coach-groups";
 import { getGroupCoachTimezone } from "@/lib/timezone";
 
 // A coach's small-group sessions: schedule one with spots, see who is in and waiting, add or remove people, mark attendance.
@@ -28,6 +28,7 @@ export default async function GroupSessionsPage(props: { params: Promise<{ group
     );
   }
 
+  const orgGroupIds = await orgGroupIdsOf(supabase, user.id, params.groupId);
   const earliest = new Date(Date.now() - 14 * 86400000).toISOString();
   const [{ data: group }, timezone, sessionsResult] = await Promise.all([
     supabase.from("groups").select("name").eq("id", params.groupId).single(),
@@ -37,6 +38,7 @@ export default async function GroupSessionsPage(props: { params: Promise<{ group
       .select("id, title, start_at, end_at, capacity, location_note, status")
       .eq("kind", "class")
       .eq("coach_id", user.id)
+      .in("group_id", orgGroupIds)
       .gte("start_at", earliest)
       .order("start_at", { ascending: true })
       .limit(100),

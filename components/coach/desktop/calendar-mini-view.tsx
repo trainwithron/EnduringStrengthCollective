@@ -1,5 +1,6 @@
 "use client";
 
+import { activeOrgGroupsFor } from "@/lib/active-org-groups";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -42,12 +43,14 @@ export function CalendarMiniView({ groupId }: { groupId: string }) {
       } = await supabase.auth.getUser();
       if (!user) return;
 
+      const orgGroupIds = (await activeOrgGroupsFor(supabase, user.id, groupId)).map((g) => g.id);
       const now = new Date();
       const monthOut = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
       const { data } = await supabase
         .from("bookings")
         .select("id, start_at, profiles!bookings_athlete_id_fkey ( full_name )")
         .eq("coach_id", user.id)
+        .in("group_id", orgGroupIds.length > 0 ? orgGroupIds : ["00000000-0000-0000-0000-000000000000"])
         .eq("status", "confirmed")
         .gte("start_at", now.toISOString())
         .lte("start_at", monthOut.toISOString())

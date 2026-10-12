@@ -375,6 +375,7 @@ export default async function CoachHomePage() {
         .select("id, title, start_at, end_at, capacity")
         .eq("kind", "class")
         .eq("coach_id", user!.id)
+        .in("group_id", allGroupIdList.length > 0 ? allGroupIdList : ["00000000-0000-0000-0000-000000000000"])
         .eq("status", "scheduled")
         .gte("start_at", day.startIso)
         .lt("start_at", day.endIso)

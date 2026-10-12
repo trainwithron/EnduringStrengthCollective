@@ -1,4 +1,5 @@
 import { fetchSessionMinutes, sessionMinutesFor } from "@/lib/availability-windows";
+import { orgGroupIdsOf } from "@/lib/coach-groups";
 import Link from "next/link";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
@@ -295,6 +296,7 @@ export default async function DayDetailPage(
         "id, start_at, end_at, athlete_id, needs_coach_resolution, recurring_series_id, profiles!bookings_athlete_id_fkey ( full_name )"
       )
       .eq("coach_id", coachMembership.profile_id)
+      .in("group_id", await orgGroupIdsOf(supabase, user.id, params.groupId))
       .eq("status", "confirmed")
       .gte("start_at", zonedDayStart.toISOString())
       .lt("start_at", zonedDayEnd.toISOString());
