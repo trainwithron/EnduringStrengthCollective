@@ -2,6 +2,7 @@ import Link from "next/link";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
+import { isMemberOfGroup, NOT_IN_GROUP_MESSAGE } from "@/lib/athlete-in-group";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ExerciseHistoryUploader } from "@/components/coach/exercise-history-uploader";
 import { HistoryImportAccessToggle } from "@/components/coach/history-import-access-toggle";
@@ -30,6 +31,10 @@ export default async function ClientHistoryPage(
     return (
       <NoAccess>Only coaches can upload a client&apos;s exercise history.</NoAccess>
     );
+  }
+
+  if (!(await isMemberOfGroup(supabase, params.groupId, params.athleteId))) {
+    return <NoAccess>{NOT_IN_GROUP_MESSAGE}</NoAccess>;
   }
 
   const [{ data: group }, { data: athleteProfile }, { data: athleteMembership }, { data: libraryRows }] =

@@ -1260,6 +1260,27 @@ for (const s of steps) {
   const errAQ2 = await run(`apply/${bundle.file}`);
   check("release-aq: the bundle applies again after an undo" + (errAQ2 ? ": " + errAQ2 : ""), !errAQ2 && (await has()));
 }
+// Release AR (step 86): ONE paste.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-ar");
+  check("release-ar: ONE bundle holds step 86", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["86"]));
+  const st86 = steps.find((x) => x.n === "86");
+  const has = async () => (await db.query("select to_regprocedure('public.enforce_athlete_in_group()') is not null as ok")).rows[0].ok === true;
+  const ear0 = await run(`apply/undo-step${st86.n}-${st86.slug}.sql`);
+  check("release-ar: before the bundle runs the rule is absent" + (ear0 ? ": " + ear0 : ""), !ear0 && !(await has()));
+  const errAR = await run(`apply/${bundle.file}`);
+  check("release-ar bundle applies on the live-shaped state" + (errAR ? ": " + errAR : ""), !errAR && (await has()));
+  const againAR = await run(`apply/${bundle.file}`);
+  check("release-ar: a second run is refused, naming step 86 (" + againAR + ")", !!againAR && againAR.includes("step 86 (0340) cannot run") && againAR.includes("already applied"));
+  const euAR = await run(`apply/undo-step${st86.n}-${st86.slug}.sql`);
+  check("release-ar: the undo removes the rule" + (euAR ? ": " + euAR : ""), !euAR && !(await has()));
+  const errAR2 = await run(`apply/${bundle.file}`);
+  check("release-ar: the bundle applies again after an undo" + (errAR2 ? ": " + errAR2 : ""), !errAR2 && (await has()));
+  // Leave the rule off again: later releases' undo files drop helpers (is_one_on_one_group) that its policies depend on.
+  const euAR2 = await run(`apply/undo-step${st86.n}-${st86.slug}.sql`);
+  check("release-ar: the undo runs again at the end" + (euAR2 ? ": " + euAR2 : ""), !euAR2);
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.

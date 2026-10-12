@@ -5,6 +5,7 @@ import { validateNoHallucinatedNumbers } from "@/lib/coach-briefing-numeral-guar
 import { gatherSessionPatternFindings } from "@/lib/session-pattern-spotter-gather";
 import { sendPushToProfile } from "@/lib/send-push";
 import { getCallerGroupRole } from "@/lib/group-access";
+import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
 // Session Pattern Spotter
 // (habit_spotter_and_post_workout_coach_page_research_sept19.md) — runs
@@ -57,7 +58,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Not allowed." }, { status: 403 });
   }
 
-  const { data: coachMembership } = await supabase
+  // Everything below is written for the COACH, by the server: the person finishing the workout is usually the client, who can't write a coach's note, notification or see the coach's push devices.
+  // The caller was checked above (their own finished session, in this group).
+  const admin = createServiceRoleClient();
+  const { data: coachMembership } = await admin
     .from("group_memberships")
     .select("profile_id")
     .eq("group_id", groupId)
@@ -69,17 +73,17 @@ export async function POST(request: Request) {
 
   // Idempotent per session — a retry (or a coach re-completing the same
   // session's flow) never double-fires the notification.
-  const { data: existing } = await supabase
+  const { data: existing } = await admin
     .from("session_pattern_checks")
     .select("id")
     .eq("session_id", sessionId)
     .maybeSingle();
   if (existing) return NextResponse.json({ ok: true, alreadyChecked: true });
 
-  const findings = await gatherSessionPatternFindings(supabase, { athleteId, groupId });
+  const findings = await gatherSessionPatternFindings(admin, { athleteId, groupId });
 
   if (findings.length === 0) {
-    await supabase.from("session_pattern_checks").insert({
+    await admin.from("session_pattern_checks").insert({
       session_id: sessionId,
       athlete_id: athleteId,
       group_id: groupId,
@@ -108,7 +112,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const { error: insertError } = await supabase.from("session_pattern_checks").insert({
+  const { error: insertError } = await admin.from("session_pattern_checks").insert({
     session_id: sessionId,
     athlete_id: athleteId,
     group_id: groupId,
@@ -123,14 +127,14 @@ export async function POST(request: Request) {
   const athleteName = athleteProfile?.full_name ?? "A client";
   const linkPath = `/sessions/${sessionId}/coach-note`;
 
-  await supabase.from("notifications").insert({
+  await admin.from("notifications").insert({
     profile_id: coachId,
     group_id: groupId,
     type: "session_pattern_note",
     body: `New note on ${athleteName}'s session`,
     link_path: linkPath,
   });
-  await sendPushToProfile(supabase, coachId, "New note on a client's session", `${athleteName} — worth a look`, linkPath);
+  await sendPushToProfile(admin, coachId, "New note on a client's session", `${athleteName} — worth a look`, linkPath);
 
   return NextResponse.json({ ok: true, foundSomething: true });
 }

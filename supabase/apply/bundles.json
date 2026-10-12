@@ -261,6 +261,14 @@
   "file": "apply-release-ao-all.sql"
  },
  {
+  "id": "release-ar",
+  "name": "Release AR (tenant safety: a coach can only file rows about people in that group; clients move only inside one organization; run any time)",
+  "steps": [
+   "86"
+  ],
+  "file": "apply-release-ar-all.sql"
+ },
+ {
   "id": "release-aq",
   "name": "Release AQ (a transformation card can only use the athlete's own photos and milestone, never for a client under 18; run any time)",
   "steps": [

@@ -25,11 +25,15 @@ export async function POST(request: Request) {
 
   const { data: group } = await supabase
     .from("groups")
-    .select("organization_id")
+    .select("organization_id, group_kind")
     .eq("id", groupId)
     .maybeSingle();
   if (!group?.organization_id) {
     return NextResponse.json({ error: "This group isn't part of an organization." }, { status: 400 });
+  }
+  // A one-on-one space belongs to its client and their coach: an organization admin can't add another coach to it.
+  if (group.group_kind === "one_on_one") {
+    return NextResponse.json({ error: "You can't add a coach to a one-on-one space." }, { status: 400 });
   }
 
   const { data: callerOrgMembership } = await supabase
@@ -46,6 +50,16 @@ export async function POST(request: Request) {
   }
 
   const serviceRole = createServiceRoleClient();
+  // ...or to a group that holds a client who is private from the organization.
+  const { count: privateClients } = await serviceRole
+    .from("group_memberships")
+    .select("profile_id", { count: "exact", head: true })
+    .eq("group_id", groupId)
+    .eq("role", "athlete")
+    .eq("private_from_org", true);
+  if ((privateClients ?? 0) > 0) {
+    return NextResponse.json({ error: "This group has a client who is private from the organization, so a coach can't be added to it." }, { status: 400 });
+  }
   const origin = appOrigin(request);
 
   const { data: invited, error: inviteError } = await serviceRole.auth.admin.inviteUserByEmail(

@@ -4,6 +4,7 @@ import { duplicateProgram } from "@/lib/program-duplication";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { grantLinkedGroupAccess } from "@/lib/package-group-access";
 import { athleteHasCopyOfProgram } from "@/lib/package-program-access";
+import { isMemberOfGroup, NOT_IN_GROUP_MESSAGE } from "@/lib/athlete-in-group";
 
 // Package-Program Linking (package_program_linking_scoping.md) — the
 // manual/comped enrollment path. package-assignment-control.tsx used to
@@ -40,6 +41,11 @@ export async function POST(request: Request) {
     .maybeSingle();
   if (membership?.role !== "coach") {
     return NextResponse.json({ error: "Only a coach of this group can assign packages." }, { status: 403 });
+  }
+
+  // The client must belong to the package's group: being its coach says nothing about any other person's id.
+  if (!(await isMemberOfGroup(supabase, pkg.group_id, athleteId))) {
+    return NextResponse.json({ error: NOT_IN_GROUP_MESSAGE }, { status: 403 });
   }
 
   const { data: existingAssignment } = await supabase

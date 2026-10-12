@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
+import { isMemberOfGroup, NOT_IN_GROUP_MESSAGE } from "@/lib/athlete-in-group";
 import { getWorkoutOverviewData } from "@/lib/workout-overview-data";
 import { WorkoutOverviewView } from "@/components/logging/workout-overview-view";
 import { CoachModeBar } from "@/components/coach/mobile/coach-mode-bar";
@@ -31,6 +32,10 @@ export default async function LogWorkoutForClientPage(
     return (
       <NoAccess>Only coaches can log sessions for a client.</NoAccess>
     );
+  }
+
+  if (!(await isMemberOfGroup(supabase, params.groupId, params.athleteId))) {
+    return <NoAccess>{NOT_IN_GROUP_MESSAGE}</NoAccess>;
   }
 
   const { data: athleteProfile } = await supabase

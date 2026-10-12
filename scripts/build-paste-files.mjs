@@ -33,6 +33,13 @@ const fnFrom0218 = (name) => fnFromMigration("0218", name);
 const fnFrom0277 = (name) => fnFromMigration("0277", name);
 const md5Is = (sig, md5) => `coalesce((select md5(replace(pg_get_functiondef(p.oid), chr(13), '')) = '${md5}' from pg_proc p where p.oid = to_regprocedure('public.${sig}')), false)`;
 
+// The tables that carry "a person" and "a group" and get the athlete-in-group rule (migration 0340).
+const TENANT_TABLES = [
+  "minor_consent", "daily_macros", "meal_plans", "athlete_injury_status", "athlete_sessions", "bookings", "programs", "workout_assignments",
+  "coach_video_checkins", "nutrition_checkins", "nutrition_phases", "client_habits", "session_credits", "wellness_checkins", "kiosk_checkins",
+  "athlete_exercise_overrides", "body_weight_logs", "nutrition_checkin_suggestions", "client_goals", "client_macro_targets", "client_phase_plans",
+  "session_exercise_videos", "transformation_milestones", "workout_notes", "workouts", "group_workout_exercises", "booking_waitlist_entries", "game_score_entries",
+];
 const has = {
   table: (t) => `to_regclass('public.${t}') is not null`,
   noTable: (t) => `to_regclass('public.${t}') is null`,
@@ -1747,6 +1754,35 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the tables the new rule checks exist", "to_regclass('public.progress_photos') is not null and to_regclass('public.transformation_milestones') is not null and to_regclass('public.client_intake') is not null"],
     ],
   },
+  {
+    n: "86",
+    slug: "0340",
+    title: "0340 A coach can only file a row about a person who belongs to that group (one rule on 28 tables); a client can only be moved inside one organization; an organization admin can't add themselves to a private client's space; a comment stays in its post's group",
+    migrations: ["0340"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for normal use. A coach (or anyone signed in) can no longer save a macro target, meal plan, consent record, booking, program, workout assignment, check-in, session or similar row for a person who is not in the group it is filed under. A client can only be moved between groups of the same organization. Rows that already exist are untouched.",
+    undo: [
+      ...TENANT_TABLES.map((t) => `drop trigger if exists ${t}_enforce_athlete_in_group on public.${t};`),
+      "drop function if exists public.enforce_athlete_in_group();",
+      "drop trigger if exists group_memberships_guard_org_move on public.group_memberships;",
+      "drop function if exists public.guard_membership_org_move();",
+      fnFromMigration("0333", "move_client_to_group"),
+      'drop policy if exists "memberships_insert_coach_or_self" on public.group_memberships;',
+      'create policy "memberships_insert_coach_or_self" on public.group_memberships for insert to authenticated with check ((public.is_group_coach(group_id) and (profile_id = (select auth.uid()) or public.is_coach_of_athlete(profile_id))) or (profile_id = (select auth.uid()) and role = \'coach\' and public.is_org_admin_of_group(group_id)));',
+      "drop function if exists public.group_closed_to_org_admin_join(uuid);",
+      'drop policy if exists "comments_insert_members" on public.comments;',
+      'create policy "comments_insert_members" on public.comments for insert to authenticated with check (author_id = (select auth.uid()) and public.is_group_member(group_id));',
+      'drop policy if exists "comments_update_own" on public.comments;',
+      'create policy "comments_update_own" on public.comments for update to authenticated using (author_id = (select auth.uid())) with check (author_id = (select auth.uid()));',
+    ].join("\n"),
+    undoWhy: "Only if step 86 misbehaves (for example a coach is told 'That person is not a member of this group' for a client who really is in the group). Removes the rule from all 28 tables and puts back the earlier move, membership and comment rules.",
+    rows: [
+      ["0340 is not already applied (the rule function does not exist yet)", "to_regprocedure('public.enforce_athlete_in_group()') is null"],
+      ["the helpers the new rules use exist", has.fn("is_group_member(uuid)") + " and " + has.fn("is_one_on_one_group(uuid)") + " and " + has.fn("is_org_admin_of_group(uuid)") + " and " + has.fn("is_coach_of_athlete(uuid)") + " and " + has.fn("move_client_to_group(uuid, uuid, uuid)")],
+      ["groups have an organization and memberships can be private from it", has.col("groups", "organization_id") + " and " + has.col("group_memberships", "private_from_org")],
+      ["every table the rule covers has the person and group columns", TENANT_TABLES.map((t) => has.col(t, "athlete_id") + " and " + has.col(t, "group_id")).join(" and ")],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -1852,6 +1888,7 @@ const BUNDLES = [
   { id: "release-ai", name: "Release AI (a payment and its sessions are recorded in one step; run BEFORE the code that uses it deploys)", steps: ["77"] },
   { id: "release-ap", name: "Release AP (parent-view links only for under-13 clients of the coach, and they expire; internal training-partner functions closed; run any time)", steps: ["84"] },
   { id: "release-ao", name: "Release AO (assigning attaches a program only inside one organization; run any time, after Release AM)", steps: ["83"] },
+  { id: "release-ar", name: "Release AR (tenant safety: a coach can only file rows about people in that group; clients move only inside one organization; run any time)", steps: ["86"] },
   { id: "release-aq", name: "Release AQ (a transformation card can only use the athlete's own photos and milestone, never for a client under 18; run any time)", steps: ["85"] },
   { id: "release-an", name: "Release AN (the 'what do you call your people' card is asked once, for good; run any time)", steps: ["82"] },
   { id: "release-am", name: "Release AM (assigning an unused no-client program to one client attaches it instead of copying it; run any time)", steps: ["81"] },
@@ -2044,6 +2081,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
+    m("0340", has.fn("enforce_athlete_in_group()")),
     m("0339", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'transformation_cards' and policyname = 'transformation_cards_insert_own')"),
     m("0337", "position('v_src_org' in pg_get_functiondef(to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)'))) > 0"),
     m("0336", has.col("profiles", "terminology_asked_at")),
