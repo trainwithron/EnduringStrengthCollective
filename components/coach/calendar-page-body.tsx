@@ -805,7 +805,7 @@ export async function CoachCalendarPageBody(
     // the recurring hours).
     supabase
       .from("bookings")
-      .select("id, start_at, end_at, athlete_id, profiles!bookings_athlete_id_fkey ( full_name )")
+      .select("id, start_at, end_at, athlete_id, recurring_series_id, profiles!bookings_athlete_id_fkey ( full_name )")
       .eq("coach_id", user.id)
       .in("group_id", orgGroupIds)
       .eq("status", "confirmed")
@@ -961,7 +961,7 @@ export async function CoachCalendarPageBody(
   ]);
   const itemGroupName = new Map((itemGroupRows ?? []).map((g) => [g.id, g.name as string]));
 
-  const bookingsByDateKey = new Map<string, { time: string; name: string; startMs?: number; endMs?: number }[]>();
+  const bookingsByDateKey = new Map<string, { time: string; name: string; startMs?: number; endMs?: number; bookingId?: string; seriesId?: string | null }[]>();
   for (const g of groupItems) {
     const d = new Date(g.start_at);
     const key = dateKeyInZone(bookingTz, d);
@@ -976,7 +976,7 @@ export async function CoachCalendarPageBody(
     const time = formatSlotTime(d, bookingTz);
     const name = b.profiles?.full_name ?? "A client";
     if (!bookingsByDateKey.has(key)) bookingsByDateKey.set(key, []);
-    bookingsByDateKey.get(key)!.push({ time, name, startMs: d.getTime(), endMs: b.end_at ? new Date(b.end_at).getTime() : undefined });
+    bookingsByDateKey.get(key)!.push({ time, name, startMs: d.getTime(), endMs: b.end_at ? new Date(b.end_at).getTime() : undefined, bookingId: b.id, seriesId: b.recurring_series_id ?? null });
   }
 
   const eventsByDateKey = new Map<string, CalendarEventEntry[]>();

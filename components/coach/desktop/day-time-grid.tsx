@@ -1,5 +1,6 @@
 "use client";
 
+import { CancelSessionDialog, type CancelTarget } from "@/components/coach/session-cancel-dialog";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
@@ -60,7 +61,7 @@ export function DayTimeGrid({
   date: Date;
   groupId: string;
   client: DraggedClient | null;
-  bookings: { time: string; name: string; startMs?: number; endMs?: number }[];
+  bookings: { time: string; name: string; startMs?: number; endMs?: number; bookingId?: string; seriesId?: string | null }[];
   events: CalendarEventEntry[];
   availabilityWindows: WindowWithType[];
   blockedRanges?: {
@@ -147,7 +148,7 @@ export function DayTimeGrid({
       const start = new Date(b.startMs!);
       const startMin = minutesOfDayInZone(start, timezone);
       const endMin = b.endMs != null ? wall(new Date(b.endMs)) : startMin + sessionLengthDefault;
-      return { startMin, endMin: Math.max(endMin, startMin + 5), name: b.name, time: b.time };
+      return { startMin, endMin: Math.max(endMin, startMin + 5), name: b.name, time: b.time, bookingId: b.bookingId, seriesId: b.seriesId ?? null, startMs: b.startMs! };
     });
 
   const range = gridRange([...windowSpans, ...blockedSpans, ...sessionSpans]);
@@ -314,6 +315,7 @@ export function DayTimeGrid({
     onChanged();
   }
 
+  const [cancelTarget, setCancelTarget] = useState<CancelTarget | null>(null);
   const pendingLabel = pendingMin != null ? `${clockLabel12(pendingMin)} to ${clockLabel12(pendingMin + lengthMin)}` : "";
 
   return (
@@ -459,11 +461,28 @@ export function DayTimeGrid({
               return (
                 <div key={`s${i}`} className="absolute" style={{ top: top - halo, height: height + halo * 2, left: `${(lane / count) * 100}%`, width: `${100 / count}%` }}>
                   {bufferMinutes > 0 && <div className="absolute inset-0 border border-dashed border-blue-400/40" aria-hidden="true" />}
-                  <div className="absolute left-0.5 right-0.5 bg-blue-500/35 border border-blue-400 px-1 overflow-hidden" style={{ top: halo, height }}>
-                    <span className="font-body text-[11px] leading-tight text-chalk block truncate">
-                      {item.time} {item.name}
-                    </span>
-                  </div>
+                  {item.bookingId && item.startMs > Date.now() ? (
+                    <button
+                      type="button"
+                      aria-label={`${item.name}, ${item.time}. Cancel this session`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setCancelTarget({ bookingId: item.bookingId!, seriesId: item.seriesId, name: item.name, whenLabel: formatInTimezone(new Date(item.startMs), timezone, "dateTime") });
+                      }}
+                      className="absolute left-0.5 right-0.5 bg-blue-500/35 border border-blue-400 px-1 overflow-hidden text-left cursor-pointer hover:bg-blue-500/50 focus-visible:outline focus-visible:outline-1 focus-visible:outline-rust"
+                      style={{ top: halo, height }}
+                    >
+                      <span className="font-body text-[11px] leading-tight text-chalk block truncate">
+                        {item.time} {item.name}
+                      </span>
+                    </button>
+                  ) : (
+                    <div className="absolute left-0.5 right-0.5 bg-blue-500/35 border border-blue-400 px-1 overflow-hidden" style={{ top: halo, height }}>
+                      <span className="font-body text-[11px] leading-tight text-chalk block truncate">
+                        {item.time} {item.name}
+                      </span>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -525,6 +544,8 @@ export function DayTimeGrid({
           )}
         </div>
       )}
+
+      {cancelTarget && <CancelSessionDialog target={cancelTarget} onClose={() => setCancelTarget(null)} onDone={onChanged} />}
 
       {booked && (
         <div className="px-3 py-2 m-3 border border-positive/40 bg-positive/10 flex flex-wrap items-center gap-3" role="status">

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   changeFromHere,
   createSeries,
+  endFromHere,
   endSeries,
   extendSeries,
   moveOccurrence,
@@ -491,5 +492,28 @@ describe("edit this and the rest", () => {
     expect(c.ok).toBe(true);
     const created = [...series.values()].find((s) => s.id === c.seriesId)!;
     expect(created.mode).toBe("ongoing");
+  });
+});
+
+describe("take this session and the rest off", () => {
+  it("cancels this session and every later one, keeps the earlier ones, and ends the schedule", async () => {
+    const { store, series, bookings } = fakeStore();
+    const r = await createSeries(store, base, NOW);
+    const all = confirmed(bookings);
+    expect(all.length).toBeGreaterThanOrEqual(3);
+    const target = all[1];
+    const e = await endFromHere(store, target.id, NOW);
+    expect(e.ok).toBe(true);
+    const left = confirmed(bookings);
+    expect(left).toHaveLength(1);
+    expect(left[0].id).toBe(all[0].id);
+    expect(series.get(r.seriesId!)!.status).toBe("ended");
+  });
+  it("refuses a session that is not part of a schedule", async () => {
+    const { store, bookings } = fakeStore();
+    const b = await store.book({ coachId: "c1", athleteId: "x", groupId: "g1", start: new Date("2027-01-12T11:00:00Z"), end: new Date("2027-01-12T12:00:00Z"), seriesId: "x" });
+    const id = (b as { bookingId: string }).bookingId;
+    bookings.get(id)!.seriesId = null;
+    expect((await endFromHere(store, id, NOW)).ok).toBe(false);
   });
 });

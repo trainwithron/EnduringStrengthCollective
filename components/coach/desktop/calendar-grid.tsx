@@ -70,7 +70,7 @@ export function CalendarGrid({
   headerLabels: string[];
   cellKeys: (string | null)[];
   todayKey: string;
-  bookingsByDateKey: Map<string, { time: string; name: string; startMs?: number; endMs?: number }[]>;
+  bookingsByDateKey: Map<string, { time: string; name: string; startMs?: number; endMs?: number; bookingId?: string; seriesId?: string | null }[]>;
   eventsByDateKey: Map<string, CalendarEventEntry[]>;
   // Every program's computed workout for this date, across the whole
   // group — the overlay that makes this the coach's one real calendar

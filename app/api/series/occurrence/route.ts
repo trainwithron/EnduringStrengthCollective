@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { changeFromHere, moveOccurrence, skipOccurrence } from "@/lib/series-engine";
+import { changeFromHere, endFromHere, moveOccurrence, skipOccurrence } from "@/lib/series-engine";
 import { authorizeCoachCall, isResponse } from "@/lib/series-route";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 
@@ -29,6 +29,9 @@ export async function POST(request: Request) {
       break;
     case "skip":
       r = await skipOccurrence(call.store, bookingId);
+      break;
+    case "end_from_here":
+      r = await endFromHere(call.store, bookingId);
       break;
     case "change_from_here":
       r = await changeFromHere(call.store, bookingId, String(body.newStartIso ?? ""), duration);

@@ -31,7 +31,7 @@ export function ExpandedDayScheduler({
   date: Date;
   groupId: string;
   client: DraggedClient;
-  bookings: { time: string; name: string; startMs?: number; endMs?: number }[];
+  bookings: { time: string; name: string; startMs?: number; endMs?: number; bookingId?: string; seriesId?: string | null }[];
   events: CalendarEventEntry[];
   availabilityWindows: AvailabilityWindow[];
   blockedRanges?: {

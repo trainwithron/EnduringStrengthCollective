@@ -539,6 +539,19 @@ export async function skipOccurrence(store: SeriesStore, bookingId: string, now:
   return { ok: true, cancelled: 1, message: "Removed just this session. The schedule carries on." };
 }
 
+// Take THIS session and every one after it off the calendar, and end the schedule. Sessions on earlier days stay.
+export async function endFromHere(store: SeriesStore, bookingId: string, now: Date = new Date()): Promise<ActionResult> {
+  const booking = await store.getBooking(bookingId);
+  if (!booking || !booking.seriesId) return { ok: false, message: "That session is not part of a schedule." };
+  if (booking.attendedAt || new Date(booking.startAt).getTime() <= now.getTime()) return { ok: false, message: "That session already happened." };
+  const series = await store.getSeries(booking.seriesId);
+  if (!series) return { ok: false, message: "That schedule was not found." };
+  const tz = series.timezone ?? "UTC";
+  const [y, m, d] = wallClockOf(new Date(booking.startAt), tz).dateKey.split("-").map(Number);
+  const dayBefore = new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10);
+  return endSeries(store, series.id, now, { cancelUpcoming: true, keepThrough: dayBefore });
+}
+
 // Edit THIS session and every one after it: new day, time or length. The old schedule ends before this session and a new one
 // starts at the new time, with the same number of weeks left (fixed) or no end (ongoing).
 export async function changeFromHere(
