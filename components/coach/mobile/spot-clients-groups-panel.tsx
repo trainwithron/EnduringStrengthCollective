@@ -5,7 +5,6 @@ import { useTerm } from "@/components/coach/terminology-provider";
 import { useRouter } from "next/navigation";
 import { Dumbbell, Plus } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { actAsSelfInGroup } from "@/lib/act-as-self";
 import { clientActivityStatus } from "@/lib/client-activity-status";
 import { computeQuietTier, QUIET_TIER_LABEL } from "@/lib/quiet-client-tier";
 import { initialsOf } from "@/lib/initials";
@@ -66,7 +65,6 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
   const [groups, setGroups] = useState<CoachedGroupOption[] | null>(null);
   const [orgs, setOrgs] = useState<{ id: string; name: string }[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
-  const [pickingOwnGroup, setPickingOwnGroup] = useState(false);
   // overnight_comprehensive_polish_pass_sept19_20.md, finding #2 — this
   // tap starts real account impersonation (the coach sees and writes as
   // this client from here on, until they exit), a categorically
@@ -209,21 +207,12 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
     router.refresh();
   }
 
-  async function logMyOwnWorkout() {
-    if (myGroups.length === 1) {
-      await selectOwnGroup(myGroups[0].groupId);
-      return;
-    }
-    setPickingOwnGroup(true);
-  }
-
-  async function selectOwnGroup(targetGroupId: string) {
+  // Your own training: no group to pick; "My training" finds your program (lib/my-training.ts).
+  function logMyOwnWorkout() {
     if (busy) return;
     setBusy(true);
-    await actAsSelfInGroup(targetGroupId);
     onNavigated();
-    router.push(`/groups/${targetGroupId}`);
-    router.refresh();
+    router.push("/my-training");
   }
 
   async function switchToGroup(targetGroupId: string) {
@@ -338,22 +327,6 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
     );
   }
 
-  if (pickingOwnGroup) {
-    return (
-      <div>
-        <p className="font-body text-sm text-steel mb-2">Which group&apos;s program?</p>
-        {myGroups.map((g) => (
-          <button key={g.groupId} type="button" disabled={busy} onClick={() => selectOwnGroup(g.groupId)} className="w-full text-left px-3 py-3 border-b border-steel/10 font-body text-sm disabled:opacity-50 active:bg-surface/60">
-            {g.name}
-          </button>
-        ))}
-        <button type="button" onClick={() => setPickingOwnGroup(false)} className="mt-2 font-body text-xs text-steel underline">
-          Back
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-4">
       {myGroups.length > 0 && (
@@ -364,7 +337,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
           className="w-full h-10 border border-rust/40 text-rust font-body text-sm flex items-center justify-center gap-2 disabled:opacity-50 active:bg-rust/5"
         >
           <Dumbbell className="w-4 h-4 shrink-0" strokeWidth={2.25} />
-          Log My Own Workout
+          Start your own workout
         </button>
       )}
 

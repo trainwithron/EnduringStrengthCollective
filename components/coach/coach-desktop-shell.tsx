@@ -122,7 +122,8 @@ type Active =
   | "records"
   | "kiosk"
   | "settings"
-  | "website";
+  | "website"
+  | "my-training";
 
 interface NavLeaf {
   key: Active;
@@ -434,6 +435,8 @@ function CoachDesktopShellFull({
     },
     // One Nutrition area. Targets, meal plans, favorite meals and the calculator are tabs and sections inside it, not separate places in the rail.
     { key: "nutrition", label: "Nutrition", href: `/groups/${groupId}/nutrition`, icon: Salad },
+    // The coach's own client app: their own program, today's workout, Calendar, Nutrition and History, with no group to pick first.
+    { key: "my-training", label: "My training", href: "/my-training", icon: Activity },
     {
       label: "Business",
       icon: TrendingUp,

@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { actAsSelfInGroup } from "@/lib/act-as-self";
 import { X, Search, Dumbbell } from "lucide-react";
 import { clientActivityStatus } from "@/lib/client-activity-status";
 import { computeQuietTier, QUIET_TIER_LABEL } from "@/lib/quiet-client-tier";
@@ -35,7 +34,6 @@ export function ViewAsClientPicker({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const [clients, setClients] = useState<ClientOption[] | null>(null);
   const [myGroups, setMyGroups] = useState<CoachedGroupOption[] | null>(null);
-  const [pickingOwnGroup, setPickingOwnGroup] = useState(false);
   const [query, setQuery] = useState("");
   const [switching, setSwitching] = useState(false);
   // overnight_comprehensive_polish_pass_sept19_20.md, finding #2 — same
@@ -158,22 +156,12 @@ export function ViewAsClientPicker({ onClose }: { onClose: () => void }) {
     await actAs(pendingClient.id, pendingClient.groupId);
   }
 
-  async function logMyOwnWorkout() {
-    const groups = myGroups ?? [];
-    if (groups.length === 1) {
-      await selectOwnGroup(groups[0].groupId);
-      return;
-    }
-    setPickingOwnGroup(true);
-  }
-
-  async function selectOwnGroup(groupId: string) {
+  // Your own training: no group to pick; "My training" finds your program (lib/my-training.ts).
+  function logMyOwnWorkout() {
     if (switching) return;
     setSwitching(true);
-    await actAsSelfInGroup(groupId);
     onClose();
-    router.push(`/groups/${groupId}`);
-    router.refresh();
+    router.push("/my-training");
   }
 
   const filtered = (clients ?? []).filter((c) =>
@@ -220,33 +208,6 @@ export function ViewAsClientPicker({ onClose }: { onClose: () => void }) {
     );
   }
 
-  if (pickingOwnGroup) {
-    return (
-      <div className="fixed inset-0 z-40 bg-graphite text-chalk font-body flex flex-col">
-        <header className="px-5 pt-8 pb-4 border-b border-steel/20 flex items-center justify-between gap-3">
-          <h1 className="font-display font-bold text-2xl uppercase leading-none">Log My Own Workout</h1>
-          <button type="button" onClick={onClose} aria-label="Close" className="text-steel active:text-rust">
-            <X className="w-5 h-5" strokeWidth={2.5} />
-          </button>
-        </header>
-        <p className="font-body text-sm text-steel px-5 pt-4">Which group&apos;s program?</p>
-        <div className="flex-1 overflow-y-auto">
-          {(myGroups ?? []).map((g) => (
-            <button
-              key={g.groupId}
-              type="button"
-              disabled={switching}
-              onClick={() => selectOwnGroup(g.groupId)}
-              className="w-full text-left px-5 py-4 border-b border-steel/10 font-body text-base disabled:opacity-50 active:bg-surface/60"
-            >
-              {g.name}
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="fixed inset-0 z-40 bg-graphite text-chalk font-body flex flex-col">
       <header className="px-5 pt-8 pb-4 border-b border-steel/20 flex items-center justify-between gap-3">
@@ -264,7 +225,7 @@ export function ViewAsClientPicker({ onClose }: { onClose: () => void }) {
           className="w-full text-left px-5 py-4 border-b border-steel/20 font-body text-base flex items-center gap-2.5 text-rust disabled:opacity-50 active:bg-surface/60"
         >
           <Dumbbell className="w-4 h-4 shrink-0" strokeWidth={2.25} />
-          Log My Own Workout
+          Start your own workout
         </button>
       )}
 

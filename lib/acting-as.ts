@@ -2,6 +2,8 @@ import { cookies } from "next/headers";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 
 export const ACTING_AS_COOKIE = "acting_as_athlete";
+// Readable by the page's own script: set while a coach is in THEIR OWN client app ("My training"), so the bar says that instead of "Viewing as someone".
+export const ACTING_AS_SELF_COOKIE = "acting_as_self";
 
 export interface EffectiveAthlete {
   athleteId: string;

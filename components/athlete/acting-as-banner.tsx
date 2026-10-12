@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { ViewAsClientPicker } from "./view-as-client-picker";
+import { writeViewOverride } from "@/lib/pwa";
 
 // Persistent, unmissable — the coach is standing in a client's real
 // mobile experience (their name, their data, their write attribution),
@@ -13,12 +14,35 @@ export function ActingAsBanner({ athleteFullName, groupId }: { athleteFullName: 
   const router = useRouter();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [exiting, setExiting] = useState(false);
+  // A coach in their OWN client app ("My training") is not viewing as anyone: a quiet bar with the way back, not the "Viewing as ..." bar.
+  const [isSelf, setIsSelf] = useState(false);
+  useEffect(() => {
+    setIsSelf(document.cookie.split("; ").some((c) => c === "acting_as_self=1"));
+  }, []);
 
   async function exit() {
     setExiting(true);
     await fetch("/api/coach/act-as", { method: "DELETE" });
+    // Back to the screen size the device would show by itself (the desktop coaching shell at a desktop).
+    writeViewOverride(null);
     router.push(`/groups/${groupId}`);
     router.refresh();
+  }
+
+  if (isSelf) {
+    return (
+      <div className="relative z-30 bg-surface border-b border-steel/20 text-chalk px-5 py-2 flex items-center justify-between gap-3">
+        <p className="font-body text-xs font-medium truncate">My training</p>
+        <button
+          type="button"
+          onClick={exit}
+          disabled={exiting}
+          className="font-body text-xs text-rust underline underline-offset-2 disabled:opacity-50 shrink-0"
+        >
+          {exiting ? "One moment…" : "Back to coaching"}
+        </button>
+      </div>
+    );
   }
 
   return (

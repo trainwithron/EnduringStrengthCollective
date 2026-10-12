@@ -391,7 +391,8 @@ export function ProgramCardMenu({
       setError(result.error);
       return;
     }
-    router.push(`/groups/${groupId}/programs/${result.programId}`);
+    // Lands where "My training" finds it: the group this copy is in, on its Home with the program ready to run.
+    router.push(`/my-training/open?group=${groupId}`);
   }
 
   async function handleDuplicateSameGroup() {
