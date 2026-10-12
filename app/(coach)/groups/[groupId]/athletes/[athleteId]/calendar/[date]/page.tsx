@@ -163,7 +163,7 @@ export default async function ClientCalendarDayPage(
   // computed when every real input actually exists for this client —
   // the form itself hides the suggestion button otherwise, never a
   // silent partial estimate.
-  const [{ data: profileDetails }, { data: connectionRow }] = await Promise.all([
+  const [{ data: profileDetailsRow }, { data: connectionRow }, { data: intakeDobRow }] = await Promise.all([
     supabase
       .from("athlete_profile_details")
       .select("height_cm, biological_sex, birthday, body_fat_pct")
@@ -176,7 +176,10 @@ export default async function ClientCalendarDayPage(
       .eq("provider", "oura")
       .eq("status", "active")
       .maybeSingle(),
+    // The date of birth every client gives at onboarding lives in the intake; the profile's own birthday is the fallback (same order as lib/client-body-profile.ts).
+    supabase.from("client_intake").select("date_of_birth").eq("athlete_id", params.athleteId).maybeSingle(),
   ]);
+  const profileDetails = profileDetailsRow ? { ...profileDetailsRow, birthday: (intakeDobRow as { date_of_birth?: string | null } | null)?.date_of_birth ?? profileDetailsRow.birthday } : profileDetailsRow;
   let avgDailySteps: number | null = null;
   if (connectionRow) {
     const sevenDaysAgo = new Date();
