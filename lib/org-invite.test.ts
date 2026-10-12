@@ -15,7 +15,13 @@ describe("joining an organization needs the person's OK", () => {
     expect(route).toContain('rpc("profile_id_for_email"');
     expect(route).toContain('.from("organization_invites")');
     expect(route.indexOf("profile_id_for_email")).toBeLessThan(route.indexOf("inviteUserByEmail"));
-    expect(read("components/coach/desktop/invite-coach-form.tsx")).toContain("They already have an account");
+    expect(route).not.toContain("pendingInvitation");
+    expect(read("components/coach/desktop/invite-coach-form.tsx")).toContain("Invitation sent. They join once they accept.");
+  });
+  it("the invitation answer never reveals whether an address has an account, and a seat is never given in a group with a private client", () => {
+    const route = read("app/api/coaches/invite/route.ts");
+    expect((route.match(/invited: true/g) ?? []).length).toBeGreaterThanOrEqual(4);
+    expect(read("supabase/migrations/0352_organization_invites_accept_and_leave.sql")).toContain("a.role = 'athlete' and a.private_from_org");
   });
   it("the invited person accepts or declines through the database function, and can leave from settings", () => {
     expect(read("components/org/org-invite-answer.tsx")).toContain('rpc("answer_organization_invite"');

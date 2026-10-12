@@ -50,7 +50,9 @@ begin
     insert into public.organization_memberships (organization_id, profile_id, role)
     values (inv.organization_id, inv.invited_profile_id, inv.role::public.org_member_role)
     on conflict (organization_id, profile_id) do nothing;
-    if inv.group_id is not null and exists (select 1 from public.groups g where g.id = inv.group_id and g.organization_id = inv.organization_id and g.group_kind is distinct from 'one_on_one') then
+    if inv.group_id is not null and exists (select 1 from public.groups g where g.id = inv.group_id and g.organization_id = inv.organization_id and g.group_kind is distinct from 'one_on_one')
+       -- never a coach seat in a group that holds a client who is private from the organization (a client can be marked private after the invitation was sent)
+       and not exists (select 1 from public.group_memberships a where a.group_id = inv.group_id and a.role = 'athlete' and a.private_from_org) then
       insert into public.group_memberships (group_id, profile_id, role)
       values (inv.group_id, inv.invited_profile_id, 'coach')
       on conflict do nothing;

@@ -72,15 +72,17 @@ export async function POST(request: Request) {
   const { data: existingId } = await serviceRole.rpc("profile_id_for_email", { p_email: trimmedEmail });
   if (typeof existingId === "string" && existingId) {
     const { data: already } = await serviceRole.from("organization_memberships").select("id").eq("organization_id", group.organization_id).eq("profile_id", existingId).maybeSingle();
-    if (already) return NextResponse.json({ error: "That person is already part of your organization." }, { status: 400 });
+    // The answer is the same whether or not the address has an account (or is already a member), so an organization cannot be used to find out who has an account.
+    if (already) return NextResponse.json({ invited: true });
     const { data: invite, error: inviteRowError } = await serviceRole
       .from("organization_invites")
       .insert({ organization_id: group.organization_id, invited_profile_id: existingId, role, group_id: groupId, created_by: user.id })
       .select("id")
       .single();
     if (inviteRowError || !invite) {
-      const duplicate = inviteRowError?.code === "23505";
-      return NextResponse.json({ error: duplicate ? "They already have an open invitation from you." : "Couldn't send the invitation. Try again." }, { status: duplicate ? 400 : 502 });
+      // An open invitation already exists: answer as if it was just sent.
+      if (inviteRowError?.code === "23505") return NextResponse.json({ invited: true });
+      return NextResponse.json({ error: "Couldn't send the invitation. Try again." }, { status: 502 });
     }
     const { data: orgRow } = await serviceRole.from("organizations").select("name").eq("id", group.organization_id).maybeSingle();
     await serviceRole.from("notifications").insert({
@@ -89,7 +91,7 @@ export async function POST(request: Request) {
       body: `${orgRow?.name ?? "An organization"} invited you to join as ${role === "admin" ? "an admin" : "a coach"}.`,
       link_path: `/org-invite/${invite.id}`,
     });
-    return NextResponse.json({ pendingInvitation: true });
+    return NextResponse.json({ invited: true });
   }
   const origin = appOrigin(request);
 
@@ -135,5 +137,5 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({ profileId: newUserId });
+  return NextResponse.json({ invited: true });
 }

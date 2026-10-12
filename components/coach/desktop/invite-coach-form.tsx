@@ -13,8 +13,6 @@ export function InviteCoachForm({ groupId }: { groupId: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  // They already have an account: they got an invitation to accept, not an email to set a password.
-  const [pending, setPending] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -31,7 +29,6 @@ export function InviteCoachForm({ groupId }: { groupId: string }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Couldn't invite this coach.");
 
-      setPending(!!data.pendingInvitation);
       setSuccess(true);
       setFullName("");
       setEmail("");
@@ -68,9 +65,7 @@ export function InviteCoachForm({ groupId }: { groupId: string }) {
       {success ? (
         <div>
           <p className="font-body text-sm text-positive">
-            {pending
-              ? "Invitation sent. They already have an account, so they will see it when they sign in and join once they accept."
-              : "Invite sent — they\u2019ll get an email to set their password and join as a coach."}
+            Invitation sent. They join once they accept.
           </p>
           <button
             type="button"

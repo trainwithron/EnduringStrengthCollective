@@ -45,6 +45,18 @@ export default {
       await h.asSuper();
       h.check("declining makes no membership", (await db.query(`select count(*)::int as n from public.organization_memberships where organization_id = $1 and profile_id = $2`, [org, stranger])).rows[0].n === 0);
 
+      // a group that holds a client who is private from the organization never gets a new coach seat from an invitation
+      await h.asSuper();
+      const priv = await h.user("OI Private Client");
+      const secret = await h.group(org, owner, "team", "OI private team");
+      await h.member(secret, priv);
+      await db.query(`update public.group_memberships set private_from_org = true where group_id = $1 and profile_id = $2`, [secret, priv]);
+      const inv3 = (await db.query(`insert into public.organization_invites (organization_id, invited_profile_id, role, group_id, created_by) values ($1, $2, 'coach', $3, $4) returning id`, [org, stranger, secret, owner])).rows[0].id;
+      await h.as(stranger);
+      await db.query(`select public.answer_organization_invite($1, true)`, [inv3]);
+      await h.asSuper();
+      h.check("accepting joins the organization but takes no coach seat in a group with a private client", (await db.query(`select (select count(*) from public.organization_memberships where organization_id = $1 and profile_id = $2)::int as m, (select count(*) from public.group_memberships where group_id = $3 and profile_id = $2 and role = 'coach')::int as g`, [org, stranger, secret])).rows[0].m === 1 && (await db.query(`select count(*)::int as g from public.group_memberships where group_id = $1 and profile_id = $2 and role = 'coach'`, [secret, stranger])).rows[0].g === 0);
+
       // leaving
       await h.as(owner);
       await h.expectError("the owner cannot leave", () => db.query(`select public.leave_organization($1)`, [org]), /owner cannot leave/i);
