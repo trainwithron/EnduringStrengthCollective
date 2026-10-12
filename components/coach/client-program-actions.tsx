@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { APPROVE_AND_ASSIGN_FAILED, ensureSignedOff } from "@/components/coach/approve-and-assign";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -17,6 +17,8 @@ export function ClientProgramActions({ groupId, athleteId, athleteFullName, extr
   const [programs, setPrograms] = useState<(PickableProgram & { uses: number })[] | null>(null);
   const [startDate, setStartDate] = useState(localDateKey());
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Set before the first await (the sign-off): state updates too late to stop a quick second click.
+  const assigning = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
 
@@ -58,7 +60,16 @@ export function ClientProgramActions({ groupId, athleteId, athleteFullName, extr
   }
 
   async function assign(program: PickableProgram) {
-    if (busyId) return;
+    if (busyId || assigning.current) return;
+    assigning.current = true;
+    try {
+      await assignOnce(program);
+    } finally {
+      assigning.current = false;
+    }
+  }
+
+  async function assignOnce(program: PickableProgram) {
     // An AI draft: the click IS the approval (the existing sign-off runs first, without making the original active).
     if ((await ensureSignedOff({ aiDraft: program.aiDraft, programId: program.id })) === "failed") {
       setError(APPROVE_AND_ASSIGN_FAILED);

@@ -69,7 +69,7 @@ describe("the client's Programs tab", () => {
     expect(SEARCH_FROM).toBeGreaterThan(1);
   });
   it("an unsigned AI draft can be picked: the click signs it off and assigns it", () => {
-    expect(actions).toContain("if (busyId) return;");
+    expect(actions).toContain("if (busyId || assigning.current) return;");
     expect(actions).toContain("ensureSignedOff({ aiDraft: program.aiDraft, programId: program.id })");
     expect(actions).not.toContain("disabled: p.aiDraft");
     expect(section).toContain('p.ai_draft ? "AI draft"');

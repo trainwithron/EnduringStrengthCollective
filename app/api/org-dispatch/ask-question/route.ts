@@ -29,5 +29,5 @@ export async function POST(request: Request) {
   const serviceRole = createServiceRoleClient();
   const result = await askDispatchQuestion(serviceRole, stepId, question.trim(), origin);
   if (!result.ok) return NextResponse.json({ error: result.error }, { status: 400 });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, notice: result.notice });
 }

@@ -117,7 +117,14 @@ export async function advanceDispatch(
 // exact same table the single-coach prospect flow already writes to —
 // rather than inventing a second booking record for the same real-world
 // event.
-export async function acceptDispatchStep(supabase: SupabaseClient, stepId: string): Promise<{ ok: boolean; error?: string }> {
+// An email that did not go out does not undo the trainer's action (the booking / the saved question stands), but the trainer is told, so a prospect is never silently left unnotified.
+async function emailProspect(to: string, subject: string, text: string, what: string): Promise<boolean> {
+  const sent = sendEmailConfigured() ? await sendEmail(to, subject, text) : false;
+  if (!sent) console.error(`[dispatch] the ${what} email was not sent (email is not set up, or the send failed)`);
+  return sent;
+}
+
+export async function acceptDispatchStep(supabase: SupabaseClient, stepId: string): Promise<{ ok: boolean; error?: string; notice?: string }> {
   const { data: step } = await supabase
     .from("org_trainer_dispatch_steps")
     .select("id, trainer_id, status, request_id")
@@ -198,14 +205,13 @@ export async function acceptDispatchStep(supabase: SupabaseClient, stepId: strin
     .update({ status: "matched", matched_trainer_id: step.trainer_id })
     .eq("id", request.id);
 
-  if (sendEmailConfigured()) {
-    await sendEmail(
-      request.prospect_email,
-      "You're booked!",
-      `Hi ${request.prospect_name}, ${trainerProfile?.full_name ?? "your coach"} confirmed your session request for ${formatInTimezone(requestedStartAt, request.prospect_timezone, "dateTime")}. See you then!`
-    );
-  }
-
+  const sent = await emailProspect(
+    request.prospect_email,
+    "You're booked!",
+    `Hi ${request.prospect_name}, ${trainerProfile?.full_name ?? "your coach"} confirmed your session request for ${formatInTimezone(requestedStartAt, request.prospect_timezone, "dateTime")}. See you then!`,
+    "booking confirmation"
+  );
+  if (!sent) return { ok: true, notice: `Booked. We couldn't email ${request.prospect_name} to confirm, so please let them know yourself: ${request.prospect_email}` };
   return { ok: true };
 }
 
@@ -236,7 +242,7 @@ export async function askDispatchQuestion(
   stepId: string,
   question: string,
   origin: string
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; notice?: string }> {
   const { data: step } = await supabase
     .from("org_trainer_dispatch_steps")
     .select("id, trainer_id, status, request_id")
@@ -261,14 +267,13 @@ export async function askDispatchQuestion(
     .single();
   if (error || !inserted) return { ok: false, error: "Couldn't send the question." };
 
-  if (sendEmailConfigured()) {
-    const replyUrl = `${origin}/dispatch-reply/${inserted.reply_token}`;
-    await sendEmail(
-      request.prospect_email,
-      `A question from ${trainerProfile?.full_name ?? "your coach"}`,
-      `${trainerProfile?.full_name ?? "Your coach"} asked: "${question}"\n\nReply here: ${replyUrl}\n\n(Your original time is still being held while you answer.)`
-    );
-  }
+  const replyUrl = `${origin}/dispatch-reply/${inserted.reply_token}`;
+  const sent = await emailProspect(
+    request.prospect_email,
+    `A question from ${trainerProfile?.full_name ?? "your coach"}`,
+    `${trainerProfile?.full_name ?? "Your coach"} asked: "${question}"\n\nReply here: ${replyUrl}\n\n(Your original time is still being held while you answer.)`,
+    "question"
+  );
 
   await notifyOrgAdmins(
     supabase,
@@ -279,6 +284,7 @@ export async function askDispatchQuestion(
     "/dashboard"
   );
 
+  if (!sent) return { ok: true, notice: `Your question was saved, but we couldn't email ${request.prospect_name}. Please contact them yourself: ${request.prospect_email}` };
   return { ok: true };
 }
 

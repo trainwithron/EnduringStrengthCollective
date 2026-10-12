@@ -1678,6 +1678,25 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["coaches are recorded in group_memberships", has.col("group_memberships", "role")],
     ],
   },
+  {
+    n: "83",
+    slug: "0337",
+    title: "0337 Assigning a program attaches it only inside one organization (across organizations it makes a copy)",
+    migrations: ["0337"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for normal use. A coach who belongs to two organizations can no longer move an unused library program out of one organization into a client's space in the other; assigning across organizations makes a copy and leaves the original where it is.",
+    undo: [
+      fnFromMigration("0335", "assign_program_to_client"),
+      "revoke execute on function public.assign_program_to_client(uuid, uuid, uuid, text, date) from public, anon;",
+      "grant execute on function public.assign_program_to_client(uuid, uuid, uuid, text, date) to authenticated, service_role;",
+    ].join("\n"),
+    undoWhy: "Only if step 83 misbehaves. Puts back the earlier version of the function (it then attaches whatever the earlier rules allow, in any organization).",
+    rows: [
+      ["0337 is not already applied (the function does not yet compare organizations)", "to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)') is not null and position('v_src_org' in pg_get_functiondef(to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)'))) = 0"],
+      ["the assign function from 0335 exists", "to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)') is not null"],
+      ["groups have an organization_id", has.col("groups", "organization_id")],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -1781,6 +1800,7 @@ const BUNDLES = [
   { id: "release-aa", name: "Release AA (every session costs exactly 1 credit; the waitlist offer shows the coach's time zone)", steps: ["75"] },
   { id: "release-ah", name: "Release AH (only a real coach can have a public booking page or website)", steps: ["76"] },
   { id: "release-ai", name: "Release AI (a payment and its sessions are recorded in one step; run BEFORE the code that uses it deploys)", steps: ["77"] },
+  { id: "release-ao", name: "Release AO (assigning attaches a program only inside one organization; run any time, after Release AM)", steps: ["83"] },
   { id: "release-an", name: "Release AN (the 'what do you call your people' card is asked once, for good; run any time)", steps: ["82"] },
   { id: "release-am", name: "Release AM (assigning an unused no-client program to one client attaches it instead of copying it; run any time)", steps: ["81"] },
   { id: "release-al", name: "Release AL (a client can switch their first name off shared workout pictures; run any time)", steps: ["80"] },
@@ -1971,6 +1991,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0329", "exists (select 1 from pg_constraint where conname = 'session_types_credit_cost_is_one')"),
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
+    m("0337", "position('v_src_org' in pg_get_functiondef(to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)'))) > 0"),
     m("0336", has.col("profiles", "terminology_asked_at")),
     m("0335", "to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)') is not null"),
     m("0334", has.col("profiles", "show_name_on_share")),

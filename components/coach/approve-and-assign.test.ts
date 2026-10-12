@@ -70,12 +70,12 @@ describe("assign to ONE client: attach when nothing depends on the program, else
 
   it("only the single-client paths attach; a position, several people, Assign to Myself, Duplicate and the package auto-assign still copy", () => {
     const menu = read("components/coach/desktop/program-card-menu.tsx");
-    const single = menu.slice(menu.indexOf("async function handleAssignToClient"), menu.indexOf("async function handleAssignToSelf"));
+    const single = menu.slice(menu.indexOf("async function assignToClient"), menu.indexOf("async function assignToSelf"));
     expect(single).toContain("assignProgramToClient(supabase");
-    const position = menu.slice(menu.indexOf("async function handleAssignToPosition"), menu.indexOf("async function handleAssignToClient"));
+    const position = menu.slice(menu.indexOf("async function assignToPosition"), menu.indexOf("async function assignToClient"));
     expect(position).toContain("duplicateProgram(supabase");
     expect(position).not.toContain("assignProgramToClient");
-    const self = menu.slice(menu.indexOf("async function handleAssignToSelf"));
+    const self = menu.slice(menu.indexOf("async function assignToSelf"));
     expect(self.slice(0, 1500)).toContain("duplicateProgram(supabase");
     expect(read("app/api/coach/package-assignments/route.ts")).toContain("duplicateProgram(");
     expect(read("components/coach/client-program-actions.tsx")).toContain("assignProgramToClient(supabase");

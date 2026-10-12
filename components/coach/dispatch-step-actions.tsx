@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { confirmDialog } from "@/components/shared/confirm-dialog";
 
 export function DispatchStepActions({ stepId }: { stepId: string }) {
   const [busy, setBusy] = useState(false);
@@ -24,6 +25,8 @@ export function DispatchStepActions({ stepId }: { stepId: string }) {
       setError(data.error ?? "Something went wrong — try again.");
       return;
     }
+    // The booking stands even if the confirmation email did not go out: say so, so the coach tells the prospect.
+    if (data.notice) await confirmDialog({ message: data.notice, confirmLabel: "Got it", cancelLabel: "Close" });
     router.refresh();
   }
 
@@ -42,6 +45,7 @@ export function DispatchStepActions({ stepId }: { stepId: string }) {
       setError(data.error ?? "Something went wrong — try again.");
       return;
     }
+    if (data.notice) await confirmDialog({ message: data.notice, confirmLabel: "Got it", cancelLabel: "Close" });
     setQuestion("");
     setAskingQuestion(false);
     router.refresh();

@@ -245,6 +245,14 @@
   "file": "apply-release-ai-all.sql"
  },
  {
+  "id": "release-ao",
+  "name": "Release AO (assigning attaches a program only inside one organization; run any time, after Release AM)",
+  "steps": [
+   "83"
+  ],
+  "file": "apply-release-ao-all.sql"
+ },
+ {
   "id": "release-an",
   "name": "Release AN (the 'what do you call your people' card is asked once, for good; run any time)",
   "steps": [

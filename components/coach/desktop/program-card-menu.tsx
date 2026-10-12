@@ -84,7 +84,7 @@ export function ProgramCardMenu({
   const [view, setView] = useState<View | null>(null);
   // Set after a single-client assignment so the coach sees it worked before
   // anything else happens, instead of being dropped into the copy's builder.
-  const [assigned, setAssigned] = useState<{ programId: string; clientName: string; groupId: string } | null>(null);
+  const [assigned, setAssigned] = useState<{ programId: string; clientName: string; groupId: string; attached: boolean } | null>(null);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
   const [clients, setClients] = useState<AssignClient[] | null>(null);
   const [orgs, setOrgs] = useState<OrgOption[] | null>(null);
@@ -93,6 +93,17 @@ export function ProgramCardMenu({
   const [assignProgress, setAssignProgress] = useState<string | null>(null);
   const [bulkResult, setBulkResult] = useState<BulkAssignResult | null>(null);
   const [busy, setBusy] = useState(false);
+  // Set BEFORE the first await of an assign (the sign-off), so a second click while it runs cannot start a second assign: state updates too late for that.
+  const assigning = useRef(false);
+  async function once(run: () => Promise<void>) {
+    if (assigning.current) return;
+    assigning.current = true;
+    try {
+      await run();
+    } finally {
+      assigning.current = false;
+    }
+  }
   const [error, setError] = useState<string | null>(null);
   const [assignStartDate, setAssignStartDate] = useState(todayDateString());
 
@@ -220,7 +231,11 @@ export function ProgramCardMenu({
     setPositions(options);
   }
 
-  async function handleAssignToPosition(position: PositionOption) {
+  function handleAssignToPosition(position: PositionOption) {
+    return once(() => assignToPosition(position));
+  }
+
+  async function assignToPosition(position: PositionOption) {
     const supabase = createBrowserClient();
     const { data: memberRows } = await supabase
       .from("group_memberships")
@@ -291,7 +306,11 @@ export function ProgramCardMenu({
     setView("assign-position-result");
   }
 
-  async function handleAssignToClient(client: AssignClient) {
+  function handleAssignToClient(client: AssignClient) {
+    return once(() => assignToClient(client));
+  }
+
+  async function assignToClient(client: AssignClient) {
     // An AI draft: the click on Assign IS the approval (the existing sign-off runs first, without making the original active).
     if ((await ensureSignedOff({ aiDraft, programId })) === "failed") {
       setError(APPROVE_AND_ASSIGN_FAILED);
@@ -335,11 +354,15 @@ export function ProgramCardMenu({
       `Your coach assigned you a new program: ${programName} — ${client.fullName}`,
       `/groups/${client.destinationGroupId}/programs/${result.programId}`
     );
-    setAssigned({ programId: result.programId, clientName: client.fullName, groupId: client.destinationGroupId });
+    setAssigned({ programId: result.programId, clientName: client.fullName, groupId: client.destinationGroupId, attached: result.attached });
     setView("assigned");
   }
 
-  async function handleAssignToSelf() {
+  function handleAssignToSelf() {
+    return once(assignToSelf);
+  }
+
+  async function assignToSelf() {
     if ((await ensureSignedOff({ aiDraft, programId })) === "failed") {
       setError(APPROVE_AND_ASSIGN_FAILED);
       return;
@@ -650,14 +673,16 @@ export function ProgramCardMenu({
           {view === "assigned" && assigned && (
             <div className="p-3">
               <p className="font-body text-sm text-chalk">
-                Assigned to {assigned.clientName}. They have been notified and now have their own copy.
+                {assigned.attached
+                  ? `Assigned to ${assigned.clientName}. They have been notified. This program is theirs now.`
+                  : `Assigned to ${assigned.clientName}. They have been notified and now have their own copy.`}
               </p>
               <button
                 type="button"
                 onClick={() => router.push(`/groups/${assigned.groupId}/programs/${assigned.programId}`)}
                 className="w-full h-11 mt-2.5 bg-rust text-graphite font-body text-sm font-medium"
               >
-                Open their copy
+                {assigned.attached ? "Open their program" : "Open their copy"}
               </button>
               <button
                 type="button"

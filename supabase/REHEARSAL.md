@@ -99,6 +99,12 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0326 | yes | yes | 14 | 0326 the coach conversation is private to the coach |
 | 0327 | yes | yes | 12 | 0327 a coach's sign-in email wording is private to the coach |
 | 0328 | yes | yes | 12 | 0328 a program removed from a client's profile is hidden from the client and kept |
+| 0332 | yes | yes | 17 | 0332 a one-on-one client cannot read the space's no-client programs |
+| 0333 | yes | yes | 25 | 0333 a one-on-one space stays a one-on-one space |
+| 0334 | yes | yes | 5 | 0334 show my first name on shared workout pictures |
+| 0335 | yes | yes | 20 | 0335 assign a no-client program to one client: attach, else copy |
+| 0336 | yes | yes | 6 | 0336 the what-do-you-call-your-people card is asked once |
+| 0337 | yes | yes | 4 | 0337 assigning attaches only inside one organization |
 | 0331 | yes | yes | 10 | 0331 a payment event and its sessions are recorded in one step |
 | 0329 | yes | yes | 12 | 0329 every session costs exactly 1 credit; the waitlist offer uses the coach's time zone |
 | 0330 | yes | yes | 9 | 0330 only a real coach can have a public page |

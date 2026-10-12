@@ -1204,6 +1204,24 @@ for (const s of steps) {
   const errAN2 = await run(`apply/${bundle.file}`);
   check("release-an: the bundle applies again after an undo" + (errAN2 ? ": " + errAN2 : ""), !errAN2 && (await has()));
 }
+// Release AO (step 83): ONE paste.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-ao");
+  check("release-ao: ONE bundle holds step 83", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["83"]));
+  const st83 = steps.find((x) => x.n === "83");
+  const has = async () => (await db.query("select position('v_src_org' in pg_get_functiondef(to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)'))) > 0 as ok")).rows[0].ok === true;
+  const eao0 = await run(`apply/undo-step${st83.n}-${st83.slug}.sql`);
+  check("release-ao: before the bundle runs the function has no organization check" + (eao0 ? ": " + eao0 : ""), !eao0 && !(await has()));
+  const errAO = await run(`apply/${bundle.file}`);
+  check("release-ao bundle applies on the live-shaped state" + (errAO ? ": " + errAO : ""), !errAO && (await has()));
+  const againAO = await run(`apply/${bundle.file}`);
+  check("release-ao: a second run is refused, naming step 83 (" + againAO + ")", !!againAO && againAO.includes("step 83 (0337) cannot run") && againAO.includes("already applied"));
+  const euAO = await run(`apply/undo-step${st83.n}-${st83.slug}.sql`);
+  check("release-ao: the undo puts back the earlier function" + (euAO ? ": " + euAO : ""), !euAO && !(await has()));
+  const errAO2 = await run(`apply/${bundle.file}`);
+  check("release-ao: the bundle applies again after an undo" + (errAO2 ? ": " + errAO2 : ""), !errAO2 && (await has()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.
