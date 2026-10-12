@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { shouldResumeClaim } from "@/lib/claim-resume";
 import { LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/workspace-header";
 import { decodeWorkspaceCookie, groupIdFromPath } from "@/lib/workspace-header";
+import { MY_TRAINING_COOKIES, shouldLeaveMyTraining } from "@/lib/my-training-exit";
 import { DOB_OK_COOKIE, dobOkCookieValid, loadDobGate, signDobOk } from "@/lib/dob-gate";
 import { SIGNED_OUT_FRAME_HTML } from "@/lib/signed-out-frame";
 
@@ -206,6 +207,16 @@ export async function updateSession(request: NextRequest) {
     }
     const signed = await signDobOk(user.id, process.env.CRON_SECRET);
     if (signed) response.cookies.set(DOB_OK_COOKIE, signed, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 7 });
+  }
+
+  // "My training" is a deliberate visit (lib/my-training-exit.ts): landing on a coach page ends it. The cookies are cleared for THIS request too, so the coach screen renders instead of a redirect
+  // into the client view.
+  if (user && shouldLeaveMyTraining(pathname, request.cookies.get(MY_TRAINING_COOKIES.actingAsSelf)?.value)) {
+    for (const name of Object.values(MY_TRAINING_COOKIES)) request.cookies.delete(name);
+    const carried = response.cookies.getAll();
+    response = NextResponse.next({ request });
+    carried.forEach((cookie) => response.cookies.set(cookie));
+    for (const name of Object.values(MY_TRAINING_COOKIES)) response.cookies.set(name, "", { path: "/", maxAge: 0 });
   }
 
   // Defense in depth (lib/workspace-header.ts): opening a group's page makes that group the open workspace, so every data request the page and its API calls make names the right organization.
