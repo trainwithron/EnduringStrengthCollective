@@ -21,3 +21,8 @@ export function cleanImportedProgramName(raw: string): string {
   if (spaced !== spaced.toLowerCase()) return spaced;
   return spaced.replace(/(^|[\s-])([a-z])/g, (_m, sep: string, ch: string) => sep + ch.toUpperCase());
 }
+
+// The name to save when a program is created from an import: the coach's confirmed name with runs of spaces collapsed, trimmed, and cut to the limit. Blank stays blank (the caller has its own fallback).
+export function tidyProgramName(raw: string): string {
+  return raw.replace(/\s+/g, " ").trim().slice(0, PROGRAM_NAME_MAX);
+}

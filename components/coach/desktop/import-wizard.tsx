@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { cleanImportedProgramName, PROGRAM_NAME_MAX } from "@/lib/program-name";
+import { cleanImportedProgramName, PROGRAM_NAME_MAX, tidyProgramName } from "@/lib/program-name";
 import * as XLSX from "xlsx";
 import * as cptable from "xlsx/dist/cpexcel.full.mjs";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -424,7 +424,7 @@ export function ImportWizard({
     const supabase = createBrowserClient();
     const { parsed, description, fuzzyMatches, autoNewExercises, sequencingNotes, injuryConsiderations } = importData;
     // The name the coach confirmed on the review screen: trimmed, and never blank.
-    const programName = importData.programName.replace(/s+/g, " ").trim().slice(0, PROGRAM_NAME_MAX);
+    const programName = tidyProgramName(importData.programName);
     const resolutions = new Map(importData.resolutions);
 
     const createdExercises: string[] = [...autoNewExercises];

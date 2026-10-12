@@ -44,3 +44,19 @@ describe("Imported program names", () => {
     expect(src).toContain("Program name");
   });
 });
+
+describe("The name saved when an import creates the program", () => {
+  it("keeps every letter (a name with s in it is unchanged), collapses runs of spaces, trims, and cuts to the limit", async () => {
+    const { tidyProgramName } = await import("@/lib/program-name");
+    expect(tidyProgramName("Strength Basics 12-Week")).toBe("Strength Basics 12-Week");
+    expect(tidyProgramName("Christmas Abs")).toBe("Christmas Abs");
+    expect(tidyProgramName("  a   b ")).toBe("a b");
+    expect(tidyProgramName("   ")).toBe("");
+    expect(tidyProgramName("x".repeat(PROGRAM_NAME_MAX + 30)).length).toBe(PROGRAM_NAME_MAX);
+  });
+  it("finalizeImport uses it (and no hand-written pattern that could lose a backslash)", () => {
+    const src = read("components/coach/desktop/import-wizard.tsx");
+    expect(src).toContain("const programName = tidyProgramName(importData.programName);");
+    expect(src).not.toMatch(/programName\.replace\(\/s\+\//);
+  });
+});
