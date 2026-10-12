@@ -66,6 +66,7 @@ from (
     ('2026100600330', 'public_page_coach_only', '0330_public_page_coach_only.sql', exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')),
     ('2026100600331', 'purchase_grants_once', '0331_purchase_grants_once.sql', to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null),
     ('2026100600338', 'guardian_links_scoped', '0338_guardian_links_scoped.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'guardian_links' and column_name = 'expires_at')),
+    ('2026100600360', 'new_group_creator_can_seat_themselves', '0360_new_group_creator_can_seat_themselves.sql', to_regprocedure('public.group_is_new_and_mine(uuid)') is not null),
     ('2026100600358', 'personal_space', '0358_personal_space.sql', to_regprocedure('public.ensure_personal_space()') is not null),
     ('2026100600355', 'client_assessments', '0355_client_assessments.sql', to_regclass('public.client_assessments') is not null),
     ('2026100600354', 'organization_money_columns_server_only', '0354_organization_money_columns_server_only.sql', to_regprocedure('public.guard_organization_share_total()') is not null),

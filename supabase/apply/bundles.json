@@ -261,6 +261,14 @@
   "file": "apply-release-ao-all.sql"
  },
  {
+  "id": "release-bn",
+  "name": "Release BN (adding a client works again: the creator of a new group can seat themselves; run any time, ideally NOW)",
+  "steps": [
+   "108"
+  ],
+  "file": "apply-release-bn-all.sql"
+ },
+ {
   "id": "release-bl",
   "name": "Release BL (four exercises added to Coach Ron's library for the FitPros history; run any time)",
   "steps": [

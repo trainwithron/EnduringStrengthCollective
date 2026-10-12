@@ -830,5 +830,13 @@
   "slug": "add-fitpros-exercises",
   "migrations": [],
   "rows": 2
+ },
+ {
+  "n": "108",
+  "slug": "0360",
+  "migrations": [
+   "0360"
+  ],
+  "rows": 2
  }
 ]
