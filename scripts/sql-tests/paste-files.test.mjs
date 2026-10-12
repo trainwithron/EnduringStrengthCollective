@@ -1480,6 +1480,24 @@ await run(`apply/undo-step94-0348.sql`);
   const errBC2 = await run(`apply/${bundle.file}`);
   check("release-bc: the bundle applies again after an undo" + (errBC2 ? ": " + errBC2 : ""), !errBC2 && (await has()));
 }
+// Release BD (step 98): ONE paste.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-bd");
+  check("release-bd: ONE bundle holds step 98", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["98"]));
+  const st98 = steps.find((x) => x.n === "98");
+  const has = async () => (await db.query("select to_regclass('public.organization_invites') is not null as ok")).rows[0].ok === true;
+  const ebd0 = await run(`apply/undo-step${st98.n}-${st98.slug}.sql`);
+  check("release-bd: before the bundle runs there are no invitations" + (ebd0 ? ": " + ebd0 : ""), !ebd0 && !(await has()));
+  const errBD = await run(`apply/${bundle.file}`);
+  check("release-bd bundle applies" + (errBD ? ": " + errBD : ""), !errBD && (await has()));
+  const againBD = await run(`apply/${bundle.file}`);
+  check("release-bd: a second run is refused, naming step 98", !!againBD && againBD.includes("step 98 (0352) cannot run") && againBD.includes("already applied"));
+  const euBD = await run(`apply/undo-step${st98.n}-${st98.slug}.sql`);
+  check("release-bd: the undo puts the owner's insert back" + (euBD ? ": " + euBD : ""), !euBD && !(await has()));
+  const errBD2 = await run(`apply/${bundle.file}`);
+  check("release-bd: the bundle applies again after an undo" + (errBD2 ? ": " + errBD2 : ""), !errBD2 && (await has()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.

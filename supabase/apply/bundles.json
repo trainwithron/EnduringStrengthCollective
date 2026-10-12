@@ -261,6 +261,14 @@
   "file": "apply-release-ao-all.sql"
  },
  {
+  "id": "release-bd",
+  "name": "Release BD (joining an organization needs the person's OK; invitations and leave; run BEFORE the code that goes with it is live)",
+  "steps": [
+   "98"
+  ],
+  "file": "apply-release-bd-all.sql"
+ },
+ {
   "id": "release-bc",
   "name": "Release BC (Duplicate makes an unassigned library program; run BEFORE the code that goes with it is live)",
   "steps": [

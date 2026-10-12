@@ -1972,6 +1972,20 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["Duplicate exists", "to_regprocedure('public.duplicate_program(uuid, uuid, uuid, uuid, text, date)') is not null"],
     ],
   },
+  {
+    n: "98",
+    slug: "0352",
+    title: "0352 Joining an organization needs the person's OK: an owner can no longer put an existing account into their organization; an invitation is accepted or declined by the person, and any member can leave",
+    migrations: ["0352"],
+    sees: "Success. No rows returned.",
+    afterwards: "An organization's owner can no longer add an existing person to the organization on their own. A new coach invited by email still joins by setting their password; a person who already has an account gets an invitation they accept or decline. Anyone but the owner can leave. Nothing existing changes.",
+    undo: "drop function if exists public.profile_id_for_email(text);\ndrop function if exists public.leave_organization(uuid);\ndrop function if exists public.answer_organization_invite(uuid, boolean);\ndrop table if exists public.organization_invites;\ncreate policy \"org_memberships_insert_owner\" on public.organization_memberships for insert to authenticated with check ((EXISTS ( SELECT 1 FROM organizations o WHERE ((o.id = organization_memberships.organization_id) AND (o.owner_id = ( SELECT auth.uid() AS uid))))));",
+    undoWhy: "Only if step 98 misbehaves. Puts back the owner's right to insert memberships and removes the invitations and the leave function (pending invitations are lost).",
+    rows: [
+      ["0352 is not already applied (the invitations table does not exist yet)", "to_regclass('public.organization_invites') is null"],
+      ["the memberships table has the owner's insert rule", has.policy("organization_memberships", "org_memberships_insert_owner")],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -2077,6 +2091,7 @@ const BUNDLES = [
   { id: "release-ai", name: "Release AI (a payment and its sessions are recorded in one step; run BEFORE the code that uses it deploys)", steps: ["77"] },
   { id: "release-ap", name: "Release AP (parent-view links only for under-13 clients of the coach, and they expire; internal training-partner functions closed; run any time)", steps: ["84"] },
   { id: "release-ao", name: "Release AO (assigning attaches a program only inside one organization; run any time, after Release AM)", steps: ["83"] },
+  { id: "release-bd", name: "Release BD (joining an organization needs the person's OK; invitations and leave; run BEFORE the code that goes with it is live)", steps: ["98"] },
   { id: "release-bc", name: "Release BC (Duplicate makes an unassigned library program; run BEFORE the code that goes with it is live)", steps: ["97"] },
   { id: "release-bb", name: "Release BB (Pro Shop links, referral partners, challenges, calendar entries, session types and discovery prospects per organization; run BEFORE the code that goes with it is live)", steps: ["96"] },
   { id: "release-ba", name: "Release BA (switch the organization-wall request header rule ON; run AFTER Release AZ and the code that sends the header)", steps: ["95"] },
@@ -2281,6 +2296,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
+    m("0352", "to_regclass('public.organization_invites') is not null"),
     m("0351", "position('p_athlete_id is null then false' in pg_get_functiondef(to_regprocedure('public.duplicate_program(uuid, uuid, uuid, uuid, text, date)'))) > 0"),
     m("0350", has.col("pro_shop_links", "organization_id")),
     m("0349", "position('select true' in pg_get_functiondef(to_regprocedure('public.org_wall_header_enabled()'))) > 0"),

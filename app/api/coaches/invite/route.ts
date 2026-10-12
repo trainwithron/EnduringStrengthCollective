@@ -67,6 +67,30 @@ export async function POST(request: Request) {
   if ((privateClients ?? 0) > 0) {
     return NextResponse.json({ error: "This group has a client who is private from the organization, so a coach can't be added to it." }, { status: 400 });
   }
+  // Someone who already has an account is not put into the organization: they get an invitation they accept or decline (Release BD). Only a brand-new address is invited by email below,
+  // and that person joins by setting their own password.
+  const { data: existingId } = await serviceRole.rpc("profile_id_for_email", { p_email: trimmedEmail });
+  if (typeof existingId === "string" && existingId) {
+    const { data: already } = await serviceRole.from("organization_memberships").select("id").eq("organization_id", group.organization_id).eq("profile_id", existingId).maybeSingle();
+    if (already) return NextResponse.json({ error: "That person is already part of your organization." }, { status: 400 });
+    const { data: invite, error: inviteRowError } = await serviceRole
+      .from("organization_invites")
+      .insert({ organization_id: group.organization_id, invited_profile_id: existingId, role, group_id: groupId, created_by: user.id })
+      .select("id")
+      .single();
+    if (inviteRowError || !invite) {
+      const duplicate = inviteRowError?.code === "23505";
+      return NextResponse.json({ error: duplicate ? "They already have an open invitation from you." : "Couldn't send the invitation. Try again." }, { status: duplicate ? 400 : 502 });
+    }
+    const { data: orgRow } = await serviceRole.from("organizations").select("name").eq("id", group.organization_id).maybeSingle();
+    await serviceRole.from("notifications").insert({
+      profile_id: existingId,
+      type: "organization_invite",
+      body: `${orgRow?.name ?? "An organization"} invited you to join as ${role === "admin" ? "an admin" : "a coach"}.`,
+      link_path: `/org-invite/${invite.id}`,
+    });
+    return NextResponse.json({ pendingInvitation: true });
+  }
   const origin = appOrigin(request);
 
   const { data: invited, error: inviteError } = await serviceRole.auth.admin.inviteUserByEmail(

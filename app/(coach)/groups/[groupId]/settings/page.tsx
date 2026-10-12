@@ -1,4 +1,6 @@
 import { ChangeMyEmail } from "@/components/athlete/change-my-email";
+import { LeaveOrganizationControl } from "@/components/org/leave-organization-control";
+import { orgIdOfGroup } from "@/lib/org-of-group";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
@@ -133,6 +135,19 @@ export default async function SettingsPage(
         .maybeSingle(),
     ]);
   const isCoach = membership?.role === "coach";
+
+  // A member who is not the owner can leave the organization this group is in.
+  let leaveInfo: { id: string; name: string } | null = null;
+  if (isCoach) {
+    const orgIdForLeave = await orgIdOfGroup(supabase, params.groupId);
+    if (orgIdForLeave) {
+      const [{ data: orgRow }, { data: memberRow }] = await Promise.all([
+        supabase.from("organizations").select("name, owner_id").eq("id", orgIdForLeave).maybeSingle(),
+        supabase.from("organization_memberships").select("id").eq("organization_id", orgIdForLeave).eq("profile_id", user.id).maybeSingle(),
+      ]);
+      if (orgRow && memberRow && orgRow.owner_id !== user.id) leaveInfo = { id: orgIdForLeave, name: orgRow.name as string };
+    }
+  }
   // The first-name-on-shared-pictures switch (0334). Read on its own so a database that does not have the column yet still shows the whole page (the switch is just left out).
   const shareNameRead = await supabase.from("profiles").select("show_name_on_share").eq("id", athleteId).maybeSingle();
   const showNameAvailable = !shareNameRead.error;
@@ -273,6 +288,12 @@ export default async function SettingsPage(
 
       <section className="px-5 pt-8 space-y-6">
         {isCoach ? <>{coachingGroup}{terminologyGroup}{notificationsGroup}</> : notificationsGroup}
+
+        {isCoach && leaveInfo && (
+          <SettingsGroup label="Organization">
+            <LeaveOrganizationControl organizationId={leaveInfo.id} organizationName={leaveInfo.name} />
+          </SettingsGroup>
+        )}
 
         <SettingsGroup label="Profile">
           {!isCoach && !effective.isActingAsOther && (
