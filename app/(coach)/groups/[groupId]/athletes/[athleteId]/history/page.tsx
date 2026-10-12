@@ -6,6 +6,7 @@ import { isMemberOfGroup, NOT_IN_GROUP_MESSAGE } from "@/lib/athlete-in-group";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ExerciseHistoryUploader } from "@/components/coach/exercise-history-uploader";
 import { HistoryImportAccessToggle } from "@/components/coach/history-import-access-toggle";
+import { FitprosHistoryImport } from "@/components/coach/fitpros-history-import";
 
 export default async function ClientHistoryPage(
   props: {
@@ -84,6 +85,8 @@ export default async function ClientHistoryPage(
           exerciseSuggestions={exerciseSuggestions}
           viewerIsCoach
         />
+
+        <FitprosHistoryImport athleteId={params.athleteId} groupId={params.groupId} athleteName={athleteName} />
       </div>
     </CoachDesktopShell>
   );

@@ -261,6 +261,14 @@
   "file": "apply-release-ao-all.sql"
  },
  {
+  "id": "release-bm",
+  "name": "Release BM (imported history weights do not set training maxes; run BEFORE importing FitPros history)",
+  "steps": [
+   "107"
+  ],
+  "file": "apply-release-bm-all.sql"
+ },
+ {
   "id": "release-bl",
   "name": "Release BL (four exercises added to Coach Ron's library for the FitPros history; run any time)",
   "steps": [
