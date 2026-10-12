@@ -12,7 +12,7 @@ const KIND_LABEL = { one_on_one: "1-on-1", online: "Online", group: "Group" } as
 
 // The coach-level Clients list: every client once, wherever the coach is standing. Filters for how they work with the coach, a name search, and one quiet number
 // per client (sessions still to schedule). Tapping a client opens their space.
-export function CoachClientsList({ rows }: { rows: CoachClientRow[] }) {
+export function CoachClientsList({ rows, selfName = null }: { rows: CoachClientRow[]; selfName?: string | null }) {
   const [filter, setFilter] = useState<ClientFilter>("all");
   const [query, setQuery] = useState("");
   // Cards by default; the coach's last choice is read once the page is on screen (never during the server render, so the two always agree first).
@@ -68,6 +68,15 @@ export function CoachClientsList({ rows }: { rows: CoachClientRow[] }) {
         </label>
       </div>
 
+      {selfName && (
+        // The coach's own training, as a client of themselves: one row, always first. It is not a client of any organization, so it is outside the counts, the filters and the search.
+        <Link href="/my-space" className="flex items-center gap-3 min-h-11 border border-steel/25 bg-surface/40 hover:border-rust px-3 py-2 mb-3">
+          <span className="w-10 h-10 rounded-full bg-graphite border border-steel/30 flex items-center justify-center shrink-0 font-display text-xs" aria-hidden="true">
+            {initialsOf(selfName)}
+          </span>
+          <span className="font-body text-sm font-medium text-chalk truncate">{selfName} (you)</span>
+        </Link>
+      )}
       {shown.length === 0 ? (
         <p className="font-body text-sm text-steel py-6">{rows.length === 0 ? "No clients yet." : "No one matches."}</p>
       ) : (

@@ -115,15 +115,15 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0345 | yes | yes | 41 | 0345 organization walls: nothing of another organization is readable; names follow the same rule |
 | 0346 | yes | yes | 7 | 0346 a coach can use the app as their own client |
 | 0347 | yes | yes | 4 | 0347 the briefing is made per organization |
-| 0348 | yes | yes | 40 | 0348 defense in depth: the request names a workspace and the database holds the line; 0358 personal space: one set of personal data, owned by the person, in no organization |
-| 0349 | yes | yes | 40 | 0348 defense in depth: the request names a workspace and the database holds the line; 0358 personal space: one set of personal data, owned by the person, in no organization |
+| 0348 | yes | yes | 41 | 0348 defense in depth: the request names a workspace and the database holds the line; 0358 personal space: one set of personal data, owned by the person, in no organization |
+| 0349 | yes | yes | 41 | 0348 defense in depth: the request names a workspace and the database holds the line; 0358 personal space: one set of personal data, owned by the person, in no organization |
 | 0350 | yes | yes | 6 | 0350 the coach's business lists are per organization |
 | 0351 | yes | yes | 4 | 0351 Duplicate makes an unassigned library program |
 | 0352 | yes | yes | 12 | 0352 joining an organization needs the person's OK |
 | 0353 | yes | yes | 3 | 0353 a coach can ask for notice before a schedule is paused or ended |
 | 0354 | yes | yes | 15 | 0354 the money settings on a membership are the server's |
 | 0355 | yes | yes | 6 | 0355 coach assessments are private to the coaches of the group |
-| 0358 | yes | yes | 25 | 0358 personal space: one set of personal data, owned by the person, in no organization |
+| 0358 | yes | yes | 26 | 0358 personal space: one set of personal data, owned by the person, in no organization |
 | 0331 | yes | yes | 10 | 0331 a payment event and its sessions are recorded in one step |
 | 0329 | yes | yes | 12 | 0329 every session costs exactly 1 credit; the waitlist offer uses the coach's time zone |
 | 0330 | yes | yes | 9 | 0330 only a real coach can have a public page |

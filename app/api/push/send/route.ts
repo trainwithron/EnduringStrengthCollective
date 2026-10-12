@@ -26,6 +26,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing profileId or title" }, { status: 400 });
   }
 
+  // Nobody is told about their own actions (the coach's own training in their personal space).
+  if (profileId === user.id) return NextResponse.json({ sent: 0 });
+
   // The recipient's subscriptions are not readable with the sender's own session (a client cannot read their coach's), so the
   // push is sent with the server's access, after checking the two really share a group or organization.
   const db = createServiceRoleClient();

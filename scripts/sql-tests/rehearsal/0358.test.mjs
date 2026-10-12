@@ -70,6 +70,12 @@ export default {
         h.check(`${label} reads none of it`, n === 0);
       }
 
+      // ---- no notification about their own training --------------------------------------------------
+      await h.asSuper();
+      await db.query("insert into public.notifications (profile_id, group_id, type, body, link_path) values ($1, $2, 'program_assigned', 'x', '/')", [coach, ps]);
+      await db.query("insert into public.notifications (profile_id, group_id, type, body, link_path) values ($1, $2, 'program_assigned', 'y', '/')", [coach, gA]);
+      h.check("a notification filed under the personal space is dropped, one under an organization group is kept", (await count("notifications", "body = 'x'")) === 0 && (await count("notifications", "body = 'y'")) === 1);
+
       // ---- no one else can be seated, and it cannot be moved ---------------------------------------------
       await h.as(coach);
       await h.expectError("the person cannot seat anyone else in their personal space", () => db.query("insert into public.group_memberships (group_id, profile_id, role) values ($1, $2, 'athlete')", [ps, stranger]), /belongs to one person|row-level security|policy/i);

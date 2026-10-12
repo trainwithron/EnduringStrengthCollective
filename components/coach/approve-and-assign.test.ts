@@ -76,7 +76,8 @@ describe("assign to ONE client: attach when nothing depends on the program, else
     expect(position).toContain("duplicateProgram(supabase");
     expect(position).not.toContain("assignProgramToClient");
     const self = menu.slice(menu.indexOf("async function assignToSelf"));
-    expect(self.slice(0, 1500)).toContain("duplicateProgram(supabase");
+    expect(self.slice(0, 2000)).toContain("assignProgramToClient(supabase");
+    expect(self.slice(0, 2000)).toContain("ensure_personal_space");
     expect(read("app/api/coach/package-assignments/route.ts")).toContain("duplicateProgram(");
     expect(read("components/coach/client-program-actions.tsx")).toContain("assignProgramToClient(supabase");
   });

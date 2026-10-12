@@ -395,10 +395,17 @@ export function ProgramCardMenu({
       return;
     }
 
+    // The coach's own training lives in their personal space (one set that follows them into every organization), made the first time it is needed.
+    const { data: spaceId } = await supabase.rpc("ensure_personal_space");
+    if (!spaceId) {
+      setBusy(false);
+      setError("Couldn't set that up. Try again.");
+      return;
+    }
     // Attaches when the program qualifies (no copy is left behind), otherwise makes a copy, like assigning to any client.
     const result = await assignProgramToClient(supabase, {
       sourceProgramId: programId,
-      destinationGroupId: groupId,
+      destinationGroupId: spaceId as string,
       athleteId: user.id,
       startDate: assignStartDate || undefined,
     });
@@ -408,8 +415,8 @@ export function ProgramCardMenu({
       setError(result.error);
       return;
     }
-    // Lands where "My training" finds it: the group this copy is in, on its Home with the program ready to run.
-    router.push(`/my-training/open?group=${groupId}`);
+    // Lands in the coach's own client app, with the program ready to run.
+    router.push(`/my-training/open?group=${spaceId}`);
   }
 
   async function handleDuplicateSameGroup() {

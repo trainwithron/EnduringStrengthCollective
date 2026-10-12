@@ -5,7 +5,8 @@
 --   3. Only its owner can ever be in it, and only as its coach (a before-insert trigger on memberships, for everyone including the server), so no invite, admin or script can seat anybody else.
 --   4. The organization wall (group_in_active_org) lets a group with no organization through under any workspace: the person is its only member and every table's own rules still limit who reads it.
 --   5. A program in a personal space is always the owner's own (the one-on-one rule 'a program in a client's own space has to be made for that client' reads the owner as the client there).
---   6. public.ensure_personal_space(): the signed-in person gets their space, created the first time it is asked for, named after their profile. Safe to call again (it returns the same space).
+--   6. Nothing is written to the notification bell for a personal space (the person would only be told about their own training); the push route also never sends someone a push about their own action.
+--   7. public.ensure_personal_space(): the signed-in person gets their space, created the first time it is asked for, named after their profile. Safe to call again (it returns the same space).
 -- No organization owner, admin or rival can read it (those rules join on the group's organization, which is empty here), and no platform-admin rule reads group data. Nothing is moved or deleted.
 
 alter table public.groups alter column organization_id drop not null;
@@ -63,6 +64,24 @@ begin
 end;
 $$;
 revoke all on function public.guard_one_on_one_program() from public, anon, authenticated;
+
+create or replace function public.skip_personal_space_notifications()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.group_id is not null and exists (select 1 from public.groups g where g.id = new.group_id and g.organization_id is null) then
+    return null;
+  end if;
+  return new;
+end;
+$$;
+revoke execute on function public.skip_personal_space_notifications() from public, anon, authenticated;
+
+drop trigger if exists notifications_skip_personal_space on public.notifications;
+create trigger notifications_skip_personal_space before insert on public.notifications for each row execute function public.skip_personal_space_notifications();
 
 create or replace function public.group_in_active_org(_group_id uuid)
 returns boolean

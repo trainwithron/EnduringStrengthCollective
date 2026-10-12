@@ -16,6 +16,9 @@ export const CLIENT_PROFILE_TABS: { key: ClientProfileTab; label: string }[] = [
 // page, so they switch instantly.
 export const LOADED_ON_OPEN: ClientProfileTab[] = ["messages", "calendar"];
 
+// On the coach's own profile there is no one to message and no billing to settle.
+export const SELF_HIDDEN_TABS: ClientProfileTab[] = ["messages", "settings"];
+
 export function isClientProfileTab(value: string | null | undefined): value is ClientProfileTab {
   return CLIENT_PROFILE_TABS.some((t) => t.key === value);
 }

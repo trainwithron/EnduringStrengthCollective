@@ -29,7 +29,7 @@ export function groupIdFromPath(pathname: string): string | null {
 
 // In the browser: the group of the page being viewed, else the remembered workspace.
 // Pages that open a person's OWN rows from a link or a list spanning their organizations (a session, My training, notifications, a printed program) send no workspace at all.
-export const NO_WORKSPACE_PATHS = ["/sessions/", "/my-training", "/notifications", "/print/"];
+export const NO_WORKSPACE_PATHS = ["/sessions/", "/my-training", "/my-space", "/notifications", "/print/"];
 export function pathSendsNoWorkspace(pathname: string): boolean {
   return NO_WORKSPACE_PATHS.some((p) => pathname === p || pathname.startsWith(p));
 }

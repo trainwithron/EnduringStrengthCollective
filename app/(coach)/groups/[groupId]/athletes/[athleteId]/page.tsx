@@ -4,7 +4,7 @@ import { ViewAsClientLink } from "@/components/coach/desktop/view-as-client-labe
 import { SendSignInLinkButton } from "@/components/coach/send-signin-link-button";
 import { ClientProfileTabs } from "@/components/coach/desktop/client-profile-tabs";
 import { ClientProgramsSection } from "@/components/coach/desktop/client-programs-section";
-import { isClientProfileTab } from "@/lib/client-profile-tabs";
+import { isClientProfileTab, SELF_HIDDEN_TABS } from "@/lib/client-profile-tabs";
 import Link from "next/link";
 import { NoAccess } from "@/components/shared/no-access";
 import { calorieSeriesWithStanding, standingForDate } from "@/lib/macro-resolution";
@@ -17,6 +17,7 @@ import { SectionLoading } from "@/components/coach/desktop/section-loading";
 import { ExerciseProgressionLoader } from "@/components/coach/desktop/exercise-progression-loader";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
+import { getActiveAnchor } from "@/lib/active-anchor";
 import { AthleteNotesEditor } from "@/components/coach/athlete-notes-editor";
 import { SessionCreditsControl } from "@/components/coach/session-credits-control";
 import { buildCreditPicture, fetchBookingCounts } from "@/lib/credit-picture";
@@ -90,12 +91,15 @@ export default async function AthleteProfilePage(
   const monthParam = searchParamsResolved?.month;
   // A drafted note (an expiry check-in, a come-back note) opens in the Messages box for the coach to edit; capped.
   const draftParam = (searchParamsResolved?.draft ?? "").slice(0, 600);
-  const initialTab = isClientProfileTab(tabParam) ? tabParam : "overview";
+  const requestedTab = isClientProfileTab(tabParam) ? tabParam : "overview";
   const supabase = await createServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
+  // The coach's own profile (their personal space): the same page every client has, without the parts that only make sense for someone else (messages to yourself, billing, set aside, delete).
+  const selfView = !!user && params.athleteId === user.id;
+  const initialTab = selfView && SELF_HIDDEN_TABS.includes(requestedTab) ? "overview" : requestedTab;
   if (!user) {
     redirect("/login");
   }
@@ -812,8 +816,19 @@ export default async function AthleteProfilePage(
     profileFlag = `Missed ${totalHabitsDue - totalHabitsCompleted} habit${totalHabitsDue - totalHabitsCompleted === 1 ? "" : "s"} this week.`;
   }
 
+  // The coach's own profile lives in their personal space, which is in no organization: the coach rail around it stays on the organization they have open.
+  let shellGroupId = params.groupId;
+  let shellGroupName = group?.name ?? "Coaching";
+  if (selfView) {
+    const open = await getActiveAnchor(supabase, user.id);
+    if (open?.anchor) {
+      shellGroupId = open.anchor.id;
+      shellGroupName = open.anchor.name;
+    }
+  }
+
   return (
-    <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="clients">
+    <CoachDesktopShell groupId={shellGroupId} groupName={shellGroupName} active="clients">
       <div className="pb-6 border-b border-steel/20 mb-6">
         <Link
           href="/clients"
@@ -864,12 +879,12 @@ export default async function AthleteProfilePage(
           >
             Upload exercise history
           </Link>
-          <VideoCheckinRecorder athleteId={params.athleteId} groupId={params.groupId} coachId={user.id} />
+          {!selfView && <VideoCheckinRecorder athleteId={params.athleteId} groupId={params.groupId} coachId={user.id} />}
         </div>
       </div>
 
       <div id="client-profile-body" data-active-tab={initialTab}>
-        <ClientProfileTabs groupId={params.groupId} athleteId={params.athleteId} initial={initialTab} />
+        <ClientProfileTabs groupId={params.groupId} athleteId={params.athleteId} initial={initialTab} hide={selfView ? SELF_HIDDEN_TABS : []} />
         <div data-tab="messages" className="mb-8">
           {initialTab === "messages" && (
             <Suspense fallback={<SectionLoading />}>
@@ -906,7 +921,7 @@ export default async function AthleteProfilePage(
                   extra={
                     <>
                       <span className="hidden lg:inline-flex">
-                        <ViewAsClientLink href={`/groups/${params.groupId}/athletes/${params.athleteId}/view`} />
+                        <ViewAsClientLink href={selfView ? "/my-space?view=client" : `/groups/${params.groupId}/athletes/${params.athleteId}/view`} />
                       </span>
                       <Link
                         href={`/groups/${params.groupId}/athletes/${params.athleteId}/log`}

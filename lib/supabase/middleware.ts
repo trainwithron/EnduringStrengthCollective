@@ -223,8 +223,11 @@ export async function updateSession(request: NextRequest) {
   // Only a group the person belongs to can become the workspace (a pasted link to someone else's group changes nothing). The new value is also given to this very request, which is still being rendered.
   const pageGroup = user ? groupIdFromPath(pathname) : null;
   if (user && pageGroup && decodeWorkspaceCookie(request.cookies.get(LAST_WORKSPACE_GROUP_COOKIE)?.value) !== pageGroup) {
-    const { data: ownMembership } = await supabase.from("group_memberships").select("group_id").eq("group_id", pageGroup).eq("profile_id", user.id).maybeSingle();
-    if (ownMembership) {
+    const { data: ownMembership } = await supabase.from("group_memberships").select("group_id, groups ( organization_id )").eq("group_id", pageGroup).eq("profile_id", user.id).maybeSingle();
+    // The personal space belongs to no organization, so it never becomes the open workspace: the organization the person was in stays open.
+    const memberGroup = (ownMembership as unknown as { groups: { organization_id: string | null } | { organization_id: string | null }[] | null } | null)?.groups;
+    const memberOrg = Array.isArray(memberGroup) ? memberGroup[0]?.organization_id : memberGroup?.organization_id;
+    if (ownMembership && memberOrg) {
       request.cookies.set(LAST_WORKSPACE_GROUP_COOKIE, encodeURIComponent(pageGroup));
       const carried = response.cookies.getAll();
       response = NextResponse.next({ request });

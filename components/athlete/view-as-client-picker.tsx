@@ -157,7 +157,7 @@ export function ViewAsClientPicker({ onClose }: { onClose: () => void }) {
     if (switching) return;
     setSwitching(true);
     onClose();
-    router.push("/my-training");
+    router.push("/my-space?view=client");
   }
 
   const filtered = (clients ?? []).filter((c) =>

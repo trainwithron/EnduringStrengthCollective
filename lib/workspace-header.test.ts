@@ -44,11 +44,11 @@ describe("the header is wired in everywhere data is read", () => {
   });
   it("opening a group page makes it the workspace, only for a group the person belongs to", () => {
     const mw = read("lib/supabase/middleware.ts");
-    expect(mw).toContain('.from("group_memberships").select("group_id").eq("group_id", pageGroup).eq("profile_id", user.id)');
+    expect(mw).toContain('.from("group_memberships").select("group_id, groups ( organization_id )").eq("group_id", pageGroup).eq("profile_id", user.id)');
     expect(mw).toContain("request.cookies.set(LAST_WORKSPACE_GROUP_COOKIE");
   });
   it("pages that open a person's own row from a link or list spanning organizations read without the workspace header", () => {
-    for (const f of ["app/sessions/[sessionId]/page.tsx", "app/sessions/[sessionId]/recap/page.tsx", "app/sessions/[sessionId]/coach-note/page.tsx", "app/print/programs/[programId]/page.tsx", "app/notifications/page.tsx", "app/my-training/page.tsx", "app/my-training/open/route.ts"]) {
+    for (const f of ["app/sessions/[sessionId]/page.tsx", "app/sessions/[sessionId]/recap/page.tsx", "app/sessions/[sessionId]/coach-note/page.tsx", "app/print/programs/[programId]/page.tsx", "app/notifications/page.tsx", "app/my-space/route.ts", "app/my-training/open/route.ts"]) {
       expect(read(f), f).toContain("createCrossOrgServerClient as createServerClient");
     }
     expect(read("lib/supabase/server.ts")).toContain("export const createCrossOrgServerClient");

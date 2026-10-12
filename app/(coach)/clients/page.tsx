@@ -71,6 +71,10 @@ export default async function CoachClientsPage() {
     };
   });
 
+  // The coach's own row (their personal space): shown in every organization they coach in, never counted as a client.
+  const { data: selfProfile } = await supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle();
+  const selfName = (selfProfile?.full_name as string | null | undefined)?.trim() || "You";
+
   return (
     <CoachDesktopShell groupId={anchor.id} groupName={anchor.name} active="clients" coachLevel>
       <div className="pb-6 border-b border-steel/20 mb-6 flex items-center justify-between gap-4">
@@ -79,7 +83,7 @@ export default async function CoachClientsPage() {
         </h1>
         <AddClientButton groupId={anchor.id} groupName={anchor.name} createdBy={user.id} />
       </div>
-      <CoachClientsList rows={rows} />
+      <CoachClientsList rows={rows} selfName={selfName} />
     </CoachDesktopShell>
   );
 }

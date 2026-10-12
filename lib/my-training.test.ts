@@ -63,22 +63,21 @@ describe("the pieces are wired", () => {
   it("both coach pickers go straight to My training: no 'Which group's program?' step", () => {
     for (const f of ["components/athlete/view-as-client-picker.tsx", "components/coach/mobile/spot-clients-groups-panel.tsx"]) {
       const src = read(f);
-      expect(src).toContain('router.push("/my-training")');
+      expect(src).toContain('router.push("/my-space?view=client")');
       expect(src).not.toContain("Which group");
       expect(src).toContain("Start your own workout");
     }
   });
-  it("Assign to Myself lands where My training finds it", () => {
-    expect(read("components/coach/desktop/program-card-menu.tsx")).toContain("router.push(`/my-training/open?group=${groupId}`);");
+  it("Assign to Myself files the program in the coach's personal space and lands in their own client app", () => {
+    const menu = read("components/coach/desktop/program-card-menu.tsx");
+    expect(menu).toContain('supabase.rpc("ensure_personal_space")');
+    expect(menu).toContain("router.push(`/my-training/open?group=${spaceId}`);");
   });
-  it("the bar says 'My training' and 'Back to coaching' for a coach in their own app, and Back to coaching also resets the screen size", () => {
+  it("the coach's own client app has no bar or nav entry of its own: the normal Viewing-as bar, and Home lists the person's programs", () => {
     const banner = read("components/athlete/acting-as-banner.tsx");
-    expect(banner).toContain("My training");
-    expect(banner).toContain("Back to coaching");
+    expect(banner).not.toContain("My training");
     expect(banner).toContain("writeViewOverride(null)");
-  });
-  it("desktop has the entry in the nav, and Home lists the person's programs from other groups", () => {
-    expect(read("components/coach/coach-desktop-shell.tsx")).toContain('href: "/my-training"');
+    expect(read("components/coach/coach-desktop-shell.tsx")).not.toContain('href: "/my-training"');
     expect(read("app/(coach)/groups/[groupId]/page.tsx")).toContain("OtherProgramsCard");
   });
 });
@@ -92,5 +91,33 @@ describe("Removing a program from my list", () => {
   it("treats an update that changed nothing as a failure, and Hide is kept off an active shared program", () => {
     expect(read("components/coach/client-program-menu.tsx")).toContain("removed.length === 0");
     expect(read("components/coach/desktop/program-card-grid.tsx")).toContain("canHide={!program.athleteId && !program.isActive}");
+  });
+});
+
+describe("The coach as their own client (personal space)", () => {
+  it("the Clients list has the coach's own row first, outside the counts, filters and search, labelled with their profile name", () => {
+    const list = read("components/coach/desktop/coach-clients-list.tsx");
+    expect(list).toContain("{selfName} (you)");
+    expect(list).toContain('href="/my-space"');
+    expect(list.indexOf("{selfName} (you)")).toBeLessThan(list.indexOf("{shown.length === 0 ? ("));
+    expect(read("app/(coach)/clients/page.tsx")).toContain("selfName={selfName}");
+    expect(read("lib/coach-clients.ts")).not.toContain("ensure_personal_space");
+  });
+  it("/my-space makes the space on first use and opens the coach's own client profile, or their client app with ?view=client", () => {
+    const route = read("app/my-space/route.ts");
+    expect(route).toContain('rpc("ensure_personal_space")');
+    expect(route).toContain("/groups/${spaceId}/athletes/${user.id}");
+    expect(route).toContain("/my-training/open?group=${spaceId}");
+    expect(read("app/my-training/page.tsx")).toContain('redirect("/my-space?view=client")');
+  });
+  it("on their own profile the Messages and Billing tabs and the video check-in are gone", () => {
+    expect(read("lib/client-profile-tabs.ts")).toContain('SELF_HIDDEN_TABS: ClientProfileTab[] = ["messages", "settings"]');
+    const page = read("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx");
+    expect(page).toContain("hide={selfView ? SELF_HIDDEN_TABS : []}");
+    expect(page).toContain("{!selfView && <VideoCheckinRecorder");
+  });
+  it("the personal space never becomes the open workspace, and is invisible to every coach-wide scope", () => {
+    expect(read("lib/supabase/middleware.ts")).toContain("if (ownMembership && memberOrg)");
+    expect(read("lib/coach-groups.ts")).toContain("!g.organization_id");
   });
 });

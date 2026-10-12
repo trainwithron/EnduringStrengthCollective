@@ -212,7 +212,7 @@ export function SpotClientsGroupsPanel({ groupId, onNavigated, fromHub = false }
     if (busy) return;
     setBusy(true);
     onNavigated();
-    router.push("/my-training");
+    router.push("/my-space?view=client");
   }
 
   async function switchToGroup(targetGroupId: string) {

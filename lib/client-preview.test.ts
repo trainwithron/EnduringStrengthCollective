@@ -48,7 +48,7 @@ describe("View as client (desktop preview) is read only", () => {
   });
   it("the entry points are on the client's profile and the client list, desktop only, and use the coach's own word for a client", () => {
     const profile = read("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx");
-    expect(profile).toContain("<ViewAsClientLink href={`/groups/${params.groupId}/athletes/${params.athleteId}/view`} />");
+    expect(profile).toContain('<ViewAsClientLink href={selfView ? "/my-space?view=client" : `/groups/${params.groupId}/athletes/${params.athleteId}/view`} />');
     expect(profile).toContain("hidden lg:inline-flex");
     const list = read("components/coach/desktop/client-card-grid.tsx");
     expect(list).toContain("/view`}");

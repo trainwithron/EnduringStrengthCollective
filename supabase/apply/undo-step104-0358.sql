@@ -3,6 +3,8 @@
 begin;
 drop trigger if exists group_memberships_guard_personal_space on public.group_memberships;
 drop function if exists public.guard_personal_space_members();
+drop trigger if exists notifications_skip_personal_space on public.notifications;
+drop function if exists public.skip_personal_space_notifications();
 drop function if exists public.ensure_personal_space();
 drop index if exists public.groups_one_personal_space_per_person;
 create or replace function public.group_in_active_org(_group_id uuid)

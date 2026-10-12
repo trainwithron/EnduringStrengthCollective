@@ -8,7 +8,7 @@ import { CLIENT_PROFILE_TABS, LOADED_ON_OPEN, type ClientProfileTab } from "@/li
 // normal coach layout, beside the coach's own rail, which never changes. Every tab shows its content right below the strip, on this page. Overview, Programs, Nutrition,
 // Progress, Forms & notes and Billing & settings are already loaded, so they switch instantly; Messages and Calendar are loaded when opened (the address gets ?tab=...,
 // so a link, a reload or the phone's full pages still work). The tab is remembered in the address. The strip wraps instead of scrolling.
-export function ClientProfileTabs({ initial = "overview" }: { groupId?: string; athleteId?: string; initial?: ClientProfileTab }) {
+export function ClientProfileTabs({ initial = "overview", hide = [] }: { groupId?: string; athleteId?: string; initial?: ClientProfileTab; hide?: ClientProfileTab[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const [tab, setTab] = useState<ClientProfileTab>(initial);
@@ -50,7 +50,7 @@ export function ClientProfileTabs({ initial = "overview" }: { groupId?: string; 
   const base = "h-11 px-3 font-body text-[13px] border-b-2 -mb-px whitespace-nowrap";
   return (
     <nav aria-label="This client" aria-busy={pending} className="flex flex-wrap items-end gap-x-1 border-b border-steel/20 mb-6">
-      {CLIENT_PROFILE_TABS.map((t) => (
+      {CLIENT_PROFILE_TABS.filter((t) => !hide.includes(t.key)).map((t) => (
         <button key={t.key} type="button" onClick={() => choose(t.key)} aria-pressed={tab === t.key} className={`${base} ${tab === t.key ? "border-rust text-chalk" : "border-transparent text-steel hover:text-chalk"}`}>
           {t.label}
         </button>
