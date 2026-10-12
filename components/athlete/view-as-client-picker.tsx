@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { activeOrgGroupsFor } from "@/lib/active-org-groups";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { X, Search, Dumbbell } from "lucide-react";
@@ -53,16 +54,11 @@ export function ViewAsClientPicker({ onClose }: { onClose: () => void }) {
       } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: coachedGroups } = await supabase
-        .from("group_memberships")
-        .select("group_id, groups ( name )")
-        .eq("profile_id", user.id)
-        .eq("role", "coach");
-      const groupIds = (coachedGroups ?? []).map((g: any) => g.group_id);
+      // Only the organization the coach is in (the one they chose): another organization's clients are never listed here.
+      const coachedGroups = await activeOrgGroupsFor(supabase, user.id, null);
+      const groupIds = coachedGroups.map((g) => g.id);
       if (!cancelled) {
-        setMyGroups(
-          (coachedGroups ?? []).map((g: any) => ({ groupId: g.group_id, name: g.groups?.name ?? "Group" }))
-        );
+        setMyGroups(coachedGroups.map((g) => ({ groupId: g.id, name: g.name })));
       }
       if (groupIds.length === 0) {
         if (!cancelled) setClients([]);

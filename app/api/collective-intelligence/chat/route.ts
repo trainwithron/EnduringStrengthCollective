@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getActiveAnchor } from "@/lib/active-anchor";
 import { createServerClient } from "@/lib/supabase/server";
 import { callClaude, extractJson, isAiConfigured } from "@/lib/anthropic-client";
 import { AiRateLimitedError, aiInputTooLong } from "@/lib/ai-usage";
@@ -125,6 +126,10 @@ export async function POST(request: Request) {
     .limit(MAX_HISTORY_MESSAGES);
   const history = priorMessages ?? [];
 
+  // Ask Spot answers about the organization the coach is in (the one they chose), never every organization they run.
+  const activeAnchor = await getActiveAnchor(supabase, user.id);
+  const orgGroupIds = activeAnchor ? activeAnchor.groups.filter((g) => g.orgId === activeAnchor.orgId).map((g) => g.id) : [];
+
   // Step 1 — router. Decides WHAT to look up; never states a fact itself.
   let requestedLookups: RouterLookupRequest[] = [];
   try {
@@ -153,13 +158,13 @@ export async function POST(request: Request) {
     const name = req.name as LookupName;
 
     if (name === "roster_logging_this_week") {
-      const result = await getRosterLoggingThisWeek(supabase, user.id);
+      const result = await getRosterLoggingThisWeek(supabase, user.id, orgGroupIds);
       if (result) results.push(result);
       continue;
     }
 
     if (!req.athleteName) continue;
-    const resolution = await resolveAthleteByName(supabase, { coachId: user.id, name: req.athleteName });
+    const resolution = await resolveAthleteByName(supabase, { coachId: user.id, name: req.athleteName, scopeGroupIds: orgGroupIds });
     if (resolution === "not_found") {
       results.push({
         description: `No client matching "${req.athleteName}" was found on this coach's roster.`,
@@ -194,7 +199,7 @@ export async function POST(request: Request) {
   // carried forward from earlier turns (the guard must never quietly stop
   // checking anything meaningful by turn ten of a conversation).
   const allowedNumbers = results.flatMap((r) => r.numericValues);
-  const rosterFullNames = await getRosterFullNames(supabase, user.id);
+  const rosterFullNames = await getRosterFullNames(supabase, user.id, orgGroupIds);
   const referenceableNames = [...new Set(results.flatMap((r) => r.athleteNamesReferenced))];
 
   const factsText =

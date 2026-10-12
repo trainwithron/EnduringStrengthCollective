@@ -1,0 +1,140 @@
+import { describe, it, expect } from "vitest";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join, relative } from "node:path";
+
+// A guard against the bug Ron found: a coach screen that lists "every group I coach" (all organizations at once) instead of the groups of the organization the coach is in. Any source file that reads the
+// signed-in person's own coach memberships directly (group_memberships ... profile_id = me ... role = coach) must either go through lib/coach-groups (getCoachedGroups + groupsInOrgOf) / lib/active-org-groups
+// or be on the list below, which holds only code that is about the person's OWN permissions (not what a screen shows) and was reviewed one by one. A new file that does this fails here until someone looks.
+const ROOT = join(__dirname, "..");
+const REVIEWED_PERMISSION_ONLY = new Set([
+  // "is this person a coach at all / do they coach this group" checks, account/erasure/AI-budget plumbing, and server routes that check a caller before acting
+  "app/api/ai/coach-conversation/route.ts",
+  "app/api/ai/parse-workout/route.ts",
+  "app/api/clients/delete/route.ts",
+  "app/api/credits/low-balance-check/route.ts",
+  "app/api/discovery-availability/[coachId]/route.ts",
+  "app/api/progress-look/route.ts",
+  "app/api/public/discovery-book/route.ts",
+  "app/api/share/sign/route.ts",
+  "app/api/sms/low-credit-alert/route.ts",
+  "lib/account-deletion.ts",
+  "lib/ai-budget-server.ts",
+  "lib/coach-credits.ts",
+  "lib/package-group-access.ts",
+  "lib/real-coach.ts",
+  "lib/user-is-coach.ts",
+  "lib/coach-groups.ts",
+  // screens whose scope is chosen by their own caller (they take the group ids to use as a prop)
+  "components/coach/inactive-clients-panel.tsx",
+  "components/coach/expiry-checkin-panel.tsx",
+  // reviewed in the organization-wall work: each one either checks the caller against the groups it was given, takes its scope from the organization of the page (the group switcher and Ask Spot filter to it), or is about the person's own permissions
+  "app/(coach)/groups/[groupId]/dashboard/page.tsx",
+  "app/(coach)/groups/[groupId]/messages/announce/page.tsx",
+  "app/api/ai/generate-meal-plan/route.ts",
+  "app/api/biomech-tags/suggest/route.ts",
+  "app/api/broadcast/send/route.ts",
+  "app/api/clients/correct-email/route.ts",
+  "app/api/coach/api-key/route.ts",
+  "app/api/coach/needs-attention/route.ts",
+  "app/api/collective-intelligence/chat/route.ts",
+  "app/partners/page.tsx",
+  "components/coach/desktop/group-switcher.tsx",
+  "components/coach/desktop/workspace-menu.tsx",
+  "components/coach/mobile/spot-clients-groups-panel.tsx",
+  "components/timezone-capture.tsx",
+  "lib/collective-intelligence-lookups.ts",
+  "lib/marketplace-outcome-gather.ts",
+  "lib/package-program-access.ts",
+  // pickers for moving or adding a person: they list the coach's own groups to choose a destination from; the destination checks (same organization) are in the database (migration 0340)
+  "components/coach/add-social-only-membership-control.tsx",
+  "components/coach/change-client-group-control.tsx",
+  "components/coach/desktop/add-client-button.tsx",
+  // coach-level pages that read the groups of the organization they stand on in the lines that follow (checked by the other tests in this file)
+  "app/(coach)/dashboard/page.tsx",
+  "app/(coach)/groups/[groupId]/athletes/[athleteId]/view/page.tsx",
+  "app/(coach)/groups/[groupId]/business/session-types/page.tsx",
+  "app/(coach)/groups/[groupId]/goal/page.tsx",
+]);
+
+function walk(dir: string, out: string[] = []): string[] {
+  for (const name of readdirSync(dir)) {
+    if (["node_modules", ".next", ".git"].includes(name)) continue;
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) walk(p, out);
+    else if (/\.(ts|tsx)$/.test(name) && !/\.test\./.test(name)) out.push(p);
+  }
+  return out;
+}
+
+describe("no screen reads every group a coach coaches (all organizations at once)", () => {
+  const offenders: string[] = [];
+  for (const dir of ["app", "components", "lib"]) {
+    for (const file of walk(join(ROOT, dir))) {
+      const rel = relative(ROOT, file).replace(/\\/g, "/");
+      const src = readFileSync(file, "utf8");
+      const direct = /from\("group_memberships"\)[\s\S]{0,300}?\.eq\("profile_id", (?:me|user\.id|coachId|userId)\)[\s\S]{0,60}?\.eq\("role", "coach"\)/.test(src);
+      if (direct && !REVIEWED_PERMISSION_ONLY.has(rel)) offenders.push(rel);
+    }
+  }
+  it("every direct read of the coach's own coach memberships is on the reviewed list", () => {
+    expect(offenders).toEqual([]);
+  });
+});
+
+describe("the coach-level pages and pickers stand on the organization the coach chose", () => {
+  const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8").replace(/\r\n/g, "\n");
+  it("Programs, Calendar, Clients and Group calendar use the active organization's group, not the first group by name", () => {
+    for (const f of ["app/(coach)/programs/page.tsx", "app/(coach)/calendar/page.tsx", "app/(coach)/clients/page.tsx", "app/(coach)/group-calendar/page.tsx"]) {
+      const src = read(f);
+      expect(src).toContain("getActiveAnchor(supabase, user.id)");
+      expect(src).not.toContain("pickCoachAnchor(");
+    }
+  });
+  it("the finder, the workspace picker and the Business widget read only the organization's groups", () => {
+    for (const f of ["components/coach/desktop/client-finder.tsx", "components/coach/workspace/pane-picker.tsx", "components/coach/desktop/rail-widgets/business-rail-widget.tsx"]) {
+      expect(read(f)).toContain("activeOrgGroupsFor(");
+    }
+  });
+  it("the Business page, MRR, the calendar's sessions and the assignable clients are one organization's", () => {
+    expect(read("app/(coach)/groups/[groupId]/business/page.tsx")).toContain("groupsInOrgOf(await getCoachedGroups(supabase, user.id), params.groupId)");
+    expect(read("lib/coach-mrr.ts")).toContain("groupsInOrgOf(await getCoachedGroups(supabase, coachId), groupId)");
+    expect(read("lib/assign-clients.ts")).toContain("groupsInOrgOf(await getCoachedGroups(supabase, coachId), programGroupId)");
+    const cal = read("components/coach/calendar-page-body.tsx");
+    expect((cal.match(/\.in\("group_id", orgGroupIds\)/g) ?? []).length).toBeGreaterThanOrEqual(5);
+  });
+  it("visiting a team or social group remembers it as the workspace, and the theme follows the workspace", () => {
+    expect(read("components/coach/coach-desktop-shell.tsx")).toContain("LAST_WORKSPACE_GROUP_COOKIE");
+    expect(read("lib/org-theme-server.ts")).toContain('get("last_workspace_group")');
+  });
+});
+
+describe("Ask Spot, the group switcher, the group dashboard and the View-as-Client picker stay in one organization", () => {
+  const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8").replace(/\r\n/g, "\n");
+  it("Ask Spot's roster, name matching and weekly count use only the active organization's groups", () => {
+    const route = read("app/api/collective-intelligence/chat/route.ts");
+    expect(route).toContain("getActiveAnchor(supabase, user.id)");
+    expect(route).toContain("scopeGroupIds: orgGroupIds");
+    expect(route).toContain("getRosterLoggingThisWeek(supabase, user.id, orgGroupIds)");
+    expect(route).toContain("getRosterFullNames(supabase, user.id, orgGroupIds)");
+    expect(read("lib/collective-intelligence-lookups.ts")).toContain("filter((id) => !scopeGroupIds || scopeGroupIds.includes(id))");
+  });
+  it("the group switcher lists only the open organization's groups; the picker lists only its clients", () => {
+    expect(read("components/coach/desktop/group-switcher.tsx")).toContain("g.organization_id === currentOrgId");
+    expect(read("components/athlete/view-as-client-picker.tsx")).toContain("activeOrgGroupsFor(supabase, user.id, null)");
+  });
+  it("the group dashboard's all-groups view means the organization's groups", () => {
+    expect(read("app/(coach)/groups/[groupId]/dashboard/page.tsx")).toContain("orgGroupIdSet.has(id)");
+  });
+});
+
+describe("the organization walls in the database (migration 0345)", () => {
+  const sql = readFileSync(join(ROOT, "supabase/migrations/0345_organization_walls.sql"), "utf8").replace(/\r\n/g, "\n");
+  it("profiles are no longer open to every signed-in account", () => {
+    expect(sql).toContain('drop policy if exists "profiles_select_authenticated" on public.profiles;');
+    expect(sql).toContain("using (public.can_see_profile(id))");
+  });
+  it("no policy lets a platform administrator read client content", () => {
+    const afterTop = sql.split("-- 2. No platform-admin read of client content.")[1].split("-- 3. Who has which tag")[0];
+    expect(afterTop).not.toContain("is_platform_admin");
+  });
+});

@@ -45,16 +45,18 @@ export interface LookupResult {
   athleteNamesReferenced: string[];
 }
 
+// `scopeGroupIds`: the groups of the organization the coach is in. Ask Spot answers about THAT organization's clients only (never another organization's), so the roster is limited to them.
 async function getCoachRoster(
   supabase: SupabaseClient,
-  coachId: string
+  coachId: string,
+  scopeGroupIds?: string[]
 ): Promise<ResolvedAthlete[]> {
   const { data: coachGroups } = await supabase
     .from("group_memberships")
     .select("group_id")
     .eq("profile_id", coachId)
     .eq("role", "coach");
-  const groupIds = (coachGroups ?? []).map((g) => g.group_id);
+  const groupIds = (coachGroups ?? []).map((g) => g.group_id).filter((id) => !scopeGroupIds || scopeGroupIds.includes(id));
   if (groupIds.length === 0) return [];
 
   const { data: athleteRows } = await supabase
@@ -82,9 +84,9 @@ async function getCoachRoster(
 // synthesis step must relay plainly rather than silently picking one.
 export async function resolveAthleteByName(
   supabase: SupabaseClient,
-  params: { coachId: string; name: string }
+  params: { coachId: string; name: string; scopeGroupIds?: string[] }
 ): Promise<AthleteResolution> {
-  const roster = await getCoachRoster(supabase, params.coachId);
+  const roster = await getCoachRoster(supabase, params.coachId, params.scopeGroupIds);
   const needle = params.name.trim().toLowerCase();
   if (!needle) return "not_found";
 
@@ -103,9 +105,10 @@ export async function resolveAthleteByName(
 // roster" blacklist without duplicating the roster fetch.
 export async function getRosterFullNames(
   supabase: SupabaseClient,
-  coachId: string
+  coachId: string,
+  scopeGroupIds?: string[]
 ): Promise<string[]> {
-  const roster = await getCoachRoster(supabase, coachId);
+  const roster = await getCoachRoster(supabase, coachId, scopeGroupIds);
   return roster.map((a) => a.fullName);
 }
 
@@ -329,9 +332,10 @@ export async function getLoggingConsistency(
 // comparison FEATURE would — it's just this coach's own aggregate.
 export async function getRosterLoggingThisWeek(
   supabase: SupabaseClient,
-  coachId: string
+  coachId: string,
+  scopeGroupIds?: string[]
 ): Promise<LookupResult | null> {
-  const roster = await getCoachRoster(supabase, coachId);
+  const roster = await getCoachRoster(supabase, coachId, scopeGroupIds);
   if (roster.length === 0) {
     return {
       description: "This coach has no athletes on their roster yet.",

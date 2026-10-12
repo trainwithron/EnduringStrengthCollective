@@ -86,7 +86,7 @@ export function GroupSwitcher({
           : Promise.resolve({ data: null }),
         supabase
           .from("group_memberships")
-          .select("groups ( id, name, focus_tag, group_kind )")
+          .select("groups ( id, name, focus_tag, group_kind, organization_id )")
           .eq("profile_id", user.id)
           .eq("role", "coach"),
       ]);
@@ -94,7 +94,8 @@ export function GroupSwitcher({
       const byId = new Map<string, OrgGroup>();
       for (const row of coachedRows ?? []) {
         const g = (row as any).groups;
-        if (g) byId.set(g.id, { id: g.id, name: g.name, focusTag: g.focus_tag ?? null, kind: (g.group_kind ?? "team") as GroupKind });
+        // Only the organization this switcher is in: another organization's groups are reached by switching to that organization.
+        if (g && (!currentOrgId || g.organization_id === currentOrgId)) byId.set(g.id, { id: g.id, name: g.name, focusTag: g.focus_tag ?? null, kind: (g.group_kind ?? "team") as GroupKind });
       }
 
       if (membership && (membership.role === "owner" || membership.role === "admin")) {
