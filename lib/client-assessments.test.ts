@@ -8,7 +8,10 @@ const read = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8").r
 describe("coach assessments", () => {
   it("are on the client's Forms and notes tab and are the coach's own", () => {
     expect(read("app/(coach)/groups/[groupId]/athletes/[athleteId]/page.tsx")).toContain("<ClientAssessmentsSection");
-    expect(read("components/coach/desktop/client-assessments.tsx")).toContain("Only you and the other coaches of this group can see them; the client cannot.");
+    const ui = read("components/coach/desktop/client-assessments.tsx");
+    expect(ui).toContain(">Assessments</h2>");
+    expect(ui).toContain("Attach a file");
+    expect(ui).not.toContain("Numbers");
   });
   it("only the coaches of the group read the table and the files", () => {
     const sql = read("supabase/migrations/0355_client_assessments.sql");

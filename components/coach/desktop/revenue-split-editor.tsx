@@ -34,7 +34,6 @@ export function RevenueSplitEditor({
   const [connecting, setConnecting] = useState(false);
   // What is saved for each person, so a refused share can go back to it.
   const [savedShares, setSavedShares] = useState<Record<string, string>>(shares);
-  const [shareError, setShareError] = useState<string | null>(null);
   const [connectError, setConnectError] = useState<string | null>(null);
 
   async function handleConnectStripe() {
@@ -63,11 +62,18 @@ export function RevenueSplitEditor({
     coaches.map((c) => ({ ...c, revenueSharePct: parseFloat(shares[c.profileId]) || 0 }))
   );
 
-  // Typing only changes what is shown; the share is saved when the box is left. The shares of one organization can never add up to more than 100%: the screen says so before saving, and the
-  // database refuses it too.
+  // The most one person's share can be: what the others leave of 100. The box cannot go past it (typing is held at it), so the shares can never add up to more than 100; the database refuses it too.
+  function maxShareFor(profileId: string): number {
+    const others = coaches.reduce((sum, c) => sum + (c.profileId === profileId ? 0 : parseFloat(shares[c.profileId]) || 0), 0);
+    return Math.max(0, Math.round((100 - others) * 100) / 100);
+  }
+
+  // Typing only changes what is shown; the share is saved when the box is left.
   function typeShare(profileId: string, value: string) {
-    setShares((prev) => ({ ...prev, [profileId]: value }));
-    setShareError(null);
+    const max = maxShareFor(profileId);
+    const n = parseFloat(value);
+    const held = value !== "" && Number.isFinite(n) && n > max ? String(max) : value;
+    setShares((prev) => ({ ...prev, [profileId]: held }));
   }
 
   async function persistShare(profileId: string) {
@@ -75,9 +81,7 @@ export function RevenueSplitEditor({
     const value = shares[profileId] ?? "0";
     const next = parseFloat(value) || 0;
     if (value === savedShares[profileId]) return;
-    const others = coaches.reduce((sum, c) => sum + (c.profileId === profileId ? 0 : parseFloat(shares[c.profileId]) || 0), 0);
-    if (next < 0 || next > 100 || others + next > 100) {
-      setShareError("These shares add up to more than 100%. Lower one to save.");
+    if (next < 0 || next > maxShareFor(profileId)) {
       setShares((prev) => ({ ...prev, [profileId]: savedShares[profileId] }));
       return;
     }
@@ -88,7 +92,6 @@ export function RevenueSplitEditor({
       .eq("organization_id", organizationId)
       .eq("profile_id", profileId);
     if (error) {
-      setShareError(/more than 100/.test(error.message) ? "These shares add up to more than 100%. Lower one to save." : "That didn't save. Nothing was changed. Try again.");
       setShares((prev) => ({ ...prev, [profileId]: savedShares[profileId] }));
       return;
     }
@@ -126,7 +129,7 @@ export function RevenueSplitEditor({
                   <input
                     type="number"
                     min={0}
-                    max={100}
+                    max={maxShareFor(share.profileId)}
                     value={shares[share.profileId]}
                     onChange={(e) => typeShare(share.profileId, e.target.value)}
                     onBlur={() => persistShare(share.profileId)}
@@ -160,11 +163,6 @@ export function RevenueSplitEditor({
             );
           })}
         </div>
-        {shareError && (
-          <p className="font-body text-xs text-rust mt-2" role="alert">
-            {shareError}
-          </p>
-        )}
         {totalSharePct !== 100 && (
           <p className="font-body text-xs text-amber-500 mt-2">
             Coach shares add up to {totalSharePct}%, not 100% —{" "}

@@ -220,7 +220,7 @@ function ProgramCard({
               </p>
             )}
           </Link>
-          <ProgramCardMenu programId={program.id} programName={program.name} groupId={groupId} aiDraft={program.aiDraft} />
+          <ProgramCardMenu programId={program.id} programName={program.name} groupId={groupId} aiDraft={program.aiDraft} showAssignButton={!program.athleteId && !program.isActive && !program.aiDraft} />
         </div>
         <div className="mt-auto flex items-center justify-between pt-2 border-t border-steel/15">
           <ProgramActiveToggle programId={program.id} isActive={program.isActive} aiDraft={program.aiDraft} programName={program.name} unassigned={!program.athleteId} />

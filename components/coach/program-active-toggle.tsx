@@ -58,7 +58,6 @@ export function ProgramActiveToggle({
     <button
       type="button"
       onClick={handleToggle}
-      title={!optimisticActive && unassigned ? "Nobody sees this yet. Tap to make it active for the group." : undefined}
       className={`font-body text-xs shrink-0 transition-colors ${
         optimisticActive ? "text-moss active:text-steel" : "text-steel active:text-rust"
       }`}

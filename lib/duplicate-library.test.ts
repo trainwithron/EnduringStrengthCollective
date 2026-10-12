@@ -14,6 +14,11 @@ describe("Duplicate makes an unassigned library program", () => {
     expect(toggle).toContain('unassigned ? "In your library" : "Set active"');
     expect(read("components/coach/desktop/program-card-grid.tsx")).toContain("unassigned={!program.athleteId}");
   });
+  it("a program in the library has a plain Assign button and no make-active hint", () => {
+    expect(read("components/coach/desktop/program-card-grid.tsx")).toContain("showAssignButton={!program.athleteId && !program.isActive && !program.aiDraft}");
+    expect(read("components/coach/desktop/program-card-menu.tsx")).toContain("function openAssign()");
+    expect(read("components/coach/program-active-toggle.tsx")).not.toContain("Tap to make it active for the group");
+  });
   it("Duplicate to another group never offers a client's one-on-one space", () => {
     expect(read("components/coach/desktop/program-card-menu.tsx")).toContain('.neq("group_kind", "one_on_one")');
   });

@@ -63,6 +63,7 @@ export function ProgramCardMenu({
   groupId,
   hideAssignAndDuplicate = false,
   aiDraft = false,
+  showAssignButton = false,
 }: {
   programId: string;
   programName: string;
@@ -76,6 +77,8 @@ export function ProgramCardMenu({
   // there is staying on your current page. Delete is a real in-place
   // action on this same program, so it stays either way.
   hideAssignAndDuplicate?: boolean;
+  // A program in the library (no client, not active): a plain Assign button beside the menu.
+  showAssignButton?: boolean;
 }) {
   const router = useRouter();
   const term = useTerm();
@@ -114,6 +117,14 @@ export function ProgramCardMenu({
   // trigger button, worse on smaller card sizes. A portal to <body>,
   // positioned from the trigger's real screen coordinates, escapes that
   // ancestor entirely.
+  // The plain Assign button on a program in the library (no client yet): opens the same assign step as the menu's "Assign program".
+  function openAssign() {
+    openMenu();
+    setAssignStartDate(todayDateString());
+    setView("assign");
+    loadClients();
+  }
+
   function openMenu() {
     const rect = buttonRef.current?.getBoundingClientRect();
     if (rect) {
@@ -487,7 +498,12 @@ export function ProgramCardMenu({
   }
 
   return (
-    <div className="relative">
+    <div className="relative flex items-center gap-1">
+      {showAssignButton && (
+        <button type="button" onClick={openAssign} className="min-h-11 px-2 font-body text-xs text-rust underline underline-offset-2">
+          Assign
+        </button>
+      )}
       <button
         ref={buttonRef}
         type="button"

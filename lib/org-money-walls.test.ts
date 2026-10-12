@@ -16,9 +16,11 @@ describe("the money settings on a membership are the server's", () => {
     expect(route).toContain("createServiceRoleClient");
     expect(route).toContain("stripe_connect_account_id: accountId");
   });
-  it("the share editor saves when the box is left and says so when the total would pass 100%", () => {
+  it("the share editor saves when the box is left and holds each box at what the others leave of 100 (no error message)", () => {
     const ed = read("components/coach/desktop/revenue-split-editor.tsx");
     expect(ed).toContain("onBlur={() => persistShare(share.profileId)}");
-    expect(ed).toContain("These shares add up to more than 100%. Lower one to save.");
+    expect(ed).toContain("max={maxShareFor(share.profileId)}");
+    expect(ed).toContain("n > max ? String(max) : value");
+    expect(ed).not.toContain("These shares add up to more than 100%");
   });
 });
