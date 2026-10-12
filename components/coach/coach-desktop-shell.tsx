@@ -134,6 +134,8 @@ interface NavLeaf {
   href: string;
   icon: typeof LayoutGrid;
   badge?: number;
+  // Opens in a new tab.
+  newTab?: boolean;
   // When set, the nav label renders as a SwappableTerm (word-swap
   // terminology system) instead of the plain `label` string — `label`
   // still doubles as the collapsed-state tooltip title.
@@ -494,7 +496,7 @@ function CoachDesktopShellFull({
       icon: Settings,
       items: [
         { key: "settings", label: "Account", href: `/groups/${groupId}/settings`, icon: Settings },
-        { key: "display", label: "Display Mode", href: `/groups/${groupId}/display`, icon: MonitorPlay },
+        { key: "display", label: "Display Mode", href: `/groups/${groupId}/display`, icon: MonitorPlay, newTab: true },
         { key: "kiosk", label: "Kiosk Check-In", href: `/groups/${groupId}/kiosk/settings`, icon: UserCheck },
         { key: "support", label: "Support", href: `/groups/${groupId}/business/support`, icon: HeartHandshake },
         { key: "quick-tips", label: "Quick Tips", href: `/groups/${groupId}/quick-tips`, icon: Lightbulb },
@@ -573,6 +575,7 @@ function CoachDesktopShellFull({
       label: item.label,
       href: item.href,
       active: active === item.key,
+      newTab: item.newTab,
     })) ?? [];
 
   return (

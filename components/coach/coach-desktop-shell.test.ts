@@ -80,3 +80,11 @@ describe("client finder wording", () => {
     expect(finder).not.toContain("`Find a ${clientWord");
   });
 });
+
+describe("Display Mode opens in a new tab", () => {
+  it("the Settings list marks it newTab and the panel adds target=_blank", () => {
+    expect(shell).toContain("icon: MonitorPlay, newTab: true");
+    const panel = readFileSync(new URL("./desktop/shell-list-panel.tsx", import.meta.url), "utf8");
+    expect(panel).toContain('target: "_blank", rel: "noopener noreferrer"');
+  });
+});

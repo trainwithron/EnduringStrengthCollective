@@ -28,6 +28,8 @@ export interface SectionSubLink {
   label: string;
   href: string;
   active: boolean;
+  // Opens in a new tab (Display Mode: a screen on a wall or a TV must not replace the coach's own tab).
+  newTab?: boolean;
 }
 
 // The secondary panel (coach_desktop_shell_identity_redesign.md, items
@@ -148,6 +150,7 @@ export function ShellListPanel({
                 <Link
                   key={link.key}
                   href={link.href}
+                  {...(link.newTab ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                   className={`block px-2 py-1.5 font-body text-sm transition-colors ${
                     link.active ? "text-rust bg-rust/10" : "text-steel active:text-chalk"
                   }`}
