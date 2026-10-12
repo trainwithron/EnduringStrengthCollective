@@ -64,7 +64,6 @@ export async function getSharedTransformationCard(cardId: string) {
 
   return {
     id: card.id,
-    athleteId: card.athlete_id as string,
     athleteName: identity.athleteName,
     groupName: identity.groupName,
     totalLossLbs,

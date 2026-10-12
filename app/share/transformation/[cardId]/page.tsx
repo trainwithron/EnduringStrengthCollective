@@ -2,8 +2,6 @@ import { BRAND_OG_IMAGES } from "@/lib/brand";
 import type { Metadata } from "next";
 import { NoAccess } from "@/components/shared/no-access";
 import { getSharedTransformationCard } from "@/lib/shared-transformation-card";
-import { createServerClient } from "@/lib/supabase/server";
-import { StopSharingButton } from "@/components/share/stop-sharing-button";
 import { ShareWorkoutButton } from "@/components/share/share-workout-button";
 
 // Transformation Cards — the public celebration card. Deliberately
@@ -33,8 +31,6 @@ export default async function ShareTransformationCardPage(
 ) {
   const params = await props.params;
   const shared = await getSharedTransformationCard(params.cardId);
-  // Only the client who made the card is offered "Stop sharing".
-  const viewerId = (await (await createServerClient()).auth.getUser()).data.user?.id ?? null;
 
   if (!shared) {
     return (
@@ -105,8 +101,6 @@ export default async function ShareTransformationCardPage(
         <div className="mt-6">
           <ShareWorkoutButton path={`/share/transformation/${shared.id}`} title={shareTitle} size="large" />
         </div>
-
-        {viewerId && viewerId === shared.athleteId && <StopSharingButton cardId={shared.id} />}
 
         <p className="font-body text-xs text-steel mt-6 pt-4 border-t border-steel/20">
           Trained with <span className="text-rust">{shared.groupName}</span>

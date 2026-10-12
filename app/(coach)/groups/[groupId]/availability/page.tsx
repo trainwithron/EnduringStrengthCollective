@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { ScheduleNoticeControl } from "@/components/coach/desktop/schedule-notice-control";
 import { inOrg, orgIdOfGroup } from "@/lib/org-of-group";
 import { redirectOneOnOneToAnchor } from "@/lib/coach-wide-redirect";
 import { NoAccess } from "@/components/shared/no-access";
@@ -83,8 +82,6 @@ export default async function AvailabilityPage(
     sessionTypeId: typeById.get(w.id) ?? null,
   }));
 
-  // The notice a client must give to pause or end a weekly schedule (Release BE). Before that update is applied this lookup returns nothing and the setting shows as none.
-  const { data: noticeRow } = await supabase.from("coach_booking_policies").select("schedule_change_notice_days, schedule_change_notice_text").eq("coach_id", user.id).maybeSingle();
   const { data: policyRow } = await supabase
     .from("coach_booking_policies")
     .select("cancellation_window_hours, buffer_minutes, minimum_notice_hours, credit_expiry_days")
@@ -140,8 +137,6 @@ export default async function AvailabilityPage(
         </p>
       )}
       <TimezoneControl initialTimezone={coachProfile?.timezone ?? null} />
-
-      <ScheduleNoticeControl coachId={user.id} initialDays={noticeRow?.schedule_change_notice_days ?? 0} initialText={noticeRow?.schedule_change_notice_text ?? ""} />
 
       <BookingPolicyControl
         key={`policy-${policyRow?.buffer_minutes ?? 0}`}
