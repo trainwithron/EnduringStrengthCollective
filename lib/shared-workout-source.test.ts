@@ -18,10 +18,17 @@ function fakeDb(tables: Record<string, any>) {
 
 describe("the card source", () => {
   it("uses the feed post when there is one", async () => {
-    const post = { id: "p1", group_id: "g", author_id: "a", broadcast_level: "prs_only", workout_logs: { session_id: "s", new_prs: [], total_volume: 100, total_sets_completed: 3 } };
+    const post = { id: "p1", group_id: "g", author_id: "a", broadcast_level: "prs_only", workout_logs: { athlete_id: "a", group_id: "g", session_id: "s", new_prs: [], total_volume: 100, total_sets_completed: 3 } };
     const r = await loadSharedSource(fakeDb({ posts: post }), "p1");
     expect(r?.post.id).toBe("p1");
     expect(r?.post.broadcast_level).toBe("prs_only");
+  });
+
+  it("refuses a post that points at somebody else's workout, or a workout of another group", async () => {
+    const forged = { id: "p1", group_id: "g", author_id: "attacker", broadcast_level: "full", workout_logs: { athlete_id: "victim", group_id: "g", session_id: "s", new_prs: ["Back Squat"], total_volume: 100, total_sets_completed: 3 } };
+    expect(await loadSharedSource(fakeDb({ posts: forged }), "p1", true)).toBeNull();
+    const otherGroup = { id: "p2", group_id: "g", author_id: "a", broadcast_level: "full", workout_logs: { athlete_id: "a", group_id: "other", session_id: "s", new_prs: [], total_volume: 100, total_sets_completed: 3 } };
+    expect(await loadSharedSource(fakeDb({ posts: otherGroup }), "p2", true)).toBeNull();
   });
 
   it("builds the card from the workout log when the workout has no feed post (private or one-on-one client), in full", async () => {

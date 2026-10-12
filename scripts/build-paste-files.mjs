@@ -1802,6 +1802,22 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the packages table has its group and session columns", has.col("coach_packages", "group_id") + " and " + has.col("coach_packages", "sessions_granted")],
     ],
   },
+  {
+    n: "88",
+    slug: "0342",
+    title: "0342 Private lookups the row rules use can't be asked about other people by any signed-in account (who shares an organization, who blocked whom, who is a client of a group, who is hidden from the organization, a coach's client count)",
+    migrations: ["0342"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for normal use: the app's own rules ask these questions only about the signed-in person. Anyone else asking about other people now gets 'no'. The server and the database's own jobs are unaffected.",
+    undo: ["create or replace function public.training_partners_share_org(a uuid, b uuid) returns boolean language sql stable security definer set search_path to 'public' as $function$ select exists (select 1 from public.group_memberships gm_a join public.groups g_a on g_a.id = gm_a.group_id join public.group_memberships gm_b on gm_b.profile_id = b join public.groups g_b on g_b.id = gm_b.group_id where gm_a.profile_id = a and g_a.organization_id is not null and g_b.organization_id = g_a.organization_id); $function$;","create or replace function public.training_partners_mutually_blocked(a uuid, b uuid) returns boolean language sql stable security definer set search_path to 'public' as $function$ select exists (select 1 from public.training_partner_blocks where (blocker_id = a and blocked_id = b) or (blocker_id = b and blocked_id = a)); $function$;","create or replace function public.is_training_client_of_group(_group_id uuid, _athlete_id uuid default auth.uid()) returns boolean language sql stable security definer set search_path to 'public' as $function$ select exists (select 1 from public.group_memberships where group_id = _group_id and profile_id = _athlete_id and role = 'athlete' and membership_type = 'training'); $function$;","create or replace function public.is_client_private_from_org(_group_id uuid, _athlete_id uuid) returns boolean language sql stable security definer set search_path to 'public' as $function$ select coalesce((select private_from_org from public.group_memberships where group_id = _group_id and profile_id = _athlete_id), false); $function$;","create or replace function public.is_wearable_subject_private_from_org(_profile_id uuid) returns boolean language sql stable security definer set search_path to 'public' as $function$ select exists (select 1 from public.group_memberships where profile_id = _profile_id and private_from_org = true); $function$;","grant execute on function public.coach_ai_multiplier(uuid) to public, anon, authenticated;","grant execute on function public.coach_client_steps(uuid) to public, anon, authenticated;"].join("\n"),
+    undoWhy: "Only if step 88 misbehaves (for example an organization admin can no longer see a client they should, or training-partner matching stops listing people). Puts the five functions back exactly as they were and opens the two coach-count functions to signed-in users again.",
+    rows: [
+      ["0342 is not already applied (the coach-count function can still be run by a signed-in user)", "has_function_privilege('authenticated', 'public.coach_ai_multiplier(uuid)', 'execute')"],
+      ["the five functions exist", has.fn("training_partners_share_org(uuid, uuid)") + " and " + has.fn("training_partners_mutually_blocked(uuid, uuid)") + " and " + has.fn("is_training_client_of_group(uuid, uuid)") + " and " + has.fn("is_client_private_from_org(uuid, uuid)") + " and " + has.fn("is_wearable_subject_private_from_org(uuid)")],
+      ["the helpers they now call exist", has.fn("is_group_coach(uuid)") + " and " + has.fn("is_org_admin_of_group(uuid)") + " and " + has.fn("is_platform_admin()")],
+      ["the two coach-count functions exist", has.fn("coach_ai_multiplier(uuid)") + " and " + has.fn("coach_client_steps(uuid)")],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -1907,6 +1923,7 @@ const BUNDLES = [
   { id: "release-ai", name: "Release AI (a payment and its sessions are recorded in one step; run BEFORE the code that uses it deploys)", steps: ["77"] },
   { id: "release-ap", name: "Release AP (parent-view links only for under-13 clients of the coach, and they expire; internal training-partner functions closed; run any time)", steps: ["84"] },
   { id: "release-ao", name: "Release AO (assigning attaches a program only inside one organization; run any time, after Release AM)", steps: ["83"] },
+  { id: "release-at", name: "Release AT (private lookup functions closed to other people; run any time)", steps: ["88"] },
   { id: "release-as", name: "Release AS (coach packages can only be written by the server; run any time)", steps: ["87"] },
   { id: "release-ar", name: "Release AR (tenant safety: a coach can only file rows about people in that group; clients move only inside one organization; run any time)", steps: ["86"] },
   { id: "release-aq", name: "Release AQ (a transformation card can only use the athlete's own photos and milestone, never for a client under 18; run any time)", steps: ["85"] },
@@ -2101,6 +2118,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
+    m("0342", "not has_function_privilege('authenticated', 'public.coach_ai_multiplier(uuid)', 'execute')"),
     m("0341", "not exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_packages' and policyname = 'coach_packages_insert_coach')"),
     m("0340", has.fn("enforce_athlete_in_group()")),
     m("0339", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'transformation_cards' and policyname = 'transformation_cards_insert_own')"),

@@ -15,13 +15,17 @@ export async function loadSharedSource(supabase: SupabaseClient, id: string, log
       `
       id, post_type, created_at, group_id, broadcast_level, author_id, shared_exercise_names,
       profiles!posts_author_id_fkey ( full_name, avatar_url ),
-      workout_logs ( session_id, new_prs, total_volume, total_sets_completed )
+      workout_logs ( athlete_id, group_id, session_id, new_prs, total_volume, total_sets_completed )
     `
     )
     .eq("id", id)
     .eq("post_type", "workout_summary")
     .maybeSingle();
-  if (post && (post as any).workout_logs) return { post, workoutLog: (post as any).workout_logs };
+  // A post may only show a workout that is its own author's, in the post's own group. (Any group member can write a post that points at anyone's workout log id; without this check the public
+  // card would show that other person's lifts, PRs and volume.)
+  const linked = (post as any)?.workout_logs;
+  if (post && linked && linked.athlete_id === (post as any).author_id && linked.group_id === (post as any).group_id) return { post, workoutLog: linked };
+  if (post && linked) return null;
 
   if (!logAllowed) return null;
 

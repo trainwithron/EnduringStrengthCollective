@@ -109,6 +109,7 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0339 | yes | yes | 10 | 0339 a transformation card only uses the athlete's own photos, milestone and group; never for under 18 |
 | 0340 | yes | yes | 15 | 0340 a row about a person must be filed in a group the person belongs to |
 | 0341 | yes | yes | 8 | 0341 coach packages are written by the server only |
+| 0342 | yes | yes | 15 | 0342 private lookup functions answer only for the people they concern |
 | 0331 | yes | yes | 10 | 0331 a payment event and its sessions are recorded in one step |
 | 0329 | yes | yes | 12 | 0329 every session costs exactly 1 credit; the waitlist offer uses the coach's time zone |
 | 0330 | yes | yes | 9 | 0330 only a real coach can have a public page |

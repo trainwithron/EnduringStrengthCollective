@@ -50,3 +50,17 @@ describe("tenant safety (migration 0340 and the pages that take a client id from
     expect(route).not.toContain('supabase.from("session_pattern_checks")');
   });
 });
+
+describe("private lookups and forged post links", () => {
+  it("a post can only show a workout log of its own author, in its own group", () => {
+    const src = read("lib/shared-workout-source.ts");
+    expect(src).toContain("linked.athlete_id === (post as any).author_id && linked.group_id === (post as any).group_id");
+    expect(src).toContain("workout_logs ( athlete_id, group_id,");
+  });
+  it("the lookup functions answer only for the people concerned, and the two coach-count functions are closed", () => {
+    const sql = read("supabase/migrations/0342_close_lookup_oracles.sql");
+    expect(sql).toContain("coalesce(auth.role(), '') <> 'authenticated' or auth.uid() = a or auth.uid() = b");
+    expect(sql).toContain("revoke execute on function public.coach_ai_multiplier(uuid) from public, anon, authenticated;");
+    expect(sql).toContain("revoke execute on function public.coach_client_steps(uuid) from public, anon, authenticated;");
+  });
+});

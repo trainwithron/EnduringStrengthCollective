@@ -1299,6 +1299,24 @@ for (const s of steps) {
   const errAS2 = await run(`apply/${bundle.file}`);
   check("release-as: the bundle applies again after an undo" + (errAS2 ? ": " + errAS2 : ""), !errAS2 && (await has()));
 }
+// Release AT (step 88): ONE paste.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-at");
+  check("release-at: ONE bundle holds step 88", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["88"]));
+  const st88 = steps.find((x) => x.n === "88");
+  const has = async () => (await db.query("select not has_function_privilege('authenticated', 'public.coach_ai_multiplier(uuid)', 'execute') as ok")).rows[0].ok === true;
+  const eat0 = await run(`apply/undo-step${st88.n}-${st88.slug}.sql`);
+  check("release-at: before the bundle runs the old functions are back" + (eat0 ? ": " + eat0 : ""), !eat0 && !(await has()));
+  const errAT = await run(`apply/${bundle.file}`);
+  check("release-at bundle applies on the live-shaped state" + (errAT ? ": " + errAT : ""), !errAT && (await has()));
+  const againAT = await run(`apply/${bundle.file}`);
+  check("release-at: a second run is refused, naming step 88 (" + againAT + ")", !!againAT && againAT.includes("step 88 (0342) cannot run") && againAT.includes("already applied"));
+  const euAT = await run(`apply/undo-step${st88.n}-${st88.slug}.sql`);
+  check("release-at: the undo puts the old functions back" + (euAT ? ": " + euAT : ""), !euAT && !(await has()));
+  const errAT2 = await run(`apply/${bundle.file}`);
+  check("release-at: the bundle applies again after an undo" + (errAT2 ? ": " + errAT2 : ""), !errAT2 && (await has()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.

@@ -261,6 +261,14 @@
   "file": "apply-release-ao-all.sql"
  },
  {
+  "id": "release-at",
+  "name": "Release AT (private lookup functions closed to other people; run any time)",
+  "steps": [
+   "88"
+  ],
+  "file": "apply-release-at-all.sql"
+ },
+ {
   "id": "release-as",
   "name": "Release AS (coach packages can only be written by the server; run any time)",
   "steps": [
