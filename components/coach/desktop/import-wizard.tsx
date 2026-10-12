@@ -422,8 +422,9 @@ export function ImportWizard({
     processingRef.current = true;
 
     const supabase = createBrowserClient();
-    const { parsed, programName, description, fuzzyMatches, autoNewExercises, sequencingNotes, injuryConsiderations } =
-      importData;
+    const { parsed, description, fuzzyMatches, autoNewExercises, sequencingNotes, injuryConsiderations } = importData;
+    // The name the coach confirmed on the review screen: trimmed, and never blank.
+    const programName = importData.programName.replace(/s+/g, " ").trim().slice(0, PROGRAM_NAME_MAX);
     const resolutions = new Map(importData.resolutions);
 
     const createdExercises: string[] = [...autoNewExercises];
