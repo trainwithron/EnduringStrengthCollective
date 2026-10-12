@@ -1395,6 +1395,24 @@ for (const s of steps) {
   const errAX2 = await run(`apply/${bundle.file}`);
   check("release-ax: the bundle applies again after an undo" + (errAX2 ? ": " + errAX2 : ""), !errAX2 && (await has()));
 }
+// Release AY (step 93): ONE paste.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-ay");
+  check("release-ay: ONE bundle holds step 93", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["93"]));
+  const st93 = steps.find((x) => x.n === "93");
+  const has = async () => (await db.query("select exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_briefings' and column_name = 'organization_id') as ok")).rows[0].ok === true;
+  const eay0 = await run(`apply/undo-step${st93.n}-${st93.slug}.sql`);
+  check("release-ay: before the bundle runs the old one-per-day rule is back" + (eay0 ? ": " + eay0 : ""), !eay0 && !(await has()));
+  const errAY = await run(`apply/${bundle.file}`);
+  check("release-ay bundle applies on the live-shaped state" + (errAY ? ": " + errAY : ""), !errAY && (await has()));
+  const againAY = await run(`apply/${bundle.file}`);
+  check("release-ay: a second run is refused, naming step 93 (" + againAY + ")", !!againAY && againAY.includes("step 93 (0347) cannot run") && againAY.includes("already applied"));
+  const euAY = await run(`apply/undo-step${st93.n}-${st93.slug}.sql`);
+  check("release-ay: the undo puts the old rule back" + (euAY ? ": " + euAY : ""), !euAY && !(await has()));
+  const errAY2 = await run(`apply/${bundle.file}`);
+  check("release-ay: the bundle applies again after an undo" + (errAY2 ? ": " + errAY2 : ""), !errAY2 && (await has()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.

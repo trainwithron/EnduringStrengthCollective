@@ -1890,6 +1890,26 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the assign function and the three tables exist", "to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)') is not null and to_regclass('public.client_phase_plans') is not null and to_regclass('public.client_nutrition_feedback') is not null and to_regclass('public.transformation_cards') is not null"],
     ],
   },
+  {
+    n: "93",
+    slug: "0347",
+    title: "0347 The daily briefing is made once per coach, per day, per organization (a coach who runs two organizations no longer gets one briefing built from both)",
+    migrations: ["0347"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing visible changes today. From the next morning's run, a coach who runs more than one organization gets a separate briefing for each, built only from that organization's clients, and Home shows the open organization's. Earlier briefings are kept as they were. Run this BEFORE the code that goes with it is live.",
+    undo: [
+      "create unique index if not exists coach_briefings_coach_id_briefing_date_key_undo on public.coach_briefings (coach_id, briefing_date);",
+      "drop index if exists public.coach_briefings_coach_id_briefing_date_key_undo;",
+      "drop index if exists public.coach_briefings_coach_day_org_key;",
+      "alter table public.coach_briefings add constraint coach_briefings_coach_id_briefing_date_key unique (coach_id, briefing_date);",
+      "alter table public.coach_briefings drop column if exists organization_id;",
+    ].join("\n"),
+    undoWhy: "Only if step 93 misbehaves, and only BEFORE the new code has made two briefings for one coach on one day (the undo then stops with an error and changes nothing). Puts back the one-per-coach-per-day rule and removes the organization column.",
+    rows: [
+      ["0347 is not already applied (the briefing has no organization column yet)", has.noCol("coach_briefings", "organization_id")],
+      ["the briefing table exists", has.table("coach_briefings")],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -1995,6 +2015,7 @@ const BUNDLES = [
   { id: "release-ai", name: "Release AI (a payment and its sessions are recorded in one step; run BEFORE the code that uses it deploys)", steps: ["77"] },
   { id: "release-ap", name: "Release AP (parent-view links only for under-13 clients of the coach, and they expire; internal training-partner functions closed; run any time)", steps: ["84"] },
   { id: "release-ao", name: "Release AO (assigning attaches a program only inside one organization; run any time, after Release AM)", steps: ["83"] },
+  { id: "release-ay", name: "Release AY (the daily briefing is made per organization; run BEFORE the code that goes with it is live)", steps: ["93"] },
   { id: "release-ax", name: "Release AX (a coach using the app as their own client can do everything a client can; Assign to Myself attaches; run AFTER Release AW)", steps: ["92"] },
   { id: "release-aw", name: "Release AW (the organization walls: names and client content readable only inside the organization; run AFTER the code that goes with it is live)", steps: ["91"] },
   { id: "release-av", name: "Release AV (a coach can still tidy up an existing row of someone who left the group; run AFTER Release AR)", steps: ["90"] },
@@ -2194,6 +2215,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
+    m("0347", has.col("coach_briefings", "organization_id")),
     m("0346", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'client_phase_plans' and policyname = 'client_phase_plans_coach_manage' and position('''athlete''::member_role' in with_check) = 0)"),
     m("0345", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'profiles' and policyname = 'profiles_select_visible')"),
     m("0344", "position('v_had_row' in pg_get_functiondef(to_regprocedure('public.enforce_athlete_in_group()'))) > 0"),

@@ -59,24 +59,26 @@ async function handler(request: Request) {
     .select("profile_id, group_id")
     .eq("role", "coach");
 
-  const groupIdsByCoach = new Map<string, string[]>();
+  // One briefing per coach PER ORGANIZATION: a coach who runs two organizations gets a separate briefing for each, built only from that organization's clients (the request to the AI never
+  // names clients from two organizations, and each organization has its own limit of items).
+  const { data: groupOrgRows } = await supabase.from("groups").select("id, organization_id").in("id", [...new Set((coachMemberships ?? []).map((r) => r.group_id))]);
+  const orgOfGroup = new Map((groupOrgRows ?? []).map((g) => [g.id as string, (g.organization_id as string | null) ?? null]));
+  const groupIdsByCoachOrg = new Map<string, { coachId: string; organizationId: string | null; groupIds: string[] }>();
   for (const row of coachMemberships ?? []) {
-    const list = groupIdsByCoach.get(row.profile_id) ?? [];
-    list.push(row.group_id);
-    groupIdsByCoach.set(row.profile_id, list);
+    const organizationId = orgOfGroup.get(row.group_id) ?? null;
+    const key = `${row.profile_id}|${organizationId ?? "none"}`;
+    const entry = groupIdsByCoachOrg.get(key) ?? { coachId: row.profile_id as string, organizationId, groupIds: [] };
+    entry.groupIds.push(row.group_id);
+    groupIdsByCoachOrg.set(key, entry);
   }
 
   const results: { coachId: string; itemCount: number; skipped: string | null }[] = [];
 
-  for (const [coachId, groupIds] of groupIdsByCoach) {
-    // Idempotent per day — a re-run (retry, manual trigger) never
-    // double-generates.
-    const { data: existing } = await supabase
-      .from("coach_briefings")
-      .select("id")
-      .eq("coach_id", coachId)
-      .eq("briefing_date", todayKey)
-      .maybeSingle();
+  for (const { coachId, organizationId, groupIds } of groupIdsByCoachOrg.values()) {
+    // Idempotent per day and organization — a re-run (retry, manual trigger) never double-generates.
+    let existingQuery = supabase.from("coach_briefings").select("id").eq("coach_id", coachId).eq("briefing_date", todayKey);
+    existingQuery = organizationId ? existingQuery.eq("organization_id", organizationId) : existingQuery.is("organization_id", null);
+    const { data: existing } = await existingQuery.maybeSingle();
     if (existing) {
       results.push({ coachId, itemCount: 0, skipped: "already generated today" });
       continue;
@@ -92,7 +94,7 @@ async function handler(request: Request) {
 
     const { data: briefing } = await supabase
       .from("coach_briefings")
-      .insert({ coach_id: coachId, briefing_date: todayKey })
+      .insert({ coach_id: coachId, briefing_date: todayKey, organization_id: organizationId })
       .select("id")
       .single();
     if (!briefing) {

@@ -159,7 +159,7 @@ export default async function CoachHomePage() {
     supabase.from("coach_profiles").select("completion_message").eq("coach_id", user.id).maybeSingle(),
     supabase.from("group_memberships").select("groups ( id, name, focus_tag, group_kind, organization_id )").eq("profile_id", user.id).eq("role", "coach"),
     supabase.from("coach_dashboard_layout").select("hidden_tiles, tile_order, tile_metric_overrides").eq("coach_id", user.id).maybeSingle(),
-    supabase.from("coach_briefings").select("id").eq("coach_id", user.id).eq("briefing_date", todayKey).maybeSingle(),
+    supabase.from("coach_briefings").select("id").eq("coach_id", user.id).eq("briefing_date", todayKey),
     supabase
       .from("notifications")
       .select("id, type, body, link_path, created_at")
@@ -196,11 +196,11 @@ export default async function CoachHomePage() {
     adminOrgIds.length > 0
       ? supabase.from("groups").select("id, name, focus_tag, group_kind, organization_id").in("organization_id", adminOrgIds).order("name")
       : Promise.resolve({ data: null }),
-    todaysBriefing
+    todaysBriefing && todaysBriefing.length > 0
       ? supabase
           .from("coach_briefing_items")
           .select("id, item_type, headline, athlete_id, group_id")
-          .eq("briefing_id", todaysBriefing.id)
+          .in("briefing_id", todaysBriefing.map((b) => b.id))
           .order("sort_order", { ascending: true })
       : Promise.resolve({ data: null }),
   ]);

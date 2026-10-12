@@ -161,3 +161,17 @@ describe("assistant, bell, notifications page and digest stay in one organizatio
     expect(digest).toContain("orgCountByCoach");
   });
 });
+
+describe("the daily briefing is made per organization", () => {
+  const read3 = (rel: string) => readFileSync(join(ROOT, rel), "utf8").replace(/\r\n/g, "\n");
+  it("the briefing cron builds one briefing per coach per organization, from that organization's clients only", () => {
+    const cron = read3("app/api/cron/coach-briefing/route.ts");
+    expect(cron).toContain("groupIdsByCoachOrg");
+    expect(cron).toContain("organization_id: organizationId");
+    expect(cron).toContain("gatherCandidateSignals(supabase, { coachId, groupIds })");
+  });
+  it("Home shows only the open organization's briefing items", () => {
+    const home = read3("app/(coach)/dashboard/page.tsx");
+    expect(home).toContain("collectiveIntelligenceItems.filter((i) => !i.groupId || allGroupIds.includes(i.groupId))");
+  });
+});
