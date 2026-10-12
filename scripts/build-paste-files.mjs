@@ -2112,6 +2112,20 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["step 109 is not already applied (the cleanup log is not there yet)", "to_regclass('public.orphan_group_cleanup_log') is null"],
     ],
   },
+  {
+    n: "108",
+    slug: "0360",
+    title: "0360 Adding a client works again: the person who has just created a group can seat themselves in it as its coach (a new one-on-one space was refusing its very first membership)",
+    migrations: ["0360"],
+    sees: "Success. No rows returned.",
+    afterwards: "Adding a client (and making a team or social group, or moving a client to a new space) now finishes: the coach is seated in the new group. The rule only works for the creator of a group that has no members yet.",
+    undo: "drop policy if exists \"memberships_insert_coach_or_self\" on public.group_memberships;\ncreate policy \"memberships_insert_coach_or_self\" on public.group_memberships for insert\n  to authenticated with check (\n    (public.is_group_coach(group_id) and (profile_id = (select auth.uid()) or public.is_coach_of_athlete(profile_id)))\n    or (\n      profile_id = (select auth.uid())\n      and role = 'coach'\n      and public.is_org_admin_of_group(group_id)\n      and not public.group_closed_to_org_admin_join(group_id)\n    )\n  );\ndrop function if exists public.group_is_new_and_mine(uuid);",
+    undoWhy: "Only if step 108 misbehaves. Puts the membership rule back as it was (adding a client would fail again) and removes the helper.",
+    rows: [
+      ["0360 is not already applied (the creator helper does not exist yet)", "to_regprocedure('public.group_is_new_and_mine(uuid)') is null"],
+      ["the membership rule and its helpers exist", "to_regprocedure('public.group_closed_to_org_admin_join(uuid)') is not null and to_regprocedure('public.is_org_admin_of_group(uuid)') is not null"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -2218,6 +2232,7 @@ const BUNDLES = [
   { id: "release-ap", name: "Release AP (parent-view links only for under-13 clients of the coach, and they expire; internal training-partner functions closed; run any time)", steps: ["84"] },
   { id: "release-ao", name: "Release AO (assigning attaches a program only inside one organization; run any time, after Release AM)", steps: ["83"] },
   { id: "release-bm", name: "Release BM (imported history weights do not set training maxes; run BEFORE importing FitPros history)", steps: ["107"] },
+  { id: "release-bn", name: "Release BN (adding a client works again: the creator of a new group can seat themselves; run any time, ideally NOW)", steps: ["108"] },
   { id: "release-bl", name: "Release BL (four exercises added to Coach Ron's library for the FitPros history; run any time)", steps: ["106"] },
   { id: "release-bk", name: "Release BK (move Coach Ron's own training into his personal space; run AFTER he has opened Coach Ron (you) once and removed the programs he does not want)", steps: ["105"] },
   { id: "release-bo", name: "Release BO (removes two empty stray Rob Derrick groups; run any time)", steps: ["109"] },
@@ -2430,6 +2445,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
+    m("0360", "to_regprocedure('public.group_is_new_and_mine(uuid)') is not null"),
     m("0359", "position('12:00:17' in pg_get_functiondef(to_regprocedure('public.recompute_training_max()'))) > 0"),
     m("0358", "to_regprocedure('public.ensure_personal_space()') is not null"),
     m("0355", "to_regclass('public.client_assessments') is not null"),

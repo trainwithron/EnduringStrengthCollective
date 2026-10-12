@@ -82,7 +82,7 @@ export const AUDIT_WRITERS = SERVER_ONLY_SIGNATURES.filter((s) => s[2]).map((s) 
 // check-function-acl.sql. (is_* and training_partner* helpers are matched by prefix.)
 export const ACL_REVIEWED = [
   "coach_ai_multiplier", "coach_client_steps", "get_invite_info", "has_valid_group_invite", "athlete_in_org", "can_view_org_branding",
-  "join_group_with_invite", "set_sms_consent", "request_workspace_org", "answer_organization_invite", "leave_organization", "group_in_active_org", "ensure_personal_space", "coach_in_org", "client_of_coach_in_org", "attach_refund_reason", "refund_coach_credit", "group_session_counts",
+  "join_group_with_invite", "set_sms_consent", "request_workspace_org", "answer_organization_invite", "leave_organization", "group_in_active_org", "ensure_personal_space", "group_is_new_and_mine", "coach_in_org", "client_of_coach_in_org", "attach_refund_reason", "refund_coach_credit", "group_session_counts",
 ];
 
 const quote = (names) => names.map((n) => `'${n}'`).join(", ");
