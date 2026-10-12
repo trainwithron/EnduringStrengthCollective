@@ -138,3 +138,26 @@ describe("the organization walls in the database (migration 0345)", () => {
     expect(afterTop).not.toContain("is_platform_admin");
   });
 });
+
+describe("assistant, bell, notifications page and digest stay in one organization", () => {
+  const read2 = (rel: string) => readFileSync(join(ROOT, rel), "utf8").replace(/\r\n/g, "\n");
+  it("the assistant's client and program search is the open organization's", () => {
+    const route = read2("app/api/assistant/navigate/route.ts");
+    expect(route).toContain("getActiveAnchor(supabase, user.id)");
+    expect(route).toContain("const coachGroupIds = orgGroupIdSet");
+  });
+  it("the coach's bell and notifications page list only the open organization's notifications", () => {
+    const bell = read2("components/athlete/notification-bell.tsx");
+    expect(bell).toContain("query.in(\"group_id\"");
+    expect(bell).toContain("if (scopeIds && !scopeIds.includes(n.group_id)) return;");
+    expect(read2("components/coach/coach-desktop-shell.tsx")).toContain("<HeaderNotificationBell scopeGroupId={groupId} />");
+    const page = read2("app/notifications/page.tsx");
+    expect(page).toContain("orgGroupIds.has(n.group_id)");
+  });
+  it("the daily digest is one push per coach PER organization, labeled when the coach runs several", () => {
+    const digest = read2("app/api/cron/coach-digest/route.ts");
+    expect(digest).toContain("`${row.profile_id}|${g?.organization_id ?? \"none\"}`");
+    expect(digest).toContain("since you last checked");
+    expect(digest).toContain("orgCountByCoach");
+  });
+});

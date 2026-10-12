@@ -5,6 +5,7 @@ import { CoachHomeShell } from "@/components/coach/coach-home-shell";
 import { NotificationList, type CenterEntry } from "@/components/notifications/notification-list";
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
 import { isValidTimeZone } from "@/lib/format-in-timezone";
+import { CHOOSE_ORGANIZATION_PATH, getActiveAnchor } from "@/lib/active-anchor";
 
 // Every notification the signed-in person has received, in one place, whatever their role: replies, programs and macros assigned, class
 // changes, partner requests, notices from their organization. The bell in the header shows the latest few and links here.
@@ -20,7 +21,7 @@ export default async function NotificationsPage() {
     supabase.from("group_memberships").select("group_id, role").eq("profile_id", user.id),
     supabase
       .from("notifications")
-      .select("id, body, link_path, read_at, created_at, groups ( name )")
+      .select("id, body, link_path, read_at, created_at, group_id, groups ( name )")
       .eq("profile_id", user.id)
       .order("created_at", { ascending: false })
       .limit(200),
@@ -30,7 +31,18 @@ export default async function NotificationsPage() {
   const isCoach = (memberships ?? []).some((m) => m.role === "coach");
   const homeGroupId = (memberships ?? [])[0]?.group_id ?? null;
 
-  const entries: CenterEntry[] = (rows ?? []).map((n: any) => ({
+  // A coach sees the OPEN organization's notifications here, never another organization's (a coach who runs several chooses one first).
+  let visibleRows = rows ?? [];
+  if (isCoach) {
+    const active = await getActiveAnchor(supabase, user.id);
+    if (active?.needsChoice) redirect(`${CHOOSE_ORGANIZATION_PATH}?next=/notifications`);
+    if (active) {
+      const orgGroupIds = new Set(active.groups.filter((g) => g.orgId === active.orgId).map((g) => g.id));
+      visibleRows = visibleRows.filter((n: any) => n.group_id && orgGroupIds.has(n.group_id));
+    }
+  }
+
+  const entries: CenterEntry[] = visibleRows.map((n: any) => ({
     id: n.id,
     body: n.body,
     linkPath: n.link_path ?? "/",

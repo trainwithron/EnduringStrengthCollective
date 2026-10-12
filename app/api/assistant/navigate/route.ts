@@ -1,5 +1,6 @@
 import { describeScheduleRequests, matchScheduleRequestQuestion, namedClients } from "@/lib/schedule-requests-chat";
 import { NextResponse } from "next/server";
+import { getActiveAnchor } from "@/lib/active-anchor";
 import { createServerClient } from "@/lib/supabase/server";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { rateLimitResponse } from "@/lib/rate-limit";
@@ -33,9 +34,14 @@ export async function POST(request: Request) {
     .from("group_memberships")
     .select("group_id, role")
     .eq("profile_id", user.id);
-  const coachGroupIds = (memberships ?? []).filter((m: any) => m.role === "coach").map((m: any) => m.group_id as string);
-  const role = coachGroupIds.length > 0 ? "coach" : "athlete";
-  const ownGroupIds = role === "coach" ? coachGroupIds : (memberships ?? []).map((m: any) => m.group_id as string);
+  const allCoachGroupIds = (memberships ?? []).filter((m: any) => m.role === "coach").map((m: any) => m.group_id as string);
+  const role = allCoachGroupIds.length > 0 ? "coach" : "athlete";
+  // A coach is answered from the organization they are in only: clients, programs and pages of another organization are not found from here. With several organizations and none chosen yet,
+  // nothing is searched until they choose one.
+  const activeAnchor = role === "coach" ? await getActiveAnchor(supabase, user.id) : null;
+  const orgGroupIdSet = activeAnchor && !activeAnchor.needsChoice ? new Set(activeAnchor.groups.filter((g) => g.orgId === activeAnchor.orgId).map((g) => g.id)) : null;
+  const coachGroupIds = orgGroupIdSet ? allCoachGroupIds.filter((id) => orgGroupIdSet.has(id)) : activeAnchor?.needsChoice ? [] : allCoachGroupIds;
+  const ownGroupIds = role === "coach" ? (coachGroupIds.length > 0 ? coachGroupIds : allCoachGroupIds) : (memberships ?? []).map((m: any) => m.group_id as string);
   if (ownGroupIds.length === 0) {
     return NextResponse.json({ kind: "unsure", text: "Join a group first, then I can help you find your way around.", chips: [], steps: [], intentIds: [] });
   }

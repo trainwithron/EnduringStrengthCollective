@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { Bell } from "lucide-react";
 import { timeAgo } from "@/lib/notification-days";
+import { activeOrgGroupsFor } from "@/lib/active-org-groups";
 
 export interface NotificationEntry {
   id: string;
@@ -22,24 +23,43 @@ export function NotificationBell({
   initial,
   viewerId,
   placement = "below",
+  scopeGroupId,
 }: {
   initial?: NotificationEntry[];
   viewerId: string;
+  // Set (a group id, or null for "the organization I chose") on a coach's screens: the bell then lists only the OPEN organization's notifications, never another organization's. Left out for a client.
+  scopeGroupId?: string | null;
   // "above" opens the list upward from a bell at the bottom of a sidebar.
   placement?: "below" | "above";
 }) {
   const [items, setItems] = useState<NotificationEntry[]>(initial ?? []);
+  // The groups of the open organization (null = not scoped; the bell shows everything the viewer has, as a client's does).
+  const [scopeIds, setScopeIds] = useState<string[] | null>(null);
+  const scoped = scopeGroupId !== undefined;
+  useEffect(() => {
+    if (!scoped) return;
+    let cancelled = false;
+    activeOrgGroupsFor(createBrowserClient(), viewerId, scopeGroupId ?? null).then((groups) => {
+      if (!cancelled) setScopeIds(groups.map((g) => g.id));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [scoped, scopeGroupId, viewerId]);
   const [open, setOpen] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     if (initial) return;
+    if (scoped && scopeIds === null) return;
     let cancelled = false;
     const supabase = createBrowserClient();
-    supabase
+    let query = supabase
       .from("notifications")
       .select("id, type, body, link_path, read_at, created_at")
-      .eq("profile_id", viewerId)
+      .eq("profile_id", viewerId);
+    if (scopeIds) query = query.in("group_id", scopeIds.length > 0 ? scopeIds : ["00000000-0000-0000-0000-000000000000"]);
+    query
       .order("created_at", { ascending: false })
       .limit(20)
       .then(({ data }) => {
@@ -51,7 +71,7 @@ export function NotificationBell({
     return () => {
       cancelled = true;
     };
-  }, [initial, viewerId]);
+  }, [initial, viewerId, scoped, scopeIds]);
 
   useEffect(() => {
     // This was a one-shot server fetch with no live update at all — a
@@ -67,6 +87,8 @@ export function NotificationBell({
         { event: "INSERT", schema: "public", table: "notifications", filter: `profile_id=eq.${viewerId}` },
         (payload) => {
           const n = payload.new as any;
+          // Another organization's notification is not added to this organization's bell.
+          if (scopeIds && !scopeIds.includes(n.group_id)) return;
           setItems((prev) => [
             {
               id: n.id,
@@ -85,7 +107,7 @@ export function NotificationBell({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [viewerId]);
+  }, [viewerId, scopeIds]);
 
   const unreadCount = items.filter((n) => !n.readAt).length;
 

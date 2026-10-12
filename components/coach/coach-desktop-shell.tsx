@@ -635,7 +635,7 @@ function CoachDesktopShellFull({
           )}
         </div>
         <div className="ml-auto flex items-center gap-1.5 shrink-0">
-          <HeaderNotificationBell />
+          <HeaderNotificationBell scopeGroupId={groupId} />
           <DownloadAppButton variant="topbar" />
           <ClientFinder currentGroupId={groupId} />
         </div>

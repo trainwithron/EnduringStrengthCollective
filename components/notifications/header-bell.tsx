@@ -6,7 +6,7 @@ import { NotificationBell } from "@/components/athlete/notification-bell";
 
 // The notification bell for any header that does not already have the viewer's id to hand: finds the signed-in person itself, then shows the
 // same bell everyone else gets (latest few, unread badge, link to the full list). Renders nothing until it knows who is signed in.
-export function HeaderNotificationBell({ placement = "below" }: { placement?: "below" | "above" }) {
+export function HeaderNotificationBell({ placement = "below", scopeGroupId = null }: { placement?: "below" | "above"; scopeGroupId?: string | null }) {
   const [viewerId, setViewerId] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -20,5 +20,5 @@ export function HeaderNotificationBell({ placement = "below" }: { placement?: "b
     };
   }, []);
   if (!viewerId) return null;
-  return <NotificationBell viewerId={viewerId} placement={placement} />;
+  return <NotificationBell viewerId={viewerId} placement={placement} scopeGroupId={scopeGroupId} />;
 }

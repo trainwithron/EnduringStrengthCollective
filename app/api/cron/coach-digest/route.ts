@@ -8,8 +8,8 @@ import { withCronRun } from "@/lib/cron-monitor";
 // Triggered daily by the Vercel Cron entry in vercel.json. No user
 // session involved — auth is the CRON_SECRET header, same pattern as
 // app/api/oura/sync/route.ts. Sends AT MOST ONE consolidated push per
-// coach per day, across every group they coach — never one push per
-// group, and never a push at all when there's genuinely nothing new.
+// coach PER ORGANIZATION per day — never one push per group, never one message that mixes two organizations (a coach who runs several gets one for
+// each, labeled with the organization's name), and never a push at all when there's genuinely nothing new.
 async function handler(request: Request) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "CRON_SECRET isn't configured." }, { status: 503 });
@@ -23,17 +23,23 @@ async function handler(request: Request) {
 
   const { data: coachRows } = await supabase
     .from("group_memberships")
-    .select("profile_id, group_id, groups ( group_kind )")
+    .select("profile_id, group_id, groups ( group_kind, organization_id, organizations ( name ) )")
     .eq("role", "coach");
 
+  // One entry per (coach, organization).
   const groupIdsByCoach = new Map<string, string[]>();
   const teamSocialGroupIdsByCoach = new Map<string, string[]>();
+  const entryInfo = new Map<string, { coachId: string; orgName: string | null }>();
+  const orgCountByCoach = new Map<string, Set<string>>();
   for (const row of coachRows ?? []) {
-    const coachId = row.profile_id;
-    groupIdsByCoach.set(coachId, [...(groupIdsByCoach.get(coachId) ?? []), row.group_id]);
-    const kind = (row as any).groups?.group_kind;
+    const g = (row as any).groups;
+    const key = `${row.profile_id}|${g?.organization_id ?? "none"}`;
+    entryInfo.set(key, { coachId: row.profile_id, orgName: g?.organizations?.name ?? null });
+    orgCountByCoach.set(row.profile_id, (orgCountByCoach.get(row.profile_id) ?? new Set<string>()).add(g?.organization_id ?? "none"));
+    groupIdsByCoach.set(key, [...(groupIdsByCoach.get(key) ?? []), row.group_id]);
+    const kind = g?.group_kind;
     if (kind === "team" || kind === "social" || !kind) {
-      teamSocialGroupIdsByCoach.set(coachId, [...(teamSocialGroupIdsByCoach.get(coachId) ?? []), row.group_id]);
+      teamSocialGroupIdsByCoach.set(key, [...(teamSocialGroupIdsByCoach.get(key) ?? []), row.group_id]);
     }
   }
 
@@ -44,14 +50,15 @@ async function handler(request: Request) {
   const { data: timezoneRows } = await supabase
     .from("profiles")
     .select("id, timezone")
-    .in("id", [...groupIdsByCoach.keys()]);
+    .in("id", [...new Set([...entryInfo.values()].map((e) => e.coachId))]);
   const timezoneByCoach = new Map(
     (timezoneRows ?? []).map((r) => [r.id, r.timezone ?? DEFAULT_COACH_TIMEZONE])
   );
 
   const results: { coachId: string; sent: boolean; summary?: string }[] = [];
 
-  for (const [coachId, groupIds] of groupIdsByCoach) {
+  for (const [entryKey, groupIds] of groupIdsByCoach) {
+    const { coachId, orgName } = entryInfo.get(entryKey)!;
     const parts: string[] = [];
 
     // "What's New" — the same coach_view_state comparison the desktop
@@ -96,7 +103,7 @@ async function handler(request: Request) {
 
     // Stale reply-needed threads — same helper the Home dashboard's
     // "Needs a reply" banner already uses.
-    const teamSocialIds = teamSocialGroupIdsByCoach.get(coachId) ?? [];
+    const teamSocialIds = teamSocialGroupIdsByCoach.get(entryKey) ?? [];
     if (teamSocialIds.length > 0) {
       const [{ data: commentRows }, { data: dismissedRows }] = await Promise.all([
         supabase.from("comments").select("post_id, group_id, author_id, created_at").in("group_id", teamSocialIds),
@@ -142,7 +149,9 @@ async function handler(request: Request) {
     }
 
     const summary = parts.join(" · ");
-    const sent = await sendPushToProfile(supabase, coachId, "Your business, since you last checked", summary, "/dashboard");
+    // A coach who runs several organizations gets each one's digest labeled with its name.
+    const title = (orgCountByCoach.get(coachId)?.size ?? 1) > 1 && orgName ? `${orgName}: since you last checked` : "Your business, since you last checked";
+    const sent = await sendPushToProfile(supabase, coachId, title, summary, "/dashboard");
     results.push({ coachId, sent: sent > 0, summary });
   }
 
