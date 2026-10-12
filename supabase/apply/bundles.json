@@ -245,6 +245,14 @@
   "file": "apply-release-ai-all.sql"
  },
  {
+  "id": "release-ap",
+  "name": "Release AP (parent-view links only for under-13 clients of the coach, and they expire; internal training-partner functions closed; run any time)",
+  "steps": [
+   "84"
+  ],
+  "file": "apply-release-ap-all.sql"
+ },
+ {
   "id": "release-ao",
   "name": "Release AO (assigning attaches a program only inside one organization; run any time, after Release AM)",
   "steps": [

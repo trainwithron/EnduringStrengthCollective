@@ -1222,6 +1222,26 @@ for (const s of steps) {
   const errAO2 = await run(`apply/${bundle.file}`);
   check("release-ao: the bundle applies again after an undo" + (errAO2 ? ": " + errAO2 : ""), !errAO2 && (await has()));
 }
+// Release AP (step 84): ONE paste.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-ap");
+  check("release-ap: ONE bundle holds step 84", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["84"]));
+  const st84 = steps.find((x) => x.n === "84");
+  const has = async () => (await db.query("select exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'guardian_links' and column_name = 'expires_at') as ok")).rows[0].ok === true;
+  const eap0 = await run(`apply/undo-step${st84.n}-${st84.slug}.sql`);
+  check("release-ap: before the bundle runs the old rule is back" + (eap0 ? ": " + eap0 : ""), !eap0);
+  await db.exec("alter table public.guardian_links drop column if exists expires_at");
+  const errAP = await run(`apply/${bundle.file}`);
+  check("release-ap bundle applies on the live-shaped state" + (errAP ? ": " + errAP : ""), !errAP && (await has()));
+  const againAP = await run(`apply/${bundle.file}`);
+  check("release-ap: a second run is refused, naming step 84 (" + againAP + ")", !!againAP && againAP.includes("step 84 (0338) cannot run") && againAP.includes("already applied"));
+  const euAP = await run(`apply/undo-step${st84.n}-${st84.slug}.sql`);
+  check("release-ap: the undo puts the old rule back" + (euAP ? ": " + euAP : ""), !euAP);
+  await db.exec("alter table public.guardian_links drop column if exists expires_at");
+  const errAP2 = await run(`apply/${bundle.file}`);
+  check("release-ap: the bundle applies again after an undo" + (errAP2 ? ": " + errAP2 : ""), !errAP2 && (await has()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.

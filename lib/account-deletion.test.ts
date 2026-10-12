@@ -19,8 +19,9 @@ describe("deletionBlocker", () => {
 });
 
 // A recording stand-in for the database client: every call is logged in order.
-function fakeDb(failAt?: string) {
+function fakeDb(failAt?: string, filesFor: Record<string, string> = {}) {
   const calls: string[] = [];
+  const storageRemoved: { bucket: string; paths: string[] }[] = [];
   const chain = (table: string, op: string) => ({
     eq: async (col: string, value: string) => {
       calls.push(`${op} ${table}.${col}`);
@@ -29,13 +30,29 @@ function fakeDb(failAt?: string) {
     },
   });
   const db: any = {
+    storageRemoved,
     from: (table: string) => ({
+      select: (column: string) => ({
+        eq: async (col: string) => {
+          calls.push(`select ${table}.${column}`);
+          return { data: filesFor[table] ? [{ [column]: filesFor[table] }] : [], error: null };
+        },
+      }),
       delete: () => chain(table, "delete"),
       update: (patch: object) => chain(table, Object.keys(patch)[0] === "athlete_id" ? "update" : "update-author"),
     }),
     rpc: async (name: string, args: { p_user: string }) => {
       calls.push(`rpc ${name} ${args.p_user}`);
       return { error: failAt === "rpc" ? { message: "cannot_delete: shared" } : null };
+    },
+    storage: {
+      from: (bucket: string) => ({
+        remove: async (paths: string[]) => {
+          calls.push(`remove ${bucket}`);
+          storageRemoved.push({ bucket, paths });
+          return { error: failAt === "storage" ? { message: "no" } : null };
+        },
+      }),
     },
     auth: {
       admin: {
@@ -46,7 +63,7 @@ function fakeDb(failAt?: string) {
       },
     },
   };
-  return { db, calls };
+  return { db, calls, storageRemoved };
 }
 
 describe("eraseAccount", () => {
@@ -91,5 +108,31 @@ describe("eraseAccount", () => {
     await eraseAccount(db, "u1", { eraseHistory: true, deleteEmptyOneOnOneGroups: ["g9"] });
     expect(calls).toContain("delete groups.id");
     expect(calls.indexOf("delete groups.id")).toBeGreaterThan(calls.indexOf("deleteUser u1"));
+  });
+});
+
+describe("their uploaded photos and videos go with the account", () => {
+  const files = { progress_photos: "u1/a.jpg", session_exercise_videos: "g/s/v.mp4", posts: "https://x.supabase.co/storage/v1/object/sign/post-media/g/abc-my%20pic.png?token=t" };
+  it("reads where the files are before anything is erased, and removes them only after the account is gone", async () => {
+    const { db, calls, storageRemoved } = fakeDb(undefined, files);
+    const r = await eraseAccount(db, "u1", { eraseHistory: false });
+    expect(r.ok).toBe(true);
+    expect(calls.indexOf("select progress_photos.storage_path")).toBeLessThan(calls.indexOf("update workout_logs.athlete_id"));
+    expect(calls.indexOf("remove progress-photos")).toBeGreaterThan(calls.indexOf("deleteUser u1"));
+    expect(storageRemoved.find((x) => x.bucket === "progress-photos")?.paths).toEqual(["u1/a.jpg"]);
+    expect(storageRemoved.find((x) => x.bucket === "athlete-exercise-videos")?.paths).toEqual(["g/s/v.mp4"]);
+    expect(storageRemoved.find((x) => x.bucket === "post-media")?.paths).toEqual(["g/abc-my pic.png"]);
+  });
+  it("does not remove any file when the account could not be deleted", async () => {
+    const { db, calls } = fakeDb("deleteUser", files);
+    const r = await eraseAccount(db, "u1", { eraseHistory: false });
+    expect(r.ok).toBe(false);
+    expect(calls.some((c) => c.startsWith("remove "))).toBe(false);
+  });
+  it("says so when a file could not be removed, instead of pretending it all went", async () => {
+    const { db } = fakeDb("storage", files);
+    const r = await eraseAccount(db, "u1", { eraseHistory: false });
+    expect(r.ok).toBe(true);
+    expect(r.ok && r.leftover).toMatch(/could not be removed from storage/);
   });
 });

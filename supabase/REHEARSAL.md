@@ -105,6 +105,7 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0335 | yes | yes | 20 | 0335 assign a no-client program to one client: attach, else copy |
 | 0336 | yes | yes | 6 | 0336 the what-do-you-call-your-people card is asked once |
 | 0337 | yes | yes | 4 | 0337 assigning attaches only inside one organization |
+| 0338 | yes | yes | 15 | 0338 parent-view links are scoped to the coach's own under-13 clients; training-partner helpers closed |
 | 0331 | yes | yes | 10 | 0331 a payment event and its sessions are recorded in one step |
 | 0329 | yes | yes | 12 | 0329 every session costs exactly 1 credit; the waitlist offer uses the coach's time zone |
 | 0330 | yes | yes | 9 | 0330 only a real coach can have a public page |

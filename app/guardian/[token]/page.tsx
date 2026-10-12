@@ -11,8 +11,10 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const params = await props.params;
   const view = await getGuardianView(params.token);
-  if (!view) return { title: "Link not found" };
-  return { title: `${view.athleteName}'s day — ${view.groupName}` };
+  // A private page for one family: never listed by search engines.
+  const robots = { index: false, follow: false };
+  if (!view) return { title: "Link not found", robots };
+  return { title: `${view.athleteName}'s day — ${view.groupName}`, robots };
 }
 
 const STATUS_LABEL: Record<string, string> = {

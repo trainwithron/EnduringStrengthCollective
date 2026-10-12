@@ -65,6 +65,7 @@ from (
     ('2026100600329', 'release_aa_credit_one_and_waitlist_zone', '0329_release_aa_credit_one_and_waitlist_zone.sql', exists (select 1 from pg_constraint where conname = 'session_types_credit_cost_is_one')),
     ('2026100600330', 'public_page_coach_only', '0330_public_page_coach_only.sql', exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')),
     ('2026100600331', 'purchase_grants_once', '0331_purchase_grants_once.sql', to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null),
+    ('2026100600338', 'guardian_links_scoped', '0338_guardian_links_scoped.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'guardian_links' and column_name = 'expires_at')),
     ('2026100600337', 'assign_same_org_only', '0337_assign_same_org_only.sql', position('v_src_org' in pg_get_functiondef(to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)'))) > 0),
     ('2026100600336', 'terminology_asked', '0336_terminology_asked.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'profiles' and column_name = 'terminology_asked_at')),
     ('2026100600335', 'assign_program_to_client', '0335_assign_program_to_client.sql', to_regprocedure('public.assign_program_to_client(uuid, uuid, uuid, text, date)') is not null),

@@ -17,19 +17,24 @@ export function GuardianShareButton({
   groupId,
   consentVerified,
   initialToken,
+  initialExpiresAt = null,
 }: {
   athleteId: string;
   groupId: string;
   consentVerified: boolean;
   initialToken: string | null;
+  initialExpiresAt?: string | null;
 }) {
   const router = useRouter();
   const [token, setToken] = useState(initialToken);
+  const [expiresAt, setExpiresAt] = useState(initialExpiresAt);
+  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
 
   async function handleCreate() {
     setBusy(true);
+    setError(null);
     const supabase = createBrowserClient();
     const {
       data: { user },
@@ -39,14 +44,21 @@ export function GuardianShareButton({
       return;
     }
     const newToken = crypto.randomUUID();
-    const { error } = await supabase.from("guardian_links").insert({
-      athlete_id: athleteId,
-      group_id: groupId,
-      access_token: newToken,
-      created_by: user.id,
-    });
-    if (!error) {
+    const { data, error } = await supabase
+      .from("guardian_links")
+      .insert({
+        athlete_id: athleteId,
+        group_id: groupId,
+        access_token: newToken,
+        created_by: user.id,
+      })
+      .select("expires_at")
+      .single();
+    if (error) {
+      setError("Couldn't make the link. A parent link can only be made for a client under 13 in a group you coach.");
+    } else {
       setToken(newToken);
+      setExpiresAt((data as { expires_at?: string | null } | null)?.expires_at ?? null);
       router.refresh();
     }
     setBusy(false);
@@ -63,6 +75,7 @@ export function GuardianShareButton({
       .eq("athlete_id", athleteId)
       .eq("access_token", token);
     setToken(null);
+    setExpiresAt(null);
     setBusy(false);
     router.refresh();
   }
@@ -99,6 +112,11 @@ export function GuardianShareButton({
             {copied ? "Copied" : "Copy"}
           </button>
         </div>
+        {expiresAt && (
+          <p className="font-body text-xs text-steel">
+            Works until {new Date(expiresAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}. After that, make a new link.
+          </p>
+        )}
         <button
           type="button"
           onClick={handleRevoke}
@@ -112,13 +130,20 @@ export function GuardianShareButton({
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleCreate}
-      disabled={busy}
-      className="h-9 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
-    >
-      {busy ? "Creating…" : "Share with parent"}
-    </button>
+    <div className="space-y-2">
+      <button
+        type="button"
+        onClick={handleCreate}
+        disabled={busy}
+        className="h-9 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
+      >
+        {busy ? "Creating…" : "Share with parent"}
+      </button>
+      {error && (
+        <p className="font-body text-xs text-rust" role="alert">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }

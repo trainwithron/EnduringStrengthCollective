@@ -35,6 +35,32 @@ const AUTHOR_COLUMNS_CLEAR: [string, string][] = [
   ["minor_consent", "verified_by"],
 ];
 
+// Files the person uploaded: the table that remembers where each one is, and whose it is. They are removed from storage when the account goes (the rows disappear with the account on their own, the
+// files do not). Not removed, on purpose: the signed copy of a waiver (a legal record the coach keeps) and anything the coach uploaded.
+export const STORAGE_FILES: { bucket: string; table: string; column: string; owner: string }[] = [
+  { bucket: "progress-photos", table: "progress_photos", column: "storage_path", owner: "athlete_id" },
+  { bucket: "athlete-exercise-videos", table: "session_exercise_videos", column: "video_path", owner: "athlete_id" },
+  { bucket: "coach-video-checkins", table: "coach_video_checkins", column: "video_path", owner: "athlete_id" },
+  { bucket: "post-media", table: "posts", column: "media_url", owner: "author_id" },
+  { bucket: "post-media", table: "challenge_participants", column: "before_photo_url", owner: "profile_id" },
+  { bucket: "post-media", table: "challenge_participants", column: "after_photo_url", owner: "profile_id" },
+];
+
+// A stored value is a plain path, or (feed posts, challenge photos) a signed link that has the path inside it.
+export function storagePathOf(value: string | null | undefined, bucket: string): string | null {
+  if (!value) return null;
+  if (!/^https?:\/\//i.test(value)) return value;
+  const marker = `/${bucket}/`;
+  const at = value.indexOf(marker);
+  if (at < 0 || !/\/object\/(sign|public|authenticated)\//.test(value)) return null;
+  const path = value.slice(at + marker.length).split("?")[0];
+  try {
+    return decodeURIComponent(path) || null;
+  } catch {
+    return path || null;
+  }
+}
+
 export interface DeletionFacts {
   isPlatformAdmin: boolean;
   coachGroupCount: number;
@@ -82,6 +108,17 @@ export async function eraseAccount(db: any, userId: string, opts: { eraseHistory
     return { ok: false, error: `${what}. Their account was not deleted.` };
   };
 
+  // Where their uploaded files are, read BEFORE anything is erased (the rows that remember the paths go with the account).
+  const files = new Map<string, Set<string>>();
+  for (const f of STORAGE_FILES) {
+    const { data, error } = await db.from(f.table).select(f.column).eq(f.owner, userId);
+    if (error) return fail("Couldn't list their photos and videos", error.message);
+    for (const row of data ?? []) {
+      const path = storagePathOf((row as Record<string, string | null>)[f.column], f.bucket);
+      if (path) files.set(f.bucket, (files.get(f.bucket) ?? new Set<string>()).add(path));
+    }
+  }
+
   if (opts.eraseHistory) {
     for (const table of HISTORY_TABLES) {
       const { error } = await db.from(table).delete().eq("athlete_id", userId);
@@ -119,18 +156,30 @@ export async function eraseAccount(db: any, userId: string, opts: { eraseHistory
   const { error: deleteError } = await db.auth.admin.deleteUser(userId);
   if (deleteError) return fail("Couldn't delete the account", deleteError.message);
 
+  // Their uploaded files, only now that the account is really gone (a failed delete must not leave a person with missing photos).
+  let leftover: string | undefined;
+  for (const [bucket, paths] of files) {
+    const all = [...paths];
+    for (let i = 0; i < all.length; i += 100) {
+      const { error } = await db.storage.from(bucket).remove(all.slice(i, i + 100));
+      if (error) {
+        console.error("[account deletion] storage", bucket, error.message);
+        leftover = "Their account is gone, but some of their uploaded photos or videos could not be removed from storage.";
+      }
+    }
+  }
+
   // A one-on-one space that held only this client. Deleting the space also deletes everything filed under it (logged workouts, notes,
   // sessions), so it is only removed when the coach chose to erase history. Otherwise it stays, renamed, so the records the coach
   // kept still have somewhere to live and no name of the person remains.
-  let leftover: string | undefined;
   for (const groupId of opts.deleteEmptyOneOnOneGroups ?? []) {
     if (opts.eraseHistory) {
       const { error } = await db.from("groups").delete().eq("id", groupId);
-      if (error) leftover = "Their account is gone, but their empty space could not be removed (payment records still point at it). It stays under the name Former client.";
+      if (error) leftover = (leftover ? leftover + " " : "") + "Their account is gone, but their empty space could not be removed (payment records still point at it). It stays under the name Former client.";
       if (error) await db.from("groups").update({ name: "Former client" }).eq("id", groupId);
     } else {
       const { error } = await db.from("groups").update({ name: "Former client" }).eq("id", groupId);
-      if (error) leftover = "Their account is gone, but their space could not be renamed.";
+      if (error) leftover = (leftover ? leftover + " " : "") + "Their account is gone, but their space could not be renamed.";
     }
   }
   return leftover ? { ok: true, leftover } : { ok: true };

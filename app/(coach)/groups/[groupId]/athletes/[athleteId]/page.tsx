@@ -487,10 +487,11 @@ export default async function AthleteProfilePage(
     isMinor
       ? supabase
           .from("guardian_links")
-          .select("access_token")
+          .select("access_token, expires_at")
           .eq("athlete_id", params.athleteId)
           .eq("group_id", params.groupId)
           .is("revoked_at", null)
+          .gt("expires_at", new Date().toISOString())
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle()
@@ -1274,6 +1275,7 @@ export default async function AthleteProfilePage(
                 groupId={params.groupId}
                 consentVerified={minorConsentRow?.verified ?? false}
                 initialToken={guardianLinkRow?.access_token ?? null}
+                initialExpiresAt={(guardianLinkRow as { expires_at?: string | null } | null)?.expires_at ?? null}
               />
             </section>
           )}
