@@ -66,6 +66,7 @@ export function ProgramCardMenu({
   aiDraft = false,
   showAssignButton = false,
   canHide = false,
+  onRename,
 }: {
   programId: string;
   programName: string;
@@ -83,6 +84,8 @@ export function ProgramCardMenu({
   showAssignButton?: boolean;
   // A library program (no client on it) can be tucked away without deleting it.
   canHide?: boolean;
+  // Opens the name for editing in place (on the card that holds this menu).
+  onRename?: () => void;
 }) {
   const router = useRouter();
   const term = useTerm();
@@ -555,6 +558,18 @@ export function ProgramCardMenu({
 
           {view === "menu" && (
             <div>
+              {onRename && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setView(null);
+                    onRename();
+                  }}
+                  className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50"
+                >
+                  Rename
+                </button>
+              )}
               {!hideAssignAndDuplicate && (
                 <>
                   <button

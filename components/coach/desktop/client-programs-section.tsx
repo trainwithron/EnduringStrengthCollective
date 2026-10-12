@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { createServerClient } from "@/lib/supabase/server";
 import { programsHrefForClient } from "@/lib/programs-scope";
-import { ClientProgramMenu } from "@/components/coach/client-program-menu";
+import { ClientProgramRow } from "@/components/coach/client-program-row";
 import { RemovedPrograms } from "@/components/coach/removed-programs";
 
 // The Programs tab of one client's profile: the programs made for this client (their own copies), the active one first, each opening the builder. Assigning one
@@ -67,13 +67,7 @@ export async function ClientProgramsSection({ groupId, athleteId, actions }: { g
       ) : (
         <ul className="divide-y divide-steel/15 border-y border-steel/15">
           {programs.map((p) => (
-            <li key={p.id} className="flex items-center">
-              <Link href={`/groups/${groupId}/programs/${p.id}`} className="flex flex-1 min-w-0 items-center justify-between gap-3 py-2.5 px-1 hover:bg-surface/60">
-                <span className="font-body text-sm text-chalk truncate">{p.name}</span>
-                <span className={`font-body text-xs shrink-0 ${p.ai_draft ? "text-rust" : p.is_active ? "text-positive" : "text-steel"}`}>{p.ai_draft ? "AI draft" : p.is_active ? "Active" : "Not active"}</span>
-              </Link>
-              <ClientProgramMenu programId={p.id} programName={p.name} clientName={p.profiles?.full_name ?? ""} isActive={p.is_active} aiDraft={!!p.ai_draft} />
-            </li>
+            <ClientProgramRow key={p.id} groupId={groupId} program={p} clientName={p.profiles?.full_name ?? ""} />
           ))}
         </ul>
       )}

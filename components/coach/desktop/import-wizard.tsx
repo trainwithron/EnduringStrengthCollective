@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { cleanImportedProgramName, PROGRAM_NAME_MAX, tidyProgramName } from "@/lib/program-name";
 import * as XLSX from "xlsx";
 import * as cptable from "xlsx/dist/cpexcel.full.mjs";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -370,7 +371,8 @@ export function ImportWizard({
 
     const pendingImport: PendingImport = {
       parsed,
-      programName,
+      // A file-style name ("christmas_abs_program") is made readable here; the coach can still change it on the review screen.
+      programName: cleanImportedProgramName(programName),
       description,
       resolutions,
       autoNewExercises,
@@ -420,8 +422,9 @@ export function ImportWizard({
     processingRef.current = true;
 
     const supabase = createBrowserClient();
-    const { parsed, programName, description, fuzzyMatches, autoNewExercises, sequencingNotes, injuryConsiderations } =
-      importData;
+    const { parsed, description, fuzzyMatches, autoNewExercises, sequencingNotes, injuryConsiderations } = importData;
+    // The name the coach confirmed on the review screen: trimmed, and never blank.
+    const programName = tidyProgramName(importData.programName);
     const resolutions = new Map(importData.resolutions);
 
     const createdExercises: string[] = [...autoNewExercises];
@@ -905,6 +908,15 @@ export function ImportWizard({
     const previewWeeks = pending.isAiSourced ? groupIntoWeeks(pending.parsed) : [];
     return (
       <div className="border border-yellow-500/40 bg-surface/60 p-6 max-w-2xl">
+        <label className="block mb-4">
+          <span className="font-body text-xs text-steel uppercase tracking-wide">Program name</span>
+          <input
+            value={pending.programName}
+            maxLength={PROGRAM_NAME_MAX}
+            onChange={(e) => setPending((prev) => (prev ? { ...prev, programName: e.target.value } : prev))}
+            className="mt-1 w-full min-h-11 bg-graphite border border-steel/40 text-chalk px-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
+          />
+        </label>
         <h3 className="font-display uppercase text-sm tracking-wide mb-2">
           {pending.fuzzyMatches.length > 0
             ? `Double-check ${pending.fuzzyMatches.length} guessed exercise${pending.fuzzyMatches.length === 1 ? "" : "s"}`
