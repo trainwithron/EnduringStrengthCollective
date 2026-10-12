@@ -1,6 +1,8 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { shouldResumeClaim } from "@/lib/claim-resume";
+import { LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/workspace-header";
+import { decodeWorkspaceCookie, groupIdFromPath } from "@/lib/workspace-header";
 import { DOB_OK_COOKIE, dobOkCookieValid, loadDobGate, signDobOk } from "@/lib/dob-gate";
 import { SIGNED_OUT_FRAME_HTML } from "@/lib/signed-out-frame";
 
@@ -204,6 +206,20 @@ export async function updateSession(request: NextRequest) {
     }
     const signed = await signDobOk(user.id, process.env.CRON_SECRET);
     if (signed) response.cookies.set(DOB_OK_COOKIE, signed, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 7 });
+  }
+
+  // Defense in depth (lib/workspace-header.ts): opening a group's page makes that group the open workspace, so every data request the page and its API calls make names the right organization.
+  // Only a group the person belongs to can become the workspace (a pasted link to someone else's group changes nothing). The new value is also given to this very request, which is still being rendered.
+  const pageGroup = user ? groupIdFromPath(pathname) : null;
+  if (user && pageGroup && decodeWorkspaceCookie(request.cookies.get(LAST_WORKSPACE_GROUP_COOKIE)?.value) !== pageGroup) {
+    const { data: ownMembership } = await supabase.from("group_memberships").select("group_id").eq("group_id", pageGroup).eq("profile_id", user.id).maybeSingle();
+    if (ownMembership) {
+      request.cookies.set(LAST_WORKSPACE_GROUP_COOKIE, encodeURIComponent(pageGroup));
+      const carried = response.cookies.getAll();
+      response = NextResponse.next({ request });
+      carried.forEach((cookie) => response.cookies.set(cookie));
+      response.cookies.set(LAST_WORKSPACE_GROUP_COOKIE, encodeURIComponent(pageGroup), { httpOnly: false, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 90 });
+    }
   }
 
   return response;

@@ -950,6 +950,9 @@ for (const s of steps) {
   const errZ2 = await run(`apply/${bundle.file}`);
   check("release-z: the bundle applies again after an undo" + (errZ2 ? ": " + errZ2 : ""), !errZ2 && (await has()));
 }
+// Defense in depth (steps 94 and 95) is taken off for the bundle tests that follow: some of them undo older steps that drop a column the rule's policies read. Its own test is further down.
+await run(`apply/undo-step95-0349.sql`);
+await run(`apply/undo-step94-0348.sql`);
 // Release AB (step 69): ONE paste. No event kind before, the bundle adds events (the class functions refuse them), a second run is refused naming step 69, the undo puts everything back, and it applies again.
 {
   const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
@@ -1412,6 +1415,34 @@ for (const s of steps) {
   check("release-ay: the undo puts the old rule back" + (euAY ? ": " + euAY : ""), !euAY && !(await has()));
   const errAY2 = await run(`apply/${bundle.file}`);
   check("release-ay: the bundle applies again after an undo" + (errAY2 ? ": " + errAY2 : ""), !errAY2 && (await has()));
+}
+// Release AZ (step 94) and Release BA (step 95): one paste each.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const az = bundles.find((b) => b.id === "release-az");
+  const ba = bundles.find((b) => b.id === "release-ba");
+  check("release-az / release-ba: one bundle each (steps 94 and 95)", !!az && !!ba && JSON.stringify(az.steps) === JSON.stringify(["94"]) && JSON.stringify(ba.steps) === JSON.stringify(["95"]));
+  const st94 = steps.find((x) => x.n === "94");
+  const st95 = steps.find((x) => x.n === "95");
+  const installed = async () => (await db.query("select to_regprocedure('public.request_workspace_org()') is not null as ok")).rows[0].ok === true;
+  const on = async () => (await db.query("select position('select true' in pg_get_functiondef(to_regprocedure('public.org_wall_header_enabled()'))) > 0 as ok")).rows[0].ok === true;
+  const e0 = await run(`apply/undo-step${st94.n}-${st94.slug}.sql`);
+  check("release-az: before the bundle runs the rule is not installed" + (e0 ? ": " + e0 : ""), !e0 && !(await installed()));
+  const errAZ = await run(`apply/${az.file}`);
+  check("release-az bundle applies" + (errAZ ? ": " + errAZ : ""), !errAZ && (await installed()) && !(await on()));
+  const againAZ = await run(`apply/${az.file}`);
+  check("release-az: a second run is refused, naming step 94", !!againAZ && againAZ.includes("step 94 (0348) cannot run") && againAZ.includes("already applied"));
+  const errBA = await run(`apply/${ba.file}`);
+  check("release-ba bundle switches the rule on" + (errBA ? ": " + errBA : ""), !errBA && (await on()));
+  const againBA = await run(`apply/${ba.file}`);
+  check("release-ba: a second run is refused, naming step 95", !!againBA && againBA.includes("step 95 (0349) cannot run") && againBA.includes("already applied"));
+  const euBA = await run(`apply/undo-step${st95.n}-${st95.slug}.sql`);
+  check("release-ba: the undo switches it off again" + (euBA ? ": " + euBA : ""), !euBA && !(await on()) && (await installed()));
+  const euAZ = await run(`apply/undo-step${st94.n}-${st94.slug}.sql`);
+  check("release-az: the undo removes the rule everywhere" + (euAZ ? ": " + euAZ : ""), !euAZ && !(await installed()));
+  const errAZ2 = await run(`apply/${az.file}`);
+  check("release-az: the bundle applies again after an undo" + (errAZ2 ? ": " + errAZ2 : ""), !errAZ2 && (await installed()));
+  await run(`apply/undo-step${st94.n}-${st94.slug}.sql`);
 }
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {

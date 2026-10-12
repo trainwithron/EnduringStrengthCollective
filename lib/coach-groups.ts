@@ -20,7 +20,7 @@ export interface CoachedGroup {
 // the "anchor" Home and the rail use as a stable URL placeholder, and it is
 // NEVER a one-on-one group (a client's own group would leak that client's
 // identity into coach-wide pages).
-export const LAST_WORKSPACE_GROUP_COOKIE = "last_workspace_group";
+export { LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/workspace-header";
 
 function normalizeKind(kind: string | null | undefined): GroupKind {
   return kind === "one_on_one" || kind === "social" ? kind : "team";

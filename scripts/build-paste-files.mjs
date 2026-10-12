@@ -1910,6 +1910,39 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the briefing table exists", has.table("coach_briefings")],
     ],
   },
+  {
+    n: "94",
+    slug: "0348",
+    title: "0348 Defense in depth for the organization walls, installed switched OFF: the database learns to refuse a row of a different organization than the workspace a request names (nothing changes until step 95)",
+    migrations: ["0348"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing visible changes: the rule is installed but switched off, so every request behaves exactly as before. It adds one extra rule (named org_wall_header) to each table whose rows belong to a group, and three helper functions. Run it BEFORE the code that goes with it is live; step 95 switches it on.",
+    undo: [
+      ...(/tables text\[\] := array\[([\s\S]*?)\];/.exec(migrationSql("0348"))[1].match(/'([a-z_]+)'/g).map((q) => q.replace(/'/g, ""))).map((t) => `drop policy if exists "org_wall_header" on public.${t};`),
+      "drop function if exists public.group_in_active_org(uuid);",
+      "drop function if exists public.request_workspace_org();",
+      "drop function if exists public.org_wall_header_enabled();",
+    ].join("\n"),
+    undoWhy: "Only if step 94 misbehaves. Removes the extra rule from every table and the three helper functions. Undo step 95 first if it has been run.",
+    rows: [
+      ["0348 is not already applied (the workspace helper does not exist yet)", "to_regprocedure('public.request_workspace_org()') is null"],
+      ["the group and organization tables the rule reads exist", "to_regclass('public.groups') is not null and to_regclass('public.programs') is not null and to_regclass('public.bookings') is not null"],
+    ],
+  },
+  {
+    n: "95",
+    slug: "0349",
+    title: "0349 Switch the organization-wall request header rule ON",
+    migrations: ["0349"],
+    sees: "Success. No rows returned.",
+    afterwards: "From now on a request that names a workspace sees and changes only that workspace's organization. Run it AFTER the code that sends the header is live and verified; to switch it off again, undo this step (one line).",
+    undo: "create or replace function public.org_wall_header_enabled() returns boolean language sql stable set search_path = public as 'select false';",
+    undoWhy: "The off switch: puts the rule back to switched off without removing it. Safe at any time.",
+    rows: [
+      ["step 94 is applied (the switch function exists)", "to_regprocedure('public.org_wall_header_enabled()') is not null"],
+      ["0349 is not already applied (the rule is still off)", "position('select true' in pg_get_functiondef(to_regprocedure('public.org_wall_header_enabled()'))) = 0"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -2015,6 +2048,8 @@ const BUNDLES = [
   { id: "release-ai", name: "Release AI (a payment and its sessions are recorded in one step; run BEFORE the code that uses it deploys)", steps: ["77"] },
   { id: "release-ap", name: "Release AP (parent-view links only for under-13 clients of the coach, and they expire; internal training-partner functions closed; run any time)", steps: ["84"] },
   { id: "release-ao", name: "Release AO (assigning attaches a program only inside one organization; run any time, after Release AM)", steps: ["83"] },
+  { id: "release-ba", name: "Release BA (switch the organization-wall request header rule ON; run AFTER Release AZ and the code that sends the header)", steps: ["95"] },
+  { id: "release-az", name: "Release AZ (defense in depth for the organization walls, installed switched off; run BEFORE the code that sends the header)", steps: ["94"] },
   { id: "release-ay", name: "Release AY (the daily briefing is made per organization; run BEFORE the code that goes with it is live)", steps: ["93"] },
   { id: "release-ax", name: "Release AX (a coach using the app as their own client can do everything a client can; Assign to Myself attaches; run AFTER Release AW)", steps: ["92"] },
   { id: "release-aw", name: "Release AW (the organization walls: names and client content readable only inside the organization; run AFTER the code that goes with it is live)", steps: ["91"] },
@@ -2215,6 +2250,8 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
+    m("0349", "position('select true' in pg_get_functiondef(to_regprocedure('public.org_wall_header_enabled()'))) > 0"),
+    m("0348", "to_regprocedure('public.request_workspace_org()') is not null"),
     m("0347", has.col("coach_briefings", "organization_id")),
     m("0346", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'client_phase_plans' and policyname = 'client_phase_plans_coach_manage' and position('''athlete''::member_role' in with_check) = 0)"),
     m("0345", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'profiles' and policyname = 'profiles_select_visible')"),

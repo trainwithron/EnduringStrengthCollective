@@ -424,7 +424,7 @@ export function ProgramCardMenu({
   async function handleDuplicateToGroup(destinationGroupId: string) {
     setBusy(true);
     setError(null);
-    const supabase = createBrowserClient();
+    const supabase = createBrowserClient({ crossOrg: true });
     const {
       data: { user },
     } = await supabase.auth.getUser();

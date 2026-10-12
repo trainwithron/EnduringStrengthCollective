@@ -261,6 +261,22 @@
   "file": "apply-release-ao-all.sql"
  },
  {
+  "id": "release-ba",
+  "name": "Release BA (switch the organization-wall request header rule ON; run AFTER Release AZ and the code that sends the header)",
+  "steps": [
+   "95"
+  ],
+  "file": "apply-release-ba-all.sql"
+ },
+ {
+  "id": "release-az",
+  "name": "Release AZ (defense in depth for the organization walls, installed switched off; run BEFORE the code that sends the header)",
+  "steps": [
+   "94"
+  ],
+  "file": "apply-release-az-all.sql"
+ },
+ {
   "id": "release-ay",
   "name": "Release AY (the daily briefing is made per organization; run BEFORE the code that goes with it is live)",
   "steps": [

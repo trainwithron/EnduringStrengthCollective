@@ -23,7 +23,7 @@ export const PLAN_ORDER = [
   "0270",
   // Closes function permissions (0271), then the two public forms once their server routes are live (0272).
   "0271", "0272",
-  "0273", "0274", "0275", "0276", "0277", "0278", "0279", "0280", "0281", "0282", "0283", "0284", "0285", "0286", "0287", "0288", "0289", "0290", "0291", "0292", "0293", "0294", "0295", "0296", "0297", "0298", "0299", "0300", "0301", "0302", "0303", "0304", "0305", "0306", "0307", "0308", "0309", "0310", "0311", "0312", "0313", "0314", "0315", "0316", "0317", "0318", "0319", "0320", "0321", "0322", "0323", "0324", "0325", "0326", "0327", "0328", "0332", "0333", "0334", "0335", "0336", "0337", "0338", "0339", "0340", "0341", "0342", "0343", "0344", "0345", "0346", "0347", "0331", "0329", "0330",
+  "0273", "0274", "0275", "0276", "0277", "0278", "0279", "0280", "0281", "0282", "0283", "0284", "0285", "0286", "0287", "0288", "0289", "0290", "0291", "0292", "0293", "0294", "0295", "0296", "0297", "0298", "0299", "0300", "0301", "0302", "0303", "0304", "0305", "0306", "0307", "0308", "0309", "0310", "0311", "0312", "0313", "0314", "0315", "0316", "0317", "0318", "0319", "0320", "0321", "0322", "0323", "0324", "0325", "0326", "0327", "0328", "0332", "0333", "0334", "0335", "0336", "0337", "0338", "0339", "0340", "0341", "0342", "0343", "0344", "0345", "0346", "0347", "0348", "0349", "0331", "0329", "0330",
 ];
 
 export function migrationFile(prefix) {
@@ -108,13 +108,13 @@ export function makeHelpers(db) {
     },
     // Run the following statements as this signed-in user, as the signed-out visitor (null), as the service role, or as the superuser.
     async as(uid) {
-      await db.exec(`reset role; select set_config('request.jwt.claim.sub', '${uid ?? ""}', false); select set_config('request.jwt.claim.role', '${uid ? "authenticated" : "anon"}', false); set role ${uid ? "authenticated" : "anon"}`);
+      await db.exec(`reset role; select set_config('request.headers', '', false); select set_config('request.jwt.claim.sub', '${uid ?? ""}', false); select set_config('request.jwt.claim.role', '${uid ? "authenticated" : "anon"}', false); set role ${uid ? "authenticated" : "anon"}`);
     },
     async asService() {
-      await db.exec(`reset role; select set_config('request.jwt.claim.sub', '', false); select set_config('request.jwt.claim.role', 'service_role', false); set role service_role`);
+      await db.exec(`reset role; select set_config('request.headers', '', false); select set_config('request.jwt.claim.sub', '', false); select set_config('request.jwt.claim.role', 'service_role', false); set role service_role`);
     },
     async asSuper() {
-      await db.exec(`reset role; select set_config('request.jwt.claim.sub', '', false); select set_config('request.jwt.claim.role', '', false)`);
+      await db.exec(`reset role; select set_config('request.headers', '', false); select set_config('request.jwt.claim.sub', '', false); select set_config('request.jwt.claim.role', '', false)`);
     },
     async one(sql, p) { return (await db.query(sql, p)).rows[0]; },
     async rows(sql, p) { return (await db.query(sql, p)).rows; },

@@ -1,6 +1,12 @@
 import { cache } from "react";
 import { createServerClient as createSupabaseServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { LAST_WORKSPACE_GROUP_COOKIE } from "@/lib/workspace-header";
+import { decodeWorkspaceCookie, WORKSPACE_HEADER } from "@/lib/workspace-header";
+
+function workspaceHeaders(group: string | null): { headers: Record<string, string> } | undefined {
+  return group ? { headers: { [WORKSPACE_HEADER]: group } } : undefined;
+}
 
 async function buildServerClient() {
   const cookieStore = await cookies();
@@ -9,6 +15,8 @@ async function buildServerClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      // Defense in depth (lib/workspace-header.ts): data requests name the open workspace. The middleware keeps the remembered workspace in step with the group page being opened.
+      global: workspaceHeaders(decodeWorkspaceCookie(cookieStore.get(LAST_WORKSPACE_GROUP_COOKIE)?.value)),
       cookies: {
         getAll() {
           return cookieStore.getAll();
