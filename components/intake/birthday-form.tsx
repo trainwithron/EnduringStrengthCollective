@@ -47,7 +47,11 @@ export function BirthdayForm({
       setSaving(false);
       return;
     }
-    const { error: upsertError } = await supabase.from("client_intake").upsert({ athlete_id: user.id, group_id: groupId, date_of_birth: dob }, { onConflict: "athlete_id" });
+    // An existing intake row keeps its group (a client in two groups has one form, and who reads it follows that group): only the date is written. A first row is filed in the client's group.
+    const { data: existingRow } = await supabase.from("client_intake").select("athlete_id").eq("athlete_id", user.id).maybeSingle();
+    const { error: upsertError } = existingRow
+      ? await supabase.from("client_intake").update({ date_of_birth: dob }).eq("athlete_id", user.id)
+      : await supabase.from("client_intake").insert({ athlete_id: user.id, group_id: groupId, date_of_birth: dob });
     if (upsertError) {
       setError("We couldn't save that. Check your connection and try again.");
       setSaving(false);

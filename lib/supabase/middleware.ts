@@ -1,7 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { shouldResumeClaim } from "@/lib/claim-resume";
-import { DOB_OK_COOKIE, loadDobGate } from "@/lib/dob-gate";
+import { DOB_OK_COOKIE, dobOkCookieValid, loadDobGate, signDobOk } from "@/lib/dob-gate";
 import { SIGNED_OUT_FRAME_HTML } from "@/lib/signed-out-frame";
 
 export async function updateSession(request: NextRequest) {
@@ -191,7 +191,7 @@ export async function updateSession(request: NextRequest) {
 
   // Every client has a date of birth on file: one without it is asked once on /birthday (before reaching their group), and a child under 13 without a verified parent's consent stops there.
   // The check is cached per person in a cookie once it passes (a client who still needs a date, or a child waiting on consent, is checked every time).
-  if (user && (pathname.startsWith("/groups") || pathname.startsWith("/sessions")) && request.cookies.get(DOB_OK_COOKIE)?.value !== user.id) {
+  if (user && (pathname.startsWith("/groups") || pathname.startsWith("/sessions")) && !(await dobOkCookieValid(request.cookies.get(DOB_OK_COOKIE)?.value, user.id, process.env.CRON_SECRET))) {
     const facts = await loadDobGate(supabase, user.id);
     if (facts.gate !== "ok") {
       const redirectUrl = new URL("/birthday", request.url);
@@ -202,7 +202,8 @@ export async function updateSession(request: NextRequest) {
       });
       return redirectResponse;
     }
-    response.cookies.set(DOB_OK_COOKIE, user.id, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 7 });
+    const signed = await signDobOk(user.id, process.env.CRON_SECRET);
+    if (signed) response.cookies.set(DOB_OK_COOKIE, signed, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 60 * 60 * 24 * 7 });
   }
 
   return response;

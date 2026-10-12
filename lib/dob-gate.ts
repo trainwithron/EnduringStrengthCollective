@@ -7,6 +7,21 @@ export type DobGate = "ok" | "need_dob" | "blocked";
 
 export const DOB_OK_COOKIE = "dob_ok";
 
+// The "already checked" cookie is signed (HMAC with a server secret) so a child cannot write it by hand to skip the check. With no secret configured nothing is cached and the check runs every time.
+async function hmacHex(message: string, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(message));
+  return Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+export async function signDobOk(userId: string, secret: string | undefined): Promise<string | null> {
+  return secret ? `${userId}.${await hmacHex(`dob_ok:${userId}`, secret)}` : null;
+}
+export async function dobOkCookieValid(value: string | undefined, userId: string, secret: string | undefined): Promise<boolean> {
+  if (!value || !secret) return false;
+  const expected = await signDobOk(userId, secret);
+  return !!expected && value === expected;
+}
+
 // Pure, so the order of the checks can be tested: no date yet is asked BEFORE anything else, and a child cannot get past it without a verified parent's consent.
 export function dobGateState(input: { isClientOnly: boolean; dateOfBirth: string | null; consentVerified: boolean; now?: Date }): DobGate {
   if (!input.isClientOnly) return "ok";

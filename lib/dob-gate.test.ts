@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { dobGateState, validDateOfBirth } from "@/lib/dob-gate";
+import { dobGateState, dobOkCookieValid, signDobOk, validDateOfBirth } from "@/lib/dob-gate";
 
 const NOW = new Date("2026-10-12T12:00:00");
 
@@ -42,6 +42,20 @@ describe("the date is asked before the client reaches their group", () => {
     expect(mw).toContain('new URL("/birthday", request.url)');
   });
   it("the date is saved where the app already reads it", () => {
-    expect(read("components/intake/birthday-form.tsx")).toContain('from("client_intake").upsert({ athlete_id: user.id, group_id: groupId, date_of_birth: dob }');
+    expect(read("components/intake/birthday-form.tsx")).toContain('from("client_intake").insert({ athlete_id: user.id, group_id: groupId, date_of_birth: dob }');
+  });
+});
+
+describe("the checked-already cookie", () => {
+  it("is valid only for the person it was signed for, with the same secret", async () => {
+    const v = await signDobOk("user-1", "secret-a");
+    expect(await dobOkCookieValid(v!, "user-1", "secret-a")).toBe(true);
+    expect(await dobOkCookieValid(v!, "user-2", "secret-a")).toBe(false);
+    expect(await dobOkCookieValid(v!, "user-1", "secret-b")).toBe(false);
+    expect(await dobOkCookieValid("user-1", "user-1", "secret-a")).toBe(false);
+  });
+  it("is never trusted or written when there is no secret", async () => {
+    expect(await signDobOk("user-1", undefined)).toBeNull();
+    expect(await dobOkCookieValid("anything", "user-1", undefined)).toBe(false);
   });
 });
