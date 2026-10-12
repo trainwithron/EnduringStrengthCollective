@@ -2018,6 +2018,20 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the memberships table has the money columns", has.col("organization_memberships", "stripe_connect_account_id") + " and " + has.col("organization_memberships", "revenue_share_pct")],
     ],
   },
+  {
+    n: "101",
+    slug: "0355",
+    title: "0355 A coach can attach their own assessments (notes, numbers and a PDF, photo or video) to a client's profile; only the coaches of that client's group can see them",
+    migrations: ["0355"],
+    sees: "Success. No rows returned.",
+    afterwards: "A new Assessments section on a client's profile (Forms and notes) where a coach adds a title, notes, optional numbers and one file. Only the coaches of that group see them, not the client, the organization's owner or admins, or the platform. Nothing existing changes.",
+    undo: "drop policy if exists \"client_assessments_files_delete\" on storage.objects;\ndrop policy if exists \"client_assessments_files_insert\" on storage.objects;\ndrop policy if exists \"client_assessments_files_select\" on storage.objects;\ndrop table if exists public.client_assessments;",
+    undoWhy: "Only if step 101 misbehaves. Removes the assessments table (and so every assessment saved) and the storage rules; uploaded files stay in storage until removed there.",
+    rows: [
+      ["0355 is not already applied (the assessments table does not exist yet)", "to_regclass('public.client_assessments') is null"],
+      ["the storage and group tables the rules read exist", "to_regclass('storage.objects') is not null and to_regclass('public.group_memberships') is not null"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -2123,6 +2137,7 @@ const BUNDLES = [
   { id: "release-ai", name: "Release AI (a payment and its sessions are recorded in one step; run BEFORE the code that uses it deploys)", steps: ["77"] },
   { id: "release-ap", name: "Release AP (parent-view links only for under-13 clients of the coach, and they expire; internal training-partner functions closed; run any time)", steps: ["84"] },
   { id: "release-ao", name: "Release AO (assigning attaches a program only inside one organization; run any time, after Release AM)", steps: ["83"] },
+  { id: "release-bg", name: "Release BG (coach assessments on a client's profile; run BEFORE the code that goes with it is live)", steps: ["101"] },
   { id: "release-bf", name: "Release BF (the money settings on organization memberships are the server's; shares never total over 100 percent; run BEFORE the code that goes with it is live)", steps: ["100"] },
   { id: "release-be", name: "Release BE (a coach can ask for notice before a client pauses or ends a schedule; run BEFORE the code that goes with it is live)", steps: ["99"] },
   { id: "release-bd", name: "Release BD (joining an organization needs the person's OK; invitations and leave; run BEFORE the code that goes with it is live)", steps: ["98"] },
@@ -2330,6 +2345,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
+    m("0355", "to_regclass('public.client_assessments') is not null"),
     m("0354", "to_regprocedure('public.guard_organization_share_total()') is not null"),
     m("0353", has.col("coach_booking_policies", "schedule_change_notice_days")),
     m("0352", "to_regclass('public.organization_invites') is not null"),

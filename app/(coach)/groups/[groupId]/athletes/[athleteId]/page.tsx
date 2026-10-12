@@ -1,4 +1,5 @@
 import { isEmailConfigured } from "@/lib/email";
+import { ClientAssessmentsSection } from "@/components/coach/desktop/client-assessments-section";
 import { ViewAsClientLink } from "@/components/coach/desktop/view-as-client-label";
 import { SendSignInLinkButton } from "@/components/coach/send-signin-link-button";
 import { ClientProfileTabs } from "@/components/coach/desktop/client-profile-tabs";
@@ -1488,6 +1489,9 @@ export default async function AthleteProfilePage(
               noteId={noteRow?.id ?? null}
               initialBody={noteRow?.body ?? ""}
             />
+          </section>
+          <section className="mt-8">
+            <ClientAssessmentsSection groupId={params.groupId} athleteId={params.athleteId} />
           </section>
           </div>
 

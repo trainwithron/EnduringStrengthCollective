@@ -41,6 +41,7 @@ export const STORAGE_FILES: { bucket: string; table: string; column: string; own
   { bucket: "progress-photos", table: "progress_photos", column: "storage_path", owner: "athlete_id" },
   { bucket: "athlete-exercise-videos", table: "session_exercise_videos", column: "video_path", owner: "athlete_id" },
   { bucket: "coach-video-checkins", table: "coach_video_checkins", column: "video_path", owner: "athlete_id" },
+  { bucket: "client-assessments", table: "client_assessments", column: "file_path", owner: "athlete_id" },
   { bucket: "post-media", table: "posts", column: "media_url", owner: "author_id" },
   { bucket: "post-media", table: "challenge_participants", column: "before_photo_url", owner: "profile_id" },
   { bucket: "post-media", table: "challenge_participants", column: "after_photo_url", owner: "profile_id" },
@@ -67,6 +68,7 @@ export function pathBelongsToPerson(bucket: string, path: string, userId: string
   const parts = path.split("/");
   if (bucket === "progress-photos") return parts[0] === userId;
   if (bucket === "coach-video-checkins") return parts[1] === userId;
+  if (bucket === "client-assessments") return parts[1] === userId;
   return true;
 }
 

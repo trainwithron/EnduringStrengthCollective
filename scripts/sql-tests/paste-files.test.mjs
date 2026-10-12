@@ -951,6 +951,8 @@ for (const s of steps) {
   check("release-z: the bundle applies again after an undo" + (errZ2 ? ": " + errZ2 : ""), !errZ2 && (await has()));
 }
 // Defense in depth (steps 94 and 95) is taken off for the bundle tests that follow: some of them undo older steps that drop a column the rule's policies read. Its own test is further down.
+// (the assessments table carries the same rule when it is installed, so it comes off first)
+await run(`apply/undo-step101-0355.sql`);
 await run(`apply/undo-step95-0349.sql`);
 await run(`apply/undo-step94-0348.sql`);
 // Release AB (step 69): ONE paste. No event kind before, the bundle adds events (the class functions refuse them), a second run is refused naming step 69, the undo puts everything back, and it applies again.
@@ -1533,6 +1535,24 @@ await run(`apply/undo-step94-0348.sql`);
   check("release-bf: the undo puts the old rights back" + (euBF ? ": " + euBF : ""), !euBF && !(await has()));
   const errBF2 = await run(`apply/${bundle.file}`);
   check("release-bf: the bundle applies again after an undo" + (errBF2 ? ": " + errBF2 : ""), !errBF2 && (await has()));
+}
+// Release BG (step 101): ONE paste.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-bg");
+  check("release-bg: ONE bundle holds step 101", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["101"]));
+  const st101 = steps.find((x) => x.n === "101");
+  const has = async () => (await db.query("select to_regclass('public.client_assessments') is not null as ok")).rows[0].ok === true;
+  const ebg0 = await run(`apply/undo-step${st101.n}-${st101.slug}.sql`);
+  check("release-bg: before the bundle runs there is no assessments table" + (ebg0 ? ": " + ebg0 : ""), !ebg0 && !(await has()));
+  const errBG = await run(`apply/${bundle.file}`);
+  check("release-bg bundle applies" + (errBG ? ": " + errBG : ""), !errBG && (await has()));
+  const againBG = await run(`apply/${bundle.file}`);
+  check("release-bg: a second run is refused, naming step 101", !!againBG && againBG.includes("step 101 (0355) cannot run") && againBG.includes("already applied"));
+  const euBG = await run(`apply/undo-step${st101.n}-${st101.slug}.sql`);
+  check("release-bg: the undo removes the table" + (euBG ? ": " + euBG : ""), !euBG && !(await has()));
+  const errBG2 = await run(`apply/${bundle.file}`);
+  check("release-bg: the bundle applies again after an undo" + (errBG2 ? ": " + errBG2 : ""), !errBG2 && (await has()));
 }
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {

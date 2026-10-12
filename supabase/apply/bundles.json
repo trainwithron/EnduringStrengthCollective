@@ -261,6 +261,14 @@
   "file": "apply-release-ao-all.sql"
  },
  {
+  "id": "release-bg",
+  "name": "Release BG (coach assessments on a client's profile; run BEFORE the code that goes with it is live)",
+  "steps": [
+   "101"
+  ],
+  "file": "apply-release-bg-all.sql"
+ },
+ {
   "id": "release-bf",
   "name": "Release BF (the money settings on organization memberships are the server's; shares never total over 100 percent; run BEFORE the code that goes with it is live)",
   "steps": [
