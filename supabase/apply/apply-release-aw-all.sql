@@ -45,6 +45,36 @@ $g91$;
 -- 3. Tags: who has which tag is visible to the organization's owner and admins and to the coach of that client, not to every coach of the organization.
 -- Existing rows are untouched. The server (service role) is unaffected.
 
+-- Training-partner matching ACROSS organizations is switched off (Ron, Oct 12): partners match only inside one organization. Turning it back on is replacing this one function with "select true".
+create or replace function public.training_partners_cross_org_enabled()
+returns boolean
+language sql
+immutable
+as $$ select false; $$;
+grant execute on function public.training_partners_cross_org_enabled() to authenticated, service_role;
+
+drop policy if exists "training_partner_profiles_select_visible" on public.training_partner_profiles;
+create policy "training_partner_profiles_select_visible" on public.training_partner_profiles for select
+  to authenticated using (
+    visible = true
+    and not public.training_partners_mutually_blocked(athlete_id, (select auth.uid()))
+    and (
+      public.training_partners_share_org(athlete_id, (select auth.uid()))
+      or (public.training_partners_cross_org_enabled() and not public.training_partner_is_restricted(athlete_id) and not public.training_partner_is_restricted((select auth.uid())))
+    )
+  );
+
+drop policy if exists "training_partner_requests_insert_own" on public.training_partner_requests;
+create policy "training_partner_requests_insert_own" on public.training_partner_requests for insert
+  to authenticated with check (
+    from_athlete_id = (select auth.uid())
+    and not public.training_partners_mutually_blocked(to_athlete_id, (select auth.uid()))
+    and (
+      public.training_partners_share_org(to_athlete_id, (select auth.uid()))
+      or (public.training_partners_cross_org_enabled() and not public.training_partner_is_restricted(to_athlete_id) and not public.training_partner_is_restricted((select auth.uid())))
+    )
+  );
+
 create or replace function public.can_see_profile(p_target uuid)
 returns boolean
 language sql
@@ -65,6 +95,8 @@ as $$
       join public.groups g on g.organization_id = om.organization_id
       join public.group_memberships gm on gm.group_id = g.id
       where om.profile_id = (select auth.uid()) and om.role in ('owner', 'admin') and gm.profile_id = p_target
+        -- a client who is private from the organization is not listed to its owner or admins either
+        and not public.is_client_private_from_org(gm.group_id, gm.profile_id)
     )
     -- an owner or admin also sees the owner, admins and coaches of their own organization (staff who are not in any group)
     or exists (
@@ -88,9 +120,24 @@ as $$
     or exists (select 1 from public.bookings b where b.coach_id = (select auth.uid()) and b.athlete_id = p_target)
     -- the platform administrator runs the service (support, feedback, organizations): staff names only (owners, admins, coaches), never a client
     or (public.is_platform_admin() and exists (select 1 from public.organization_memberships sm where sm.profile_id = p_target))
-    -- training-partner matching: the rows below are themselves only visible when the matching rules allow it
-    or exists (select 1 from public.training_partner_profiles tp where tp.athlete_id = p_target)
-    or exists (select 1 from public.training_partner_requests r where r.from_athlete_id = p_target or r.to_athlete_id = p_target);
+    -- the author of a post or comment in a group the viewer is in (someone who has since left the group still shows their name on what they wrote)
+    or exists (select 1 from public.posts po where po.author_id = p_target and public.is_group_member(po.group_id))
+    or exists (select 1 from public.comments co where co.author_id = p_target and public.is_group_member(co.group_id))
+    -- training-partner matching, with the matching feature's OWN rules (this function bypasses row security, so they are repeated here): a visible partner profile who is not blocked and whom
+    -- the viewer is allowed to match with; and a partner request that involves the viewer
+    or exists (
+      select 1 from public.training_partner_profiles tp
+      where tp.athlete_id = p_target and tp.visible = true
+        and not public.training_partners_mutually_blocked(p_target, (select auth.uid()))
+        and (
+          public.training_partners_share_org(p_target, (select auth.uid()))
+          or (public.training_partners_cross_org_enabled() and not public.training_partner_is_restricted(p_target) and not public.training_partner_is_restricted((select auth.uid())))
+        )
+    )
+    or exists (
+      select 1 from public.training_partner_requests r
+      where (r.from_athlete_id = (select auth.uid()) and r.to_athlete_id = p_target) or (r.to_athlete_id = (select auth.uid()) and r.from_athlete_id = p_target)
+    );
 $$;
 revoke execute on function public.can_see_profile(uuid) from public, anon;
 grant execute on function public.can_see_profile(uuid) to authenticated, service_role;

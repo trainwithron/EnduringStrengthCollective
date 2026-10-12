@@ -271,7 +271,7 @@ export function InlineCommentSection({
       {replyTarget && (
         <div className="flex items-center justify-between">
           <p className="font-body text-xs text-steel">
-            Replying to {replyTarget.profiles.full_name}
+            Replying to {replyTarget.profiles?.full_name ?? "a former member"}
           </p>
           <button onClick={() => setReplyTo(null)} className="font-body text-xs text-rust">
             Cancel
@@ -306,7 +306,7 @@ export function InlineCommentSection({
           onKeyDown={(e) => {
             if (e.key === "Enter" && mentionQuery === null) handleSend();
           }}
-          placeholder={replyTarget ? `Reply to ${replyTarget.profiles.full_name}` : "Add a comment"}
+          placeholder={replyTarget ? `Reply to ${replyTarget.profiles?.full_name ?? "a former member"}` : "Add a comment"}
           disabled={sending}
           className="flex-1 h-11 bg-surface border border-steel/30 text-chalk px-3 font-body text-sm focus:outline-none focus:border-rust disabled:opacity-60"
         />
@@ -337,7 +337,7 @@ function CommentLine({
   return (
     <div>
       <p className="font-body text-sm">
-        <span className="font-medium">{comment.profiles.full_name}</span>{" "}
+        <span className="font-medium">{comment.profiles?.full_name ?? "Former member"}</span>{" "}
         <span className="text-chalk">{renderWithMentions(comment.body)}</span>
       </p>
       <div className="flex items-center gap-3 mt-0.5">

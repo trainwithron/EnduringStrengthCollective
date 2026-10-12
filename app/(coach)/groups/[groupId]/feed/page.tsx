@@ -32,8 +32,8 @@ function mapPostRow(p: any, groupId: string, viewerId: string | null): FeedPost 
     createdAt: p.created_at,
     author: {
       id: p.profiles.id,
-      fullName: p.profiles.full_name,
-      avatarUrl: p.profiles.avatar_url,
+      fullName: p.profiles?.full_name ?? "Former member",
+      avatarUrl: p.profiles?.avatar_url ?? null,
     },
     workoutSummary: p.workout_logs
       ? {

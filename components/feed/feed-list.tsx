@@ -74,9 +74,9 @@ export function FeedList({
               mediaType: data.media_type,
               createdAt: data.created_at,
               author: {
-                id: (data.profiles as any).id,
-                fullName: (data.profiles as any).full_name,
-                avatarUrl: (data.profiles as any).avatar_url,
+                id: (data.profiles as any)?.id ?? "",
+                fullName: (data.profiles as any)?.full_name ?? "Former member",
+                avatarUrl: (data.profiles as any)?.avatar_url ?? null,
               },
               workoutSummary: data.workout_logs
                 ? {

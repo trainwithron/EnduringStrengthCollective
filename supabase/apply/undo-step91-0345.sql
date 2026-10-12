@@ -48,5 +48,10 @@ drop policy if exists "nutrition_phases_select_org_owner" on public.nutrition_ph
 drop policy if exists "client_phase_plans_select_org_owner" on public.client_phase_plans;
 drop policy if exists "nutrition_checkin_suggestions_select_org_owner" on public.nutrition_checkin_suggestions;
 drop policy if exists "direct_messages_select_org_owner" on public.direct_messages;
+drop policy if exists "training_partner_profiles_select_visible" on public.training_partner_profiles;
+create policy "training_partner_profiles_select_visible" on public.training_partner_profiles for select to authenticated using (((visible = true) AND (NOT training_partners_mutually_blocked(athlete_id, ( SELECT auth.uid() AS uid))) AND (training_partners_share_org(athlete_id, ( SELECT auth.uid() AS uid)) OR ((NOT training_partner_is_restricted(athlete_id)) AND (NOT training_partner_is_restricted(( SELECT auth.uid() AS uid)))))));
+drop policy if exists "training_partner_requests_insert_own" on public.training_partner_requests;
+create policy "training_partner_requests_insert_own" on public.training_partner_requests for insert to authenticated with check (((from_athlete_id = ( SELECT auth.uid() AS uid)) AND (NOT training_partners_mutually_blocked(to_athlete_id, ( SELECT auth.uid() AS uid))) AND (training_partners_share_org(to_athlete_id, ( SELECT auth.uid() AS uid)) OR ((NOT training_partner_is_restricted(to_athlete_id)) AND (NOT training_partner_is_restricted(( SELECT auth.uid() AS uid)))))));
+drop function if exists public.training_partners_cross_org_enabled();
 drop function if exists public.can_see_profile(uuid);
 commit;

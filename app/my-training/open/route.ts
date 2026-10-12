@@ -27,7 +27,7 @@ export async function GET(request: Request) {
   if (membership.role === "coach") {
     response.cookies.set(ACTING_AS_COOKIE, JSON.stringify({ athleteId: user.id, groupId }), { httpOnly: true, sameSite: "lax", secure, path: "/", maxAge: 60 * 60 * 12 });
     response.cookies.set(ACTING_AS_SELF_COOKIE, "1", { httpOnly: false, sameSite: "lax", secure, path: "/", maxAge: 60 * 60 * 12 });
-    response.cookies.set(VIEW_OVERRIDE_COOKIE, "mobile", { httpOnly: false, sameSite: "lax", secure, path: "/", maxAge: 60 * 60 * 24 * 365 });
+    response.cookies.set(VIEW_OVERRIDE_COOKIE, "mobile", { httpOnly: false, sameSite: "lax", secure, path: "/", maxAge: 60 * 60 * 12 });
   }
   return response;
 }

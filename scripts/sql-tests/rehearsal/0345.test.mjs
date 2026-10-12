@@ -170,6 +170,36 @@ export default {
       const own4 = await private4();
       h.check("...while that client's own coach still sees everything of theirs", own4.macros >= 1 && own4.notes >= 1 && own4.messages >= 1 && own4.intake >= 1, JSON.stringify(own4));
 
+      // ---- names: the privacy rules of partner matching and of private clients are kept; an author who left still has a name on their post ------------------
+      await h.asSuper();
+      await db.query(`insert into public.training_partner_profiles (athlete_id, visible) values ($1, true), ($2, false)`, [c1, c2]);
+      const gone = await h.user("OW Left The Group");
+      await db.query(`insert into public.posts (group_id, author_id) values ($1, $2)`, [tA, gone]);
+      await h.as(c4);
+      h.check("a same-organization partner who is visible shows their name", (await namesVisible([c1])) === 1);
+      h.check("...but a partner profile that is switched off does not", (await namesVisible([c2])) === 0);
+      await h.as(bClient);
+      h.check("a visible partner of ANOTHER organization is not shown (cross-organization matching is off)", (await namesVisible([c1])) === 0);
+      await h.as(c1);
+      h.check("someone who wrote a post in a group you are in keeps their name after leaving it", (await namesVisible([gone])) === 1);
+      await h.as(bClient);
+      h.check("...and a stranger cannot see that name", (await namesVisible([gone])) === 0);
+      for (const [label, uid] of [["the owner", aOwner], ["an admin", aAdmin]]) {
+        await h.as(uid);
+        h.check(`${label} does not see the name of a client who is private from the organization`, (await namesVisible([c4])) === 0);
+      }
+
+      // ---- handing an organization to someone: only the owner, only to one of its members, and only THAT organization moves ------------------
+      await h.as(bCoach);
+      await h.expectError("a coach of organization B cannot take over organization B", () => db.query(`select public.transfer_organization_ownership($1, $2)`, [orgB, bCoach]), /Only the current owner|not authorized/i);
+      await h.as(bOwner);
+      await h.expectError("organization B's owner cannot hand it to someone who is not a member of it", () => db.query(`select public.transfer_organization_ownership($1, $2)`, [orgB, aOwner]), /must already be a member/i);
+      await db.query(`select public.transfer_organization_ownership($1, $2)`, [orgB, bAdmin]);
+      await h.as(bAdmin);
+      const newOwnerSeesA = await visibleA();
+      h.check("the new owner of organization B reads zero rows of organization A", total(newOwnerSeesA) === 0, JSON.stringify(newOwnerSeesA));
+      h.check("...and no name of anyone in it", (await namesVisible(aPeople)) === 0);
+
       // ---- no way around it through the lookup functions ---------------------------------
       await h.as(bOwner);
       h.check("can_see_profile says no for a stranger in another organization", (await db.query(`select public.can_see_profile($1) as v`, [c3])).rows[0].v === false);
