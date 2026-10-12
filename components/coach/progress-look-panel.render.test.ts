@@ -78,7 +78,7 @@ describe("the row on Home", () => {
     expect(readFileSync(new URL("../../app/(coach)/dashboard/page.tsx", import.meta.url), "utf8")).toContain("<ProgressLookPanel groupIds=");
     expect(readFileSync(new URL("./mobile/coach-mobile-home.tsx", import.meta.url), "utf8")).toContain("<ProgressLookPanel groupIds=");
     const route = readFileSync(new URL("../../app/api/progress-look/route.ts", import.meta.url), "utf8");
-    expect(route).toContain('eq("role", "coach")');
+    expect(route).toContain("getActiveAnchor(supabase, user.id)");
     expect(route).toContain("groupIds.length === 0");
   });
 
