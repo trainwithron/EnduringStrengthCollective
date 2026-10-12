@@ -952,6 +952,7 @@ for (const s of steps) {
 }
 // Defense in depth (steps 94 and 95) is taken off for the bundle tests that follow: some of them undo older steps that drop a column the rule's policies read. Its own test is further down.
 // (the assessments table carries the same rule when it is installed, so it comes off first)
+await run(`apply/undo-step104-0358.sql`);
 await run(`apply/undo-step101-0355.sql`);
 await run(`apply/undo-step95-0349.sql`);
 await run(`apply/undo-step94-0348.sql`);
@@ -1535,6 +1536,31 @@ await run(`apply/undo-step94-0348.sql`);
   check("release-bf: the undo puts the old rights back" + (euBF ? ": " + euBF : ""), !euBF && !(await has()));
   const errBF2 = await run(`apply/${bundle.file}`);
   check("release-bf: the bundle applies again after an undo" + (errBF2 ? ": " + errBF2 : ""), !errBF2 && (await has()));
+}
+// Release BJ (step 104): ONE paste.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-bj");
+  check("release-bj: ONE bundle holds step 104", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["104"]));
+  const st104 = steps.find((x) => x.n === "104");
+  // Release BJ needs the organization wall (Release AZ) installed first; it is taken off again at the end of this block.
+  const azb = bundles.find((b) => b.id === "release-az");
+  const st94b = steps.find((x) => x.n === "94");
+  const errAZb = await run(`apply/${azb.file}`);
+  check("release-bj: the wall (Release AZ) is installed first" + (errAZb ? ": " + errAZb : ""), !errAZb);
+  const has = async () => (await db.query("select to_regprocedure('public.ensure_personal_space()') is not null as ok")).rows[0].ok === true;
+  const ebj0 = await run(`apply/undo-step${st104.n}-${st104.slug}.sql`);
+  check("release-bj: before the bundle runs there is no personal-space function" + (ebj0 ? ": " + ebj0 : ""), !ebj0 && !(await has()));
+  const errBJ = await run(`apply/${bundle.file}`);
+  check("release-bj bundle applies" + (errBJ ? ": " + errBJ : ""), !errBJ && (await has()));
+  const againBJ = await run(`apply/${bundle.file}`);
+  check("release-bj: a second run is refused, naming step 104", !!againBJ && againBJ.includes("step 104 (0358) cannot run") && againBJ.includes("already applied"));
+  const euBJ = await run(`apply/undo-step${st104.n}-${st104.slug}.sql`);
+  check("release-bj: the undo removes the function" + (euBJ ? ": " + euBJ : ""), !euBJ && !(await has()));
+  const errBJ2 = await run(`apply/${bundle.file}`);
+  check("release-bj: the bundle applies again after an undo" + (errBJ2 ? ": " + errBJ2 : ""), !errBJ2 && (await has()));
+  await run(`apply/undo-step${st104.n}-${st104.slug}.sql`);
+  await run(`apply/undo-step${st94b.n}-${st94b.slug}.sql`);
 }
 // Release BG (step 101): ONE paste.
 {

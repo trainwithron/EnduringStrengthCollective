@@ -261,6 +261,14 @@
   "file": "apply-release-ao-all.sql"
  },
  {
+  "id": "release-bj",
+  "name": "Release BJ (a personal space for each person, outside any organization; run BEFORE the code that goes with it is live)",
+  "steps": [
+   "104"
+  ],
+  "file": "apply-release-bj-all.sql"
+ },
+ {
   "id": "release-bg",
   "name": "Release BG (coach assessments on a client's profile; run BEFORE the code that goes with it is live)",
   "steps": [

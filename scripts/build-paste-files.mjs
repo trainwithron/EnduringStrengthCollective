@@ -2032,6 +2032,20 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the storage and group tables the rules read exist", "to_regclass('storage.objects') is not null and to_regclass('public.group_memberships') is not null"],
     ],
   },
+  {
+    n: "104",
+    slug: "0358",
+    title: "0358 A personal space: every person can have one space of their own that belongs to no organization, so a coach's own training is one set that follows them into every organization",
+    migrations: ["0358"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes on screen by itself. A coach's own training space is created the first time they open their own client view, named after their profile, and it appears in every organization they coach in as their own row in the Clients list. No organization's owner, admin or rival can read it, and it is in no organization's counts or billing.",
+    undo: "drop trigger if exists group_memberships_guard_personal_space on public.group_memberships;\ndrop function if exists public.guard_personal_space_members();\ndrop function if exists public.ensure_personal_space();\ndrop index if exists public.groups_one_personal_space_per_person;\n" + fnFromMigration("0348", "group_in_active_org") + "\n" + fnFromMigration("0333", "guard_one_on_one_program") + "\nrevoke all on function public.guard_one_on_one_program() from public, anon, authenticated;\ndo $u$ begin if not exists (select 1 from public.groups where organization_id is null) then alter table public.groups alter column organization_id set not null; end if; end $u$;",
+    undoWhy: "Only if step 104 misbehaves. Puts the organization wall back as it was and removes the personal-space function. Personal spaces already created stay (and the column stays optional while any exist), so nothing anyone saved is lost.",
+    rows: [
+      ["0358 is not already applied (the personal-space function does not exist yet)", "to_regprocedure('public.ensure_personal_space()') is null"],
+      ["the organization wall function and the groups table exist", "to_regprocedure('public.group_in_active_org(uuid)') is not null and to_regclass('public.groups') is not null"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -2137,6 +2151,7 @@ const BUNDLES = [
   { id: "release-ai", name: "Release AI (a payment and its sessions are recorded in one step; run BEFORE the code that uses it deploys)", steps: ["77"] },
   { id: "release-ap", name: "Release AP (parent-view links only for under-13 clients of the coach, and they expire; internal training-partner functions closed; run any time)", steps: ["84"] },
   { id: "release-ao", name: "Release AO (assigning attaches a program only inside one organization; run any time, after Release AM)", steps: ["83"] },
+  { id: "release-bj", name: "Release BJ (a personal space for each person, outside any organization; run BEFORE the code that goes with it is live)", steps: ["104"] },
   { id: "release-bg", name: "Release BG (coach assessments on a client's profile; run BEFORE the code that goes with it is live)", steps: ["101"] },
   { id: "release-bf", name: "Release BF (the money settings on organization memberships are the server's; shares never total over 100 percent; run BEFORE the code that goes with it is live)", steps: ["100"] },
   { id: "release-be", name: "Release BE (a coach can ask for notice before a client pauses or ends a schedule; run BEFORE the code that goes with it is live)", steps: ["99"] },
@@ -2345,6 +2360,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
+    m("0358", "to_regprocedure('public.ensure_personal_space()') is not null"),
     m("0355", "to_regclass('public.client_assessments') is not null"),
     m("0354", "to_regprocedure('public.guard_organization_share_total()') is not null"),
     m("0353", has.col("coach_booking_policies", "schedule_change_notice_days")),
