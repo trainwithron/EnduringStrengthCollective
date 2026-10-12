@@ -66,6 +66,7 @@ from (
     ('2026100600330', 'public_page_coach_only', '0330_public_page_coach_only.sql', exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')),
     ('2026100600331', 'purchase_grants_once', '0331_purchase_grants_once.sql', to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null),
     ('2026100600338', 'guardian_links_scoped', '0338_guardian_links_scoped.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'guardian_links' and column_name = 'expires_at')),
+    ('2026100600345', 'organization_walls', '0345_organization_walls.sql', exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'profiles' and policyname = 'profiles_select_visible')),
     ('2026100600344', 'athlete_in_group_keep_old_rows', '0344_athlete_in_group_keep_old_rows.sql', position('v_had_row' in pg_get_functiondef(to_regprocedure('public.enforce_athlete_in_group()'))) > 0),
     ('2026100600343', 'coach_credit_grants_once', '0343_coach_credit_grants_once.sql', to_regprocedure('public.grant_coach_credit_pack_once(text, text, uuid, integer, integer)') is not null),
     ('2026100600342', 'close_lookup_oracles', '0342_close_lookup_oracles.sql', not has_function_privilege('authenticated', 'public.coach_ai_multiplier(uuid)', 'execute')),

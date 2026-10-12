@@ -261,6 +261,14 @@
   "file": "apply-release-ao-all.sql"
  },
  {
+  "id": "release-aw",
+  "name": "Release AW (the organization walls: names and client content readable only inside the organization; run AFTER the code that goes with it is live)",
+  "steps": [
+   "91"
+  ],
+  "file": "apply-release-aw-all.sql"
+ },
+ {
   "id": "release-av",
   "name": "Release AV (a coach can still tidy up an existing row of someone who left the group; run AFTER Release AR)",
   "steps": [

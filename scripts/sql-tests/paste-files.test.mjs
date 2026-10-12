@@ -1359,6 +1359,24 @@ for (const s of steps) {
   const euAR3 = await run(`apply/undo-step${st86.n}-${st86.slug}.sql`);
   check("release-av: Release AR is taken off again at the end" + (euAR3 ? ": " + euAR3 : ""), !euAR3);
 }
+// Release AW (step 91): ONE paste.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-aw");
+  check("release-aw: ONE bundle holds step 91", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["91"]));
+  const st91 = steps.find((x) => x.n === "91");
+  const has = async () => (await db.query("select exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'profiles' and policyname = 'profiles_select_visible') as ok")).rows[0].ok === true;
+  const eaw0 = await run(`apply/undo-step${st91.n}-${st91.slug}.sql`);
+  check("release-aw: before the bundle runs the open profiles rule is back" + (eaw0 ? ": " + eaw0 : ""), !eaw0 && !(await has()));
+  const errAW = await run(`apply/${bundle.file}`);
+  check("release-aw bundle applies on the live-shaped state" + (errAW ? ": " + errAW : ""), !errAW && (await has()));
+  const againAW = await run(`apply/${bundle.file}`);
+  check("release-aw: a second run is refused, naming step 91 (" + againAW + ")", !!againAW && againAW.includes("step 91 (0345) cannot run") && againAW.includes("already applied"));
+  const euAW = await run(`apply/undo-step${st91.n}-${st91.slug}.sql`);
+  check("release-aw: the undo puts the old rules back" + (euAW ? ": " + euAW : ""), !euAW && !(await has()));
+  const errAW2 = await run(`apply/${bundle.file}`);
+  check("release-aw: the bundle applies again after an undo" + (errAW2 ? ": " + errAW2 : ""), !errAW2 && (await has()));
+}
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {
   // The bundle tests above took steps back and applied them again, which recreated some trigger functions with the default (open) rights; closing them again is what steps 52 and 53 do.
