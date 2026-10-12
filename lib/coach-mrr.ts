@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { computeEstimatedMRR, computeRealMRR } from "@/lib/business-metrics";
 import { ratesByMembership } from "@/lib/client-rates";
-import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
+import { loadBusinessScope } from "@/lib/business-scope";
 
 // The one number a coach is shown as "MRR": real subscriptions when there are any, otherwise the estimate from the monthly rates set by hand. The Business page and the phone Home
 // both read it through here, so the two can never disagree.
@@ -13,8 +13,8 @@ const NO_GROUP = "00000000-0000-0000-0000-000000000000";
 
 // The coach's MRR across EVERY group they coach (a 1-on-1 coach has one group per client, so one group alone is nearly always $0), as the Business page reads it.
 export async function loadCoachMrr(supabase: SupabaseClient, coachId: string, groupId: string): Promise<{ value: number; estimated: boolean }> {
-  // Only the organization the page is in (never another organization's income).
-  const ids = groupsInOrgOf(await getCoachedGroups(supabase, coachId), groupId).map((g) => g.id);
+  // Only the organization the page is in (never another organization's income): the coach's own groups, or every group of the organization for its owner or an admin.
+  const ids = (await loadBusinessScope(supabase, coachId, groupId)).groupIds;
   const groupIds = ids.length > 0 ? ids : [NO_GROUP];
   const [{ data: subRows }, { data: memberRows }, { data: rateRows }] = await Promise.all([
     supabase.from("membership_subscriptions").select("price_cents, status").in("group_id", groupIds),

@@ -4,6 +4,7 @@ import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
 import { redirectOneOnOneToAnchor } from "@/lib/coach-wide-redirect";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
+import { loadBusinessScope } from "@/lib/business-scope";
 import { createServerClient } from "@/lib/supabase/server";
 import { getViewerDisplayTimezone } from "@/lib/display-timezone-server";
 import { dateKeyInZone, monthBoundsInZone } from "@/lib/timezone";
@@ -63,7 +64,9 @@ export default async function BusinessDashboardPage(
     .single();
 
   // Every group this coach runs IN THIS ORGANIZATION: the business view spans the whole business of the organization that is open, never another organization's clients or income.
-  const groupIds = (groupsInOrgOf(await getCoachedGroups(supabase, user.id), params.groupId)).map((g) => g.id);
+  // A coach: their own groups. The owner or an admin of the organization: every group in it (all coaches, all clients).
+  const scope = await loadBusinessScope(supabase, user.id, params.groupId);
+  const groupIds = scope.groupIds;
 
   const { data: memberRows } = await supabase
     .from("group_memberships")
@@ -118,7 +121,6 @@ export default async function BusinessDashboardPage(
   const { count: bookingsThisMonthCount } = await supabase
     .from("bookings")
     .select("id", { count: "exact", head: true })
-    .eq("coach_id", user.id)
     .in("group_id", groupIds.length > 0 ? groupIds : ["00000000-0000-0000-0000-000000000000"])
     .eq("status", "confirmed")
     .gte("start_at", monthStartIso);
