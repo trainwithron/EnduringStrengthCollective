@@ -8,7 +8,7 @@ function workspaceHeaders(group: string | null): { headers: Record<string, strin
   return group ? { headers: { [WORKSPACE_HEADER]: group } } : undefined;
 }
 
-async function buildServerClient() {
+async function buildServerClient(crossOrg = false) {
   const cookieStore = await cookies();
 
   const client = createSupabaseServerClient(
@@ -16,7 +16,7 @@ async function buildServerClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       // Defense in depth (lib/workspace-header.ts): data requests name the open workspace. The middleware keeps the remembered workspace in step with the group page being opened.
-      global: workspaceHeaders(decodeWorkspaceCookie(cookieStore.get(LAST_WORKSPACE_GROUP_COOKIE)?.value)),
+      global: crossOrg ? undefined : workspaceHeaders(decodeWorkspaceCookie(cookieStore.get(LAST_WORKSPACE_GROUP_COOKIE)?.value)),
       cookies: {
         getAll() {
           return cookieStore.getAll();
@@ -56,4 +56,8 @@ async function buildServerClient() {
 // getUser above is actually shared between the layout and the page. Outside a
 // render (route handlers) React.cache does not memoise and every call builds a
 // fresh client, exactly as before.
-export const createServerClient = cache(buildServerClient);
+export const createServerClient = cache(() => buildServerClient(false));
+
+// The same client without the workspace header, for pages that open ONE row the person is allowed to open (a session, a printed program, their own notifications, My training) whatever
+// organization it is in: they come from a link or a list that spans the person's organizations, not from a workspace they have open.
+export const createCrossOrgServerClient = cache(() => buildServerClient(true));

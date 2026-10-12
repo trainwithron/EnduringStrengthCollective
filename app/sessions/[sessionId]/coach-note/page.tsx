@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
-import { createServerClient } from "@/lib/supabase/server";
+import { createCrossOrgServerClient as createServerClient } from "@/lib/supabase/server";
 import { AcknowledgeSessionPatternNoteButton } from "@/components/coach/acknowledge-session-pattern-note-button";
 
 // Session Pattern Spotter's coach-facing page

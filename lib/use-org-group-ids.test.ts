@@ -29,6 +29,6 @@ describe("one answer per page render for the shared lookups", () => {
     expect(read("lib/display-timezone-server.ts")).toContain("export const getViewerDisplayTimezone = cache(readViewerDisplayTimezone);");
   });
   it("they share the request's one Supabase client, which is what makes the shared answer possible", () => {
-    expect(read("lib/supabase/server.ts")).toContain("export const createServerClient = cache(buildServerClient);");
+    expect(read("lib/supabase/server.ts")).toContain("export const createServerClient = cache(() => buildServerClient(false));");
   });
 });

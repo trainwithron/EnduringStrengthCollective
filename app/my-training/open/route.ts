@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabase/server";
+import { createCrossOrgServerClient as createServerClient } from "@/lib/supabase/server";
 import { ACTING_AS_COOKIE, ACTING_AS_SELF_COOKIE } from "@/lib/acting-as";
 import { VIEW_OVERRIDE_COOKIE } from "@/lib/pwa";
 

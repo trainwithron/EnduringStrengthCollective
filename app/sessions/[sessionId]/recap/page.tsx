@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { NoAccess } from "@/components/shared/no-access";
-import { createServerClient } from "@/lib/supabase/server";
+import { createCrossOrgServerClient as createServerClient } from "@/lib/supabase/server";
 import { getSessionRecap } from "@/lib/session-recap-data";
 import { getWorkoutOverviewData, type WorkoutOverviewExercise } from "@/lib/workout-overview-data";
 import { findMostRecentCoachNoteForExercise } from "@/lib/exercise-note-history";

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { createServerClient } from "@/lib/supabase/server";
+import { createCrossOrgServerClient as createServerClient } from "@/lib/supabase/server";
 import { loadMyTraining } from "@/lib/my-training";
 import { parseLastGroupCookie } from "@/lib/start-group";
 

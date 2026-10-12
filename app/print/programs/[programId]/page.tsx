@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createServerClient } from "@/lib/supabase/server";
+import { createCrossOrgServerClient as createServerClient } from "@/lib/supabase/server";
 import { NoAccess } from "@/components/shared/no-access";
 import { PrintButton } from "@/components/shared/print-button";
 import { SET_ROW_SELECT, mapSetRow } from "@/lib/exercise-fields";

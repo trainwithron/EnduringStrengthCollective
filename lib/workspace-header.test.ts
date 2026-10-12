@@ -32,13 +32,19 @@ describe("the header is wired in everywhere data is read", () => {
   it("the browser client and the server client both send it, and the cross-organization copy does not", () => {
     expect(read("lib/supabase/client.ts")).toContain("global: { fetch: workspaceFetch }");
     expect(read("lib/supabase/client.ts")).toContain("crossOrg");
-    expect(read("lib/supabase/server.ts")).toContain("global: workspaceHeaders(");
+    expect(read("lib/supabase/server.ts")).toContain("workspaceHeaders(decodeWorkspaceCookie(");
     expect(read("components/coach/desktop/program-card-menu.tsx")).toContain("createBrowserClient({ crossOrg: true })");
   });
   it("opening a group page makes it the workspace, only for a group the person belongs to", () => {
     const mw = read("lib/supabase/middleware.ts");
     expect(mw).toContain('.from("group_memberships").select("group_id").eq("group_id", pageGroup).eq("profile_id", user.id)');
     expect(mw).toContain("request.cookies.set(LAST_WORKSPACE_GROUP_COOKIE");
+  });
+  it("pages that open a person's own row from a link or list spanning organizations read without the workspace header", () => {
+    for (const f of ["app/sessions/[sessionId]/page.tsx", "app/sessions/[sessionId]/recap/page.tsx", "app/sessions/[sessionId]/coach-note/page.tsx", "app/print/programs/[programId]/page.tsx", "app/notifications/page.tsx", "app/my-training/page.tsx", "app/my-training/open/route.ts"]) {
+      expect(read(f), f).toContain("createCrossOrgServerClient as createServerClient");
+    }
+    expect(read("lib/supabase/server.ts")).toContain("export const createCrossOrgServerClient");
   });
   it("the rule in the database ships switched off first and has a separate switch-on step", () => {
     expect(read("supabase/migrations/0348_org_wall_request_header.sql")).toContain("as $$ select false $$;");

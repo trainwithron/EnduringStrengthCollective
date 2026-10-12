@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { NoAccess } from "@/components/shared/no-access";
 import Link from "next/link";
-import { createServerClient } from "@/lib/supabase/server";
+import { createCrossOrgServerClient as createServerClient } from "@/lib/supabase/server";
 import { SessionLogger } from "@/components/logging/session-logger";
 import type { PendingGateTask } from "@/components/session/rest-timer-bar";
 import { isHabitDueOn } from "@/lib/habits";

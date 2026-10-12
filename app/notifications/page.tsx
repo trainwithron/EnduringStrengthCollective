@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { createServerClient } from "@/lib/supabase/server";
+import { createCrossOrgServerClient as createServerClient } from "@/lib/supabase/server";
 import { CoachHomeShell } from "@/components/coach/coach-home-shell";
 import { NotificationList, type CenterEntry } from "@/components/notifications/notification-list";
 import { DEFAULT_COACH_TIMEZONE } from "@/lib/timezone";
