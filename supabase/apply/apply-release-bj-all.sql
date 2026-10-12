@@ -38,7 +38,7 @@ $g104$;
 --   4. The organization wall (group_in_active_org) lets a group with no organization through under any workspace: the person is its only member and every table's own rules still limit who reads it.
 --   5. A program in a personal space is always the owner's own (the one-on-one rule 'a program in a client's own space has to be made for that client' reads the owner as the client there).
 --   6. Nothing is written to the notification bell for a personal space (the person would only be told about their own training); the push route also never sends someone a push about their own action.
---   7. public.ensure_personal_space(): the signed-in person gets their space, created the first time it is asked for, named after their profile. Safe to call again (it returns the same space).
+--   7. public.ensure_personal_space(): a COACH (an organization member or a coach of an organization group) gets their space, created the first time it is asked for, named after their profile. Safe to call again (it returns the same space).
 -- No organization owner, admin or rival can read it (those rules join on the group's organization, which is empty here), and no platform-admin rule reads group data. Nothing is moved or deleted.
 
 alter table public.groups alter column organization_id drop not null;
@@ -145,6 +145,11 @@ begin
   select g.id into v_id from public.groups g where g.created_by = v_user and g.organization_id is null;
   if v_id is not null then
     return v_id;
+  end if;
+  -- Only a coach has a personal space (a client or child who asked for one would become a "coach" to every check that looks for a coach membership).
+  if not exists (select 1 from public.organization_memberships om where om.profile_id = v_user)
+     and not exists (select 1 from public.group_memberships gm join public.groups g on g.id = gm.group_id where gm.profile_id = v_user and gm.role = 'coach' and g.organization_id is not null) then
+    raise exception 'Only coaches have a personal space.' using errcode = '42501';
   end if;
   select coalesce(nullif(trim(p.full_name), ''), 'My training') into v_name from public.profiles p where p.id = v_user;
   insert into public.groups (name, group_kind, created_by, organization_id)

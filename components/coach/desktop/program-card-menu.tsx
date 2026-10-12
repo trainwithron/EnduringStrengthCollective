@@ -396,10 +396,10 @@ export function ProgramCardMenu({
     }
 
     // The coach's own training lives in their personal space (one set that follows them into every organization), made the first time it is needed.
-    const { data: spaceId } = await supabase.rpc("ensure_personal_space");
+    const { data: spaceId, error: spaceError } = await supabase.rpc("ensure_personal_space");
     if (!spaceId) {
       setBusy(false);
-      setError("Couldn't set that up. Try again.");
+      setError(spaceError?.message?.includes("Only coaches") ? "Only coaches have a personal space." : "Couldn't set that up. Try again.");
       return;
     }
     // Attaches when the program qualifies (no copy is left behind), otherwise makes a copy, like assigning to any client.

@@ -33,6 +33,8 @@ async function handler(request: Request) {
   const orgCountByCoach = new Map<string, Set<string>>();
   for (const row of coachRows ?? []) {
     const g = (row as any).groups;
+    // A personal space belongs to no organization and has no clients: it is not part of the digest.
+    if (!g?.organization_id) continue;
     const key = `${row.profile_id}|${g?.organization_id ?? "none"}`;
     entryInfo.set(key, { coachId: row.profile_id, orgName: g?.organizations?.name ?? null });
     orgCountByCoach.set(row.profile_id, (orgCountByCoach.get(row.profile_id) ?? new Set<string>()).add(g?.organization_id ?? "none"));

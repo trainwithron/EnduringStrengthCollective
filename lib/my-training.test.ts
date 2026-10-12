@@ -121,3 +121,15 @@ describe("The coach as their own client (personal space)", () => {
     expect(read("lib/coach-groups.ts")).toContain("!g.organization_id");
   });
 });
+
+describe("Personal space: only coaches, and no briefings for it", () => {
+  it("the database refuses a non-coach, and the page and Assign to Myself say so calmly", () => {
+    expect(read("supabase/migrations/0358_personal_space.sql")).toContain("Only coaches have a personal space.");
+    expect(read("app/my-space/route.ts")).toContain("Only coaches have a personal space.");
+    expect(read("components/coach/desktop/program-card-menu.tsx")).toContain("Only coaches have a personal space.");
+  });
+  it("the daily briefing and the digest skip a group with no organization", () => {
+    expect(read("app/api/cron/coach-briefing/route.ts")).toContain("if (!organizationId) continue;");
+    expect(read("app/api/cron/coach-digest/route.ts")).toContain("if (!g?.organization_id) continue;");
+  });
+});

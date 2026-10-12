@@ -14,6 +14,9 @@ export async function GET(request: Request) {
   if (!user) return NextResponse.redirect(new URL("/login", url));
 
   const { data: spaceId, error } = await supabase.rpc("ensure_personal_space");
+  if (error?.message?.includes("Only coaches")) {
+    return new NextResponse("<!doctype html><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><body style=\"font-family:system-ui;padding:2rem;max-width:32rem\"><p>Only coaches have a personal space.</p><p><a href=\"/\">Back</a></p></body>", { status: 403, headers: { "content-type": "text/html; charset=utf-8" } });
+  }
   if (error || !spaceId) return NextResponse.redirect(new URL("/dashboard", url));
 
   if (url.searchParams.get("view") === "client") {

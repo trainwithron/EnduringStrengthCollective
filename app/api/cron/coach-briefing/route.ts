@@ -66,6 +66,8 @@ async function handler(request: Request) {
   const groupIdsByCoachOrg = new Map<string, { coachId: string; organizationId: string | null; groupIds: string[] }>();
   for (const row of coachMemberships ?? []) {
     const organizationId = orgOfGroup.get(row.group_id) ?? null;
+    // A personal space belongs to no organization and has no clients: it is not briefed.
+    if (!organizationId) continue;
     const key = `${row.profile_id}|${organizationId ?? "none"}`;
     const entry = groupIdsByCoachOrg.get(key) ?? { coachId: row.profile_id as string, organizationId, groupIds: [] };
     entry.groupIds.push(row.group_id);

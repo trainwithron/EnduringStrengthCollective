@@ -28,6 +28,14 @@ export default {
       await h.asSuper();
       await db.exec(`create or replace function public.org_wall_header_enabled() returns boolean language sql stable set search_path = public as $$ select true $$`);
 
+      // ---- only a coach has one --------------------------------------------------------------------------
+      const kid = await h.user("PS Client Only");
+      await h.member(gA, kid);
+      await h.as(kid);
+      await h.expectError("a client who is not a coach cannot create a personal space", () => db.query("select public.ensure_personal_space()"), /Only coaches have a personal space/i);
+      await h.asSuper();
+      h.check("...and no group was made for them", (await count("groups", `created_by = '${kid}' and organization_id is null`)) === 0);
+
       // ---- creating it ---------------------------------------------------------------------------------
       await h.as(coach);
       const ps = (await db.query("select public.ensure_personal_space() as id")).rows[0].id;
