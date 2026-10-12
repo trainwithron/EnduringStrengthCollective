@@ -818,5 +818,17 @@
    "0358"
   ],
   "rows": 2
+ },
+ {
+  "n": "105",
+  "slug": "move-ron-personal-training",
+  "migrations": [],
+  "rows": 5
+ },
+ {
+  "n": "106",
+  "slug": "add-fitpros-exercises",
+  "migrations": [],
+  "rows": 2
  }
 ]
