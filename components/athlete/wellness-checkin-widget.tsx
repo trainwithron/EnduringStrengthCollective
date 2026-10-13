@@ -4,7 +4,7 @@ import { useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { notifyPush } from "@/lib/push-notify";
 import { isHighPriorityClient } from "@/lib/notification-priority";
-import { isLowReadiness } from "@/lib/wellness";
+import { isLowReadiness, sorenessShown, sorenessStored } from "@/lib/wellness";
 
 export interface WellnessCheckinValues {
   sleepQuality: number;
@@ -17,11 +17,13 @@ interface ScaleFieldDef {
   label: string;
   lowLabel: string;
   highLabel: string;
+  // The scale reads the other way round from how it is stored (soreness: shown 1 = Fresh ... 5 = Very sore; stored 5 = fresh).
+  flipped?: boolean;
 }
 
 const FIELDS: ScaleFieldDef[] = [
   { key: "sleepQuality", label: "Sleep quality", lowLabel: "Poor", highLabel: "Great" },
-  { key: "soreness", label: "Soreness", lowLabel: "Very sore", highLabel: "Fresh" },
+  { key: "soreness", label: "Soreness", lowLabel: "Fresh", highLabel: "Very sore", flipped: true },
   { key: "energy", label: "Energy", lowLabel: "Low", highLabel: "High" },
 ];
 
@@ -141,7 +143,7 @@ export function WellnessCheckinWidget({
       {!editing && saved ? (
         <div className="flex items-center justify-between">
           <p className="font-body text-sm text-chalk">
-            {FIELDS.map((f) => `${f.label.split(" ")[0]} ${saved[f.key]}`).join(" · ")}
+            {FIELDS.map((f) => `${f.label.split(" ")[0]} ${f.flipped ? sorenessShown(saved[f.key]) : saved[f.key]}`).join(" · ")}
           </p>
           <button
             type="button"
@@ -165,10 +167,10 @@ export function WellnessCheckinWidget({
                     key={n}
                     type="button"
                     aria-label={`${field.label}: ${n} of 5${n === 1 ? ` (${field.lowLabel})` : n === 5 ? ` (${field.highLabel})` : ""}`}
-                    aria-pressed={draft[field.key] === n}
-                    onClick={() => setDraft((prev) => ({ ...prev, [field.key]: n }))}
+                    aria-pressed={draft[field.key] === (field.flipped ? sorenessStored(n) : n)}
+                    onClick={() => setDraft((prev) => ({ ...prev, [field.key]: field.flipped ? sorenessStored(n) : n }))}
                     className={`flex-1 h-9 border font-body text-sm ${
-                      draft[field.key] === n
+                      draft[field.key] === (field.flipped ? sorenessStored(n) : n)
                         ? "bg-rust border-rust text-graphite"
                         : "border-steel/30 text-chalk"
                     }`}

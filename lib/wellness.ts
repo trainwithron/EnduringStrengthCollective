@@ -2,6 +2,15 @@
 // means better (soreness 5 = fresh/no soreness) — see
 // supabase/migrations/0114_wellness_checkins.sql for why — so a plain
 // average of the three is a meaningful single readiness score.
+// What the person SEES on the soreness scale is 1 = Fresh ... 5 = Very sore, the way people say it. What is STORED, and what every reader (readiness averages, low-readiness flags, charts, the coach
+// briefing, the AI lookups) uses, stays as it always was: 5 = fresh. The flip happens only at the edges, in these two functions, so no stored row and no reader changes meaning.
+export function sorenessShown(stored: number): number {
+  return 6 - stored;
+}
+export function sorenessStored(shown: number): number {
+  return 6 - shown;
+}
+
 export interface WellnessCheckinValues {
   sleepQuality: number;
   soreness: number;
