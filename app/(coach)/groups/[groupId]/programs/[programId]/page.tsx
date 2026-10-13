@@ -25,6 +25,7 @@ import { ProgramProgressBanner } from "@/components/coach/program-progress-banne
 import { ProgrammingSpotterPanel } from "@/components/coach/desktop/programming-spotter-panel";
 import { getProgramBuilderData } from "@/lib/program-builder-data";
 import { Lock } from "lucide-react";
+import { sweepEmptyDays } from "@/lib/empty-sweep";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { ProgramPlainView } from "@/components/shared/program-plain-view-server";
 
@@ -271,6 +272,8 @@ async function CoachProgramBuilder({
   clientGroupId: string | null;
 }) {
   const supabase = await createServerClient();
+  // A day with no exercises and no "Rest day" name (and no log, session, note or date) is not worth keeping: it goes when the program is opened again, never while it is being edited.
+  await sweepEmptyDays(supabase, programId);
   // The builder's data, the program's label/order, and the quiet question after a sign-off do not depend on each other: one batch.
   const [data, { data: roleRow, error: roleError }, { data: askedRule }] = await Promise.all([
     getProgramBuilderData(supabase, { groupId, programId, coachId }),

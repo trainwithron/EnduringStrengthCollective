@@ -8,6 +8,7 @@ import { programDayShape } from "@/lib/program-completeness";
 import { ProgramCardGrid, type ProgramCardData } from "@/components/coach/desktop/program-card-grid";
 import { ProgramsList } from "@/components/coach/desktop/programs-list";
 import { defaultList, type RemovedProgram } from "@/lib/programs-filter";
+import { sweepEmptyPrograms } from "@/lib/empty-sweep";
 import { SwappableTerm } from "@/components/coach/swappable-term";
 import { computeProgramCardVisuals } from "@/lib/program-card-data";
 import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
@@ -48,6 +49,8 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
 
   const inOrg = groupsInOrgOf(groups, anchor.id);
   const groupIds = inOrg.map((g) => g.id);
+  // His own programs with nothing in them (no exercise, no session, no copy), untouched for 24 hours, are removed quietly (AI builder leftovers).
+  await sweepEmptyPrograms(supabase, user.id, groupIds);
   const { data: programs, error: programsError } = await supabase
     .from("programs")
     .select("id, group_id, name, is_active, ai_draft, cover_image_path, athlete_id, source_program_id, training_intent, updated_at, profiles!programs_athlete_id_fkey ( full_name ), workouts(id, group_workout_exercises(count))")
