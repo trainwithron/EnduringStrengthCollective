@@ -1001,6 +1001,23 @@ for (const s of steps) {
   const errU2 = await run(`apply/${bundle.file}`);
   check("release-u: the bundle applies again after an undo" + (errU2 ? ": " + errU2 : ""), !errU2 && (await strips()));
 }
+// Release BS (step 113, smaller goals): one paste. The table is there after the loop; take it back, the bundle applies, a second run is refused naming step 113, the undo returns it, and it applies again.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bs = bundles.find((b) => b.id === "release-bs");
+  check("release-bs: ONE bundle holds step 113", !!bs && JSON.stringify(bs.steps) === JSON.stringify(["113"]));
+  const there = async () => (await db.query("select to_regclass('public.client_sub_goals') is not null as ok")).rows[0].ok === true;
+  const eu0 = await run("apply/undo-step113-0363.sql");
+  check("release-bs: before the bundle runs there is no smaller-goals table" + (eu0 ? ": " + eu0 : ""), !eu0 && !(await there()));
+  const errBS = await run(`apply/${bs.file}`);
+  check("release-bs bundle applies" + (errBS ? ": " + errBS : ""), !errBS && (await there()));
+  const againBS = await run(`apply/${bs.file}`);
+  check("release-bs: a second run is refused, naming step 113", !!againBS && againBS.includes("step 113 (0363) cannot run") && againBS.includes("already applied"));
+  const euBS = await run("apply/undo-step113-0363.sql");
+  check("release-bs: the undo removes the table" + (euBS ? ": " + euBS : ""), !euBS && !(await there()));
+  const errBS2 = await run(`apply/${bs.file}`);
+  check("release-bs: the bundle applies again after an undo" + (errBS2 ? ": " + errBS2 : ""), !errBS2 && (await there()));
+}
 // Release V (step 64): ONE paste. At this point step 64 is applied; take it back with its undo, then the bundle applies, a second run is refused naming step 64, the undo returns it, and it applies again.
 // (Step 111 is newer and renames some of V's survivors, so it is taken back first and applied again after this block.)
 await run("apply/undo-step111-catalog-merge-ron.sql");
@@ -1124,6 +1141,7 @@ await run("apply/undo-step111-catalog-merge-ron.sql");
 }
 // Defense in depth (steps 94 and 95) is taken off for the bundle tests that follow: some of them undo older steps that drop a column the rule's policies read. Its own test is further down.
 // (the assessments table carries the same rule when it is installed, so it comes off first)
+await run(`apply/undo-step113-0363.sql`);
 await run(`apply/undo-step104-0358.sql`);
 await run(`apply/undo-step101-0355.sql`);
 await run(`apply/undo-step95-0349.sql`);

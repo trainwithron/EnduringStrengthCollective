@@ -2193,6 +2193,20 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the storage buckets and the coach website table exist", "to_regclass('storage.buckets') is not null and to_regclass('public.coach_sites') is not null"],
     ],
   },
+  {
+    n: "113",
+    slug: "0363",
+    title: "0363 Smaller goals under a client's goal: either side adds one, the other side agrees or says not now, an agreed one can be marked done (nothing changes a program or a nutrition target)",
+    migrations: ["0363"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes on screen until the code that goes with it is live. Then the client's My Goal page and the coach's view of the client show a Smaller goals section. Changing a state goes through the server only.",
+    undo: "drop table if exists public.client_sub_goals;",
+    undoWhy: "Only if step 113 misbehaves. Removes the smaller-goals table and every smaller goal saved so far.",
+    rows: [
+      ["0363 is not already applied (the smaller-goals table does not exist yet)", "to_regclass('public.client_sub_goals') is null"],
+      ["the goals table and the group helpers exist", "to_regclass('public.client_goals') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -2302,6 +2316,7 @@ const BUNDLES = [
   { id: "release-bn", name: "Release BN (adding a client works again: the creator of a new group can seat themselves; run any time, ideally NOW)", steps: ["108"] },
   { id: "release-bl", name: "Release BL (four exercises added to Coach Ron's library for the FitPros history; run any time)", steps: ["106"] },
   { id: "release-bk", name: "Release BK (move Coach Ron's own training into his personal space; run AFTER he has opened Coach Ron (you) once and removed the programs he does not want)", steps: ["105"] },
+  { id: "release-bs", name: "Release BS (smaller goals under a client's goal; run BEFORE the code that goes with it is live)", steps: ["113"] },
   { id: "release-br", name: "Release BR (each storage bucket accepts only the file types its screen uploads; run any time)", steps: ["112"] },
   { id: "release-bq", name: "Release BQ (Coach Ron's exercise names merged and renamed, and the shared catalog filled from his library; run AFTER Release BP)", steps: ["111"] },
   { id: "release-bp", name: "Release BP (the shared exercise catalog, empty; run any time)", steps: ["110"] },
@@ -2515,6 +2530,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
+    m("0363", "to_regclass('public.client_sub_goals') is not null"),
     m("0362", "exists (select 1 from storage.buckets where id = 'waiver-documents' and allowed_mime_types is not null)"),
     m("0361", "to_regclass('public.exercise_catalog') is not null"),
     m("0360", "to_regprocedure('public.group_is_new_and_mine(uuid)') is not null"),

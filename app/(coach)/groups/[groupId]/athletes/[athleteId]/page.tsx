@@ -31,6 +31,8 @@ import { getGroupCoachTimezone } from "@/lib/timezone";
 import { getViewerDisplayTimezone } from "@/lib/display-timezone-server";
 import type { LedgerEntry } from "@/lib/session-ledger";
 import { GoalConfirmationControl } from "@/components/coach/goal-confirmation-control";
+import { SubGoalsSection } from "@/components/shared/sub-goals-section";
+import type { SubGoalStatus, SubGoalView } from "@/lib/sub-goals";
 import { GoalWaitingOnClient } from "@/components/coach/goal-waiting-on-client";
 import { GoalProposalForm } from "@/components/athlete/goal-proposal-form";
 import { findHelpAnswer } from "@/lib/help-answer";
@@ -577,6 +579,11 @@ export default async function AthleteProfilePage(
   ]);
 
   const sharedPhotos = signedPhotoResults;
+  // Smaller goals under this client's goal (both sides see them).
+  const { data: subGoalRows } = selfView
+    ? { data: [] as any[] }
+    : await supabase.from("client_sub_goals").select("id, title, target_date, proposed_by, status").eq("athlete_id", params.athleteId).eq("group_id", params.groupId).order("created_at", { ascending: true });
+  const subGoals: SubGoalView[] = ((subGoalRows ?? []) as any[]).map((r: any) => ({ id: r.id as string, title: r.title as string, targetDate: (r.target_date as string | null) ?? null, proposedBy: r.proposed_by as string, status: r.status as SubGoalStatus }));
   const parQAnswers = (intake?.par_q_answers as { question: string; answer: boolean }[]) ?? [];
   const parQFlaggedCount = parQAnswers.filter((a) => a.answer).length;
   const hasAboutInfo = !!(
@@ -1359,6 +1366,15 @@ export default async function AthleteProfilePage(
           </div>
 
           <div data-tab="overview forms">
+          {!selfView && user && (
+            <SubGoalsSection
+              groupId={params.groupId}
+              athleteId={params.athleteId}
+              viewerId={user.id}
+              otherName={(profile?.full_name ?? "").trim().split(/\s+/)[0] || "your client"}
+              items={subGoals}
+            />
+          )}
           {latestGoalRow?.status === "proposed" && latestGoalRow.created_by === params.athleteId && (
             <section>
               <GoalConfirmationControl

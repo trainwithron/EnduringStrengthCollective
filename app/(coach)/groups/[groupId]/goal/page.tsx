@@ -6,6 +6,8 @@ import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { GoalProposalForm } from "@/components/athlete/goal-proposal-form";
 import { GoalAnswerControl } from "@/components/athlete/goal-answer-control";
 import { GOAL_TYPE_LABELS } from "@/lib/goal-types";
+import { SubGoalsSection } from "@/components/shared/sub-goals-section";
+import type { SubGoalStatus, SubGoalView } from "@/lib/sub-goals";
 import type { GoalType } from "@/lib/goal-reversal";
 
 // Client always sets/owns the goal (goal_date_aware_nutrition_and_
@@ -39,6 +41,14 @@ export default async function GoalPage(props: { params: Promise<{ groupId: strin
     .eq("athlete_id", user.id)
     .eq("group_id", params.groupId)
     .order("created_at", { ascending: false });
+
+  const { data: subGoalRows } = await supabase
+    .from("client_sub_goals")
+    .select("id, title, target_date, proposed_by, status")
+    .eq("athlete_id", user.id)
+    .eq("group_id", params.groupId)
+    .order("created_at", { ascending: true });
+  const subGoals: SubGoalView[] = ((subGoalRows ?? []) as any[]).map((r: any) => ({ id: r.id as string, title: r.title as string, targetDate: (r.target_date as string | null) ?? null, proposedBy: r.proposed_by as string, status: r.status as SubGoalStatus }));
 
   const current = (goals ?? [])[0] ?? null;
   // A goal their coach suggested and the client has not answered yet.
@@ -95,6 +105,8 @@ export default async function GoalPage(props: { params: Promise<{ groupId: strin
           {current.priority_note && <p className="font-body text-sm text-steel mt-1">{current.priority_note}</p>}
         </div>
       )}
+
+      <SubGoalsSection groupId={params.groupId} athleteId={user.id} viewerId={user.id} otherName="your coach" items={subGoals} />
 
       <div className="border border-steel/20 p-4 mb-6">
         <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-3">
