@@ -30,6 +30,7 @@ const NOT_A_SAVE = new Set([
   "/api/ai/parse-session-nl",
   "/api/ai/parse-workout",
   "/api/ai/program-chat",
+  "/api/ai/explain-program",
   "/api/assistant/navigate",
   "/api/auth/forgot-password",
   "/api/auth/resend-confirmation",

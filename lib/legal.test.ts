@@ -122,6 +122,7 @@ describe("the AI paragraph covers every route that calls the AI", () => {
     // One day at a time: the same program-building data as generate-program (the coach's words, the days built so far, the exercise library, a client's injury and age context), so the same paragraph covers it.
     "app/api/ai/build-day/route.ts",
     "app/api/ai/coach-conversation/route.ts",
+    "app/api/ai/explain-program/route.ts",
     "app/api/ai/learn-reason/route.ts",
     "app/api/ai/parse-food-log/route.ts",
     "app/api/ai/parse-food-photo/route.ts",

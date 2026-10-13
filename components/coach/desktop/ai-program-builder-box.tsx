@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { readAiJson } from "@/lib/ai-fetch";
 import { BUILDER_ONE_WORKOUT_SELECT, mapWorkoutRowToBuilderDay } from "@/lib/program-builder-data";
+import { AiRunPanel } from "@/components/coach/desktop/ai-run-panel";
 import { fixTargetFrom, parseBuildRequest, planSlots, scopeLimitFrom } from "@/lib/ai-day-request";
 import type { DaySlot } from "@/lib/ai-day-slots";
 import type { BuilderDay } from "@/lib/types";
@@ -36,6 +37,9 @@ export function AiProgramBuilderBox({
   const [line, setLine] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [flags, setFlags] = useState<string[]>([]);
+  // What he asked for in this run, shown beside the box (read-only).
+  const [shownRequest, setShownRequest] = useState("");
+  const [shownCorrections, setShownCorrections] = useState<string[]>([]);
   // After a run finishes: the next week it can offer to continue into (one button, never started by itself).
   const [offerWeek, setOfferWeek] = useState<number | null>(null);
   const finishedWeeks = useRef<Set<number>>(new Set());
@@ -120,6 +124,8 @@ export function AiProgramBuilderBox({
     if (!said || phase === "building") return;
     request.current = said;
     corrections.current = [];
+    setShownRequest(said);
+    setShownCorrections([]);
     token.current = null;
     pauseRequested.current = false;
     setFlags([]);
@@ -175,6 +181,7 @@ export function AiProgramBuilderBox({
     setPhase("building");
     if (said) {
       corrections.current = [...corrections.current, said];
+      setShownCorrections([...corrections.current]);
       setText("");
       const named = fixTargetFrom(said);
       const target: DaySlot | null = named ? { week: named.week ?? lastBuilt.current?.week ?? 1, day: named.day } : lastBuilt.current;
@@ -214,7 +221,8 @@ export function AiProgramBuilderBox({
 
   const building = phase === "building";
   return (
-    <section className="mt-4 border border-steel/25 bg-surface/40 p-3 max-w-3xl" aria-label="AI Program Builder">
+    <div className="mt-4 flex flex-col lg:flex-row lg:items-start gap-3">
+    <section className="border border-steel/25 bg-surface/40 p-3 max-w-3xl w-full lg:flex-1 min-w-0" aria-label="AI Program Builder">
       <h2 className="font-display uppercase text-sm tracking-wide text-steel">AI Program Builder</h2>
       <p className="font-body text-xs text-steel mt-1">Saved as you go. Nothing reaches the client until you assign it.</p>
       <div className="mt-2 flex flex-col sm:flex-row gap-2">
@@ -262,5 +270,7 @@ export function AiProgramBuilderBox({
         <p className="font-body text-xs text-steel mt-1">Worth a look: {flags.slice(-3).join(" · ")}</p>
       )}
     </section>
+    <AiRunPanel programId={programId} request={shownRequest} corrections={shownCorrections} />
+    </div>
   );
 }
