@@ -1,3 +1,4 @@
+import { clampAiRow } from "@/lib/ai-row-clamps";
 // The server side of the one Build-with-AI box's "read this for me" path: what the request may contain, how a PDF is read, the instructions Claude gets, and how its answer is cleaned
 // up. Pure and testable apart from the PDF reader (which only needs the bytes). The route (app/api/ai/parse-workout) wires this to the AI call and its usage limits.
 
@@ -125,7 +126,7 @@ function isValidRow(row: unknown): row is Record<string, unknown> & { week: stri
 // Keeps only usable rows and puts every field in the shape the review screen expects.
 export function normalizeRows(parsed: unknown[]): ParsedImportRow[] {
   return parsed.filter(isValidRow).map((r) =>
-    normalizeTimedRow({
+    clampAiRow(normalizeTimedRow({
     week: r.week,
     day: r.day,
     exerciseName: r.exerciseName,
@@ -135,7 +136,7 @@ export function normalizeRows(parsed: unknown[]): ParsedImportRow[] {
     rpe: typeof r.rpe === "number" ? r.rpe : null,
     rest: r.rest != null ? String(r.rest) : null,
     timeSeconds: typeof r.timeSeconds === "number" ? r.timeSeconds : null,
-    })
+    }))
   );
 }
 

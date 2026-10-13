@@ -9,6 +9,7 @@ import { checkAndSpendCoachCredits, canRunAiAction } from "@/lib/coach-credits";
 import { createServiceRoleClient } from "@/lib/supabase/service-role";
 import { matchExercise, matchTopN, type LibraryExercise } from "@/lib/exercise-matching";
 import { scanConstraints } from "@/lib/constraint-scan";
+import { clampAiRow } from "@/lib/ai-row-clamps";
 import { athleteIsMinor, YOUTH_PROMPT_BLOCK } from "@/lib/youth-block";
 import { buildProgrammingProfile, libraryContext, mentionsExercise, rankLibrary, type LibraryItem } from "@/lib/builder-context";
 
@@ -404,7 +405,7 @@ export async function POST(request: Request) {
     }
 
     const rows: ParsedImportRow[] = parsed.rows.filter(isValidRow).map((r: any) =>
-      normalizeTimedRow({
+      clampAiRow(normalizeTimedRow({
       week: r.week,
       day: r.day,
       exerciseName: r.exerciseName,
@@ -414,7 +415,7 @@ export async function POST(request: Request) {
       rpe: typeof r.rpe === "number" ? r.rpe : null,
       rest: r.rest != null ? String(r.rest) : null,
       timeSeconds: typeof r.timeSeconds === "number" ? r.timeSeconds : null,
-      })
+      }))
     );
 
     if (rows.length === 0) {

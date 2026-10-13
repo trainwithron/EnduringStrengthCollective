@@ -4,6 +4,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 // credits as a whole generated program; the later days carry this signed token instead, so they are not charged again. The token is good for two hours and at most 40 days.
 export const RUN_TTL_MS = 2 * 60 * 60 * 1000;
 import { MAX_DAYS_PER_RUN, daysPerWeekOf, type DaySlot } from "@/lib/ai-day-slots";
+import { clampAiRow } from "@/lib/ai-row-clamps";
 
 export { MAX_DAYS_PER_RUN, daysPerWeekOf };
 export type { DaySlot };
@@ -172,8 +173,8 @@ export function readDayResult(parsed: unknown, fallbackTitle: string): DayResult
     const r = raw as Record<string, unknown>;
     const name = typeof r?.exerciseName === "string" ? r.exerciseName.trim() : "";
     const sets = num(r?.sets);
-    if (!name || name.length > 120 || sets == null || sets < 1 || sets > 20) return null;
-    exercises.push({
+    if (!name || name.length > 120 || sets == null || sets < 1) return null;
+    exercises.push(clampAiRow({
       exerciseName: name,
       sets: Math.round(sets),
       reps: typeof r.reps === "string" && r.reps.trim() ? r.reps.trim().slice(0, 40) : typeof r.reps === "number" ? String(r.reps) : null,
@@ -181,7 +182,7 @@ export function readDayResult(parsed: unknown, fallbackTitle: string): DayResult
       rpe: num(r.rpe),
       rest: typeof r.rest === "string" && r.rest.trim() ? r.rest.trim().slice(0, 40) : null,
       timeSeconds: num(r.timeSeconds),
-    });
+    }));
   }
   const title = typeof p.title === "string" && p.title.trim() ? p.title.trim().slice(0, 60) : fallbackTitle;
   return { title, exercises };
