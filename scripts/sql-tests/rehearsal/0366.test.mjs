@@ -45,6 +45,12 @@ export default {
       h.check("the template itself still has its slot", templateStill === 1);
       await db.query(`delete from public.programs where athlete_id = $1`, [client]);
 
+      // R3: the coach stores a client's training level on the client's membership (the same row policy that lets the coach set food tracking).
+      await h.as(coach);
+      const setLevel = await db.query(`update public.group_memberships set training_level = 'advanced' where group_id = $1 and profile_id = $2 returning training_level`, [group, client]);
+      h.check("a coach can store a client's training level", setLevel.rows.length === 1 && setLevel.rows[0].training_level === "advanced");
+      await h.asSuper();
+
       const refused = await msg(db, `select public.duplicate_program($1, $2, $3, $4, null, null)`, [template, group, coach, client]);
       h.check("a copy for a client of a program with a slot is refused, with the plain message", refused.includes("This template has slots"));
       const made = (await db.query(`select count(*)::int as n from public.programs where athlete_id = $1`, [client])).rows[0].n;

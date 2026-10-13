@@ -89,3 +89,20 @@ describe("Use this template: nothing is taken back once the client has their cop
     expect(panel.indexOf("if (clientHasCopy) {")).toBeLessThan(panel.indexOf('await supabase.from("programs").delete().eq("id", copyId)'));
   });
 });
+
+describe("R3: a stored training level per client", () => {
+  const control = read("components/coach/training-level-control.tsx");
+  const panel = read("components/coach/desktop/use-template-panel.tsx");
+  it("the client profile shows a Training level control that saves on the client's membership and only says it saved when a row changed", () => {
+    expect(control).toContain("Training level");
+    expect(control).toContain('update({ training_level: next === "" ? null : next })');
+    expect(control).toContain(".select(\"training_level\")");
+    expect(control).toContain("That didn't save. It is back to what it was.");
+    expect(read("components/coach/desktop/client-programs-section.tsx")).toContain("<TrainingLevelControl");
+  });
+  it("choosing a client in Use this template pre-fills their level, and the first use stores the chosen level for them", () => {
+    expect(panel).toContain('.select("training_level")');
+    expect(panel).toContain("setLevel(stored);");
+    expect(panel).toContain("if (!storedLevel) await supabase.from(\"group_memberships\").update({ training_level: level })");
+  });
+});

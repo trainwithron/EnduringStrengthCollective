@@ -20,6 +20,8 @@ export function UseTemplatePanel({ programId, programName, groupId, onClose, onC
   const [name, setName] = useState("");
   const [nameTouched, setNameTouched] = useState(false);
   const [clientId, setClientId] = useState("");
+  // The chosen client's stored level (null = none yet). It pre-fills the Level, and is stored for them the first time a template is used for them.
+  const [storedLevel, setStoredLevel] = useState<Level | null>(null);
   const [changed, setChanged] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,6 +107,8 @@ export function UseTemplatePanel({ programId, programName, groupId, onClose, onC
         const assigned = await assignProgramToClient(supabase, { sourceProgramId: copyId, destinationGroupId: client.destinationGroupId, athleteId: client.id, startDate: localDateKey() });
         if ("error" in assigned) throw new Error(assigned.error);
         clientHasCopy = true;
+        // The first time a template is used for this client, the level chosen becomes theirs (change it any time on their profile).
+        if (!storedLevel) await supabase.from("group_memberships").update({ training_level: level }).eq("group_id", client.destinationGroupId).eq("profile_id", client.id);
       }
       setDone(madeMessage(shownName.trim()));
       onChanged();
@@ -163,7 +167,31 @@ export function UseTemplatePanel({ programId, programName, groupId, onClose, onC
               </label>
               <label className="font-body text-xs text-steel">
                 For a client (optional)
-                <select value={clientId} onChange={(e) => setClientId(e.target.value)} className={`${field} mt-1`}>
+                <select
+                  value={clientId}
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    setClientId(id);
+                    setStoredLevel(null);
+                    const picked = clients.find((c) => c.id === id);
+                    if (!picked) return;
+                    void createBrowserClient()
+                      .from("group_memberships")
+                      .select("training_level")
+                      .eq("group_id", picked.destinationGroupId)
+                      .eq("profile_id", picked.id)
+                      .maybeSingle()
+                      .then(({ data }) => {
+                        const stored = ((data as { training_level?: Level | null } | null)?.training_level ?? null) as Level | null;
+                        setStoredLevel(stored);
+                        if (stored) {
+                          setLevel(stored);
+                          setChanged({});
+                        }
+                      });
+                  }}
+                  className={`${field} mt-1`}
+                >
                   <option value="">No one yet (keep it in my library)</option>
                   {clients.map((c) => (
                     <option key={c.id} value={c.id}>

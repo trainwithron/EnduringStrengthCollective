@@ -4,6 +4,8 @@ import { createServerClient } from "@/lib/supabase/server";
 import { programsHrefForClient } from "@/lib/programs-scope";
 import { ClientProgramRow } from "@/components/coach/client-program-row";
 import { RemovedPrograms } from "@/components/coach/removed-programs";
+import { TrainingLevelControl } from "@/components/coach/training-level-control";
+import type { Level } from "@/lib/slot-templates";
 
 // The Programs tab of one client's profile: the programs made for this client (their own copies), the active one first, each opening the builder. Assigning one
 // is the "Assign program" button above the list.
@@ -45,6 +47,9 @@ export async function ClientProgramsSection({ groupId, athleteId, actions }: { g
         .limit(1)
         .maybeSingle();
   const shared = (sharedRow ?? null) as { id: string; name: string } | null;
+  // This client's training level with the coach (a database without the column yet reads as not set, and the control is left out).
+  const { data: levelRow, error: levelError } = await supabase.from("group_memberships").select("training_level").eq("group_id", groupId).eq("profile_id", athleteId).maybeSingle();
+  const trainingLevel = ((levelRow as { training_level?: Level | null } | null)?.training_level ?? null) as Level | null;
 
   return (
     <section>
@@ -55,6 +60,7 @@ export async function ClientProgramsSection({ groupId, athleteId, actions }: { g
           Open on the Programs page
         </Link>
       </div>
+      {!levelError && <TrainingLevelControl athleteId={athleteId} groupId={groupId} initialLevel={trainingLevel} />}
       {actions}
       {shared && (
         <Link href={`/groups/${groupId}/programs/${shared.id}`} className="flex items-center justify-between gap-3 py-2.5 px-1 mb-2 border-y border-steel/15 hover:bg-surface/60">
