@@ -17,6 +17,7 @@ export function ProgramDayPicker({
   canEdit,
   isCoachViewing,
   nowIso,
+  startLabel,
 }: {
   title: string;
   weeks: PlainWeek[];
@@ -27,6 +28,8 @@ export function ProgramDayPicker({
   canEdit: boolean;
   isCoachViewing: boolean;
   nowIso: string;
+  // Overrides the day sheet's button text (the coach logging for a client says "Log this workout").
+  startLabel?: string;
 }) {
   const [weekNumber, setWeekNumber] = useState(() => defaultWeek(weeks, currentWeek));
   const [open, setOpen] = useState<{ week: number; day: PlainDay } | null>(null);
@@ -200,7 +203,7 @@ export function ProgramDayPicker({
                   href={`${workoutHrefBase}/${open.day.id}`}
                   className="flex items-center justify-center min-h-14 rounded-full bg-rust text-graphite font-display font-bold uppercase tracking-wide text-lg"
                 >
-                  {isCoachViewing ? "Open this workout" : "Start Workout"}
+                  {startLabel ?? (isCoachViewing ? "Open this workout" : "Start Workout")}
                 </Link>
               )}
             </div>

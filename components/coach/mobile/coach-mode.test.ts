@@ -20,7 +20,7 @@ describe("coach mode: a coach logging a workout for a client on the phone", () =
     expect(workout).toContain("<CoachModeBar");
     expect(workout).toContain("loggedByCoach");
     const list = read("app/(coach)/groups/[groupId]/athletes/[athleteId]/log/page.tsx");
-    expect((list.match(/<CoachModeBar/g) ?? []).length).toBe(2);
+    expect((list.match(/<CoachModeBar/g) ?? []).length).toBe(3);
   });
   it("the coach-logged session screen carries it only for a coach viewing a coach-logged session, and passes the minor flag on", () => {
     const page = read("app/sessions/[sessionId]/page.tsx");

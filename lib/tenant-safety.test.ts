@@ -72,8 +72,9 @@ describe("a page that shows one program for a client resolves it for the CLIENT"
     expect(body).toContain("scheduledPrograms.find((p) => p.athleteId === athleteId) ?? scheduledPrograms[0]");
   });
   it("the coach pages for one client use that client's program, never the newest of the group", () => {
+    // The Log page lists every program THIS client follows (getActivePrograms is scoped to the client, the same list getAthleteCurrentProgram picks from).
+    expect(read("app/(coach)/groups/[groupId]/athletes/[athleteId]/log/page.tsx")).toContain("getActivePrograms(supabase, params.groupId, params.athleteId)");
     for (const f of [
-      "app/(coach)/groups/[groupId]/athletes/[athleteId]/log/page.tsx",
       "components/coach/desktop/client-calendar-section.tsx",
       "app/(coach)/groups/[groupId]/athletes/[athleteId]/calendar/[date]/page.tsx",
       "lib/nutrition-block-adjustment-gather.ts",
