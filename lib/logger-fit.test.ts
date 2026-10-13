@@ -25,17 +25,17 @@ describe("one exercise per snap, both directions", () => {
 describe("the card fits the screen", () => {
   it("the carousel is capped to the viewport and a long card scrolls inside itself", () => {
     expect(horizontal).toContain("maxHeight: maxHeight ?? undefined");
-    expect(horizontal).toContain("overflow-y-auto overscroll-contain px-5");
+    expect(horizontal).toContain("overflow-x-hidden overflow-y-auto overscroll-x-auto overscroll-y-contain px-5");
     expect(vertical).toContain("max-h-[calc(100dvh-14rem)]");
   });
   it("the top is one slim block while a workout is in progress", () => {
-    expect(page).toContain('"px-5 pt-2 pb-2 border-b border-steel/20"');
+    expect(page).toContain('"relative px-5 pt-1 pb-1 border-b border-steel/20"');
     expect(page).toContain("font-display font-bold text-lg leading-none uppercase truncate");
   });
   it("the rest timer is one line: the Rest? chips sit on the stopwatch row", () => {
     const top = rest.slice(rest.indexOf("<SessionStopwatch"), rest.indexOf("{running && ("));
     expect(top).toContain("{showPrompt && (");
-    expect(rest).toContain("py-1.5");
+    expect(rest).toContain("px-5 py-1");
   });
   it("the notes box is one line that opens when used, and Add / Quick add sit behind one small button", () => {
     expect(note).toContain("rows={1}");

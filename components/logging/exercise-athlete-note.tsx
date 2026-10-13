@@ -118,8 +118,8 @@ export function ExerciseAthleteNote({
 
   const fieldId = `note-${sessionExerciseId}`;
   return (
-    <div className="mb-3">
-      <div className="flex items-center justify-between min-h-[24px] mb-1">
+    <div className="mb-2">
+      <div className="flex items-center justify-between min-h-[16px]">
         <label htmlFor={fieldId} className="font-body text-xs text-steel uppercase tracking-wide">
           {ownNote ? "Your notes" : "Notes for this exercise"}
         </label>
@@ -177,7 +177,7 @@ export function ExerciseAthleteNote({
         rows={1}
         maxLength={2000}
         placeholder="How did it feel? Anything your coach should know?"
-        className="w-full min-h-[44px] focus:min-h-[96px] transition-[min-height] bg-surface border border-steel/30 text-chalk px-3 py-2 font-body text-base focus:outline-none focus:border-rust resize-none"
+        className="w-full min-h-[40px] focus:min-h-[96px] transition-[min-height] bg-surface border border-steel/30 text-chalk px-3 py-2 font-body text-base focus:outline-none focus:border-rust resize-none"
       />
     </div>
   );

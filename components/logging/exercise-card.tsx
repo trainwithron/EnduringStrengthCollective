@@ -420,7 +420,7 @@ export function ExerciseCard({
       />
 
       {!readOnly && (
-        <div className="relative mb-1 flex items-center gap-4 whitespace-nowrap">
+        <div className="relative flex items-center gap-4 whitespace-nowrap">
           <button
             type="button"
             onClick={() => setFieldsOpen((v) => !v)}

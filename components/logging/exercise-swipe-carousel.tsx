@@ -116,10 +116,12 @@ export function ExerciseSwipeCarousel({
   useLayoutEffect(() => {
     const scroller = scrollerRef.current;
     if (!scroller) return;
-    const BELOW_CARD_PX = 98;
     const fit = () => {
       const top = scroller.getBoundingClientRect().top + window.scrollY;
-      setMaxHeight(Math.max(260, Math.floor(window.innerHeight - top - BELOW_CARD_PX)));
+      // The pinned Complete bar's real height (it grows with the phone's safe area), plus a little air.
+      const bar = document.querySelector("[data-complete-bar]") as HTMLElement | null;
+      const below = (bar?.offsetHeight ?? 65) + 4;
+      setMaxHeight(Math.max(260, Math.floor(window.innerHeight - top - below)));
     };
     fit();
     window.addEventListener("resize", fit);
@@ -131,24 +133,34 @@ export function ExerciseSwipeCarousel({
     };
   }, [exercises.length]);
 
-  // Safety net: whenever scrolling stops, a card is always centred. If the browser left the row between two cards (a focus jump, an interrupted swipe), it is put back on the nearest one.
+  // Safety net: when a scroll has really ENDED and no finger is down, a card is always centred. If the browser left the row between two cards (a focus jump, an interrupted swipe), it is put back on the
+  // nearest one. It never runs while a finger is on the screen (a version that did pulled the card back under a slow drag).
   useEffect(() => {
     const scroller = scrollerRef.current;
     if (!scroller) return;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const settle = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        const width = scroller.clientWidth;
-        if (width <= 0) return;
-        const target = Math.round(scroller.scrollLeft / width) * width;
-        if (Math.abs(scroller.scrollLeft - target) > 2) scroller.scrollTo({ left: target, behavior: "smooth" });
-      }, 160);
+    let touching = false;
+    const down = () => {
+      touching = true;
     };
-    scroller.addEventListener("scroll", settle, { passive: true });
+    const up = () => {
+      touching = false;
+    };
+    const settle = () => {
+      if (touching) return;
+      const width = scroller.clientWidth;
+      if (width <= 0) return;
+      const target = Math.round(scroller.scrollLeft / width) * width;
+      if (Math.abs(scroller.scrollLeft - target) > 2) scroller.scrollTo({ left: target, behavior: "smooth" });
+    };
+    scroller.addEventListener("touchstart", down, { passive: true });
+    scroller.addEventListener("touchend", up, { passive: true });
+    scroller.addEventListener("touchcancel", up, { passive: true });
+    scroller.addEventListener("scrollend", settle);
     return () => {
-      clearTimeout(timer);
-      scroller.removeEventListener("scroll", settle);
+      scroller.removeEventListener("touchstart", down);
+      scroller.removeEventListener("touchend", up);
+      scroller.removeEventListener("touchcancel", up);
+      scroller.removeEventListener("scrollend", settle);
     };
   }, []);
 
@@ -222,7 +234,7 @@ export function ExerciseSwipeCarousel({
       {exercises.length > 1 && (
         <div
           ref={dotsRef}
-          className="flex items-center justify-center gap-1.5 mb-3 min-h-8 touch-none"
+          className="flex items-center justify-center gap-1.5 mb-1 min-h-7 touch-none"
           onPointerDown={(e) => {
             scrubIndexRef.current = null;
             try {
@@ -273,10 +285,10 @@ export function ExerciseSwipeCarousel({
             <div
               key={exercise.id}
               data-exercise-id={exercise.id}
-              className="relative snap-center snap-always shrink-0 w-full overflow-y-auto overscroll-contain px-5"
+              className="relative snap-center snap-always shrink-0 w-full overflow-x-hidden overflow-y-auto overscroll-x-auto overscroll-y-contain px-5"
               style={{ maxHeight: maxHeight ?? undefined }}
             >
-              <div className="border border-steel/20 bg-surface/20 p-3">
+              <div className="border border-steel/20 bg-surface/20 p-2.5">
               <p className="sr-only">
                 Exercise {exercises.findIndex((e) => e.id === exercise.id) + 1} of {exercises.length}
               </p>

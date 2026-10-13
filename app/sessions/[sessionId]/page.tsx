@@ -553,15 +553,21 @@ export default async function SessionPage(
     : `/groups/${session.group_id}`;
 
   return (
-    <main className={`min-h-screen bg-graphite text-chalk font-body ${session.status === "in_progress" ? "pb-24" : "pb-32"}`}>
+    <main className={`min-h-screen overflow-x-clip bg-graphite text-chalk font-body ${session.status === "in_progress" ? "pb-16" : "pb-32"}`}>
       {coachModeClient && <CoachModeBar groupId={session.group_id} clientName={coachModeClient.name} homeHref={coachHomeHref} />}
-      <header className={session.status === "in_progress" ? "px-5 pt-2 pb-2 border-b border-steel/20" : "px-5 pt-8 pb-6 border-b border-steel/20"}>
+      <header className={session.status === "in_progress" ? "relative px-5 pt-1 pb-1 border-b border-steel/20" : "px-5 pt-8 pb-6 border-b border-steel/20"}>
         {/* In progress is ONE slim row (Back, the day, who logged it) so the exercise card keeps the screen; a finished or paused workout keeps the roomier header. */}
         {session.status === "in_progress" ? (
           <div className="flex items-center justify-between gap-2">
             <ExitWorkoutButton sessionId={session.id} backHref={backHref} />
             <h1 className="font-display font-bold text-lg leading-none uppercase truncate min-w-0 flex-1 text-center">{(session as any).workouts?.title ?? "Workout"}</h1>
-            {session.logged_by_coach ? <CoachLoggedBadge /> : <span className="w-12 shrink-0" aria-hidden="true" />}
+            {session.logged_by_coach && !isOwnSession ? (
+              <SendToClientButton athleteId={session.athlete_id} sessionId={session.id} workoutTitle={(session as any).workouts?.title ?? "Workout"} compact />
+            ) : session.logged_by_coach ? (
+              <CoachLoggedBadge />
+            ) : (
+              <span className="w-12 shrink-0" aria-hidden="true" />
+            )}
           </div>
         ) : (
           <Link href={backHref} className="font-body text-xs text-steel uppercase tracking-wide">
@@ -586,13 +592,6 @@ export default async function SessionPage(
             rest off. The client can already resume this exact session
             the moment they open it themselves (existingSession handles
             that); this just makes sure they know to. */}
-        {session.logged_by_coach && !isOwnSession && session.status === "in_progress" && (
-          <SendToClientButton
-            athleteId={session.athlete_id}
-            sessionId={session.id}
-            workoutTitle={(session as any).workouts?.title ?? "Workout"}
-          />
-        )}
         {sharePostId && (
           <Link
             href={`/share/${sharePostId}`}

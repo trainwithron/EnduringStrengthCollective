@@ -21,10 +21,13 @@ export function SendToClientButton({
   athleteId,
   sessionId,
   workoutTitle,
+  compact = false,
 }: {
   athleteId: string;
   sessionId: string;
   workoutTitle: string;
+  // One small button on the header row (no row of its own) while logging; what it says after sending shows just under the header.
+  compact?: boolean;
 }) {
   const [status, setStatus] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -49,6 +52,27 @@ export function SendToClientButton({
       setStatus("Couldn't send");
     }
     setSending(false);
+  }
+
+  if (compact) {
+    return (
+      <div className="shrink-0">
+        <button
+          type="button"
+          onClick={handleSend}
+          disabled={sending}
+          className="h-7 px-2 border border-steel/30 text-steel font-body text-xs disabled:opacity-40 whitespace-nowrap"
+          title="Send a push notification with a direct link so the client can finish logging this session themselves"
+        >
+          📲 Send to client
+        </button>
+        {status && (
+          <p className="absolute right-5 top-full z-20 mt-1 bg-graphite border border-steel/30 px-2 py-1 font-body text-xs text-steel" role="status">
+            {status}
+          </p>
+        )}
+      </div>
+    );
   }
 
   return (

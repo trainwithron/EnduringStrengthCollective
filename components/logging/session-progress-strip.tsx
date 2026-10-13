@@ -48,7 +48,7 @@ export function SessionProgressStrip({
   if (!previousSummary && !next) return null;
 
   return (
-    <div className="flex items-center justify-between gap-3 mb-2 px-3 py-1 border border-steel/20 bg-surface/20 [@media(max-height:760px)]:hidden">
+    <div className="flex items-center justify-between gap-3 mb-2 px-3 py-1 border border-steel/20 bg-surface/20 overflow-hidden [@media(max-height:760px)]:hidden">
       {previousSummary ? (
         <p className="font-body text-xs text-steel truncate min-w-0">
           <span className="text-chalk">{previous!.exerciseName}</span> — {previousSummary}
@@ -57,8 +57,11 @@ export function SessionProgressStrip({
         <span />
       )}
       {next && (
-        <p className="font-body text-xs text-steel shrink-0 flex items-center gap-1">
-          Next: <span className="text-chalk">{next.exerciseName}</span> →
+        // A long exercise name is cut short here; it must never widen the page (a page wider than the screen makes the phone zoom out and the whole logger stops fitting).
+        <p className="font-body text-xs text-steel min-w-0 flex items-center gap-1">
+          <span className="shrink-0">Next:</span>
+          <span className="text-chalk truncate">{next.exerciseName}</span>
+          <span className="shrink-0">→</span>
         </p>
       )}
     </div>

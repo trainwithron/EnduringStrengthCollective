@@ -31,7 +31,7 @@ export function SessionStopwatch({ startedAt }: { startedAt: string }) {
 
   return (
     // The server renders a second or two before the browser does; the first tick fixes it.
-    <p className="font-display text-3xl leading-none text-chalk tabular-nums" suppressHydrationWarning>
+    <p className="font-display text-2xl leading-none text-chalk tabular-nums" suppressHydrationWarning>
       {formatElapsed(elapsedSeconds)}
     </p>
   );

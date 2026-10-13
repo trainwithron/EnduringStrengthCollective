@@ -276,7 +276,7 @@ export function SessionLogger({
         />
       )}
       <SetSaveBanner />
-      <section className="px-5 pt-4">
+      <section className="px-5 pt-1">
       {showDiscovery && (
         <SwipeDirectionDiscovery
           athleteId={athleteId}
@@ -374,7 +374,7 @@ export function SessionLogger({
                 type="button"
                 onClick={() => setAddMenuOpen((v) => !v)}
                 aria-expanded={addMenuOpen}
-                className="h-8 px-3 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors"
+                className="h-7 px-3 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors"
               >
                 + Add
               </button>

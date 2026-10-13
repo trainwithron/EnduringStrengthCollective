@@ -389,9 +389,10 @@ export function CompleteWorkoutButton({
   if (rpeNudge) {
     return (
       <div
+        data-complete-bar
         className={`fixed ${
           raised ? "bottom-16" : "bottom-0"
-        } left-0 right-0 bg-graphite border-t border-steel/20 px-5 py-4`}
+        } left-0 right-0 bg-graphite border-t border-steel/20 px-5 py-2`}
       >
         <p className="font-body text-sm text-chalk mb-2">How hard was that whole session? (1-10)</p>
         <div className="grid grid-cols-5 gap-1.5">
@@ -427,9 +428,10 @@ export function CompleteWorkoutButton({
   if (weightNudge) {
     return (
       <div
+        data-complete-bar
         className={`fixed ${
           raised ? "bottom-16" : "bottom-0"
-        } left-0 right-0 bg-graphite border-t border-steel/20 px-5 py-4`}
+        } left-0 right-0 bg-graphite border-t border-steel/20 px-5 py-2`}
       >
         <p className="font-body text-sm text-chalk mb-2">Log today&apos;s weight while you&apos;re here?</p>
         <div className="flex items-center gap-2">
@@ -466,9 +468,10 @@ export function CompleteWorkoutButton({
 
   return (
     <div
+      data-complete-bar
       className={`fixed ${
         raised ? "bottom-16" : "bottom-0"
-      } left-0 right-0 bg-graphite border-t border-steel/20 px-5 py-4`}
+      } left-0 right-0 bg-graphite border-t border-steel/20 px-5 py-2`}
     >
       {confirming && (
         <div className="mb-3 p-3 border border-rust/40 bg-surface/60">
@@ -513,7 +516,7 @@ export function CompleteWorkoutButton({
         type="button"
         onClick={handleTap}
         disabled={disabled || submitting}
-        className="w-full h-14 bg-rust text-graphite font-display uppercase text-lg font-bold disabled:opacity-40 active:bg-rust/80 transition-colors"
+        className="w-full h-12 bg-rust text-graphite font-display uppercase text-lg font-bold disabled:opacity-40 active:bg-rust/80 transition-colors"
       >
         {submitting ? "Finishing…" : "Complete workout"}
       </button>
