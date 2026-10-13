@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
+import { ASSESSMENT_TESTS, cleanLabel, formatMeasurements, type TestEntry } from "@/lib/assessment-tests";
 
 export interface AssessmentRow {
   id: string;
@@ -25,12 +26,17 @@ export function ClientAssessments({ groupId, athleteId, initial }: { groupId: st
   const [adding, setAdding] = useState(false);
   const [notes, setNotes] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  // The numbers typed for the common tests (by position in ASSESSMENT_TESTS) and the tests the coach added.
+  const [values, setValues] = useState<string[]>(() => ASSESSMENT_TESTS.map(() => ""));
+  const [custom, setCustom] = useState<TestEntry[]>([]);
+  const entries: TestEntry[] = [...ASSESSMENT_TESTS.map((t, i) => ({ ...t, value: values[i] })), ...custom];
+  const measured = formatMeasurements(entries);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function save() {
     const note = notes.trim();
-    if ((!note && !file) || busy) return;
+    if ((!note && !file && measured.count === 0) || busy) return;
     if (file && (!ALLOWED.test(file.type) || file.size > MAX_FILE_BYTES)) {
       setError("Use a PDF, photo or video under 200 MB.");
       return;
@@ -60,7 +66,7 @@ export function ClientAssessments({ groupId, athleteId, initial }: { groupId: st
     const title = (note ? note.split("\n")[0] : (file?.name ?? "Assessment")).slice(0, 80) || "Assessment";
     const { data, error: insertError } = await supabase
       .from("client_assessments")
-      .insert({ athlete_id: athleteId, group_id: groupId, title, notes: note || null, file_path: path, file_name: file ? file.name.slice(0, 200) : null, created_by: user.id })
+      .insert({ athlete_id: athleteId, group_id: groupId, title, notes: note || null, measurements: measured.text || null, file_path: path, file_name: file ? file.name.slice(0, 200) : null, created_by: user.id })
       .select("id, created_at")
       .single();
     if (insertError || !data) {
@@ -69,8 +75,10 @@ export function ClientAssessments({ groupId, athleteId, initial }: { groupId: st
       setError("That didn't save. Try again.");
       return;
     }
-    setRows((prev) => [{ id: data.id, title, notes: note, measurements: "", filePath: path, fileName: file ? file.name : null, createdAt: data.created_at }, ...prev]);
+    setRows((prev) => [{ id: data.id, title, notes: note, measurements: measured.text, filePath: path, fileName: file ? file.name : null, createdAt: data.created_at }, ...prev]);
     setNotes("");
+    setValues(ASSESSMENT_TESTS.map(() => ""));
+    setCustom([]);
     setFile(null);
     setAdding(false);
     setBusy(false);
@@ -110,6 +118,55 @@ export function ClientAssessments({ groupId, athleteId, initial }: { groupId: st
       {adding && (
         <div className="border border-steel/20 p-3 space-y-2 max-w-lg mb-3">
           <textarea value={notes} maxLength={4000} onChange={(e) => setNotes(e.target.value)} placeholder="Note" aria-label="Assessment note" rows={3} className="w-full bg-graphite border border-steel/30 text-chalk px-2 py-2 font-body text-base sm:text-sm" />
+          <div className="space-y-2" aria-label="Tests">
+            {ASSESSMENT_TESTS.map((t, i) => (
+              <label key={t.name} className="flex items-center justify-between gap-3 font-body text-sm text-steel">
+                <span>
+                  {t.name} ({t.unit})
+                </span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={values[i]}
+                  onChange={(e) => setValues((prev) => prev.map((v, j) => (j === i ? e.target.value : v)))}
+                  className="w-24 min-h-11 bg-graphite border border-steel/30 text-chalk px-2 text-base text-right"
+                />
+              </label>
+            ))}
+            {custom.map((c, i) => (
+              <div key={i} className="flex items-center gap-2 font-body text-sm text-steel">
+                <input
+                  type="text"
+                  value={c.name}
+                  maxLength={40}
+                  placeholder="Test"
+                  aria-label="Test name"
+                  onChange={(e) => setCustom((prev) => prev.map((x, j) => (j === i ? { ...x, name: cleanLabel(e.target.value, 40) } : x)))}
+                  className="flex-1 min-w-0 min-h-11 bg-graphite border border-steel/30 text-chalk px-2 text-base"
+                />
+                <input
+                  type="text"
+                  value={c.unit}
+                  maxLength={12}
+                  placeholder="Unit"
+                  aria-label="Unit"
+                  onChange={(e) => setCustom((prev) => prev.map((x, j) => (j === i ? { ...x, unit: cleanLabel(e.target.value, 12) } : x)))}
+                  className="w-16 min-h-11 bg-graphite border border-steel/30 text-chalk px-2 text-base"
+                />
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={c.value}
+                  aria-label="Number"
+                  onChange={(e) => setCustom((prev) => prev.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))}
+                  className="w-20 min-h-11 bg-graphite border border-steel/30 text-chalk px-2 text-base text-right"
+                />
+              </div>
+            ))}
+            <button type="button" onClick={() => setCustom((prev) => [...prev, { name: "", unit: "", value: "" }])} className="min-h-11 font-body text-sm text-rust underline underline-offset-2">
+              + Add a test
+            </button>
+          </div>
           <label className="flex min-h-11 items-center font-body text-sm text-steel cursor-pointer">
             <span className="border border-steel/30 px-3 py-2">{file ? file.name : "Attach a file"}</span>
             <input type="file" accept="application/pdf,image/*,video/*" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="hidden" />
@@ -120,8 +177,8 @@ export function ClientAssessments({ groupId, athleteId, initial }: { groupId: st
             </p>
           )}
           <div className="flex gap-2">
-            <button type="button" onClick={save} disabled={busy || (!notes.trim() && !file)} className="min-h-11 bg-rust text-graphite font-display font-bold uppercase tracking-wide px-4 disabled:opacity-40">
-              {busy ? "Saving…" : "Save"}
+            <button type="button" onClick={save} disabled={busy || (!notes.trim() && !file && measured.count === 0)} className="min-h-11 bg-rust text-graphite font-display font-bold uppercase tracking-wide px-4 disabled:opacity-40">
+              {busy ? "Saving…" : "Save assessment"}
             </button>
             <button type="button" disabled={busy} onClick={() => { setAdding(false); setError(null); }} className="min-h-11 px-3 font-body text-sm text-steel">
               Cancel
@@ -148,6 +205,7 @@ export function ClientAssessments({ groupId, athleteId, initial }: { groupId: st
                   Delete
                 </button>
               </div>
+              {r.measurements && <p className="font-body text-sm text-chalk whitespace-pre-wrap">{r.measurements}</p>}
               {r.notes && <p className="font-body text-sm text-chalk whitespace-pre-wrap">{r.notes}</p>}
               {r.filePath && (
                 <button type="button" onClick={() => openFile(r)} className="min-h-11 font-body text-sm text-rust underline underline-offset-2">
