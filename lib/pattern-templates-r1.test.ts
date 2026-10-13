@@ -38,7 +38,7 @@ describe("Ron's taxonomy and the starter ladders", () => {
   it("his squat ladder includes a bodyweight squat, a goblet squat and a barbell back squat", () => {
     const squat = STARTER_RUNGS.filter((r) => r.pattern === "Squat" && !r.unilateral).sort((a, b) => a.rank - b.rank);
     expect(squat[0].exercise).toBe("Bodyweight Squat");
-    expect(squat.map((r) => r.exercise)).toEqual(expect.arrayContaining(["Goblet Squat", "Front Squat", "Back Squat"]));
+    expect(squat.map((r) => r.exercise)).toEqual(expect.arrayContaining(["Goblet Squat", "Barbell Front Squat", "Barbell Back Squat"]));
   });
 });
 
@@ -147,5 +147,46 @@ describe("the ladder editor keeps the one-sided mark", () => {
     const sql = read("supabase/migrations/0365_pattern_class_templates.sql");
     expect(sql).toContain("add column if not exists is_unilateral boolean not null default false");
     expect(sql).not.toMatch(/\b(drop|delete|update) /i);
+  });
+});
+
+describe("the starter names follow Ron's final naming (implement stated, singular, Dumbbell / Kettlebell spelled out)", () => {
+  it("no abbreviations and none of the old short forms", () => {
+    for (const r of STARTER_RUNGS) {
+      expect(r.exercise, r.exercise).not.toMatch(/\b(DB|KB)\b/);
+      expect(r.exercise, r.exercise).not.toMatch(/RDL/);
+    }
+    const names = STARTER_RUNGS.map((r) => r.exercise);
+    for (const n of ["Barbell Back Squat", "Barbell Front Squat", "Barbell Box Squat", "Barbell Romanian Deadlift", "Dumbbell Split Squat", "Cable Lat Pulldown", "Banded Face Pull", "Barbell Bench Press", "Incline Dumbbell Bench Press", "Dumbbell Bench Press", "Dumbbell Shoulder Press", "Dumbbell Curl", "Single Leg Romanian Deadlift", "Dumbbell One Arm Row", "Suitcase Carry", "Farmers Carry", "Dumbbell Overhead Tricep Extension", "Kettlebell Swing"]) {
+      expect(names, n).toContain(n);
+    }
+    for (const old of ["Back Squat", "Front Squat", "Box Squat", "Romanian Deadlift", "Split Squat", "Lat Pulldown", "Face Pull", "Bench Press", "Incline DB Bench Press"]) {
+      expect(names, old).not.toContain(old);
+    }
+  });
+  it("Suitcase Carry is on the Loaded Carry ladder only", () => {
+    expect(STARTER_RUNGS.filter((r) => r.exercise === "Suitcase Carry").map((r) => r.pattern)).toEqual(["Loaded Carry"]);
+  });
+  it("an exercise already on a ladder under another spelling counts as there: nothing is added twice", () => {
+    const plan = planStarterAdd([
+      { id: "s", name: "Squat", exerciseNames: ["Back Squat", "Front Squat", "Box Squat", "Dumbbell Split Squat", "step-up"] },
+      { id: "p", name: "Horizontal Press", exerciseNames: ["Bench Press", "DB Bench Press", "Push-ups", "Incline DB Bench Press"] },
+      { id: "c", name: "Elbow Flexion (Biceps)", exerciseNames: ["DB Curl", "Barbell Curl"] },
+      { id: "h", name: "Hinge", exerciseNames: ["Romanian Deadlift", "DB Single-Leg RDL"] },
+    ]);
+    const added = (pattern: string) => (plan.rungs.find((g) => g.pattern === pattern)?.rungs ?? []).map((r) => r.exercise);
+    expect(added("Squat")).not.toEqual(expect.arrayContaining(["Barbell Back Squat"]));
+    for (const n of ["Barbell Back Squat", "Barbell Front Squat", "Barbell Box Squat", "Dumbbell Split Squat", "Step Up"]) expect(added("Squat"), n).not.toContain(n);
+    for (const n of ["Barbell Bench Press", "Dumbbell Bench Press", "Push-Up", "Incline Dumbbell Bench Press"]) expect(added("Horizontal Press"), n).not.toContain(n);
+    for (const n of ["Dumbbell Curl", "Barbell Curl"]) expect(added("Elbow Flexion (Biceps)"), n).not.toContain(n);
+    for (const n of ["Barbell Romanian Deadlift", "Single Leg Romanian Deadlift"]) expect(added("Hinge"), n).not.toContain(n);
+    expect(added("Squat")).toContain("Goblet Squat");
+  });
+  it("nothing that Ron's own library already has under his spelling is added to his ladders", () => {
+    const ron = ["Barbell Back Squat", "Barbell Front Squat", "Barbell Box Squat", "Goblet Squat", "Leg Press", "Zercher Squat", "Sissy Squat", "Dumbbell Split Squat", "Bulgarian Split Squat", "Dumbbell Walking Lunge", "Dumbbell Reverse Lunge", "Barbell Romanian Deadlift", "Dumbbell Romanian Deadlift", "Trap Bar Deadlift", "Conventional Deadlift", "Kettlebell Swing", "Cable Lat Pulldown", "Banded Face Pull", "Barbell Bench Press", "Dumbbell Bench Press", "Incline Dumbbell Bench Press", "Barbell Curl", "Dumbbell Curl", "Cable Triceps Pushdown", "Dumbbell Skull Crusher", "Suitcase Carry", "Dumbbell One Arm Row", "Barbell Row"];
+    const existing = STARTER_PATTERNS.map((p) => ({ id: p.name, name: p.name, exerciseNames: ron }));
+    const plan = planStarterAdd(existing);
+    const added = new Set(plan.rungs.flatMap((g) => g.rungs.map((r) => r.exercise)));
+    for (const n of ron) expect(added.has(n), n).toBe(false);
   });
 });
