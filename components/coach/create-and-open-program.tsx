@@ -40,7 +40,7 @@ export function CreateAndOpenProgram({
         started.current = false;
         return;
       }
-      router.replace(`/groups/${groupId}/programs/${data.id}${forClient ? `?forClient=${forClient.id}&clientGroup=${forClient.groupId}` : ""}`);
+      router.replace(`/groups/${groupId}/programs/${data.id}?edit=1${forClient ? `&forClient=${forClient.id}&clientGroup=${forClient.groupId}` : ""}`);
     })();
   }, [groupId, createdBy, athleteId, athleteFirstName, forClient, router]);
 

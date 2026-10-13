@@ -25,6 +25,8 @@ import { ProgramProgressBanner } from "@/components/coach/program-progress-banne
 import { ProgrammingSpotterPanel } from "@/components/coach/desktop/programming-spotter-panel";
 import { getProgramBuilderData } from "@/lib/program-builder-data";
 import { Lock } from "lucide-react";
+import { prefersAthleteStyleView } from "@/lib/pwa-server";
+import { ProgramPlainView } from "@/components/shared/program-plain-view-server";
 
 export default async function ProgramDetailPage(
   props: {
@@ -36,7 +38,7 @@ export default async function ProgramDetailPage(
     // always landed back at the top and had to manually find and expand
     // that week themselves. `?week=N` lets the mini-view jump straight
     // to the right week already open.
-    searchParams: Promise<{ week?: string; forClient?: string; clientGroup?: string }>;
+    searchParams: Promise<{ week?: string; forClient?: string; clientGroup?: string; edit?: string }>;
   }
 ) {
   const params = await props.params;
@@ -56,7 +58,7 @@ export default async function ProgramDetailPage(
     supabase.from("group_memberships").select("role").eq("group_id", params.groupId).eq("profile_id", user.id).maybeSingle(),
     supabase
       .from("programs")
-      .select("id, name, description, start_date, training_days, visibility_window, ai_sequencing_notes, training_intent")
+      .select("id, name, description, start_date, training_days, visibility_window, ai_sequencing_notes, training_intent, athlete_id")
       .eq("id", params.programId)
       .eq("group_id", params.groupId)
       .single(),
@@ -71,6 +73,19 @@ export default async function ProgramDetailPage(
   if (!program) {
     return (
       <NoAccess>This program isn&apos;t available, or you don&apos;t have access to it.</NoAccess>
+    );
+  }
+
+  // On a phone a program opens as a plain view (every week, pick the week and the day, log it); the builder is one tap away for the coach ("Edit program", ?edit=1). Desktop is unchanged.
+  if (!searchParams.edit && (await prefersAthleteStyleView())) {
+    return (
+      <ProgramPlainView
+        groupId={params.groupId}
+        programId={params.programId}
+        userId={user.id}
+        isCoach={membership.role === "coach"}
+        program={{ name: program.name, start_date: program.start_date, training_days: program.training_days, visibility_window: program.visibility_window as VisibilityWindow | null, athlete_id: (program as { athlete_id?: string | null }).athlete_id ?? null }}
+      />
     );
   }
 

@@ -20,7 +20,7 @@ describe("coach-level programs: built unattached, assigned later", () => {
   it("keeps the approved name and carries the client to the builder in the address", () => {
     expect(creator).toContain("${athleteFirstName}'s program");
     expect(creator).toContain('"New program"');
-    expect(creator).toContain("forClient=${forClient.id}&clientGroup=${forClient.groupId}");
+    expect(creator).toContain('?edit=1${forClient ? `&forClient=${forClient.id}&clientGroup=${forClient.groupId}` : ""}');
     expect(creator).toContain("athlete_id: athleteId");
     // a library (no-client) program is not active, so the group never sees it on Athlete Home; the assigned copy is live
     expect(creator).toContain("is_active: athleteId !== null");
