@@ -16,7 +16,6 @@ import { parseNumericReps } from "@/lib/program-card-visuals";
 import { computePriorBest } from "@/lib/obstacle-unlock";
 import { computeVolumeHistory } from "@/lib/exercise-volume-history";
 import { ExitWorkoutButton } from "@/components/session/exit-workout-button";
-import { ResumeWorkoutButton } from "@/components/session/resume-workout-button";
 import { dateKeyInZone, getGroupCoachTimezone } from "@/lib/timezone";
 import { findDemo, type DemoRow } from "@/lib/exercise-demo";
 import { getReadForViewer, type ReadForViewer } from "@/lib/read-content/for-viewer";
@@ -563,7 +562,6 @@ export default async function SessionPage(
             {(session as any).workouts?.title ?? "Workout"}
           </h1>
         )}
-        {session.status === "abandoned" && <ResumeWorkoutButton sessionId={session.id} />}
         {/* Coach-only, mid-logging escape hatch — Ron's own real scenario:
             ran out of time in person and needed a quick way to hand the
             rest off. The client can already resume this exact session
@@ -593,6 +591,8 @@ export default async function SessionPage(
         lastTimeByExercise={lastTimeByExercise}
         ladderByExercise={ladderByExercise}
         raised={isOwnSession}
+        finishedLine={session.status === "completed" ? "Done. Good workout." : null}
+        pausedSessionId={session.status === "abandoned" ? session.id : null}
         coachMode={coachModeClient ? { homeHref: coachHomeHref, clientIsMinor: coachModeClient.isMinor } : undefined}
         groupId={session.group_id}
         athleteId={session.athlete_id}

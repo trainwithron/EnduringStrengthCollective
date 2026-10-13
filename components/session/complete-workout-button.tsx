@@ -40,8 +40,11 @@ export function CompleteWorkoutButton({
   disabled,
   raised,
   coachMode,
+  pauseHref,
 }: {
   sessionId: string;
+  // Where "Pause for now" goes (the person's Home, or the coach's Home when logging for a client).
+  pauseHref: string;
   allSetsResolved: boolean;
   disabled: boolean;
   raised?: boolean;
@@ -103,9 +106,17 @@ export function CompleteWorkoutButton({
     finishNavigation(weightNudge.navHref);
   }
 
-  // Complete always completes: whatever is filled in is saved, empty fields stay empty. (It used to stop and ask "finish it anyway?".)
+  // Tapping the button opens the choice: complete the workout (whatever is filled in is saved, empty fields stay empty) or pause it for later.
   function handleTap() {
-    handleComplete();
+    setConfirming(true);
+  }
+
+  async function handlePause() {
+    setSubmitting(true);
+    const supabase = createBrowserClient();
+    await flushSets();
+    await supabase.from("athlete_sessions").update({ status: "abandoned" }).eq("id", sessionId).eq("status", "in_progress");
+    router.push(pauseHref);
   }
 
   async function handleComplete() {
@@ -441,10 +452,8 @@ export function CompleteWorkoutButton({
     >
       {confirming && (
         <div className="mb-3 p-3 border border-rust/40 bg-surface/60">
-          <p className="font-body text-sm text-chalk">
-            This workout isn&apos;t fully filled in — finish it anyway?
-          </p>
-          <div className="flex items-center gap-3 mt-3">
+          <p className="font-body text-sm text-chalk">Complete this workout, or pause it and pick it up later.</p>
+          <div className="flex flex-wrap items-center gap-3 mt-3">
             <button
               type="button"
               onClick={() => {
@@ -454,20 +463,25 @@ export function CompleteWorkoutButton({
               disabled={submitting}
               className="h-11 px-4 bg-rust text-graphite font-body text-sm font-medium disabled:opacity-40"
             >
-              {submitting ? "Finishing…" : "Finish workout"}
+              {submitting ? "Finishing…" : "Complete workout"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handlePause()}
+              disabled={submitting}
+              className="h-11 px-4 border border-rust text-rust font-body text-sm font-medium disabled:opacity-40"
+            >
+              Pause for now
             </button>
             <button
               type="button"
               onClick={() => setConfirming(false)}
               disabled={submitting}
-              className="h-11 px-4 border border-steel/30 text-steel font-body text-sm"
+              className="h-11 px-3 border border-steel/30 text-steel font-body text-sm"
             >
               Keep going
             </button>
           </div>
-          <p className="font-body text-xs text-steel mt-2">
-            Only the sets you&apos;ve filled in count toward this workout.
-          </p>
         </div>
       )}
       {error && (

@@ -9,6 +9,7 @@ import { ExerciseVerticalCarousel } from "./exercise-vertical-carousel";
 import { SwipeDirectionDiscovery } from "./swipe-direction-discovery";
 import type { SwipeDirection } from "@/components/athlete/swipe-direction-setting";
 import { CompleteWorkoutButton } from "@/components/session/complete-workout-button";
+import { ResumeWorkoutButton } from "@/components/session/resume-workout-button";
 import { isNoLoadExercise } from "@/lib/exercise-load";
 import { RestTimerBar, type PendingGateTask } from "@/components/session/rest-timer-bar";
 import { QuickAddNlButton } from "./quick-add-nl-button";
@@ -26,6 +27,8 @@ export function SessionLogger({
   lastTimeByExercise,
   ladderByExercise,
   raised,
+  finishedLine = null,
+  pausedSessionId = null,
   coachMode,
   groupId,
   athleteId,
@@ -46,6 +49,9 @@ export function SessionLogger({
   lastTimeByExercise: Record<string, { weight: number; reps: number }>;
   ladderByExercise: Record<string, string[]>;
   raised?: boolean;
+  // Once the workout is completed this line replaces the buttons; while it is paused, Resume workout takes the place of Complete workout.
+  finishedLine?: string | null;
+  pausedSessionId?: string | null;
   coachMode?: { homeHref: string; clientIsMinor: boolean };
   groupId: string;
   athleteId: string;
@@ -396,7 +402,18 @@ export function SessionLogger({
           disabled={false}
           raised={raised && !exercises.every((e) => isNoLoadExercise(e.exerciseName))}
           coachMode={coachMode}
+          pauseHref={coachMode ? coachMode.homeHref : `/groups/${groupId}`}
         />
+      )}
+      {isCompleted && finishedLine && (
+        <p className="mt-4 mb-2 text-center font-display font-bold uppercase text-lg text-chalk" role="status">
+          {finishedLine}
+        </p>
+      )}
+      {isCompleted && pausedSessionId && (
+        <div className={`fixed ${raised ? "bottom-16" : "bottom-0"} left-0 right-0 bg-graphite border-t border-steel/20 px-5 py-4`}>
+          <ResumeWorkoutButton sessionId={pausedSessionId} />
+        </div>
       )}
       </section>
       {demoExerciseId && demoLibrary && (

@@ -34,10 +34,9 @@ describe("the logger", () => {
     expect(grid).toContain('onSetChange(set.id, { status: "completed" })');
     expect(grid).toContain('set.status === "completed" && !forced');
   });
-  it("Complete Workout always completes, and a no-load session does not ask for an effort score", () => {
-    const tap = complete.slice(complete.indexOf("function handleTap()"), complete.indexOf("async function handleComplete()"));
-    expect(tap).toContain("handleComplete();");
-    expect(tap).not.toContain("setConfirming(true)");
+  it("Complete workout completes whatever is filled in (the choice never asks for a value), and a no-load session does not ask for an effort score", () => {
+    expect(complete).toContain("Complete workout");
+    expect(complete).not.toContain("fully filled in");
     expect(logger).toContain("raised && !exercises.every((e) => isNoLoadExercise(e.exerciseName))");
   });
 });
