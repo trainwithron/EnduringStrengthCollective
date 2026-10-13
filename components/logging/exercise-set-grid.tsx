@@ -520,7 +520,7 @@ export function ExerciseSetGrid({
   function RowHandle({ field }: { field: TrackedField }) {
     const dragStartX = useRef<number | null>(null);
     const dragFired = useRef(false);
-    if (readOnly || sets.length < 2) return <div className="w-6 shrink-0" />;
+    if (readOnly || sets.length < 2) return <div className="w-8 shrink-0" />;
     return (
       <button
         type="button"
@@ -564,7 +564,7 @@ export function ExerciseSetGrid({
           vibrateConfirm();
           handlePropagateRow(field);
         }}
-        className="w-6 h-11 shrink-0 flex items-center justify-center touch-none cursor-grab active:cursor-grabbing group"
+        className="w-8 h-11 shrink-0 flex items-center justify-center touch-none cursor-grab active:cursor-grabbing group"
       >
         <span className="w-2.5 h-2.5 rounded-full bg-steel group-active:bg-rust group-active:scale-125 transition-transform" />
       </button>
@@ -592,7 +592,7 @@ export function ExerciseSetGrid({
       <div className="inline-flex flex-col gap-1.5 min-w-full">
         <div className="flex items-center gap-1.5">
           <div className="w-12 shrink-0" />
-          <div className="w-6 shrink-0" />
+          <div className="w-8 shrink-0" />
           {sets.map((set, i) => (
             <span key={set.id} className="w-12 shrink-0 text-center font-body text-xs text-steel">
               {i + 1}
@@ -636,7 +636,7 @@ export function ExerciseSetGrid({
 
         <div className="flex items-center gap-1.5">
           <span className="w-12 shrink-0 font-body text-xs text-steel truncate">Status</span>
-          <div className="w-6 shrink-0" />
+          <div className="w-8 shrink-0" />
           {sets.map((set) => {
             const isComplete = set.status === "completed";
             const isSkipped = set.status === "skipped";
