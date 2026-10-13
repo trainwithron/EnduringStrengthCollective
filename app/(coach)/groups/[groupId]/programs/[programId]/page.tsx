@@ -342,6 +342,7 @@ async function CoachProgramBuilder({
           />
         }
         athleteId={data.athleteId}
+        canAddSlot={data.canAddSlot}
         programName={data.programName}
         programDescription={data.programDescription}
         aiSequencingNotes={data.aiSequencingNotes}

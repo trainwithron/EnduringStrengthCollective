@@ -117,6 +117,14 @@ describe("a placeholder never reaches a client", () => {
     expect(toggle).toContain("SLOT_ACTIVE_BLOCKED");
     expect(SLOT_ACTIVE_BLOCKED).toBe("This program has slots to fill in, so it can't be made active. Assign it to a client instead.");
   });
+  it("+ Slot is offered only in a library program nobody follows, and signing off a program with slots is refused", () => {
+    expect(read("lib/program-builder-data.ts")).toContain("canAddSlot: program.athlete_id === null && program.is_active === false");
+    expect(read("components/coach/desktop/day-card.tsx")).toContain("{canAddSlot && (");
+    const signOff = read("app/api/ai/sign-off/route.ts");
+    expect(signOff).toContain("SLOT_ACTIVE_BLOCKED");
+    expect(signOff).toContain('.eq("is_slot", true)');
+    expect(read("supabase/migrations/0366_template_slots_survive_duplicate.sql")).toContain("and not exists (select 1 from public.workouts w join public.group_workout_exercises e on e.workout_id = w.id where w.program_id = src.id and e.is_slot)");
+  });
   it("the migration copies the slot columns and refuses a client copy while a slot exists", () => {
     const sql = read("supabase/migrations/0366_template_slots_survive_duplicate.sql");
     expect(sql).toContain("is_slot, slot_side, slot_tier");

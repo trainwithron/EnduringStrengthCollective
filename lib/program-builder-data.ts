@@ -30,6 +30,7 @@ export interface ProgramBuilderData {
   // athlete_training_maxes for a real number instead of having no
   // athlete context at all.
   athleteId: string | null;
+  canAddSlot: boolean;
   programId: string;
   programName: string;
   programDescription: string | null;
@@ -58,7 +59,7 @@ export async function getProgramBuilderData(
   const { data: program } = await supabase
     .from("programs")
     .select(
-      "id, name, description, start_date, training_days, visibility_window, ai_sequencing_notes, training_intent, athlete_id"
+      "id, name, description, start_date, training_days, visibility_window, ai_sequencing_notes, training_intent, athlete_id, is_active"
     )
     .eq("id", programId)
     .eq("group_id", groupId)
@@ -213,6 +214,8 @@ export async function getProgramBuilderData(
     groupId,
     groupName: group?.name ?? "Coaching",
     athleteId: program.athlete_id,
+    // A slot may only be added to a library program that nobody follows (no client, not active).
+    canAddSlot: program.athlete_id === null && program.is_active === false,
     programId,
     programName: program.name,
     programDescription: program.description,

@@ -25,6 +25,7 @@ export function WeekGrid({
   programId,
   groupId,
   athleteId,
+  canAddSlot = false,
   exerciseLibrary,
   exerciseAliases,
   exerciseTierByName,
@@ -45,6 +46,7 @@ export function WeekGrid({
   programId: string;
   groupId: string;
   athleteId: string | null;
+  canAddSlot?: boolean;
   exerciseLibrary: string[];
   exerciseAliases: AliasEntry[];
   exerciseTierByName: Record<string, "A" | "B" | "C" | null>;
@@ -324,6 +326,7 @@ export function WeekGrid({
                   laddersByPattern={laddersByPattern}
                   restSuggestions={restSuggestions}
                   athleteId={athleteId}
+                  canAddSlot={canAddSlot}
                   condensed={compactIds.has(day.id)}
                   onToggleCondensed={() => setCompactIds(toggleDay(new Set(compactIds), day.id))}
                   onCompactEditorChange={(open) => setCompactEditor(day.id, open)}

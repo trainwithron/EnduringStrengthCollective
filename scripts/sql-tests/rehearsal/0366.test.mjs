@@ -40,6 +40,14 @@ export default {
       const made = (await db.query(`select count(*)::int as n from public.programs where athlete_id = $1`, [client])).rows[0].n;
       h.check("and nothing was created for the client", made === 0);
 
+      // The attach path (an unused library program handed straight to a client) must not take a slot either.
+      await h.as(coach);
+      const attach = await msg(db, `select * from public.assign_program_to_client($1, $2, $3, null, null)`, [template, group, client]);
+      await h.asSuper();
+      h.check("assign_program_to_client refuses a program with a slot too", attach.includes("This template has slots"));
+      const stillLibrary = (await db.query(`select athlete_id from public.programs where id = $1`, [template])).rows[0];
+      h.check("and the template stays a library program", stillLibrary.athlete_id === null);
+
       const ok = await msg(db, `select public.duplicate_program($1, $2, $3, $4, null, null)`, [plain, group, coach, client]);
       h.check("a program with no slot is still given to a client as before", ok === "");
       const real = (await db.query(`select e.is_slot, e.exercise_name from public.group_workout_exercises e join public.workouts w on w.id = e.workout_id join public.programs p on p.id = w.program_id where p.athlete_id = $1`, [client])).rows[0];

@@ -60,6 +60,7 @@ export function DayCard({
   laddersByPattern,
   restSuggestions,
   athleteId = null,
+  canAddSlot = false,
   condensed = false,
   onToggleCondensed,
   onCompactEditorChange,
@@ -81,6 +82,8 @@ export function DayCard({
   restSuggestions?: RestTempoSuggestion[];
   // The client this program was made for (null for a shared group program): when set and the day is open, the day also shows what the client logged, or the gray weight suggestions.
   athleteId?: string | null;
+  // + Slot is offered only in a library program nobody follows (no client, not active).
+  canAddSlot?: boolean;
   // The compact view: each exercise is ONE line (name, sets x reps, weight when there is one); tapping a line opens its normal editor in place. Switched per day (the small
   // button in the day's header) or for the whole week (the week's "Compact view"). Distinct from the day's own header chevron below, which hides the exercise list entirely.
   condensed?: boolean;
@@ -736,6 +739,7 @@ export function DayCard({
             >
               + Note
             </button>
+            {canAddSlot && (
             <button
               type="button"
               onClick={() => setShowSlotForm((v) => !v)}
@@ -744,6 +748,7 @@ export function DayCard({
             >
               + Slot
             </button>
+            )}
           </div>
         </>
       )}

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { SLOT_ACTIVE_BLOCKED } from "@/lib/slot-templates";
 import { createServerClient } from "@/lib/supabase/server";
 import { diffDraft, type DraftRow } from "@/lib/edit-diff";
 import { detectSwapPatterns, patternKey, suggestionText } from "@/lib/edit-patterns";
@@ -25,6 +26,16 @@ export async function POST(request: Request) {
   const { data: membership } = await supabase.from("group_memberships").select("role").eq("group_id", program.group_id).eq("profile_id", user.id).maybeSingle();
   if (membership?.role !== "coach") return NextResponse.json({ error: "Only the coach can sign off a program." }, { status: 403 });
   if (!program.ai_draft) return NextResponse.json({ ok: true, suggestion: null });
+
+  // A program with a slot (a template) is a placeholder, never made active.
+  if (activate) {
+    const { count: slotCount } = await supabase
+      .from("group_workout_exercises")
+      .select("id, workouts!inner ( program_id )", { count: "exact", head: true })
+      .eq("is_slot", true)
+      .eq("workouts.program_id", programId);
+    if ((slotCount ?? 0) > 0) return NextResponse.json({ error: SLOT_ACTIVE_BLOCKED }, { status: 409 });
+  }
 
   const { error: updateError } = await supabase.from("programs").update(activate ? { ai_draft: false, is_active: true } : { ai_draft: false }).eq("id", programId);
   if (updateError) return NextResponse.json({ error: "That didn't save. The program is still a draft." }, { status: 500 });

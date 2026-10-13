@@ -25,6 +25,7 @@ export function ProgramBuilderDesktop({
   programId,
   groupId,
   athleteId,
+  canAddSlot = false,
   programName,
   programDescription,
   aiSequencingNotes,
@@ -52,6 +53,7 @@ export function ProgramBuilderDesktop({
   // WeekGrid/DuplicateWeekPanel so "% of training max" can query a real
   // athlete_training_maxes row instead of having no athlete context.
   athleteId: string | null;
+  canAddSlot?: boolean;
   programName: string;
   programDescription: string | null;
   // Only set for an AI-generated program — the "Ask the AI" why/correct
@@ -341,6 +343,7 @@ export function ProgramBuilderDesktop({
             programId={programId}
             groupId={groupId}
             athleteId={athleteId}
+            canAddSlot={canAddSlot}
             exerciseLibrary={exerciseLibrary}
             exerciseAliases={exerciseAliases}
             exerciseTierByName={exerciseTierByName}
