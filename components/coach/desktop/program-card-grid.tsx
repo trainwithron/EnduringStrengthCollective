@@ -213,7 +213,7 @@ function ProgramCard({
             {program.athleteName && <p className="font-body text-xs text-rust mt-0.5 truncate">For {firstName(program.athleteName)}</p>}
           </Link>
           )}
-          <ProgramCardMenu onRename={() => setRenaming(true)} programId={program.id} programName={program.name} groupId={groupId} aiDraft={program.aiDraft} canHide={!program.athleteId && !program.isActive} showAssignButton={!program.athleteId && !program.isActive && !program.aiDraft} />
+          <ProgramCardMenu onRename={() => setRenaming(true)} programId={program.id} programName={program.name} groupId={groupId} aiDraft={program.aiDraft} canHide={!program.athleteId && !program.isActive} showAssignButton={!program.athleteId && !program.isActive && !program.aiDraft} slotCount={program.slotCount ?? 0} />
         </div>
         <div className="mt-auto flex items-center justify-between pt-2 border-t border-steel/15">
           <ProgramActiveToggle programId={program.id} isActive={program.isActive} aiDraft={program.aiDraft} programName={program.name} unassigned={!program.athleteId} />

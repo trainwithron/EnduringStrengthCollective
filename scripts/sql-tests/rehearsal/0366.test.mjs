@@ -35,6 +35,16 @@ export default {
       const slotCopy = (await db.query(`select e.is_slot, e.slot_side, e.slot_tier from public.group_workout_exercises e join public.workouts w on w.id = e.workout_id where w.program_id = $1`, [copy])).rows[0];
       h.check("a plain duplicate of a template keeps the slot, its side and its class", slotCopy?.is_slot === true && slotCopy.slot_side === "unilateral" && slotCopy.slot_tier === "A");
 
+      // Use this template: the copy's slot is replaced by a real exercise, and THEN the copy can be given to a client (the template itself is untouched).
+      await db.query(`update public.group_workout_exercises e set exercise_name = 'Barbell Romanian Deadlift', is_slot = false, slot_side = null, slot_tier = null from public.workouts w where e.workout_id = w.id and w.program_id = $1 and e.is_slot`, [copy]);
+      const slotsLeftInCopy = (await db.query(`select count(*)::int as n from public.group_workout_exercises e join public.workouts w on w.id = e.workout_id where w.program_id = $1 and e.is_slot`, [copy])).rows[0].n;
+      h.check("after the slots are replaced the copy has no slot", slotsLeftInCopy === 0);
+      const assignResolved = await msg(db, `select public.duplicate_program($1, $2, $3, $4, null, null)`, [copy, group, coach, client]);
+      h.check("and a resolved copy CAN be given to a client", assignResolved === "");
+      const templateStill = (await db.query(`select count(*)::int as n from public.group_workout_exercises e join public.workouts w on w.id = e.workout_id where w.program_id = $1 and e.is_slot`, [template])).rows[0].n;
+      h.check("the template itself still has its slot", templateStill === 1);
+      await db.query(`delete from public.programs where athlete_id = $1`, [client]);
+
       const refused = await msg(db, `select public.duplicate_program($1, $2, $3, $4, null, null)`, [template, group, coach, client]);
       h.check("a copy for a client of a program with a slot is refused, with the plain message", refused.includes("This template has slots"));
       const made = (await db.query(`select count(*)::int as n from public.programs where athlete_id = $1`, [client])).rows[0].n;
