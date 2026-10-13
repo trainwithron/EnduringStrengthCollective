@@ -17,6 +17,10 @@ vi.mock("@/lib/supabase/service-role", () => ({
         if (table === "profiles") state.profiles.add(row.id);
         return { error: null };
       },
+      upsert: async (row: { booking_mode?: string }) => {
+        state.calls.push(`upsert:${table}:${row.booking_mode}`);
+        return { error: null };
+      },
     }),
   }),
 }));
@@ -51,6 +55,10 @@ describe("coach signup records what they agreed to", () => {
     expect(state.calls.slice(0, 3)).toEqual(["createUser", "insert:profiles", "recordLegal"]);
     expect(state.recorded).toEqual(["u1"]);
     expect(json.legalRecorded).toBe(true);
+  });
+  it("a brand-new coach starts in request booking (clients ask, the coach approves)", async () => {
+    await post();
+    expect(state.calls).toContain("upsert:coach_booking_policies:request");
   });
   it("still signs them up when recording fails, but says so in the response and in the log", async () => {
     state.failLegal = true;
