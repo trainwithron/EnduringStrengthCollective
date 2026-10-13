@@ -5,7 +5,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { readAiJson } from "@/lib/ai-fetch";
 import { BUILDER_ONE_WORKOUT_SELECT, mapWorkoutRowToBuilderDay } from "@/lib/program-builder-data";
 import { fixTargetFrom, parseBuildRequest, planSlots } from "@/lib/ai-day-request";
-import type { DaySlot } from "@/lib/ai-day-run";
+import type { DaySlot } from "@/lib/ai-day-slots";
 import type { BuilderDay } from "@/lib/types";
 import type { DemoRow } from "@/lib/exercise-demo";
 

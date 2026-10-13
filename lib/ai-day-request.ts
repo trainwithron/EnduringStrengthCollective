@@ -1,4 +1,4 @@
-import { MAX_DAYS_PER_RUN, daysPerWeekOf, type DaySlot } from "@/lib/ai-day-run";
+import { MAX_DAYS_PER_RUN, daysPerWeekOf, type DaySlot } from "@/lib/ai-day-slots";
 
 // What the coach asked the AI Program Builder for, read from their own words. Pure, so it is tested. The words that matter: how many weeks ("make it 4 weeks", "a 6 week block"), how many days a
 // week ("3 days a week"), and "finish the week" (fill the empty days of the week that already has a day built). Anything it cannot read is left out and the program's own shape decides.

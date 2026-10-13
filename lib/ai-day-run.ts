@@ -3,7 +3,10 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 // One RUN of the AI Program Builder = the days built between pressing Ask and finishing (pausing and resuming is the same run). A run is charged once, on its first day, with the same allowance and
 // credits as a whole generated program; the later days carry this signed token instead, so they are not charged again. The token is good for two hours and at most 40 days.
 export const RUN_TTL_MS = 2 * 60 * 60 * 1000;
-export const MAX_DAYS_PER_RUN = 40;
+import { MAX_DAYS_PER_RUN, daysPerWeekOf, type DaySlot } from "@/lib/ai-day-slots";
+
+export { MAX_DAYS_PER_RUN, daysPerWeekOf };
+export type { DaySlot };
 
 interface RunPayload {
   u: string; // user
@@ -49,11 +52,6 @@ export function checkRunToken(token: string | null | undefined, userId: string, 
 
 // ---- which day comes next -------------------------------------------------------------------
 
-export interface DaySlot {
-  week: number;
-  day: number;
-}
-
 export interface BuiltDay {
   workoutId: string;
   week: number;
@@ -72,16 +70,6 @@ export function nextSlotToBuild(days: { week: number; day: number; hasExercises:
   if (!last) return { week: 1, day: 1 };
   if (last.day < Math.max(1, daysPerWeek)) return { week: last.week, day: last.day + 1 };
   return { week: last.week + 1, day: 1 };
-}
-
-// How many days a week has in this program: the most common count among its weeks, else 1.
-export function daysPerWeekOf(days: { week: number; day: number }[]): number {
-  const counts = new Map<number, number>();
-  for (const d of days) counts.set(d.week, Math.max(counts.get(d.week) ?? 0, d.day));
-  if (counts.size === 0) return 1;
-  const freq = new Map<number, number>();
-  for (const n of counts.values()) freq.set(n, (freq.get(n) ?? 0) + 1);
-  return [...freq.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0][0];
 }
 
 // ---- the prompt for ONE day ---------------------------------------------------------------
