@@ -6,6 +6,8 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { UnavailableState } from "@/components/ui/unavailable-state";
 import { programDayShape } from "@/lib/program-completeness";
 import { ProgramCardGrid, type ProgramCardData } from "@/components/coach/desktop/program-card-grid";
+import { ProgramsList } from "@/components/coach/desktop/programs-list";
+import { defaultList } from "@/lib/programs-filter";
 import { SwappableTerm } from "@/components/coach/swappable-term";
 import { computeProgramCardVisuals } from "@/lib/program-card-data";
 import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
@@ -49,11 +51,10 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
   const groupIds = inOrg.map((g) => g.id);
   const { data: programs, error: programsError } = await supabase
     .from("programs")
-    .select("id, group_id, name, is_active, ai_draft, cover_image_path, athlete_id, source_program_id, profiles!programs_athlete_id_fkey ( full_name ), workouts(id, group_workout_exercises(count))")
+    .select("id, group_id, name, is_active, ai_draft, cover_image_path, athlete_id, source_program_id, training_intent, updated_at, profiles!programs_athlete_id_fkey ( full_name ), workouts(id, group_workout_exercises(count))")
     .in("group_id", groupIds.length > 0 ? groupIds : [""])
     .is("archived_at", null)
-    .order("is_active", { ascending: false })
-    .order("created_at", { ascending: false });
+    .order("updated_at", { ascending: false });
 
   // Library programs the coach tucked away (kept, with every log): a quiet fold at the bottom with Put back.
   const { data: hiddenRows } = clientId
@@ -78,6 +79,8 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
     athleteId: p.athlete_id,
     athleteName: p.profiles?.full_name ?? null,
     sourceProgramId: p.source_program_id ?? null,
+    trainingIntent: p.training_intent ?? null,
+    updatedAt: p.updated_at ?? null,
     groupId: p.group_id,
   }));
 
@@ -100,12 +103,13 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
 
   // The library page lists programs with no client on them. A client's own version of a library program (it has a source) is never a card here: it is reached from the client's profile and from
   // the program's "Assigned to". Programs built straight for one client (no source) sit in one collapsed fold. Scoped to one client (?client=), the client's own programs show as before.
+  // The page is ONE flat list: the library programs and the programs built straight for one client, newest changed first. A client's own copy of a library program is not in the default list (it is under
+  // the program's "Assigned to" and on the client's profile); the "One client" filter brings a client's copies in. Scoped to one client (?client=), their own programs show as before.
   const scoped = scopePrograms(all, clientId, clientGroupId);
-  const cards = clientId ? scoped : scoped.filter((c) => !c.athleteId);
-  const oneClientCards = clientId ? [] : scoped.filter((c) => c.athleteId && !c.sourceProgramId);
-  const assignedCounts = clientId ? new Map<string, number>() : await countAssignedTo(supabase, cards.map((c) => c.id));
-  for (const c of cards) c.assignedCount = assignedCounts.get(c.id) ?? 0;
-  const uncoveredProgramIds = [...cards, ...oneClientCards].filter((c) => !c.coverImagePath).map((c) => c.id);
+  const cards = clientId ? scoped : defaultList(scoped);
+  const assignedCounts = clientId ? new Map<string, number>() : await countAssignedTo(supabase, scoped.filter((c) => !c.athleteId).map((c) => c.id));
+  for (const c of scoped) if (!c.athleteId) c.assignedCount = assignedCounts.get(c.id) ?? 0;
+  const uncoveredProgramIds = cards.filter((c) => !c.coverImagePath).map((c) => c.id);
   const visualsMap = await computeProgramCardVisuals(supabase, uncoveredProgramIds, user.id);
   const visualsByProgramId = Object.fromEntries(visualsMap);
 
@@ -137,15 +141,12 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
 
       {!clientId && <ConversationInviteSection supabase={supabase} coachId={user.id} />}
 
-      {programsError ? <UnavailableState what="your programs" /> : <ProgramCardGrid groupId={anchor.id} programs={cards} visualsByProgramId={visualsByProgramId} />}
-
-      {!clientId && oneClientCards.length > 0 && (
-        <details className="mt-8">
-          <summary className="font-body text-sm text-steel cursor-pointer min-h-11 flex items-center">Programs made for one client ({oneClientCards.length})</summary>
-          <div className="mt-3">
-            <ProgramCardGrid groupId={anchor.id} programs={oneClientCards} visualsByProgramId={visualsByProgramId} />
-          </div>
-        </details>
+      {programsError ? (
+        <UnavailableState what="your programs" />
+      ) : clientId ? (
+        <ProgramCardGrid groupId={anchor.id} programs={cards} visualsByProgramId={visualsByProgramId} />
+      ) : (
+        <ProgramsList groupId={anchor.id} programs={scoped} visualsByProgramId={visualsByProgramId} />
       )}
 
       {!clientId && <RemovedPrograms programs={hidden} label="Hidden programs" />}

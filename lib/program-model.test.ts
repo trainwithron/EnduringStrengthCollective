@@ -31,13 +31,13 @@ describe("One program in the library, an independent version for each person", (
     const menu = read("components/coach/desktop/program-card-menu.tsx");
     expect(menu.indexOf("assignedBlockMessage(assignedCount)")).toBeLessThan(menu.indexOf('from("programs").delete()'));
   });
-  it("the Programs page lists only no-client programs as cards, puts programs built for one client in one collapsed fold, and never shows a client's version of a library program", () => {
+  it("the Programs page is one flat list of library programs and programs built for one client, never a client's version of a library program, with Assigned to (n) on library cards", () => {
     const page = read("app/(coach)/programs/page.tsx");
-    expect(page).toContain("const cards = clientId ? scoped : scoped.filter((c) => !c.athleteId);");
-    expect(page).toContain("scoped.filter((c) => c.athleteId && !c.sourceProgramId)");
-    expect(page).toContain("Programs made for one client (");
+    expect(page).toContain("const cards = clientId ? scoped : defaultList(scoped);");
+    expect(page).toContain("<ProgramsList");
+    expect(page).not.toContain("<details");
     expect(page).toContain("countAssignedTo(");
-    expect(read("components/coach/desktop/program-card-grid.tsx")).toContain("Assigned to ({program.assignedCount})");
+    expect(read("components/coach/desktop/program-card-grid.tsx")).toContain("Assigned to ({program.assignedCount ?? 0})");
   });
   it("assigning always copies and adds no client name; nothing calls the attach step", () => {
     const lib = read("lib/program-duplication.ts");

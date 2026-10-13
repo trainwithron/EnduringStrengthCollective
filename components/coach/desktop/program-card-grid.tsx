@@ -1,5 +1,6 @@
 "use client";
 
+import { firstName } from "@/lib/programs-filter";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { LayoutGrid, ImagePlus } from "lucide-react";
@@ -28,6 +29,9 @@ export interface ProgramCardData {
   sourceProgramId?: string | null;
   // How many people have their own version of this library program.
   assignedCount?: number;
+  // The program's training type (Hypertrophy, Mobility/Flow ...) and when it was last changed, for the Programs page's filter and its newest-first order.
+  trainingIntent?: string | null;
+  updatedAt?: string | null;
   // The group the program belongs to, when the page lists programs from more than one group (the coach-level Programs page). Otherwise the grid's own group.
   groupId?: string;
 }
@@ -69,7 +73,7 @@ export function ProgramCardGrid({
   if (programs.length === 0) {
     return (
       <p className="font-body text-sm text-steel py-6">
-        No programs yet. Create one to start assigning workouts.
+        No programs yet. Tap Build program.
       </p>
     );
   }
@@ -198,14 +202,8 @@ function ProgramCard({
             <p className="font-body text-xs text-steel mt-0.5">
               {program.workoutCount} {program.workoutCount === 1 ? "workout" : "workouts"}
             </p>
-            {!program.athleteId && (program.assignedCount ?? 0) > 0 && (
-              <p className="font-body text-xs text-steel mt-0.5">Assigned to ({program.assignedCount})</p>
-            )}
-            {program.athleteName && (
-              <p className="font-body text-xs text-rust mt-0.5 truncate">
-                {program.athleteName}&apos;s program
-              </p>
-            )}
+            {!program.athleteId && <p className="font-body text-xs text-steel mt-0.5">Assigned to ({program.assignedCount ?? 0})</p>}
+            {program.athleteName && <p className="font-body text-xs text-rust mt-0.5 truncate">For {firstName(program.athleteName)}</p>}
           </Link>
           )}
           <ProgramCardMenu onRename={() => setRenaming(true)} programId={program.id} programName={program.name} groupId={groupId} aiDraft={program.aiDraft} canHide={!program.athleteId && !program.isActive} showAssignButton={!program.athleteId && !program.isActive && !program.aiDraft} />
