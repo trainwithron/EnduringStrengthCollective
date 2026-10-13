@@ -284,6 +284,7 @@ export function SessionLogger({
         />
       )}
       <SessionProgressStrip exercises={exercises} activeIndex={activeExerciseIndex} />
+      <div className="relative">
       {swipeDirection === "vertical" ? (
         <ExerciseVerticalCarousel
           exercises={exercises}
@@ -332,8 +333,17 @@ export function SessionLogger({
         />
       )}
 
+      {/* Swiping sideways: "+ Add" sits on the dots row (right edge) so the card keeps the room; its menu opens over the top of the card. Scrolling down: it stays under the list as before. */}
       {!isCompleted && (
-        <div className="mt-2 pb-2">
+        <div
+          className={
+            swipeDirection === "vertical"
+              ? "mt-2 pb-2"
+              : addMenuOpen || addingExercise || addedCount >= MAX_ADDED_EXERCISES
+              ? "absolute left-0 right-0 top-0 z-30 bg-graphite border border-steel/30 p-3 shadow-lg"
+              : "absolute right-0 top-0 z-30"
+          }
+        >
           {addedCount >= MAX_ADDED_EXERCISES ? (
             <p className="font-body text-xs text-steel">
               You&apos;ve added the max of {MAX_ADDED_EXERCISES} extra exercises for this workout.
@@ -364,7 +374,7 @@ export function SessionLogger({
                 type="button"
                 onClick={() => setAddMenuOpen((v) => !v)}
                 aria-expanded={addMenuOpen}
-                className="h-9 px-3 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors"
+                className="h-8 px-3 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors"
               >
                 + Add
               </button>
@@ -394,6 +404,7 @@ export function SessionLogger({
           )}
         </div>
       )}
+      </div>
 
       {!isCompleted && (
         <CompleteWorkoutButton

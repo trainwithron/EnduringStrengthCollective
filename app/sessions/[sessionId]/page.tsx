@@ -3,6 +3,7 @@ import { NoAccess } from "@/components/shared/no-access";
 import Link from "next/link";
 import { createCrossOrgServerClient as createServerClient } from "@/lib/supabase/server";
 import { SessionLogger } from "@/components/logging/session-logger";
+import { resumedStartedAt } from "@/lib/resume-elapsed";
 import type { PendingGateTask } from "@/components/session/rest-timer-bar";
 import { isHabitDueOn } from "@/lib/habits";
 import { DEFAULT_TRACKED_FIELDS } from "@/lib/exercise-fields";
@@ -54,7 +55,21 @@ export default async function SessionPage(
   // "Resume workout" from the workout page or Home: a paused workout goes back to in progress, exactly where it was (completed sets stay completed).
   if (query.resume === "1" && session.status === "abandoned") {
     const { data: resumed } = await supabase.from("athlete_sessions").update({ status: "in_progress" }).eq("id", session.id).eq("status", "abandoned").select("id");
-    if (resumed && resumed.length > 0) (session as { status: string }).status = "in_progress";
+    if (resumed && resumed.length > 0) {
+      (session as { status: string }).status = "in_progress";
+      // The timer carries on from where the work stopped; the time it sat paused is not counted.
+      const { data: lastSet } = await supabase
+        .from("set_logs")
+        .select("completed_at, session_exercises!inner(session_id)")
+        .eq("session_exercises.session_id", session.id)
+        .not("completed_at", "is", null)
+        .order("completed_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const newStart = resumedStartedAt(session.started_at, (lastSet as { completed_at?: string | null } | null)?.completed_at ?? null, new Date());
+      const { error: startError } = await supabase.from("athlete_sessions").update({ started_at: newStart }).eq("id", session.id);
+      if (!startError) (session as { started_at: string }).started_at = newStart;
+    }
   }
   // A paused workout is "Paused" for 48 hours after it was started, then "Not finished". It is never completed for him.
   const pausedRecently = !!session.started_at && Date.now() - new Date(session.started_at).getTime() < 48 * 3600000;
@@ -538,25 +553,29 @@ export default async function SessionPage(
     : `/groups/${session.group_id}`;
 
   return (
-    <main className="min-h-screen bg-graphite text-chalk font-body pb-32">
+    <main className={`min-h-screen bg-graphite text-chalk font-body ${session.status === "in_progress" ? "pb-24" : "pb-32"}`}>
       {coachModeClient && <CoachModeBar groupId={session.group_id} clientName={coachModeClient.name} homeHref={coachHomeHref} />}
       <header className={session.status === "in_progress" ? "px-5 pt-2 pb-2 border-b border-steel/20" : "px-5 pt-8 pb-6 border-b border-steel/20"}>
+        {/* In progress is ONE slim row (Back, the day, who logged it) so the exercise card keeps the screen; a finished or paused workout keeps the roomier header. */}
         {session.status === "in_progress" ? (
-          <ExitWorkoutButton sessionId={session.id} backHref={backHref} />
+          <div className="flex items-center justify-between gap-2">
+            <ExitWorkoutButton sessionId={session.id} backHref={backHref} />
+            <h1 className="font-display font-bold text-lg leading-none uppercase truncate min-w-0 flex-1 text-center">{(session as any).workouts?.title ?? "Workout"}</h1>
+            {session.logged_by_coach ? <CoachLoggedBadge /> : <span className="w-12 shrink-0" aria-hidden="true" />}
+          </div>
         ) : (
           <Link href={backHref} className="font-body text-xs text-steel uppercase tracking-wide">
             &larr; Back
           </Link>
         )}
-        <div className={session.status === "in_progress" ? "flex items-center justify-between gap-2" : "flex items-center justify-between mt-3"}>
-          <p className="font-body text-xs text-steel uppercase tracking-wide shrink-0">
-            {session.status === "completed" ? "Completed" : session.status === "abandoned" ? (pausedRecently ? "Paused" : "Not finished") : "In progress"}
-          </p>
-          {session.status === "in_progress" && (
-            <h1 className="font-display font-bold text-lg leading-none uppercase truncate min-w-0 flex-1 text-center">{(session as any).workouts?.title ?? "Workout"}</h1>
-          )}
-          {session.logged_by_coach && <CoachLoggedBadge />}
-        </div>
+        {session.status !== "in_progress" && (
+          <div className="flex items-center justify-between mt-3">
+            <p className="font-body text-xs text-steel uppercase tracking-wide shrink-0">
+              {session.status === "completed" ? "Completed" : session.status === "abandoned" ? (pausedRecently ? "Paused" : "Not finished") : "In progress"}
+            </p>
+            {session.logged_by_coach && <CoachLoggedBadge />}
+          </div>
+        )}
         {session.status !== "in_progress" && (
           <h1 className="font-display font-bold text-3xl leading-none mt-1 uppercase">
             {(session as any).workouts?.title ?? "Workout"}

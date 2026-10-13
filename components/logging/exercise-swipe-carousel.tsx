@@ -110,6 +110,48 @@ export function ExerciseSwipeCarousel({
     // The active exercise id is a dependency so a swap or reorder (same count) re-targets the observer to the right element.
   }, [activeIndex, activeExerciseId, exercises.length]);
 
+  // The card plus the pinned Complete bar and the "+ Add" row fit the screen: the card may be as tall as the room from the top of the carousel down to those, measured (not guessed) so a taller header or
+  // a different phone still fits. A card with more in it than that scrolls inside itself; the page does not scroll.
+  const [maxHeight, setMaxHeight] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const BELOW_CARD_PX = 98;
+    const fit = () => {
+      const top = scroller.getBoundingClientRect().top + window.scrollY;
+      setMaxHeight(Math.max(260, Math.floor(window.innerHeight - top - BELOW_CARD_PX)));
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(fit) : null;
+    if (ro) ro.observe(document.body);
+    return () => {
+      window.removeEventListener("resize", fit);
+      ro?.disconnect();
+    };
+  }, [exercises.length]);
+
+  // Safety net: whenever scrolling stops, a card is always centred. If the browser left the row between two cards (a focus jump, an interrupted swipe), it is put back on the nearest one.
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const settle = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        const width = scroller.clientWidth;
+        if (width <= 0) return;
+        const target = Math.round(scroller.scrollLeft / width) * width;
+        if (Math.abs(scroller.scrollLeft - target) > 2) scroller.scrollTo({ left: target, behavior: "smooth" });
+      }, 160);
+    };
+    scroller.addEventListener("scroll", settle, { passive: true });
+    return () => {
+      clearTimeout(timer);
+      scroller.removeEventListener("scroll", settle);
+    };
+  }, []);
+
   function scrollToIndex(index: number) {
     const scroller = scrollerRef.current;
     if (!scroller) return;
@@ -176,10 +218,11 @@ export function ExerciseSwipeCarousel({
       {/* Position dots double as a drag-to-scrub quick-jump — a coach's
           day plan is usually short enough (2-6 exercises) that this
           reads as a real nav aid, not clutter. */}
+      {exercises.length === 1 && !readOnly && <div className="h-9 mb-3" aria-hidden="true" />}
       {exercises.length > 1 && (
         <div
           ref={dotsRef}
-          className="flex items-center justify-center gap-1.5 mb-3 py-2 touch-none"
+          className="flex items-center justify-center gap-1.5 mb-3 min-h-8 touch-none"
           onPointerDown={(e) => {
             scrubIndexRef.current = null;
             try {
@@ -220,30 +263,23 @@ export function ExerciseSwipeCarousel({
       <div
         ref={scrollerRef}
         onScroll={handleScroll}
-        className="flex items-start overflow-x-auto overflow-y-hidden snap-x snap-mandatory scroll-smooth -mx-5 px-5 gap-4 transition-[height] duration-200 ease-out motion-reduce:transition-none"
-        style={{ scrollbarWidth: "none", height: activeHeight ?? undefined, maxHeight: "calc(100dvh - 15rem)" }}
+        className="flex items-start overflow-x-auto overflow-y-hidden snap-x snap-mandatory scroll-smooth -mx-5 transition-[height] duration-200 ease-out motion-reduce:transition-none"
+        style={{ scrollbarWidth: "none", height: activeHeight ?? undefined, maxHeight: maxHeight ?? undefined }}
       >
         {exercises.map((exercise) => {
           const expanded = expandedId === exercise.id;
           return (
+            // Each slide is exactly the scroller's (the screen's) width and the page gutter is padding INSIDE it, so one card fills the screen and a neighbour can never show at an edge.
             <div
               key={exercise.id}
               data-exercise-id={exercise.id}
-              className="snap-center snap-always shrink-0 w-full max-h-[calc(100dvh-15rem)] overflow-y-auto overscroll-contain border border-steel/20 bg-surface/20 p-4"
+              className="relative snap-center snap-always shrink-0 w-full overflow-y-auto overscroll-contain px-5"
+              style={{ maxHeight: maxHeight ?? undefined }}
             >
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <p className="font-body text-xs text-steel uppercase tracking-wide">
-                  Exercise {exercises.findIndex((e) => e.id === exercise.id) + 1} of {exercises.length}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setExpandedId(expanded ? null : exercise.id)}
-                  className="flex items-center gap-1 min-h-[44px] px-2 -mr-2 font-body text-xs text-steel uppercase tracking-wide active:text-rust"
-                >
-                  {expanded ? "Less room" : "More room"}
-                  {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                </button>
-              </div>
+              <div className="border border-steel/20 bg-surface/20 p-3">
+              <p className="sr-only">
+                Exercise {exercises.findIndex((e) => e.id === exercise.id) + 1} of {exercises.length}
+              </p>
 
               {expanded && (
                 <div className="mb-3">
@@ -270,7 +306,18 @@ export function ExerciseSwipeCarousel({
                 canUpload={canUploadVideo}
                 onSetCompleted={onSetCompleted}
                 gamificationEnabled={gamificationEnabled}
+                rowAction={
+                  <button
+                    type="button"
+                    onClick={() => setExpandedId(expanded ? null : exercise.id)}
+                    className="flex items-center gap-1 min-h-9 px-1 font-body text-xs text-steel uppercase tracking-wide active:text-rust"
+                  >
+                    {expanded ? "Less room" : "More room"}
+                    {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  </button>
+                }
               />
+              </div>
             </div>
           );
         })}

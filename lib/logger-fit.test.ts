@@ -24,8 +24,8 @@ describe("one exercise per snap, both directions", () => {
 
 describe("the card fits the screen", () => {
   it("the carousel is capped to the viewport and a long card scrolls inside itself", () => {
-    expect(horizontal).toContain('maxHeight: "calc(100dvh - 15rem)"');
-    expect(horizontal).toContain("max-h-[calc(100dvh-15rem)] overflow-y-auto overscroll-contain");
+    expect(horizontal).toContain("maxHeight: maxHeight ?? undefined");
+    expect(horizontal).toContain("overflow-y-auto overscroll-contain px-5");
     expect(vertical).toContain("max-h-[calc(100dvh-14rem)]");
   });
   it("the top is one slim block while a workout is in progress", () => {

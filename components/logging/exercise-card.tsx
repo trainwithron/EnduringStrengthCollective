@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -43,6 +44,7 @@ export function ExerciseCard({
   canUpload,
   onSetCompleted,
   gamificationEnabled,
+  rowAction,
 }: {
   exercise: SessionExerciseEntry;
   lastTime?: { weight: number; reps: number };
@@ -62,6 +64,8 @@ export function ExerciseCard({
   canUpload: boolean;
   onSetCompleted?: (set: SetLogEntry, rest?: RestForSet | null) => void;
   gamificationEnabled?: boolean;
+  // Sits at the right end of the "Edit metrics" row (the carousel puts "More room" here so the card needs no row of its own for it).
+  rowAction?: ReactNode;
 }) {
   const { discard: discardPendingSaves, remove: removeSetRow, unsavedIds } = useSetSave();
   // The demo is found from the exercise's current name (so a swapped or added exercise has one too); a client can hide the button in Settings.
@@ -416,14 +420,20 @@ export function ExerciseCard({
       />
 
       {!readOnly && (
-        <div className="relative mb-2">
+        <div className="relative mb-1 flex items-center gap-4 whitespace-nowrap">
           <button
             type="button"
             onClick={() => setFieldsOpen((v) => !v)}
-            className="font-body text-xs text-steel active:text-rust transition-colors"
+            className="font-body text-xs text-steel active:text-rust transition-colors min-h-9"
           >
             Edit metrics
           </button>
+          {canAddLoad && (
+            <button type="button" onClick={() => setShowLoad(true)} className="font-body text-xs text-steel active:text-rust min-h-9">
+              Add weight / RPE
+            </button>
+          )}
+          {rowAction && <span className="ml-auto">{rowAction}</span>}
           {fieldsOpen && (
             <div className="absolute z-10 left-0 mt-1 bg-surface border border-steel/30 p-2 w-56">
               {exercise.trackedFields.length > 0 && (
@@ -459,12 +469,6 @@ export function ExerciseCard({
             </div>
           )}
         </div>
-      )}
-
-      {canAddLoad && (
-        <button type="button" onClick={() => setShowLoad(true)} className="font-body text-xs text-steel active:text-rust min-h-9 mb-1">
-          Add weight / RPE
-        </button>
       )}
 
       {!readOnly && (

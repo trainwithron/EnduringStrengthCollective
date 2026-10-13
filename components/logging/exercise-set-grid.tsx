@@ -219,7 +219,7 @@ function GridCell({
   if (field === "rest" && coachRest != null) {
     return (
       <div
-        className="w-16 h-11 shrink-0 flex items-center justify-center rounded-token-pill bg-surface/40 border border-steel/20 text-chalk font-body text-sm tabular-nums"
+        className="w-12 h-11 shrink-0 flex items-center justify-center rounded-token-pill bg-surface/40 border border-steel/20 text-chalk font-body text-sm tabular-nums"
         aria-label={`Rest after set ${setNumber}: ${formatRest(coachRest)}, set by your coach`}
       >
         {formatRest(coachRest)}
@@ -228,7 +228,7 @@ function GridCell({
   }
 
   return (
-    <div className="relative w-16 h-11 shrink-0">
+    <div className="relative w-12 h-11 shrink-0">
       <input
         type={isNumeric ? "number" : "text"}
         inputMode={isNumeric ? (field === "reps" ? "numeric" : "decimal") : undefined}
@@ -245,7 +245,7 @@ function GridCell({
         aria-invalid={invalid ? true : undefined}
         onBlur={handleBlur}
         {...swipe}
-        className={`w-16 h-11 rounded-token-pill font-body text-sm text-center focus:outline-none focus:border-rust disabled:opacity-60 touch-pan-y ${
+        className={`w-12 h-11 rounded-token-pill font-body text-sm text-center focus:outline-none focus:border-rust disabled:opacity-60 touch-pan-y ${
           unsaved ? "border-2 border-amber-400/70 " : ""
         }${
           invalid ? "border-2 border-rust " : ""
@@ -520,7 +520,7 @@ export function ExerciseSetGrid({
   function RowHandle({ field }: { field: TrackedField }) {
     const dragStartX = useRef<number | null>(null);
     const dragFired = useRef(false);
-    if (readOnly || sets.length < 2) return <div className="w-8 shrink-0" />;
+    if (readOnly || sets.length < 2) return <div className="w-6 shrink-0" />;
     return (
       <button
         type="button"
@@ -564,7 +564,7 @@ export function ExerciseSetGrid({
           vibrateConfirm();
           handlePropagateRow(field);
         }}
-        className="w-8 h-11 shrink-0 flex items-center justify-center touch-none cursor-grab active:cursor-grabbing group"
+        className="w-6 h-11 shrink-0 flex items-center justify-center touch-none cursor-grab active:cursor-grabbing group"
       >
         <span className="w-2.5 h-2.5 rounded-full bg-steel group-active:bg-rust group-active:scale-125 transition-transform" />
       </button>
@@ -591,10 +591,10 @@ export function ExerciseSetGrid({
       ))}
       <div className="inline-flex flex-col gap-1.5 min-w-full">
         <div className="flex items-center gap-1.5">
-          <div className="w-16 shrink-0" />
-          <div className="w-8 shrink-0" />
+          <div className="w-12 shrink-0" />
+          <div className="w-6 shrink-0" />
           {sets.map((set, i) => (
-            <span key={set.id} className="w-16 shrink-0 text-center font-body text-xs text-steel">
+            <span key={set.id} className="w-12 shrink-0 text-center font-body text-xs text-steel">
               {i + 1}
             </span>
           ))}
@@ -602,7 +602,7 @@ export function ExerciseSetGrid({
 
         {fields.map((field) => (
           <div key={field} className="flex items-center gap-1.5">
-            <span className="w-16 shrink-0 font-body text-xs text-steel truncate flex items-center gap-1">
+            <span className="w-12 shrink-0 font-body text-xs text-steel truncate flex items-center gap-1">
               {fieldDef(field).label}
               {field === "rpe" && (
                 <InfoTip text="Rate of Perceived Exertion — how hard that set felt, 1 (easy) to 10 (max effort)." />
@@ -635,8 +635,8 @@ export function ExerciseSetGrid({
         ))}
 
         <div className="flex items-center gap-1.5">
-          <span className="w-16 shrink-0 font-body text-xs text-steel truncate">Status</span>
-          <div className="w-8 shrink-0" />
+          <span className="w-12 shrink-0 font-body text-xs text-steel truncate">Status</span>
+          <div className="w-6 shrink-0" />
           {sets.map((set) => {
             const isComplete = set.status === "completed";
             const isSkipped = set.status === "skipped";
@@ -648,7 +648,7 @@ export function ExerciseSetGrid({
                 disabled={readOnly || isSkipped}
                 aria-pressed={isComplete}
                 aria-label={isComplete ? "Set complete, tap to undo" : isSkipped ? "Set skipped" : "Mark set complete"}
-                className={`w-16 h-8 shrink-0 flex items-center justify-center border rounded-token-circle ${
+                className={`w-12 h-8 shrink-0 flex items-center justify-center border rounded-token-circle ${
                   isComplete
                     ? "bg-moss border-moss text-graphite"
                     : isSkipped
