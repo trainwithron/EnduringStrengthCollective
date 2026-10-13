@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ClassCard } from "@/components/athlete/classes-list";
+import { orgIdOfGroup } from "@/lib/org-of-group";
 
 // The group sessions a client can join, with spots left and their own answer. Row security already limits the sessions to this person's own coach. Shared by the Group sessions page (everything coming up)
 // and the client Home (the next seven days, a handful).
@@ -10,10 +11,14 @@ export async function loadClassCards(
   opts: { untilIso?: string; limit: number }
 ): Promise<{ classes: ClassCard[]; balance: number | null; notReady: boolean; nowIso: string }> {
   const nowIso = new Date().toISOString();
+  // A class belongs to one organization: only this group's organization's classes are listed (a group with no organization, a personal space, has none).
+  const organizationId = await orgIdOfGroup(supabase, groupId);
+  if (!organizationId) return { classes: [], balance: null, notReady: false, nowIso };
   let query = supabase
     .from("group_sessions")
     .select("id, title, start_at, end_at, capacity, location_note, status")
     .eq("kind", "class")
+    .eq("organization_id", organizationId)
     .gte("start_at", nowIso)
     .order("start_at", { ascending: true })
     .limit(opts.limit);

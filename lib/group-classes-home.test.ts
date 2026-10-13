@@ -25,4 +25,8 @@ describe("group classes on the client Home", () => {
     expect(hub).toContain("loadClassCards(");
     expect(loader).toContain('.eq("kind", "class")');
   });
+  it("lists only the classes of the group's own organization", () => {
+    expect(loader).toContain('.eq("organization_id", organizationId)');
+    expect(loader).toContain("orgIdOfGroup(supabase, groupId)");
+  });
 });
