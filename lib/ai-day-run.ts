@@ -28,6 +28,11 @@ export function issueRunToken(userId: string, programId: string, days: number, n
   return `${body}.${sign(body)}`;
 }
 
+// A token is good for the days it says were built. If the log shows MORE days built under it than that (the same token used again after a newer one was issued), it is stale and the run is charged again.
+export function runTokenIsStale(daysLoggedSinceIssued: number, daysOnToken: number): boolean {
+  return daysLoggedSinceIssued > daysOnToken;
+}
+
 export type RunCheck = { ok: true; days: number; issuedAt: number } | { ok: false };
 
 export function checkRunToken(token: string | null | undefined, userId: string, programId: string, now = Date.now()): RunCheck {

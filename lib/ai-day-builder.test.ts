@@ -100,3 +100,20 @@ describe("Fixing a day never leaves it empty", () => {
     expect(route).not.toContain('.delete().eq("workout_id", workoutId)');
   });
 });
+
+describe("A run token cannot be used again to skip the charge", () => {
+  it("a token is stale when the log shows more days built under it than it counts", async () => {
+    const { runTokenIsStale } = await import("@/lib/ai-day-run");
+    expect(runTokenIsStale(2, 2)).toBe(false);
+    expect(runTokenIsStale(0, 2)).toBe(false);
+    expect(runTokenIsStale(3, 2)).toBe(true);
+  });
+  it("the route checks the log before trusting a token, and a new run's token starts counting before its first day is logged", () => {
+    const route = read("app/api/ai/build-day/route.ts");
+    expect(route).toContain("if (runTokenIsStale(count ?? 0, run.days)) run = { ok: false };");
+    expect(route).toContain('.eq("feature", "program_day")');
+    expect(route).toContain('.neq("status", "error")');
+    expect(route).toContain("run.ok ? run.issuedAt : startedAt");
+    expect(route.indexOf("const startedAt = Date.now();")).toBeLessThan(route.indexOf("await callClaude("));
+  });
+});

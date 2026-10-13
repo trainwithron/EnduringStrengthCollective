@@ -12,7 +12,7 @@ import { scanConstraints } from "@/lib/constraint-scan";
 import { parseRestSeconds } from "@/lib/workout-import-parser";
 import { DEFAULT_TRACKED_FIELDS } from "@/lib/exercise-fields";
 import type { TrackedField } from "@/lib/exercise-fields";
-import { buildDaySystemPrompt, buildDayUserText, checkRunToken, issueRunToken, readDayResult, type BuiltDay } from "@/lib/ai-day-run";
+import { buildDaySystemPrompt, buildDayUserText, checkRunToken, issueRunToken, readDayResult, runTokenIsStale, type BuiltDay } from "@/lib/ai-day-run";
 
 // ONE workout per call (about 10 to 20 seconds), so a long program is many short calls and none of them can hit a time limit.
 export const maxDuration = 60;
@@ -46,8 +46,20 @@ export async function POST(request: Request) {
   const { data: membership } = await supabase.from("group_memberships").select("role").eq("group_id", groupId).eq("profile_id", user.id).maybeSingle();
   if (membership?.role !== "coach") return NextResponse.json({ error: "Only coaches can build programs." }, { status: 403 });
 
-  // A run is charged once, on its first day. Later days carry the signed token instead.
-  const run = checkRunToken(typeof body.runToken === "string" ? body.runToken : null, user.id, programId);
+  // A run is charged once, on its first day. Later days carry the signed token instead. A token is also checked against the log: if more days were built under it than it counts (it was used again
+  // after a newer one was issued) it is stale, and the run is charged as a new one.
+  const startedAt = Date.now();
+  let run = checkRunToken(typeof body.runToken === "string" ? body.runToken : null, user.id, programId);
+  if (run.ok) {
+    const { count } = await createServiceRoleClient()
+      .from("ai_usage_log")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("feature", "program_day")
+      .neq("status", "error")
+      .gte("created_at", new Date(run.issuedAt).toISOString());
+    if (runTokenIsStale(count ?? 0, run.days)) run = { ok: false };
+  }
   if (!run.ok) {
     const canRun = await canRunAiAction(supabase, user.id, "program_generation");
     if (!canRun.ok) return NextResponse.json({ error: canRun.error }, { status: 402 });
@@ -201,7 +213,7 @@ export async function POST(request: Request) {
       title: result.title,
       exerciseCount: rows.length - failed,
       flags,
-      runToken: issueRunToken(user.id, programId, (run.ok ? run.days : 0) + 1, Date.now(), run.ok ? run.issuedAt : Date.now()),
+      runToken: issueRunToken(user.id, programId, (run.ok ? run.days : 0) + 1, Date.now(), run.ok ? run.issuedAt : startedAt),
     });
   } catch (err) {
     if (err instanceof AiRateLimitedError) return NextResponse.json({ error: err.message }, { status: 429 });
