@@ -262,7 +262,11 @@ export function exerciseIdentity(name: string): string {
   return g === undefined ? k : `group:${g}`;
 }
 
-export function planStarterAdd(existing: ExistingPattern[]): StarterPlan {
+// libraryNames: the coach's own exercise library. A starter exercise that the library already has under another spelling is added to the ladder under the library's spelling, so a ladder never points at a
+// name the coach does not have (no dead duplicate of an exercise they already own).
+export function planStarterAdd(existing: ExistingPattern[], libraryNames: string[] = []): StarterPlan {
+  const libraryByIdentity = new Map<string, string>();
+  for (const n of libraryNames) if (!libraryByIdentity.has(exerciseIdentity(n))) libraryByIdentity.set(exerciseIdentity(n), n);
   const byName = new Map(existing.map((p) => [norm(p.name), p]));
   const newPatterns: StarterPattern[] = [];
   const rungs: StarterPlan["rungs"] = [];
@@ -272,7 +276,10 @@ export function planStarterAdd(existing: ExistingPattern[]): StarterPlan {
     const have = byName.get(norm(sp.name));
     if (!have) newPatterns.push(sp);
     const haveNames = new Set((have?.exerciseNames ?? []).map(exerciseIdentity));
-    const missing = STARTER_RUNGS.filter((r) => r.pattern === sp.name && !haveNames.has(exerciseIdentity(r.exercise)));
+    const missing = STARTER_RUNGS.filter((r) => r.pattern === sp.name && !haveNames.has(exerciseIdentity(r.exercise))).map((r) => ({
+      ...r,
+      exercise: libraryByIdentity.get(exerciseIdentity(r.exercise)) ?? r.exercise,
+    }));
     if (missing.length > 0) {
       rungs.push({ pattern: sp.name, rungs: missing });
       exerciseCount += missing.length;

@@ -190,3 +190,23 @@ describe("the starter names follow Ron's final naming (implement stated, singula
     for (const n of ron) expect(added.has(n), n).toBe(false);
   });
 });
+
+describe("a starter exercise takes the spelling the coach's library already has", () => {
+  it("the old short spelling in the library is used instead of adding a second name", () => {
+    const plan = planStarterAdd([], ["Back Squat", "DB Curl", "Lat Pulldown", "Goblet Squat"]);
+    const all = plan.rungs.flatMap((g) => g.rungs.map((r) => r.exercise));
+    expect(all).toContain("Back Squat");
+    expect(all).not.toContain("Barbell Back Squat");
+    expect(all).toContain("DB Curl");
+    expect(all).not.toContain("Dumbbell Curl");
+    expect(all).toContain("Lat Pulldown");
+    expect(all).not.toContain("Cable Lat Pulldown");
+    expect(all.filter((n) => n === "Goblet Squat")).toHaveLength(1);
+  });
+  it("with no library the starter spelling is used", () => {
+    expect(planStarterAdd([]).rungs.flatMap((g) => g.rungs.map((r) => r.exercise))).toContain("Barbell Back Squat");
+  });
+  it("the button reads the coach's library", () => {
+    expect(readFileSync(join(__dirname, "..", "components/coach/add-starter-ladders-button.tsx"), "utf8")).toContain('from("exercise_library")');
+  });
+});

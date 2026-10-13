@@ -32,7 +32,8 @@ export function AddStarterLaddersButton() {
         exerciseNames: ((p.movement_pattern_exercises ?? []) as any[]).map((e) => e.exercise_name as string),
         maxRank: Math.max(-1, ...((p.movement_pattern_exercises ?? []) as any[]).map((e) => Number(e.difficulty_rank) || 0)),
       }));
-      const plan = planStarterAdd(existing);
+      const { data: libraryRows } = await supabase.from("exercise_library").select("name").eq("created_by", userId);
+      const plan = planStarterAdd(existing, ((libraryRows ?? []) as { name: string }[]).map((r) => r.name));
       const idByName = new Map<string, string>(existing.map((p) => [p.name, p.id as string]));
       if (plan.newPatterns.length > 0) {
         const { data: created, error: createError } = await supabase
