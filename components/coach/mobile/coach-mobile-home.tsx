@@ -134,6 +134,13 @@ export async function CoachMobileHome({
           <h1 className="font-display font-bold text-3xl leading-none uppercase truncate">{groupName}</h1>
         </header>
 
+        {/* Pinned at the top of the coach's Home, whatever else is (or is not) on the page: the coach's own workout. It makes the coach's own space the first time and opens it as their own client app. */}
+        <div className="px-5 pb-4">
+          <Link href="/my-space?view=client" className="h-14 flex items-center justify-center bg-rust text-graphite font-display uppercase text-lg font-bold">
+            Start workout
+          </Link>
+        </div>
+
         <div className="px-5 pb-5 flex items-center gap-2">
           <ViewModeToggle targetMode="desktop" label="Desktop Mode" variant="button" groupId={groupId} />
         </div>

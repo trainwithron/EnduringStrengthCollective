@@ -21,3 +21,18 @@ describe("a coach's own personal space on the phone", () => {
     expect(home).toContain("&& !clientsElsewhere &&");
   });
 });
+
+describe("Start workout on the coach's phone Home", () => {
+  it("is pinned at the top, always, above every other card, and never replaced by the first-run card", () => {
+    const start = home.indexOf("Start workout");
+    expect(start).toBeGreaterThan(-1);
+    expect(home).toContain('href="/my-space?view=client"');
+    expect(start).toBeLessThan(home.indexOf("<LateChangesPanel"));
+    expect(start).toBeLessThan(home.indexOf("Welcome. Two things get you started"));
+    expect(home.match(/Start workout/g)?.length).toBe(1);
+  });
+  it("says who is being logged for on the coach-logs-for-a-client bar", () => {
+    const bar = read("components/coach/mobile/coach-mode-bar.tsx");
+    expect(bar).toContain("You are logging for {clientName}, a client, not you");
+  });
+});

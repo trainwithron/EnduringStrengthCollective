@@ -12,7 +12,7 @@ export function CoachModeBar({ groupId, clientName, homeHref }: { groupId: strin
       <div data-testid="coach-mode-bar" className="sticky top-0 z-30 h-14 bg-rust text-graphite flex items-center justify-between gap-2 px-3 pt-[env(safe-area-inset-top)]">
         <p className="font-body text-xs font-semibold uppercase tracking-wide leading-tight min-w-0 w-[calc(50%-32px)]">
           <span className="block">Coach mode</span>
-          <span className="block font-normal normal-case truncate">Logging for {clientName}</span>
+          <span className="block font-normal normal-case text-[11px] leading-tight line-clamp-2">You are logging for {clientName}, a client, not you</span>
         </p>
         <Link
           href={homeHref}
