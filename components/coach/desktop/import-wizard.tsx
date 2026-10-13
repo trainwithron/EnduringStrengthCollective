@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cleanImportedProgramName, PROGRAM_NAME_MAX, tidyProgramName } from "@/lib/program-name";
+import { readAiJson } from "@/lib/ai-fetch";
 import * as XLSX from "xlsx";
 import * as cptable from "xlsx/dist/cpexcel.full.mjs";
 import { createBrowserClient } from "@/lib/supabase/client";
@@ -749,7 +750,7 @@ export function ImportWizard({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ prompt: aiPrompt, groupId, athleteId: athleteId ?? undefined }),
       });
-      const data = await res.json();
+      const data = await readAiJson(res);
 
       if (!res.ok) {
         setStatus("error");
@@ -806,7 +807,7 @@ export function ImportWizard({
         headers: { "content-type": "application/json" },
         body: JSON.stringify(body),
       });
-      const data = await res.json();
+      const data = await readAiJson(res);
 
       if (!res.ok) {
         setStatus("error");

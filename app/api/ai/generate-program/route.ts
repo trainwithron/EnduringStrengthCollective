@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
-import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError, AiTruncatedError } from "@/lib/anthropic-client";
+import { callClaude, extractJson, isAiConfigured, AiNotConfiguredError, AiTruncatedError, AiTimeoutError } from "@/lib/anthropic-client";
 import { AiRateLimitedError } from "@/lib/ai-usage";
 import type { ParsedImportRow } from "@/lib/workout-import-parser";
 import { normalizeTimedRow } from "@/lib/timed-exercise";
@@ -158,7 +158,7 @@ function isValidRow(row: any): row is ParsedImportRow {
 }
 
 // AI generation can take well over the platform default; without this the request is cut off mid-way.
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 export async function POST(request: Request) {
   const supabase = await createServerClient();
@@ -373,6 +373,8 @@ export async function POST(request: Request) {
       // sized for a single day's worth of content. 16384 still wasn't
       // enough for the same request.
       maxTokens: 32000,
+      // Our own limit, a little under the platform's 300 seconds, so a very long program ends with a message instead of the platform's plain-text error page.
+      timeoutMs: 280_000,
     });
 
     const parsed = JSON.parse(extractJson(text));
@@ -518,6 +520,9 @@ export async function POST(request: Request) {
     }
     if (err instanceof AiNotConfiguredError) {
       return NextResponse.json({ error: err.message }, { status: 503 });
+    }
+    if (err instanceof AiTimeoutError) {
+      return NextResponse.json({ error: err.message }, { status: 504 });
     }
     if (err instanceof AiTruncatedError) {
       return NextResponse.json(

@@ -42,6 +42,8 @@ export interface ClaudeCallOptions {
   image?: ClaudeImageInput;
   document?: ClaudeDocumentInput;
   maxTokens?: number;
+  // Give up after this many milliseconds and throw AiTimeoutError, so a long generation ends with our own message before the platform cuts the request off with a plain-text page.
+  timeoutMs?: number;
   // Who/what this call is for — drives usage logging (model + tokens per
   // call, for per-coach cost) and the burst limit (lib/ai-usage.ts).
   // Required so a new call site can't silently skip the cost log.
@@ -66,6 +68,13 @@ export class AiNotConfiguredError extends Error {
 // surfacing separately so a caller building structured JSON (a program,
 // a meal plan) can tell a coach "this was too big, ask for less" instead
 // of a raw JSON.parse error pointing at a byte offset.
+export class AiTimeoutError extends Error {
+  constructor() {
+    super("That took too long. Try again, or ask for fewer days at a time.");
+    this.name = "AiTimeoutError";
+  }
+}
+
 export class AiTruncatedError extends Error {
   constructor() {
     super("Claude's response was cut off before finishing — the request was too large for the configured token limit.");
@@ -84,6 +93,7 @@ export async function callClaude({
   image,
   document,
   maxTokens = 4096,
+  timeoutMs,
   meta,
 }: ClaudeCallOptions): Promise<string> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -135,6 +145,7 @@ export async function callClaude({
         system,
         messages: [{ role: "user", content }],
       }),
+      ...(timeoutMs ? { signal: AbortSignal.timeout(timeoutMs) } : {}),
     });
 
   // The model id comes from ANTHROPIC_MODEL (default below). If the API says the model is not found (404), ask once more with the fallback id and remember
@@ -156,6 +167,7 @@ export async function callClaude({
     const errorClass = classifyAiThrown(err);
     noteAiAttempt({ ok: false, errorClass });
     await usage.complete({ status: "error", errorClass });
+    if (timeoutMs && err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) throw new AiTimeoutError();
     throw err;
   }
 

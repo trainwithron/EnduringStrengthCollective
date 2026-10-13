@@ -38,7 +38,7 @@ function buildHistoryText(history: { role: string; body: string }[]): string {
 }
 
 // AI generation can take well over the platform default; without this the request is cut off mid-way.
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 export async function POST(request: Request) {
   const supabase = await createServerClient();

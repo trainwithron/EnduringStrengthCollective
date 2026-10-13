@@ -5,6 +5,7 @@ import { MessageCircleQuestion, ChevronDown, ChevronUp } from "lucide-react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { MicButton } from "@/components/shared/mic-button";
+import { readAiJson } from "@/lib/ai-fetch";
 
 interface ChatMessage {
   role: "coach" | "assistant";
@@ -56,11 +57,10 @@ export function ProgramChatPanel({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ threadId, programId, message: question }),
       });
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
+      const data = await readAiJson(response);
+      if (!response.ok || data.error) {
         throw new Error(data.error ?? "Something went wrong.");
       }
-      const data = await response.json();
       setThreadId(data.threadId);
       setMessages((prev) => [...prev, { role: "assistant", body: data.reply, proposedRule: data.proposedRule }]);
     } catch (e) {
