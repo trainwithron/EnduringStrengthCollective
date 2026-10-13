@@ -1,11 +1,11 @@
-import Link from "next/link";
 import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
-import { NewProgramForm } from "@/components/coach/new-program-form";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
-import { ImportWizard } from "@/components/coach/desktop/import-wizard";
+import { CreateAndOpenProgram } from "@/components/coach/create-and-open-program";
 
+// "New program" and "Build program": there is no screen to fill in. The program is made at once and the builder opens (components/coach/create-and-open-program.tsx); the AI Program Builder is at
+// the top of the builder. An old link with ?method=ai goes to the import page, which is still there.
 export default async function NewProgramPage(
   props: {
     params: Promise<{ groupId: string }>;
@@ -23,6 +23,10 @@ export default async function NewProgramPage(
     redirect("/login");
   }
 
+  if (searchParams.method === "ai") {
+    redirect(`/groups/${params.groupId}/programs/import${searchParams.athleteId ? `?athleteId=${encodeURIComponent(searchParams.athleteId)}` : ""}`);
+  }
+
   const { data: membership } = await supabase
     .from("group_memberships")
     .select("role")
@@ -31,46 +35,19 @@ export default async function NewProgramPage(
     .maybeSingle();
 
   if (membership?.role !== "coach") {
-    return (
-      <NoAccess>Only coaches can create training programs.</NoAccess>
-    );
+    return <NoAccess>Only coaches can create training programs.</NoAccess>;
   }
 
-  const { data: group } = await supabase
-    .from("groups")
-    .select("name, group_kind")
-    .eq("id", params.groupId)
-    .single();
+  const { data: group } = await supabase.from("groups").select("name, group_kind").eq("id", params.groupId).single();
 
-  // The coach's one-on-one clients, so naming a program after one of them in a shared group can be caught.
-  const { data: soloRows } = await supabase
-    .from("group_memberships")
-    .select("group_id, profiles ( full_name ), groups!inner ( group_kind )")
-    .eq("role", "athlete")
-    .eq("groups.group_kind", "one_on_one");
-  const soloClients = (soloRows ?? [])
-    .map((r: any) => ({ fullName: (r.profiles?.full_name ?? "") as string, groupId: r.group_id as string }))
-    .filter((c) => c.fullName);
-
-  // Surfaced right here instead of only reachable via a separate "Import
-  // or build with AI" page (live_walkthrough_round2_findings.md) — same
-  // real ImportWizard/generate-program flow, not a second implementation.
-  // A plain query param keeps this a real, bookmarkable/back-button-safe
-  // tab instead of client-only toggle state, matching this app's existing
-  // convention (e.g. the group Dashboard's ?scope=all tabs).
-  const method = searchParams.method === "ai" ? "ai" : "blank";
-
-  // "Build with AI for this client" (injury_pain_science_research_and_
-  // ai_gap_sept15.md) — reached from ClientProgramActions with a real
-  // athleteId; verified against this group's own roster rather than
-  // trusted at face value, same discipline as the API route's own check.
-  // In a client's own (one-on-one) space every program is for that client, so it is filled in here too (the database also fills it in).
+  // For a client: the one named in the address, checked against this group's own roster; in a client's own one-on-one space, its one client.
   let wantedAthleteId: string | undefined = searchParams.athleteId;
   if (!wantedAthleteId && (group as { group_kind?: string } | null)?.group_kind === "one_on_one") {
     const { data: soleAthletes } = await supabase.from("group_memberships").select("profile_id").eq("group_id", params.groupId).eq("role", "athlete");
     if (soleAthletes?.length === 1) wantedAthleteId = soleAthletes[0].profile_id as string;
   }
-  let athleteName: string | null = null;
+  let athleteFirstName: string | null = null;
+  let athleteId: string | null = null;
   if (wantedAthleteId) {
     const { data: athleteMembership } = await supabase
       .from("group_memberships")
@@ -79,76 +56,15 @@ export default async function NewProgramPage(
       .eq("profile_id", wantedAthleteId)
       .maybeSingle();
     if (athleteMembership?.role === "athlete") {
-      athleteName = (athleteMembership.profiles as any)?.full_name ?? "this client";
+      athleteId = wantedAthleteId;
+      const full = ((athleteMembership.profiles as { full_name?: string | null } | null)?.full_name ?? "").trim();
+      athleteFirstName = full.split(/\s+/)[0] || "Client";
     }
   }
-  const athleteId = athleteName ? wantedAthleteId! : null;
-
-  const { data: libraryRows } =
-    method === "ai"
-      ? await supabase.from("exercise_library").select("name").eq("created_by", user.id).order("name")
-      : { data: null };
-  const { data: aliasRows } =
-    method === "ai"
-      ? await supabase.from("exercise_aliases").select("raw_name, exercise_name").eq("coach_id", user.id)
-      : { data: null };
 
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="programs">
-      <div className="pb-6 border-b border-steel/20 mb-6">
-        <h1 className="font-display font-bold text-3xl uppercase leading-none">New program</h1>
-        <p className="font-body text-sm text-steel mt-2">
-          A program is a training block — you&apos;ll add workouts to it next.
-        </p>
-        {athleteId && (
-          <p className="font-body text-xs text-rust mt-2">
-            Building a personal program for <span className="font-medium">{athleteName}</span>.
-          </p>
-        )}
-      </div>
-
-      <div className="flex gap-2 mb-6">
-        <Link
-          href={`/groups/${params.groupId}/programs/new${athleteId ? `?athleteId=${athleteId}` : ""}`}
-          className={`h-9 px-3.5 flex items-center font-body text-sm border ${
-            method === "blank" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
-          }`}
-        >
-          Start blank
-        </Link>
-        <Link
-          href={`/groups/${params.groupId}/programs/new?method=ai${athleteId ? `&athleteId=${athleteId}` : ""}`}
-          className={`h-9 px-3.5 flex items-center font-body text-sm border ${
-            method === "ai" ? "bg-rust text-graphite border-rust" : "border-steel/30 text-steel"
-          }`}
-        >
-          Build with AI
-        </Link>
-      </div>
-
-      {method === "blank" ? (
-        <div className="max-w-lg">
-          <NewProgramForm
-            groupId={params.groupId}
-            createdBy={user.id}
-            athleteId={athleteId}
-            groupName={group?.name ?? "this group"}
-            sharedGroup={(group as { group_kind?: string } | null)?.group_kind !== "one_on_one"}
-            soloClients={soloClients}
-          />
-        </div>
-      ) : (
-        <>
-          <ImportWizard
-            coachId={user.id}
-            groupId={params.groupId}
-            athleteId={athleteId}
-            athleteName={athleteName}
-            initialLibrary={libraryRows ?? []}
-            initialAliases={(aliasRows ?? []).map((a) => ({ rawName: a.raw_name, exerciseName: a.exercise_name }))}
-          />
-        </>
-      )}
+      <CreateAndOpenProgram groupId={params.groupId} createdBy={user.id} athleteId={athleteId} athleteFirstName={athleteFirstName} />
     </CoachDesktopShell>
   );
 }
