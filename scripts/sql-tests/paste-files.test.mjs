@@ -1143,6 +1143,7 @@ await run("apply/undo-step111-catalog-merge-ron.sql");
 // (the assessments table carries the same rule when it is installed, so it comes off first)
 await run(`apply/undo-step113-0363.sql`);
 await run(`apply/undo-step104-0358.sql`);
+await run(`apply/undo-step102-0356.sql`);
 await run(`apply/undo-step101-0355.sql`);
 await run(`apply/undo-step95-0349.sql`);
 await run(`apply/undo-step94-0348.sql`);
@@ -1810,6 +1811,24 @@ await run(`apply/undo-step94-0348.sql`);
   check("release-bg: the undo removes the table" + (euBG ? ": " + euBG : ""), !euBG && !(await has()));
   const errBG2 = await run(`apply/${bundle.file}`);
   check("release-bg: the bundle applies again after an undo" + (errBG2 ? ": " + errBG2 : ""), !errBG2 && (await has()));
+}
+// Release BH (step 102): ONE paste.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bundle = bundles.find((b) => b.id === "release-bh");
+  check("release-bh: ONE bundle holds step 102", !!bundle && JSON.stringify(bundle.steps) === JSON.stringify(["102"]));
+  const st102 = steps.find((x) => x.n === "102");
+  const has = async () => (await db.query("select to_regclass('public.client_quotes') is not null as ok")).rows[0].ok === true;
+  const ebh0 = await run(`apply/undo-step${st102.n}-${st102.slug}.sql`);
+  check("release-bh: before the bundle runs there are no quotes" + (ebh0 ? ": " + ebh0 : ""), !ebh0 && !(await has()));
+  const errBH = await run(`apply/${bundle.file}`);
+  check("release-bh bundle applies" + (errBH ? ": " + errBH : ""), !errBH && (await has()));
+  const againBH = await run(`apply/${bundle.file}`);
+  check("release-bh: a second run is refused, naming step 102", !!againBH && againBH.includes("step 102 (0356) cannot run") && againBH.includes("already applied"));
+  const euBH = await run(`apply/undo-step${st102.n}-${st102.slug}.sql`);
+  check("release-bh: the undo removes the tables" + (euBH ? ": " + euBH : ""), !euBH && !(await has()));
+  const errBH2 = await run(`apply/${bundle.file}`);
+  check("release-bh: the bundle applies again after an undo" + (errBH2 ? ": " + errBH2 : ""), !errBH2 && (await has()));
 }
 // The permanent function-permission check: all true after step 24, and it catches a new function that nobody closed.
 {

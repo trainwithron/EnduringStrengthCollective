@@ -16,6 +16,15 @@ export interface WebsiteSettingsInitial {
   published: boolean;
 }
 
+// A quote a client sent from the review card, waiting for the coach.
+export interface PendingQuote {
+  id: string;
+  body: string;
+  firstName: string;
+  // The client agreed it may be shared publicly. Without it the review stays private to the coach.
+  sharePublicly: boolean;
+}
+
 const BUCKET = "coach-profile-photos";
 const ALLOWED = ["image/png", "image/jpeg", "image/webp"];
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -23,7 +32,8 @@ const input = "w-full h-11 bg-graphite border border-steel/30 text-chalk px-3 fo
 const label = "font-body text-xs text-steel uppercase tracking-wide";
 
 // The coach's one small "My website" screen: a few short fields, two pictures, a background choice, a Preview link and ONE Publish switch (off until the coach turns it on).
-export function WebsiteSettings({ coachId, slug, initial }: { coachId: string; slug: string | null; initial: WebsiteSettingsInitial }) {
+export function WebsiteSettings({ coachId, slug, initial, pendingQuotes = [] }: { coachId: string; slug: string | null; initial: WebsiteSettingsInitial; pendingQuotes?: PendingQuote[] }) {
+  const [quotes, setQuotes] = useState(pendingQuotes);
   const [headline, setHeadline] = useState(initial.headline);
   const [whoIHelp, setWhoIHelp] = useState(initial.whoIHelp);
   const [whatIDo, setWhatIDo] = useState(initial.whatIDo);
@@ -66,6 +76,34 @@ export function WebsiteSettings({ coachId, slug, initial }: { coachId: string; s
     }
     setMessage({ text: "Saved.", error: false });
     return true;
+  }
+
+  // Put a client's quote on the page: it goes into the first empty review slot and the page is saved; the quote is then marked used. Nothing a client sends is public until the coach does this.
+  async function addQuoteToPage(q: PendingQuote) {
+    if (!q.sharePublicly) return;
+    const slot = reviews.findIndex((r) => !r.quote.trim());
+    if (slot < 0) {
+      setMessage({ text: "Your page holds three reviews. Clear one first.", error: true });
+      return;
+    }
+    const next = reviews.map((r, i) => (i === slot ? { quote: q.body, first_name: q.firstName } : r));
+    setReviews(next);
+    const c = cleanSite({ headline, whoIHelp, whatIDo, whyLines: why, reviews: next, background });
+    setBusy(true);
+    const { error } = await supabase.from("coach_sites").upsert({ coach_id: coachId, reviews: c.reviews, updated_at: new Date().toISOString() }, { onConflict: "coach_id" });
+    if (!error) await supabase.from("client_quotes").update({ status: "used" }).eq("id", q.id);
+    setBusy(false);
+    if (error) {
+      setMessage({ text: "That didn't save. Nothing was changed. Try again.", error: true });
+      return;
+    }
+    setQuotes((prev) => prev.filter((x) => x.id !== q.id));
+    setMessage({ text: "Added to your page.", error: false });
+  }
+
+  async function dismissQuote(q: PendingQuote) {
+    const { error } = await supabase.from("client_quotes").update({ status: "declined" }).eq("id", q.id);
+    if (!error) setQuotes((prev) => prev.filter((x) => x.id !== q.id));
   }
 
   async function togglePublish() {
@@ -162,6 +200,32 @@ export function WebsiteSettings({ coachId, slug, initial }: { coachId: string; s
           </div>
         ))}
       </div>
+
+      {quotes.length > 0 && (
+        <div className="space-y-2" aria-label="Quotes from clients">
+          <p className={label}>Reviews clients sent you</p>
+          <p className="font-body text-xs text-steel">Nothing shows on your page until you add it. Only reviews marked shareable can be added. After you add one, add the client's first name if they are happy to be named.</p>
+          <ul className="divide-y divide-steel/15 border border-steel/20">
+            {quotes.map((q) => (
+              <li key={q.id} className="p-3">
+                <p className="font-body text-sm text-chalk">&ldquo;{q.body}&rdquo;{q.firstName && <span className="text-steel"> &mdash; {q.firstName}</span>}</p>
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  {q.sharePublicly ? (
+                    <button type="button" disabled={busy} onClick={() => void addQuoteToPage(q)} className="min-h-11 px-3 font-body text-sm text-rust underline underline-offset-2 disabled:opacity-40">
+                      Add to my page
+                    </button>
+                  ) : (
+                    <span className="font-body text-xs text-steel">Private: the client did not agree to share it.</span>
+                  )}
+                  <button type="button" disabled={busy} onClick={() => void dismissQuote(q)} className="min-h-11 px-3 font-body text-sm text-steel">
+                    Dismiss
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {(["hero", "cover"] as const).map((kind) => {
