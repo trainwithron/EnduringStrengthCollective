@@ -49,7 +49,7 @@ export function ReviewPromptCard({ groupId, athleteId, coachId, coachName, first
         <textarea value={quote} maxLength={240} rows={3} onChange={(e) => setQuote(e.target.value)} aria-label="Your review" placeholder="One or two sentences" className="w-full bg-graphite border border-steel/30 text-chalk px-2 py-2 font-body text-base sm:text-sm" />
         <label className="flex min-h-11 items-start gap-2 font-body text-sm text-chalk cursor-pointer">
           <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} className="mt-1 h-5 w-5 shrink-0 accent-[#D2703B]" />
-          <span>I agree {coachName} may share this publicly, for example on their website.</span>
+          <span>I agree {coachName} may share this, with my first name, publicly, for example on their website.</span>
         </label>
         {error && (
           <p className="font-body text-xs text-rust" role="alert">

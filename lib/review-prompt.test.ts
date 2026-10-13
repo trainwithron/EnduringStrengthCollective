@@ -19,7 +19,7 @@ describe("asking for a review, once and quietly", () => {
   it("is a text box and a consent tick, with no Google link anywhere", () => {
     const card = read("components/athlete/review-prompt-card.tsx");
     expect(card).toContain("Enjoying training with {coachName}? Leave a review.");
-    expect(card).toContain("I agree {coachName} may share this publicly, for example on their website.");
+    expect(card).toContain("I agree {coachName} may share this, with my first name, publicly, for example on their website.");
     expect(card).toContain("share_publicly: agree");
     expect(card).not.toMatch(/google/i);
     expect(read("components/coach/desktop/website-settings.tsx")).not.toMatch(/Your Google review link|review_url/i);
