@@ -6,7 +6,7 @@ import { isMemberOfGroup, NOT_IN_GROUP_MESSAGE } from "@/lib/athlete-in-group";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ExerciseHistoryUploader } from "@/components/coach/exercise-history-uploader";
 import { HistoryImportAccessToggle } from "@/components/coach/history-import-access-toggle";
-import { FitprosHistoryImport } from "@/components/coach/fitpros-history-import";
+import { HistoryImportPicker } from "@/components/coach/history-import-picker";
 
 export default async function ClientHistoryPage(
   props: {
@@ -79,14 +79,16 @@ export default async function ClientHistoryPage(
           />
         </div>
 
-        <FitprosHistoryImport athleteId={params.athleteId} groupId={params.groupId} athleteName={athleteName} />
+        <HistoryImportPicker athleteId={params.athleteId} groupId={params.groupId} athleteName={athleteName} />
 
-        <ExerciseHistoryUploader
-          athleteId={params.athleteId}
-          groupId={params.groupId}
-          exerciseSuggestions={exerciseSuggestions}
-          viewerIsCoach
-        />
+        <div id="history-upload" className="mt-8 scroll-mt-20">
+          <ExerciseHistoryUploader
+            athleteId={params.athleteId}
+            groupId={params.groupId}
+            exerciseSuggestions={exerciseSuggestions}
+            viewerIsCoach
+          />
+        </div>
       </div>
     </CoachDesktopShell>
   );

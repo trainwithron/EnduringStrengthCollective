@@ -22,7 +22,7 @@ function todayKey(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-// "Import from FitPros": the coach picks the exported text file, sees exactly what would be written (a dry run: nothing is saved), and only then imports. Each workout is matched to the program
+// FitPros import: the coach picks the exported text file, sees exactly what would be written (a dry run: nothing is saved), and only then imports. Each workout is matched to the program
 // day by its exercise list. Imported days show in History, not as ticked days on the calendar. Running it again never doubles anything, and "Undo this import" removes only what it wrote.
 export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athleteId: string; groupId: string; athleteName: string }) {
   const router = useRouter();
@@ -91,22 +91,30 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
   }
 
   async function runImport() {
-    if (!plan || !program || busy) return;
+    if (!workouts || !program || busy) return;
     setBusy(true);
     setError(null);
     setMessage(null);
     const supabase = createBrowserClient();
+    // The start date the import is matched against: moved first (and checked in the database), never assumed.
+    let start = program.startDate;
+    let moved = false;
     if (moveStart && firstDate) {
-      const ok = await moveProgramStart(supabase, program.programId, firstDate);
-      if (!ok) {
+      const stored = await moveProgramStart(supabase, program.programId, firstDate);
+      if (stored !== firstDate) {
         setBusy(false);
-        setError("Couldn't move the program start. Nothing was imported.");
+        setError(`The program start did NOT move to ${firstDate}, so nothing was imported. Try again, and tell us if it happens again.`);
         return;
       }
+      start = stored;
+      moved = true;
     }
-    const result = await runFitprosImport(supabase, { athleteId, groupId, plan, existingKeys });
+    // The plan is made again here from exactly that start date, so what is written is what was just confirmed, never a screen that is a moment out of date.
+    const finalPlan = planFitprosImport(workouts, program.workouts, start, new Set(program.takenWorkoutIds));
+    const result = await runFitprosImport(supabase, { athleteId, groupId, plan: finalPlan, existingKeys });
     setBusy(false);
-    setMessage(`Imported ${result.imported} workout${result.imported === 1 ? "" : "s"}${result.skippedAlreadyThere ? `, ${result.skippedAlreadyThere} already there` : ""}.${result.failed.length ? ` ${result.failed.length} did not save: ${result.failed.join("; ")}` : ""}`);
+    const linked = finalPlan.filter((w) => w.programWorkoutId).length;
+    setMessage(`Imported ${result.imported} workout${result.imported === 1 ? "" : "s"}${result.skippedAlreadyThere ? `, ${result.skippedAlreadyThere} already there` : ""} (${linked} matched to program days, ${finalPlan.length - linked} plain history).${moved ? ` The program start is now ${start}.` : ""}${result.failed.length ? ` ${result.failed.length} did not save: ${result.failed.join("; ")}` : ""}`);
     await reload();
     router.refresh();
   }
@@ -129,7 +137,7 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
 
   return (
     <section className="border border-steel/20 p-4 mt-8 max-w-3xl">
-      <h2 className="font-display uppercase text-sm tracking-wide text-steel">Import from FitPros</h2>
+      <h2 className="font-display uppercase text-sm tracking-wide text-steel">FitPros</h2>
       <p className="font-body text-sm text-steel mt-1 max-w-2xl">
         Choose the FitPros history file for {athleteName}. You see what would be saved first; nothing is saved until you press Import. Imported workouts show in History, are not counted as new records, and send no notifications. The star rating and workout notes are left out.
       </p>
@@ -155,6 +163,11 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
                 {existing.length > 0 ? ` ${existing.length} already imported.` : ""}
               </p>
 
+              {needsEarlierStart && firstDate && !moveStart && (
+                <p className="font-body text-sm text-rust" role="alert">
+                  These workouts start on {firstDate}, before the program starts{currentStart ? ` (${currentStart})` : ""}. Nothing before the start can be matched to a program day, so it will import as plain history. Tick the box below to move the start.
+                </p>
+              )}
               {needsEarlierStart && firstDate && (
                 <div className="border border-steel/30 p-3 font-body text-sm">
                   <label className="flex items-start gap-2 min-h-11 cursor-pointer">

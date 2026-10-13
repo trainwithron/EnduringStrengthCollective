@@ -144,7 +144,8 @@ describe("The importer writes history only, and says so", () => {
     expect(code).toContain("isImportMarker(started)");
   });
   it("the history page shows the importer, with a dry run before Import and an Undo", () => {
-    expect(src("app/(coach)/groups/[groupId]/athletes/[athleteId]/history/page.tsx")).toContain("<FitprosHistoryImport");
+    expect(src("app/(coach)/groups/[groupId]/athletes/[athleteId]/history/page.tsx")).toContain("<HistoryImportPicker");
+    expect(src("components/coach/history-import-picker.tsx")).toContain("<FitprosHistoryImport");
     const ui = src("components/coach/fitpros-history-import.tsx");
     expect(ui).toContain("nothing is saved until you press Import");
     expect(ui).toContain("Undo this import");
@@ -161,5 +162,32 @@ describe("Only the import's own stamp counts as an import", () => {
     expect(isImportMarker("2026-09-03T09:30:18+00:00")).toBe(false);
     expect(isImportMarker("2026-09-03T12:05:17+00:00")).toBe(false);
     expect(isImportMarker("2026-09-03T12:00:17-07:00")).toBe(false);
+  });
+});
+
+describe("Moving the program start is checked, never assumed", () => {
+  const src = (rel: string) => readFileSync(join(__dirname, "..", rel), "utf8").replace(/\r\n/g, "\n");
+  const ui =src("components/coach/fitpros-history-import.tsx");
+  const lib = src("lib/fitpros-history-import.ts");
+  it("moveProgramStart reports the stored date and null unless it is the date asked for", () => {
+    expect(lib).toContain('.select("id, start_date")');
+    expect(lib).toContain("return stored === startDate ? stored : null;");
+  });
+  it("the import moves the start first, stops loudly if it did not move, and plans again from the start it really has", () => {
+    expect(ui).toContain("if (stored !== firstDate)");
+    expect(ui).toContain("did NOT move to");
+    expect(ui).toContain("const finalPlan = planFitprosImport(workouts, program.workouts, start,");
+    expect(ui).toContain("plan: finalPlan");
+  });
+  it("it warns in red when the workouts come before the program start and the start is not being moved", () => {
+    expect(ui).toContain("before the program starts");
+    expect(ui).toContain("Tick the box below to move the start");
+  });
+  it("the page has ONE Import button that asks where the history is from, and no source is named in the page itself", () => {
+    const picker = src("components/coach/history-import-picker.tsx");
+    expect(picker).toContain("Where is the history from?");
+    expect(picker.match(/^\s+Import$/gm)?.length).toBe(1);
+    expect(picker).toContain("Other (CSV or Excel)");
+    expect(src("app/(coach)/groups/[groupId]/athletes/[athleteId]/history/page.tsx")).not.toContain("FitPros");
   });
 });

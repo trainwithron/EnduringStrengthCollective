@@ -180,7 +180,10 @@ export async function undoFitprosImport(supabase: SupabaseClient, groupId: strin
 }
 
 // The coach may move the program's start date back so the history lines up with the weeks.
-export async function moveProgramStart(supabase: SupabaseClient, programId: string, startDate: string): Promise<boolean> {
-  const { data, error } = await supabase.from("programs").update({ start_date: startDate }).eq("id", programId).select("id");
-  return !error && !!data && data.length > 0;
+// Returns the start date the database now holds, or null when the change did not happen (no row changed, an error, or the stored date is not the one asked for).
+export async function moveProgramStart(supabase: SupabaseClient, programId: string, startDate: string): Promise<string | null> {
+  const { data, error } = await supabase.from("programs").update({ start_date: startDate }).eq("id", programId).select("id, start_date");
+  if (error || !data || data.length === 0) return null;
+  const stored = (data[0] as { start_date: string | null }).start_date;
+  return stored === startDate ? stored : null;
 }
