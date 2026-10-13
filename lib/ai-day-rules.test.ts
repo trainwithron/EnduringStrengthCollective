@@ -107,7 +107,7 @@ describe("the day route applies the rules", () => {
   const prompt = readFileSync(join(__dirname, "ai-day-run.ts"), "utf8").replace(/\r\n/g, "\n");
   it("retries a day once when it breaks something he said to leave out, and only if there is time", () => {
     expect(route).toContain("hard.length > 0 && elapsed <= 28_000");
-    expect(route.match(/await attempt\(/g)?.length).toBe(2);
+    expect(route.match(/await attempt\(/g)?.length).toBe(3); // the first try, the shorter retry after a cut-off, and the retry for a broken rule
     expect(route).toContain("isHard");
   });
   it("removes repeats, keeps timed items consistent, snaps to plain names, names the day by its purpose", () => {
