@@ -59,6 +59,8 @@ import {
 import type { RosterMember } from "@/lib/types";
 import { loadMyTraining } from "@/lib/my-training";
 import { FeaturedShopCards } from "@/components/athlete/pro-shop-list";
+import { ClassesList } from "@/components/athlete/classes-list";
+import { loadClassCards } from "@/lib/class-cards";
 import type { ProShopLink } from "@/components/coach/desktop/pro-shop-manager";
 import { inOrg, orgIdOfGroup } from "@/lib/org-of-group";
 import { OtherProgramsCard } from "@/components/athlete/other-programs-card";
@@ -234,6 +236,13 @@ export default async function GroupHubPage(
         featured: !!r.featured,
       }));
     }
+  }
+
+  // The client's Home: the group sessions they can join in the next seven days (a handful). A client's own one-on-one space has none.
+  let weekClasses: Awaited<ReturnType<typeof loadClassCards>> | null = null;
+  if (user && athleteId === user.id && (!isCoachViewer(roster, user.id) || isActingAsOther) && (group as { group_kind?: string } | null)?.group_kind !== "one_on_one") {
+    const loaded = await loadClassCards(supabase, athleteId, params.groupId, { untilIso: new Date(Date.now() + 7 * 86400000).toISOString(), limit: 5 });
+    if (!loaded.notReady && loaded.classes.length > 0) weekClasses = loaded;
   }
 
   // Coaches first, then athletes, alphabetical within each group.
@@ -846,6 +855,15 @@ export default async function GroupHubPage(
                 mealLine={mealLine}
                 sessionsLeft={sessionsLeft}
               />
+              {isToday && weekClasses && (
+                <section aria-label="Group classes this week">
+                  <h2 className="font-body text-xs uppercase tracking-wide text-steel mb-2">Group classes this week</h2>
+                  <ClassesList classes={weekClasses.classes} balance={weekClasses.balance} timezone={timezone} nowIso={weekClasses.nowIso} />
+                  <Link href={`/groups/${params.groupId}/classes`} className="inline-block mt-2 font-body text-xs text-rust min-h-11 leading-[44px]">
+                    See all group sessions
+                  </Link>
+                </section>
+              )}
               {isToday && <FeaturedShopCards links={featuredShop} />}
               {isToday && isFirstDay && (
                 <WellnessCheckinPopup
