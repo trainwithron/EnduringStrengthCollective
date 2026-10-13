@@ -8,7 +8,7 @@ describe("coach mode: a coach logging a workout for a client on the phone", () =
   it("the frame says whose app it is, keeps the hub button and gives one tap home", () => {
     const bar = read("components/coach/mobile/coach-mode-bar.tsx");
     expect(bar).toContain("Coach mode");
-    expect(bar).toContain("Logging for {clientName}");
+    expect(bar).toContain("You are logging for {clientName}, a client, not you");
     expect(bar).toContain("<CoachSpotHub groupId={groupId} />");
     expect(bar).toContain("href={homeHref}");
     expect(bar).toContain("bg-rust");
