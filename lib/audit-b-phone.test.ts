@@ -23,7 +23,7 @@ describe("the set grid is phone-sized", () => {
   const grid = read("components/logging/exercise-set-grid.tsx");
   it("cells are 44px tall, the fill handle is wider, and the hint is just the number", () => {
     expect(grid).not.toMatch(/\bh-10\b/);
-    expect(grid).toContain('className="relative w-16 h-11 shrink-0"');
+    expect(grid).toContain('className="relative w-12 h-11 shrink-0"');
     expect(grid).toContain("w-8 h-11 shrink-0");
     expect(grid).not.toContain("(target)");
     expect(grid).not.toContain("lbs`");

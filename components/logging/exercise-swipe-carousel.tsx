@@ -310,7 +310,7 @@ export function ExerciseSwipeCarousel({
                   <button
                     type="button"
                     onClick={() => setExpandedId(expanded ? null : exercise.id)}
-                    className="flex items-center gap-1 min-h-9 px-1 font-body text-xs text-steel uppercase tracking-wide active:text-rust"
+                    className="flex items-center gap-1 min-h-[44px] px-1 font-body text-xs text-steel uppercase tracking-wide active:text-rust"
                   >
                     {expanded ? "Less room" : "More room"}
                     {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
