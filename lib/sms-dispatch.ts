@@ -21,7 +21,26 @@ export type SmsDispatchReason =
   | "quiet_hours"
   | "already_sent"
   | "send_failed"
-  | "daily_cap";
+  | "daily_cap"
+  | "monthly_cap";
+
+// Texts stay, but very limited: a modest cap per coach per calendar month (UTC), counted from sms_log, checked before every send. Adjustable with SMS_MONTHLY_CAP_PER_COACH.
+export const SMS_MONTHLY_CAP_DEFAULT = 60;
+export const SMS_MONTHLY_CAP_MESSAGE = "You've used this month's text messages. Clients still get in-app messages and notifications.";
+
+export function smsMonthlyCap(): number {
+  const n = Number(process.env.SMS_MONTHLY_CAP_PER_COACH);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : SMS_MONTHLY_CAP_DEFAULT;
+}
+
+export function startOfMonthUtc(now: Date = new Date()): string {
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+}
+
+export async function smsUsedThisMonth(supabase: SupabaseClient, coachId: string, now: Date = new Date()): Promise<number> {
+  const { count } = await supabase.from("sms_log").select("id", { count: "exact", head: true }).eq("coach_id", coachId).gte("sent_at", startOfMonthUtc(now));
+  return count ?? 0;
+}
 
 export interface SmsDispatchResult {
   sent: boolean;
@@ -129,6 +148,9 @@ export async function dispatchSms(
   if (isWithinQuietHours(nowInZone(zone), config.quiet_hours_start, config.quiet_hours_end)) {
     return { sent: false, reason: "quiet_hours" };
   }
+
+  // The monthly cap: past it nothing more is texted this month (clients still get in-app messages and notifications).
+  if ((await smsUsedThisMonth(supabase, params.coachId)) >= smsMonthlyCap()) return { sent: false, reason: "monthly_cap" };
 
   // A per-coach daily ceiling, so a bug or a flood of events can never run up a text bill: the platform pays for
   // these. Adjustable with SMS_DAILY_CAP_PER_COACH (default 40 a day).

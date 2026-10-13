@@ -46,7 +46,7 @@ const PAGES: PageDef[] = [
   { key: "leads", label: "Leads", section: "Business", path: "business/leads", keywords: ["prospects", "inquiries"] },
   { key: "session-ledger", label: "Session ledger", section: "Business", path: "business/session-ledger", keywords: ["credits", "balance"] },
   { key: "waiver", label: "Waiver", section: "Business", path: "business/waiver", keywords: ["intake", "parq"] },
-  { key: "sms-settings", label: "SMS notifications", section: "Business", path: "business/sms-settings", keywords: ["text"] },
+  { key: "sms-settings", label: "Text messages", section: "Settings", path: "business/sms-settings", keywords: ["text"] },
   { key: "zapier", label: "Zapier", section: "Business", path: "business/zapier", keywords: ["automation", "integration"] },
   { key: "branding", label: "Organization", section: "Business", path: "branding", keywords: ["brand", "logo", "colors"] },
   { key: "support", label: "Support", section: "Business", path: "business/support", keywords: ["help"] },

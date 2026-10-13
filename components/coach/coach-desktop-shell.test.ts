@@ -32,7 +32,7 @@ describe("coach desktop shell", () => {
       expect(at(m), m).toBeLessThan(at('label: "Business"'));
     }
     // Business holds the business tools, Pro Shop and Referrals (the Resources page), and for the platform admin only Organizations and Marketplace ranking
-    for (const m of ['label: "Booking Page"', 'label: "Waiver"', 'label: "Leads"', 'label: "Session Ledger"', 'label: "Organization"', 'label: "SMS Notifications"', 'label: "Zapier"', 'label: "Pro Shop and Referrals"', 'label: "Marketplace ranking"']) {
+    for (const m of ['label: "Booking Page"', 'label: "Waiver"', 'label: "Leads"', 'label: "Session Ledger"', 'label: "Organization"', 'label: "Zapier"', 'label: "Pro Shop and Referrals"', 'label: "Marketplace ranking"']) {
       expect(at(m), m).toBeGreaterThan(at('label: "Business"'));
       expect(at(m), m).toBeLessThan(at('label: "Group"'));
     }
@@ -46,7 +46,7 @@ describe("coach desktop shell", () => {
       expect(at(m), m).toBeLessThan(at('label: "Settings"'));
     }
     // Settings: Account, Display Mode, Kiosk Check-In, Support, Quick Tips, and the Support Inbox for the platform admin only
-    for (const m of ['label: "Account"', 'label: "Display Mode"', 'label: "Kiosk Check-In"', 'label: "Support"', 'label: "Quick Tips"', 'label: "Support Inbox"']) expect(at(m), m).toBeGreaterThan(at('label: "Settings"'));
+    for (const m of ['label: "Account"', 'label: "Text messages"', 'label: "Display Mode"', 'label: "Kiosk Check-In"', 'label: "Support"', 'label: "Quick Tips"', 'label: "Support Inbox"']) expect(at(m), m).toBeGreaterThan(at('label: "Settings"'));
     // the footer keeps only the workspace switcher, Report a problem, Download app and Sign out
     expect(shell).not.toContain('title="Display Mode"');
     expect(shell).not.toContain('title="Kiosk Check-In"');

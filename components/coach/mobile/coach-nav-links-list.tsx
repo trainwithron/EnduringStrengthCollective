@@ -134,7 +134,6 @@ export function CoachNavLinksList({ groupId }: { groupId: string; groupName?: st
             <GroupHeader label="Business" icon={TrendingUp} />
             <Item href={`/groups/${groupId}/business/packages`} label="Packages" icon={Layers} />
             <Item href={`/groups/${groupId}/business/waiver`} label="Waiver" icon={ClipboardList} />
-            <Item href={`/groups/${groupId}/business/sms-settings`} label="SMS notifications" icon={MessageCircle} />
             <Item href={`/groups/${groupId}/business/zapier`} label="Zapier" icon={Zap} />
             <Item href={`/groups/${groupId}/branding`} label="Organization settings" icon={Palette} />
 
@@ -161,6 +160,7 @@ export function CoachNavLinksList({ groupId }: { groupId: string; groupName?: st
               <MonitorPlay className="w-4 h-4 shrink-0 text-steel" strokeWidth={2.25} />
               Kiosk display
             </a>
+            <Item href={`/groups/${groupId}/business/sms-settings`} label="Text messages" icon={MessageCircle} />
             <Item href={`/groups/${groupId}/business/support`} label="Support" icon={HeartHandshake} />
             {isPlatformAdmin && (
               <>

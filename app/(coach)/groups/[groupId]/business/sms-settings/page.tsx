@@ -4,6 +4,7 @@ import { NoAccess } from "@/components/shared/no-access";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { SmsSettingsForm } from "@/components/coach/desktop/sms-settings-form";
+import { SMS_MONTHLY_CAP_MESSAGE, smsMonthlyCap, smsUsedThisMonth } from "@/lib/sms-dispatch";
 import { isTwilioConfigured } from "@/lib/twilio";
 
 export default async function SmsSettingsPage(
@@ -27,7 +28,7 @@ export default async function SmsSettingsPage(
 
   if (membership?.role !== "coach") {
     return (
-      <NoAccess>Only coaches can manage SMS settings.</NoAccess>
+      <NoAccess>Only coaches can manage text messages.</NoAccess>
     );
   }
 
@@ -39,14 +40,18 @@ export default async function SmsSettingsPage(
     .eq("coach_id", user.id)
     .maybeSingle();
 
+  const used = await smsUsedThisMonth(supabase, user.id);
+  const cap = smsMonthlyCap();
+
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="sms-settings">
       <div className="pb-6 border-b border-steel/20 mb-6">
-        <h1 className="font-display font-bold text-3xl uppercase leading-none">SMS Notifications</h1>
-        <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">
-          Session reminders, booking confirmations, attendance nudges, and low-credit alerts, sent
-          as real text messages alongside the push notifications you already get.
+        <h1 className="font-display font-bold text-3xl uppercase leading-none">Text messages</h1>
+        <p className="font-body text-sm text-steel mt-2 max-w-[70ch]">Reminders and confirmations by text, for the few clients who choose them.</p>
+        <p className="font-body text-sm text-chalk mt-2" role="status">
+          Text messages this month: {used} of {cap}.
         </p>
+        {used >= cap && <p className="font-body text-sm text-steel mt-1 max-w-[70ch]">{SMS_MONTHLY_CAP_MESSAGE}</p>}
       </div>
 
       <SmsSettingsForm

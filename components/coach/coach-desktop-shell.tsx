@@ -457,7 +457,6 @@ function CoachDesktopShellFull({
         { key: "leads", label: "Leads", href: `/groups/${groupId}/business/leads`, icon: UserPlus },
         { key: "session-ledger", label: "Session Ledger", href: `/groups/${groupId}/business/session-ledger`, icon: Wallet },
         { key: "branding", label: "Organization", href: `/groups/${groupId}/branding`, icon: Palette },
-        { key: "sms-settings", label: "SMS Notifications", href: `/groups/${groupId}/business/sms-settings`, icon: MessageCircle },
         { key: "zapier", label: "Zapier", href: `/groups/${groupId}/business/zapier`, icon: Zap },
         // Platform administration: only the platform admin sees these (their pages refuse everyone else on the server too).
         ...(isPlatformAdmin
@@ -498,6 +497,7 @@ function CoachDesktopShellFull({
         { key: "settings", label: "Account", href: `/groups/${groupId}/settings`, icon: Settings },
         { key: "display", label: "Display Mode", href: `/groups/${groupId}/display`, icon: MonitorPlay, newTab: true },
         { key: "kiosk", label: "Kiosk Check-In", href: `/groups/${groupId}/kiosk/settings`, icon: UserCheck },
+        { key: "sms-settings", label: "Text messages", href: `/groups/${groupId}/business/sms-settings`, icon: MessageCircle },
         { key: "support", label: "Support", href: `/groups/${groupId}/business/support`, icon: HeartHandshake },
         { key: "quick-tips", label: "Quick Tips", href: `/groups/${groupId}/quick-tips`, icon: Lightbulb },
         ...(isPlatformAdmin ? [{ key: "admin-support" as const, label: "Support Inbox", href: "/admin/support", icon: HeartHandshake, badge: openSupportCount }] : []),
