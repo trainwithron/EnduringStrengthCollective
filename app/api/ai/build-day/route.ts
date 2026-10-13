@@ -12,6 +12,7 @@ import { scanConstraints } from "@/lib/constraint-scan";
 import { parseRestSeconds } from "@/lib/workout-import-parser";
 import { DEFAULT_TRACKED_FIELDS } from "@/lib/exercise-fields";
 import type { TrackedField } from "@/lib/exercise-fields";
+import { allowsRepeats, applyTimedConsistency, dedupeDay, isMobilityTitle, longDayFlag, mobilityDaysWanted, mobilityInstruction, mobilityRole, plainLibraryName, ruleKey } from "@/lib/ai-day-rules";
 import { buildDaySystemPrompt, buildDayUserText, checkRunToken, issueRunToken, readDayResult, runTokenIsStale, type BuiltDay } from "@/lib/ai-day-run";
 
 // ONE workout per call (about 10 to 20 seconds), so a long program is many short calls and none of them can hit a time limit.
@@ -68,11 +69,12 @@ export async function POST(request: Request) {
   // The days already in the program (so a new day knows them and does not repeat them).
   const { data: workoutRows } = await supabase
     .from("workouts")
-    .select("id, title, week_number, day_index, group_workout_exercises ( id, exercise_name, exercise_order, group_workout_exercise_sets ( target_reps ) )")
+    .select("id, title, week_number, day_index, group_workout_exercises ( id, exercise_name, exercise_order, group_workout_exercise_sets ( target_reps, target_time_seconds ) )")
     .eq("program_id", programId)
     .order("week_number", { ascending: true })
     .order("day_index", { ascending: true });
   const built: BuiltDay[] = [];
+  const knownTimes = new Map<string, number>();
   let target: { id: string; title: string; hasExercises: boolean } | null = null;
   let targetBuilt: BuiltDay | null = null;
   for (const w of (workoutRows ?? []) as any[]) {
@@ -84,6 +86,12 @@ export async function POST(request: Request) {
       title: w.title,
       exercises: exs.map((e) => `${e.exercise_name} ${(e.group_workout_exercise_sets ?? []).length || ""}${(e.group_workout_exercise_sets ?? [])[0]?.target_reps ? "x" + (e.group_workout_exercise_sets ?? [])[0].target_reps : ""}`.trim()),
     };
+    if (!(w.week_number === week && w.day_index === day)) {
+      for (const e of exs) {
+        const t = ((e.group_workout_exercise_sets ?? [])[0]?.target_time_seconds as number | null | undefined) ?? null;
+        if (t && t > 0 && !knownTimes.has(ruleKey(e.exercise_name))) knownTimes.set(ruleKey(e.exercise_name), t);
+      }
+    }
     if (w.week_number === week && w.day_index === day) {
       target = { id: w.id, title: w.title, hasExercises: exs.length > 0 };
       targetBuilt = entry;
@@ -96,6 +104,15 @@ export async function POST(request: Request) {
   if (mode === "fix" && !targetBuilt?.exercises.length) {
     return NextResponse.json({ error: "There is nothing in that day to change yet." }, { status: 409 });
   }
+
+  // How many of this week's days the coach wants as mobility days, and so whether this one must be, must not be, or is free.
+  const sayings = `${instruction}. ${corrections.join(". ")}`;
+  const wantedMobility = mobilityDaysWanted(sayings);
+  const weekRowsAll = ((workoutRows ?? []) as any[]).filter((w) => w.week_number === week);
+  const builtMobility = weekRowsAll.filter((w) => !(w.day_index === day) && (w.group_workout_exercises ?? []).length > 0 && isMobilityTitle(w.title ?? "")).length;
+  const daysLeft = weekRowsAll.filter((w) => w.day_index !== day && (w.group_workout_exercises ?? []).length === 0).length + 1;
+  const role = mobilityRole({ wanted: wantedMobility, builtMobility, daysLeft });
+  const mobilityNote = mobilityInstruction(role, wantedMobility);
 
   // The client's injury and age context, the same rules the whole-program builder follows.
   let injuryContext: string | null = null;
@@ -122,24 +139,50 @@ export async function POST(request: Request) {
   const shown = rankLibrary(libraryItems, `${instruction} ${corrections.join(" ")}`);
   const libraryText = libraryContext(shown, libraryItems.length);
 
-  try {
-    const text = await callClaude({
-      meta: { feature: "program_day", userId: user.id },
-      system: buildDaySystemPrompt({ youthBlock, hasInjury: injuryContext !== null }),
-      userText: buildDayUserText({ slot: { week, day }, instruction, corrections, built, fixing: mode === "fix" ? targetBuilt : null, youthBlock, injuryContext, libraryText }),
-      maxTokens: 3500,
-      timeoutMs: 50_000,
-    });
-    const result = readDayResult(JSON.parse(extractJson(text)), `Day ${day}`);
-    if (!result) return NextResponse.json({ error: "Couldn't build that day. Try Resume, or tell it what to change." }, { status: 502 });
+  // Names are snapped to the coach's library when they match (to its plainest name for the movement); a name the coach typed that is not in the library stays as written.
+  const libraryList = libraryItems.map((i) => ({ name: i.name }));
+  const libraryNames = libraryItems.map((i) => i.name);
+  const aliases = (aliasRows ?? []).map((a: any) => ({ rawName: a.raw_name as string, exerciseName: a.exercise_name as string }));
+  const allowRepeat = allowsRepeats(sayings);
 
-    // Names are snapped to the coach's library when they match; a name the coach typed that is not in the library stays as written.
-    const libraryList = libraryItems.map((i) => ({ name: i.name }));
-    const aliases = (aliasRows ?? []).map((a: any) => ({ rawName: a.raw_name as string, exerciseName: a.exercise_name as string }));
-    const rows = result.exercises.map((e) => {
-      const m = matchExercise(e.exerciseName, libraryList, aliases);
-      return { ...e, exerciseName: m.exerciseName ?? e.exerciseName };
+  async function attempt(retryNote: string | null, timeoutMs: number) {
+    const text = await callClaude({
+      meta: { feature: "program_day", userId: user!.id },
+      system: buildDaySystemPrompt({ youthBlock, hasInjury: injuryContext !== null }),
+      userText: buildDayUserText({ slot: { week, day }, instruction, corrections, built, fixing: mode === "fix" ? targetBuilt : null, youthBlock, injuryContext, libraryText, mobilityNote, retryNote }),
+      maxTokens: 3500,
+      timeoutMs,
     });
+    const parsed = readDayResult(JSON.parse(extractJson(text)), `Day ${day}`);
+    if (!parsed) return null;
+    const snapped = parsed.exercises.map((e) => {
+      const m = matchExercise(e.exerciseName, libraryList, aliases);
+      return { ...e, exerciseName: plainLibraryName(m.exerciseName ?? e.exerciseName, libraryNames) };
+    });
+    const tidy = applyTimedConsistency(dedupeDay(snapped, allowRepeat).rows, knownTimes);
+    const scan = scanConstraints(sayings, tidy.map((r) => ({ week: `Week ${week}`, day: `Day ${day}`, exerciseName: r.exerciseName, sets: r.sets, reps: r.reps, weight: r.weight, rpe: r.rpe, rest: r.rest, timeSeconds: r.timeSeconds }) as never));
+    return { result: { ...parsed, exercises: tidy }, rows: tidy, scan };
+  }
+  // A flag that says a chosen exercise breaks something the coach said to leave out (not the softer "check this" notes).
+  const isHard = (flag: string) => /conflicts with "no |which your description said to leave out/.test(flag);
+
+  try {
+    let first = await attempt(null, 50_000);
+    if (!first) return NextResponse.json({ error: "Couldn't build that day. Try Resume, or tell it what to change." }, { status: 502 });
+    // One automatic retry when the day breaks something the coach said to leave out, if there is time left in this request.
+    const hard = first.scan.filter(isHard);
+    const elapsed = Date.now() - startedAt;
+    if (hard.length > 0 && elapsed <= 28_000) {
+      try {
+        const second = await attempt(`Your last try for this day broke what the coach said to leave out: ${hard.join(" ")} Write the day again without those.`, Math.max(15_000, 55_000 - elapsed - 4_000));
+        if (second && second.scan.filter(isHard).length <= hard.length) first = second;
+      } catch {
+        // the first try stands, with its notes
+      }
+    }
+    const result = first.result;
+    const rows = first.rows;
+    const dayTitle = role === "must" && !isMobilityTitle(result.title) ? "Mobility" : result.title;
 
     // Spend once per run, only after a day really came back.
     if (!run.ok) {
@@ -152,11 +195,15 @@ export async function POST(request: Request) {
     if (!workoutId) {
       const { data: created, error: createError } = await supabase
         .from("workouts")
-        .insert({ program_id: programId, group_id: groupId, title: result.title, week_number: week, day_index: day })
+        .insert({ program_id: programId, group_id: groupId, title: dayTitle, week_number: week, day_index: day })
         .select("id")
         .single();
       if (createError || !created) return NextResponse.json({ error: "Couldn't build that day. Try Resume, or tell it what to change." }, { status: 500 });
       workoutId = created.id as string;
+    }
+    // An empty day that already exists with a placeholder name ("Day 2") takes the purpose name the day was given.
+    if (target && mode === "build" && /^(day\s*\d*)?$/i.test((target.title ?? "").trim()) && !/^day\s*\d*$/i.test(dayTitle.trim())) {
+      await supabase.from("workouts").update({ title: dayTitle }).eq("id", workoutId);
     }
     // A day being fixed keeps its old exercises until the new ones are safely in; only then are the old ones removed (so a failed write never leaves the day empty).
     const oldIds: string[] =
@@ -205,12 +252,14 @@ export async function POST(request: Request) {
     }
     if (oldIds.length > 0) await supabase.from("group_workout_exercises").delete().in("id", oldIds);
 
+    const longDay = longDayFlag(week, day, rows.length);
     const flags = scanConstraints(`${instruction}. ${corrections.join(". ")}`, rows.map((r) => ({ week: `Week ${week}`, day: `Day ${day}`, exerciseName: r.exerciseName, sets: r.sets, reps: r.reps, weight: r.weight, rpe: r.rpe, rest: r.rest, timeSeconds: r.timeSeconds }) as never));
+    if (longDay) flags.push(longDay);
     return NextResponse.json({
       workoutId,
       week,
       day,
-      title: result.title,
+      title: dayTitle,
       exerciseCount: rows.length - failed,
       flags,
       runToken: issueRunToken(user.id, programId, (run.ok ? run.days : 0) + 1, Date.now(), run.ok ? run.issuedAt : startedAt),

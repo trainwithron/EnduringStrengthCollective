@@ -48,7 +48,8 @@ describe("The route that builds a day", () => {
   const route = read("app/api/ai/build-day/route.ts");
   it("is one short call: 60 second platform limit, 50 second limit of its own", () => {
     expect(route).toContain("export const maxDuration = 60;");
-    expect(route).toContain("timeoutMs: 50_000");
+    expect(route).toContain("attempt(null, 50_000)");
+    expect(route).toContain("55_000 - elapsed - 4_000");
     expect(route).toContain('feature: "program_day"');
   });
   it("only coaches of the program's group, and a day that already has exercises is never overwritten in build mode", () => {

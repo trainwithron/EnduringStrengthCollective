@@ -605,7 +605,7 @@ export function DayCard({
                       title="Open this exercise to edit it"
                       className="w-full flex items-center gap-1.5 py-2 px-1 min-h-9 text-left active:bg-surface/60"
                     >
-                      <span className="font-body text-sm truncate flex-1 min-w-0">{item.displayName || item.exerciseName || "Untitled exercise"}</span>
+                      <span className="font-body text-sm line-clamp-2 break-words flex-1 min-w-0">{item.displayName || item.exerciseName || "Untitled exercise"}</span>
                       {item.notes && <StickyNote className="w-3.5 h-3.5 text-steel shrink-0" aria-label="Has a coach note" />}
                       {hasVideo && <Video className="w-3.5 h-3.5 text-steel shrink-0" aria-label="Has a demo video" />}
                       <span className="font-body text-xs text-steel shrink-0 [font-variant-numeric:tabular-nums]">{formatCompactLine(item.sets, item.trackedFields, loggedWeight)}</span>

@@ -4,7 +4,9 @@ import type { ParsedImportRow } from "@/lib/workout-import-parser";
 // coach should double-check; it never changes anything. Pure; no database.
 
 // What a named exclusion or concern covers, as words that appear in exercise names.
-const CONCEPTS: { triggers: RegExp; label: string; words: string[]; concern?: boolean }[] = [
+// soft: the exclusion is worth a second look but mobility work with that word in its name is usually fine ("no core rotations" and a Thoracic Rotation Stretch), so it is shown as a note, not a conflict.
+const CONCEPTS: { triggers: RegExp; label: string; words: string[]; concern?: boolean; soft?: boolean }[] = [
+  { triggers: /\b(rotations?|rotational|rotating)\b/, label: "rotation", words: ["rotation", "rotational", "woodchop", "wood chop", "russian twist", "twist"], soft: true },
   { triggers: /\b(jump|jumping|jumps|plyo|plyometric|plyometrics)\b/, label: "jumping", words: ["jump", "plyo", "hop", "bound", "skip"] },
   { triggers: /\b(run|running|runs|sprint|sprinting|jog|jogging)\b/, label: "running", words: ["run", "sprint", "jog"] },
   { triggers: /\b(overhead|ohp)\b/, label: "overhead work", words: ["overhead", "military press", "push press", "jerk", "snatch", "handstand"] },
@@ -44,13 +46,22 @@ export function scanConstraints(brief: string, rows: ParsedImportRow[]): string[
     }
   }
   const exclusionPhrases = [...text.matchAll(/\b(?:no|avoid|avoiding|without|exclude|excluding|skip|never)\s+([a-z-]+(?:\s+[a-z-]+)?)/g)].map((m) => m[1]);
+  const softWords = new Set<string>();
   for (const c of CONCEPTS) {
     if (!exclusionPhrases.some((p) => c.triggers.test(p))) continue;
+    if (c.soft) for (const w of c.words) softWords.add(singular(w));
     for (const r of rows) {
-      if (c.words.some((w) => named(r).includes(w))) add(`"${r.exerciseName}" (${at(r)}) conflicts with "no ${c.label}" in your description.`);
+      if (c.words.some((w) => named(r).includes(w))) {
+        add(
+          c.soft
+            ? `"${r.exerciseName}" (${at(r)}) is a ${c.label} movement, and your description said no ${c.label}s. Fine if it is mobility work, otherwise check it.`
+            : `"${r.exerciseName}" (${at(r)}) conflicts with "no ${c.label}" in your description.`
+        );
+      }
     }
   }
   for (const word of excluded) {
+    if (softWords.has(word)) continue;
     for (const r of rows) {
       if (named(r).includes(word)) add(`"${r.exerciseName}" (${at(r)}) contains "${word}", which your description said to leave out.`);
     }

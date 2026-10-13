@@ -89,13 +89,16 @@ export interface DayPromptInput {
   youthBlock: string | null;
   injuryContext: string | null;
   libraryText: string;
+  // Extra, per-day instructions the server works out: how many mobility days this week, and (on a retry) what the first try got wrong.
+  mobilityNote?: string | null;
+  retryNote?: string | null;
 }
 
 export function buildDaySystemPrompt(input: { youthBlock: string | null; hasInjury: boolean }): string {
   return `You are an experienced strength & conditioning coach building ONE training day inside a program the coach is writing. Respond with ONLY a JSON object, no markdown fences, shaped exactly like this:
 
 {
-  "title": string,            // short day name, e.g. "Day 2" or "Lower body" (keep the coach's naming style if the days so far use one)
+  "title": string,            // short name for the day's PURPOSE, e.g. "Upper heavy", "Mobility", "Full body" (never just "Day 2"; keep the coach's naming style if the days so far use one)
   "exercises": [
     {
       "exerciseName": string, // an EXACT name from the coach's exercise library below when one fits
@@ -110,10 +113,13 @@ export function buildDaySystemPrompt(input: { youthBlock: string | null; hasInju
 }
 
 Rules:
-- Build ONE coherent day of 4 to 10 exercises that fits the program so far. Do not repeat a day that is already built; vary the focus or the exercises sensibly, keeping the program's style (sets x reps, order of movement patterns, number of exercises).
+- Build ONE coherent day of 5 to 8 exercises (a mobility day can be a few more short items, but never more than 10) that fits the program so far and what the coach described. Never write the same exercise twice in one day unless the coach asked for that. Do not repeat a day that is already built; vary the focus or the exercises sensibly, keeping the program's style (sets x reps, order of movement patterns, number of exercises).
 - Everything the coach has said (the request and every correction) is a HARD requirement. A correction such as "no barbell squats, his back" means no barbell squats in this day or any later day.
 - Exercises you choose yourself must come only from the library below, using the exact names. If the coach names an exercise that is not in the library, use it exactly as named.
-- One row per exercise, not one row per set (3x8 is ONE row with sets=3, reps="8").${
+- One row per exercise, not one row per set (3x8 is ONE row with sets=3, reps="8").
+- Timed work (foam rolling, stretches, holds, planks, breathing) is a time: put it in timeSeconds, set reps to null, and use the same time every time that item appears in the program.
+- Prefer the library's plainest name for a movement (singular, no grip in brackets), for example "Dumbbell Curl" rather than "Dumbbell Bicep Curls (Supinated Grip)", when the library has it.
+- Where the coach has named equipment or machines as allowed, they are allowed; where the coach has said to leave something out, leave it out.${
     input.hasInjury
       ? `
 - This program is for a client with a flagged injury or health concern, given below. Treat it as a hard constraint: avoid or substantially modify anything that could reasonably aggravate the stated area.`
@@ -139,6 +145,8 @@ export function buildDayUserText(input: DayPromptInput): string {
   parts.push(input.built.length > 0 ? `Days already built in this program (do not repeat them):\n${input.built.map(dayLine).join("\n")}` : "No days are built yet.");
   if (input.corrections.length > 0) parts.push(`Corrections the coach has given so far (all still apply):\n${input.corrections.map((c) => `- ${c}`).join("\n")}`);
   if (input.fixing) parts.push(`Fix this day, changing only what the correction asks and keeping the rest as it is:\n${dayLine(input.fixing)}`);
+  if (input.mobilityNote) parts.push(input.mobilityNote);
+  if (input.retryNote) parts.push(input.retryNote);
   parts.push(input.fixing ? `Write the corrected Week ${input.slot.week}, Day ${input.slot.day}.` : `Write Week ${input.slot.week}, Day ${input.slot.day}.`);
   if (input.instruction.trim()) parts.push(`The coach's request: ${input.instruction.trim()}`);
   return parts.join("\n\n");
