@@ -22,6 +22,10 @@ export default async function WebsitePage(props: { params: Promise<{ groupId: st
     supabase.from("coach_booking_pages").select("slug").eq("coach_id", user.id).maybeSingle(),
   ]);
 
+  // Quotes clients sent from the review card, waiting for this coach (before the database update that adds them this returns nothing).
+  const { data: quoteRows } = await supabase.from("client_quotes").select("id, body, first_name, share_publicly").eq("coach_id", user.id).eq("status", "pending").order("created_at", { ascending: false }).limit(20);
+  const pendingQuotes = ((quoteRows ?? []) as { id: string; body: string; first_name: string | null; share_publicly: boolean }[]).map((q) => ({ id: q.id, body: q.body, firstName: q.first_name ?? "", sharePublicly: !!q.share_publicly }));
+
   const content = cleanSite({
     headline: site?.headline ?? "",
     whoIHelp: site?.who_i_help ?? "",
@@ -43,6 +47,7 @@ export default async function WebsitePage(props: { params: Promise<{ groupId: st
         coachId={user.id}
         slug={(bookingPage?.slug as string | null) ?? null}
         initial={{ ...content, heroPath: site?.hero_path ?? null, coverPath: site?.cover_path ?? null, published: !!site?.published }}
+        pendingQuotes={pendingQuotes}
       />
     </CoachDesktopShell>
   );

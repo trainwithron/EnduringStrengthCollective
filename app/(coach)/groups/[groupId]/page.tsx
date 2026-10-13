@@ -64,6 +64,7 @@ import { loadClassCards } from "@/lib/class-cards";
 import type { ProShopLink } from "@/components/coach/desktop/pro-shop-manager";
 import { inOrg, orgIdOfGroup } from "@/lib/org-of-group";
 import { OtherProgramsCard } from "@/components/athlete/other-programs-card";
+import { ReviewPromptSection } from "@/components/athlete/review-prompt-section";
 import type { TodayMacros, TodayHabit } from "@/components/athlete/today-widget";
 import type { WeightLogEntry } from "@/components/athlete/weight-log-widget";
 
@@ -812,6 +813,7 @@ export default async function GroupHubPage(
               {isToday && aboutYouNeeded && !isCoach && !isActingAsOther && <AboutYouCard groupId={params.groupId} athleteId={athleteId} />}
               {reupState && <ReupCard state={reupState} />}
               {isToday && <OtherProgramsCard programs={myTraining?.mine ?? []} />}
+              {isToday && !isCoach && !isActingAsOther && athleteId && <ReviewPromptSection groupId={params.groupId} athleteId={athleteId} />}
               {scheduleCard && <MyScheduleCard groupId={params.groupId} state={scheduleCard} />}
               {isToday && !isCoach && !isActingAsOther && (
                 // The one place a client reaches their coach: it was three taps deep (Settings, More, Messages).

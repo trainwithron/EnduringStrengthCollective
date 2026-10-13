@@ -74,6 +74,7 @@ from (
     ('2026100600360', 'new_group_creator_can_seat_themselves', '0360_new_group_creator_can_seat_themselves.sql', to_regprocedure('public.group_is_new_and_mine(uuid)') is not null),
     ('2026100600359', 'imported_history_sets_do_not_set_training_maxes', '0359_imported_history_sets_do_not_set_training_maxes.sql', position('12:00:17' in pg_get_functiondef(to_regprocedure('public.recompute_training_max()'))) > 0),
     ('2026100600358', 'personal_space', '0358_personal_space.sql', to_regprocedure('public.ensure_personal_space()') is not null),
+    ('2026100600356', 'review_prompt_and_client_quotes', '0356_review_prompt_and_client_quotes.sql', to_regclass('public.client_quotes') is not null),
     ('2026100600355', 'client_assessments', '0355_client_assessments.sql', to_regclass('public.client_assessments') is not null),
     ('2026100600354', 'organization_money_columns_server_only', '0354_organization_money_columns_server_only.sql', to_regprocedure('public.guard_organization_share_total()') is not null),
     ('2026100600353', 'schedule_change_notice', '0353_schedule_change_notice.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_booking_policies' and column_name = 'schedule_change_notice_days')),
