@@ -223,12 +223,25 @@ for (const s of steps) {
       insert into public.wellness_checkins (athlete_id, group_id, sleep_quality, soreness, energy) values ('136394ed-f108-4283-bcb7-310a1ac6cbc8', 'b0000000-0000-4000-8000-0000000000e1', 4, 2, 5);
     `);
   }
+  if (s.n === "109") {
+    // The two empty stray groups left by failed add-client attempts, with the same ids as live.
+    await db.exec(`
+      insert into public.groups (id, name, created_by, organization_id, group_kind) values
+        ('e2425435-950a-409d-8d4e-e24d92f21652', 'Rob Derrick', '136394ed-f108-4283-bcb7-310a1ac6cbc8', 'b0000000-0000-4000-8000-000000000001', 'one_on_one'),
+        ('568e84b6-b85c-476c-b160-7b6b64e21caa', 'Rob Derrick', '136394ed-f108-4283-bcb7-310a1ac6cbc8', 'b0000000-0000-4000-8000-000000000001', 'one_on_one');
+    `);
+  }
   const base = `apply/apply-step${s.n}-${s.slug}`;
   const rows = await pre(`${base}-precheck.sql`);
   const bad = rows.filter((r) => !r.ok).map((r) => r.check_name);
   check(`step ${s.n} (${s.slug}) precheck: ${rows.length} rows, all true` + (bad.length ? ` (FALSE: ${bad.join("; ")})` : ""), rows.length === s.rows && bad.length === 0);
   e = await run(`${base}.sql`);
   check(`step ${s.n} (${s.slug}) applies` + (e ? `: ${e}` : ""), !e);
+  if (s.n === "109") {
+    const gone = (await db.query("select count(*)::int as n from public.groups where id in ('e2425435-950a-409d-8d4e-e24d92f21652', '568e84b6-b85c-476c-b160-7b6b64e21caa')")).rows[0].n;
+    const logged = (await db.query("select count(*)::int as n from public.orphan_group_cleanup_log")).rows[0].n;
+    check("step 109 removed the two empty Rob Derrick groups and logged them: " + gone + " left, " + logged + " logged", gone === 0 && logged === 2);
+  }
   if (s.n === "105") {
     const one = async (sql) => (await db.query(sql)).rows[0];
     const PS = "b0000000-0000-4000-8000-0000000000f1";

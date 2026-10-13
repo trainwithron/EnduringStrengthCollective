@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { CLIENT_PROFILE_TABS, LOADED_ON_OPEN, type ClientProfileTab } from "@/lib/client-profile-tabs";
 
@@ -8,7 +9,7 @@ import { CLIENT_PROFILE_TABS, LOADED_ON_OPEN, type ClientProfileTab } from "@/li
 // normal coach layout, beside the coach's own rail, which never changes. Every tab shows its content right below the strip, on this page. Overview, Programs, Nutrition,
 // Progress, Forms & notes and Billing & settings are already loaded, so they switch instantly; Messages and Calendar are loaded when opened (the address gets ?tab=...,
 // so a link, a reload or the phone's full pages still work). The tab is remembered in the address. The strip wraps instead of scrolling.
-export function ClientProfileTabs({ initial = "overview", hide = [] }: { groupId?: string; athleteId?: string; initial?: ClientProfileTab; hide?: ClientProfileTab[] }) {
+export function ClientProfileTabs({ groupId, athleteId, initial = "overview", hide = [] }: { groupId?: string; athleteId?: string; initial?: ClientProfileTab; hide?: ClientProfileTab[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const [tab, setTab] = useState<ClientProfileTab>(initial);
@@ -55,6 +56,12 @@ export function ClientProfileTabs({ initial = "overview", hide = [] }: { groupId
           {t.label}
         </button>
       ))}
+      {/* History is its own page (exercise history, and the FitPros import): a link that reads like the tabs. */}
+      {groupId && athleteId && (
+        <Link href={`/groups/${groupId}/athletes/${athleteId}/history`} className={`${base} border-transparent text-steel hover:text-chalk inline-flex items-center`}>
+          History
+        </Link>
+      )}
     </nav>
   );
 }

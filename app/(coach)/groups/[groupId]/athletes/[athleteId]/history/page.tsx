@@ -63,7 +63,7 @@ export default async function ClientHistoryPage(
         >
           ← Back to {athleteName}
         </Link>
-        <h1 className="font-display font-bold text-2xl uppercase mb-1">{athleteName}&apos;s exercise history</h1>
+        <h1 className="font-display font-bold text-2xl uppercase mb-1">{athleteName}&apos;s history</h1>
         <p className="font-body text-sm text-steel mb-6 max-w-2xl">
           Backfill training history from before {athleteName} joined — a recent PR, a working max, or a spreadsheet
           of past sessions. Every entry is flagged self-reported, not gym-verified, and feeds the AI program
@@ -79,14 +79,14 @@ export default async function ClientHistoryPage(
           />
         </div>
 
+        <FitprosHistoryImport athleteId={params.athleteId} groupId={params.groupId} athleteName={athleteName} />
+
         <ExerciseHistoryUploader
           athleteId={params.athleteId}
           groupId={params.groupId}
           exerciseSuggestions={exerciseSuggestions}
           viewerIsCoach
         />
-
-        <FitprosHistoryImport athleteId={params.athleteId} groupId={params.groupId} athleteName={athleteName} />
       </div>
     </CoachDesktopShell>
   );

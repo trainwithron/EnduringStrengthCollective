@@ -48,10 +48,11 @@ describe("the client's Programs tab", () => {
     expect(actions).not.toContain("View Assigned Programs");
     expect(() => readFileSync(join(__dirname, "..", "components/coach/client-programming-menu.tsx"))).toThrow();
   });
-  it("two plain buttons: Assign program and Build with AI", () => {
+  it("two plain buttons: Assign program and Build program", () => {
     expect(actions).toContain("Assign program\n");
-    expect(actions).toContain("Build with AI\n");
-    expect(actions).toContain("/programs/new?method=ai&athleteId=${athleteId}");
+    expect(actions).toContain("Build program\n");
+    expect(actions).not.toContain("method=ai");
+    expect(actions).toContain("/programs/new?athleteId=${athleteId}");
   });
   it("assigning is one click with the existing copy engine, a start date that defaults to today, and no confirmation popup", () => {
     expect(actions).toContain("assignProgramToClient(supabase, {");
