@@ -7,7 +7,7 @@ import { zonedTimeToUtc } from "@/lib/timezone";
 import { notifyBookingConfirmed } from "@/lib/notify-booking-confirmed";
 import { mirrorGoogleCalendarEvent } from "@/lib/mirror-google-calendar-event";
 import { DayHourGrid, minutesToTimeInput, type GridBlocked, type GridBooking, type GridEvent, type GridWindow } from "@/components/coach/desktop/day-hour-grid";
-import { addTimeChoices, overlapWarning, parseTimeInput, shiftTime, type AddKind } from "@/lib/day-add";
+import { addTimeChoices, endFrom, minutesBetween, overlapWarning, parseTimeInput, shiftTime, timeOptions15, type AddKind } from "@/lib/day-add";
 
 export interface DayClient {
   id: string;
@@ -52,7 +52,7 @@ export function DayCalendar({
   const [pickedTime, setPickedTime] = useState<string | null>(null);
   const [kind, setKind] = useState<AddKind>("session");
   const [time, setTime] = useState("");
-  const [minutes, setMinutes] = useState(String(defaultMinutes));
+  const [endTime, setEndTime] = useState("");
   const [clientId, setClientId] = useState(initialClientId ?? "");
   const [title, setTitle] = useState("");
   const [busy, setBusy] = useState(false);
@@ -61,7 +61,7 @@ export function DayCalendar({
   function openAt(t: string) {
     setPickedTime(t);
     setTime(t);
-    setMinutes(String(defaultMinutes));
+    setEndTime(endFrom(t, defaultMinutes));
     setError(null);
   }
   function close() {
@@ -71,8 +71,8 @@ export function DayCalendar({
   }
 
   const parsed = parseTimeInput(time);
-  const length = Number(minutes);
-  const lengthOk = Number.isInteger(length) && length >= 5 && length <= 480;
+  const length = minutesBetween(time, endTime) ?? 0;
+  const lengthOk = length >= 5 && length <= 480;
   const start = parsed ? zonedTimeToUtc(dateKey, time, timezone) : null;
   const end = start && lengthOk ? new Date(start.getTime() + length * 60000) : null;
   const warning = start && end && kind !== "event" ? overlapWarning(start.getTime(), end.getTime(), busyRanges, openRanges, kind) : null;
@@ -138,6 +138,14 @@ export function DayCalendar({
     router.refresh();
   }
 
+  // Moves the start and keeps the length, so the end moves with it.
+  function nudge(delta: number) {
+    const keep = minutesBetween(time, endTime) ?? defaultMinutes;
+    const next = shiftTime(time || pickedTime || "09:00", delta);
+    setTime(next);
+    setEndTime(endFrom(next, keep));
+  }
+
   const field = "mt-1 block w-full h-11 bg-graphite border border-steel/30 text-chalk px-2 font-body text-base focus:outline-none focus:border-rust";
   const choices = addTimeChoices();
 
@@ -196,24 +204,43 @@ export function DayCalendar({
               </label>
             )}
 
-            <div className="flex items-end gap-3 mb-1">
+            {/* Start and End list every 15 minutes; any exact minute can still be typed. Moving the start moves the end with it, so the length stays. */}
+            <datalist id="day-add-times">
+              {timeOptions15().map((t) => (
+                <option key={t} value={t} />
+              ))}
+            </datalist>
+            <div className="flex items-end gap-3 mb-3">
               <label className="flex-1 font-body text-xs text-steel">
                 Start
-                <input type="time" step={60} value={time} onChange={(e) => setTime(e.target.value)} className={field} />
+                <input
+                  type="time"
+                  step={60}
+                  list="day-add-times"
+                  value={time}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    const keep = minutesBetween(time, endTime) ?? defaultMinutes;
+                    setTime(next);
+                    if (parseTimeInput(next)) setEndTime(endFrom(next, keep));
+                  }}
+                  className={field}
+                />
               </label>
               {kind !== "event" && (
-                <label className="w-28 font-body text-xs text-steel">
-                  Minutes
-                  <input type="number" min={5} max={480} step={5} value={minutes} onChange={(e) => setMinutes(e.target.value)} className={field} />
+                <label className="flex-1 font-body text-xs text-steel">
+                  End
+                  <input type="time" step={60} list="day-add-times" value={endTime} onChange={(e) => setEndTime(e.target.value)} className={field} />
                 </label>
               )}
             </div>
+
             <div className="flex gap-2 mb-3">
-              <button type="button" onClick={() => setTime(shiftTime(time || pickedTime, -5))} className="min-h-11 px-3 border border-steel/30 text-steel font-body text-sm">
-                5 min earlier
+              <button type="button" onClick={() => nudge(-15)} className="min-h-11 px-3 border border-steel/30 text-steel font-body text-sm">
+                15 min earlier
               </button>
-              <button type="button" onClick={() => setTime(shiftTime(time || pickedTime, 5))} className="min-h-11 px-3 border border-steel/30 text-steel font-body text-sm">
-                5 min later
+              <button type="button" onClick={() => nudge(15)} className="min-h-11 px-3 border border-steel/30 text-steel font-body text-sm">
+                15 min later
               </button>
             </div>
 

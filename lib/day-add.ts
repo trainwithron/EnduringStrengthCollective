@@ -35,7 +35,30 @@ export function overlapWarning(
   open: { startMs: number; endMs: number }[],
   kind: AddKind
 ): string | null {
-  if (busy.some((b) => b.startMs < endMs && b.endMs > startMs)) return "This overlaps another session on this day. You can still add it.";
+  if (busy.some((b) => b.startMs < endMs && b.endMs > startMs)) return "This overlaps another session.";
   if (kind === "session" && !open.some((o) => o.startMs <= startMs && endMs <= o.endMs)) return "This is outside your open hours. You can still add it.";
   return null;
+}
+
+// The dropdown under Start and End lists every 15 minutes (a typed minute such as 10:22 is still accepted).
+export function timeOptions15(): string[] {
+  return Array.from({ length: 96 }, (_, i) => `${String(Math.floor(i / 4)).padStart(2, "0")}:${String((i % 4) * 15).padStart(2, "0")}`);
+}
+
+function toMinutes(value: string): number | null {
+  const p = parseTimeInput(value);
+  return p ? p.hour * 60 + p.minute : null;
+}
+
+// Minutes from start to end on the same day, or null when either is not a time or end is not after start.
+export function minutesBetween(start: string, end: string): number | null {
+  const a = toMinutes(start);
+  const b = toMinutes(end);
+  if (a === null || b === null || b <= a) return null;
+  return b - a;
+}
+
+// The end time that is `minutes` after start, capped at the end of the day.
+export function endFrom(start: string, minutes: number): string {
+  return shiftTime(start, minutes);
 }

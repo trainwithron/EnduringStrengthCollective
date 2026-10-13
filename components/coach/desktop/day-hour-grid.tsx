@@ -64,9 +64,9 @@ export function minutesToTimeInput(min: number): string {
   return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 }
 
-// The minute a tap landed on, snapped to the nearest 5.
+// The minute a tap landed on, snapped to the nearest 15 (like Google Calendar).
 export function snapTapToMinutes(offsetPx: number, rangeStart: number): number {
-  return Math.round((rangeStart + offsetPx / PX_PER_MIN) / 5) * 5;
+  return Math.round((rangeStart + offsetPx / PX_PER_MIN) / 15) * 15;
 }
 
 export function DayHourGrid({
