@@ -68,3 +68,25 @@ export function restForSet(sets: RestSet[], setId: string): RestForSet | null {
   if (set.restSeconds != null && set.restSeconds > 0) return { seconds: set.restSeconds, source: "typed" };
   return null;
 }
+
+// Any way a coach or the AI writes a rest, as seconds: "90", "1:30", "90s", "2 min", and a RANGE ("60-90", "60 to 90 seconds", "1:00-1:30", "1 to 2 min"). A range is stored as its LONGER end (the one
+// rest column holds one time, and the timer counts that rest; the athlete may go sooner). Returns null when it is not a time (the caller then asks, never guesses).
+export function parseRestAnyForm(text: string | null | undefined): number | null {
+  if (!text) return null;
+  const t = text.trim().toLowerCase().replace(/[–—]/g, "-");
+  if (t === "") return null;
+  const range = t.match(/^(.+?)\s*(?:-|\bto\b)\s*(.+)$/);
+  if (range) {
+    const rightUnit = range[2].match(/([a-z]+)$/)?.[1] ?? "";
+    // "60 to 90 seconds": the unit written once belongs to both ends.
+    const left = /^\d+$/.test(range[1].trim()) && rightUnit ? `${range[1].trim()} ${rightUnit}` : range[1];
+    const a = parseRestInput(left);
+    const b = parseRestInput(range[2]);
+    if (!a.ok || !b.ok || a.seconds === null || b.seconds === null) return null;
+    // A range of small bare numbers ("5-10") is as unclear as one ("2"): minutes or seconds? Ask, the same as a single bare number.
+    if (a.bare || b.bare) return null;
+    return Math.max(a.seconds, b.seconds);
+  }
+  const one = parseRestInput(t);
+  return one.ok ? one.seconds : null;
+}
