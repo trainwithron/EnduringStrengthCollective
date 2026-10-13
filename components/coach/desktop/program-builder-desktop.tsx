@@ -18,6 +18,7 @@ import { SaveToastChannelContext } from "./save-toast-channel";
 import { createSaveToastChannel } from "@/lib/save-toast";
 import { ProgramChatPanel } from "./program-chat-panel";
 import { TrainingIntentSelector } from "../training-intent-selector";
+import { AiProgramBuilderBox } from "./ai-program-builder-box";
 import { REST_TEMPO_SUGGESTIONS, type TrainingIntent } from "@/lib/training-intent";
 
 export function ProgramBuilderDesktop({
@@ -150,6 +151,12 @@ export function ProgramBuilderDesktop({
     });
   }
 
+  // A day the AI Program Builder has just written (or fixed): drawn in its week and day, replacing the same day if it was already on screen.
+  function handleAiDay(day: BuilderDay) {
+    setDays((prev) => (prev.some((d) => d.id === day.id) ? prev.map((d) => (d.id === day.id ? day : d)) : [...prev, day]));
+    setExpandedWeeks((prev) => new Set(prev).add(day.weekNumber));
+  }
+
   async function handleAddWeek() {
     if (addWeekBusy) return;
     setAddWeekBusy(true);
@@ -269,6 +276,11 @@ export function ProgramBuilderDesktop({
             Print or PDF
           </a>
           {toolbarExtra}
+          {!embedded && (
+            <Link href={`/groups/${groupId}/programs/import`} className="inline-flex items-center h-9 font-body text-xs text-steel hover:text-chalk px-1 underline underline-offset-2">
+              Import a program
+            </Link>
+          )}
           {startDate && trainingDays && trainingDays.length > 0 && (
             <Link
               href={`/groups/${groupId}/programs/${programId}/calendar`}
@@ -278,6 +290,16 @@ export function ProgramBuilderDesktop({
             </Link>
           )}
         </div>
+        {!embedded && (
+          <AiProgramBuilderBox
+            programId={programId}
+            days={days}
+            trainingDaysCount={trainingDays && trainingDays.length > 0 ? trainingDays.length : null}
+            demoLibrary={demoLibrary}
+            exerciseTierByName={exerciseTierByName}
+            onDay={handleAiDay}
+          />
+        )}
         <div className="flex flex-wrap gap-4 mt-4">
           <TrainingIntentSelector
             programId={programId}

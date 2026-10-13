@@ -129,9 +129,6 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
           {cards.length} {cards.length === 1 ? "program" : "programs"}
         </p>
         <div className="flex items-center gap-4 mt-4">
-          <Link href={`/groups/${newProgramGroupId}/programs/import`} className="font-body text-xs text-rust">
-            Import or build with AI →
-          </Link>
           <Link href={`/groups/${newProgramGroupId}/programs/new${newProgramQuery}`} className="font-body text-xs text-rust">
             + New program
           </Link>

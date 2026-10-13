@@ -231,3 +231,46 @@ export async function getProgramBuilderData(
     spotterFlags,
   };
 }
+
+// ---- one day, for the AI Program Builder -------------------------------------------------------
+// The AI Program Builder writes a day and then draws just that day in the builder; it reads the one workout with this select and maps it the same way the whole-program read above does.
+export const BUILDER_ONE_WORKOUT_SELECT = `
+      id, title, week_number, day_index, scheduled_date,
+      group_workout_exercises (
+        id, exercise_name, display_name, exercise_order, movement_pattern_id, tracked_fields, notes,
+        group_workout_exercise_sets ( id, set_order, target_reps, target_weight, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance )
+      ),
+      workout_notes ( id, body, position )
+    `;
+
+export function mapWorkoutRowToBuilderDay(w: any, demoRows: DemoRow[], tierByName: Map<string, "A" | "B" | "C" | null>): BuilderDay {
+  const exerciseItems: BuilderExercise[] = (w.group_workout_exercises ?? []).map((ex: any) => {
+    const media = findDemo(demoRows, ex.exercise_name);
+    return {
+      kind: "exercise" as const,
+      id: ex.id,
+      order: ex.exercise_order,
+      exerciseName: ex.exercise_name,
+      displayName: ex.display_name ?? null,
+      movementPatternId: ex.movement_pattern_id,
+      trackedFields: ex.tracked_fields ?? DEFAULT_TRACKED_FIELDS,
+      notes: ex.notes,
+      videoPath: media?.videoPath ?? null,
+      youtubeUrl: media?.youtubeUrl ?? null,
+      tier: tierByName.get(ex.exercise_name) ?? null,
+      sets: (ex.group_workout_exercise_sets ?? [])
+        .slice()
+        .sort((a: any, b: any) => a.set_order - b.set_order)
+        .map(mapSetRow),
+    };
+  });
+  const noteItems: BuilderNote[] = (w.workout_notes ?? []).map((n: any) => ({ kind: "note" as const, id: n.id, order: n.position, body: n.body }));
+  return {
+    id: w.id,
+    title: w.title,
+    weekNumber: w.week_number,
+    dayIndex: w.day_index,
+    items: [...exerciseItems, ...noteItems],
+    scheduledDate: w.scheduled_date,
+  };
+}

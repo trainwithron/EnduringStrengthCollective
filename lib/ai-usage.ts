@@ -53,6 +53,7 @@ export function aiMultiplier(clientCount: number, opts: AllowanceScaleInput = {}
 export type AiFeature =
   // coach/athlete-triggered (burst-limited)
   | "program_generation"
+  | "program_day"
   | "program_chat"
   | "program_import_photo"
   | "program_import_text"
@@ -102,6 +103,8 @@ const POLICY: Record<AiFeature, FeaturePolicy> = {
   // A failed or cut-off generation is not charged, but every attempt is logged, so a monthly ceiling of 1.5x the
   // included generations (per step, scaled like the allowance) stops failed attempts from being unlimited free spend.
   program_generation: { enforce: true, monthlyCeiling: 150 },
+  // The AI Program Builder, one day per call. A run is charged once as a program_generation; the days are logged here, with their own looser burst limit (a run is back-to-back calls) and a monthly ceiling.
+  program_day: { enforce: true, burstLimit: 12, monthlyCeiling: 2000 },
   program_chat: { enforce: true },
   // Reading a program from a picture, a PDF or pasted text: no credit is charged, so a monthly ceiling keeps repeated reads from being unlimited spend.
   program_import_photo: { enforce: true, monthlyCeiling: 100 },
