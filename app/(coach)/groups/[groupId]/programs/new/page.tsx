@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { CreateAndOpenProgram } from "@/components/coach/create-and-open-program";
+import { getCoachedGroups, pickAnchorGroup } from "@/lib/coach-groups";
 
 // "New program" and "Build program": there is no screen to fill in. The program is made at once and the builder opens (components/coach/create-and-open-program.tsx); the AI Program Builder is at
 // the top of the builder. An old link with ?method=ai goes to the import page, which is still there.
@@ -62,9 +63,26 @@ export default async function NewProgramPage(
     }
   }
 
+  // Started from a client's page: the program is the coach's own (no client on it) and lives with their other programs; "Assign to [First]" in the builder gives the client their own copy.
+  // A client's own space cannot hold a program with no client, so the program is made in the coach's team or social group of the same organization. (The coach's own training space keeps
+  // building programs for the coach, as before.)
+  let targetGroupId = params.groupId;
+  let forClient: { id: string; groupId: string } | null = null;
+  if (athleteId) {
+    const coached = await getCoachedGroups(supabase, user.id);
+    const here = coached.find((g) => g.id === params.groupId);
+    if (here) {
+      const library = here.kind === "one_on_one" ? pickAnchorGroup(coached, null, here.orgId) : here;
+      if (library && library.kind !== "one_on_one") {
+        targetGroupId = library.id;
+        forClient = { id: athleteId, groupId: params.groupId };
+      }
+    }
+  }
+
   return (
     <CoachDesktopShell groupId={params.groupId} groupName={group?.name ?? "Coaching"} active="programs">
-      <CreateAndOpenProgram groupId={params.groupId} createdBy={user.id} athleteId={athleteId} athleteFirstName={athleteFirstName} />
+      <CreateAndOpenProgram groupId={targetGroupId} createdBy={user.id} athleteId={forClient ? null : athleteId} athleteFirstName={athleteFirstName} forClient={forClient} />
     </CoachDesktopShell>
   );
 }

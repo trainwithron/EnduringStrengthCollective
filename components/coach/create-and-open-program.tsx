@@ -7,7 +7,20 @@ import { detectTrainingIntent } from "@/lib/training-intent";
 
 // "Build program" / "New program": the program is made at once and the builder opens. The name is "[First name]'s program" for a client and "New program" in the library; it is editable at the
 // top of the builder. Nothing is asked first. (Made when the page opens in the browser, never by a prefetch.)
-export function CreateAndOpenProgram({ groupId, createdBy, athleteId, athleteFirstName }: { groupId: string; createdBy: string; athleteId: string | null; athleteFirstName: string | null }) {
+export function CreateAndOpenProgram({
+  groupId,
+  createdBy,
+  athleteId,
+  athleteFirstName,
+  forClient,
+}: {
+  groupId: string;
+  createdBy: string;
+  athleteId: string | null;
+  athleteFirstName: string | null;
+  // Started from a client's page: the program has no client on it; the builder offers "Assign to [First]".
+  forClient?: { id: string; groupId: string } | null;
+}) {
   const router = useRouter();
   const started = useRef(false);
   const [error, setError] = useState<string | null>(null);
@@ -16,7 +29,7 @@ export function CreateAndOpenProgram({ groupId, createdBy, athleteId, athleteFir
     if (started.current) return;
     started.current = true;
     void (async () => {
-      const name = athleteId && athleteFirstName ? `${athleteFirstName}'s program` : "New program";
+      const name = (athleteId || forClient) && athleteFirstName ? `${athleteFirstName}'s program` : "New program";
       const { data, error: insertError } = await createBrowserClient()
         .from("programs")
         .insert({ group_id: groupId, name, created_by: createdBy, athlete_id: athleteId, training_intent: detectTrainingIntent(name) })
@@ -27,9 +40,9 @@ export function CreateAndOpenProgram({ groupId, createdBy, athleteId, athleteFir
         started.current = false;
         return;
       }
-      router.replace(`/groups/${groupId}/programs/${data.id}`);
+      router.replace(`/groups/${groupId}/programs/${data.id}${forClient ? `?forClient=${forClient.id}&clientGroup=${forClient.groupId}` : ""}`);
     })();
-  }, [groupId, createdBy, athleteId, athleteFirstName, router]);
+  }, [groupId, createdBy, athleteId, athleteFirstName, forClient, router]);
 
   return error ? (
     <div className="p-8">

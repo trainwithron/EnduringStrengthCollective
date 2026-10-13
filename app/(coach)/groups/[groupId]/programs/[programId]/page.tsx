@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { UnavailableState } from "@/components/ui/unavailable-state";
 import { ProgramBuilderDesktop } from "@/components/coach/desktop/program-builder-desktop";
+import { AssignToClientBanner } from "@/components/coach/assign-to-client-banner";
+import { loadAssignedTo } from "@/lib/program-assigned";
 import { AiDraftBanner } from "@/components/coach/ai-draft-banner";
 import { LearnedSuggestionCard } from "@/components/coach/learned-suggestion-card";
 import { suggestionText } from "@/lib/edit-patterns";
@@ -34,7 +36,7 @@ export default async function ProgramDetailPage(
     // always landed back at the top and had to manually find and expand
     // that week themselves. `?week=N` lets the mini-view jump straight
     // to the right week already open.
-    searchParams: Promise<{ week?: string }>;
+    searchParams: Promise<{ week?: string; forClient?: string; clientGroup?: string }>;
   }
 ) {
   const params = await props.params;
@@ -82,6 +84,8 @@ export default async function ProgramDetailPage(
         programId={params.programId}
         coachId={user.id}
         requestedWeek={requestedWeek}
+        forClientId={searchParams.forClient ?? null}
+        clientGroupId={searchParams.clientGroup ?? null}
       />
     );
   }
@@ -241,11 +245,15 @@ async function CoachProgramBuilder({
   programId,
   coachId,
   requestedWeek,
+  forClientId,
+  clientGroupId,
 }: {
   groupId: string;
   programId: string;
   coachId: string;
   requestedWeek: number | null;
+  forClientId: string | null;
+  clientGroupId: string | null;
 }) {
   const supabase = await createServerClient();
   // The builder's data, the program's label/order, and the quiet question after a sign-off do not depend on each other: one batch.
@@ -277,8 +285,23 @@ async function CoachProgramBuilder({
     );
   }
 
+  // Started from a client's page and still nobody's: a line and one button to give that client their own copy. The client is checked here (a client of a group this coach coaches), never trusted from the address.
+  let assignTo: { id: string; groupId: string; firstName: string; assigned: boolean } | null = null;
+  if (forClientId && clientGroupId && !data.athleteId) {
+    const [{ data: coachSeat }, { data: clientSeat }, assignedTo] = await Promise.all([
+      supabase.from("group_memberships").select("role").eq("group_id", clientGroupId).eq("profile_id", coachId).maybeSingle(),
+      supabase.from("group_memberships").select("role, profiles ( full_name )").eq("group_id", clientGroupId).eq("profile_id", forClientId).maybeSingle(),
+      loadAssignedTo(supabase, programId),
+    ]);
+    if (coachSeat?.role === "coach" && clientSeat?.role === "athlete") {
+      const full = (((clientSeat.profiles as { full_name?: string | null } | null)?.full_name) ?? "").trim();
+      assignTo = { id: forClientId, groupId: clientGroupId, firstName: full.split(/\s+/)[0] || "client", assigned: assignedTo.some((a) => a.athleteId === forClientId) };
+    }
+  }
+
   return (
     <CoachDesktopShell groupId={groupId} groupName={data.groupName} active="programs" wide>
+      {assignTo && <AssignToClientBanner programId={programId} clientId={assignTo.id} clientGroupId={assignTo.groupId} firstName={assignTo.firstName} alreadyAssigned={assignTo.assigned} aiDraft={isAiDraft} />}
       {/* The "Day N of M, you've moved X lbs" strip is for the client's own view of a program, not the coach's builder. */}
       {isAiDraft && <AiDraftBanner programId={programId} programName={data.programName} />}
       {askedRule && (
