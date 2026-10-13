@@ -45,6 +45,8 @@ const REVIEWED = new Set([
   "components/shared/coach-profile-popup.tsx::pro_shop_links",
   // limited to the page group's organization by inOrg(...) wrapped around the query on the line before (migration 0350), which this line-based scan cannot see
   "app/(coach)/groups/[groupId]/resources/page.tsx::pro_shop_links",
+  // the client Home's Featured cards: same inOrg(...) wrapped around the query on the line before
+  "app/(coach)/groups/[groupId]/page.tsx::pro_shop_links",
   "app/(coach)/groups/[groupId]/challenges/page.tsx::challenges",
 ]);
 
