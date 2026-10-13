@@ -32,7 +32,7 @@ export function CreateAndOpenProgram({
       const name = (athleteId || forClient) && athleteFirstName ? `${athleteFirstName}'s program` : "New program";
       const { data, error: insertError } = await createBrowserClient()
         .from("programs")
-        .insert({ group_id: groupId, name, created_by: createdBy, athlete_id: athleteId, training_intent: detectTrainingIntent(name) })
+        .insert({ group_id: groupId, name, created_by: createdBy, athlete_id: athleteId, is_active: athleteId !== null, training_intent: detectTrainingIntent(name) })
         .select("id")
         .single();
       if (insertError || !data) {
