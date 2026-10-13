@@ -14,7 +14,15 @@ export function ParQAnswersPanel({
 }: {
   answers: { question: string; answer: boolean }[];
 }) {
-  if (answers.length === 0) return null;
+  // No answers is said out loud, never silent: a coach reading nothing could take it for "no concerns".
+  if (answers.length === 0) {
+    return (
+      <div>
+        <p className="font-body text-xs text-steel uppercase tracking-wide mb-2">Health screening (PAR-Q+)</p>
+        <p className="font-body text-sm text-steel">No health screening answers on file for this client.</p>
+      </div>
+    );
+  }
 
   const flagged = answers.filter((a) => a.answer);
 
