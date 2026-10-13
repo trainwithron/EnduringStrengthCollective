@@ -85,8 +85,10 @@ export async function ProgramPlainView({
       isToday,
       lockedLabel: locked && when ? `Unlocks ${formatShortDate(unlockDate(when, program.visibility_window ?? undefined))}` : null,
       completedAt: lastDone.get(w.id) ?? null,
-      exercises,
-      totalSets,
+      // A locked day (the coach's "show days ahead") sends no exercises to the browser at all, only how many there are.
+      exerciseCount: exercises.length,
+      exercises: locked ? [] : exercises,
+      totalSets: locked ? 0 : totalSets,
     };
     week.days.push(day);
     byWeek.set(w.week_number, week);

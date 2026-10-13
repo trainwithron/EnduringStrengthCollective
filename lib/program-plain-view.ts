@@ -17,6 +17,8 @@ export interface PlainDay {
   lockedLabel: string | null;
   // The last time the person finished this day (ISO), or null.
   completedAt: string | null;
+  // How many exercises the day has (kept even when the day is locked and its exercises are not sent to the browser).
+  exerciseCount: number;
   exercises: PlainExercise[];
   totalSets: number;
 }

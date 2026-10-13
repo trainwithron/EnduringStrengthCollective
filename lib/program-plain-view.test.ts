@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { agoLabel, currentWeekFor, dayCardTitle, defaultWeek, exerciseCountLabel, exerciseLine, previewLine, programStats, weekIsComplete, type PlainDay, type PlainWeek } from "@/lib/program-plain-view";
 
 const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
-const day = (id: string, dayIndex: number, over: Partial<PlainDay> = {}): PlainDay => ({ id, dayIndex, title: `Day ${dayIndex}`, dateLabel: null, isToday: false, lockedLabel: null, completedAt: null, exercises: [], totalSets: 0, ...over });
+const day = (id: string, dayIndex: number, over: Partial<PlainDay> = {}): PlainDay => ({ id, dayIndex, title: `Day ${dayIndex}`, dateLabel: null, isToday: false, lockedLabel: null, completedAt: null, exerciseCount: 0, exercises: [], totalSets: 0, ...over });
 
 describe("plain program view helpers", () => {
   it("writes sets and reps, and seconds for timed work", () => {
@@ -46,6 +46,18 @@ describe("plain program view helpers", () => {
     expect(agoLabel("2026-10-20T09:00:00Z", now)).toBe("about 3 hours ago");
     expect(agoLabel("2026-10-17T12:00:00Z", now)).toBe("3 days ago");
     expect(agoLabel("2026-09-15T12:00:00Z", now)).toBe("about 1 month ago");
+  });
+});
+
+describe("a locked day", () => {
+  it("sends no exercises to the browser, only how many there are and when it unlocks", () => {
+    const server = read("components/shared/program-plain-view-server.tsx");
+    expect(server).toContain("exercises: locked ? [] : exercises");
+    expect(server).toContain("exerciseCount: exercises.length");
+    expect(server).toContain("totalSets: locked ? 0 : totalSets");
+    const picker = read("components/shared/program-day-picker.tsx");
+    expect(picker).toContain("d.lockedLabel ??");
+    expect(picker).toContain("{open.day.lockedLabel ? null :");
   });
 });
 

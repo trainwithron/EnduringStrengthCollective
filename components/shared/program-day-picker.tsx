@@ -133,9 +133,9 @@ export function ProgramDayPicker({
                         {dayCardTitle(weekNumber, d)}
                         {d.isToday && <span className="ml-2 font-display text-xs uppercase tracking-wide text-rust align-middle">Today</span>}
                       </span>
-                      <span className="block font-body text-sm text-steel truncate mt-0.5">{previewLine(d.exercises) || "Nothing in this day yet."}</span>
+                      <span className="block font-body text-sm text-steel truncate mt-0.5">{d.lockedLabel ?? (previewLine(d.exercises) || "Nothing in this day yet.")}</span>
                       <span className="block font-body text-xs mt-1">
-                        <span className="text-steel">{exerciseCountLabel(d.exercises.length)}</span>
+                        <span className="text-steel">{exerciseCountLabel(d.exerciseCount)}</span>
                         {done && d.completedAt && <span className="text-positive"> {"·"} {agoLabel(d.completedAt, now)}</span>}
                       </span>
                     </span>
@@ -158,7 +158,7 @@ export function ProgramDayPicker({
               {open.day.dateLabel && <p className="font-body text-xs text-steel mt-1">{open.day.dateLabel}</p>}
               <div className="grid grid-cols-2 gap-3 mt-4">
                 <div className="rounded-2xl bg-surface/70 border border-steel/20 py-3 text-center">
-                  <p className="font-display font-bold text-2xl leading-none">{open.day.exercises.length}</p>
+                  <p className="font-display font-bold text-2xl leading-none">{open.day.exerciseCount}</p>
                   <p className="font-body text-[11px] text-steel uppercase tracking-wide mt-1">Exercises</p>
                 </div>
                 <div className="rounded-2xl bg-surface/70 border border-steel/20 py-3 text-center">
@@ -166,7 +166,7 @@ export function ProgramDayPicker({
                   <p className="font-body text-[11px] text-steel uppercase tracking-wide mt-1">Total sets</p>
                 </div>
               </div>
-              {open.day.exercises.length === 0 ? (
+              {open.day.lockedLabel ? null : open.day.exercises.length === 0 ? (
                 <p className="font-body text-sm text-steel mt-5">Nothing in this day yet.</p>
               ) : (
                 <ul className="mt-4 pb-4">
