@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { WORKOUT_CHOICE_EVENT } from "@/lib/workout-choice";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { localDateKey } from "@/lib/timezone";
 import { useSetSave } from "@/components/logging/set-save-context";
@@ -56,6 +57,25 @@ export function CompleteWorkoutButton({
   const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+
+  // The on-screen Back and the phone's own back gesture open this same choice (complete, pause, or keep going) instead of leaving. The page keeps one extra history step while the workout is open so the
+  // gesture lands here; the step is dropped again when this unmounts.
+  useEffect(() => {
+    function open() {
+      setConfirming(true);
+    }
+    function guard() {
+      window.history.pushState({ workoutGuard: true }, "");
+      setConfirming(true);
+    }
+    window.addEventListener(WORKOUT_CHOICE_EVENT, open);
+    window.history.pushState({ workoutGuard: true }, "");
+    window.addEventListener("popstate", guard);
+    return () => {
+      window.removeEventListener(WORKOUT_CHOICE_EVENT, open);
+      window.removeEventListener("popstate", guard);
+    };
+  }, []);
 
   // Post-workout weight-log nudge — prompted right after "Complete
   // Workout" is tapped (not mid-rest), since the athlete is likely still

@@ -28,10 +28,21 @@ describe("Complete workout is where complete, pause and resume live", () => {
     expect(logger).toContain("<ResumeWorkoutButton sessionId={pausedSessionId} />");
     expect(logger).toContain("{!isCompleted && (\n        <CompleteWorkoutButton");
   });
-  it("there is no separate Pause button: the top-left link only leaves, and leaving pauses", () => {
+  it("Back never pauses silently: it opens the same choice as Complete workout, and so does the phone's back gesture", () => {
+    expect(exit).toContain("onClick={askWorkoutChoice}");
     expect(exit).toContain("&larr; Back");
+    expect(exit).not.toContain("athlete_sessions");
     expect(exit).not.toContain("Pause workout");
-    expect(exit).toContain('status: "abandoned"');
+    const choice = read("lib/workout-choice.ts");
+    expect(choice).toContain('WORKOUT_CHOICE_EVENT = "workout:choose"');
+    expect(complete).toContain("window.addEventListener(WORKOUT_CHOICE_EVENT, open)");
+    expect(complete).toContain('window.addEventListener("popstate", guard)');
+    expect(complete).toContain("window.history.pushState");
+    expect(complete).toContain("window.removeEventListener(\"popstate\", guard)");
+  });
+  it("a finished or paused workout has a plain Back link", () => {
+    expect(page).toContain('<Link href={backHref} className="font-body text-xs text-steel uppercase tracking-wide">');
+    expect(page).toContain("<ExitWorkoutButton sessionId={session.id} backHref={backHref} />");
   });
   it("shows Paused for 48 hours, then Not finished, and ?resume=1 resumes where he left off", () => {
     expect(page).toContain('pausedRecently ? "Paused" : "Not finished"');

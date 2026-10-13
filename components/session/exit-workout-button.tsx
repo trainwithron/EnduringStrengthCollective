@@ -1,25 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { createBrowserClient } from "@/lib/supabase/client";
+import { askWorkoutChoice } from "@/lib/workout-choice";
 
-// The way out of a workout without choosing: leaving PAUSES it. Everything already logged is saved, and "Resume workout" picks it up again (a paused workout is stored as the session state
-// the app has always had for a workout that was left, shown as Paused, never counted as skipped). The real choice (complete or pause) is the Complete workout button.
+// Back on a workout that is in progress never leaves silently: it opens the same choice as Complete workout (complete it, pause it and pick it up later, or keep going). A finished or paused
+// workout has a plain Back link instead (the page decides which).
 export function ExitWorkoutButton({ sessionId, backHref }: { sessionId: string; backHref: string }) {
-  const router = useRouter();
-  const [leaving, setLeaving] = useState(false);
-
-  async function handleLeave() {
-    if (leaving) return;
-    setLeaving(true);
-    const supabase = createBrowserClient();
-    await supabase.from("athlete_sessions").update({ status: "abandoned" }).eq("id", sessionId).eq("status", "in_progress");
-    router.push(backHref);
-  }
-
+  void sessionId;
+  void backHref;
   return (
-    <button type="button" onClick={handleLeave} disabled={leaving} className="font-body text-xs text-steel uppercase tracking-wide active:text-rust min-h-9">
+    <button type="button" onClick={askWorkoutChoice} className="font-body text-xs text-steel uppercase tracking-wide active:text-rust min-h-9">
       &larr; Back
     </button>
   );
