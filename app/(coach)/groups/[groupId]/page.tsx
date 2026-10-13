@@ -58,6 +58,9 @@ import {
 } from "@/lib/program-day-contexts";
 import type { RosterMember } from "@/lib/types";
 import { loadMyTraining } from "@/lib/my-training";
+import { FeaturedShopCards } from "@/components/athlete/pro-shop-list";
+import type { ProShopLink } from "@/components/coach/desktop/pro-shop-manager";
+import { inOrg, orgIdOfGroup } from "@/lib/org-of-group";
 import { OtherProgramsCard } from "@/components/athlete/other-programs-card";
 import type { TodayMacros, TodayHabit } from "@/components/athlete/today-widget";
 import type { WeightLogEntry } from "@/components/athlete/weight-log-widget";
@@ -85,6 +88,10 @@ function isValidDateKey(value: string | undefined): value is string {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const parsed = new Date(`${value}T00:00:00`);
   return !Number.isNaN(parsed.getTime()) && dateKeyOf(parsed) === value;
+}
+
+function isCoachViewer(roster: { profileId: string; role: string }[], userId: string): boolean {
+  return roster.some((m) => m.profileId === userId && m.role === "coach");
 }
 
 export default async function GroupHubPage(
@@ -198,6 +205,36 @@ export default async function GroupHubPage(
     lastWorkoutAt: lastLogByAthlete.get(m.profile_id) ?? null,
     clientTier: m.client_tier ?? null,
   }));
+
+  // The coach's Featured Pro Shop cards, for the client's Home (the group's coach and the group's organization, like the Pro Shop page itself).
+  let featuredShop: ProShopLink[] = [];
+  if (user && athleteId && (!isCoachViewer(roster, user.id) || isActingAsOther)) {
+    const shopCoachId = roster.find((m) => m.role === "coach")?.profileId ?? null;
+    if (shopCoachId) {
+      const { data: shopRows } = await inOrg(
+        supabase
+          .from("pro_shop_links")
+          .select("id, title, category, description, url, image_url, discount_code, discount_description, click_count, featured")
+          .eq("coach_id", shopCoachId)
+          .eq("featured", true),
+        await orgIdOfGroup(supabase, params.groupId)
+      )
+        .order("created_at", { ascending: true })
+        .limit(3);
+      featuredShop = (shopRows ?? []).map((r: any) => ({
+        id: r.id,
+        title: r.title,
+        category: r.category,
+        description: r.description,
+        url: r.url,
+        imageUrl: r.image_url,
+        discountCode: r.discount_code,
+        discountDescription: r.discount_description,
+        clickCount: r.click_count,
+        featured: !!r.featured,
+      }));
+    }
+  }
 
   // Coaches first, then athletes, alphabetical within each group.
   roster.sort((a, b) => {
@@ -809,6 +846,7 @@ export default async function GroupHubPage(
                 mealLine={mealLine}
                 sessionsLeft={sessionsLeft}
               />
+              {isToday && <FeaturedShopCards links={featuredShop} />}
               {isToday && isFirstDay && (
                 <WellnessCheckinPopup
                   inline

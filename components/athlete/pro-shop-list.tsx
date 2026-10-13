@@ -55,3 +55,36 @@ export function ProShopList({ links }: { links: ProShopLink[] }) {
     </div>
   );
 }
+
+// The client's Home: the cards the coach marked Featured, at most three, under "From your coach". Nothing is drawn when there are none. Same card as the Pro Shop page; a tap opens the link in a new tab.
+export function FeaturedShopCards({ links }: { links: ProShopLink[] }) {
+  const featured = links.filter((l) => l.featured && safeWebUrl(l.url)).slice(0, 3);
+  if (featured.length === 0) return null;
+  return (
+    <section aria-label="From your coach">
+      <h2 className="font-body text-xs uppercase tracking-wide text-steel mb-2">From your coach</h2>
+      <ShopGrid>
+        {featured.map((l) => (
+          <ShopCard
+            key={l.id}
+            title={l.title}
+            description={l.description}
+            imageUrl={safeWebUrl(l.imageUrl)}
+            href={safeWebUrl(l.url) as string}
+            onOpen={() => {
+              createBrowserClient().rpc("increment_pro_shop_click", { p_id: l.id }).then(() => {});
+            }}
+            note={
+              l.discountDescription ? (
+                <>
+                  {l.discountDescription}
+                  {l.discountCode && <span className="text-chalk"> &middot; Code: {l.discountCode}</span>}
+                </>
+              ) : null
+            }
+          />
+        ))}
+      </ShopGrid>
+    </section>
+  );
+}
