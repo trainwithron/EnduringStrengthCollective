@@ -293,6 +293,14 @@
   "file": "apply-release-bk-all.sql"
  },
  {
+  "id": "release-bt",
+  "name": "Release BT (a group session belongs to one organization; run BEFORE the code that goes with it is live)",
+  "steps": [
+   "114"
+  ],
+  "file": "apply-release-bt-all.sql"
+ },
+ {
   "id": "release-bs",
   "name": "Release BS (smaller goals under a client's goal; run BEFORE the code that goes with it is live)",
   "steps": [

@@ -2207,6 +2207,20 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the goals table and the group helpers exist", "to_regclass('public.client_goals') is not null and to_regprocedure('public.is_group_coach(uuid)') is not null"],
     ],
   },
+  {
+    n: "114",
+    slug: "0364",
+    title: "0364 A group session (class) belongs to one organization: members see, join and are counted in only the classes of an organization in which they are that coach's client (no class exists yet)",
+    migrations: ["0364"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes on screen: there are no group sessions yet. From now on a class is made inside one organization, and a client sees it only through that organization. Run it BEFORE the code that goes with it is live.",
+    undo: readFileSync(new URL("./release-bt-undo.sql", import.meta.url), "utf8").replace(/\r\n/g, "\n").replace(/\s+$/, ""),
+    undoWhy: "Only if step 114 misbehaves. Puts the four class functions and the client rule back as they were and removes the organization column (safe while no class exists; a class made after this step would lose its organization).",
+    rows: [
+      ["0364 is not already applied (the class table has no organization column yet)", "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_sessions' and column_name = 'organization_id')"],
+      ["the class table is empty (so no class is left without an organization)", "case when to_regclass('public.group_sessions') is null then false else (xpath('/row/c/text()', query_to_xml('select count(*) as c from public.group_sessions where kind = ''class''', false, true, '')))[1]::text = '0' end"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -2316,6 +2330,7 @@ const BUNDLES = [
   { id: "release-bn", name: "Release BN (adding a client works again: the creator of a new group can seat themselves; run any time, ideally NOW)", steps: ["108"] },
   { id: "release-bl", name: "Release BL (four exercises added to Coach Ron's library for the FitPros history; run any time)", steps: ["106"] },
   { id: "release-bk", name: "Release BK (move Coach Ron's own training into his personal space; run AFTER he has opened Coach Ron (you) once and removed the programs he does not want)", steps: ["105"] },
+  { id: "release-bt", name: "Release BT (a group session belongs to one organization; run BEFORE the code that goes with it is live)", steps: ["114"] },
   { id: "release-bs", name: "Release BS (smaller goals under a client's goal; run BEFORE the code that goes with it is live)", steps: ["113"] },
   { id: "release-br", name: "Release BR (each storage bucket accepts only the file types its screen uploads; run any time)", steps: ["112"] },
   { id: "release-bq", name: "Release BQ (Coach Ron's exercise names merged and renamed, and the shared catalog filled from his library; run AFTER Release BP)", steps: ["111"] },
@@ -2530,6 +2545,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
+    m("0364", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_sessions' and column_name = 'organization_id')"),
     m("0363", "to_regclass('public.client_sub_goals') is not null"),
     m("0362", "exists (select 1 from storage.buckets where id = 'waiver-documents' and allowed_mime_types is not null)"),
     m("0361", "to_regclass('public.exercise_catalog') is not null"),
