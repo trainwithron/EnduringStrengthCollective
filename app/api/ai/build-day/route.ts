@@ -9,7 +9,7 @@ import { athleteIsMinor, YOUTH_PROMPT_BLOCK } from "@/lib/youth-block";
 import { libraryContext, rankLibrary, type LibraryItem } from "@/lib/builder-context";
 import { matchExercise } from "@/lib/exercise-matching";
 import { scanConstraints } from "@/lib/constraint-scan";
-import { parseRestSeconds } from "@/lib/workout-import-parser";
+import { parseRestAnyForm } from "@/lib/rest-time";
 import { DEFAULT_TRACKED_FIELDS } from "@/lib/exercise-fields";
 import type { TrackedField } from "@/lib/exercise-fields";
 import { exercisesWanted, allowsRepeats, applyTimedConsistency, dedupeDay, isMobilityTitle, longDayFlag, mobilityDaysWanted, mobilityInstruction, mobilityRole, plainLibraryName, ruleKey } from "@/lib/ai-day-rules";
@@ -228,7 +228,7 @@ export async function POST(request: Request) {
       const r = rows[i];
       const usesTime = r.timeSeconds != null;
       const usesReps = r.reps != null && r.reps !== "";
-      const usesRest = parseRestSeconds(r.rest) != null;
+      const usesRest = parseRestAnyForm(r.rest) != null;
       const trackedFields: TrackedField[] = [
         ...(usesTime && !usesReps ? DEFAULT_TRACKED_FIELDS.filter((f) => f !== "reps") : DEFAULT_TRACKED_FIELDS),
         ...(usesTime ? (["time"] as TrackedField[]) : []),
@@ -251,7 +251,7 @@ export async function POST(request: Request) {
         target_weight: r.weight,
         target_rpe: r.rpe,
         target_time_seconds: r.timeSeconds,
-        target_rest_seconds: parseRestSeconds(r.rest) ?? null,
+        target_rest_seconds: parseRestAnyForm(r.rest) ?? null,
       }));
       const { error: setError } = await supabase.from("group_workout_exercise_sets").insert(sets);
       if (setError) failed++;
