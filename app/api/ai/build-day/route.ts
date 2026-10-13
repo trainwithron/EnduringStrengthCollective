@@ -12,7 +12,7 @@ import { scanConstraints } from "@/lib/constraint-scan";
 import { parseRestSeconds } from "@/lib/workout-import-parser";
 import { DEFAULT_TRACKED_FIELDS } from "@/lib/exercise-fields";
 import type { TrackedField } from "@/lib/exercise-fields";
-import { allowsRepeats, applyTimedConsistency, dedupeDay, isMobilityTitle, longDayFlag, mobilityDaysWanted, mobilityInstruction, mobilityRole, plainLibraryName, ruleKey } from "@/lib/ai-day-rules";
+import { exercisesWanted, allowsRepeats, applyTimedConsistency, dedupeDay, isMobilityTitle, longDayFlag, mobilityDaysWanted, mobilityInstruction, mobilityRole, plainLibraryName, ruleKey } from "@/lib/ai-day-rules";
 import { buildDaySystemPrompt, buildDayUserText, checkRunToken, issueRunToken, readDayResult, runTokenIsStale, type BuiltDay } from "@/lib/ai-day-run";
 
 // ONE workout per call (about 10 to 20 seconds), so a long program is many short calls and none of them can hit a time limit.
@@ -252,7 +252,7 @@ export async function POST(request: Request) {
     }
     if (oldIds.length > 0) await supabase.from("group_workout_exercises").delete().in("id", oldIds);
 
-    const longDay = longDayFlag(week, day, rows.length);
+    const longDay = longDayFlag(week, day, rows.length, exercisesWanted(sayings));
     const flags = scanConstraints(`${instruction}. ${corrections.join(". ")}`, rows.map((r) => ({ week: `Week ${week}`, day: `Day ${day}`, exerciseName: r.exerciseName, sets: r.sets, reps: r.reps, weight: r.weight, rpe: r.rpe, rest: r.rest, timeSeconds: r.timeSeconds }) as never));
     if (longDay) flags.push(longDay);
     return NextResponse.json({

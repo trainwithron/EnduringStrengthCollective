@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { allowsRepeats, applyTimedConsistency, dedupeDay, longDayFlag, mobilityDaysWanted, mobilityInstruction, mobilityRole, plainLibraryName, type DayRow } from "@/lib/ai-day-rules";
+import { exercisesWanted, allowsRepeats, applyTimedConsistency, dedupeDay, longDayFlag, mobilityDaysWanted, mobilityInstruction, mobilityRole, plainLibraryName, type DayRow } from "@/lib/ai-day-rules";
 import { scanConstraints } from "@/lib/constraint-scan";
 
 // The explicit parts of the prompt Ron tested the builder with (only what he actually wrote).
@@ -87,6 +87,12 @@ describe("plain library names", () => {
 });
 
 describe("a sensible day length", () => {
+  it("yields to a number of exercises he asks for", () => {
+    expect(exercisesWanted("I want 12 exercises a day")).toBe(12);
+    expect(exercisesWanted("short sessions")).toBeNull();
+    expect(longDayFlag(1, 1, 12, 12)).toBeNull();
+    expect(longDayFlag(1, 1, 13, 12)).toContain("13 exercises");
+  });
   it("flags only a day over ten exercises", () => {
     expect(longDayFlag(1, 1, 10)).toBeNull();
     expect(longDayFlag(1, 1, 11)).toContain("Week 1, Day 1 has 11 exercises");

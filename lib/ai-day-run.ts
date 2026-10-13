@@ -113,7 +113,7 @@ export function buildDaySystemPrompt(input: { youthBlock: string | null; hasInju
 }
 
 Rules:
-- Build ONE coherent day of 5 to 8 exercises (a mobility day can be a few more short items, but never more than 10) that fits the program so far and what the coach described. Never write the same exercise twice in one day unless the coach asked for that. Do not repeat a day that is already built; vary the focus or the exercises sensibly, keeping the program's style (sets x reps, order of movement patterns, number of exercises).
+- Build ONE coherent day of 5 to 8 exercises (a mobility day can be a few more short items, but never more than 10) that fits the program so far and what the coach described. If the coach says how many exercises a day should have, or asks for short or long sessions, follow that instead of this number. Never write the same exercise twice in one day unless the coach asked for that. Do not repeat a day that is already built; vary the focus or the exercises sensibly, keeping the program's style (sets x reps, order of movement patterns, number of exercises).
 - Everything the coach has said (the request and every correction) is a HARD requirement. A correction such as "no barbell squats, his back" means no barbell squats in this day or any later day.
 - Exercises you choose yourself must come only from the library below, using the exact names. If the coach names an exercise that is not in the library, use it exactly as named.
 - One row per exercise, not one row per set (3x8 is ONE row with sets=3, reps="8").
