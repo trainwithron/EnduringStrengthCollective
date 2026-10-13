@@ -129,7 +129,7 @@ export const MAX_SENSIBLE_DAY = 10;
 
 // "10 exercises a day", "12 exercises per session": a number of exercises the coach asked for. His number wins over the usual 5 to 8.
 export function exercisesWanted(text: string): number | null {
-  const m = /(d{1,2})s*(?:-|to)?s*(?:d{1,2}s*)?exercises?/i.exec(text);
+  const m = /\b(\d{1,2})\s*(?:-|to)?\s*(?:\d{1,2}\s*)?exercises?\b/i.exec(text);
   if (!m) return null;
   const n = Number(m[1]);
   return n >= 1 && n <= 14 ? n : null;
