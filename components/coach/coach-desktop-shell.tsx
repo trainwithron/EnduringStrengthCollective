@@ -26,7 +26,6 @@ import {
   Home,
   MonitorPlay,
   Activity,
-  MoreHorizontal,
   CalendarClock,
   Mail,
   Trophy,
@@ -123,6 +122,10 @@ type Active =
   | "records"
   | "kiosk"
   | "settings"
+  | "display"
+  | "admin-organizations"
+  | "admin-support"
+  | "admin-ranking"
   | "website";
 
 interface NavLeaf {
@@ -131,6 +134,8 @@ interface NavLeaf {
   href: string;
   icon: typeof LayoutGrid;
   badge?: number;
+  // Opens in a new tab.
+  newTab?: boolean;
   // When set, the nav label renders as a SwappableTerm (word-swap
   // terminology system) instead of the plain `label` string — `label`
   // still doubles as the collapsed-state tooltip title.
@@ -421,28 +426,29 @@ function CoachDesktopShellFull({
     // roster-wide insights page every coach can use, not just team-mode
     // groups — gating it behind a group would hide something that's
     // reachable today for anyone who isn't running a team sport.
-    // The rail is short and coach-level: Clients, Calendar, Messages, Programs, Nutrition, Business (Home and Settings sit around it).
-    // Everything else is under "More tools". The old group Dashboard entry is gone from the rail (Home is the dashboard); it is under More tools.
+    // The rail is short and coach-level: Clients, Calendar, Messages, then the labeled groups.
+    // Coaching (Programs, Exercise Library, Nutrition), Business, Group (inside a team or social group) and Settings (account, display, kiosk, support, quick tips) are the labeled groups; there is no "more" menu.
     // Clients is always the coach's full list, wherever they are. A team or social group's own roster is a separate "Members" entry, shown only inside such a group.
     { key: "clients", label: "Clients", href: CLIENTS_HREF, icon: UserRound, badge: clientsUnread, termKey: "client", termForm: "plural" },
     { key: "calendar", label: "Calendar", href: "/calendar", icon: CalendarDays },
     { key: "messages", label: "Messages", href: `/groups/${groupId}/messages`, icon: Mail, badge: messagesUnread },
     {
-      label: "Programming",
+      label: "Coaching",
       icon: Dumbbell,
       items: [
         { key: "programs", label: "Programs", href: ALL_PROGRAMS_HREF, icon: Dumbbell, termKey: "program", termForm: "plural" },
         { key: "exercise-library", label: "Exercise Library", href: `/groups/${groupId}/exercise-library`, icon: Library },
+        // One Nutrition area. Targets, meal plans, favorite meals and the calculator are tabs and sections inside it, not separate places in the rail.
+        { key: "nutrition", label: "Nutrition", href: `/groups/${groupId}/nutrition`, icon: Salad },
       ],
     },
-    // One Nutrition area. Targets, meal plans, favorite meals and the calculator are tabs and sections inside it, not separate places in the rail.
-    { key: "nutrition", label: "Nutrition", href: `/groups/${groupId}/nutrition`, icon: Salad },
     {
       label: "Business",
       icon: TrendingUp,
       items: [
         { key: "business", label: "Overview", href: `/groups/${groupId}/business`, icon: TrendingUp },
         { key: "packages", label: "Packages", href: `/groups/${groupId}/business/packages`, icon: Layers },
+        { key: "resources", label: "Pro Shop and Referrals", href: `/groups/${groupId}/resources`, icon: HeartHandshake },
         { key: "website", label: "My website", href: `/groups/${groupId}/business/website`, icon: Globe },
         { key: "availability", label: "Availability", href: `/groups/${groupId}/availability`, icon: CalendarClock },
         { key: "session-types", label: "Session Types", href: `/groups/${groupId}/business/session-types`, icon: Tag },
@@ -453,6 +459,13 @@ function CoachDesktopShellFull({
         { key: "branding", label: "Organization", href: `/groups/${groupId}/branding`, icon: Palette },
         { key: "sms-settings", label: "SMS Notifications", href: `/groups/${groupId}/business/sms-settings`, icon: MessageCircle },
         { key: "zapier", label: "Zapier", href: `/groups/${groupId}/business/zapier`, icon: Zap },
+        // Platform administration: only the platform admin sees these (their pages refuse everyone else on the server too).
+        ...(isPlatformAdmin
+          ? [
+              { key: "admin-organizations" as const, label: "Organizations", href: "/admin/organizations", icon: Building2 },
+              { key: "admin-ranking" as const, label: "Marketplace ranking", href: "/admin/marketplace-ranking", icon: SlidersHorizontal },
+            ]
+          : []),
       ],
     },
     // The group's own tools. Members (a team or social group's own roster) and the team pages show only where they apply; nothing here is removed, only regrouped.
@@ -479,12 +492,15 @@ function CoachDesktopShellFull({
       ],
     },
     {
-      label: "More tools",
-      icon: MoreHorizontal,
+      label: "Settings",
+      icon: Settings,
       items: [
+        { key: "settings", label: "Account", href: `/groups/${groupId}/settings`, icon: Settings },
+        { key: "display", label: "Display Mode", href: `/groups/${groupId}/display`, icon: MonitorPlay, newTab: true },
+        { key: "kiosk", label: "Kiosk Check-In", href: `/groups/${groupId}/kiosk/settings`, icon: UserCheck },
         { key: "support", label: "Support", href: `/groups/${groupId}/business/support`, icon: HeartHandshake },
-        { key: "resources", label: "Resources", href: `/groups/${groupId}/resources`, icon: HeartHandshake },
         { key: "quick-tips", label: "Quick Tips", href: `/groups/${groupId}/quick-tips`, icon: Lightbulb },
+        ...(isPlatformAdmin ? [{ key: "admin-support" as const, label: "Support Inbox", href: "/admin/support", icon: HeartHandshake, badge: openSupportCount }] : []),
       ],
     },
   ];
@@ -559,6 +575,7 @@ function CoachDesktopShellFull({
       label: item.label,
       href: item.href,
       active: active === item.key,
+      newTab: item.newTab,
     })) ?? [];
 
   return (
@@ -657,57 +674,7 @@ function CoachDesktopShellFull({
           ]}
           footer={
             <>
-              <a
-                href={`/groups/${groupId}/display`}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Display Mode"
-                className="w-11 h-11 flex items-center justify-center text-steel active:text-chalk"
-              >
-                <MonitorPlay className="w-4 h-4" strokeWidth={2.25} />
-              </a>
-              <a
-                href={`/groups/${groupId}/settings`}
-                title="Settings"
-                aria-label="Settings"
-                className="w-11 h-11 flex items-center justify-center text-steel active:text-chalk"
-              >
-                <Settings className="w-4 h-4" strokeWidth={2.25} />
-              </a>
-              <a
-                href={`/groups/${groupId}/kiosk/settings`}
-                title="Kiosk Check-In"
-                className="w-11 h-11 flex items-center justify-center text-steel active:text-chalk"
-              >
-                <UserCheck className="w-4 h-4" strokeWidth={2.25} />
-              </a>
               <WorkspaceRailButton />
-              {isPlatformAdmin && (
-                <>
-                  <Link
-                    href="/admin/organizations"
-                    title="Organizations"
-                    className="w-11 h-11 flex items-center justify-center text-steel active:text-chalk"
-                  >
-                    <Building2 className="w-4 h-4" strokeWidth={2.25} />
-                  </Link>
-                  <Link
-                    href="/admin/support"
-                    title="Support Inbox"
-                    className="relative w-11 h-11 flex items-center justify-center text-steel active:text-chalk"
-                  >
-                    <HeartHandshake className="w-4 h-4" strokeWidth={2.25} />
-                    <NavBadge count={openSupportCount} collapsed />
-                  </Link>
-                  <Link
-                    href="/admin/marketplace-ranking"
-                    title="Marketplace Ranking Weights"
-                    className="w-11 h-11 flex items-center justify-center text-steel active:text-chalk"
-                  >
-                    <SlidersHorizontal className="w-4 h-4" strokeWidth={2.25} />
-                  </Link>
-                </>
-              )}
               <FeedbackButton variant="icon" />
               <DownloadAppButton collapsed />
               <div className="w-11 flex items-center justify-center">

@@ -15,7 +15,7 @@ describe("the three look-alike rail icons are now different", () => {
     expect(svg.match(/<circle/g)?.length).toBe(3);
   });
   it("Programs (the rail entry and its panel tab) is a dumbbell, and the grid icon is no longer used for programs", () => {
-    expect(nav).toContain('label: "Programming",\n      icon: Dumbbell,');
+    expect(nav).toContain('label: "Coaching",\n      icon: Dumbbell,');
     expect(nav).toContain('{ key: "programs", label: "Programs", href: ALL_PROGRAMS_HREF, icon: Dumbbell,');
     expect(nav).not.toMatch(/icon: LayoutGrid/);
   });
@@ -25,8 +25,8 @@ describe("the three look-alike rail icons are now different", () => {
 });
 
 describe("Exercise Library does not look like Programs", () => {
-  it("is a library icon, so the dumbbell is only Programs inside the Programming panel", () => {
+  it("is a library icon, so the dumbbell is only Programs inside the Coaching panel", () => {
     expect(nav).toContain('label: "Exercise Library", href: `/groups/${groupId}/exercise-library`, icon: Library }');
-    expect(nav.match(/icon: Dumbbell/g)?.length).toBe(2); // the Programming rail icon and its Programs tab
+    expect(nav.match(/icon: Dumbbell/g)?.length).toBe(2); // the Coaching rail icon and its Programs tab
   });
 });
