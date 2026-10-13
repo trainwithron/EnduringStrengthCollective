@@ -83,6 +83,8 @@ export function parseRestAnyForm(text: string | null | undefined): number | null
     const a = parseRestInput(left);
     const b = parseRestInput(range[2]);
     if (!a.ok || !b.ok || a.seconds === null || b.seconds === null) return null;
+    // A range of small bare numbers ("5-10") is as unclear as one ("2"): minutes or seconds? Ask, the same as a single bare number.
+    if (a.bare || b.bare) return null;
     return Math.max(a.seconds, b.seconds);
   }
   const one = parseRestInput(t);

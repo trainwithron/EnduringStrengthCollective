@@ -13,7 +13,7 @@ describe("rest is read the same way everywhere, ranges included", () => {
   it("every way of writing it", () => {
     const cases: [string, number | null][] = [
       ["90", 90], ["90s", 90], ["1:30", 90], ["2 min", 120], ["2m", 120], ["60-90", 90], ["60 to 90", 90], ["60 to 90 seconds", 90], ["60–90s", 90], ["1:00-1:30", 90], ["1 to 2 min", 120], ["45-60 sec", 60],
-      ["as needed", null], ["", null], ["abc", null], ["60-", null],
+      ["as needed", null], ["", null], ["abc", null], ["60-", null], ["5-10", null], ["2 to 3", null],
     ];
     for (const [text, seconds] of cases) expect(parseRestAnyForm(text), text).toBe(seconds);
     expect(parseRestAnyForm(null)).toBeNull();
