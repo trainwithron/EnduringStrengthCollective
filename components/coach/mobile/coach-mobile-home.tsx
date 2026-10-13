@@ -70,6 +70,19 @@ export async function CoachMobileHome({
     }
   }
 
+  // His own workout that is paused or in progress (started in the last 36 hours): the pinned button resumes it where he left off.
+  const { data: ownOpen } = await supabase
+    .from("athlete_sessions")
+    .select("id")
+    .eq("athlete_id", coachId)
+    .in("status", ["in_progress", "abandoned"])
+    .gte("started_at", new Date(Date.now() - 36 * 3600000).toISOString())
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const startHref = ownOpen ? `/sessions/${(ownOpen as { id: string }).id}?resume=1` : "/my-space?view=client";
+  const startLabel = ownOpen ? "Resume workout" : "Start workout";
+
   const topDue = dueRoster[0] ?? null;
   const soloAthlete =
     !topDue && (rosterRows ?? []).length === 1 ? (rosterRows as any[])[0] : null;
@@ -136,8 +149,8 @@ export async function CoachMobileHome({
 
         {/* Pinned at the top of the coach's Home, whatever else is (or is not) on the page: the coach's own workout. It makes the coach's own space the first time and opens it as their own client app. */}
         <div className="px-5 pb-4">
-          <Link href="/my-space?view=client" className="h-14 flex items-center justify-center bg-rust text-graphite font-display uppercase text-lg font-bold">
-            Start workout
+          <Link href={startHref} className="h-14 flex items-center justify-center bg-rust text-graphite font-display uppercase text-lg font-bold">
+            {startLabel}
           </Link>
         </div>
 
