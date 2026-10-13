@@ -74,6 +74,8 @@ export function UseTemplatePanel({ programId, programName, groupId, onClose, onC
     setError(null);
     const supabase = createBrowserClient();
     let copyId: string | null = null;
+    // Once the client has their own copy, nothing is taken back: removing the library copy then would leave the client's copy with its source gone.
+    let clientHasCopy = false;
     try {
       const {
         data: { user },
@@ -102,13 +104,20 @@ export function UseTemplatePanel({ programId, programName, groupId, onClose, onC
       if (client) {
         const assigned = await assignProgramToClient(supabase, { sourceProgramId: copyId, destinationGroupId: client.destinationGroupId, athleteId: client.id, startDate: localDateKey() });
         if ("error" in assigned) throw new Error(assigned.error);
+        clientHasCopy = true;
       }
       setDone(madeMessage(shownName.trim()));
       onChanged();
     } catch {
-      // Nothing is kept: the half-made copy is removed again.
-      if (copyId) await supabase.from("programs").delete().eq("id", copyId);
-      setError(MAKE_FAILED_MESSAGE);
+      if (clientHasCopy) {
+        // Made and assigned; only the closing steps failed.
+        setDone(madeMessage(shownName.trim()));
+        onChanged();
+      } else {
+        // Nothing is kept: the half-made copy is removed again.
+        if (copyId) await supabase.from("programs").delete().eq("id", copyId);
+        setError(MAKE_FAILED_MESSAGE);
+      }
     }
     setBusy(false);
   }

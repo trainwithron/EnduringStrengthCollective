@@ -80,3 +80,12 @@ describe("Use this template: it makes a normal program and never touches the tem
     expect(read("components/coach/desktop/program-card-grid.tsx")).toContain("slotCount={program.slotCount ?? 0}");
   });
 });
+
+describe("Use this template: nothing is taken back once the client has their copy", () => {
+  it("the cleanup only runs before the assignment succeeded", () => {
+    const panel = read("components/coach/desktop/use-template-panel.tsx");
+    expect(panel).toContain("let clientHasCopy = false;");
+    expect(panel).toContain("clientHasCopy = true;");
+    expect(panel.indexOf("if (clientHasCopy) {")).toBeLessThan(panel.indexOf('await supabase.from("programs").delete().eq("id", copyId)'));
+  });
+});
