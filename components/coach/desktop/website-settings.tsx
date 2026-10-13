@@ -204,7 +204,7 @@ export function WebsiteSettings({ coachId, slug, initial, pendingQuotes = [] }: 
       {quotes.length > 0 && (
         <div className="space-y-2" aria-label="Quotes from clients">
           <p className={label}>Reviews clients sent you</p>
-          <p className="font-body text-xs text-steel">Nothing shows on your page until you add it. Only reviews marked shareable can be added. After you add one, add the client's first name if they are happy to be named.</p>
+          <p className="font-body text-xs text-steel">Nothing shows on your page until you add it. Only reviews marked shareable can be added. After you add one, add the client&apos;s first name if they are happy to be named.</p>
           <ul className="divide-y divide-steel/15 border border-steel/20">
             {quotes.map((q) => (
               <li key={q.id} className="p-3">
