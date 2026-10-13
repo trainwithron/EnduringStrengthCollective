@@ -221,7 +221,7 @@ export function ExerciseSwipeCarousel({
         ref={scrollerRef}
         onScroll={handleScroll}
         className="flex items-start overflow-x-auto overflow-y-hidden snap-x snap-mandatory scroll-smooth -mx-5 px-5 gap-4 transition-[height] duration-200 ease-out motion-reduce:transition-none"
-        style={{ scrollbarWidth: "none", height: activeHeight ?? undefined }}
+        style={{ scrollbarWidth: "none", height: activeHeight ?? undefined, maxHeight: "calc(100dvh - 15rem)" }}
       >
         {exercises.map((exercise) => {
           const expanded = expandedId === exercise.id;
@@ -229,7 +229,7 @@ export function ExerciseSwipeCarousel({
             <div
               key={exercise.id}
               data-exercise-id={exercise.id}
-              className="snap-center shrink-0 w-full border border-steel/20 bg-surface/20 p-4"
+              className="snap-center snap-always shrink-0 w-full max-h-[calc(100dvh-15rem)] overflow-y-auto overscroll-contain border border-steel/20 bg-surface/20 p-4"
             >
               <div className="flex items-center justify-between gap-2 mb-2">
                 <p className="font-body text-xs text-steel uppercase tracking-wide">

@@ -189,7 +189,7 @@ export function ExerciseVerticalCarousel({
       <div
         ref={scrollerRef}
         onScroll={handleScroll}
-        className="flex flex-col overflow-y-auto snap-y snap-mandatory scroll-smooth gap-4 max-h-[65vh]"
+        className="flex flex-col overflow-y-auto snap-y snap-mandatory scroll-smooth gap-4 max-h-[calc(100dvh-14rem)]"
         style={{ scrollbarWidth: "none" }}
       >
         {exercises.map((exercise, exerciseIndex) => {
@@ -200,7 +200,7 @@ export function ExerciseVerticalCarousel({
               data-exercise-id={exercise.id}
               onFocusCapture={() => setActiveIndex(exerciseIndex)}
               onPointerDownCapture={() => setActiveIndex(exerciseIndex)}
-              className="snap-center shrink-0 border border-steel/20 bg-surface/20 p-4"
+              className="snap-center snap-always shrink-0 border border-steel/20 bg-surface/20 p-4"
             >
               <div className="flex items-center justify-between gap-2 mb-2">
                 <p className="font-body text-xs text-steel uppercase tracking-wide">

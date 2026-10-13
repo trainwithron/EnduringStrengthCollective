@@ -46,9 +46,9 @@ describe("the exercise cards size to their content", () => {
     expect(swipe).toContain("height: activeHeight");
     expect(swipe).toContain("ResizeObserver");
   });
-  it("the vertical carousel no longer reserves a fixed 65 percent of the screen: it is as tall as its content, up to that, then scrolls", () => {
-    expect(vertical).toContain("max-h-[65vh]");
-    expect(vertical).not.toMatch(/(?<!max-)h-\[65vh\]/);
+  it("the vertical carousel is as tall as its content, up to what is left under the header and the pinned bar, then scrolls inside itself", () => {
+    expect(vertical).toContain("max-h-[calc(100dvh-14rem)]");
+    expect(vertical).not.toContain("h-[65vh]");
   });
 });
 

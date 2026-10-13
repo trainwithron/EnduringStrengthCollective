@@ -531,7 +531,7 @@ export default async function SessionPage(
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-32">
       {coachModeClient && <CoachModeBar groupId={session.group_id} clientName={coachModeClient.name} homeHref={coachHomeHref} />}
-      <header className="px-5 pt-8 pb-6 border-b border-steel/20">
+      <header className={session.status === "in_progress" ? "px-5 pt-2 pb-2 border-b border-steel/20" : "px-5 pt-8 pb-6 border-b border-steel/20"}>
         {session.status === "in_progress" ? (
           <ExitWorkoutButton sessionId={session.id} backHref={backHref} />
         ) : (
@@ -539,15 +539,20 @@ export default async function SessionPage(
             &larr; Back
           </Link>
         )}
-        <div className="flex items-center justify-between mt-3">
-          <p className="font-body text-xs text-steel uppercase tracking-wide">
+        <div className={session.status === "in_progress" ? "flex items-center justify-between gap-2" : "flex items-center justify-between mt-3"}>
+          <p className="font-body text-xs text-steel uppercase tracking-wide shrink-0">
             {session.status === "completed" ? "Completed" : session.status === "abandoned" ? "Exited" : "In progress"}
           </p>
+          {session.status === "in_progress" && (
+            <h1 className="font-display font-bold text-lg leading-none uppercase truncate min-w-0 flex-1 text-center">{(session as any).workouts?.title ?? "Workout"}</h1>
+          )}
           {session.logged_by_coach && <CoachLoggedBadge />}
         </div>
-        <h1 className="font-display font-bold text-3xl leading-none mt-1 uppercase">
-          {(session as any).workouts?.title ?? "Workout"}
-        </h1>
+        {session.status !== "in_progress" && (
+          <h1 className="font-display font-bold text-3xl leading-none mt-1 uppercase">
+            {(session as any).workouts?.title ?? "Workout"}
+          </h1>
+        )}
         {session.status === "abandoned" && <ResumeWorkoutButton sessionId={session.id} />}
         {/* Coach-only, mid-logging escape hatch — Ron's own real scenario:
             ran out of time in person and needed a quick way to hand the

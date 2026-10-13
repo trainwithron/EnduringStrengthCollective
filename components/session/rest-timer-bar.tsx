@@ -222,9 +222,46 @@ export function RestTimerBar({
   const showPrompt = pendingPrompt && !running;
 
   return (
-    <div className="sticky top-0 z-10 bg-graphite border-b border-steel/20 px-5 py-3">
+    <div className="sticky top-0 z-10 bg-graphite border-b border-steel/20 px-5 py-1.5">
       <div className="flex items-center justify-between gap-3">
         <SessionStopwatch startedAt={startedAt} />
+
+      {showPrompt && (
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="font-body text-xs text-steel">Rest?</span>
+          {PRESETS.map((seconds) => (
+            <button
+              key={seconds}
+              type="button"
+              onClick={() => startPreset(seconds)}
+              className={`h-9 px-2.5 font-body text-xs border ${
+                seconds === pendingPrompt!.defaultSeconds
+                  ? "bg-rust border-rust text-graphite"
+                  : "border-steel/30 text-steel"
+              }`}
+            >
+              {seconds}s
+            </button>
+          ))}
+          {!PRESETS.includes(pendingPrompt!.defaultSeconds) && (
+            <button
+              type="button"
+              onClick={() => startPreset(pendingPrompt!.defaultSeconds)}
+              className="h-9 px-2.5 font-body text-xs border bg-rust border-rust text-graphite"
+            >
+              {pendingPrompt!.defaultSeconds}s
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onPromptHandled}
+            aria-label="Dismiss rest timer prompt"
+            className="ml-auto font-body text-xs text-steel"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
         {running && (
           <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
@@ -235,7 +272,7 @@ export function RestTimerBar({
               <button
                 type="button"
                 onClick={addFifteen}
-                className="h-11 px-2.5 border border-steel/30 text-steel font-body text-xs"
+                className="h-9 px-2.5 border border-steel/30 text-steel font-body text-xs"
               >
                 +15s
               </button>
@@ -243,7 +280,7 @@ export function RestTimerBar({
             <button
               type="button"
               onClick={skip}
-              className="h-11 px-2.5 border border-steel/30 text-steel font-body text-xs"
+              className="h-9 px-2.5 border border-steel/30 text-steel font-body text-xs"
             >
               Skip
             </button>
@@ -272,7 +309,7 @@ export function RestTimerBar({
                   <button
                     type="button"
                     onClick={() => setGateOpen((v) => !v)}
-                    className="h-11 px-2.5 border border-steel/30 text-steel font-body text-xs"
+                    className="h-9 px-2.5 border border-steel/30 text-steel font-body text-xs"
                   >
                     🔒 Unlock
                   </button>
@@ -372,42 +409,6 @@ export function RestTimerBar({
         />
       )}
 
-      {showPrompt && (
-        <div className="flex items-center gap-2 mt-2.5">
-          <span className="font-body text-xs text-steel">Rest?</span>
-          {PRESETS.map((seconds) => (
-            <button
-              key={seconds}
-              type="button"
-              onClick={() => startPreset(seconds)}
-              className={`h-11 px-3 font-body text-xs border ${
-                seconds === pendingPrompt!.defaultSeconds
-                  ? "bg-rust border-rust text-graphite"
-                  : "border-steel/30 text-steel"
-              }`}
-            >
-              {seconds}s
-            </button>
-          ))}
-          {!PRESETS.includes(pendingPrompt!.defaultSeconds) && (
-            <button
-              type="button"
-              onClick={() => startPreset(pendingPrompt!.defaultSeconds)}
-              className="h-11 px-3 font-body text-xs border bg-rust border-rust text-graphite"
-            >
-              {pendingPrompt!.defaultSeconds}s
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={onPromptHandled}
-            aria-label="Dismiss rest timer prompt"
-            className="ml-auto font-body text-xs text-steel"
-          >
-            ✕
-          </button>
-        </div>
-      )}
     </div>
   );
 }

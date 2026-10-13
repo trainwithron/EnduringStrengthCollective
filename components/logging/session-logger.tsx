@@ -121,6 +121,7 @@ export function SessionLogger({
     setPendingRestPrompt({ defaultSeconds: typed ?? 90, isPrescribed: typed != null, source: typed != null ? "typed" : undefined });
   }
   const [addingExercise, setAddingExercise] = useState(false);
+  const [addMenuOpen, setAddMenuOpen] = useState(false);
   const [newExerciseName, setNewExerciseName] = useState("");
   const [addExerciseBusy, setAddExerciseBusy] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -326,7 +327,7 @@ export function SessionLogger({
       )}
 
       {!isCompleted && (
-        <div className="mt-6 pb-4">
+        <div className="mt-2 pb-2">
           {addedCount >= MAX_ADDED_EXERCISES ? (
             <p className="font-body text-xs text-steel">
               You&apos;ve added the max of {MAX_ADDED_EXERCISES} extra exercises for this workout.
@@ -355,16 +356,26 @@ export function SessionLogger({
             <div className="space-y-2">
               <button
                 type="button"
-                onClick={() => setAddingExercise(true)}
-                className="w-full h-11 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors"
+                onClick={() => setAddMenuOpen((v) => !v)}
+                aria-expanded={addMenuOpen}
+                className="h-9 px-3 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors"
               >
-                + Add exercise
+                + Add
               </button>
+              {addMenuOpen && (
+                <button
+                  type="button"
+                  onClick={() => setAddingExercise(true)}
+                  className="block w-full h-11 border border-steel/30 text-steel font-body text-sm active:border-rust active:text-rust transition-colors"
+                >
+                  + Add exercise
+                </button>
+              )}
               {/* Coach mobile app's NL quick-add (coach_mobile_app_
                   redesign_plan.md) — a coach driving someone else's
                   in-person session only; an athlete logging their own
                   session keeps the plain manual add above. */}
-              {!isOwnSession && (
+              {!isOwnSession && addMenuOpen && (
                 <QuickAddNlButton
                   sessionId={sessionId}
                   nextExerciseOrder={

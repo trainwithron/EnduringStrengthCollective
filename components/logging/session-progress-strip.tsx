@@ -48,7 +48,7 @@ export function SessionProgressStrip({
   if (!previousSummary && !next) return null;
 
   return (
-    <div className="flex items-center justify-between gap-3 mb-3 px-3 py-2 border border-steel/20 bg-surface/20">
+    <div className="flex items-center justify-between gap-3 mb-2 px-3 py-1 border border-steel/20 bg-surface/20 [@media(max-height:760px)]:hidden">
       {previousSummary ? (
         <p className="font-body text-xs text-steel truncate min-w-0">
           <span className="text-chalk">{previous!.exerciseName}</span> — {previousSummary}

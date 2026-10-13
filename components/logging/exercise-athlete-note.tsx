@@ -174,10 +174,10 @@ export function ExerciseAthleteNote({
           saver.change(e.target.value);
         }}
         onBlur={(e) => void saver.flush(e.currentTarget.value)}
-        rows={2}
+        rows={1}
         maxLength={2000}
         placeholder="How did it feel? Anything your coach should know?"
-        className="w-full min-h-[64px] bg-surface border border-steel/30 text-chalk px-3 py-2 font-body text-base focus:outline-none focus:border-rust resize-none"
+        className="w-full min-h-[44px] focus:min-h-[96px] transition-[min-height] bg-surface border border-steel/30 text-chalk px-3 py-2 font-body text-base focus:outline-none focus:border-rust resize-none"
       />
     </div>
   );
