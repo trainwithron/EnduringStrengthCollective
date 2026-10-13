@@ -95,7 +95,7 @@ export function WorkoutOverviewView({
       >
         {existingSession ? (
           <Link
-            href={`/sessions/${existingSession.id}`}
+            href={existingSession.status === "completed" ? `/sessions/${existingSession.id}` : `/sessions/${existingSession.id}?resume=1`}
             className="block w-full h-14 bg-rust text-graphite font-display uppercase text-lg font-bold text-center leading-[56px] active:bg-rust/80 transition-colors"
           >
             {existingSession.status === "completed" ? "View workout" : "Resume workout"}

@@ -28,7 +28,7 @@ export function ExitWorkoutButton({ sessionId, backHref }: { sessionId: string; 
     return (
       <div className="border border-rust/40 bg-surface/60 p-3 mt-1">
         <p className="font-body text-xs text-chalk mb-2">
-          Exit this workout? Everything you&apos;ve already logged is saved either way.
+          Pause this workout? Everything you&apos;ve logged is saved. You can pick it up again later today.
         </p>
         <div className="flex items-center gap-3">
           <button
@@ -37,7 +37,7 @@ export function ExitWorkoutButton({ sessionId, backHref }: { sessionId: string; 
             disabled={exiting}
             className="h-11 px-3 bg-rust text-graphite font-body text-xs font-medium disabled:opacity-40"
           >
-            {exiting ? "Exiting…" : "Exit workout"}
+            {exiting ? "Pausing…" : "Pause workout"}
           </button>
           <button
             type="button"
@@ -58,7 +58,7 @@ export function ExitWorkoutButton({ sessionId, backHref }: { sessionId: string; 
       onClick={() => setConfirming(true)}
       className="font-body text-xs text-steel uppercase tracking-wide active:text-rust"
     >
-      &larr; Exit workout
+      &larr; Pause workout
     </button>
   );
 }

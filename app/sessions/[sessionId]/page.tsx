@@ -26,9 +26,11 @@ import { CoachModeBar } from "@/components/coach/mobile/coach-mode-bar";
 export default async function SessionPage(
   props: {
     params: Promise<{ sessionId: string }>;
+    searchParams?: Promise<{ resume?: string }>;
   }
 ) {
   const params = await props.params;
+  const query = (await props.searchParams) ?? {};
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -49,6 +51,14 @@ export default async function SessionPage(
       <NoAccess>This session isn&apos;t available, or you don&apos;t have access to it.</NoAccess>
     );
   }
+
+  // "Resume workout" from the workout page or Home: a paused workout goes back to in progress, exactly where it was (completed sets stay completed).
+  if (query.resume === "1" && session.status === "abandoned") {
+    const { data: resumed } = await supabase.from("athlete_sessions").update({ status: "in_progress" }).eq("id", session.id).eq("status", "abandoned").select("id");
+    if (resumed && resumed.length > 0) (session as { status: string }).status = "in_progress";
+  }
+  // A paused workout is "Paused" for 48 hours after it was started, then "Not finished". It is never completed for him.
+  const pausedRecently = !!session.started_at && Date.now() - new Date(session.started_at).getTime() < 48 * 3600000;
 
   const isOwnSession = session.athlete_id === user.id;
 
@@ -541,7 +551,7 @@ export default async function SessionPage(
         )}
         <div className={session.status === "in_progress" ? "flex items-center justify-between gap-2" : "flex items-center justify-between mt-3"}>
           <p className="font-body text-xs text-steel uppercase tracking-wide shrink-0">
-            {session.status === "completed" ? "Completed" : session.status === "abandoned" ? "Exited" : "In progress"}
+            {session.status === "completed" ? "Completed" : session.status === "abandoned" ? (pausedRecently ? "Paused" : "Not finished") : "In progress"}
           </p>
           {session.status === "in_progress" && (
             <h1 className="font-display font-bold text-lg leading-none uppercase truncate min-w-0 flex-1 text-center">{(session as any).workouts?.title ?? "Workout"}</h1>
