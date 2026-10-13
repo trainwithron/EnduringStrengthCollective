@@ -30,6 +30,7 @@ export interface ProgramBuilderData {
   // athlete_training_maxes for a real number instead of having no
   // athlete context at all.
   athleteId: string | null;
+  canAddSlot: boolean;
   programId: string;
   programName: string;
   programDescription: string | null;
@@ -58,7 +59,7 @@ export async function getProgramBuilderData(
   const { data: program } = await supabase
     .from("programs")
     .select(
-      "id, name, description, start_date, training_days, visibility_window, ai_sequencing_notes, training_intent, athlete_id"
+      "id, name, description, start_date, training_days, visibility_window, ai_sequencing_notes, training_intent, athlete_id, is_active"
     )
     .eq("id", programId)
     .eq("group_id", groupId)
@@ -92,7 +93,7 @@ export async function getProgramBuilderData(
         `
       id, title, week_number, day_index, scheduled_date,
       group_workout_exercises (
-        id, exercise_name, display_name, exercise_order, movement_pattern_id, tracked_fields, notes,
+        id, exercise_name, display_name, exercise_order, movement_pattern_id, tracked_fields, notes, is_slot, slot_side, slot_tier,
         group_workout_exercise_sets ( id, set_order, target_reps, target_weight, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance, rep_min, rep_max )
       ),
       workout_notes ( id, body, position )
@@ -126,7 +127,8 @@ export async function getProgramBuilderData(
   // Most-used first (counted across this program's own exercises), then A to Z, so the name box's dropdown puts the coach's usual exercises ahead of rarely used ones.
   const usage = new Map<string, number>();
   for (const w of workoutRows ?? []) {
-    for (const ex of (w as { group_workout_exercises?: { exercise_name: string }[] }).group_workout_exercises ?? []) {
+    for (const ex of (w as { group_workout_exercises?: { exercise_name: string; is_slot?: boolean }[] }).group_workout_exercises ?? []) {
+      if (ex.is_slot) continue;
       usage.set(ex.exercise_name, (usage.get(ex.exercise_name) ?? 0) + 1);
     }
   }
@@ -166,6 +168,7 @@ export async function getProgramBuilderData(
         videoPath: media?.videoPath ?? null,
         youtubeUrl: media?.youtubeUrl ?? null,
         tier: tierByName.get(ex.exercise_name) ?? null,
+        slot: ex.is_slot ? { side: ex.slot_side ?? null, tier: ex.slot_tier ?? null } : null,
         sets: (ex.group_workout_exercise_sets ?? [])
           .slice()
           .sort((a: any, b: any) => a.set_order - b.set_order)
@@ -211,6 +214,8 @@ export async function getProgramBuilderData(
     groupId,
     groupName: group?.name ?? "Coaching",
     athleteId: program.athlete_id,
+    // A slot may only be added to a library program that nobody follows (no client, not active).
+    canAddSlot: program.athlete_id === null && program.is_active === false,
     programId,
     programName: program.name,
     programDescription: program.description,
@@ -237,7 +242,7 @@ export async function getProgramBuilderData(
 export const BUILDER_ONE_WORKOUT_SELECT = `
       id, title, week_number, day_index, scheduled_date,
       group_workout_exercises (
-        id, exercise_name, display_name, exercise_order, movement_pattern_id, tracked_fields, notes,
+        id, exercise_name, display_name, exercise_order, movement_pattern_id, tracked_fields, notes, is_slot, slot_side, slot_tier,
         group_workout_exercise_sets ( id, set_order, target_reps, target_weight, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance )
       ),
       workout_notes ( id, body, position )
@@ -258,6 +263,7 @@ export function mapWorkoutRowToBuilderDay(w: any, demoRows: DemoRow[], tierByNam
       videoPath: media?.videoPath ?? null,
       youtubeUrl: media?.youtubeUrl ?? null,
       tier: tierByName.get(ex.exercise_name) ?? null,
+      slot: ex.is_slot ? { side: ex.slot_side ?? null, tier: ex.slot_tier ?? null } : null,
       sets: (ex.group_workout_exercise_sets ?? [])
         .slice()
         .sort((a: any, b: any) => a.set_order - b.set_order)

@@ -29,6 +29,8 @@ export interface ProgramCardData {
   sourceProgramId?: string | null;
   // How many people have their own version of this library program.
   assignedCount?: number;
+  // Template slots in the program (library programs): shows the "Template" mark.
+  slotCount?: number;
   // The program's training type (Hypertrophy, Mobility/Flow ...) and when it was last changed, for the Programs page's filter and its newest-first order.
   trainingIntent?: string | null;
   updatedAt?: string | null;
@@ -202,11 +204,16 @@ function ProgramCard({
             <p className="font-body text-xs text-steel mt-0.5">
               {program.workoutCount} {program.workoutCount === 1 ? "workout" : "workouts"}
             </p>
+            {!program.athleteId && (program.slotCount ?? 0) > 0 && (
+              <p className="font-body text-xs text-chalk mt-0.5">
+                Template, {program.slotCount} {program.slotCount === 1 ? "slot" : "slots"}
+              </p>
+            )}
             {!program.athleteId && <p className="font-body text-xs text-steel mt-0.5">Assigned to ({program.assignedCount ?? 0})</p>}
             {program.athleteName && <p className="font-body text-xs text-rust mt-0.5 truncate">For {firstName(program.athleteName)}</p>}
           </Link>
           )}
-          <ProgramCardMenu onRename={() => setRenaming(true)} programId={program.id} programName={program.name} groupId={groupId} aiDraft={program.aiDraft} canHide={!program.athleteId && !program.isActive} showAssignButton={!program.athleteId && !program.isActive && !program.aiDraft} />
+          <ProgramCardMenu onRename={() => setRenaming(true)} programId={program.id} programName={program.name} groupId={groupId} aiDraft={program.aiDraft} canHide={!program.athleteId && !program.isActive} showAssignButton={!program.athleteId && !program.isActive && !program.aiDraft} slotCount={program.slotCount ?? 0} />
         </div>
         <div className="mt-auto flex items-center justify-between pt-2 border-t border-steel/15">
           <ProgramActiveToggle programId={program.id} isActive={program.isActive} aiDraft={program.aiDraft} programName={program.name} unassigned={!program.athleteId} />

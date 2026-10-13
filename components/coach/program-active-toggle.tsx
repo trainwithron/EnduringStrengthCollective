@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { confirmDialog } from "@/components/shared/confirm-dialog";
 import { signOffProgram } from "@/components/coach/ai-draft-banner";
+import { SLOT_ACTIVE_BLOCKED } from "@/lib/slot-templates";
 
 // Activation is per program. A coach can run several programs for the same
 // client at once (their main programming, a mobility program for off days,
@@ -35,9 +36,21 @@ export function ProgramActiveToggle({
 
   async function handleToggle() {
     const nextActive = !optimisticActive;
+    const supabase = createBrowserClient();
+    // A template with slots is a placeholder, not a program anyone can follow: it is never made active (a team would see "Slot: Hinge" as an exercise).
+    if (nextActive) {
+      const { count } = await supabase
+        .from("group_workout_exercises")
+        .select("id, workouts!inner ( program_id )", { count: "exact", head: true })
+        .eq("is_slot", true)
+        .eq("workouts.program_id", programId);
+      if ((count ?? 0) > 0) {
+        await confirmDialog({ message: SLOT_ACTIVE_BLOCKED, confirmLabel: "OK" });
+        return;
+      }
+    }
     // Flip the label instantly; revert if the write fails.
     setOptimisticActive(nextActive);
-    const supabase = createBrowserClient();
     const { error } = await supabase.from("programs").update({ is_active: nextActive }).eq("id", programId);
     if (error) {
       setOptimisticActive(!nextActive);

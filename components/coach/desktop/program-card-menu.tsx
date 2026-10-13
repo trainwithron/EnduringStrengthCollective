@@ -9,6 +9,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { clampedLeft, clampedWidth } from "@/lib/viewport-clamp";
 import { duplicateProgram } from "@/lib/program-duplication";
 import { ProgramAssignPanel } from "@/components/coach/desktop/program-assign-panel";
+import { UseTemplatePanel } from "@/components/coach/desktop/use-template-panel";
 import { assignedBlockMessage, loadAssignedTo } from "@/lib/program-assigned";
 import { MoreVertical } from "lucide-react";
 import { hideProgramMessage } from "@/lib/program-archive";
@@ -42,6 +43,7 @@ export function ProgramCardMenu({
   showAssignButton = false,
   canHide = false,
   onRename,
+  slotCount = 0,
 }: {
   programId: string;
   programName: string;
@@ -61,6 +63,8 @@ export function ProgramCardMenu({
   canHide?: boolean;
   // Opens the name for editing in place (on the card that holds this menu).
   onRename?: () => void;
+  // A template (a program with slots) is made into a real program with "Use this template…"; it is never assigned as it is.
+  slotCount?: number;
 }) {
   const router = useRouter();
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -70,6 +74,8 @@ export function ProgramCardMenu({
   const [orgs, setOrgs] = useState<OrgOption[] | null>(null);
   const [orgGroups, setOrgGroups] = useState<GroupOption[] | null>(null);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
+  const isTemplate = slotCount > 0;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -279,9 +285,14 @@ export function ProgramCardMenu({
 
   return (
     <div className="relative flex items-center gap-1">
-      {showAssignButton && (
+      {showAssignButton && !isTemplate && (
         <button type="button" onClick={openAssign} className="min-h-11 px-2 font-body text-xs text-rust underline underline-offset-2">
           Assign
+        </button>
+      )}
+      {isTemplate && !hideAssignAndDuplicate && (
+        <button type="button" onClick={() => setTemplateOpen(true)} className="min-h-11 px-2 font-body text-xs text-rust underline underline-offset-2">
+          Use template
         </button>
       )}
       <button
@@ -293,6 +304,8 @@ export function ProgramCardMenu({
       >
         <MoreVertical className="w-4 h-4" />
       </button>
+
+      {templateOpen && <UseTemplatePanel programId={programId} programName={programName} groupId={groupId} onClose={() => setTemplateOpen(false)} onChanged={() => router.refresh()} />}
 
       {assignOpen && (
         <ProgramAssignPanel programId={programId} programName={programName} groupId={groupId} aiDraft={aiDraft} onClose={() => setAssignOpen(false)} onChanged={() => router.refresh()} />
@@ -326,16 +339,29 @@ export function ProgramCardMenu({
               )}
               {!hideAssignAndDuplicate && (
                 <>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setView(null);
-                      setAssignOpen(true);
-                    }}
-                    className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50"
-                  >
-                    Assign…
-                  </button>
+                  {isTemplate ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setView(null);
+                        setTemplateOpen(true);
+                      }}
+                      className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50"
+                    >
+                      Use this template…
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setView(null);
+                        setAssignOpen(true);
+                      }}
+                      className="w-full text-left px-3 py-2.5 font-body text-sm text-chalk hover:bg-graphite/50"
+                    >
+                      Assign…
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setView("duplicate")}

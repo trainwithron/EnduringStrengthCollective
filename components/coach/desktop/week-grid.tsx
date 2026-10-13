@@ -25,6 +25,7 @@ export function WeekGrid({
   programId,
   groupId,
   athleteId,
+  canAddSlot = false,
   exerciseLibrary,
   exerciseAliases,
   exerciseTierByName,
@@ -45,6 +46,7 @@ export function WeekGrid({
   programId: string;
   groupId: string;
   athleteId: string | null;
+  canAddSlot?: boolean;
   exerciseLibrary: string[];
   exerciseAliases: AliasEntry[];
   exerciseTierByName: Record<string, "A" | "B" | "C" | null>;
@@ -209,7 +211,7 @@ export function WeekGrid({
 
   const sortedDays = days.slice().sort((a, b) => a.dayIndex - b.dayIndex);
   const weekExercises: BuilderExercise[] = days.flatMap((d) =>
-    d.items.filter((i): i is BuilderExercise => i.kind === "exercise")
+    d.items.filter((i): i is BuilderExercise => i.kind === "exercise" && !i.slot)
   );
 
   function handleWeekBulkApplied(
@@ -328,6 +330,7 @@ export function WeekGrid({
                   laddersByPattern={laddersByPattern}
                   restSuggestions={restSuggestions}
                   athleteId={athleteId}
+                  canAddSlot={canAddSlot}
                   condensed={compactIds.has(day.id)}
                   onToggleCondensed={() => setCompactIds(toggleDay(new Set(compactIds), day.id))}
                   onCompactEditorChange={(open) => setCompactEditor(day.id, open)}

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
-import type { BuilderDay, BuilderItem } from "@/lib/types";
+import type { BuilderDay, BuilderExercise, BuilderItem } from "@/lib/types";
 import { SET_ROW_SELECT, mapSetRow, type TrackedField } from "@/lib/exercise-fields";
 import {
   generateLinearProgression,
@@ -206,6 +206,8 @@ export function DuplicateWeekPanel({
     const dayNoteTracks: { dayIndex: number; dayTitle: string; itemOrder: number; body: string }[] = [];
     const setTracks: SetTrack[] = [];
     const intervalTracks: IntervalTrack[] = [];
+    // A template slot is copied into the new weeks exactly as it is (it has no weight to progress).
+    const slotTracks: { dayIndex: number; itemOrder: number; item: BuilderExercise }[] = [];
 
     for (const day of sortedDays) {
       for (const item of day.items) {
@@ -216,6 +218,11 @@ export function DuplicateWeekPanel({
             itemOrder: item.order,
             body: item.body,
           });
+          continue;
+        }
+
+        if (item.slot) {
+          slotTracks.push({ dayIndex: day.dayIndex, itemOrder: item.order, item });
           continue;
         }
 
@@ -402,11 +409,43 @@ export function DuplicateWeekPanel({
 
         const tracksForDay = setTracks.filter((t) => t.dayIndex === day.dayIndex);
         const intervalTracksForDay = intervalTracks.filter((t) => t.dayIndex === day.dayIndex);
+        const slotTracksForDay = slotTracks.filter((t) => t.dayIndex === day.dayIndex);
         const exerciseOrders = Array.from(
-          new Set([...tracksForDay.map((t) => t.itemOrder), ...intervalTracksForDay.map((t) => t.itemOrder)])
+          new Set([...tracksForDay.map((t) => t.itemOrder), ...intervalTracksForDay.map((t) => t.itemOrder), ...slotTracksForDay.map((t) => t.itemOrder)])
         ).sort((a, b) => a - b);
 
         for (const itemOrder of exerciseOrders) {
+          const slotTrack = slotTracksForDay.find((t) => t.itemOrder === itemOrder);
+          if (slotTrack) {
+            const src = slotTrack.item;
+            const { data: slotRow, error: slotError } = await supabase
+              .from("group_workout_exercises")
+              .insert({
+                workout_id: workoutRow.id,
+                group_id: groupId,
+                exercise_name: src.exerciseName,
+                exercise_order: itemOrder,
+                movement_pattern_id: src.movementPatternId,
+                tracked_fields: src.trackedFields,
+                notes: src.notes,
+                is_slot: true,
+                slot_side: src.slot?.side ?? null,
+                slot_tier: src.slot?.tier ?? null,
+              })
+              .select("id")
+              .single();
+            if (slotError || !slotRow) {
+              anyFailed = true;
+              continue;
+            }
+            const { data: slotSets, error: slotSetsError } = await supabase
+              .from("group_workout_exercise_sets")
+              .insert(src.sets.map((st, i) => ({ group_workout_exercise_id: slotRow.id, set_order: i, target_reps: st.targetReps })))
+              .select(SET_ROW_SELECT);
+            if (slotSetsError) anyFailed = true;
+            items.push({ ...src, id: slotRow.id, order: itemOrder, sets: (slotSets ?? []).map(mapSetRow) });
+            continue;
+          }
           const intervalTrack = intervalTracksForDay.find((t) => t.itemOrder === itemOrder);
 
           if (intervalTrack) {
