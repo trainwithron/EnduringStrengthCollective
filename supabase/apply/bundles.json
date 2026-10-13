@@ -365,6 +365,14 @@
   "file": "apply-release-bj-all.sql"
  },
  {
+  "id": "release-bh",
+  "name": "Release BH (a one-time review request, a review link and client quotes; run BEFORE the code that goes with it is live)",
+  "steps": [
+   "102"
+  ],
+  "file": "apply-release-bh-all.sql"
+ },
+ {
   "id": "release-bg",
   "name": "Release BG (coach assessments on a client's profile; run BEFORE the code that goes with it is live)",
   "steps": [
