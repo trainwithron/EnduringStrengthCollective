@@ -74,43 +74,18 @@ export function ProgramCardGrid({
     );
   }
 
-  const sharedPrograms = programs.filter((p) => !p.athleteId);
-  const clientPrograms = programs.filter((p) => p.athleteId);
-
+  // One plain grid of cards, no inner headings: the page names the section (Programs, or the fold "Programs made for one client"). A client's own copy of a library program is never a card here (it is
+  // reached from the program's "Assigned to" and the client's profile), so there is no per-client section to be empty.
   return (
     <div>
       <div className="flex justify-end mb-3">
         <CardSizeToggle size={size} onChange={handleSizeChange} />
       </div>
-
-      <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
-        Shared Programs
-      </h2>
-      {sharedPrograms.length === 0 ? (
-        <p className="font-body text-xs text-steel mb-6">No shared programs yet.</p>
-      ) : (
-        <div className={`grid ${GRID_CLASS[size]} mb-6`}>
-          {sharedPrograms.map((p) => (
-            <ProgramCard key={p.id} groupId={p.groupId ?? groupId} program={p} size={size} visual={visualsByProgramId[p.id]} />
-          ))}
-        </div>
-      )}
-
-      <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
-        Client Programs
-      </h2>
-      {clientPrograms.length === 0 ? (
-        <p className="font-body text-xs text-steel">
-          No individually-assigned programs yet — use a shared program&apos;s
-          ⋮ menu to assign it to a client.
-        </p>
-      ) : (
-        <div className={`grid ${GRID_CLASS[size]}`}>
-          {clientPrograms.map((p) => (
-            <ProgramCard key={p.id} groupId={p.groupId ?? groupId} program={p} size={size} visual={visualsByProgramId[p.id]} />
-          ))}
-        </div>
-      )}
+      <div className={`grid ${GRID_CLASS[size]}`}>
+        {programs.map((p) => (
+          <ProgramCard key={p.id} groupId={p.groupId ?? groupId} program={p} size={size} visual={visualsByProgramId[p.id]} />
+        ))}
+      </div>
     </div>
   );
 }
