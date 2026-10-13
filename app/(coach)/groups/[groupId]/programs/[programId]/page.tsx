@@ -58,7 +58,7 @@ export default async function ProgramDetailPage(
     supabase.from("group_memberships").select("role").eq("group_id", params.groupId).eq("profile_id", user.id).maybeSingle(),
     supabase
       .from("programs")
-      .select("id, name, description, start_date, training_days, visibility_window, ai_sequencing_notes, training_intent")
+      .select("id, name, description, start_date, training_days, visibility_window, ai_sequencing_notes, training_intent, athlete_id")
       .eq("id", params.programId)
       .eq("group_id", params.groupId)
       .single(),
@@ -84,7 +84,7 @@ export default async function ProgramDetailPage(
         programId={params.programId}
         userId={user.id}
         isCoach={membership.role === "coach"}
-        program={{ name: program.name, start_date: program.start_date, training_days: program.training_days, visibility_window: program.visibility_window as VisibilityWindow | null }}
+        program={{ name: program.name, start_date: program.start_date, training_days: program.training_days, visibility_window: program.visibility_window as VisibilityWindow | null, athlete_id: (program as { athlete_id?: string | null }).athlete_id ?? null }}
       />
     );
   }
