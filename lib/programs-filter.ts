@@ -4,7 +4,23 @@
 //   One client      = that client's programs: the ones built for them and their copies of library programs
 //   Program type    = the default list, narrowed to one training type
 
-export type ProgramsFilterMode = "all" | "shared" | "client" | "type";
+export type ProgramsFilterMode = "all" | "shared" | "client" | "type" | "removed";
+
+// A program the coach removed (hid): kept, with its history, until he deletes it.
+export interface RemovedProgram {
+  id: string;
+  name: string;
+  groupId: string;
+  athleteId: string | null;
+  athleteName: string | null;
+}
+
+// Which removed programs show: all of them under "Removed programs", and a client's own under "One client" (so nothing a coach removed can be lost from view).
+export function removedFor(removed: RemovedProgram[], mode: ProgramsFilterMode, value: string | null): RemovedProgram[] {
+  if (mode === "removed") return removed;
+  if (mode === "client" && value) return removed.filter((r) => r.athleteId === value);
+  return [];
+}
 
 export interface FilterableProgram {
   id: string;
@@ -24,6 +40,7 @@ export function defaultList<T extends FilterableProgram>(all: T[]): T[] {
 
 export function applyProgramsFilter<T extends FilterableProgram>(all: T[], mode: ProgramsFilterMode, value: string | null): T[] {
   const list = defaultList(all);
+  if (mode === "removed") return [];
   if (mode === "shared") return list.filter((p) => !p.athleteId);
   if (mode === "client") return value ? all.filter((p) => p.athleteId === value) : list.filter((p) => !!p.athleteId);
   if (mode === "type") return value ? list.filter((p) => p.trainingIntent === value) : list;
@@ -35,7 +52,7 @@ export function newestFirst<T extends FilterableProgram>(programs: T[]): T[] {
   return programs.slice().sort((a, b) => (b.updatedAt ?? "").localeCompare(a.updatedAt ?? ""));
 }
 
-export function clientOptions(all: FilterableProgram[]): { id: string; name: string }[] {
+export function clientOptions(all: { athleteId: string | null; athleteName: string | null }[]): { id: string; name: string }[] {
   const seen = new Map<string, string>();
   for (const p of all) if (p.athleteId && p.athleteName && !seen.has(p.athleteId)) seen.set(p.athleteId, p.athleteName);
   return [...seen.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));

@@ -7,7 +7,7 @@ import { UnavailableState } from "@/components/ui/unavailable-state";
 import { programDayShape } from "@/lib/program-completeness";
 import { ProgramCardGrid, type ProgramCardData } from "@/components/coach/desktop/program-card-grid";
 import { ProgramsList } from "@/components/coach/desktop/programs-list";
-import { defaultList } from "@/lib/programs-filter";
+import { defaultList, type RemovedProgram } from "@/lib/programs-filter";
 import { SwappableTerm } from "@/components/coach/swappable-term";
 import { computeProgramCardVisuals } from "@/lib/program-card-data";
 import { getCoachedGroups, groupsInOrgOf } from "@/lib/coach-groups";
@@ -16,7 +16,6 @@ import { getCoachClients } from "@/lib/coach-clients";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
 import { LearnedSection } from "@/components/coach/learned-section";
 import { ConversationInviteSection } from "@/components/coach/conversation-section";
-import { RemovedPrograms } from "@/components/coach/removed-programs";
 import { countAssignedTo } from "@/lib/program-assigned";
 import { ALL_PROGRAMS_HREF, clientFromSearch, groupFromSearch, scopePrograms } from "@/lib/programs-scope";
 
@@ -56,18 +55,17 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
     .is("archived_at", null)
     .order("updated_at", { ascending: false });
 
-  // Library programs the coach tucked away (kept, with every log): a quiet fold at the bottom with Put back.
+  // Every program the coach removed (kept, with every log), library or one client's: found under "Removed programs" and under its client, with Put back and Delete.
   const { data: hiddenRows } = clientId
     ? { data: [] }
     : await supabase
         .from("programs")
-        .select("id, name")
+        .select("id, name, group_id, athlete_id, profiles!programs_athlete_id_fkey ( full_name )")
         .in("group_id", groupIds.length > 0 ? groupIds : [""])
-        .is("athlete_id", null)
         .not("archived_at", "is", null)
         .order("archived_at", { ascending: false })
-        .limit(50);
-  const hidden = (hiddenRows ?? []) as { id: string; name: string }[];
+        .limit(200);
+  const removed: RemovedProgram[] = ((hiddenRows ?? []) as any[]).map((r) => ({ id: r.id, name: r.name, groupId: r.group_id, athleteId: r.athlete_id ?? null, athleteName: r.profiles?.full_name ?? null }));
 
   const all: ProgramCardData[] = (programs ?? []).map((p: any) => ({
     id: p.id,
@@ -146,10 +144,8 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
       ) : clientId ? (
         <ProgramCardGrid groupId={anchor.id} programs={cards} visualsByProgramId={visualsByProgramId} />
       ) : (
-        <ProgramsList groupId={anchor.id} programs={scoped} visualsByProgramId={visualsByProgramId} />
+        <ProgramsList groupId={anchor.id} programs={scoped} removed={removed} visualsByProgramId={visualsByProgramId} />
       )}
-
-      {!clientId && <RemovedPrograms programs={hidden} label="Hidden programs" />}
 
       {!clientId && <LearnedSection supabase={supabase} coachId={user.id} />}
     </CoachDesktopShell>

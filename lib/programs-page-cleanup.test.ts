@@ -57,3 +57,28 @@ describe("Programs page sections", () => {
     expect(grid).toContain("For {firstName(program.athleteName)}");
   });
 });
+
+import { removedFor, type RemovedProgram } from "@/lib/programs-filter";
+
+describe("removed programs are always findable and deletable", () => {
+  const removed: RemovedProgram[] = [
+    { id: "r1", name: "Rob Derrick", groupId: "g", athleteId: "rob", athleteName: "Rob Derrick" },
+    { id: "r2", name: "Rob's program", groupId: "g", athleteId: "rob", athleteName: "Rob Derrick" },
+    { id: "r3", name: "Old library one", groupId: "g", athleteId: null, athleteName: null },
+  ];
+  it("Removed programs lists every one, and One client shows that client's removed ones too", () => {
+    expect(removedFor(removed, "removed", null).map((r) => r.id)).toEqual(["r1", "r2", "r3"]);
+    expect(removedFor(removed, "client", "rob").map((r) => r.id)).toEqual(["r1", "r2"]);
+    expect(removedFor(removed, "all", null)).toEqual([]);
+    expect(applyProgramsFilter([], "removed", null)).toEqual([]);
+  });
+  it("the list offers Put back and Delete on each, and the page loads removed programs of every kind (not only library ones)", () => {
+    expect(list).toContain("Put back");
+    expect(list).toContain("Delete");
+    expect(list).toContain('from("programs").delete().eq("id", row.id)');
+    expect(list).toContain("Removed programs (");
+    expect(page).toContain('.not("archived_at", "is", null)');
+    expect(page).not.toContain('.is("athlete_id", null)\n        .not("archived_at"');
+    expect(page).not.toContain("<RemovedPrograms");
+  });
+});
