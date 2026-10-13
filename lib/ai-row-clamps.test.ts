@@ -25,6 +25,13 @@ describe("What the AI writes is held to sane limits on the server", () => {
     expect(clampReps("8")).toBe("8");
     expect(clampReps("8-10")).toBe("8-10");
     expect(clampReps("AMRAP")).toBe("AMRAP");
+    expect(clampReps("400m")).toBe("400m");
+    expect(clampReps("30 sec")).toBe("30 sec");
+    expect(clampReps("30-60 sec")).toBe("30-60 sec");
+    expect(clampReps("200 yd")).toBe("200 yd");
+    expect(clampReps("150 cal")).toBe("150 cal");
+    expect(clampReps("9999")).toBe("100");
+    expect(clampReps("10 each side")).toBe("10 each side");
     expect(clampReps("10 each side")).toBe("10 each side");
     expect(clampReps("5000")).toBe("100");
     expect(clampReps("0")).toBe("1");

@@ -22,6 +22,9 @@ export function clampReps(reps: string | null): string | null {
   if (reps == null) return null;
   const text = reps.trim();
   if (!text) return null;
+  // Only a plain rep count is clamped (digits, ranges, x, each side, AMRAP). Anything with a unit (400m, 200 yd, 30 sec, 150 cal) stays as written.
+  const withoutWords = text.replace(/amrap|each\s+(?:side|leg|arm)|per\s+(?:side|leg|arm)|reps?/gi, "");
+  if (/[^\d\s.\-–x×+/,]/i.test(withoutWords)) return text.slice(0, MAX_TEXT);
   const clamped = text.replace(/\d+(?:\.\d+)?/g, (n) => {
     const v = Number(n);
     if (!Number.isFinite(v)) return n;
