@@ -27,7 +27,7 @@ import { formatCompactLine } from "@/lib/compact-line";
 import { useSaveToastChannel } from "./save-toast-channel";
 import { capitalizeWords } from "@/lib/exercise-name-case";
 import { useDayLogged } from "./use-day-logged";
-import { REST_DAY_TITLE, isRestDayTitle } from "@/lib/empty-sweep";
+import { isRestDayTitle } from "@/lib/empty-sweep";
 
 // Quick-add is typed fast, so a bare "Bench" for an existing "Bench
 // Press" is common — matchExercise's fuzzy threshold is deliberately
@@ -678,15 +678,9 @@ export function DayCard({
             })()}
           </div>
 
-          {day.items.length === 0 && (
+          {day.items.length === 0 && isRestDayTitle(day.title) && (
             <div className="px-3 pb-2">
-              {isRestDayTitle(day.title) ? (
-                <p className="font-body text-sm text-chalk">Rest day</p>
-              ) : (
-                <button type="button" onClick={() => void persistTitle(REST_DAY_TITLE)} className="min-h-9 font-body text-xs text-rust underline underline-offset-2">
-                  Make this a rest day
-                </button>
-              )}
+              <p className="font-body text-sm text-chalk">Rest day</p>
             </div>
           )}
           <div className="flex items-center gap-2 px-3 py-2.5 border-t border-steel/20">

@@ -5,7 +5,7 @@ import { isRemovableEmptyDay, isRemovableEmptyProgram, isRestDayTitle, type Empt
 
 const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
 const now = new Date("2026-10-20T12:00:00Z");
-const day = (over: Partial<EmptyDayRow> = {}): EmptyDayRow => ({ id: "d", title: "Day 3", scheduledDate: null, createdAt: "2026-10-20T10:00:00Z", exercises: 0, notes: 0, sessions: 0, logs: 0, ...over });
+const day = (over: Partial<EmptyDayRow> = {}): EmptyDayRow => ({ id: "d", title: "Day 3", scheduledDate: null, createdAt: "2026-10-17T10:00:00Z", exercises: 0, notes: 0, sessions: 0, logs: 0, assignments: 0, ...over });
 const program = (over: Partial<EmptyProgramRow> = {}): EmptyProgramRow => ({ id: "p", ownerId: "ron", updatedAt: "2026-10-18T10:00:00Z", workoutsWithExercises: 0, sessions: 0, copies: 0, ...over });
 
 describe("an empty day is removed unless it is a rest day or something points at it", () => {
@@ -19,10 +19,13 @@ describe("an empty day is removed unless it is a rest day or something points at
     expect(isRemovableEmptyDay(day({ logs: 1 }), now)).toBe(false);
     expect(isRemovableEmptyDay(day({ sessions: 2 }), now)).toBe(false);
     expect(isRemovableEmptyDay(day({ notes: 1 }), now)).toBe(false);
+    expect(isRemovableEmptyDay(day({ assignments: 1 }), now)).toBe(false);
     expect(isRemovableEmptyDay(day({ scheduledDate: "2026-10-21" }), now)).toBe(false);
   });
-  it("never removes a day made in the last ten minutes (he may be about to fill it)", () => {
+  it("never removes a day made in the last 24 hours (he may be setting it up to fill in later)", () => {
     expect(isRemovableEmptyDay(day({ createdAt: "2026-10-20T11:55:00Z" }), now)).toBe(false);
+    expect(isRemovableEmptyDay(day({ createdAt: "2026-10-19T13:00:00Z" }), now)).toBe(false);
+    expect(isRemovableEmptyDay(day({ createdAt: "2026-10-19T11:00:00Z" }), now)).toBe(true);
   });
   it("knows a rest day by its name", () => {
     expect(isRestDayTitle("Rest day")).toBe(true);
@@ -53,10 +56,10 @@ describe("wiring", () => {
     expect(sweep).toContain(".eq(\"created_by\", viewerId)");
     expect(sweep).toContain("workout_logs(count)");
   });
-  it("an empty day offers one tap to make it a rest day (named Rest day) and a rest day is shown plainly", () => {
+  it("a day named Rest day is shown plainly (there is no one-tap button: naming it by hand works)", () => {
     const card = read("components/coach/desktop/day-card.tsx");
-    expect(card).toContain("Make this a rest day");
-    expect(card).toContain("persistTitle(REST_DAY_TITLE)");
+    expect(card).not.toContain("Make this a rest day");
+    expect(card).toContain("isRestDayTitle(day.title)");
     expect(card).toContain("Rest day");
   });
 });

@@ -19,15 +19,17 @@ export interface EmptyDayRow {
   notes: number;
   sessions: number;
   logs: number;
+  assignments: number;
 }
 
-const DAY_NEW_MS = 10 * 60000;
+// A day set up to be filled in later is kept for a full day (the same as a program), so nothing is lost mid-build.
+const DAY_NEW_MS = 24 * 3600000;
 
 export function isRemovableEmptyDay(d: EmptyDayRow, now: Date): boolean {
-  if (d.exercises > 0 || d.notes > 0 || d.sessions > 0 || d.logs > 0) return false;
+  if (d.exercises > 0 || d.notes > 0 || d.sessions > 0 || d.logs > 0 || d.assignments > 0) return false;
   if (d.scheduledDate) return false;
   if (isRestDayTitle(d.title)) return false;
-  // A day made in the last few minutes may be one he is about to fill: never mid-edit.
+  // A day made in the last day may be one he is about to fill: never mid-edit.
   return now.getTime() - new Date(d.createdAt).getTime() >= DAY_NEW_MS;
 }
 
@@ -56,12 +58,12 @@ export async function sweepEmptyDays(supabase: SupabaseClient, programId: string
   try {
     const { data } = await supabase
       .from("workouts")
-      .select("id, title, scheduled_date, created_at, group_workout_exercises(count), workout_notes(count), athlete_sessions(count), workout_logs(count)")
+      .select("id, title, scheduled_date, created_at, group_workout_exercises(count), workout_notes(count), athlete_sessions(count), workout_logs(count), workout_assignments(count)")
       .eq("program_id", programId);
     const ids = ((data ?? []) as any[])
       .filter((w) =>
         isRemovableEmptyDay(
-          { id: w.id, title: w.title, scheduledDate: w.scheduled_date ?? null, createdAt: w.created_at, exercises: count(w.group_workout_exercises), notes: count(w.workout_notes), sessions: count(w.athlete_sessions), logs: count(w.workout_logs) },
+          { id: w.id, title: w.title, scheduledDate: w.scheduled_date ?? null, createdAt: w.created_at, exercises: count(w.group_workout_exercises), notes: count(w.workout_notes), sessions: count(w.athlete_sessions), logs: count(w.workout_logs), assignments: count(w.workout_assignments) },
           now
         )
       )
