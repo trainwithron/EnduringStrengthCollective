@@ -51,6 +51,26 @@ const has = {
   noPolicy: (t, p) => `not exists (select 1 from pg_policies where schemaname = 'public' and tablename = '${t}' and policyname = '${p}')`,
 };
 
+// What step 111 does to each name, shown as one check row per change in the precheck ("A + B -> final name"; the names listed must be in Ron's library).
+const CATALOG_PREVIEW = [
+  ["Back Squat + Barbell Back Squats -> Barbell Back Squat", ["Back Squat", "Barbell Back Squats"]],
+  ["Front Squat + Barbell Front Squats -> Barbell Front Squat", ["Front Squat", "Barbell Front Squats"]],
+  ["Leg Extension + Leg Extension Machine -> Leg Extension", ["Leg Extension", "Leg Extension Machine"]],
+  ["Dumbbell Skull Crusher + Dumbbell Tricep Skull Crushers -> Dumbbell Skull Crusher", ["Dumbbell Skull Crusher", "Dumbbell Tricep Skull Crushers"]],
+  ["Incline Dumbbell Bench Press + Incline Dumbbell Press -> Incline Dumbbell Bench Press", ["Incline Dumbbell Bench Press", "Incline Dumbbell Press"]],
+  ["Single Arm Farmers Carry + Suitcase Carry (Single Arm Farmers Carry) -> Suitcase Carry", ["Single Arm Farmers Carry", "Suitcase Carry (Single Arm Farmers Carry)"]],
+  ["Kettlebell Swing + Russian Kettlebell Swing -> Kettlebell Swing", ["Kettlebell Swing", "Russian Kettlebell Swing"]],
+  ["Rear Foot Elevated Split Squat + Dumbbell Rear Foot Elevated Split Squat -> Dumbbell Rear Foot Elevated Split Squat", ["Rear Foot Elevated Split Squat", "Dumbbell Rear Foot Elevated Split Squat"]],
+  ["Walking Lunge + Dumbbell Walking Lunge -> Dumbbell Walking Lunge", ["Walking Lunge", "Dumbbell Walking Lunge"]],
+  ["Face Pull -> Banded Face Pull (stays separate from Cable Face Pull and Barbell Face Pull)", ["Face Pull"]],
+  ["Cable Face Pulls -> Cable Face Pull", ["Cable Face Pulls"]],
+  ["Romanian Deadlift -> Barbell Romanian Deadlift (Dumbbell Romanian Deadlift stays separate)", ["Romanian Deadlift", "Dumbbell Romanian Deadlift"]],
+  ["Reverse Lunge -> Dumbbell Reverse Lunge (Barbell Reverse Lunge stays separate)", ["Reverse Lunge", "Barbell Reverse Lunge"]],
+  ["Split Squat -> Dumbbell Split Squat", ["Split Squat"]],
+  ["Box Squat -> Barbell Box Squat", ["Box Squat"]],
+  ["Lat Pulldown -> Cable Lat Pulldown", ["Lat Pulldown"]],
+];
+
 const STEPS = [
   {
     n: "01",
@@ -2126,6 +2146,39 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the membership rule and its helpers exist", "to_regprocedure('public.group_closed_to_org_admin_join(uuid)') is not null and to_regprocedure('public.is_org_admin_of_group(uuid)') is not null"],
     ],
   },
+  {
+    n: "110",
+    slug: "0361",
+    title: "0361 The shared exercise catalog (empty): one list of real movements everyone can read and only the platform admin can write, and a link from each coach's library entry to its movement",
+    migrations: ["0361"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes on screen. Two new empty tables (the catalog and its spellings) and one new empty column on the exercise library.",
+    undo: "alter table public.exercise_library drop column if exists catalog_id;\ndrop table if exists public.exercise_catalog_aliases;\ndrop table if exists public.exercise_catalog;",
+    undoWhy: "Only if step 110 misbehaves. Removes the catalog tables and the link column (they are empty or only hold names).",
+    rows: [
+      ["0361 is not already applied (the catalog table does not exist yet)", "to_regclass('public.exercise_catalog') is null"],
+      ["the platform-admin helper and the exercise library exist", "to_regprocedure('public.is_platform_admin()') is not null and to_regclass('public.exercise_library') is not null"],
+    ],
+  },
+  {
+    n: "111",
+    slug: "catalog-merge-ron",
+    title: "Coach Ron's exercise names: 9 merges and 9 renames (the implement stated), his four FitPros exercises, and the shared catalog filled from his library; undoable",
+    migrations: [],
+    warn: "A one-time data change for Coach Ron's library and world ONLY, decided by Ron on Oct 12. Run step 110 first. It rewrites the exercise name in his programs, his clients' sessions, records, patterns, tags and maxes, saves each old name as an alias of the final one, deletes the merged-away library rows, and fills the catalog. Every changed or deleted row is saved first (exercise_catalog_merge_log, exercise_catalog_merge_deleted) and the undo file puts it all back. It refuses by itself if any old name is missing from his library.",
+    sees: "Success. No rows returned.",
+    afterwards: "Each old name is now the final name everywhere in Ron's programs and history, typing an old name still finds the final one, the library lists each exercise once, and the catalog holds one entry per exercise with its spellings. To see how many rows changed per table: select tbl, col, count(*) from public.exercise_catalog_merge_log group by tbl, col order by tbl, col;",
+    bodySql: readFileSync(new URL("./release-catalog-merge.sql", import.meta.url), "utf8").replace(/\r\n/g, "\n").replace(/\s+$/, ""),
+    undo: readFileSync(new URL("./release-catalog-undo.sql", import.meta.url), "utf8").replace(/\r\n/g, "\n").replace(/\s+$/, ""),
+    undoWhy: "Only if the merge is wrong. Puts every changed name back, brings the merged-away library rows back, gives renamed entries their old names and videos, removes the aliases and catalog entries this step added, and drops the two log tables.",
+    rows: [
+      ["Coach Ron's profile exists", "exists (select 1 from public.profiles where id = '136394ed-f108-4283-bcb7-310a1ac6cbc8')"],
+      ["step 110 is applied (the catalog is there and empty)", "case when to_regclass('public.exercise_catalog') is null then false else (xpath('/row/c/text()', query_to_xml('select count(*) as c from public.exercise_catalog', false, true, '')))[1]::text = '0' end"],
+      ...CATALOG_PREVIEW.map(([text, names]) => ["PREVIEW " + text + " (all these names are in Coach Ron's library)", "(select count(*) from public.exercise_library where created_by = '136394ed-f108-4283-bcb7-310a1ac6cbc8' and name = any (array[" + names.map((n) => "'" + n.replace(/'/g, "''") + "'").join(", ") + "])) = " + names.length]),
+      ["the four FitPros exercises are in Coach Ron's library", "(select count(*) from public.exercise_library where created_by = '136394ed-f108-4283-bcb7-310a1ac6cbc8' and name in ('Sissy Squat', 'Thoracic Extension (Quadruped)', 'Handcuff W Rotation', 'Incline Iso Lateral Chest Press')) = 4"],
+      ["step 111 is not already applied (the merge log is not there yet)", "to_regclass('public.exercise_catalog_merge_log') is null"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -2235,6 +2288,8 @@ const BUNDLES = [
   { id: "release-bn", name: "Release BN (adding a client works again: the creator of a new group can seat themselves; run any time, ideally NOW)", steps: ["108"] },
   { id: "release-bl", name: "Release BL (four exercises added to Coach Ron's library for the FitPros history; run any time)", steps: ["106"] },
   { id: "release-bk", name: "Release BK (move Coach Ron's own training into his personal space; run AFTER he has opened Coach Ron (you) once and removed the programs he does not want)", steps: ["105"] },
+  { id: "release-bq", name: "Release BQ (Coach Ron's exercise names merged and renamed, and the shared catalog filled from his library; run AFTER Release BP)", steps: ["111"] },
+  { id: "release-bp", name: "Release BP (the shared exercise catalog, empty; run any time)", steps: ["110"] },
   { id: "release-bo", name: "Release BO (removes two empty stray Rob Derrick groups; run any time)", steps: ["109"] },
   { id: "release-bj", name: "Release BJ (a personal space for each person, outside any organization; run BEFORE the code that goes with it is live)", steps: ["104"] },
   { id: "release-bg", name: "Release BG (coach assessments on a client's profile; run BEFORE the code that goes with it is live)", steps: ["101"] },
@@ -2445,6 +2500,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
+    m("0361", "to_regclass('public.exercise_catalog') is not null"),
     m("0360", "to_regprocedure('public.group_is_new_and_mine(uuid)') is not null"),
     m("0359", "position('12:00:17' in pg_get_functiondef(to_regprocedure('public.recompute_training_max()'))) > 0"),
     m("0358", "to_regprocedure('public.ensure_personal_space()') is not null"),

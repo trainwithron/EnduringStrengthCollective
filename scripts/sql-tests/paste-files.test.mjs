@@ -38,6 +38,7 @@ await db.exec(`
 `);
 
 const before64 = { snap: null };
+const before111 = { snap: null, other: null };
 const RON64 = "136394ed-f108-4283-bcb7-310a1ac6cbc8";
 const OTHER64 = "00000000-0000-4000-8000-0000000000f1";
 const G164 = "64000000-0000-4000-8000-000000000001";
@@ -231,6 +232,40 @@ for (const s of steps) {
         ('568e84b6-b85c-476c-b160-7b6b64e21caa', 'Rob Derrick', '136394ed-f108-4283-bcb7-310a1ac6cbc8', 'b0000000-0000-4000-8000-000000000001', 'one_on_one');
     `);
   }
+  if (s.n === "111") {
+    // Coach Ron's library with the old names (plus the four FitPros ones from step 106), program lines, a session, a record, a client's two maxes (one per old name), aliases and a post that use them;
+    // another coach with some of the same names whose library and programs must not change at all; and a name only that other coach has, which must never reach the shared catalog.
+    const q = (n) => "'" + n.replace(/'/g, "''") + "'";
+    const names = ["Back Squat", "Barbell Back Squats", "Front Squat", "Barbell Front Squats", "Leg Extension", "Leg Extension Machine", "Dumbbell Skull Crusher", "Dumbbell Tricep Skull Crushers", "Incline Dumbbell Bench Press", "Incline Dumbbell Press", "Single Arm Farmers Carry", "Suitcase Carry (Single Arm Farmers Carry)", "Kettlebell Swing", "Russian Kettlebell Swing", "Rear Foot Elevated Split Squat", "Dumbbell Rear Foot Elevated Split Squat", "Walking Lunge", "Dumbbell Walking Lunge", "Face Pull", "Cable Face Pulls", "Barbell Face Pull", "Romanian Deadlift", "Dumbbell Romanian Deadlift", "Reverse Lunge", "Barbell Reverse Lunge", "Split Squat", "Box Squat", "Lat Pulldown"];
+    const videos = { "Back Squat": "https://youtube.example/BackSquat", "Russian Kettlebell Swing": "https://youtube.example/RussianSwing", "Dumbbell Walking Lunge": "https://youtube.example/DbWalkingLunge" };
+    await db.exec(`
+      insert into public.exercise_library (created_by, name, youtube_url, category) values
+        ${names.map((n) => "('" + RON64 + "', " + q(n) + ", " + (videos[n] ? q(videos[n]) : "null") + ", 'Legs')").join(", ")}
+      on conflict (created_by, name) do nothing;
+      insert into public.exercise_library (created_by, name, youtube_url, category) values
+        ('${OTHER64}', 'Back Squat', null, 'Legs'), ('${OTHER64}', 'Face Pull', null, null), ('${OTHER64}', 'Lat Pulldown', null, null), ('${OTHER64}', 'Other Coach Only Move', null, null);
+      update public.exercise_library set youtube_url = 'https://youtube.example/BackSquat' where created_by = '${RON64}' and name = 'Back Squat' and youtube_url is null;
+      insert into public.group_workout_exercises (id, workout_id, group_id, exercise_name, exercise_order, tracked_fields) values
+        ('11100000-0000-4000-8000-000000000001', '64000000-0000-4000-8000-0000000000b1', '${G164}', 'Barbell Back Squats', 11, array['reps']),
+        ('11100000-0000-4000-8000-000000000002', '64000000-0000-4000-8000-0000000000b1', '${G164}', 'Face Pull', 12, array['reps']),
+        ('11100000-0000-4000-8000-000000000003', '64000000-0000-4000-8000-0000000000b1', '${G164}', 'Lat Pulldown', 13, array['reps']),
+        ('11100000-0000-4000-8000-000000000004', '64000000-0000-4000-8000-0000000000b1', '${G164}', 'Cable Face Pulls', 14, array['reps']),
+        ('11100000-0000-4000-8000-000000000005', '64000000-0000-4000-8000-0000000000b2', '64000000-0000-4000-8000-000000000002', 'Face Pull', 11, array['reps']),
+        ('11100000-0000-4000-8000-000000000006', '64000000-0000-4000-8000-0000000000b2', '64000000-0000-4000-8000-000000000002', 'Lat Pulldown', 12, array['reps']);
+      insert into public.session_exercises (session_id, exercise_name, exercise_order) values
+        ('64000000-0000-4000-8000-0000000000d1', 'Barbell Back Squats', 3), ('64000000-0000-4000-8000-0000000000d1', 'Face Pull', 4);
+      insert into public.exercise_records (group_id, exercise_name, tracked_field, direction, value, athlete_id, achieved_at) values
+        ('${G164}', 'Back Squat', 'weight', 'higher_better', 225, '00000000-0000-4000-8000-0000000000a2', now());
+      insert into public.athlete_training_maxes (athlete_id, exercise_name, estimated_max, source_weight, source_reps, source_rpe) values
+        ('00000000-0000-4000-8000-0000000000a2', 'Back Squat', 200, 180, 5, 8), ('00000000-0000-4000-8000-0000000000a2', 'Barbell Back Squats', 250, 220, 5, 8), ('00000000-0000-4000-8000-0000000000a2', 'Face Pull', 50, 40, 10, 8);
+      insert into public.exercise_aliases (coach_id, raw_name, exercise_name) values ('${RON64}', 'bs', 'Back Squat'), ('${OTHER64}', 'bs', 'Back Squat');
+      insert into public.posts (group_id, author_id, post_type, body, shared_exercise_names) values ('${G164}', '${RON64}', 'user_post', 'y', array['Barbell Back Squats', 'Lat Pulldown']);
+    `);
+    before111.snap = await snapshot64();
+    before111.other = JSON.stringify((await db.query(`select
+      (select coalesce(json_agg(name order by name), '[]') from public.exercise_library where created_by = '${OTHER64}') as lib,
+      (select coalesce(json_agg(exercise_name order by id), '[]') from public.group_workout_exercises where group_id = '64000000-0000-4000-8000-000000000002') as gwe`)).rows[0]);
+  }
   const base = `apply/apply-step${s.n}-${s.slug}`;
   const rows = await pre(`${base}-precheck.sql`);
   const bad = rows.filter((r) => !r.ok).map((r) => r.check_name);
@@ -258,6 +293,57 @@ for (const s of steps) {
       (select count(*)::int from public.athlete_sessions where group_id = 'b0000000-0000-4000-8000-0000000000e2' and id = 'b0000000-0000-4000-8000-0000000000d2') as other_space_session_stays`);
     check("step 105 moved the program, its workout and line, the session, the log and the wellness check-in into the personal space: " + JSON.stringify(moved), moved.prog === 1 && moved.wk === 1 && moved.line === 1 && moved.sess === 1 && moved.log === 1 && moved.well === 1);
     check("step 105 left the removed program, its workout and the session in another person's space where they were", moved.removed_stays === 1 && moved.removed_wk_stays === 1 && moved.other_space_session_stays === 1);
+  }
+  if (s.n === "111") {
+    const one = async (sql) => (await db.query(sql)).rows[0];
+    const ATH2 = "00000000-0000-4000-8000-0000000000a2";
+    const a = await one(`select
+      (select count(*)::int from public.exercise_library where created_by = '${RON64}' and name in ('Back Squat', 'Barbell Back Squats', 'Front Squat', 'Barbell Front Squats', 'Leg Extension Machine', 'Dumbbell Tricep Skull Crushers', 'Incline Dumbbell Press', 'Single Arm Farmers Carry', 'Suitcase Carry (Single Arm Farmers Carry)', 'Russian Kettlebell Swing', 'Rear Foot Elevated Split Squat', 'Walking Lunge', 'Face Pull', 'Cable Face Pulls', 'Romanian Deadlift', 'Reverse Lunge', 'Split Squat', 'Box Squat', 'Lat Pulldown')) as old_left,
+      (select count(*)::int from public.exercise_library where created_by = '${RON64}' and name in ('Barbell Back Squat', 'Barbell Front Squat', 'Leg Extension', 'Dumbbell Skull Crusher', 'Incline Dumbbell Bench Press', 'Suitcase Carry', 'Kettlebell Swing', 'Dumbbell Rear Foot Elevated Split Squat', 'Dumbbell Walking Lunge', 'Banded Face Pull', 'Cable Face Pull', 'Barbell Face Pull', 'Barbell Romanian Deadlift', 'Dumbbell Romanian Deadlift', 'Dumbbell Reverse Lunge', 'Barbell Reverse Lunge', 'Dumbbell Split Squat', 'Barbell Box Squat', 'Cable Lat Pulldown')) as final_there,
+      (select youtube_url from public.exercise_library where created_by = '${RON64}' and name = 'Barbell Back Squat') as bbs_video,
+      (select youtube_url from public.exercise_library where created_by = '${RON64}' and name = 'Kettlebell Swing') as kb_video,
+      (select youtube_url from public.exercise_library where created_by = '${RON64}' and name = 'Dumbbell Walking Lunge') as dwl_video,
+      (select count(*)::int from public.group_workout_exercises where group_id = '${G164}' and exercise_name in ('Back Squat', 'Barbell Back Squats', 'Face Pull', 'Cable Face Pulls', 'Lat Pulldown')) as gwe_old,
+      (select count(*)::int from public.group_workout_exercises where group_id = '${G164}' and exercise_name = 'Barbell Back Squat') as gwe_bbs,
+      (select count(*)::int from public.group_workout_exercises where group_id = '${G164}' and exercise_name = 'Banded Face Pull') as gwe_banded,
+      (select count(*)::int from public.group_workout_exercises where group_id = '${G164}' and exercise_name = 'Cable Face Pull') as gwe_cable,
+      (select count(*)::int from public.session_exercises where session_id = '64000000-0000-4000-8000-0000000000d1' and exercise_name in ('Barbell Back Squat', 'Banded Face Pull')) as se_new,
+      (select count(*)::int from public.exercise_records where group_id = '${G164}' and exercise_name = 'Barbell Back Squat') as rec_new,
+      (select string_agg(exercise_name || ':' || estimated_max::int, ',' order by exercise_name) from public.athlete_training_maxes where athlete_id = '${ATH2}' and exercise_name in ('Back Squat', 'Barbell Back Squats', 'Barbell Back Squat', 'Face Pull', 'Banded Face Pull')) as maxes,
+      (select string_agg(shared_exercise_names::text, '|') from public.posts where group_id = '${G164}' and body = 'y') as post_names,
+      (select exercise_name from public.exercise_aliases where coach_id = '${RON64}' and raw_name = 'Back Squat') as alias_old_name,
+      (select exercise_name from public.exercise_aliases where coach_id = '${RON64}' and raw_name = 'bs') as alias_bs,
+      (select exercise_name from public.exercise_aliases where coach_id = '${RON64}' and raw_name = 'Face Pull') as alias_fp`);
+    check("step 111: none of the old names is left in Ron's library, every final name is there once (merged-away entries gone, separate ones kept): " + a.old_left + " old, " + a.final_there + " final", a.old_left === 0 && a.final_there === 19);
+    check("step 111: the merged entries keep a video (Back Squat's onto Barbell Back Squat, Russian Swing's onto Kettlebell Swing; an existing one is not replaced)", a.bbs_video === "https://youtube.example/BackSquat" && a.kb_video === "https://youtube.example/RussianSwing" && a.dwl_video === "https://youtube.example/DbWalkingLunge");
+    check("step 111: Ron's program lines, session lines, record, post and client max carry the final names (" + JSON.stringify(a) + ")", a.gwe_old === 0 && a.gwe_bbs === 2 && a.gwe_banded === 1 && a.gwe_cable === 1 && a.se_new === 3 && a.rec_new === 1 && a.post_names === '{"Barbell Back Squat","Cable Lat Pulldown"}');
+    check("step 111: a client with both old names keeps the higher max under the final name, and Face Pull's max follows its rename", a.maxes === "Banded Face Pull:50,Barbell Back Squat:250");
+    check("step 111: the old names are saved as aliases of the final names, and Ron's own alias follows", a.alias_old_name === "Barbell Back Squat" && a.alias_bs === "Barbell Back Squat" && a.alias_fp === "Banded Face Pull");
+    const other = JSON.stringify(await one(`select
+      (select coalesce(json_agg(name order by name), '[]') from public.exercise_library where created_by = '${OTHER64}') as lib,
+      (select coalesce(json_agg(exercise_name order by id), '[]') from public.group_workout_exercises where group_id = '64000000-0000-4000-8000-000000000002') as gwe`));
+    check("step 111: the other coach's library and program lines are exactly as they were", other === before111.other);
+    const cat = await one(`select
+      (select count(*)::int from public.exercise_catalog) as n,
+      (select count(distinct lower(name))::int from public.exercise_library where created_by = '${RON64}') as ron_distinct,
+      (select count(*)::int from public.exercise_library where created_by = '${RON64}' and catalog_id is null) as unlinked,
+      (select count(*)::int from public.exercise_catalog where name not in (select name from public.exercise_library where created_by = '${RON64}')) as strangers,
+      (select count(*)::int from public.exercise_catalog where name = 'Other Coach Only Move') as leaked,
+      (select count(*)::int from public.exercise_library where created_by = '${OTHER64}' and catalog_id is not null) as other_linked,
+      (select c.name from public.exercise_catalog_aliases a join public.exercise_catalog c on c.id = a.catalog_id where a.alias_key = 'backsquat') as back_squat_alias,
+      (select c.name from public.exercise_catalog_aliases a join public.exercise_catalog c on c.id = a.catalog_id where a.alias_key = 'sissysquats') as sissy_alias,
+      (select count(*)::int from public.exercise_catalog where name in ('Sissy Squat', 'Thoracic Extension (Quadruped)', 'Handcuff W Rotation', 'Incline Iso Lateral Chest Press')) as fitpros`);
+    check("step 111: the catalog holds one entry per exercise in Ron's library, every library row is linked, and old spellings point at the final entry (" + JSON.stringify(cat) + ")", cat.n === cat.ron_distinct && cat.unlinked === 0 && cat.back_squat_alias === "Barbell Back Squat" && cat.sissy_alias === "Sissy Squat" && cat.fitpros === 4);
+    check("step 111: nothing of another coach reaches the catalog (names only from Ron's library; the other coach's own entries are not linked)", cat.strangers === 0 && cat.leaked === 0 && cat.other_linked === 0);
+    // The undo returns every table to exactly what it was, and the step applies again with the same result.
+    const afterSnap111 = await snapshot64();
+    const eu111 = await run("apply/undo-step111-catalog-merge-ron.sql");
+    const undone111 = await one("select (select count(*)::int from public.exercise_catalog) as cat, (select count(*)::int from public.exercise_catalog_aliases) as al, to_regclass('public.exercise_catalog_merge_log') as lg");
+    const undoneSnap111 = await snapshot64();
+    const differing111 = Object.keys(JSON.parse(before111.snap)).filter((k) => JSON.stringify(JSON.parse(before111.snap)[k]) !== JSON.stringify(JSON.parse(undoneSnap111)[k]));
+    check("step 111: the undo runs, empties the catalog, drops its log and returns every table to exactly what it was" + (eu111 ? ": " + eu111 : "") + (differing111.length ? " (differs: " + differing111.join(", ") + ")" : ""), !eu111 && undone111.cat === 0 && undone111.al === 0 && undone111.lg === null && undoneSnap111 === before111.snap && afterSnap111 !== before111.snap);
+    const re111 = await run("apply/apply-step111-catalog-merge-ron.sql");
+    check("step 111: applies again after the undo and gives the same result" + (re111 ? ": " + re111 : ""), !re111 && (await snapshot64()) === afterSnap111);
   }
   if (s.n === "64") {
     const one = async (sql) => (await db.query(sql)).rows[0];
@@ -916,6 +1002,8 @@ for (const s of steps) {
   check("release-u: the bundle applies again after an undo" + (errU2 ? ": " + errU2 : ""), !errU2 && (await strips()));
 }
 // Release V (step 64): ONE paste. At this point step 64 is applied; take it back with its undo, then the bundle applies, a second run is refused naming step 64, the undo returns it, and it applies again.
+// (Step 111 is newer and renames some of V's survivors, so it is taken back first and applied again after this block.)
+await run("apply/undo-step111-catalog-merge-ron.sql");
 {
   const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
   const bundle = bundles.find((b) => b.id === "release-v");
@@ -932,6 +1020,31 @@ for (const s of steps) {
   check("release-v: the undo returns it" + (euV ? ": " + euV : ""), !euV && !(await merged()));
   const errV2 = await run(`apply/${bundle.file}`);
   check("release-v: the bundle applies again after an undo" + (errV2 ? ": " + errV2 : ""), !errV2 && (await merged()));
+}
+// Releases BP (step 110, the empty catalog) and BQ (step 111, Ron's names): one paste each. BQ is refused until BP is in, a second run is refused, the undo returns it, and it applies again.
+{
+  const bundles = JSON.parse(readFileSync(new URL("../../supabase/apply/bundles.json", import.meta.url), "utf8"));
+  const bp = bundles.find((b) => b.id === "release-bp");
+  const bq = bundles.find((b) => b.id === "release-bq");
+  check("release-bp / release-bq: one bundle each (steps 110 and 111)", !!bp && !!bq && JSON.stringify(bp.steps) === JSON.stringify(["110"]) && JSON.stringify(bq.steps) === JSON.stringify(["111"]));
+  const catalogThere = async () => (await db.query("select to_regclass('public.exercise_catalog') is not null as ok")).rows[0].ok === true;
+  const catalogRows = async () => Number((await db.query("select count(*)::int as n from public.exercise_catalog")).rows[0].n);
+  const euBP0 = await run("apply/undo-step110-0361.sql");
+  check("release-bp: before the bundle runs there is no catalog" + (euBP0 ? ": " + euBP0 : ""), !euBP0 && !(await catalogThere()));
+  const refusedBQ = await run(`apply/${bq.file}`);
+  check("release-bq: refused with nothing changed while Release BP is not in", !!refusedBQ && refusedBQ.includes("cannot run") && !(await catalogThere()));
+  const errBP = await run(`apply/${bp.file}`);
+  check("release-bp bundle applies" + (errBP ? ": " + errBP : ""), !errBP && (await catalogThere()) && (await catalogRows()) === 0);
+  const againBP = await run(`apply/${bp.file}`);
+  check("release-bp: a second run is refused, naming step 110", !!againBP && againBP.includes("step 110 (0361) cannot run") && againBP.includes("already applied"));
+  const errBQ = await run(`apply/${bq.file}`);
+  check("release-bq bundle applies" + (errBQ ? ": " + errBQ : ""), !errBQ && (await catalogRows()) > 0);
+  const againBQ = await run(`apply/${bq.file}`);
+  check("release-bq: a second run is refused, naming step 111", !!againBQ && againBQ.includes("step 111 (catalog-merge-ron) cannot run") && againBQ.includes("already applied"));
+  const euBQ = await run("apply/undo-step111-catalog-merge-ron.sql");
+  check("release-bq: the undo empties the catalog again" + (euBQ ? ": " + euBQ : ""), !euBQ && (await catalogRows()) === 0);
+  const errBQ2 = await run(`apply/${bq.file}`);
+  check("release-bq: the bundle applies again after an undo" + (errBQ2 ? ": " + errBQ2 : ""), !errBQ2 && (await catalogRows()) > 0);
 }
 // Release W (step 65): ONE paste. The audit functions have no fixed search path before, the bundle pins them and closes rls_auto_enable, a second run is refused naming step 65, the undo puts it back, and it applies again.
 {

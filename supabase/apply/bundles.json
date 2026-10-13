@@ -293,6 +293,22 @@
   "file": "apply-release-bk-all.sql"
  },
  {
+  "id": "release-bq",
+  "name": "Release BQ (Coach Ron's exercise names merged and renamed, and the shared catalog filled from his library; run AFTER Release BP)",
+  "steps": [
+   "111"
+  ],
+  "file": "apply-release-bq-all.sql"
+ },
+ {
+  "id": "release-bp",
+  "name": "Release BP (the shared exercise catalog, empty; run any time)",
+  "steps": [
+   "110"
+  ],
+  "file": "apply-release-bp-all.sql"
+ },
+ {
   "id": "release-bo",
   "name": "Release BO (removes two empty stray Rob Derrick groups; run any time)",
   "steps": [
