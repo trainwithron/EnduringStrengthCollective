@@ -1,0 +1,48 @@
+"use client";
+
+// TEMPORARY local-only harness (never committed): renders the real SessionLogger with mock data in the same page chrome as /sessions/[id].
+import { SessionLogger } from "@/components/logging/session-logger";
+import { ExitWorkoutButton } from "@/components/session/exit-workout-button";
+import { CoachModeBar } from "@/components/coach/mobile/coach-mode-bar";
+import { SendToClientButton } from "@/components/session/send-to-client-button";
+import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
+
+function sets(n: number, exId: string, reps: number | null): SetLogEntry[] {
+  return Array.from({ length: n }, (_, i) => ({
+    id: `${exId}-s${i}`, setOrder: i, weight: null, reps, rpe: null, rir: null, tempo: null, timeSeconds: null, height: null, distance: null, restSeconds: null, pace: null, status: "pending",
+  })) as SetLogEntry[];
+}
+
+const names: [string, number, number | null][] = [
+  ["Barbell Back Squat", 3, 5],
+  ["Dumbbell Romanian Deadlift", 5, 8],
+  ["Barbell Rear Foot Elevated Split Squat With A Very Long Exercise Name", 4, 8],
+  ["Barbell Overhead Press", 10, 8],
+  ["Cable Lat Pulldown", 3, 10],
+  ["Shoulder CARs", 3, 5],
+];
+
+const exercises: SessionExerciseEntry[] = names.map(([name, n, reps], i) => ({
+  id: `ex${i}`, exerciseName: name, exerciseOrder: i, isSwapped: false, isAdded: false, trackedFields: ["reps", "weight", "rpe"], videoUrl: null, youtubeUrl: null, notes: null, sets: sets(n, `ex${i}`, reps),
+}));
+
+export default function Harness() {
+  return (
+    <main className="min-h-screen bg-graphite text-chalk font-body pb-16">
+      <CoachModeBar groupId="g" clientName="Jaxson Kremer" homeHref="/" />
+      <header className="relative px-5 pt-1 pb-1 border-b border-steel/20">
+        <div className="flex items-center justify-between gap-2">
+          <ExitWorkoutButton sessionId="harness" backHref="/" />
+          <h1 className="font-display font-bold text-lg leading-none uppercase truncate min-w-0 flex-1 text-center">Day 2</h1>
+          <SendToClientButton athleteId="a" sessionId="s" workoutTitle="Day 2" compact />
+        </div>
+      </header>
+      <SessionLogger
+        sessionId="harness" isCompleted={false} initialExercises={exercises} lastTimeByExercise={{}} ladderByExercise={{}} raised={false}
+        coachMode={{ homeHref: "/", clientIsMinor: false }} groupId="g" athleteId="a" viewerId="v" canUploadVideo={false}
+        startedAt={new Date(Date.now() - 7 * 60000).toISOString()} gamificationEnabled={false} todayDate="2026-10-13"
+        coachNoteByExerciseName={{}} exerciseSwipeDirection="horizontal" demoLibrary={[]} read={null}
+      />
+    </main>
+  );
+}

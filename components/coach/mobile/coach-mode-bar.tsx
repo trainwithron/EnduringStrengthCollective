@@ -1,27 +1,17 @@
 "use client";
 
-import Link from "next/link";
 import { CoachSpotHub } from "@/components/coach/mobile/coach-spot-hub";
 
-// The frame a coach sees while logging a workout FOR a client on the phone. It says plainly whose app this is (the coach's, logging for the client, not the client signed in),
-// keeps the coach's Spotlight hub button (Clients, Business, Calendar...) within reach, and gives one tap back to the coach's home. The hub button sits top-centre, so the label
-// is on the left and the Home button on the right.
+// The frame a coach sees while logging a workout FOR a client on the phone: ONE slim line ("Coach mode" on the left, "Logging for [Name]" on the right) so the workout gets the height. The Spotlight button
+// sits in the middle of it, and the way back to the coach's Home is inside that button (its first entry), so the bar needs no Home button.
 export function CoachModeBar({ groupId, clientName, homeHref }: { groupId: string; clientName: string; homeHref: string }) {
   return (
     <>
-      <div data-testid="coach-mode-bar" className="sticky top-0 z-30 h-14 bg-rust text-graphite flex items-center justify-between gap-2 px-3 pt-[env(safe-area-inset-top)]">
-        <p className="font-body text-xs font-semibold uppercase tracking-wide leading-tight min-w-0 w-[calc(50%-32px)]">
-          <span className="block">Coach mode</span>
-          <span className="block font-normal normal-case text-[11px] leading-tight line-clamp-2">You are logging for {clientName}, a client, not you</span>
-        </p>
-        <Link
-          href={homeHref}
-          className="shrink-0 min-h-11 inline-flex items-center px-3 border border-graphite/60 font-body text-xs font-semibold uppercase tracking-wide active:bg-graphite/10"
-        >
-          Home
-        </Link>
+      <div data-testid="coach-mode-bar" className="sticky top-0 z-30 h-8 bg-rust text-graphite flex items-center justify-between gap-2 px-3 box-content pt-[env(safe-area-inset-top)]">
+        <span className="font-body text-xs font-semibold uppercase tracking-wide w-[calc(50%-24px)] truncate">Coach mode</span>
+        <span className="font-body text-xs w-[calc(50%-24px)] truncate text-right">Logging for {clientName}</span>
       </div>
-      <CoachSpotHub groupId={groupId} />
+      <CoachSpotHub groupId={groupId} homeHref={homeHref} compact />
     </>
   );
 }

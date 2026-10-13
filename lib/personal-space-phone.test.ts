@@ -34,6 +34,6 @@ describe("Start workout on the coach's phone Home", () => {
   });
   it("says who is being logged for on the coach-logs-for-a-client bar", () => {
     const bar = read("components/coach/mobile/coach-mode-bar.tsx");
-    expect(bar).toContain("You are logging for {clientName}, a client, not you");
+    expect(bar).toContain("Logging for {clientName}");
   });
 });

@@ -3,22 +3,24 @@ import { NoAccess } from "@/components/shared/no-access";
 import { redirect } from "next/navigation";
 import { createServerClient } from "@/lib/supabase/server";
 import { isMemberOfGroup, NOT_IN_GROUP_MESSAGE } from "@/lib/athlete-in-group";
-import { getAthleteCurrentProgram } from "@/lib/active-programs";
+import { getActivePrograms } from "@/lib/active-programs";
 import { CoachModeBar } from "@/components/coach/mobile/coach-mode-bar";
-import { getTodaysSessions, workoutResultFromSessions } from "@/lib/todays-workout";
+import { ProgramPlainView } from "@/components/shared/program-plain-view-server";
+import { getTodaysSessions } from "@/lib/todays-workout";
+import { getGroupCoachTimezone, nowInZone } from "@/lib/timezone";
+import { PICK_LABEL, VIEW_PROGRAM_LABEL, buildLogChoices, exerciseCountLine, startLabel, weekdayName } from "@/lib/coach-log-choice";
 
-// Coach-only: the entry point for logging an in-person session on a
-// client's behalf. Jumps straight to today's due workout when there is
-// one — the overwhelmingly common case for an in-person session — instead
-// of always making the coach scroll a full week-grouped list and pick.
-// That list still renders as a fallback (and to log an ad-hoc/makeup day)
-// when there's no clean "today's workout" to jump to.
+// Coach-only: the entry point for logging an in-person session on a client's behalf. It opens on a SMALL choice and never straight into a day: "Start [Day]'s workout" (what is due today) and
+// "View whole program" (every week and day open, nothing locked for the coach), one card per program the client follows. Picking a day from the program view logs that day; Back from a day
+// returns to the program view, so there is no loop and the whole program is always reachable.
 export default async function LogForClientPage(
   props: {
     params: Promise<{ groupId: string; athleteId: string }>;
+    searchParams: Promise<{ program?: string }>;
   }
 ) {
   const params = await props.params;
+  const searchParams = await props.searchParams;
   const supabase = await createServerClient();
   const {
     data: { user },
@@ -45,85 +47,30 @@ export default async function LogForClientPage(
     return <NoAccess>{NOT_IN_GROUP_MESSAGE}</NoAccess>;
   }
 
-  const todaySessions = await getTodaysSessions(supabase, {
-    groupId: params.groupId,
-    athleteId: params.athleteId,
-  });
-  const todays = workoutResultFromSessions(todaySessions);
-  const readyCards = todaySessions.cards.filter((c) => c.status === "ready");
-  // Several programs have something today (main plus mobility, say): let the coach pick which
-  // one they are logging instead of silently opening whichever comes first.
-  const chooseProgram = !todaySessions.overrideWorkoutId && readyCards.length >= 2;
-  if (todays.status === "ready" && !chooseProgram) {
-    redirect(`/groups/${params.groupId}/athletes/${params.athleteId}/log/${todays.workoutId}`);
-  }
-
   const { data: athleteProfile } = await supabase
     .from("profiles")
     .select("full_name")
     .eq("id", params.athleteId)
     .single();
+  const clientName = athleteProfile?.full_name ?? "this client";
+  const logBase = `/groups/${params.groupId}/athletes/${params.athleteId}/log`;
 
-  if (chooseProgram) {
+  // The programs this client follows (their own and the shared ones), never another client's personal program or the coach's hidden template.
+  const programs = await getActivePrograms(supabase, params.groupId, params.athleteId);
+
+  if (programs.length === 0) {
     return (
       <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
-        <CoachModeBar groupId={params.groupId} clientName={athleteProfile?.full_name ?? "this client"} homeHref={`/groups/${params.groupId}`} />
-        <header className="px-5 pt-8 pb-6 border-b border-steel/20">
-          <Link
-            href={`/groups/${params.groupId}/athletes/${params.athleteId}`}
-            className="font-body text-xs text-steel uppercase tracking-wide"
-          >
+        <CoachModeBar groupId={params.groupId} clientName={clientName} homeHref={`/groups/${params.groupId}`} />
+        <header className="px-5 pt-4 pb-4 border-b border-steel/20">
+          <Link href={`/groups/${params.groupId}/athletes/${params.athleteId}`} className="font-body text-xs text-steel uppercase tracking-wide">
             &larr; Back to profile
           </Link>
-          <p className="font-body text-xs text-rust uppercase tracking-wide mt-3">
-            Logging for {athleteProfile?.full_name ?? "this client"}
-          </p>
-          <h1 className="font-display font-bold text-3xl leading-tight mt-3 uppercase">Which session?</h1>
-        </header>
-        <ul className="px-5 pt-6 space-y-3">
-          {readyCards.map((c) => (
-            <li key={c.programId} className="border border-steel/20 p-4">
-              <p className="font-body text-xs text-rust uppercase tracking-wide">{c.heading}</p>
-              <p className="font-display font-bold text-xl uppercase leading-none mt-1">{c.title}</p>
-              <Link
-                href={`/groups/${params.groupId}/athletes/${params.athleteId}/log/${c.workoutId}`}
-                className="mt-3 w-full h-11 flex items-center justify-center bg-rust text-graphite font-display uppercase text-sm font-bold"
-              >
-                Log this session
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </main>
-    );
-  }
-
-  // This client's program (never another client's personal program or the coach's hidden template).
-  const activeProgram = await getAthleteCurrentProgram(supabase, params.groupId, params.athleteId);
-
-  if (!activeProgram) {
-    return (
-      <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
-        <CoachModeBar groupId={params.groupId} clientName={athleteProfile?.full_name ?? "this client"} homeHref={`/groups/${params.groupId}`} />
-        <header className="px-5 pt-8 pb-6 border-b border-steel/20">
-          <Link
-            href={`/groups/${params.groupId}/athletes/${params.athleteId}`}
-            className="font-body text-xs text-steel uppercase tracking-wide"
-          >
-            &larr; Back to profile
-          </Link>
-          <p className="font-body text-xs text-rust uppercase tracking-wide mt-3">
-            Logging for {athleteProfile?.full_name ?? "this client"}
-          </p>
-          <h1 className="font-display font-bold text-3xl leading-tight mt-3 uppercase">
-            No active program yet
-          </h1>
+          <h1 className="font-display font-bold text-3xl leading-tight mt-3 uppercase">No active program yet</h1>
         </header>
         <section className="px-5 pt-6">
           <p className="font-body text-sm text-steel mb-4">
-            This group doesn&apos;t have an active program yet — assign one from{" "}
-            {athleteProfile?.full_name ?? "this client"}&apos;s profile before logging an
-            in-person session.
+            This group doesn&apos;t have an active program yet — assign one from {clientName}&apos;s profile before logging an in-person session.
           </p>
           <Link
             href={`/groups/${params.groupId}/athletes/${params.athleteId}`}
@@ -136,82 +83,90 @@ export default async function LogForClientPage(
     );
   }
 
-  const { data: workouts } = await supabase
-    .from("workouts")
-    .select("id, title, week_number, day_index, group_workout_exercises(count)")
-    .eq("program_id", activeProgram.id)
-    .order("week_number", { ascending: true })
-    .order("day_index", { ascending: true });
-
-  const weeks = new Map<number, typeof workouts>();
-  for (const w of workouts ?? []) {
-    const list = weeks.get(w.week_number) ?? [];
-    list.push(w);
-    weeks.set(w.week_number, list);
+  // The whole program: every week and day open, with "Log this workout" on each day.
+  const chosen = searchParams.program ? programs.find((p) => p.id === searchParams.program) : undefined;
+  if (chosen) {
+    return (
+      <>
+        <CoachModeBar groupId={params.groupId} clientName={clientName} homeHref={`/groups/${params.groupId}`} />
+        <ProgramPlainView
+          groupId={params.groupId}
+          programId={chosen.id}
+          userId={user.id}
+          isCoach
+          subjectId={params.athleteId}
+          backHref={logBase}
+          workoutHrefBase={logBase}
+          startLabel="Log this workout"
+          program={{ name: chosen.name, start_date: chosen.startDate, training_days: chosen.trainingDays, visibility_window: chosen.visibilityWindow, athlete_id: chosen.athleteId }}
+        />
+      </>
+    );
   }
-  const weekNumbers = Array.from(weeks.keys()).sort((a, b) => a - b);
+
+  const todaySessions = await getTodaysSessions(supabase, { groupId: params.groupId, athleteId: params.athleteId });
+  const workoutIds = todaySessions.cards.map((c) => c.workoutId);
+  const { data: countRows } = workoutIds.length
+    ? await supabase.from("workouts").select("id, group_workout_exercises(count)").in("id", workoutIds)
+    : { data: [] as any[] };
+  const exerciseCountByWorkout: Record<string, number> = {};
+  for (const r of (countRows ?? []) as any[]) exerciseCountByWorkout[r.id] = r.group_workout_exercises?.[0]?.count ?? 0;
+  const choices = buildLogChoices(
+    programs.map((p) => ({ programId: p.id, name: p.name, label: p.label })),
+    todaySessions.cards,
+    exerciseCountByWorkout
+  );
+  const timezone = await getGroupCoachTimezone(supabase, params.groupId);
+  const weekday = weekdayName(nowInZone(timezone), timezone);
 
   return (
     <main className="min-h-screen bg-graphite text-chalk font-body pb-24">
-      <header className="px-5 pt-8 pb-6 border-b border-steel/20">
-        <Link
-          href={`/groups/${params.groupId}/athletes/${params.athleteId}`}
-          className="font-body text-xs text-steel uppercase tracking-wide"
-        >
+      <CoachModeBar groupId={params.groupId} clientName={clientName} homeHref={`/groups/${params.groupId}`} />
+      <header className="px-5 pt-2 pb-1">
+        <Link href={`/groups/${params.groupId}/athletes/${params.athleteId}`} className="font-body text-xs text-steel uppercase tracking-wide min-h-11 inline-flex items-center">
           &larr; Back to profile
         </Link>
-        <p className="font-body text-xs text-rust uppercase tracking-wide mt-3">
-          Logging for {athleteProfile?.full_name ?? "this client"}
-        </p>
-        <h1 className="font-display font-bold text-4xl leading-none mt-3 uppercase">
-          {activeProgram.name}
-        </h1>
-        {todays.status === "done" && (
-          <p className="font-body text-xs text-steel mt-3">
-            Every scheduled workout is already logged — pick one below for an extra or makeup session.
-          </p>
-        )}
-        {todays.status === "locked" && (
-          <p className="font-body text-xs text-steel mt-3">
-            Their next workout isn&apos;t due yet — pick one below to log anyway.
-          </p>
-        )}
       </header>
-
-      <section className="px-5 pt-6">
-        {weekNumbers.length === 0 && (
-          <p className="font-body text-sm text-steel py-3">No workouts in this program yet.</p>
-        )}
-
-        {weekNumbers.map((weekNum) => (
-          <div key={weekNum} className="pt-6 first:pt-0">
-            <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
-              Week {weekNum}
-            </h2>
-            <div className="divide-y divide-steel/15">
-              {weeks.get(weekNum)!.map((w: any) => {
-                const exerciseCount = w.group_workout_exercises?.[0]?.count ?? 0;
-                return (
-                  <div key={w.id} className="py-3">
-                    <div className="flex items-center justify-between">
-                      <span className="font-body font-medium text-[15px]">{w.title}</span>
-                      <span className="font-body text-xs text-steel">
-                        {exerciseCount} {exerciseCount === 1 ? "exercise" : "exercises"}
-                      </span>
-                    </div>
-                    <Link
-                      href={`/groups/${params.groupId}/athletes/${params.athleteId}/log/${w.id}`}
-                      className="font-body text-xs text-rust mt-1.5 inline-block"
-                    >
-                      Log &rarr;
-                    </Link>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+      <ul className="px-5 pt-2 space-y-3">
+        {choices.map((c) => (
+          <li key={c.programId} className="border border-steel/20 bg-surface/40 p-4" data-testid="log-choice">
+            <p className="font-body text-xs text-rust uppercase tracking-wide">{c.heading}</p>
+            {c.kind === "start" && (
+              <>
+                <Link
+                  href={`${logBase}/${c.workoutId}`}
+                  className="mt-2 w-full min-h-14 flex items-center justify-center bg-rust text-graphite font-display uppercase text-lg font-bold text-center px-3"
+                >
+                  {startLabel(weekday)}
+                </Link>
+                <p className="font-body text-xs text-steel mt-2">
+                  {c.title} &middot; {exerciseCountLine(c.exerciseCount)}
+                </p>
+              </>
+            )}
+            {c.kind === "done" && (
+              <p className="font-body text-sm text-chalk mt-2">
+                Today&apos;s workout is logged{c.title ? `: ${c.title}` : ""}.
+              </p>
+            )}
+            {c.kind === "pick" ? (
+              <Link
+                href={`${logBase}?program=${c.programId}`}
+                className="mt-2 w-full min-h-14 flex items-center justify-center bg-rust text-graphite font-display uppercase text-lg font-bold text-center px-3"
+              >
+                {PICK_LABEL}
+              </Link>
+            ) : (
+              <Link
+                href={`${logBase}?program=${c.programId}`}
+                className="mt-3 w-full min-h-11 flex items-center justify-center border border-steel/40 text-chalk font-body text-sm text-center px-3"
+              >
+                {VIEW_PROGRAM_LABEL}
+              </Link>
+            )}
+          </li>
         ))}
-      </section>
+      </ul>
     </main>
   );
 }

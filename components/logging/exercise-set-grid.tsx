@@ -45,7 +45,9 @@ function useSwipeGesture(onAccept: () => void, enabled: boolean) {
   const fired = useRef(false);
   return {
     onPointerDown: (e: React.PointerEvent) => {
-      if (!enabled) return;
+      // On a touch screen a horizontal drag anywhere on the card is the swipe to the next exercise, so a cell never takes it over (a cell that captured the finger made the swipe impossible from most of the
+      // card). The swipe-to-accept stays for a mouse or pen.
+      if (!enabled || e.pointerType === "touch") return;
       startX.current = e.clientX;
       fired.current = false;
       // Without this, a real finger drag routinely moves off this
@@ -209,6 +211,10 @@ function GridCell({
     commit(suggestion);
   }, !readOnly && draft.trim() === "" && suggestion != null);
 
+  // On a touch screen the swipe is the next exercise, so the grey suggested number is taken with one tap instead: the first tap on an empty cell fills it in (and does not open the keyboard), a second tap edits it.
+  const touchTap = useRef(false);
+  const tapAccepts = !readOnly && draft.trim() === "" && suggestion != null && field !== "rest";
+
   // Decoupled from whether the cell is empty — pre-filled and swiped-in
   // values show the overlay too, as long as this exercise's goal hasn't
   // actually been cleared yet (a coach-set target auto-fills the exact
@@ -245,7 +251,22 @@ function GridCell({
         aria-invalid={invalid ? true : undefined}
         onBlur={handleBlur}
         {...swipe}
-        className={`w-12 h-11 rounded-token-pill font-body text-sm text-center focus:outline-none focus:border-rust disabled:opacity-60 touch-pan-y ${
+        onPointerDown={(e) => {
+          touchTap.current = e.pointerType === "touch";
+          swipe.onPointerDown(e);
+        }}
+        onMouseDown={(e) => {
+          if (touchTap.current && tapAccepts) e.preventDefault();
+        }}
+        onClick={() => {
+          if (!touchTap.current || !tapAccepts || suggestion == null) return;
+          touchTap.current = false;
+          setDraft(String(suggestion));
+          vibrateConfirm();
+          onTouched();
+          commit(suggestion);
+        }}
+        className={`w-12 h-11 rounded-token-pill font-body text-sm text-center focus:outline-none focus:border-rust disabled:opacity-60 ${
           unsaved ? "border-2 border-amber-400/70 " : ""
         }${
           invalid ? "border-2 border-rust " : ""
@@ -589,7 +610,7 @@ export function ExerciseSetGrid({
           onChange={(patch) => onSetChange(set.id, patch)}
         />
       ))}
-      <div className="inline-flex flex-col gap-1.5 min-w-full">
+      <div className="inline-flex flex-col gap-1 min-w-full">
         <div className="flex items-center gap-1.5">
           <div className="w-12 shrink-0" />
           <div className="w-8 shrink-0" />

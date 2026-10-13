@@ -222,7 +222,7 @@ export function RestTimerBar({
   const showPrompt = pendingPrompt && !running;
 
   return (
-    <div className="sticky top-0 z-10 bg-graphite border-b border-steel/20 px-5 py-1.5">
+    <div className="sticky top-0 z-10 bg-graphite border-b border-steel/20 px-5 py-1">
       <div className="flex items-center justify-between gap-3">
         <SessionStopwatch startedAt={startedAt} />
 

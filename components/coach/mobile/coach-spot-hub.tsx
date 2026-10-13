@@ -41,12 +41,18 @@ export function CoachSpotHub({
   groupId,
   initialAthleteId,
   initialAthleteName,
+  homeHref,
+  compact = false,
 }: {
   groupId: string;
   // Deep link from a client's own row/profile (?spotBuilder=...): opens
   // straight into Program -> Build with AI for that client.
   initialAthleteId?: string | null;
   initialAthleteName?: string | null;
+  // When set (the slim Coach mode bar while logging), the hub's grid starts with a Home link, so the bar needs no Home button of its own.
+  homeHref?: string;
+  // A smaller sparkle that fits the slim bar.
+  compact?: boolean;
 }) {
   const [open, setOpen] = useState(!!initialAthleteId);
   const [view, setView] = useState<"grid" | TileKey>(initialAthleteId ? "program" : "grid");
@@ -202,9 +208,11 @@ export function CoachSpotHub({
         aria-expanded={open}
         aria-controls={panelId}
         aria-label="Spotlight"
-        className="fixed top-3 left-1/2 -translate-x-1/2 z-40 h-10 w-10 rounded-token-circle bg-graphite/90 border border-rust/50 flex items-center justify-center active:border-rust transition-colors shadow-lg"
+        className={`fixed left-1/2 -translate-x-1/2 z-40 rounded-token-circle bg-graphite/90 border border-rust/50 flex items-center justify-center active:border-rust transition-colors shadow-lg ${
+          compact ? "top-[calc(env(safe-area-inset-top)+1px)] h-[30px] w-[30px]" : "top-3 h-10 w-10"
+        }`}
       >
-        <Sparkles className="w-5 h-5 text-rust" strokeWidth={2.25} />
+        <Sparkles className={compact ? "w-4 h-4 text-rust" : "w-5 h-5 text-rust"} strokeWidth={2.25} />
       </button>
 
       {open && (
@@ -263,6 +271,14 @@ export function CoachSpotHub({
             <div className="flex-1 min-h-0 overflow-hidden">
               {view === "grid" && (
                 <div className="h-full overflow-y-auto grid grid-cols-2 gap-2 p-4">
+                  {homeHref && (
+                    <a
+                      href={homeHref}
+                      className="col-span-2 border border-steel/20 p-3 flex items-center justify-center gap-2 active:border-rust active:bg-rust/5 transition-colors"
+                    >
+                      <span className="font-body text-sm text-chalk text-center">Home</span>
+                    </a>
+                  )}
                   {TILES.map((tile) => {
                     const Icon = tile.icon;
                     return (

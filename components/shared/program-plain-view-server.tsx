@@ -12,11 +12,20 @@ export async function ProgramPlainView({
   userId,
   isCoach,
   program,
+  subjectId: subjectOverride,
+  backHref,
+  workoutHrefBase,
+  startLabel,
 }: {
   groupId: string;
   programId: string;
   userId: string;
   isCoach: boolean;
+  // The coach logging for a client: whose workouts are checked off, where Back goes, where a day's button goes, and what it says.
+  subjectId?: string;
+  backHref?: string;
+  workoutHrefBase?: string;
+  startLabel?: string;
   program: { name: string; start_date: string | null; training_days: number[] | null; visibility_window: VisibilityWindow | null; athlete_id: string | null };
 }) {
   const supabase = await createServerClient();
@@ -29,7 +38,7 @@ export async function ProgramPlainView({
 
   const rows = (workouts ?? []) as any[];
   // Whose workouts are checked off: the client the program is for, else the person looking (their own training).
-  const subjectId = program.athlete_id ?? userId;
+  const subjectId = subjectOverride ?? program.athlete_id ?? userId;
   const [{ data: sessionRows }, { data: coachSeat }] = await Promise.all([
     rows.length > 0
       ? supabase.from("athlete_sessions").select("workout_id, completed_at").eq("athlete_id", subjectId).eq("status", "completed").in("workout_id", rows.map((w) => w.id))
@@ -101,10 +110,11 @@ export async function ProgramPlainView({
       title={program.name}
       weeks={weeks}
       currentWeek={current}
-      backHref={isCoach ? `/groups/${groupId}/programs` : `/groups/${groupId}`}
-      editHref={isCoach ? `/groups/${groupId}/programs/${programId}?edit=1` : null}
-      workoutHrefBase={`/groups/${groupId}/workouts`}
-      canEdit={isCoach}
+      backHref={backHref ?? (isCoach ? `/groups/${groupId}/programs` : `/groups/${groupId}`)}
+      editHref={isCoach && !workoutHrefBase ? `/groups/${groupId}/programs/${programId}?edit=1` : null}
+      workoutHrefBase={workoutHrefBase ?? `/groups/${groupId}/workouts`}
+      startLabel={startLabel}
+      canEdit={isCoach && !workoutHrefBase}
       isCoachViewing={isCoach && !!program.athlete_id && program.athlete_id !== userId}
       nowIso={new Date().toISOString()}
     />
