@@ -1,10 +1,10 @@
+"use client";
+
 // Real hour-by-hour visual overview of one day — availability windows as
 // shaded bands, confirmed bookings and custom events positioned by their
 // actual time and (for bookings) duration. Read-only: this is the "see my
-// whole day at a glance" view; actually booking/cancelling/assigning still
-// happens through the existing flat slot list rendered below it, which
-// already has all the interaction affordances (Book/Cancel/Assign
-// buttons) wired to specific slot times.
+// whole day at a glance" view. Tapping an empty spot on it hands that exact time (snapped to 5 minutes) to onPickTime, which opens the add sheet; the flat slot
+// list below it still has the Book/Cancel/Assign controls for sessions already on the day.
 const PX_PER_MIN = 1;
 const PAD_MINUTES = 60;
 const DEFAULT_START_MIN = 6 * 60; // 6:00 AM
@@ -16,6 +16,13 @@ export interface GridWindow {
 }
 
 export interface GridBooking {
+  id: string;
+  start: Date;
+  end: Date;
+  label: string;
+}
+
+export interface GridBlocked {
   id: string;
   start: Date;
   end: Date;
@@ -51,16 +58,31 @@ function formatMinutes(min: number): string {
   return m === 0 ? `${h12} ${period}` : `${h12}:${String(m).padStart(2, "0")} ${period}`;
 }
 
+// "HH:MM" to the grid's own minutes, and back.
+export function minutesToTimeInput(min: number): string {
+  const m = Math.max(0, Math.min(24 * 60 - 1, min));
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+}
+
+// The minute a tap landed on, snapped to the nearest 5.
+export function snapTapToMinutes(offsetPx: number, rangeStart: number): number {
+  return Math.round((rangeStart + offsetPx / PX_PER_MIN) / 5) * 5;
+}
+
 export function DayHourGrid({
   windows,
   bookings,
   events,
+  blocked = [],
   timeZone,
+  onPickTime,
 }: {
   windows: GridWindow[];
   bookings: GridBooking[];
   events: GridEvent[];
+  blocked?: GridBlocked[];
   timeZone?: string;
+  onPickTime?: (time: string) => void;
 }) {
   const timedEvents = events.filter((e): e is GridEvent & { time: string } => e.time != null);
 
@@ -68,6 +90,7 @@ export function DayHourGrid({
     ...windows.flatMap((w) => [timeStrToMinutes(w.startTime), timeStrToMinutes(w.endTime)]),
     ...bookings.flatMap((b) => [dateToMinutes(b.start, timeZone), dateToMinutes(b.end, timeZone)]),
     ...timedEvents.map((e) => timeStrToMinutes(e.time)),
+    ...blocked.flatMap((b) => [dateToMinutes(b.start, timeZone), dateToMinutes(b.end, timeZone)]),
   ];
 
   const rangeStart =
@@ -105,7 +128,20 @@ export function DayHourGrid({
         ))}
       </div>
 
-      <div className="flex-1 relative" style={{ height: gridHeight }}>
+      <div
+        className={`flex-1 relative ${onPickTime ? "cursor-pointer" : ""}`}
+        style={{ height: gridHeight }}
+        role={onPickTime ? "button" : undefined}
+        aria-label={onPickTime ? "Tap a time to add something" : undefined}
+        onClick={
+          onPickTime
+            ? (e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                onPickTime(minutesToTimeInput(snapTapToMinutes(e.clientY - rect.top, rangeStart)));
+              }
+            : undefined
+        }
+      >
         {hourMarks.map((min) => (
           <div
             key={min}
@@ -126,6 +162,22 @@ export function DayHourGrid({
           );
         })}
 
+        {blocked.map((b) => {
+          const start = dateToMinutes(b.start, timeZone);
+          const end = dateToMinutes(b.end, timeZone);
+          return (
+            <div
+              key={b.id}
+              className="absolute left-0 right-0 bg-steel/20 text-chalk px-2 py-0.5 overflow-hidden pointer-events-none"
+              style={{ top: topFor(start), height: Math.max(18, (end - start) * PX_PER_MIN) }}
+            >
+              <p className="font-body text-xs leading-tight truncate">
+                {formatMinutes(start)} · {b.label}
+              </p>
+            </div>
+          );
+        })}
+
         {bookings.map((b) => {
           const start = dateToMinutes(b.start, timeZone);
           const end = dateToMinutes(b.end, timeZone);
@@ -134,8 +186,11 @@ export function DayHourGrid({
               key={b.id}
               className="absolute left-1 right-1 bg-rust/80 text-graphite px-2 py-0.5 overflow-hidden"
               style={{ top: topFor(start), height: Math.max(18, (end - start) * PX_PER_MIN) }}
+              onClick={(e) => e.stopPropagation()}
             >
-              <p className="font-body text-xs font-medium leading-tight truncate">{b.label}</p>
+              <p className="font-body text-xs font-medium leading-tight truncate">
+                {formatMinutes(start)} · {b.label}
+              </p>
             </div>
           );
         })}
@@ -147,8 +202,11 @@ export function DayHourGrid({
               key={e.id}
               className="absolute left-1 right-1 bg-moss/80 text-graphite px-2 py-0.5 overflow-hidden"
               style={{ top: topFor(start), height: 18 }}
+              onClick={(ev) => ev.stopPropagation()}
             >
-              <p className="font-body text-xs font-medium leading-tight truncate">{e.title}</p>
+              <p className="font-body text-xs font-medium leading-tight truncate">
+                {formatMinutes(start)} · Event · {e.title}
+              </p>
             </div>
           );
         })}

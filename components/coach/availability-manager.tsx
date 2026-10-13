@@ -29,7 +29,7 @@ export function AvailabilityManager({
   const [weekday, setWeekday] = useState("1");
   const [startTime, setStartTime] = useState("17:00");
   const [endTime, setEndTime] = useState("20:00");
-  const [slotDuration, setSlotDuration] = useState("60");
+  const [slotDuration, setSlotDuration] = useState("30");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
