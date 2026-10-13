@@ -5,7 +5,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 
 // The one small, ignorable review card. Whatever the client does with it, it is recorded as shown and never comes back. The review goes to the coach only; it can be shared publicly ONLY if the client
 // ticked the box, and even then only when the coach chooses to put it on their page.
-export function ReviewPromptCard({ groupId, athleteId, coachId, coachName }: { groupId: string; athleteId: string; coachId: string; coachName: string }) {
+export function ReviewPromptCard({ groupId, athleteId, coachId, coachName, firstName }: { groupId: string; athleteId: string; coachId: string; coachName: string; firstName: string }) {
   const [open, setOpen] = useState(true);
   const [quote, setQuote] = useState("");
   const [agree, setAgree] = useState(false);
@@ -22,7 +22,7 @@ export function ReviewPromptCard({ groupId, athleteId, coachId, coachName }: { g
     if (!body || busy) return;
     setBusy(true);
     setError(null);
-    const { error: insertError } = await createBrowserClient().from("client_quotes").insert({ athlete_id: athleteId, group_id: groupId, coach_id: coachId, body: body.slice(0, 240), share_publicly: agree });
+    const { error: insertError } = await createBrowserClient().from("client_quotes").insert({ athlete_id: athleteId, group_id: groupId, coach_id: coachId, body: body.slice(0, 240), first_name: firstName.slice(0, 30) || null, share_publicly: agree });
     if (insertError) {
       setBusy(false);
       setError("That didn't send. Try again, or skip it.");

@@ -22,5 +22,8 @@ export async function ReviewPromptSection({ groupId, athleteId }: { groupId: str
   const { data: coachRow } = await db.from("group_memberships").select("profile_id, profiles ( full_name )").eq("group_id", groupId).eq("role", "coach").limit(1).maybeSingle();
   if (!coachRow) return null;
   const coachName = ((coachRow.profiles as { full_name?: string | null } | null)?.full_name ?? "your coach").split(" ")[0];
-  return <ReviewPromptCard groupId={groupId} athleteId={athleteId} coachId={coachRow.profile_id as string} coachName={coachName} />;
+  // The client's own first name goes with the quote (so a quote the coach puts on their page is attributed); it is only ever shown if the client ticked the box and the coach adds it.
+  const { data: me } = await supabase.from("profiles").select("full_name").eq("id", athleteId).maybeSingle();
+  const firstName = ((me as { full_name?: string | null } | null)?.full_name ?? "").trim().split(/\s+/)[0] ?? "";
+  return <ReviewPromptCard groupId={groupId} athleteId={athleteId} coachId={coachRow.profile_id as string} coachName={coachName} firstName={firstName} />;
 }

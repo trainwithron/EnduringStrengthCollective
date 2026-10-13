@@ -37,3 +37,12 @@ describe("asking for a review, once and quietly", () => {
     expect(settings).toContain("Nothing shows on your page until you add it.");
   });
 });
+
+describe("the quote carries the client's first name", () => {
+  it("the section reads it and the card saves it with the quote, so a quote the coach adds to the page is attributed", () => {
+    const section = readFileSync(join(__dirname, "..", "components/athlete/review-prompt-section.tsx"), "utf8");
+    const card = readFileSync(join(__dirname, "..", "components/athlete/review-prompt-card.tsx"), "utf8");
+    expect(section).toContain("firstName={firstName}");
+    expect(card).toContain("first_name: firstName.slice(0, 30) || null");
+  });
+});
