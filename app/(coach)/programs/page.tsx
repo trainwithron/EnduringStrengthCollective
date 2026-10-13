@@ -70,6 +70,18 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
         .limit(200);
   const removed: RemovedProgram[] = ((hiddenRows ?? []) as any[]).map((r) => ({ id: r.id, name: r.name, groupId: r.group_id, athleteId: r.athlete_id ?? null, athleteName: r.profiles?.full_name ?? null }));
 
+  // How many template slots each library program holds (the Templates filter and the card's mark).
+  const { data: slotRows } = await supabase
+    .from("group_workout_exercises")
+    .select("id, workouts!inner ( program_id )")
+    .eq("is_slot", true)
+    .in("group_id", groupIds.length > 0 ? groupIds : [""]);
+  const slotCountByProgram = new Map<string, number>();
+  for (const r of (slotRows ?? []) as any[]) {
+    const pid = r.workouts?.program_id as string | undefined;
+    if (pid) slotCountByProgram.set(pid, (slotCountByProgram.get(pid) ?? 0) + 1);
+  }
+
   const all: ProgramCardData[] = (programs ?? []).map((p: any) => ({
     id: p.id,
     name: p.name,
@@ -83,6 +95,7 @@ export default async function CoachProgramsPage(props: { searchParams: Promise<{
     trainingIntent: p.training_intent ?? null,
     updatedAt: p.updated_at ?? null,
     groupId: p.group_id,
+    slotCount: slotCountByProgram.get(p.id) ?? 0,
   }));
 
   // The scoped client's name (for the label) and the place a new program for them goes.

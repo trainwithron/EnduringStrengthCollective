@@ -21,6 +21,7 @@ import { ExerciseBuilderCard, type MovementPatternOption } from "../exercise-bui
 import type { RestTempoSuggestion } from "@/lib/training-intent";
 import { TextNoteCard } from "../text-note-card";
 import { BulkEditDayPanel } from "./bulk-edit-day-panel";
+import { AddSlotForm, SlotCard } from "./slot-card";
 import { formatShortDate } from "@/lib/program-schedule";
 import { GripVertical, ChevronDown, ChevronUp, StickyNote, Video } from "lucide-react";
 import { formatCompactLine } from "@/lib/compact-line";
@@ -199,6 +200,8 @@ export function DayCard({
     onItemsChange(reindexed);
     persistOrder(reindexed);
   }
+
+  const [showSlotForm, setShowSlotForm] = useState(false);
 
   async function handleAddExercise() {
     if (addItemBusy) return;
@@ -390,7 +393,8 @@ export function DayCard({
   }
 
   const itemCount = day.items.filter((i) => i.kind === "exercise").length;
-  const dayExercises = day.items.filter((i): i is BuilderExercise => i.kind === "exercise");
+  // A slot has no real exercise to bulk edit.
+  const dayExercises = day.items.filter((i): i is BuilderExercise => i.kind === "exercise" && !i.slot);
 
   function handleBulkApplied(
     updates: { exerciseId: string; field: TrackedField; value: string | number | null }[]
@@ -409,6 +413,21 @@ export function DayCard({
 
   // One exercise's full editor. Used by the normal view and, in the compact view, by an exercise the coach opens inline.
   function renderExerciseCard(item: BuilderExercise, sortedItems: BuilderItem[], index: number) {
+    if (item.slot) {
+      return (
+        <SlotCard
+          exercise={item}
+          patterns={movementPatterns}
+          canMoveUp={index > 0}
+          canMoveDown={index < sortedItems.length - 1}
+          onMoveUp={() => moveItem(sortedItems, index, -1)}
+          onMoveDown={() => moveItem(sortedItems, index, 1)}
+          onChange={(patch) => onItemsChange(day.items.map((i) => (i.id === item.id && i.kind === "exercise" ? { ...i, ...patch } : i)))}
+          onDeleted={() => onItemsChange(day.items.filter((i) => i.id !== item.id))}
+          onError={flashSaveError}
+        />
+      );
+    }
     return (
                     <ExerciseBuilderCard
                       exercise={item}
@@ -683,6 +702,23 @@ export function DayCard({
               <p className="font-body text-sm text-chalk">Rest day</p>
             </div>
           )}
+          {showSlotForm && (
+            <div className="px-3 pb-2">
+              <AddSlotForm
+                workoutId={day.id}
+                groupId={groupId}
+                nextOrder={day.items.length > 0 ? Math.max(...day.items.map((i) => i.order)) + 1 : 0}
+                patterns={movementPatterns}
+                onAdded={(item) => {
+                  onItemsChange([...day.items, item]);
+                  setShowSlotForm(false);
+                  flashSaved();
+                }}
+                onCancel={() => setShowSlotForm(false)}
+                onError={flashSaveError}
+              />
+            </div>
+          )}
           <div className="flex items-center gap-2 px-3 py-2.5 border-t border-steel/20">
             <button
               type="button"
@@ -699,6 +735,14 @@ export function DayCard({
               className="h-9 px-3 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
             >
               + Note
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowSlotForm((v) => !v)}
+              disabled={addItemBusy}
+              className="h-9 px-3 border border-dashed border-steel/40 text-steel font-body text-xs active:border-rust active:text-rust transition-colors disabled:opacity-40"
+            >
+              + Slot
             </button>
           </div>
         </>

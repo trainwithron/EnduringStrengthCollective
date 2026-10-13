@@ -2235,6 +2235,20 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the ladder, workout exercise and membership tables exist", "to_regclass('public.movement_pattern_exercises') is not null and to_regclass('public.group_workout_exercises') is not null and to_regclass('public.group_memberships') is not null"],
     ],
   },
+  {
+    n: "116",
+    slug: "0366",
+    title: "0366 Template slots survive Duplicate, and a program that still has a slot cannot be given to a client (the duplicate-program function is replaced; the two flags added by step 115 may be empty so the old restore scripts still work)",
+    migrations: ["0366"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes on screen until the code that goes with it is live. Then a template with slots can be duplicated and kept in the library, and assigning one to a client says it cannot be assigned yet. Run it AFTER step 115 (Release BU) and BEFORE the code that goes with it is live.",
+    undo: readFileSync(new URL("./release-bv-undo.sql", import.meta.url), "utf8").replace(/\r\n/g, "\n").replace(/\s+$/, ""),
+    undoWhy: "Only if step 116 misbehaves. Puts the duplicate-program function back as it was (a copy then drops the slot marks, so do not use it once a template with slots exists).",
+    rows: [
+      ["0366 is not already applied (the duplicate-program function does not know about slots yet)", "position('is_slot' in pg_get_functiondef(to_regprocedure('public.duplicate_program(uuid, uuid, uuid, uuid, text, date)'))) = 0"],
+      ["Release BU is applied (the slot columns exist)", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercises' and column_name = 'is_slot')"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -2344,6 +2358,7 @@ const BUNDLES = [
   { id: "release-bn", name: "Release BN (adding a client works again: the creator of a new group can seat themselves; run any time, ideally NOW)", steps: ["108"] },
   { id: "release-bl", name: "Release BL (four exercises added to Coach Ron's library for the FitPros history; run any time)", steps: ["106"] },
   { id: "release-bk", name: "Release BK (move Coach Ron's own training into his personal space; run AFTER he has opened Coach Ron (you) once and removed the programs he does not want)", steps: ["105"] },
+  { id: "release-bv", name: "Release BV (template slots survive Duplicate; a program with a slot cannot be assigned to a client; run AFTER Release BU and BEFORE the code that goes with it is live)", steps: ["116"] },
   { id: "release-bu", name: "Release BU (pattern and class templates: a one-sided mark on ladder exercises, plus empty columns for slots and a client's level; run BEFORE the code that goes with it is live)", steps: ["115"] },
   { id: "release-bt", name: "Release BT (a group session belongs to one organization; run BEFORE the code that goes with it is live)", steps: ["114"] },
   { id: "release-bs", name: "Release BS (smaller goals under a client's goal; run BEFORE the code that goes with it is live)", steps: ["113"] },
@@ -2560,6 +2575,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
+    m("0366", "position('is_slot' in pg_get_functiondef(to_regprocedure('public.duplicate_program(uuid, uuid, uuid, uuid, text, date)'))) > 0"),
     m("0365", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'movement_pattern_exercises' and column_name = 'is_unilateral')"),
     m("0364", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_sessions' and column_name = 'organization_id')"),
     m("0363", "to_regclass('public.client_sub_goals') is not null"),

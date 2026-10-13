@@ -209,7 +209,7 @@ export function WeekGrid({
 
   const sortedDays = days.slice().sort((a, b) => a.dayIndex - b.dayIndex);
   const weekExercises: BuilderExercise[] = days.flatMap((d) =>
-    d.items.filter((i): i is BuilderExercise => i.kind === "exercise")
+    d.items.filter((i): i is BuilderExercise => i.kind === "exercise" && !i.slot)
   );
 
   function handleWeekBulkApplied(

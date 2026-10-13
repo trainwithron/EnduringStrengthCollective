@@ -52,7 +52,7 @@ export function ClientPreviewSheet({ days, heading, demoLibrary, onClose }: { da
 
 function PreviewDay({ day, showTitle, demoLibrary }: { day: BuilderDay; showTitle: boolean; demoLibrary: DemoRow[] }) {
   const sorted = [...day.items].sort((a, b) => a.order - b.order);
-  const exercises = sorted.filter((i): i is BuilderExercise => i.kind === "exercise");
+  const exercises = sorted.filter((i): i is BuilderExercise => i.kind === "exercise" && !i.slot);
   const notes = sorted.filter((i): i is BuilderNote => i.kind === "note" && i.body.trim() !== "");
   return (
     <section className="mb-4 last:mb-0">

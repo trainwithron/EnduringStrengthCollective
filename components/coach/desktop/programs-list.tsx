@@ -47,6 +47,7 @@ export function ProgramsList({
             <option value="shared">Shared programs</option>
             <option value="client">One client</option>
             {types.length > 0 && <option value="type">Program type</option>}
+            <option value="templates">Templates</option>
             {removed.length > 0 && <option value="removed">Removed programs ({removed.length})</option>}
           </select>
         </label>
@@ -74,6 +75,7 @@ export function ProgramsList({
       {mode !== "removed" && <ProgramCardGrid groupId={groupId} programs={shown} visualsByProgramId={visualsByProgramId} />}
       {removedShown.length > 0 && <RemovedRows rows={removedShown} />}
       {mode === "removed" && removedShown.length === 0 && <p className="font-body text-sm text-steel">Nothing removed.</p>}
+      {mode === "templates" && shown.length === 0 && <p className="font-body text-sm text-steel">No templates yet. Add a slot to a day of a program to make one.</p>}
     </div>
   );
 }
