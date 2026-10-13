@@ -36,8 +36,10 @@ export function AiProgramBuilderBox({
   const [line, setLine] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [flags, setFlags] = useState<string[]>([]);
-  const [pausing, setPausing] = useState(false);
   const pauseRequested = useRef(false);
+  // The run that is going: Pause shows "paused" at once, but the day already being built finishes (and is drawn) in the background, so Resume waits for it before carrying on.
+  const runPromise = useRef<Promise<void> | null>(null);
+  const resuming = useRef(false);
   const queue = useRef<DaySlot[]>([]);
   const token = useRef<string | null>(null);
   const request = useRef("");
@@ -70,13 +72,20 @@ export function AiProgramBuilderBox({
     return true;
   }
 
-  async function runQueue() {
+  function runQueue(): Promise<void> {
+    const p = runQueueInner().finally(() => {
+      if (runPromise.current === p) runPromise.current = null;
+    });
+    runPromise.current = p;
+    return p;
+  }
+
+  async function runQueueInner() {
     setPhase("building");
     setError(null);
     while (queue.current.length > 0) {
       if (pauseRequested.current) {
         setPhase("paused");
-        setPausing(false);
         setLine("Paused. Tell it what to change, then Resume.");
         return;
       }
@@ -86,7 +95,6 @@ export function AiProgramBuilderBox({
       if (!result.ok) {
         setError(result.message);
         setPhase("paused");
-        setPausing(false);
         setLine("Paused. Tell it what to change, then Resume.");
         return;
       }
@@ -96,7 +104,6 @@ export function AiProgramBuilderBox({
       queue.current.shift();
     }
     setPhase("done");
-    setPausing(false);
     setLine("Done. Your days are in the builder.");
   }
 
@@ -123,11 +130,26 @@ export function AiProgramBuilderBox({
 
   function pause() {
     pauseRequested.current = true;
-    setPausing(true);
+    setPhase("paused");
+    setLine("Paused. Tell it what to change, then Resume.");
   }
 
   async function resume() {
-    if (phase === "building") return;
+    if (phase === "building" || resuming.current) return;
+    resuming.current = true;
+    try {
+      // The day that was being built when Pause was pressed lands first.
+      if (runPromise.current) {
+        setLine("Finishing the day it was on…");
+        await runPromise.current;
+      }
+      await resumeNow();
+    } finally {
+      resuming.current = false;
+    }
+  }
+
+  async function resumeNow() {
     const said = text.trim();
     pauseRequested.current = false;
     setError(null);
@@ -166,12 +188,11 @@ export function AiProgramBuilderBox({
           rows={2}
           placeholder={phase === "paused" ? "What should it change?" : "Tell it what to build, or say: finish the week using Day 1"}
           aria-label="Tell the AI what to build"
-          disabled={building}
-          className="flex-1 min-w-0 bg-graphite border border-steel/30 text-chalk px-2 py-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust disabled:opacity-60"
+          className="flex-1 min-w-0 bg-graphite border border-steel/30 text-chalk px-2 py-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
         />
         {building ? (
-          <button type="button" onClick={pause} disabled={pausing} className="min-h-11 px-5 border border-rust text-rust font-display font-bold uppercase tracking-wide disabled:opacity-60 sm:self-start">
-            {pausing ? "Pausing…" : "Pause"}
+          <button type="button" onClick={pause} className="min-h-11 px-5 border border-rust text-rust font-display font-bold uppercase tracking-wide sm:self-start">
+            Pause
           </button>
         ) : phase === "paused" ? (
           <button type="button" onClick={() => void resume()} className="min-h-11 px-5 bg-rust text-graphite font-display font-bold uppercase tracking-wide sm:self-start">
