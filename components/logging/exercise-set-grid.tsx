@@ -361,7 +361,8 @@ function SetCompletionSync({
     // thing and log the whole program.)
     if (allFilled && set.status !== "completed" && touched) {
       persist({ status: "completed" });
-    } else if (!allFilled && set.status === "completed" && !forced) {
+    } else if (!allFilled && set.status === "completed" && !forced && touched) {
+      // Only when the person changed a field this session: a completed set loaded from the database (a tapped check with nothing filled in) is never flipped back on load.
       persist({ status: "pending" });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

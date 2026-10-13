@@ -41,3 +41,16 @@ describe("the logger", () => {
     expect(logger).toContain("raised && !exercises.every((e) => isNoLoadExercise(e.exerciseName))");
   });
 });
+
+describe("review fixes", () => {
+  it("a hang clean, a hang power clean, a pull-up and a chin-up keep weight and RPE; a dead hang does not", () => {
+    for (const n of ["Hang Clean", "Hang Power Clean", "Hang Snatch", "Pull-Up", "Chin-Up", "Weighted Pull Up"]) {
+      expect(isNoLoadExercise(n), n).toBe(false);
+    }
+    expect(isNoLoadExercise("Dead Hang")).toBe(true);
+  });
+  it("a completed set with empty fields stays completed when the page loads (the revert needs the person to have changed a field this session)", () => {
+    const grid = read("components/logging/exercise-set-grid.tsx");
+    expect(grid).toContain('set.status === "completed" && !forced && touched');
+  });
+});
