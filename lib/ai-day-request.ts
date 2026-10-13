@@ -44,7 +44,7 @@ export interface ExistingDay {
 }
 
 // The days to build, in order: every (week, day) in the target shape that has no exercises yet, never one that does. The shape: days per week from the request, else the program's training days,
-// else the days the program already shows (when more than one), else 3; weeks from the request, else just the week that is already under way ("finish the week"), else 4 for an empty program.
+// else the days the program already shows (when more than one), else 3; weeks from the request, else just the week that is already under way ("finish the week"), else ONE week for an empty program (never a longer program than the coach's words ask for).
 // At most MAX_DAYS_PER_RUN, so one run stays inside what one run is charged for.
 export function planSlots(existing: ExistingDay[], request: BuildRequest, trainingDaysCount: number | null): DaySlot[] {
   const built = existing.filter((d) => d.hasExercises);
@@ -54,7 +54,7 @@ export function planSlots(existing: ExistingDay[], request: BuildRequest, traini
   let weeks: number;
   if (request.weeks != null) weeks = request.weeks;
   else if (request.finishWeek || lastBuiltWeek > 0) weeks = Math.max(1, lastBuiltWeek);
-  else weeks = 4;
+  else weeks = 1;
   const hasAt = new Set(built.map((d) => `${d.week}:${d.day}`));
   const slots: DaySlot[] = [];
   for (let w = 1; w <= weeks; w++) {
@@ -72,5 +72,24 @@ export function fixTargetFrom(text: string): { week: number | null; day: number 
   if (both) return { week: Number(both[1]), day: Number(both[2]) };
   const dayOnly = /\bday\s*(\d{1,2})\b/.exec(t);
   if (dayOnly) return { week: null, day: Number(dayOnly[1]) };
+  return null;
+}
+
+// A scope the coach types while it is building ("only one week", "just week one", "no more than two weeks", "I didn't ask for more than one week"): the number of weeks to stop after, or null.
+const SCOPE_WORD = "(\\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|twelve|a single)";
+export function scopeLimitFrom(text: string): { weeks: number; phrase: string } | null {
+  const t = text.toLowerCase();
+  const patterns = [
+    new RegExp(`\\b(?:only|just)\\s+${SCOPE_WORD}\\s+weeks?\\b`),
+    new RegExp(`\\b(?:only|just)\\s+week\\s+${SCOPE_WORD}\\b`),
+    new RegExp(`\\b(?:no more than|not more than|didn'?t ask for more than|did not ask for more than)\\s+${SCOPE_WORD}\\s+weeks?\\b`),
+  ];
+  for (const p of patterns) {
+    const m = p.exec(t);
+    if (!m) continue;
+    const token = m[1] === "a single" ? "one" : m[1];
+    const n = numberFrom(token);
+    if (n != null && n >= 1 && n <= 24) return { weeks: n, phrase: m[0] };
+  }
   return null;
 }

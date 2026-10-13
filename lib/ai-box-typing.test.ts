@@ -27,3 +27,18 @@ describe("the AI Program Builder text box while it builds", () => {
     expect(box).toContain("What should it change?");
   });
 });
+
+describe("the AI Program Builder builds one week unless asked for more", () => {
+  it("stops after the scope, says so, and offers the next week once with a button", () => {
+    expect(box).toContain("scopeLimitFrom(said)");
+    expect(box).toContain("queue.current = queue.current.filter((s) => s.week <= scope.weeks)");
+    expect(box).toContain("Done. Week ${top} is in the builder.");
+    expect(box).toContain("Want me to continue into Week {offerWeek}?");
+    expect(box).toContain("Continue into Week {offerWeek}");
+  });
+  it("never continues by itself: the offered week starts only from the button", () => {
+    const afterRun = box.slice(box.indexOf("setOfferWeek(top < 24 ? top + 1 : null)"), box.indexOf("function ask()"));
+    expect(afterRun).not.toContain("runQueue()");
+    expect(box).toContain("onClick={() => continueInto(offerWeek)}");
+  });
+});

@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { readAiJson } from "@/lib/ai-fetch";
 import { BUILDER_ONE_WORKOUT_SELECT, mapWorkoutRowToBuilderDay } from "@/lib/program-builder-data";
-import { fixTargetFrom, parseBuildRequest, planSlots } from "@/lib/ai-day-request";
+import { fixTargetFrom, parseBuildRequest, planSlots, scopeLimitFrom } from "@/lib/ai-day-request";
 import type { DaySlot } from "@/lib/ai-day-slots";
 import type { BuilderDay } from "@/lib/types";
 import type { DemoRow } from "@/lib/exercise-demo";
@@ -36,6 +36,10 @@ export function AiProgramBuilderBox({
   const [line, setLine] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [flags, setFlags] = useState<string[]>([]);
+  // After a run finishes: the next week it can offer to continue into (one button, never started by itself).
+  const [offerWeek, setOfferWeek] = useState<number | null>(null);
+  const finishedWeeks = useRef<Set<number>>(new Set());
+  const lastRequest = useRef<{ daysPerWeek: number | null }>({ daysPerWeek: null });
   const pauseRequested = useRef(false);
   // The run that is going: Pause shows "paused" at once, but the day already being built finishes (and is drawn) in the background, so Resume waits for it before carrying on.
   const runPromise = useRef<Promise<void> | null>(null);
@@ -101,10 +105,14 @@ export function AiProgramBuilderBox({
       await show(result.workoutId);
       if (result.flags.length > 0) setFlags((prev) => [...prev, ...result.flags].slice(-6));
       lastBuilt.current = slot;
+      finishedWeeks.current.add(slot.week);
       queue.current.shift();
     }
     setPhase("done");
-    setLine("Done. Your days are in the builder.");
+    const weeks = [...finishedWeeks.current].sort((a, b) => a - b);
+    const top = weeks.length > 0 ? weeks[weeks.length - 1] : (lastBuilt.current?.week ?? 1);
+    setLine(weeks.length <= 1 ? `Done. Week ${top} is in the builder.` : "Done. Your days are in the builder.");
+    setOfferWeek(top < 24 ? top + 1 : null);
   }
 
   function ask() {
@@ -115,8 +123,12 @@ export function AiProgramBuilderBox({
     token.current = null;
     pauseRequested.current = false;
     setFlags([]);
+    setOfferWeek(null);
+    finishedWeeks.current = new Set();
     const existing = daysRef.current.map((d) => ({ week: d.weekNumber, day: d.dayIndex, hasExercises: d.items.some((i) => i.kind === "exercise") }));
-    const slots = planSlots(existing, parseBuildRequest(said), trainingDaysCount);
+    const parsed = parseBuildRequest(said);
+    lastRequest.current = { daysPerWeek: parsed.daysPerWeek };
+    const slots = planSlots(existing, parsed, trainingDaysCount);
     if (slots.length === 0) {
       setPhase("idle");
       setLine("Every day in that range already has exercises. Say how many weeks to add, for example: make it 4 weeks.");
@@ -150,7 +162,14 @@ export function AiProgramBuilderBox({
   }
 
   async function resumeNow() {
-    const said = text.trim();
+    let said = text.trim();
+    // "only one week" / "just week one": stop after that many weeks; the rest of the queue is dropped, and the words are not treated as a change to a day.
+    const scope = scopeLimitFrom(said);
+    if (scope) {
+      queue.current = queue.current.filter((s) => s.week <= scope.weeks);
+      said = said.replace(new RegExp(scope.phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i"), "").replace(/^[\s,.;:-]+|[\s,.;:-]+$/g, "").trim();
+      setText(said);
+    }
     pauseRequested.current = false;
     setError(null);
     setPhase("building");
@@ -173,6 +192,23 @@ export function AiProgramBuilderBox({
         if (fixed.flags.length > 0) setFlags((prev) => [...prev, ...fixed.flags].slice(-6));
       }
     }
+    void runQueue();
+  }
+
+  // The one offered next week: its empty days only, as a new run. Never started by itself.
+  function continueInto(week: number) {
+    if (phase === "building") return;
+    setOfferWeek(null);
+    token.current = null;
+    pauseRequested.current = false;
+    finishedWeeks.current = new Set();
+    const existing = daysRef.current.map((d) => ({ week: d.weekNumber, day: d.dayIndex, hasExercises: d.items.some((i) => i.kind === "exercise") }));
+    const slots = planSlots(existing, { weeks: week, daysPerWeek: lastRequest.current.daysPerWeek, finishWeek: false }, trainingDaysCount).filter((s) => s.week === week);
+    if (slots.length === 0) {
+      setLine(`Week ${week} already has exercises.`);
+      return;
+    }
+    queue.current = slots;
     void runQueue();
   }
 
@@ -213,6 +249,14 @@ export function AiProgramBuilderBox({
         <p className="font-body text-xs text-rust mt-1" role="alert">
           {error}
         </p>
+      )}
+      {phase === "done" && offerWeek && (
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <p className="font-body text-sm text-chalk">Want me to continue into Week {offerWeek}?</p>
+          <button type="button" onClick={() => continueInto(offerWeek)} className="min-h-11 px-5 bg-rust text-graphite font-display font-bold uppercase tracking-wide">
+            Continue into Week {offerWeek}
+          </button>
+        </div>
       )}
       {flags.length > 0 && (
         <p className="font-body text-xs text-steel mt-1">Worth a look: {flags.slice(-3).join(" · ")}</p>

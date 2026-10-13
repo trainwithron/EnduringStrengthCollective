@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fixTargetFrom, parseBuildRequest, planSlots } from "@/lib/ai-day-request";
+import { fixTargetFrom, parseBuildRequest, planSlots, scopeLimitFrom } from "@/lib/ai-day-request";
 import { checkRunToken, daysPerWeekOf, issueRunToken, nextSlotToBuild, readDayResult, RUN_TTL_MS, MAX_DAYS_PER_RUN } from "@/lib/ai-day-run";
 
 describe("Reading the request", () => {
@@ -27,8 +27,24 @@ describe("Which days get built", () => {
     expect(slots[0]).toEqual({ week: 2, day: 1 });
     expect(slots.some((s) => s.week === 1)).toBe(false);
   });
-  it("an empty program with no numbers builds 4 weeks of 3 days", () => {
-    expect(planSlots([], parseBuildRequest("full body program"), null)).toHaveLength(12);
+  it("an empty program with no week count builds exactly ONE week (3 days), never a longer program", () => {
+    const slots = planSlots([], parseBuildRequest("full body program"), null);
+    expect(slots).toHaveLength(3);
+    expect(slots.every((s) => s.week === 1)).toBe(true);
+  });
+  it("more weeks only when the words say so", () => {
+    expect(planSlots([], parseBuildRequest("a 4 week program"), 3)).toHaveLength(12);
+    expect(planSlots([], parseBuildRequest("a month of training"), 3)).toHaveLength(12);
+    expect(planSlots([], parseBuildRequest("12 week program, 3 days a week"), null)).toHaveLength(36);
+  });
+  it("reads a scope typed mid-run", () => {
+    expect(scopeLimitFrom("only one week")?.weeks).toBe(1);
+    expect(scopeLimitFrom("Just week one please")?.weeks).toBe(1);
+    expect(scopeLimitFrom("I didn't ask for more than one week")?.weeks).toBe(1);
+    expect(scopeLimitFrom("no more than two weeks")?.weeks).toBe(2);
+    expect(scopeLimitFrom("only a single week")?.weeks).toBe(1);
+    expect(scopeLimitFrom("make day 2 heavier")).toBeNull();
+    expect(scopeLimitFrom("make it 4 weeks")).toBeNull();
   });
   it("one run builds at most the number of days a run is charged for", () => {
     expect(planSlots([], parseBuildRequest("12 weeks, 5 days a week"), null)).toHaveLength(MAX_DAYS_PER_RUN);
