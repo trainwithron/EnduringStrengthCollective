@@ -156,15 +156,17 @@ export function ProgramDayPicker({
             <div className="px-5 pt-4 overflow-y-auto">
               <h2 className="font-display font-bold text-2xl leading-none">{dayCardTitle(open.week, open.day)}</h2>
               {open.day.dateLabel && <p className="font-body text-xs text-steel mt-1">{open.day.dateLabel}</p>}
-              <div className="grid grid-cols-2 gap-3 mt-4">
+              <div className={`grid ${open.day.lockedLabel ? "grid-cols-1" : "grid-cols-2"} gap-3 mt-4`}>
                 <div className="rounded-2xl bg-surface/70 border border-steel/20 py-3 text-center">
                   <p className="font-display font-bold text-2xl leading-none">{open.day.exerciseCount}</p>
                   <p className="font-body text-[11px] text-steel uppercase tracking-wide mt-1">Exercises</p>
                 </div>
-                <div className="rounded-2xl bg-surface/70 border border-steel/20 py-3 text-center">
-                  <p className="font-display font-bold text-2xl leading-none">{open.day.totalSets}</p>
-                  <p className="font-body text-[11px] text-steel uppercase tracking-wide mt-1">Total sets</p>
-                </div>
+                {!open.day.lockedLabel && (
+                  <div className="rounded-2xl bg-surface/70 border border-steel/20 py-3 text-center">
+                    <p className="font-display font-bold text-2xl leading-none">{open.day.totalSets}</p>
+                    <p className="font-body text-[11px] text-steel uppercase tracking-wide mt-1">Total sets</p>
+                  </div>
+                )}
               </div>
               {open.day.lockedLabel ? null : open.day.exercises.length === 0 ? (
                 <p className="font-body text-sm text-steel mt-5">Nothing in this day yet.</p>

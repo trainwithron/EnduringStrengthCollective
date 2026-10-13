@@ -58,6 +58,7 @@ describe("a locked day", () => {
     const picker = read("components/shared/program-day-picker.tsx");
     expect(picker).toContain("d.lockedLabel ??");
     expect(picker).toContain("{open.day.lockedLabel ? null :");
+    expect(picker).toContain("{!open.day.lockedLabel && (");
   });
 });
 
