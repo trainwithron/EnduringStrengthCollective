@@ -2059,7 +2059,7 @@ alter table public.coach_availability_windows drop column if exists session_minu
     migrations: ["0356"],
     sees: "Success. No rows returned.",
     afterwards: "Nothing visible until an adult client reaches 12 sessions. They see one small card, once. A review they send is private to the coach unless they ticked that the coach may share it; only a ticked one can go on the coach's page, and only when the coach adds it.",
-    undo: "drop table if exists public.review_prompts_shown;\ndrop table if exists public.client_quotes;",
+    undo: "drop table if exists public.review_prompts_shown;\ndrop table if exists public.client_quotes;\ndrop function if exists public.client_quotes_refuse_minor();",
     undoWhy: "Only if step 102 misbehaves. Removes the quotes and the record of who was shown the card (their contents are lost).",
     rows: [
       ["0356 is not already applied (no quotes table yet)", "to_regclass('public.client_quotes') is null"],

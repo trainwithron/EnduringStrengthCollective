@@ -10,6 +10,7 @@ export default {
       const otherCoach = await h.user("RQ Other Coach");
       const client = await h.user("RQ Client");
       const other = await h.user("RQ Other Client");
+      const minor = await h.user("RQ Young Client");
       const org = await h.org(owner);
       await h.orgMember(org, coach, "coach");
       await h.orgMember(org, otherCoach, "coach");
@@ -17,8 +18,10 @@ export default {
       const g2 = await h.group(org, otherCoach, "team", "RQ other team");
       await h.member(g, client);
       await h.member(g, other);
+      await h.member(g, minor);
       await h.member(g2, other);
 
+      await db.query(`insert into public.client_intake (athlete_id, group_id, date_of_birth) values ($1, $2, (current_date - interval '15 years')::date)`, [minor, g]);
       await h.as(client);
       await db.query(`insert into public.client_quotes (athlete_id, group_id, coach_id, body, first_name, share_publicly) values ($1, $2, $3, 'Best coach I have had.', 'Sam', true)`, [client, g, coach]);
       h.check("a client can send a short quote to their coach", (await db.query(`select count(*)::int as n from public.client_quotes where athlete_id = $1`, [client])).rows[0].n === 1);
@@ -39,6 +42,9 @@ export default {
       await h.as(other);
       h.check("another client sees none of it", (await db.query(`select count(*)::int as n from public.client_quotes where group_id = $1`, [g])).rows[0].n === 0);
 
+      await h.as(minor);
+      await h.expectError("a client whose date of birth makes them under 18 cannot leave a quote, shared or not", () => db.query(`insert into public.client_quotes (athlete_id, group_id, coach_id, body, share_publicly) values ($1, $2, $3, 'x', true)`, [minor, g, coach]), /under 18/i);
+      await h.expectError("...not even privately", () => db.query(`insert into public.client_quotes (athlete_id, group_id, coach_id, body) values ($1, $2, $3, 'x')`, [minor, g, coach]), /under 18/i);
       await h.as(client);
       await db.query(`insert into public.review_prompts_shown (athlete_id, group_id, outcome) values ($1, $2, 'not_now')`, [client, g]);
       await h.expectError("the card is recorded once per client and group", () => db.query(`insert into public.review_prompts_shown (athlete_id, group_id, outcome) values ($1, $2, 'quote')`, [client, g]), /duplicate|unique/i);

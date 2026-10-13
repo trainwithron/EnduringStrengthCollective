@@ -3,4 +3,5 @@
 begin;
 drop table if exists public.review_prompts_shown;
 drop table if exists public.client_quotes;
+drop function if exists public.client_quotes_refuse_minor();
 commit;

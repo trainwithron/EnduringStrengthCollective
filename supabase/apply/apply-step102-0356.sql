@@ -80,4 +80,21 @@ begin
 end
 $$;
 
+-- Never under 18, enforced in the database too and not only on the screen: a quote (or a public-sharing tick) from a client whose known date of birth makes them under 18 is refused. An unknown date of
+-- birth counts as an adult, the same as the screen. Security definer so the check reads the intake date whoever is writing.
+create or replace function public.client_quotes_refuse_minor() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare dob date;
+begin
+  select date_of_birth into dob from public.client_intake where athlete_id = new.athlete_id;
+  if dob is not null and dob > (current_date - interval '18 years')::date then
+    raise exception 'Reviews are not collected from clients under 18.' using errcode = '42501';
+  end if;
+  return new;
+end
+$$;
+revoke all on function public.client_quotes_refuse_minor() from public, anon, authenticated;
+drop trigger if exists client_quotes_refuse_minor on public.client_quotes;
+create trigger client_quotes_refuse_minor before insert on public.client_quotes for each row execute function public.client_quotes_refuse_minor();
+
 commit;
