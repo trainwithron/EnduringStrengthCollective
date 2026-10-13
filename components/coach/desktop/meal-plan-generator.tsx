@@ -41,6 +41,7 @@ import type { WeeklyWeightTrend } from "@/lib/weight-trend";
 import { RecipeVoteFavorite } from "./recipe-vote-favorite";
 import { AiOutputWrongButton } from "@/components/coach/ai-output-wrong-button";
 import { AiUsageMeter } from "@/components/coach/ai-usage-meter";
+import { readAiJson } from "@/lib/ai-fetch";
 
 type DayView = "daily" | "train" | "rest";
 
@@ -799,7 +800,7 @@ export function MealPlanGenerator({
           athleteId,
         }),
       });
-      const data = await res.json();
+      const data = await readAiJson(res);
 
       // Any non-2xx (not configured, rate-limited, a transient API
       // error) is treated as "AI unavailable" for this purpose — the
