@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { prefersAthleteStyleView } from "@/lib/pwa-server";
+import { createServerClient } from "@/lib/supabase/server";
 
 export const ACTING_AS_COOKIE = "acting_as_athlete";
 // Readable by the page's own script: set while a coach is in THEIR OWN client app ("My training"), so the bar says that instead of "Viewing as someone".
@@ -36,6 +37,17 @@ export function resolveActingAs(
   return { athleteId: realUserId, realUserId, isActingAsOther: false };
 }
 
+// The group is the signed-in person's own personal space: a group with no organization that they created.
+async function isOwnPersonalSpace(groupId: string, userId: string): Promise<boolean> {
+  try {
+    const supabase = await createServerClient();
+    const { data } = await supabase.from("groups").select("organization_id, created_by").eq("id", groupId).maybeSingle();
+    return !!data && (data as { organization_id: string | null }).organization_id === null && (data as { created_by: string }).created_by === userId;
+  } catch {
+    return false;
+  }
+}
+
 // Resolves "which athlete's data should this page load" for a coach who
 // may be standing in a client's mobile experience. Act-as is a PHONE-only
 // tool (it is how a coach logs in person for a client): outside the
@@ -54,5 +66,10 @@ export async function getEffectiveAthlete(
   }
   const cookieStore = await cookies();
   const raw = cookieStore.get(ACTING_AS_COOKIE)?.value;
-  return resolveActingAs(raw, groupId, realUserId);
+  const resolved = resolveActingAs(raw, groupId, realUserId);
+  if (resolved.isActingAsOther) return resolved;
+  // A coach's OWN personal space (his own training, no organization) is always his client app, as himself, on the phone, with or without the act-as setting. The setting is a 12 hour cookie: when
+  // it ran out while the page was still open, the coach landed on the coaching Home of an empty space ("Welcome, two things get you started") instead of his own training.
+  if (await isOwnPersonalSpace(groupId, realUserId)) return { athleteId: realUserId, realUserId, isActingAsOther: true };
+  return resolved;
 }

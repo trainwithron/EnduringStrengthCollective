@@ -60,6 +60,16 @@ export async function CoachMobileHome({
   // The same number the Business page shows (every group this coach runs; the estimate from set rates when there are no subscriptions yet).
   const mrr = coachMrr.value;
 
+  // The first-run card is for a workspace with no clients at all. A coach whose clients are in another group of THIS organization, looking at an empty group, is told which one this is instead.
+  let clientsElsewhere = false;
+  if ((rosterRows ?? []).length === 0) {
+    const others = orgGroupIds.filter((id) => id !== groupId);
+    if (others.length > 0) {
+      const { count } = await supabase.from("group_memberships").select("profile_id", { count: "exact", head: true }).eq("role", "athlete").in("group_id", others);
+      clientsElsewhere = (count ?? 0) > 0;
+    }
+  }
+
   const topDue = dueRoster[0] ?? null;
   const soloAthlete =
     !topDue && (rosterRows ?? []).length === 1 ? (rosterRows as any[])[0] : null;
@@ -221,7 +231,16 @@ export async function CoachMobileHome({
           </section>
         )}
 
-        {!topDue && !soloAthlete && (rosterRows ?? []).length === 0 && (
+        {!topDue && !soloAthlete && (rosterRows ?? []).length === 0 && clientsElsewhere && (
+          <section className="px-5 pb-6">
+            <div className="border border-steel/20 p-4">
+              <p className="font-body text-sm text-chalk">No clients in {groupName}.</p>
+              <p className="font-body text-xs text-steel mt-1">Your clients are in another group of this organization.</p>
+            </div>
+          </section>
+        )}
+
+        {!topDue && !soloAthlete && (rosterRows ?? []).length === 0 && !clientsElsewhere && (
           <section className="px-5 pb-6">
             <div className="border border-steel/20 p-4">
               <p className="font-body text-sm text-chalk">Welcome. Two things get you started:</p>
