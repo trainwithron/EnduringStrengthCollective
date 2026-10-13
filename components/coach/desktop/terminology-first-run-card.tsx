@@ -87,7 +87,7 @@ export function TerminologyFirstRunCard({ groupId, askedOnServer = null }: { gro
         <div className="flex-1">
           <p className="font-body text-sm text-chalk font-medium">What do you call your people?</p>
           <p className="font-body text-xs text-steel mt-0.5 mb-3">Pick the word you use. It is used throughout your coach screens.</p>
-          <TerminologyChooser groupId={groupId} moreHref={`/groups/${groupId}/branding?tab=terminology`} onChosen={answered} />
+          <TerminologyChooser groupId={groupId} onChosen={answered} />
           {chosen && (
             <p className="font-body text-sm text-moss mt-3" role="status">
               Done. You can change this any time in Settings.

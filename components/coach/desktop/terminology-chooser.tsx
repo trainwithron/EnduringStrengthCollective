@@ -1,14 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { TerminologyProvider, useTerminology } from "@/components/coach/terminology-provider";
 import { TERM_DEFAULTS, TERM_PRESETS } from "@/lib/terminology";
 import { capFirst } from "@/lib/term-text";
 
 // "What do you call your people?" (Ron, Oct 6): the word is chosen once, here (the first-run card on Home and the coach's Settings), and then it reads as plain
 // text everywhere. One tap on a button applies it coach-wide; "Something else" takes your own word.
-function Chooser({ moreHref, onChosen }: { moreHref?: string; onChosen?: () => void }) {
+function Chooser({ onChosen }: { onChosen?: () => void }) {
   const { overrides, setOverride } = useTerminology();
   const [custom, setCustom] = useState(false);
   const [customText, setCustomText] = useState("");
@@ -75,14 +74,6 @@ function Chooser({ moreHref, onChosen }: { moreHref?: string; onChosen?: () => v
       )}
       <p className="font-body text-xs text-steel mt-2">
         It changes everywhere in your coach screens at once, and you can change it again here any time.
-        {moreHref && (
-          <>
-            {" "}
-            <Link href={moreHref} className="underline text-chalk">
-              More words (groups, coaches, sessions, programs)
-            </Link>
-          </>
-        )}
       </p>
     </div>
   );
@@ -90,12 +81,12 @@ function Chooser({ moreHref, onChosen }: { moreHref?: string; onChosen?: () => v
 
 // It uses the page's own vocabulary when the page has one (so the whole screen updates at once), and brings its own otherwise (Settings on a phone).
 // onChosen: called when the coach picks ANY word (the default included), so the first-run card can count that as the answer.
-export function TerminologyChooser({ groupId, moreHref, onChosen }: { groupId?: string; moreHref?: string; onChosen?: () => void }) {
+export function TerminologyChooser({ groupId, onChosen }: { groupId?: string; onChosen?: () => void }) {
   const { mounted } = useTerminology();
-  if (mounted) return <Chooser moreHref={moreHref} onChosen={onChosen} />;
+  if (mounted) return <Chooser onChosen={onChosen} />;
   return (
     <TerminologyProvider groupId={groupId}>
-      <Chooser moreHref={moreHref} onChosen={onChosen} />
+      <Chooser onChosen={onChosen} />
     </TerminologyProvider>
   );
 }

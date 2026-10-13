@@ -243,7 +243,7 @@ export default async function SettingsPage(
   ) : null;
   const terminologyGroup = isCoach ? (
     <SettingsGroup label="What do you call your people?">
-            <TerminologyChooser groupId={params.groupId} moreHref={`/groups/${params.groupId}/branding?tab=terminology`} />
+            <TerminologyChooser groupId={params.groupId} />
           </SettingsGroup>
   ) : null;
   const notificationsGroup = (
