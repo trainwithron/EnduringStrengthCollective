@@ -127,6 +127,7 @@ Not covered by this: the real database's data, real Supabase Auth, real storage,
 | 0359 | yes | yes | 5 | 0359 imported FitPros sets do not set training maxes |
 | 0360 | yes | yes | 9 | 0360 the creator of a new group can seat themselves as its coach |
 | 0361 | yes | yes | 15 | 0361 shared exercise catalog: read for everyone signed in, write for the platform admin only |
+| 0362 | yes | yes | 21 | 0362 storage buckets accept only the file types their screens upload |
 | 0331 | yes | yes | 10 | 0331 a payment event and its sessions are recorded in one step |
 | 0329 | yes | yes | 12 | 0329 every session costs exactly 1 credit; the waitlist offer uses the coach's time zone |
 | 0330 | yes | yes | 9 | 0330 only a real coach can have a public page |

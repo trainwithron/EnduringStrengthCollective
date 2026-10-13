@@ -866,5 +866,13 @@
   "slug": "catalog-merge-ron",
   "migrations": [],
   "rows": 20
+ },
+ {
+  "n": "112",
+  "slug": "0362",
+  "migrations": [
+   "0362"
+  ],
+  "rows": 2
  }
 ]

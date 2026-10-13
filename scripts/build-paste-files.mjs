@@ -2179,6 +2179,20 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["step 111 is not already applied (the merge log is not there yet)", "to_regclass('public.exercise_catalog_merge_log') is null"],
     ],
   },
+  {
+    n: "112",
+    slug: "0362",
+    title: "0362 Each storage bucket accepts only the file types its screen uploads (the three public buckets included), post-media gets a 100 MB size limit, and the signed-out role has no rights on the coach website table",
+    migrations: ["0362"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes for normal use: photos, videos and PDFs upload as before. A file of any other type (an executable, a script, an HTML page) is now refused by the storage service. Existing files are not touched.",
+    undo: "update storage.buckets set allowed_mime_types = null where id in ('coach-profile-photos', 'pro-shop-images', 'org-branding', 'program-covers', 'progress-photos', 'athlete-exercise-videos', 'exercise-media', 'coach-video-checkins', 'post-media', 'client-assessments', 'waiver-documents');\nupdate storage.buckets set file_size_limit = null where id = 'post-media';\ngrant all on public.coach_sites to anon;",
+    undoWhy: "Only if step 112 refuses a file type a screen really needs. Takes the type lists and the post-media size limit off again and gives the signed-out role its default table rights back.",
+    rows: [
+      ["0362 is not already applied (the profile photo bucket has no type list yet)", "coalesce((select allowed_mime_types is null from storage.buckets where id = 'coach-profile-photos'), true)"],
+      ["the storage buckets and the coach website table exist", "to_regclass('storage.buckets') is not null and to_regclass('public.coach_sites') is not null"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -2288,6 +2302,7 @@ const BUNDLES = [
   { id: "release-bn", name: "Release BN (adding a client works again: the creator of a new group can seat themselves; run any time, ideally NOW)", steps: ["108"] },
   { id: "release-bl", name: "Release BL (four exercises added to Coach Ron's library for the FitPros history; run any time)", steps: ["106"] },
   { id: "release-bk", name: "Release BK (move Coach Ron's own training into his personal space; run AFTER he has opened Coach Ron (you) once and removed the programs he does not want)", steps: ["105"] },
+  { id: "release-br", name: "Release BR (each storage bucket accepts only the file types its screen uploads; run any time)", steps: ["112"] },
   { id: "release-bq", name: "Release BQ (Coach Ron's exercise names merged and renamed, and the shared catalog filled from his library; run AFTER Release BP)", steps: ["111"] },
   { id: "release-bp", name: "Release BP (the shared exercise catalog, empty; run any time)", steps: ["110"] },
   { id: "release-bo", name: "Release BO (removes two empty stray Rob Derrick groups; run any time)", steps: ["109"] },
@@ -2500,6 +2515,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
+    m("0362", "exists (select 1 from storage.buckets where id = 'waiver-documents' and allowed_mime_types is not null)"),
     m("0361", "to_regclass('public.exercise_catalog') is not null"),
     m("0360", "to_regprocedure('public.group_is_new_and_mine(uuid)') is not null"),
     m("0359", "position('12:00:17' in pg_get_functiondef(to_regprocedure('public.recompute_training_max()'))) > 0"),
