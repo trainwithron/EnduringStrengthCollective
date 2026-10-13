@@ -306,9 +306,12 @@ function SetCompletionSync({
   touched,
   weightOptional,
   prescribedRestSeconds,
+  forced,
   onChange,
 }: {
   set: SetLogEntry;
+  // The check was tapped: the set stays complete whether or not every field is filled in.
+  forced: boolean;
   trackedFields: TrackedField[];
   readOnly: boolean;
   // Bodyweight movements: reps alone complete the set (no typing 0 lbs).
@@ -358,7 +361,7 @@ function SetCompletionSync({
     // thing and log the whole program.)
     if (allFilled && set.status !== "completed" && touched) {
       persist({ status: "completed" });
-    } else if (!allFilled && set.status === "completed") {
+    } else if (!allFilled && set.status === "completed" && !forced) {
       persist({ status: "pending" });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -377,6 +380,7 @@ function SetCompletionSync({
     set.status,
     readOnly,
     touched,
+    forced,
   ]);
 
   return null;
@@ -403,6 +407,25 @@ export function ExerciseSetGrid({
   const { save } = useSetSave();
   // Sets the athlete has interacted with (see SetCompletionSync).
   const [touchedSetIds, setTouchedSetIds] = useState<Set<string>>(new Set());
+  const [forcedIds, setForcedIds] = useState<Set<string>>(new Set());
+  // Tapping the check completes the set (nothing has to be filled in); tapping it again undoes that.
+  function toggleCheck(set: SetLogEntry) {
+    if (readOnly || set.status === "skipped") return;
+    const done = set.status === "completed";
+    setForcedIds((prev) => {
+      const next = new Set(prev);
+      if (done) next.delete(set.id);
+      else next.add(set.id);
+      return next;
+    });
+    if (done) {
+      onSetChange(set.id, { status: "pending" });
+      save(set.id, { status: "pending" });
+    } else {
+      onSetChange(set.id, { status: "completed" });
+      save(set.id, { status: "completed", completed_at: new Date().toISOString() });
+    }
+  }
   function markTouched(...ids: string[]) {
     setTouchedSetIds((prev) => {
       if (ids.every((id) => prev.has(id))) return prev;
@@ -556,6 +579,7 @@ export function ExerciseSetGrid({
           trackedFields={trackedFields}
           readOnly={readOnly}
           touched={touchedSetIds.has(set.id)}
+          forced={forcedIds.has(set.id)}
           weightOptional={weightOptional}
           prescribedRestSeconds={(() => {
             const r = restForSet(sets, set.id);
@@ -616,10 +640,13 @@ export function ExerciseSetGrid({
             const isComplete = set.status === "completed";
             const isSkipped = set.status === "skipped";
             return (
-              <span
+              <button
+                type="button"
                 key={set.id}
-                role="img"
-                aria-label={isComplete ? "Set complete" : isSkipped ? "Set skipped" : "Set pending"}
+                onClick={() => toggleCheck(set)}
+                disabled={readOnly || isSkipped}
+                aria-pressed={isComplete}
+                aria-label={isComplete ? "Set complete, tap to undo" : isSkipped ? "Set skipped" : "Mark set complete"}
                 className={`w-16 h-8 shrink-0 flex items-center justify-center border rounded-token-circle ${
                   isComplete
                     ? "bg-moss border-moss text-graphite"
@@ -629,7 +656,7 @@ export function ExerciseSetGrid({
                 }`}
               >
                 <Check className="w-4 h-4" strokeWidth={3} />
-              </span>
+              </button>
             );
           })}
         </div>

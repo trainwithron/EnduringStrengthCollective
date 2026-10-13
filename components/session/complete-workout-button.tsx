@@ -103,11 +103,8 @@ export function CompleteWorkoutButton({
     finishNavigation(weightNudge.navHref);
   }
 
+  // Complete always completes: whatever is filled in is saved, empty fields stay empty. (It used to stop and ask "finish it anyway?".)
   function handleTap() {
-    if (!allSetsResolved) {
-      setConfirming(true);
-      return;
-    }
     handleComplete();
   }
 

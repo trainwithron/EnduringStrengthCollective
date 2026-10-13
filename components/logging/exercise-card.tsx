@@ -11,6 +11,7 @@ import { restForSet, type RestForSet } from "@/lib/rest-time";
 import { UNDO_REMOVE_SET_MS, canRemoveSet, lastSet, prescribedNote, removeSetConfirmText, restoreSetRow, setHasLoggedWork } from "@/lib/set-removal";
 import { useSetSave } from "./set-save-context";
 import { classifyEquipmentType } from "@/lib/equipment-classifier";
+import { isNoLoadExercise } from "@/lib/exercise-load";
 import { ExerciseVideoThread } from "./exercise-video-thread";
 import { ExerciseDemoButton } from "./exercise-demo-button";
 import { useDemoLibrary, useOpenDemo } from "./demo-library-context";
@@ -92,6 +93,7 @@ export function ExerciseCard({
     const t = setTimeout(() => setRemoved(null), UNDO_REMOVE_SET_MS);
     return () => clearTimeout(t);
   }, [removed]);
+  const [showLoad, setShowLoad] = useState(false);
   const [fieldsOpen, setFieldsOpen] = useState(false);
   const [fieldsBusy, setFieldsBusy] = useState(false);
   // Phase 3 (custom_shape_theming_idea.md) — the per-set equipment-visual
@@ -276,6 +278,12 @@ export function ExerciseCard({
     }
   }
 
+  // A mobility drill, stretch, foam roll or hold (Shoulder CARs) is never loaded or rated: weight and RPE are hidden unless something was already logged or they are asked for with "Add weight / RPE".
+  const loadLogged = exercise.sets.some((s) => (s.weight !== null && s.weight !== undefined) || (s.rpe !== null && s.rpe !== undefined));
+  const hideLoad = !readOnly && isNoLoadExercise(exercise.exerciseName) && !loadLogged && !showLoad;
+  const gridFields = hideLoad ? exercise.trackedFields.filter((f) => f !== "weight" && f !== "rpe") : exercise.trackedFields;
+  const canAddLoad = hideLoad && exercise.trackedFields.some((f) => f === "weight" || f === "rpe");
+
   const untrackedFields = TRACKED_FIELD_DEFS.map((f) => f.key).filter(
     (k) => !exercise.trackedFields.includes(k)
   );
@@ -453,6 +461,12 @@ export function ExerciseCard({
         </div>
       )}
 
+      {canAddLoad && (
+        <button type="button" onClick={() => setShowLoad(true)} className="font-body text-xs text-steel active:text-rust min-h-9 mb-1">
+          Add weight / RPE
+        </button>
+      )}
+
       {!readOnly && (
         <EquipmentVisual
           equipmentType={exercise.equipmentType}
@@ -463,7 +477,7 @@ export function ExerciseCard({
 
       <ExerciseSetGrid
         sets={exercise.sets}
-        trackedFields={exercise.trackedFields}
+        trackedFields={gridFields}
         readOnly={readOnly}
         weightOptional={classifyEquipmentType(exercise.exerciseName) === "bodyweight"}
         onSetChange={(setId, patch) => {

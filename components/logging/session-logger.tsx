@@ -9,6 +9,7 @@ import { ExerciseVerticalCarousel } from "./exercise-vertical-carousel";
 import { SwipeDirectionDiscovery } from "./swipe-direction-discovery";
 import type { SwipeDirection } from "@/components/athlete/swipe-direction-setting";
 import { CompleteWorkoutButton } from "@/components/session/complete-workout-button";
+import { isNoLoadExercise } from "@/lib/exercise-load";
 import { RestTimerBar, type PendingGateTask } from "@/components/session/rest-timer-bar";
 import { QuickAddNlButton } from "./quick-add-nl-button";
 import { SessionProgressStrip } from "./session-progress-strip";
@@ -382,7 +383,7 @@ export function SessionLogger({
           sessionId={sessionId}
           allSetsResolved={allSetsResolved}
           disabled={false}
-          raised={raised}
+          raised={raised && !exercises.every((e) => isNoLoadExercise(e.exerciseName))}
           coachMode={coachMode}
         />
       )}
