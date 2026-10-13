@@ -28,7 +28,8 @@ import { RequestSlotButton } from "@/components/athlete/request-slot-button";
 import { RequestDifferentTime } from "@/components/athlete/request-different-time";
 import { BottomTabBar } from "@/components/athlete/bottom-tab-bar";
 import { ActingAsBanner } from "@/components/athlete/acting-as-banner";
-import { DayHourGrid } from "@/components/coach/desktop/day-hour-grid";
+import { DayCalendar } from "@/components/coach/desktop/day-calendar";
+import { getCoachClients } from "@/lib/coach-clients";
 import { CalendarPurchasePrompt } from "@/components/athlete/calendar-purchase-prompt";
 import { isStripeConfigured } from "@/lib/stripe";
 import { VideoCallButton } from "@/components/booking/video-call-button";
@@ -721,7 +722,7 @@ export default async function CoachDayDetailPage(
           </p>
         ) : (
           <p className="font-body text-xs text-steel mt-3">
-            Pick a client from the calendar to assign them into an open slot.
+            Tap a time on the day to add a session, an event or time off.
           </p>
         )}
       </div>
@@ -742,7 +743,16 @@ export default async function CoachDayDetailPage(
         </div>
       )}
 
-      <DayHourGrid
+      {/* Tap a time on the day to add a session, an event or time off: one sheet, set to that exact time. */}
+      <DayCalendar
+        coachId={user.id}
+        groupId={params.groupId}
+        dateKey={params.date}
+        timezone={timezone}
+        organizationId={pageOrgId}
+        clients={(await getCoachClients(supabase, user.id, params.groupId)).map((c) => ({ id: c.id, fullName: c.fullName, groupId: c.groupId }))}
+        initialClientId={clientMembership ? clientId ?? null : null}
+        defaultMinutes={slots[0]?.durationMinutes ?? windows.find((w) => w.weekday === date.getDay())?.sessionMinutes ?? windows.find((w) => w.weekday === date.getDay())?.slotDurationMinutes ?? 60}
         windows={windows.filter((w) => w.weekday === date.getDay())}
         bookings={(bookingRows ?? []).map((b: any) => ({
           id: b.id,
@@ -751,7 +761,11 @@ export default async function CoachDayDetailPage(
           label: b.profiles?.full_name ?? "Client",
         }))}
         events={(dayEventRows ?? []).map((e) => ({ id: e.id, time: e.event_time, title: e.title }))}
-        timeZone={timezone}
+        blocked={blockedRanges.map((b, i) => ({ id: `blocked-${i}`, start: b.start, end: b.end, label: "Blocked" }))}
+        openRanges={windows
+          .filter((w) => w.weekday === date.getDay())
+          .map((w) => ({ startMs: zonedTimeToUtc(params.date, w.startTime, timezone).getTime(), endMs: zonedTimeToUtc(params.date, w.endTime, timezone).getTime() }))}
+        busyRanges={(bookingRows ?? []).map((b: any) => ({ startMs: new Date(b.start_at).getTime(), endMs: new Date(b.end_at).getTime() }))}
       />
 
       <AddDayEventForm coachId={user.id} dateKey={params.date} organizationId={pageOrgId} />
