@@ -1,4 +1,12 @@
-// The plain PROGRAM VIEW on a phone: every week of the program, pick the week and the day, see the workout, log it. No builder, no calendar lock by default. Pure helpers, tested.
+// The plain PROGRAM VIEW on a phone (FitPros is the reference): a stats card, a row of weeks, one card per day of the chosen week, and a bottom sheet with the day's workout. Read-only; no builder,
+// no calendar lock by default. Pure helpers, tested.
+
+export interface PlainExercise {
+  name: string;
+  line: string;
+  note: string | null;
+  thumbUrl: string | null;
+}
 
 export interface PlainDay {
   id: string;
@@ -7,7 +15,10 @@ export interface PlainDay {
   dateLabel: string | null;
   isToday: boolean;
   lockedLabel: string | null;
-  exercises: { name: string; line: string; note: string | null }[];
+  // The last time the person finished this day (ISO), or null.
+  completedAt: string | null;
+  exercises: PlainExercise[];
+  totalSets: number;
 }
 
 export interface PlainWeek {
@@ -15,16 +26,12 @@ export interface PlainWeek {
   days: PlainDay[];
 }
 
-// "3 x 5", "3 x 8-10", or "2:00" for timed work, from a row's sets.
+// "3 x 5", "3 x 8-10", or "1 x 60" (seconds) for timed work, from a row's sets.
 export function exerciseLine(sets: { target_reps: string | null; target_time_seconds: number | null }[]): string {
   const first = sets[0];
   if (!first) return "";
-  if (first.target_time_seconds && first.target_time_seconds > 0) {
-    const s = first.target_time_seconds;
-    const clock = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-    return sets.length > 1 ? `${sets.length} x ${clock}` : clock;
-  }
-  if (first.target_reps) return `${sets.length} x ${first.target_reps}`;
+  if (first.target_time_seconds && first.target_time_seconds > 0) return `${sets.length} × ${first.target_time_seconds}`;
+  if (first.target_reps) return `${sets.length} × ${first.target_reps}`;
   return `${sets.length} ${sets.length === 1 ? "set" : "sets"}`;
 }
 
@@ -49,13 +56,49 @@ export function defaultWeek(weeks: PlainWeek[], current: number | null): number 
   return weeks[0]?.weekNumber ?? 1;
 }
 
-// Today's day when the schedule marks one in this week, else the first day.
-export function defaultDay(week: PlainWeek | undefined): string | null {
-  if (!week || week.days.length === 0) return null;
-  return (week.days.find((d) => d.isToday) ?? week.days[0]).id;
+// "Week 1 Day 2" for a day with no name of its own; the coach's name when it has one ("Mobility").
+export function dayCardTitle(weekNumber: number, day: PlainDay): string {
+  const t = (day.title ?? "").trim();
+  return t && !/^day\s*\d*$/i.test(t) ? t : `Week ${weekNumber} Day ${day.dayIndex}`;
 }
 
-export function dayChipLabel(day: PlainDay): string {
-  const named = day.title && !/^day\s*\d+$/i.test(day.title.trim());
-  return named ? `Day ${day.dayIndex} · ${day.title.trim()}` : `Day ${day.dayIndex}`;
+// "Seated Hip CAR, Bodyweight Squat Holds, ..." (the first few names; the screen cuts it with an ellipsis).
+export function previewLine(exercises: { name: string }[]): string {
+  return exercises
+    .slice(0, 3)
+    .map((e) => e.name)
+    .join(", ");
+}
+
+export function exerciseCountLabel(n: number): string {
+  return `${n} ${n === 1 ? "exercise" : "exercises"}`;
+}
+
+export function weekIsComplete(week: PlainWeek): boolean {
+  return week.days.length > 0 && week.days.every((d) => d.completedAt != null);
+}
+
+export function programStats(weeks: PlainWeek[]): { weeks: number; workouts: number; complete: number; percent: number } {
+  const days = weeks.flatMap((w) => w.days);
+  const complete = days.filter((d) => d.completedAt != null).length;
+  return { weeks: weeks.length, workouts: days.length, complete, percent: days.length === 0 ? 0 : Math.round((complete / days.length) * 100) };
+}
+
+// "about 1 month ago", "3 days ago", "about 2 hours ago", "just now".
+export function agoLabel(iso: string, now: Date): string {
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const minutes = Math.max(0, Math.floor((now.getTime() - then) / 60000));
+  if (minutes < 2) return "just now";
+  if (minutes < 60) return `${minutes} minutes ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `about ${hours} ${hours === 1 ? "hour" : "hours"} ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} ${days === 1 ? "day" : "days"} ago`;
+  const weeks = Math.floor(days / 7);
+  if (days < 30) return `about ${weeks} ${weeks === 1 ? "week" : "weeks"} ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `about ${months} ${months === 1 ? "month" : "months"} ago`;
+  const years = Math.floor(days / 365);
+  return `about ${years} ${years === 1 ? "year" : "years"} ago`;
 }
