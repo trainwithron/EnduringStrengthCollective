@@ -2263,6 +2263,20 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["Release BU is applied (the slot columns exist)", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercises' and column_name = 'is_slot')"],
     ],
   },
+  {
+    n: "117",
+    slug: "0367",
+    title: "0367 A rest can be a range: a new empty column holds the high end (the low end stays where it is), and Duplicate copies it",
+    migrations: ["0367"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes on screen until the code that goes with it is live. Then a coach can give a rest as a range (60-90): it shows as 60-90 s, and the client's timer counts to the low end, tells them they can go, and keeps counting to the high end. A single time stays a single time. Run it AFTER step 116 (Release BV) and BEFORE the code.",
+    undo: "alter table public.group_workout_exercise_sets drop constraint if exists group_workout_exercise_sets_rest_range;" + "\n" + "alter table public.group_workout_exercise_sets drop column if exists target_rest_max_seconds;" + "\n" + fnFromMigration("0366", "duplicate_program"),
+    undoWhy: "Only if step 117 misbehaves. Removes the high end of every rest range (those become their low end only) and puts the duplicate-program function back as step 116 left it.",
+    rows: [
+      ["0367 is not already applied (no rest high-end column yet)", "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"],
+      ["Release BV is applied (Duplicate knows about slots)", "position('is_slot' in pg_get_functiondef(to_regprocedure('public.duplicate_program(uuid, uuid, uuid, uuid, text, date)'))) > 0"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -2372,6 +2386,7 @@ const BUNDLES = [
   { id: "release-bn", name: "Release BN (adding a client works again: the creator of a new group can seat themselves; run any time, ideally NOW)", steps: ["108"] },
   { id: "release-bl", name: "Release BL (four exercises added to Coach Ron's library for the FitPros history; run any time)", steps: ["106"] },
   { id: "release-bk", name: "Release BK (move Coach Ron's own training into his personal space; run AFTER he has opened Coach Ron (you) once and removed the programs he does not want)", steps: ["105"] },
+  { id: "release-bw", name: "Release BW (a rest can be a range such as 60-90; run AFTER Release BV and BEFORE the code that goes with it is live)", steps: ["117"] },
   { id: "release-bv", name: "Release BV (template slots survive Duplicate; a program with a slot cannot be assigned to a client; run AFTER Release BU and BEFORE the code that goes with it is live)", steps: ["116"] },
   { id: "release-bu", name: "Release BU (pattern and class templates: a one-sided mark on ladder exercises, plus empty columns for slots and a client's level; run BEFORE the code that goes with it is live)", steps: ["115"] },
   { id: "release-bt", name: "Release BT (a group session belongs to one organization; run BEFORE the code that goes with it is live)", steps: ["114"] },
@@ -2590,6 +2605,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0330", "exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')"),
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
+    m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
     m("0366", "position('is_slot' in pg_get_functiondef(to_regprocedure('public.duplicate_program(uuid, uuid, uuid, uuid, text, date)'))) > 0"),
     m("0365", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'movement_pattern_exercises' and column_name = 'is_unilateral')"),
     m("0364", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_sessions' and column_name = 'organization_id')"),

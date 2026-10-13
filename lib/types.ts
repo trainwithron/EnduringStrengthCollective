@@ -73,6 +73,8 @@ export interface SetLogEntry {
   targetHeight?: number | null;
   targetDistance?: number | null;
   targetRestSeconds?: number | null;
+  // The high end when the coach gave a rest range (targetRestSeconds is then the low end); empty for a single time.
+  targetRestMaxSeconds?: number | null;
   targetPace?: string | null;
   // Correlating-week weight suggestion (lib/set-suggestions.ts) — a
   // grayed-out placeholder in the logging UI, accepted via swipe/tap;
@@ -145,6 +147,7 @@ export interface ExerciseSetTarget {
   targetHeight: number | null;
   targetDistance: number | null;
   targetRestSeconds: number | null;
+  targetRestMaxSeconds?: number | null;
   targetPace: string | null;
   // Optional structured rep range (distinct from the free-text targetReps
   // above) — only used by Double Progression to know when a set has

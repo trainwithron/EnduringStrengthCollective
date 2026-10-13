@@ -9,6 +9,8 @@ export interface RestTimerState {
   // Set when the coach prescribed this rest: it is shown as "set by your coach" and cannot be extended.
   source?: "coach" | "typed";
   prescribedSeconds?: number;
+  // A rest RANGE: durationSeconds is the high end (the countdown runs to it) and this is the low end, where the client may already go.
+  readySeconds?: number;
 }
 
 function storageKey(sessionId: string): string {
@@ -27,6 +29,7 @@ export function readRestTimerState(sessionId: string): RestTimerState | null {
         durationSeconds: parsed.durationSeconds,
         ...(parsed.source === "coach" || parsed.source === "typed" ? { source: parsed.source } : {}),
         ...(typeof parsed.prescribedSeconds === "number" ? { prescribedSeconds: parsed.prescribedSeconds } : {}),
+        ...(typeof parsed.readySeconds === "number" ? { readySeconds: parsed.readySeconds } : {}),
       };
     }
     return null;

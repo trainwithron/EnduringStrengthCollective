@@ -47,31 +47,38 @@ export function formatRest(seconds: number): string {
 export type RestSource = "coach" | "typed";
 export interface RestForSet {
   seconds: number;
+  // The high end when the coach gave a range (seconds is the low end); absent for a single time.
+  maxSeconds?: number;
   source: RestSource;
 }
 
-type RestSet = Pick<SetLogEntry, "id" | "setOrder" | "targetRestSeconds" | "restSeconds">;
+type RestSet = Pick<SetLogEntry, "id" | "setOrder" | "targetRestSeconds" | "restSeconds"> & { targetRestMaxSeconds?: number | null };
 
 // The rest that applies after this set. (1) The set's own prescribed rest. (2) A set with no rest of its own (one the client added, or one the coach left blank; 0 counts
 // as blank) uses the rest of the nearest earlier set that has one, so an exercise the coach gave a rest never falls back to the picker. (3) Only when the coach prescribed no rest at all: a rest
 // the client typed, as before. (4) Otherwise nothing: the usual picker.
+function maxOf(s: RestSet): { maxSeconds?: number } {
+  return s.targetRestMaxSeconds != null && s.targetRestSeconds != null && s.targetRestMaxSeconds > s.targetRestSeconds ? { maxSeconds: s.targetRestMaxSeconds } : {};
+}
+
 export function restForSet(sets: RestSet[], setId: string): RestForSet | null {
   const set = sets.find((s) => s.id === setId);
   if (!set) return null;
   const own = set.targetRestSeconds;
-  if (own != null && own > 0) return { seconds: own, source: "coach" };
+  if (own != null && own > 0) return { seconds: own, ...maxOf(set), source: "coach" };
   let inherited: RestSet | null = null;
   for (const s of sets) {
     if (s.setOrder < set.setOrder && s.targetRestSeconds != null && s.targetRestSeconds > 0 && (inherited === null || s.setOrder > inherited.setOrder)) inherited = s;
   }
-  if (inherited) return { seconds: inherited.targetRestSeconds as number, source: "coach" };
+  if (inherited) return { seconds: inherited.targetRestSeconds as number, ...maxOf(inherited), source: "coach" };
   if (set.restSeconds != null && set.restSeconds > 0) return { seconds: set.restSeconds, source: "typed" };
   return null;
 }
 
-// Any way a coach or the AI writes a rest, as seconds: "90", "1:30", "90s", "2 min", and a RANGE ("60-90", "60 to 90 seconds", "1:00-1:30", "1 to 2 min"). A range is stored as its LONGER end (the one
-// rest column holds one time, and the timer counts that rest; the athlete may go sooner). Returns null when it is not a time (the caller then asks, never guesses).
-export function parseRestAnyForm(text: string | null | undefined): number | null {
+// Any way a coach or the AI writes a rest: "90", "1:30", "90s", "2 min", or a RANGE ("60-90", "60 to 90 seconds", "1:00-1:30", "1 to 2 min"). A range keeps BOTH ends (low and high); a single time has high = null.
+// Returns null when it is not a time (the caller then asks, never guesses).
+export type RestSpan = { low: number; high: number | null };
+export function parseRestSpan(text: string | null | undefined): RestSpan | null {
   if (!text) return null;
   const t = text.trim().toLowerCase().replace(/[–—]/g, "-");
   if (t === "") return null;
@@ -85,8 +92,17 @@ export function parseRestAnyForm(text: string | null | undefined): number | null
     if (!a.ok || !b.ok || a.seconds === null || b.seconds === null) return null;
     // A range of small bare numbers ("5-10") is as unclear as one ("2"): minutes or seconds? Ask, the same as a single bare number.
     if (a.bare || b.bare) return null;
-    return Math.max(a.seconds, b.seconds);
+    const low = Math.min(a.seconds, b.seconds);
+    const high = Math.max(a.seconds, b.seconds);
+    return high > low ? { low, high } : { low, high: null };
   }
   const one = parseRestInput(t);
-  return one.ok ? one.seconds : null;
+  return one.ok && one.seconds !== null ? { low: one.seconds, high: null } : null;
+}
+
+// How a rest is shown: a single time as m:ss ("1:30"); a range as "60-90 s" when both ends are under two minutes, otherwise as m:ss to m:ss ("1:30-2:30").
+export function formatRestSpan(low: number, high?: number | null): string {
+  if (high == null || high <= low) return formatRest(low);
+  if (high < 120) return `${Math.round(low)}-${Math.round(high)} s`;
+  return `${formatRest(low)}-${formatRest(high)}`;
 }

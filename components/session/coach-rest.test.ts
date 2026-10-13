@@ -34,7 +34,7 @@ describe("a coach-prescribed rest is the only option for that set", () => {
   it("the coach's rest cell takes 5:00, 300 or 90s and shows m:ss", () => {
     expect(builder).toContain("parseRestInput(typed, field === \"time\" ? MAX_TIME_SECONDS : undefined)");
     expect(builder).toContain('(field === "rest" || field === "time") && typeof v === "number"');
-    expect(builder).toContain("Rest looks like 5:00, 3m or 90s (up to 30:00).");
+    expect(builder).toContain("Rest looks like 5:00, 3m, 90s or a range like 60-90 (up to 30:00).");
   });
   it("a bare small number asks before it is saved as seconds for Rest (never for Time), and a stored 0 shows as an empty cell", () => {
     expect(builder).toContain('parsed.bare && field !== "time" && !await confirmDialog(');

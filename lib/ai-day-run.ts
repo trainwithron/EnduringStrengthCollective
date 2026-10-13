@@ -106,7 +106,7 @@ export function buildDaySystemPrompt(input: { youthBlock: string | null; hasInju
       "reps": string | null,  // e.g. "8", "8-10", "AMRAP"; null only for pure time-based work
       "weight": number | null,// null unless the coach gave a real number
       "rpe": number | null,
-      "rest": string | null,   // one time such as "90" or "1:30"; for a range the coach gave ("60 to 90 seconds") write the LONGER end, "90"
+      "rest": string | null,   // one time such as "90" or "1:30"; for a range the coach gave write the range as given, "60-90"
       "timeSeconds": number | null
     }
   ]

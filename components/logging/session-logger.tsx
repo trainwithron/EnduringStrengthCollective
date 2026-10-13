@@ -108,6 +108,7 @@ export function SessionLogger({
     defaultSeconds: number;
     isPrescribed: boolean;
     source?: "coach" | "typed";
+    readySeconds?: number;
   } | null>(null);
 
   // Smart-default rest duration: the set's own prescribed rest (from the
@@ -120,7 +121,8 @@ export function SessionLogger({
     // The coach's rest for THIS set (or the last prescribed set before it, for a set the client added) is the only option: the timer starts it by itself. A rest
     // the client typed is used only when the coach prescribed none, and with nothing at all the usual 60/90/120 picker shows.
     if (rest && rest.source === "coach") {
-      setPendingRestPrompt({ defaultSeconds: rest.seconds, isPrescribed: true, source: "coach" });
+      // A range counts down to its high end; the low end is where the client may already go.
+      setPendingRestPrompt({ defaultSeconds: rest.maxSeconds ?? rest.seconds, isPrescribed: true, source: "coach", ...(rest.maxSeconds ? { readySeconds: rest.seconds } : {}) });
       return;
     }
     const typed = set.restSeconds ?? null;

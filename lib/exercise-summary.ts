@@ -4,7 +4,7 @@
 import type { TrackedField } from "@/lib/exercise-fields";
 import type { ExerciseSetTarget } from "@/lib/types";
 
-type SummarySet = Pick<ExerciseSetTarget, "targetReps" | "targetWeight" | "targetTimeSeconds" | "targetDistance" | "targetHeight" | "targetRestSeconds"> &
+type SummarySet = Pick<ExerciseSetTarget, "targetReps" | "targetWeight" | "targetTimeSeconds" | "targetDistance" | "targetHeight" | "targetRestSeconds" | "targetRestMaxSeconds"> &
   Partial<Pick<ExerciseSetTarget, "targetRpe" | "targetRir" | "targetTempo" | "targetPace">>;
 
 const numberOf = (text: string | null): number | null => {
@@ -107,7 +107,8 @@ export function summarizeSets(sets: SummarySet[], tracked: TrackedField[], optio
     const r = sets.map((s) => s.targetRestSeconds).filter((x): x is number => x != null && x > 0);
     if (r.length > 0) {
       const lo = Math.min(...r);
-      const hi = Math.max(...r);
+      // A set whose rest is a range counts to its high end.
+      const hi = Math.max(...sets.map((s) => (s.targetRestMaxSeconds ?? s.targetRestSeconds) ?? 0));
       text += lo === hi ? ` · rest ${clean(lo)}s` : ` · rest ${clean(lo)}-${clean(hi)}s`;
     }
   }

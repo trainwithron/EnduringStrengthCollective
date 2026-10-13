@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { parseRestAnyForm, restForSet } from "@/lib/rest-time";
+import { parseRestSpan, restForSet } from "@/lib/rest-time";
 import { BULK_NEEDS_TIME, parseBulkValue } from "@/lib/bulk-edit-value";
 
 const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
@@ -11,20 +11,27 @@ const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").repla
 // builder only listed a field the exercises already track, and the AI gives an exercise a rest only when it wrote one. (3) The AI wrote "60-90s" for a range and a range was never saved.
 describe("rest is read the same way everywhere, ranges included", () => {
   it("every way of writing it", () => {
-    const cases: [string, number | null][] = [
-      ["90", 90], ["90s", 90], ["1:30", 90], ["2 min", 120], ["2m", 120], ["60-90", 90], ["60 to 90", 90], ["60 to 90 seconds", 90], ["60–90s", 90], ["1:00-1:30", 90], ["1 to 2 min", 120], ["45-60 sec", 60],
-      ["as needed", null], ["", null], ["abc", null], ["60-", null], ["5-10", null], ["2 to 3", null],
+    // [text, low, high]: a single time has high null; a range keeps BOTH ends.
+    const cases: [string, number | null, number | null][] = [
+      ["90", 90, null], ["90s", 90, null], ["1:30", 90, null], ["2 min", 120, null], ["2m", 120, null],
+      ["60-90", 60, 90], ["60 to 90", 60, 90], ["60 to 90 seconds", 60, 90], ["60–90s", 60, 90], ["1:00-1:30", 60, 90], ["1 to 2 min", 60, 120], ["45-60 sec", 45, 60], ["90-60", 60, 90], ["60-60", 60, null],
     ];
-    for (const [text, seconds] of cases) expect(parseRestAnyForm(text), text).toBe(seconds);
-    expect(parseRestAnyForm(null)).toBeNull();
+    for (const [text, low, high] of cases) expect(parseRestSpan(text), text).toEqual({ low, high });
+    for (const text of ["as needed", "", "abc", "60-", "5-10", "2 to 3"]) expect(parseRestSpan(text), text).toBeNull();
+    expect(parseRestSpan(null)).toBeNull();
   });
 });
 
 describe("Bulk edit reads what was typed, and a blank never clears by accident", () => {
-  it("a rest time of any form is read; a range takes the longer end", () => {
-    expect(parseBulkValue("rest", "90")).toEqual({ ok: true, blank: false, value: 90 });
-    expect(parseBulkValue("rest", "1:30")).toEqual({ ok: true, blank: false, value: 90 });
-    expect(parseBulkValue("rest", "60 to 90 seconds")).toEqual({ ok: true, blank: false, value: 90 });
+  it("a rest time of any form is read; a range keeps both ends", () => {
+    expect(parseBulkValue("rest", "90")).toEqual({ ok: true, blank: false, value: 90, highValue: null });
+    expect(parseBulkValue("rest", "1:30")).toEqual({ ok: true, blank: false, value: 90, highValue: null });
+    expect(parseBulkValue("rest", "60 to 90 seconds")).toEqual({ ok: true, blank: false, value: 60, highValue: 90 });
+    expect(parseBulkValue("rest", "60-90")).toEqual({ ok: true, blank: false, value: 60, highValue: 90 });
+  });
+  it("a time worked is one time, never a range", () => {
+    expect(parseBulkValue("time", "60-90")).toEqual({ ok: false, message: BULK_NEEDS_TIME });
+    expect(parseBulkValue("time", "45")).toEqual({ ok: true, blank: false, value: 45, highValue: null });
   });
   it("a time it cannot read is an error, never a blank", () => {
     expect(parseBulkValue("rest", "later")).toEqual({ ok: false, message: BULK_NEEDS_TIME });
@@ -65,10 +72,11 @@ describe("the builder and the AI keep the rest", () => {
     expect(panel).toContain("Clear ${fieldDef(field).label} on every set?");
     expect(panel).toContain("Type a value to apply.");
   });
-  it("the AI day builder reads a range and is told to write the longer end", () => {
+  it("the AI day builder reads a range, saves both ends, and is told to write the range as given", () => {
     const route = read("app/api/ai/build-day/route.ts");
-    expect(route).toContain("parseRestAnyForm(r.rest)");
+    expect(route).toContain("parseRestSpan(r.rest)");
+    expect(route).toContain("target_rest_max_seconds: restSpan?.high ?? null");
     expect(route).not.toContain("parseRestSeconds(");
-    expect(read("lib/ai-day-run.ts")).toContain('for a range the coach gave ("60 to 90 seconds") write the LONGER end');
+    expect(read("lib/ai-day-run.ts")).toContain('for a range the coach gave write the range as given, "60-90"');
   });
 });

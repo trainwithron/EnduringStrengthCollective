@@ -37,8 +37,9 @@ export function describePrescription(sets: ExerciseSetTarget[]): string {
   if (rir.length > 0) parts.push(`RIR ${slash(rir.map(clean))}`);
   const tempo = distinct(ordered.map((s) => s.targetTempo));
   if (tempo.length > 0) parts.push(`tempo ${slash(tempo)}`);
-  const rest = distinct(ordered.map((s) => s.targetRestSeconds));
-  if (rest.length > 0) parts.push(`rest ${slash(rest.map((r) => `${clean(r)}s`))}`);
+  // A rest range prints as "60-90s".
+  const rest = distinct(ordered.map((s) => (s.targetRestSeconds == null ? null : s.targetRestMaxSeconds != null && s.targetRestMaxSeconds > s.targetRestSeconds ? `${clean(s.targetRestSeconds)}-${clean(s.targetRestMaxSeconds)}s` : `${clean(s.targetRestSeconds)}s`)));
+  if (rest.length > 0) parts.push(`rest ${slash(rest)}`);
   const pace = distinct(ordered.map((s) => s.targetPace));
   if (pace.length > 0) parts.push(`pace ${slash(pace)}`);
   return parts.join(", ");

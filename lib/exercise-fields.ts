@@ -117,6 +117,7 @@ export function mapSetRow(row: {
   target_height: number | null;
   target_distance: number | null;
   target_rest_seconds?: number | null;
+  target_rest_max_seconds?: number | null;
   target_pace?: string | null;
   rep_min?: number | null;
   rep_max?: number | null;
@@ -133,6 +134,7 @@ export function mapSetRow(row: {
     targetHeight: row.target_height,
     targetDistance: row.target_distance,
     targetRestSeconds: row.target_rest_seconds ?? null,
+    targetRestMaxSeconds: row.target_rest_max_seconds ?? null,
     targetPace: row.target_pace ?? null,
     repMin: row.rep_min ?? null,
     repMax: row.rep_max ?? null,
@@ -168,4 +170,4 @@ export function formatCondensedSets(
 }
 
 export const SET_ROW_SELECT =
-  "id, set_order, target_reps, target_weight, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance, target_rest_seconds, target_pace, rep_min, rep_max";
+  "id, set_order, target_reps, target_weight, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance, target_rest_seconds, target_rest_max_seconds, target_pace, rep_min, rep_max";

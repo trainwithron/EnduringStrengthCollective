@@ -293,6 +293,14 @@
   "file": "apply-release-bk-all.sql"
  },
  {
+  "id": "release-bw",
+  "name": "Release BW (a rest can be a range such as 60-90; run AFTER Release BV and BEFORE the code that goes with it is live)",
+  "steps": [
+   "117"
+  ],
+  "file": "apply-release-bw-all.sql"
+ },
+ {
   "id": "release-bv",
   "name": "Release BV (template slots survive Duplicate; a program with a slot cannot be assigned to a client; run AFTER Release BU and BEFORE the code that goes with it is live)",
   "steps": [

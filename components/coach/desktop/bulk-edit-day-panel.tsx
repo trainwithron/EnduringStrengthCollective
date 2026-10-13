@@ -17,7 +17,7 @@ export function BulkEditDayPanel({
 }: {
   exercises: BuilderExercise[];
   // addedField: this exercise did not track the field before and now does (Rest on an exercise the AI wrote without one).
-  onApplied: (updates: { exerciseId: string; field: TrackedField; value: string | number | null; addedField?: boolean }[]) => void;
+  onApplied: (updates: { exerciseId: string; field: TrackedField; value: string | number | null; highValue?: number | null; addedField?: boolean }[]) => void;
   label?: string;
 }) {
   const { flashSaved, flashSaveError } = useSaveToastChannel();
@@ -38,12 +38,13 @@ export function BulkEditDayPanel({
   const hasAnyTier = exercises.some((e) => e.tier);
 
   // Writes one value onto every set of these exercises; an exercise that did not track the field starts tracking it (so the rest shows in the builder and the logger prescribes it).
-  async function writeValue(supabase: ReturnType<typeof createBrowserClient>, target: BuilderExercise[], parsed: string | number | null, updates: { exerciseId: string; field: TrackedField; value: string | number | null; addedField?: boolean }[]): Promise<boolean> {
+  async function writeValue(supabase: ReturnType<typeof createBrowserClient>, target: BuilderExercise[], parsed: string | number | null, high: number | null, updates: { exerciseId: string; field: TrackedField; value: string | number | null; highValue?: number | null; addedField?: boolean }[]): Promise<boolean> {
     const setIds = target.flatMap((e) => e.sets.map((s) => s.id));
     if (setIds.length === 0) return true;
     const { error } = await supabase
       .from("group_workout_exercise_sets")
-      .update({ [TARGET_COLUMN[field]]: parsed })
+      // A rest always writes its high end too (empty for a single time), so a range never survives a change to one time.
+      .update(field === "rest" ? { [TARGET_COLUMN[field]]: parsed, target_rest_max_seconds: high } : { [TARGET_COLUMN[field]]: parsed })
       .in("id", setIds);
     if (error) return false;
     let ok = true;
@@ -56,7 +57,7 @@ export function BulkEditDayPanel({
           continue;
         }
       }
-      updates.push({ exerciseId: e.id, field, value: parsed, addedField: addField });
+      updates.push({ exerciseId: e.id, field, value: parsed, highValue: field === "rest" ? high : undefined, addedField: addField });
     }
     return ok;
   }
@@ -82,11 +83,11 @@ export function BulkEditDayPanel({
 
     setApplying(true);
     const supabase = createBrowserClient();
-    const updates: { exerciseId: string; field: TrackedField; value: string | number | null; addedField?: boolean }[] = [];
+    const updates: { exerciseId: string; field: TrackedField; value: string | number | null; highValue?: number | null; addedField?: boolean }[] = [];
     let anyFailed = false;
     for (const entry of parsedEntries) {
       const target = entry.tier === null ? exercises : exercises.filter((e) => e.tier === entry.tier);
-      if (!(await writeValue(supabase, target, entry.parsed.value, updates))) anyFailed = true;
+      if (!(await writeValue(supabase, target, entry.parsed.value, entry.parsed.ok && entry.parsed.highValue != null ? entry.parsed.highValue : null, updates))) anyFailed = true;
     }
 
     onApplied(updates);

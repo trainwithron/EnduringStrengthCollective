@@ -168,6 +168,7 @@ export function DuplicateWeekPanel({
         height: number | null;
         distance: number | null;
         restSeconds: number | null;
+        restMaxSeconds?: number | null;
         pace: string | null;
       };
       // Carried through unchanged onto every generated week's sets — the
@@ -339,6 +340,7 @@ export function DuplicateWeekPanel({
               height: set.targetHeight,
               distance: set.targetDistance,
               restSeconds: set.targetRestSeconds,
+              restMaxSeconds: set.targetRestMaxSeconds ?? null,
               pace: set.targetPace,
             },
             repRange: { min: set.repMin, max: set.repMax },
@@ -544,6 +546,7 @@ export function DuplicateWeekPanel({
                   target_time_seconds: track.otherTargets.timeSeconds,
                   target_height: track.otherTargets.height,
                   target_rest_seconds: track.otherTargets.restSeconds,
+                  target_rest_max_seconds: track.otherTargets.restMaxSeconds ?? null,
                   rep_min: track.repRange.min,
                   rep_max: track.repRange.max,
                 };
@@ -561,6 +564,7 @@ export function DuplicateWeekPanel({
                 target_height: track.otherTargets.height,
                 target_distance: track.otherTargets.distance,
                 target_rest_seconds: track.otherTargets.restSeconds,
+                target_rest_max_seconds: track.otherTargets.restMaxSeconds ?? null,
                 target_pace: track.otherTargets.pace,
                 rep_min: track.repRange.min,
                 rep_max: track.repRange.max,

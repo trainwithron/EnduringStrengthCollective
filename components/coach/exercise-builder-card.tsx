@@ -4,7 +4,7 @@ import { confirmDialog } from "@/components/shared/confirm-dialog";
 import type { DemoRow } from "@/lib/exercise-demo";
 import { useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
-import { MAX_TIME_SECONDS, formatRest, parseRestInput } from "@/lib/rest-time";
+import { MAX_TIME_SECONDS, formatRest, parseRestInput, parseRestSpan } from "@/lib/rest-time";
 import { ExerciseNameInput } from "./exercise-name-input";
 import { BuilderDemoThumb } from "@/components/coach/builder-demo-thumb";
 import { builderDemoFor, type BuilderDemo } from "@/lib/builder-demo";
@@ -107,7 +107,8 @@ function TargetCell({
           e.currentTarget.blur();
         }
       }}
-      className="w-12 h-9 bg-graphite border border-steel/30 text-chalk px-1 font-body text-xs text-center focus:outline-none focus:border-rust shrink-0"
+      title={draft.length > 5 ? draft : undefined}
+      className={`w-12 h-9 bg-graphite border border-steel/30 text-chalk font-body ${draft.length > 5 ? "px-0.5 text-[10px]" : "px-1 text-xs"} text-center focus:outline-none focus:border-rust shrink-0`}
     />
   );
 }
@@ -122,8 +123,29 @@ function targetValue(set: ExerciseSetTarget, field: TrackedField): string {
   const v = set[prop];
   if (v === null || v === undefined) return "";
   // Rest is shown as m:ss (5:00), and typed as 5:00, 300 or 90s.
-  if ((field === "rest" || field === "time") && typeof v === "number") return v > 0 ? formatRest(v) : "";
+  if ((field === "rest" || field === "time") && typeof v === "number") {
+    if (field === "rest" && set.targetRestMaxSeconds != null && set.targetRestMaxSeconds > v) return restRangeText(v, set.targetRestMaxSeconds);
+    return v > 0 ? formatRest(v) : "";
+  }
   return String(v);
+}
+
+// A rest range as the cell shows and re-reads it: "60-90" when both ends are under two minutes, otherwise "1:30-2:30".
+function restRangeText(low: number, high: number): string {
+  return high < 120 ? `${Math.round(low)}-${Math.round(high)}` : `${formatRest(low)}-${formatRest(high)}`;
+}
+
+// What to save for a cell. A rest is its low end plus its high end (empty for a single time, so a range never survives a change to one time). "60-90" arrives as a range.
+function cellWrite(field: TrackedField, raw: string): { patch: Record<string, unknown>; local: Partial<ExerciseSetTarget> } {
+  if (field === "rest") {
+    const m = raw.match(/^(d+)-(d+)$/);
+    const low = m ? Number(m[1]) : raw.trim() === "" ? null : Number(raw);
+    const high = m ? Number(m[2]) : null;
+    return { patch: { target_rest_seconds: low, target_rest_max_seconds: high }, local: { targetRestSeconds: low, targetRestMaxSeconds: high } };
+  }
+  const def = fieldDef(field);
+  const value = def.kind === "number" ? (raw.trim() === "" ? null : Number(raw)) : raw.trim() || null;
+  return { patch: { [TARGET_COLUMN[field]]: value }, local: { [TARGET_PROP[field]]: value } as Partial<ExerciseSetTarget> };
 }
 
 export function ExerciseBuilderCard({
@@ -378,6 +400,7 @@ export function ExerciseBuilderCard({
           target_height: last?.targetHeight ?? null,
           target_distance: last?.targetDistance ?? null,
           target_rest_seconds: last?.targetRestSeconds ?? null,
+          target_rest_max_seconds: last?.targetRestMaxSeconds ?? null,
           target_pace: last?.targetPace ?? null,
         })
         .select(SET_ROW_SELECT)
@@ -413,19 +436,18 @@ export function ExerciseBuilderCard({
   }
 
   async function handleCellCommit(setId: string, field: TrackedField, raw: string) {
-    const def = fieldDef(field);
-    const value = def.kind === "number" ? (raw.trim() === "" ? null : Number(raw)) : raw.trim() || null;
+    const write = cellWrite(field, raw);
     const supabase = createBrowserClient();
     const { error } = await supabase
       .from("group_workout_exercise_sets")
-      .update({ [TARGET_COLUMN[field]]: value })
+      .update(write.patch)
       .eq("id", setId);
     if (error) {
       flashSaveError("Couldn't save that value — try again.");
       return;
     }
     onSetsChange(
-      exercise.sets.map((s) => (s.id === setId ? { ...s, [TARGET_PROP[field]]: value } : s))
+      exercise.sets.map((s) => (s.id === setId ? { ...s, ...write.local } : s))
     );
     flashSaved();
   }
@@ -434,19 +456,18 @@ export function ExerciseBuilderCard({
   // fills every other set in that same row too — 3 sets of 5 shouldn't
   // need typing "5" three times.
   async function handleFirstSetCommit(setId: string, field: TrackedField, raw: string) {
-    const def = fieldDef(field);
-    const value = def.kind === "number" ? (raw.trim() === "" ? null : Number(raw)) : raw.trim() || null;
+    const write = cellWrite(field, raw);
     const otherSetIds = exercise.sets.filter((s) => s.id !== setId).map((s) => s.id);
     const supabase = createBrowserClient();
     const { error } = await supabase
       .from("group_workout_exercise_sets")
-      .update({ [TARGET_COLUMN[field]]: value })
+      .update(write.patch)
       .in("id", [setId, ...otherSetIds]);
     if (error) {
       flashSaveError("Couldn't save that value across all sets — try again.");
       return;
     }
-    onSetsChange(exercise.sets.map((s) => ({ ...s, [TARGET_PROP[field]]: value })));
+    onSetsChange(exercise.sets.map((s) => ({ ...s, ...write.local })));
     flashSaved();
   }
 
@@ -498,13 +519,13 @@ export function ExerciseBuilderCard({
     if (setIds.length > 0) {
       const { error: clearError } = await supabase
         .from("group_workout_exercise_sets")
-        .update({ [TARGET_COLUMN[field]]: null })
+        .update(field === "rest" ? { target_rest_seconds: null, target_rest_max_seconds: null } : { [TARGET_COLUMN[field]]: null })
         .in("id", setIds);
       clearFailed = !!clearError;
     }
     onFieldsAndSetsChange(
       nextFields,
-      exercise.sets.map((s) => ({ ...s, [TARGET_PROP[field]]: null }))
+      exercise.sets.map((s) => ({ ...s, [TARGET_PROP[field]]: null, ...(field === "rest" ? { targetRestMaxSeconds: null } : {}) }))
     );
     if (clearFailed) {
       flashSaveError("Field removed, but couldn't clear its saved values.");
@@ -566,9 +587,9 @@ export function ExerciseBuilderCard({
       if (setIds.length > 0) {
         await supabase
           .from("group_workout_exercise_sets")
-          .update({ target_time_seconds: preset.workSeconds, target_rest_seconds: preset.restSeconds })
+          .update({ target_time_seconds: preset.workSeconds, target_rest_seconds: preset.restSeconds, target_rest_max_seconds: null })
           .in("id", setIds);
-        sets = sets.map((s) => ({ ...s, targetTimeSeconds: preset.workSeconds, targetRestSeconds: preset.restSeconds }));
+        sets = sets.map((s) => ({ ...s, targetTimeSeconds: preset.workSeconds, targetRestSeconds: preset.restSeconds, targetRestMaxSeconds: null }));
       }
 
       onFieldsAndSetsChange(nextFields, sets);
@@ -632,7 +653,7 @@ export function ExerciseBuilderCard({
       if (setIds.length > 0) {
         const { error } = await supabase
           .from("group_workout_exercise_sets")
-          .update({ target_rest_seconds: suggestion.restSeconds })
+          .update({ target_rest_seconds: suggestion.restSeconds, target_rest_max_seconds: null })
           .in("id", setIds);
         if (error) {
           flashSaveError("Couldn't apply that rest suggestion — try again.");
@@ -642,7 +663,7 @@ export function ExerciseBuilderCard({
 
       onFieldsAndSetsChange(
         nextFields,
-        exercise.sets.map((s) => ({ ...s, targetRestSeconds: suggestion.restSeconds }))
+        exercise.sets.map((s) => ({ ...s, targetRestSeconds: suggestion.restSeconds, targetRestMaxSeconds: null }))
       );
       setRestMenuOpen(false);
       flashSaved();
@@ -709,6 +730,7 @@ export function ExerciseBuilderCard({
             target_height: s.targetHeight,
             target_distance: s.targetDistance,
             target_rest_seconds: s.targetRestSeconds,
+            target_rest_max_seconds: s.targetRestMaxSeconds ?? null,
             target_pace: s.targetPace,
           }))
         )
@@ -922,10 +944,13 @@ export function ExerciseBuilderCard({
                         label={field === "rest" || field === "time" ? `${builderLabel(field, def.label)} (m:ss), set ${i + 1}` : `${def.label}, set ${i + 1}`}
                         onCommit={async (typed) => {
                           let raw = typed;
-                          if (field === "rest" || field === "time") {
+                          const span = field === "rest" ? parseRestSpan(typed) : null;
+                          if (span && span.high !== null) {
+                            raw = `${span.low}-${span.high}`;
+                          } else if (field === "rest" || field === "time") {
                             const parsed = parseRestInput(typed, field === "time" ? MAX_TIME_SECONDS : undefined);
                             if (!parsed.ok) {
-                              flashSaveError(field === "time" ? "Time looks like 3:00, 3 min, 90s or 180 (up to 4:00:00)." : "Rest looks like 5:00, 3m or 90s (up to 30:00).");
+                              flashSaveError(field === "time" ? "Time looks like 3:00, 3 min, 90s or 180 (up to 4:00:00)." : "Rest looks like 5:00, 3m, 90s or a range like 60-90 (up to 30:00).");
                               return false;
                             }
                             if (parsed.bare && field !== "time" && !await confirmDialog({ message: `${parsed.seconds} means ${parsed.seconds} seconds. For minutes type ${parsed.seconds}:00 or ${parsed.seconds}m. Save ${parsed.seconds} seconds?`, confirmLabel: "Save" })) return false;

@@ -17,7 +17,7 @@ import { parseNumericReps } from "@/lib/program-card-visuals";
 import { isExerciseUnlocked, type PriorBest } from "@/lib/obstacle-unlock";
 import { Check, Lock, LockOpen } from "lucide-react";
 import { InfoTip } from "@/components/shared/info-tip";
-import { MAX_REST_SECONDS, formatRest, parseRestInput, restForSet } from "@/lib/rest-time";
+import { MAX_REST_SECONDS, formatRest, formatRestSpan, parseRestInput, restForSet } from "@/lib/rest-time";
 
 // Metrics-as-rows, sets-as-columns — one row per tracked field (Reps,
 // Weight, RPE, ...), one cell per set, scrolling horizontally instead of
@@ -96,11 +96,14 @@ function GridCell({
   setNumber,
   locked,
   coachRest,
+  coachRestMax,
 }: {
   set: SetLogEntry;
   field: TrackedField;
   // The rest the coach prescribed for this set (own or inherited): shown here as a fixed time, not an input.
   coachRest?: number | null;
+  // The high end when the coach gave a range (coachRest is the low end).
+  coachRestMax?: number | null;
   readOnly: boolean;
   onChange: (patch: Partial<SetLogEntry>) => void;
   // The athlete interacted with this set (focused/blurred/swiped a cell) —
@@ -226,9 +229,9 @@ function GridCell({
     return (
       <div
         className="w-12 h-11 shrink-0 flex items-center justify-center rounded-token-pill bg-surface/40 border border-steel/20 text-chalk font-body text-sm tabular-nums"
-        aria-label={`Rest after set ${setNumber}: ${formatRest(coachRest)}, set by your coach`}
+        aria-label={`Rest after set ${setNumber}: ${formatRestSpan(coachRest, coachRestMax)}, set by your coach`}
       >
-        {formatRest(coachRest)}
+        {coachRestMax != null ? `${Math.round(coachRest)}-${Math.round(coachRestMax)}` : formatRest(coachRest)}
       </div>
     );
   }
@@ -649,6 +652,10 @@ export function ExerciseSetGrid({
                 coachRest={(() => {
                   const r = restForSet(sets, set.id);
                   return r && r.source === "coach" ? r.seconds : null;
+                })()}
+                coachRestMax={(() => {
+                  const r = restForSet(sets, set.id);
+                  return r && r.source === "coach" ? r.maxSeconds ?? null : null;
                 })()}
               />
             ))}

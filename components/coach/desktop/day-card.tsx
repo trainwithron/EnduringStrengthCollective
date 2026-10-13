@@ -400,7 +400,7 @@ export function DayCard({
   const dayExercises = day.items.filter((i): i is BuilderExercise => i.kind === "exercise" && !i.slot);
 
   function handleBulkApplied(
-    updates: { exerciseId: string; field: TrackedField; value: string | number | null; addedField?: boolean }[]
+    updates: { exerciseId: string; field: TrackedField; value: string | number | null; highValue?: number | null; addedField?: boolean }[]
   ) {
     const byExercise = new Map(updates.map((u) => [u.exerciseId, u]));
     onItemsChange(
@@ -413,7 +413,7 @@ export function DayCard({
           ...item,
           // An exercise that did not track this field (Rest on one the AI wrote without a rest) now does, so it shows in the builder.
           trackedFields: update.addedField && !item.trackedFields.includes(update.field) ? [...item.trackedFields, update.field] : item.trackedFields,
-          sets: item.sets.map((s) => ({ ...s, [prop]: update.value })),
+          sets: item.sets.map((s) => ({ ...s, [prop]: update.value, ...(update.field === "rest" ? { targetRestMaxSeconds: update.highValue ?? null } : {}) })),
         };
       })
     );

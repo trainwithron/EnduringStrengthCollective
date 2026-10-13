@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { computeRemainingSeconds, formatMMSS } from "@/lib/rest-timer-math";
 import { readRestTimerState, writeRestTimerState, clearRestTimerState } from "@/lib/rest-timer-storage";
 import { playRestAlert } from "@/lib/rest-alert";
-import { formatRest } from "@/lib/rest-time";
+import { formatRest, formatRestSpan } from "@/lib/rest-time";
 import { MIN_REST_SECONDS_FOR_GAME } from "@/lib/rest-timer-difficulty";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { SessionStopwatch } from "./session-stopwatch";
@@ -52,6 +52,7 @@ interface RunningState {
   // "coach": the rest the coach prescribed for this set (no extending it); "typed": a rest the client typed (as before).
   source?: "coach" | "typed";
   prescribedSeconds?: number;
+  readySeconds?: number;
 }
 
 export function RestTimerBar({
@@ -71,7 +72,7 @@ export function RestTimerBar({
   // to that exercise's own target rest if it has one. When isPrescribed
   // is true, the coach actually specified this rest period, so the
   // countdown auto-starts immediately instead of waiting for a tap.
-  pendingPrompt: { defaultSeconds: number; isPrescribed: boolean; source?: "coach" | "typed" } | null;
+  pendingPrompt: { defaultSeconds: number; isPrescribed: boolean; source?: "coach" | "typed"; readySeconds?: number } | null;
   onPromptHandled: () => void;
   // A real pending item (a due habit, an unanswered wellness check-in)
   // gates the game picker behind resolving it first — null whenever
@@ -99,6 +100,8 @@ export function RestTimerBar({
   const [gateOpen, setGateOpen] = useState(false);
   const [habitSaving, setHabitSaving] = useState(false);
   const wakeLockRef = useRef<any>(null);
+  // A rest range: the alert for reaching its low end is played once.
+  const readyAlerted = useRef(false);
 
   // Purely optional content riding on the countdown, per the governing
   // "never blocks" constraint — closes itself the instant rest actually
@@ -136,6 +139,7 @@ export function RestTimerBar({
     if (!stored) return;
     const remainingNow = computeRemainingSeconds(stored.startedAtMs, stored.durationSeconds, Date.now());
     if (remainingNow > 0) {
+      readyAlerted.current = stored.readySeconds != null && stored.durationSeconds - remainingNow >= stored.readySeconds;
       setRunning(stored);
       setRemaining(remainingNow);
       acquireWakeLock();
@@ -150,6 +154,11 @@ export function RestTimerBar({
     const interval = setInterval(() => {
       const remainingNow = computeRemainingSeconds(running.startedAtMs, running.durationSeconds, Date.now());
       setRemaining(remainingNow);
+      // A rest range: tell the client when the low end is reached (they may go now), and keep counting to the high end.
+      if (running.readySeconds != null && !readyAlerted.current && running.durationSeconds - remainingNow >= running.readySeconds) {
+        readyAlerted.current = true;
+        playRestAlert();
+      }
       if (remainingNow <= 0) {
         clearInterval(interval);
         playRestAlert();
@@ -163,12 +172,14 @@ export function RestTimerBar({
     return () => clearInterval(interval);
   }, [running, sessionId]);
 
-  function startPreset(seconds: number, source?: "coach" | "typed") {
+  function startPreset(seconds: number, source?: "coach" | "typed", readySeconds?: number) {
+    readyAlerted.current = false;
     const next: RunningState = {
       startedAtMs: Date.now(),
       durationSeconds: seconds,
       ...(source ? { source } : {}),
       ...(source === "coach" ? { prescribedSeconds: seconds } : {}),
+      ...(source === "coach" && readySeconds ? { readySeconds } : {}),
     };
     setRunning(next);
     setRemaining(seconds);
@@ -183,7 +194,7 @@ export function RestTimerBar({
   // still falls through to the tap-a-preset prompt below.
   useEffect(() => {
     if (pendingPrompt?.isPrescribed && !running) {
-      startPreset(pendingPrompt.defaultSeconds, pendingPrompt.source);
+      startPreset(pendingPrompt.defaultSeconds, pendingPrompt.source, pendingPrompt.readySeconds);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingPrompt]);
@@ -382,7 +393,11 @@ export function RestTimerBar({
 
       {running && running.source === "coach" && (
         <p className="font-body text-xs text-steel mt-1.5">
-          Rest {formatRest(running.prescribedSeconds ?? running.durationSeconds)} (set by your coach)
+          {running.readySeconds != null
+            ? running.durationSeconds - remaining >= running.readySeconds
+              ? `You can go now. Your coach's rest is ${formatRestSpan(running.readySeconds, running.durationSeconds)}.`
+              : `Rest ${formatRestSpan(running.readySeconds, running.durationSeconds)} (set by your coach)`
+            : `Rest ${formatRest(running.prescribedSeconds ?? running.durationSeconds)} (set by your coach)`}
         </p>
       )}
 

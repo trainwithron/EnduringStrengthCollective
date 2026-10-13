@@ -158,6 +158,7 @@ export default async function SessionPage(
       height: number | null;
       distance: number | null;
       restSeconds: number | null;
+      restMaxSeconds: number | null;
       pace: string | null;
       reps: number | null;
       weight: number | null;
@@ -167,7 +168,7 @@ export default async function SessionPage(
     const { data: templateSets } = await supabase
       .from("group_workout_exercise_sets")
       .select(
-        "group_workout_exercise_id, set_order, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance, target_rest_seconds, target_pace, target_reps, target_weight"
+        "group_workout_exercise_id, set_order, target_rpe, target_rir, target_tempo, target_time_seconds, target_height, target_distance, target_rest_seconds, target_rest_max_seconds, target_pace, target_reps, target_weight"
       )
       .in("group_workout_exercise_id", templateExerciseIds);
     for (const t of templateSets ?? []) {
@@ -180,6 +181,7 @@ export default async function SessionPage(
         height: t.target_height,
         distance: t.target_distance,
         restSeconds: t.target_rest_seconds,
+        restMaxSeconds: t.target_rest_max_seconds,
         pace: t.target_pace,
         reps: parseNumericReps(t.target_reps),
         weight: t.target_weight,
@@ -388,6 +390,7 @@ export default async function SessionPage(
               targetHeight: target?.height ?? null,
               targetDistance: target?.distance ?? null,
               targetRestSeconds: target?.restSeconds ?? null,
+              targetRestMaxSeconds: target?.restMaxSeconds ?? null,
               targetPace: target?.pace ?? null,
               suggestedWeight:
                 sl.weight == null
