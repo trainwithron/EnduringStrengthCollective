@@ -54,6 +54,8 @@ as $function$
       and g.organization_id = target_org_id
   );
 $function$;
+revoke all on function public.is_client_of_coach_in_org(uuid, uuid) from public, anon;
+grant execute on function public.is_client_of_coach_in_org(uuid, uuid) to authenticated;
 
 drop policy if exists "group_sessions_select_client" on public.group_sessions;
 create policy "group_sessions_select_client" on public.group_sessions for select to authenticated
