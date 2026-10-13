@@ -974,7 +974,7 @@ export default async function AthleteProfilePage(
           )}
           </div>
           <div data-tab="overview forms">
-          {(hasAboutInfo || parQAnswers.length > 0 || !!intake) && (
+          {(
             <RosterSection
               title="Personal Info"
               summary={
@@ -1018,7 +1018,7 @@ export default async function AthleteProfilePage(
                           .filter(Boolean)
                           .join(" + ")}
                 </p>
-                {parQAnswers.length > 0 && <ParQAnswersPanel answers={parQAnswers} />}
+                <ParQAnswersPanel answers={parQAnswers} />
                 {intake && (
                   <WaiverStatusLine
                     waiverAccepted={!!intake.waiver_accepted}
