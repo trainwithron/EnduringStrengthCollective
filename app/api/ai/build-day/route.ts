@@ -145,9 +145,13 @@ export async function POST(request: Request) {
         .single();
       if (createError || !created) return NextResponse.json({ error: "Couldn't build that day. Try Resume, or tell it what to change." }, { status: 500 });
       workoutId = created.id as string;
-    } else if (mode === "fix") {
-      await supabase.from("group_workout_exercises").delete().eq("workout_id", workoutId);
     }
+    // A day being fixed keeps its old exercises until the new ones are safely in; only then are the old ones removed (so a failed write never leaves the day empty).
+    const oldIds: string[] =
+      mode === "fix" && target
+        ? (((await supabase.from("group_workout_exercises").select("id").eq("workout_id", workoutId)).data ?? []) as { id: string }[]).map((r) => r.id)
+        : [];
+    const newIds: string[] = [];
 
     let failed = 0;
     for (let i = 0; i < rows.length; i++) {
@@ -169,6 +173,7 @@ export async function POST(request: Request) {
         failed++;
         continue;
       }
+      newIds.push(ex.id as string);
       const sets = Array.from({ length: Math.max(1, r.sets) }, (_, setOrder) => ({
         group_workout_exercise_id: ex.id,
         set_order: setOrder,
@@ -181,7 +186,12 @@ export async function POST(request: Request) {
       const { error: setError } = await supabase.from("group_workout_exercise_sets").insert(sets);
       if (setError) failed++;
     }
-    if (failed === rows.length) return NextResponse.json({ error: "Couldn't build that day. Try Resume, or tell it what to change." }, { status: 500 });
+    if (failed === rows.length) {
+      // Nothing usable was written: remove what part-way rows there are and leave the day as it was.
+      if (newIds.length > 0) await supabase.from("group_workout_exercises").delete().in("id", newIds);
+      return NextResponse.json({ error: "Couldn't build that day. Try Resume, or tell it what to change." }, { status: 500 });
+    }
+    if (oldIds.length > 0) await supabase.from("group_workout_exercises").delete().in("id", oldIds);
 
     const flags = scanConstraints(`${instruction}. ${corrections.join(". ")}`, rows.map((r) => ({ week: `Week ${week}`, day: `Day ${day}`, exerciseName: r.exerciseName, sets: r.sets, reps: r.reps, weight: r.weight, rpe: r.rpe, rest: r.rest, timeSeconds: r.timeSeconds }) as never));
     return NextResponse.json({

@@ -55,7 +55,7 @@ describe("The route that builds a day", () => {
     expect(route).toContain('membership?.role !== "coach"');
     expect(route).toContain('mode === "build" && target?.hasExercises');
     expect(route).toContain("status: 409");
-    expect(route).toContain('} else if (mode === "fix") {');
+    expect(route).toContain('mode === "fix" && target');
   });
   it("charges once per run (on its first day) with the same allowance and credits as a whole program", () => {
     expect(route).toContain("if (!run.ok) {\n    const canRun = await canRunAiAction(supabase, user.id, \"program_generation\");");
@@ -88,5 +88,15 @@ describe("Build program and New program make the program at once", () => {
     const page = read("app/(coach)/programs/page.tsx");
     expect(page).not.toContain("Import or build with AI");
     expect(page).toContain("+ New program");
+  });
+});
+
+describe("Fixing a day never leaves it empty", () => {
+  it("the new exercises are written first and the old ones removed only after they are in", () => {
+    const route = read("app/api/ai/build-day/route.ts");
+    expect(route).toContain("const oldIds: string[] =");
+    expect(route.indexOf("newIds.push(ex.id as string);")).toBeLessThan(route.indexOf('delete().in("id", oldIds)'));
+    expect(route).toContain('delete().in("id", newIds)');
+    expect(route).not.toContain('.delete().eq("workout_id", workoutId)');
   });
 });
