@@ -85,7 +85,7 @@ describe("events never touch a credit, anywhere in the app code or the migration
     expect(create.match(/sendPushToProfile\(/g)?.length).toBe(1);
   });
   it("the class lists only show classes", () => {
-    for (const f of ["app/(coach)/groups/[groupId]/classes/page.tsx", "app/(coach)/groups/[groupId]/group-sessions/page.tsx", "app/(coach)/dashboard/page.tsx", "app/(coach)/groups/[groupId]/page.tsx"]) {
+    for (const f of ["lib/class-cards.ts", "app/(coach)/groups/[groupId]/group-sessions/page.tsx", "app/(coach)/dashboard/page.tsx", "app/(coach)/groups/[groupId]/page.tsx"]) {
       expect(read(f), f).toContain('.eq("kind", "class")');
     }
   });
