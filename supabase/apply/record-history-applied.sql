@@ -66,6 +66,7 @@ from (
     ('2026100600330', 'public_page_coach_only', '0330_public_page_coach_only.sql', exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'coach_sites' and policyname = 'coach_sites_own' and with_check like '%group_memberships%')),
     ('2026100600331', 'purchase_grants_once', '0331_purchase_grants_once.sql', to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null),
     ('2026100600338', 'guardian_links_scoped', '0338_guardian_links_scoped.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'guardian_links' and column_name = 'expires_at')),
+    ('2026100600365', 'pattern_class_templates', '0365_pattern_class_templates.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'movement_pattern_exercises' and column_name = 'is_unilateral')),
     ('2026100600364', 'class_sessions_belong_to_an_organization', '0364_class_sessions_belong_to_an_organization.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_sessions' and column_name = 'organization_id')),
     ('2026100600363', 'client_sub_goals', '0363_client_sub_goals.sql', to_regclass('public.client_sub_goals') is not null),
     ('2026100600362', 'storage_bucket_file_types', '0362_storage_bucket_file_types.sql', exists (select 1 from storage.buckets where id = 'waiver-documents' and allowed_mime_types is not null)),

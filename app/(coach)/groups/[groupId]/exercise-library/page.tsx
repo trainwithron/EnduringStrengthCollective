@@ -47,12 +47,13 @@ export default async function ExerciseLibraryPage(
 
   const { data: tierRows } = await supabase
     .from("movement_pattern_exercises")
-    .select("exercise_name, tier, movement_patterns!inner ( created_by )")
+    .select("exercise_name, tier, is_unilateral, movement_patterns!inner ( created_by, name )")
     .eq("movement_patterns.created_by", user.id);
 
-  const tierByName = new Map<string, "A" | "B" | "C" | null>();
+  // An exercise is sorted by being on one of the coach's pattern ladders: that ladder is its pattern, its mark is its class and side.
+  const tagByName = new Map<string, { tier: "A" | "B" | "C" | null; pattern: string | null; unilateral: boolean }>();
   for (const row of (tierRows ?? []) as any[]) {
-    if (!tierByName.has(row.exercise_name)) tierByName.set(row.exercise_name, row.tier);
+    if (!tagByName.has(row.exercise_name)) tagByName.set(row.exercise_name, { tier: row.tier, pattern: row.movement_patterns?.name ?? null, unilateral: !!row.is_unilateral });
   }
 
   const exercises = (libraryRows ?? []).map((r) => ({
@@ -60,7 +61,9 @@ export default async function ExerciseLibraryPage(
     name: r.name,
     videoPath: r.video_path,
     youtubeUrl: r.youtube_url,
-    tier: tierByName.get(r.name) ?? null,
+    tier: tagByName.get(r.name)?.tier ?? null,
+    pattern: tagByName.get(r.name)?.pattern ?? null,
+    unilateral: tagByName.get(r.name)?.unilateral ?? false,
     category: r.category as string | null,
     equipmentType: r.equipment_type as EquipmentType | null,
     description: r.description as string | null,
@@ -68,7 +71,7 @@ export default async function ExerciseLibraryPage(
 
   const { data: patterns } = await supabase
     .from("movement_patterns")
-    .select("id, name, plane, movement_pattern_exercises ( id, exercise_name, difficulty_rank, tier )")
+    .select("id, name, plane, movement_pattern_exercises ( id, exercise_name, difficulty_rank, tier, is_unilateral )")
     .eq("created_by", user.id)
     .order("name");
 
@@ -79,7 +82,7 @@ export default async function ExerciseLibraryPage(
     ladder: (p.movement_pattern_exercises ?? [])
       .slice()
       .sort((a: any, b: any) => a.difficulty_rank - b.difficulty_rank)
-      .map((e: any) => ({ key: e.id, exerciseName: e.exercise_name, tier: e.tier })),
+      .map((e: any) => ({ key: e.id, exerciseName: e.exercise_name, tier: e.tier, unilateral: !!e.is_unilateral, rank: e.difficulty_rank as number })),
   }));
 
   const exerciseLibrary = exercises.map((e) => e.name);

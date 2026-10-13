@@ -13,6 +13,8 @@ import { BiomechTagPicker, type BiomechTagOption, type BiomechTagSelection } fro
 import { generateBiomechBreakdown } from "@/lib/biomech-breakdown";
 import { ExerciseQrCodeButton } from "./exercise-qr-code-button";
 import { Trash2, Trophy } from "lucide-react";
+import { NO_FILTERS, filtersActive, matchesFilters, patternFilterOptions, tagChip, type ClassFilter, type LibraryFilters, type SideFilter } from "@/lib/library-sort";
+import { PATTERN_NAMES, TIER_KEY } from "@/lib/starter-ladders";
 
 export interface LibraryExerciseRow {
   id: string;
@@ -20,6 +22,9 @@ export interface LibraryExerciseRow {
   videoPath: string | null;
   youtubeUrl: string | null;
   tier: "A" | "B" | "C" | null;
+  // The movement pattern ladder this exercise is on (null = not sorted yet) and whether it is the one-sided version.
+  pattern?: string | null;
+  unilateral?: boolean;
   category: string | null;
   equipmentType: EquipmentType | null;
   description: string | null;
@@ -63,6 +68,7 @@ export function ExerciseLibraryList({
 }) {
   const [exercises, setExercises] = useState(initialExercises);
   const [search, setSearch] = useState("");
+  const [filters, setFilters] = useState<LibraryFilters>(NO_FILTERS);
   const [newName, setNewName] = useState("");
   const [newCategory, setNewCategory] = useState<string>("");
   const [newEquipmentType, setNewEquipmentType] = useState<string>("");
@@ -217,6 +223,7 @@ export function ExerciseLibraryList({
 
   const visible = exercises
     .filter((e) => e.name.toLowerCase().includes(search.trim().toLowerCase()))
+    .filter((e) => matchesFilters({ pattern: e.pattern ?? null, unilateral: !!e.unilateral, tier: e.tier }, filters))
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const withVideoCount = exercises.filter((e) => e.videoPath || e.youtubeUrl).length;
@@ -323,8 +330,50 @@ export function ExerciseLibraryList({
     await supabase.from("exercise_library").delete().eq("id", id);
   }
 
+  const patternOptions = patternFilterOptions(
+    exercises.map((e) => e.pattern ?? "").filter(Boolean),
+    PATTERN_NAMES
+  );
+  const filterSelect = "h-10 bg-surface border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust";
+
   return (
     <div>
+      <div className="flex flex-wrap items-center gap-3 mb-3">
+        <label className="font-body text-xs text-steel flex items-center gap-2">
+          Pattern
+          <select value={filters.pattern} onChange={(e) => setFilters((f) => ({ ...f, pattern: e.target.value }))} className={filterSelect}>
+            <option value="all">All</option>
+            {patternOptions.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="font-body text-xs text-steel flex items-center gap-2">
+          Side
+          <select value={filters.side} onChange={(e) => setFilters((f) => ({ ...f, side: e.target.value as SideFilter }))} className={filterSelect}>
+            <option value="all">All</option>
+            <option value="bilateral">Bilateral</option>
+            <option value="unilateral">Unilateral</option>
+          </select>
+        </label>
+        <label className="font-body text-xs text-steel flex items-center gap-2">
+          Class
+          <select value={filters.tier} onChange={(e) => setFilters((f) => ({ ...f, tier: e.target.value as ClassFilter }))} className={filterSelect}>
+            <option value="all">All</option>
+            <option value="A">Class A</option>
+            <option value="B">Class B</option>
+            <option value="C">Class C</option>
+          </select>
+        </label>
+        <span className="font-body text-xs text-steel">{TIER_KEY}</span>
+        {filtersActive(filters) && (
+          <button type="button" onClick={() => setFilters(NO_FILTERS)} className="min-h-10 px-2 font-body text-xs text-rust">
+            Clear filters
+          </button>
+        )}
+      </div>
       <div className="flex items-center gap-3 mb-4">
         <input
           type="text"
@@ -443,7 +492,7 @@ export function ExerciseLibraryList({
       )}
 
       {visible.length === 0 ? (
-        <p className="font-body text-sm text-steel py-6">No exercises match.</p>
+        <p className="font-body text-sm text-steel py-6">{filtersActive(filters) ? "No exercises match. Clear a filter." : "No exercises match."}</p>
       ) : (
         <div className="space-y-6">
           {grouped.map((group) => (
@@ -468,6 +517,9 @@ export function ExerciseLibraryList({
                     <div className="flex items-center gap-3">
                       <div className="flex-1 min-w-0">
                         <span className="font-body font-medium text-[15px]">{ex.name}</span>
+                        {tagChip({ pattern: ex.pattern ?? null, unilateral: !!ex.unilateral, tier: ex.tier }) && (
+                          <p className="font-body text-xs text-steel">{tagChip({ pattern: ex.pattern ?? null, unilateral: !!ex.unilateral, tier: ex.tier })}</p>
+                        )}
                         {ex.description && (
                           <p className="font-body text-xs text-steel truncate">{ex.description}</p>
                         )}

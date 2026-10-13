@@ -34,6 +34,7 @@ const NOT_A_SAVE = new Set([
   "/api/assistant/navigate",
   "/api/auth/forgot-password",
   "/api/auth/resend-confirmation",
+  "/api/ai/suggest-patterns",
   "/api/biomech-tags/suggest",
   "/api/coach/act-as",
   "/api/coaches/signup",

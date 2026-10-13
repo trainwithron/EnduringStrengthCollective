@@ -13,6 +13,8 @@ interface LadderItem {
   key: string;
   exerciseName: string;
   tier: ExerciseTier;
+  // The one-sided version of the pattern (a lunge is a unilateral squat).
+  unilateral?: boolean;
 }
 
 export type MovementPlane = "sagittal" | "frontal" | "transverse" | null;
@@ -46,7 +48,7 @@ export function MovementPatternRow({
   const [ladder, setLadder] = useState<LadderItem[]>(
     initialLadder.length > 0
       ? initialLadder
-      : [{ key: crypto.randomUUID(), exerciseName: "", tier: null }]
+      : [{ key: crypto.randomUUID(), exerciseName: "", tier: null, unilateral: false }]
   );
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -60,6 +62,10 @@ export function MovementPatternRow({
 
   function updateTier(key: string, tier: ExerciseTier) {
     setLadder((prev) => prev.map((item) => (item.key === key ? { ...item, tier } : item)));
+  }
+
+  function updateUnilateral(key: string, unilateral: boolean) {
+    setLadder((prev) => prev.map((item) => (item.key === key ? { ...item, unilateral } : item)));
   }
 
   function removeItem(key: string) {
@@ -110,6 +116,7 @@ export function MovementPatternRow({
         exercise_name: item.exerciseName,
         difficulty_rank: i,
         tier: item.tier,
+        is_unilateral: !!item.unilateral,
       }))
     );
 
@@ -201,6 +208,17 @@ export function MovementPatternRow({
                 </div>
                 <button
                   type="button"
+                  onClick={() => updateUnilateral(item.key, !item.unilateral)}
+                  aria-pressed={!!item.unilateral}
+                  aria-label="Unilateral"
+                  className={`h-7 px-1.5 flex items-center justify-center border font-body text-xs transition-colors shrink-0 ${
+                    item.unilateral ? "bg-rust border-rust text-graphite" : "border-steel/30 text-steel active:border-rust active:text-rust"
+                  }`}
+                >
+                  Unilateral
+                </button>
+                <button
+                  type="button"
                   onClick={() => moveItem(i, -1)}
                   disabled={i === 0}
                   aria-label="Move exercise up"
@@ -235,7 +253,7 @@ export function MovementPatternRow({
             onClick={() =>
               setLadder((prev) => [
                 ...prev,
-                { key: crypto.randomUUID(), exerciseName: "", tier: null },
+                { key: crypto.randomUUID(), exerciseName: "", tier: null, unilateral: false },
               ])
             }
             className="w-full h-9 border border-steel/30 text-steel font-body text-xs active:border-rust active:text-rust transition-colors"

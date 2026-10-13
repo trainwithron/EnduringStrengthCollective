@@ -31,6 +31,7 @@ const REVIEWED_PERMISSION_ONLY = new Set([
   "app/(coach)/groups/[groupId]/dashboard/page.tsx",
   "app/(coach)/groups/[groupId]/messages/announce/page.tsx",
   "app/api/ai/generate-meal-plan/route.ts",
+  "app/api/ai/suggest-patterns/route.ts",
   "app/api/biomech-tags/suggest/route.ts",
   "app/api/broadcast/send/route.ts",
   "app/api/clients/correct-email/route.ts",

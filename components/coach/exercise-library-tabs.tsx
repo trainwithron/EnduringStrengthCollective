@@ -5,6 +5,8 @@ import { ExerciseLibraryList, type LibraryExerciseRow } from "./exercise-library
 import type { BiomechTagOption, BiomechTagSelection } from "./biomech-tag-picker";
 import { MovementPatternList } from "./movement-pattern-list";
 import { NewMovementPatternForm } from "./new-movement-pattern-form";
+import { AddStarterLaddersButton } from "./add-starter-ladders-button";
+import { SortMyExercises } from "./sort-my-exercises";
 import type { MovementPlane } from "./movement-pattern-row";
 import { OneRepMaxCalculator } from "@/components/tools/one-rep-max-calculator";
 
@@ -12,10 +14,10 @@ interface PatternWithLadder {
   id: string;
   name: string;
   plane: MovementPlane;
-  ladder: { key: string; exerciseName: string; tier: "A" | "B" | "C" | null }[];
+  ladder: { key: string; exerciseName: string; tier: "A" | "B" | "C" | null; unilateral?: boolean; rank?: number }[];
 }
 
-type Tab = "exercises" | "patterns" | "one-rep-max";
+type Tab = "exercises" | "patterns" | "sort" | "one-rep-max";
 
 export function ExerciseLibraryTabs({
   groupId,
@@ -63,6 +65,17 @@ export function ExerciseLibraryTabs({
         </button>
         <button
           type="button"
+          onClick={() => setTab("sort")}
+          className={`h-10 px-4 font-body text-sm border-b-2 transition-colors ${
+            tab === "sort"
+              ? "border-rust text-chalk"
+              : "border-transparent text-steel active:text-chalk"
+          }`}
+        >
+          Sort my exercises
+        </button>
+        <button
+          type="button"
           onClick={() => setTab("one-rep-max")}
           className={`h-10 px-4 font-body text-sm border-b-2 transition-colors ${
             tab === "one-rep-max"
@@ -85,6 +98,7 @@ export function ExerciseLibraryTabs({
       )}
       {tab === "patterns" && (
         <div>
+          <AddStarterLaddersButton />
           <NewMovementPatternForm />
           {initialPatterns.length > 0 && (
             <div className="mt-6">
@@ -92,6 +106,15 @@ export function ExerciseLibraryTabs({
             </div>
           )}
         </div>
+      )}
+      {tab === "sort" && (
+        <SortMyExercises
+          libraryNames={initialExercises.map((e) => e.name)}
+          sortedNames={initialExercises.filter((e) => e.pattern).map((e) => e.name)}
+          patternChoices={initialPatterns.map((p) => p.name)}
+          patternIds={Object.fromEntries(initialPatterns.map((p) => [p.name, p.id]))}
+          ranksByPattern={Object.fromEntries(initialPatterns.map((p) => [p.name, p.ladder.map((l) => l.rank ?? 0)]))}
+        />
       )}
       {tab === "one-rep-max" && <OneRepMaxCalculator />}
     </div>

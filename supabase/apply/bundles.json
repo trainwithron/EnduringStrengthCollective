@@ -293,6 +293,14 @@
   "file": "apply-release-bk-all.sql"
  },
  {
+  "id": "release-bu",
+  "name": "Release BU (pattern and class templates: a one-sided mark on ladder exercises, plus empty columns for slots and a client's level; run BEFORE the code that goes with it is live)",
+  "steps": [
+   "115"
+  ],
+  "file": "apply-release-bu-all.sql"
+ },
+ {
   "id": "release-bt",
   "name": "Release BT (a group session belongs to one organization; run BEFORE the code that goes with it is live)",
   "steps": [

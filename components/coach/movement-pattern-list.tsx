@@ -7,7 +7,7 @@ interface PatternWithLadder {
   id: string;
   name: string;
   plane: MovementPlane;
-  ladder: { key: string; exerciseName: string; tier: "A" | "B" | "C" | null }[];
+  ladder: { key: string; exerciseName: string; tier: "A" | "B" | "C" | null; unilateral?: boolean; rank?: number }[];
 }
 
 const PLANES = ["sagittal", "frontal", "transverse"] as const;
