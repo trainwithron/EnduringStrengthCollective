@@ -111,6 +111,13 @@ export async function POST(request: Request) {
       ownerId: newUserId,
     });
 
+    // A brand-new coach starts in "request" booking (a client asks, the coach approves); they can change it any time in their availability settings. Coaches who signed up before this
+    // keep what they have. Best-effort: with no row, booking behaves as it always did.
+    const { error: modeError } = await serviceRole
+      .from("coach_booking_policies")
+      .upsert({ coach_id: newUserId, booking_mode: "request" }, { onConflict: "coach_id", ignoreDuplicates: true });
+    if (modeError) console.error("signup: couldn't set the starting booking mode:", modeError.message);
+
     // Best-effort — the account and organization already exist either
     // way, so a delivery hiccup here shouldn't turn into a failed signup;
     // logged server-side rather than surfaced, same tolerance as other
