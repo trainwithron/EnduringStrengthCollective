@@ -13,7 +13,7 @@ import { parseRestSeconds } from "@/lib/workout-import-parser";
 import { DEFAULT_TRACKED_FIELDS } from "@/lib/exercise-fields";
 import type { TrackedField } from "@/lib/exercise-fields";
 import { exercisesWanted, allowsRepeats, applyTimedConsistency, dedupeDay, isMobilityTitle, longDayFlag, mobilityDaysWanted, mobilityInstruction, mobilityRole, plainLibraryName, ruleKey } from "@/lib/ai-day-rules";
-import { buildDaySystemPrompt, buildDayUserText, checkRunToken, issueRunToken, readDayResult, runTokenIsStale, type BuiltDay } from "@/lib/ai-day-run";
+import { DAY_MAX_TOKENS, TOO_LONG_MESSAGE, TRUNCATED_RETRY_NOTE, buildDaySystemPrompt, buildDayUserText, checkRunToken, issueRunToken, readDayResult, runTokenIsStale, truncatedRetryTimeoutMs, type BuiltDay } from "@/lib/ai-day-run";
 
 // ONE workout per call (about 10 to 20 seconds), so a long program is many short calls and none of them can hit a time limit.
 export const maxDuration = 60;
@@ -58,6 +58,8 @@ export async function POST(request: Request) {
       .eq("user_id", user.id)
       .eq("feature", "program_day")
       .neq("status", "error")
+      // A day that came back cut off was never built, so it is not a day under this token.
+      .neq("status", "truncated")
       .gte("created_at", new Date(run.issuedAt).toISOString());
     if (runTokenIsStale(count ?? 0, run.days)) run = { ok: false };
   }
@@ -150,7 +152,7 @@ export async function POST(request: Request) {
       meta: { feature: "program_day", userId: user!.id },
       system: buildDaySystemPrompt({ youthBlock, hasInjury: injuryContext !== null }),
       userText: buildDayUserText({ slot: { week, day }, instruction, corrections, built, fixing: mode === "fix" ? targetBuilt : null, youthBlock, injuryContext, libraryText, mobilityNote, retryNote }),
-      maxTokens: 3500,
+      maxTokens: DAY_MAX_TOKENS,
       timeoutMs,
     });
     const parsed = readDayResult(JSON.parse(extractJson(text)), `Day ${day}`);
@@ -167,7 +169,16 @@ export async function POST(request: Request) {
   const isHard = (flag: string) => /conflicts with "no |which your description said to leave out/.test(flag);
 
   try {
-    let first = await attempt(null, 50_000);
+    let first;
+    try {
+      first = await attempt(null, 50_000);
+    } catch (err) {
+      // Cut off at the length limit: write the day once more, shorter (never charged; the coach is charged only after a day really comes back).
+      if (!(err instanceof AiTruncatedError)) throw err;
+      const retryTimeout = truncatedRetryTimeoutMs(Date.now() - startedAt);
+      if (retryTimeout === null) return NextResponse.json({ error: TOO_LONG_MESSAGE }, { status: 502 });
+      first = await attempt(TRUNCATED_RETRY_NOTE, retryTimeout);
+    }
     if (!first) return NextResponse.json({ error: "Couldn't build that day. Try Resume, or tell it what to change." }, { status: 502 });
     // One automatic retry when the day breaks something the coach said to leave out, if there is time left in this request.
     const hard = first.scan.filter(isHard);
@@ -268,7 +279,7 @@ export async function POST(request: Request) {
     if (err instanceof AiRateLimitedError) return NextResponse.json({ error: err.message }, { status: 429 });
     if (err instanceof AiNotConfiguredError) return NextResponse.json({ error: err.message }, { status: 503 });
     if (err instanceof AiTimeoutError) return NextResponse.json({ error: "Couldn't build that day. Try Resume, or tell it what to change." }, { status: 504 });
-    if (err instanceof AiTruncatedError) return NextResponse.json({ error: "Couldn't build that day. Try Resume, or tell it what to change." }, { status: 502 });
+    if (err instanceof AiTruncatedError) return NextResponse.json({ error: TOO_LONG_MESSAGE }, { status: 502 });
     return NextResponse.json({ error: "Couldn't build that day. Try Resume, or tell it what to change." }, { status: 502 });
   }
 }
