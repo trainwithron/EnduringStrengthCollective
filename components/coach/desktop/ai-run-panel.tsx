@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { readAiJson } from "@/lib/ai-fetch";
+import { MicButton } from "@/components/shared/mic-button";
 
 // Beside the AI Program Builder: what the coach asked for in this run (their request and every change they asked for, read-only, collapsible) so they can compare it with what they got, and an
 // "Ask why" box under it. The answer only explains; it never changes the program.
@@ -59,15 +60,24 @@ export function AiRunPanel({ programId, request, corrections }: { programId: str
         <label className="block font-body text-xs text-steel uppercase tracking-wide" htmlFor="ai-ask-why">
           Ask why
         </label>
-        <textarea
-          id="ai-ask-why"
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          rows={2}
-          maxLength={500}
-          placeholder="Ask why it did something, for example: why two presses on Day 1?"
-          className="mt-1 w-full bg-graphite border border-steel/30 text-chalk px-2 py-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
-        />
+        <div className="mt-1 flex items-start gap-2">
+          <textarea
+            id="ai-ask-why"
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            rows={2}
+            maxLength={500}
+            placeholder="Ask why it did something, for example: why two presses on Day 1?"
+            className="flex-1 min-w-0 bg-graphite border border-steel/30 text-chalk px-2 py-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
+          />
+          <MicButton
+            onText={(t) => setQuestion((x) => (x.trim() ? `${x.trim()} ${t}` : t).slice(0, 500))}
+            startLabel="Start voice typing"
+            stopLabel="Stop voice typing"
+            continuous
+            unsupportedHint="Voice typing isn't available in this browser"
+          />
+        </div>
         <div className="mt-2 flex items-center gap-3">
           <button type="button" onClick={() => void explain()} disabled={!question.trim() || busy} className="min-h-11 px-5 border border-rust text-rust font-display font-bold uppercase tracking-wide disabled:opacity-40">
             {busy ? "One moment…" : "Explain"}

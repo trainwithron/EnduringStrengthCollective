@@ -5,6 +5,7 @@ import { createBrowserClient } from "@/lib/supabase/client";
 import { readAiJson } from "@/lib/ai-fetch";
 import { BUILDER_ONE_WORKOUT_SELECT, mapWorkoutRowToBuilderDay } from "@/lib/program-builder-data";
 import { AiRunPanel } from "@/components/coach/desktop/ai-run-panel";
+import { MicButton } from "@/components/shared/mic-button";
 import { fixTargetFrom, parseBuildRequest, planSlots, scopeLimitFrom } from "@/lib/ai-day-request";
 import type { DaySlot } from "@/lib/ai-day-slots";
 import type { BuilderDay } from "@/lib/types";
@@ -234,6 +235,15 @@ export function AiProgramBuilderBox({
           aria-label="Tell the AI what to build"
           className="flex-1 min-w-0 bg-graphite border border-steel/30 text-chalk px-2 py-2 font-body text-base sm:text-sm focus:outline-none focus:border-rust"
         />
+        <div className="sm:self-start">
+          <MicButton
+            onText={(t) => setText((x) => (x.trim() ? `${x.trim()} ${t}` : t))}
+            startLabel="Start voice typing"
+            stopLabel="Stop voice typing"
+            continuous
+            unsupportedHint="Voice typing isn't available in this browser"
+          />
+        </div>
         {building ? (
           <button type="button" onClick={pause} className="min-h-11 px-5 border border-rust text-rust font-display font-bold uppercase tracking-wide sm:self-start">
             Pause
