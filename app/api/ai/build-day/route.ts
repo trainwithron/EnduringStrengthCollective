@@ -7,12 +7,11 @@ import { checkAndSpendCoachCredits, canRunAiAction } from "@/lib/coach-credits";
 import { hasFlaggedMusculoskeletalConcern } from "@/lib/athlete-injury-flag";
 import { athleteIsMinor, YOUTH_PROMPT_BLOCK } from "@/lib/youth-block";
 import { libraryContext, rankLibrary, type LibraryItem } from "@/lib/builder-context";
-import { matchExercise } from "@/lib/exercise-matching";
 import { scanConstraints } from "@/lib/constraint-scan";
 import { parseRestAnyForm } from "@/lib/rest-time";
 import { DEFAULT_TRACKED_FIELDS } from "@/lib/exercise-fields";
 import type { TrackedField } from "@/lib/exercise-fields";
-import { exercisesWanted, allowsRepeats, applyTimedConsistency, dedupeDay, isMobilityTitle, longDayFlag, mobilityDaysWanted, mobilityInstruction, mobilityRole, plainLibraryName, ruleKey } from "@/lib/ai-day-rules";
+import { resolveAiExerciseName, exercisesWanted, allowsRepeats, applyTimedConsistency, dedupeDay, isMobilityTitle, longDayFlag, mobilityDaysWanted, mobilityInstruction, mobilityRole, plainLibraryName, ruleKey } from "@/lib/ai-day-rules";
 import { DAY_MAX_TOKENS, TOO_LONG_MESSAGE, TRUNCATED_RETRY_NOTE, buildDaySystemPrompt, buildDayUserText, checkRunToken, issueRunToken, readDayResult, runTokenIsStale, truncatedRetryTimeoutMs, type BuiltDay } from "@/lib/ai-day-run";
 
 // ONE workout per call (about 10 to 20 seconds), so a long program is many short calls and none of them can hit a time limit.
@@ -157,12 +156,14 @@ export async function POST(request: Request) {
     });
     const parsed = readDayResult(JSON.parse(extractJson(text)), `Day ${day}`);
     if (!parsed) return null;
+    // An exercise the coach named stays exactly as named (the library never renames it); only the ones the AI chose are snapped to the library, and only on a confident match.
     const snapped = parsed.exercises.map((e) => {
-      const m = matchExercise(e.exerciseName, libraryList, aliases);
-      return { ...e, exerciseName: plainLibraryName(m.exerciseName ?? e.exerciseName, libraryNames) };
+      const r = resolveAiExerciseName(e, sayings, libraryList, aliases, (n) => plainLibraryName(n, libraryNames));
+      return { ...e, exerciseName: r.name, coachNamed: r.coachNamed };
     });
     const tidy = applyTimedConsistency(dedupeDay(snapped, allowRepeat).rows, knownTimes);
-    const scan = scanConstraints(sayings, tidy.map((r) => ({ week: `Week ${week}`, day: `Day ${day}`, exerciseName: r.exerciseName, sets: r.sets, reps: r.reps, weight: r.weight, rpe: r.rpe, rest: r.rest, timeSeconds: r.timeSeconds }) as never));
+    // The coach's own named exercises are never flagged or replaced by the "worth a look" checks.
+    const scan = scanConstraints(sayings, tidy.filter((r) => !r.coachNamed).map((r) => ({ week: `Week ${week}`, day: `Day ${day}`, exerciseName: r.exerciseName, sets: r.sets, reps: r.reps, weight: r.weight, rpe: r.rpe, rest: r.rest, timeSeconds: r.timeSeconds }) as never));
     return { result: { ...parsed, exercises: tidy }, rows: tidy, scan };
   }
   // A flag that says a chosen exercise breaks something the coach said to leave out (not the softer "check this" notes).
@@ -264,7 +265,7 @@ export async function POST(request: Request) {
     if (oldIds.length > 0) await supabase.from("group_workout_exercises").delete().in("id", oldIds);
 
     const longDay = longDayFlag(week, day, rows.length, exercisesWanted(sayings));
-    const flags = scanConstraints(`${instruction}. ${corrections.join(". ")}`, rows.map((r) => ({ week: `Week ${week}`, day: `Day ${day}`, exerciseName: r.exerciseName, sets: r.sets, reps: r.reps, weight: r.weight, rpe: r.rpe, rest: r.rest, timeSeconds: r.timeSeconds }) as never));
+    const flags = scanConstraints(`${instruction}. ${corrections.join(". ")}`, rows.filter((r) => !r.coachNamed).map((r) => ({ week: `Week ${week}`, day: `Day ${day}`, exerciseName: r.exerciseName, sets: r.sets, reps: r.reps, weight: r.weight, rpe: r.rpe, rest: r.rest, timeSeconds: r.timeSeconds }) as never));
     if (longDay) flags.push(longDay);
     return NextResponse.json({
       workoutId,

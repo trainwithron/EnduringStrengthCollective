@@ -196,3 +196,18 @@ export function confidenceBucket(confidence: MatchConfidence): "green" | "yellow
   if (confidence === "fuzzy") return "yellow";
   return "red";
 }
+
+// Two names that differ in implement, side or position are different exercises however many other words they share ("Barbell Bench Press" / "Dumbbell Bench Press", "Single Leg Hip Bridge" / "Hip Bridge"):
+// a fuzzy match between them is not a confident one and must not rename what someone typed.
+const qualifierWords = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+const QUALIFIERS = new Set([
+  "barbell", "dumbbell", "kettlebell", "cable", "band", "banded", "machine", "smith", "landmine", "trap", "bodyweight", "ez", "sled",
+  "single", "one", "unilateral", "left", "right", "alternating", "split", "offset", "staggered", "bilateral",
+  "incline", "decline", "seated", "standing", "kneeling", "prone", "supine", "lying", "front", "back", "overhead", "hanging", "heel", "elevated",
+]);
+const qualifiersOf = (s: string) => new Set(qualifierWords(s).split(" ").filter((w) => QUALIFIERS.has(w)));
+export const sameQualifiers = (a: string, b: string) => {
+  const x = qualifiersOf(a);
+  const y = qualifiersOf(b);
+  return x.size === y.size && [...x].every((q) => y.has(q));
+};
