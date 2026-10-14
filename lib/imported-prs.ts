@@ -95,4 +95,3 @@ export function dailyBestByExercise(rows: RollupRow[]): Record<string, { date: s
   return out;
 }
 
-export const INCLUDES_IMPORTED_TAG = "Includes imported history";

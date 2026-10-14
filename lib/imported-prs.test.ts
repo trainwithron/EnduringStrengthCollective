@@ -103,7 +103,7 @@ describe("the profile uses it", () => {
     expect(page).toContain('supabase.rpc("client_exercise_rollup"');
     expect(page).toContain("const totalCompleted = (allLogs?.length ?? 0) + importedSums.workouts;");
     expect(page).toContain("hindsightPrs(rollup)");
-    expect(page).toContain("INCLUDES_IMPORTED_TAG");
+    expect(page).not.toContain("Includes imported history");
   });
   it("the exercise graph reads the same rows and no longer reads set logs directly", () => {
     const loader = read("components/coach/desktop/exercise-progression-loader.tsx");

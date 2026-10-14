@@ -1,6 +1,6 @@
 import { isEmailConfigured } from "@/lib/email";
 import { mergeLoggedList } from "@/lib/logged-list";
-import { INCLUDES_IMPORTED_TAG, hindsightPrs, importedTotals, parseRollup } from "@/lib/imported-prs";
+import { hindsightPrs, importedTotals, parseRollup } from "@/lib/imported-prs";
 import { sorenessShown } from "@/lib/wellness";
 import { ClientAssessmentsSection } from "@/components/coach/desktop/client-assessments-section";
 import { ViewAsClientLink } from "@/components/coach/desktop/view-as-client-label";
@@ -617,13 +617,13 @@ export default async function AthleteProfilePage(
   const totalCompleted = (allLogs?.length ?? 0) + importedSums.workouts;
   const totalVolume = (allLogs ?? []).reduce((sum, l) => sum + (l.total_volume ?? 0), 0) + importedSums.volume;
 
-  const prEntries: { exerciseName: string; date: string; imported?: boolean }[] = [];
+  const prEntries: { exerciseName: string; date: string }[] = [];
   for (const log of allLogs ?? []) {
     for (const name of log.new_prs ?? []) {
       prEntries.push({ exerciseName: name, date: log.created_at });
     }
   }
-  for (const pr of hindsightPrs(rollup)) prEntries.push({ exerciseName: pr.exerciseName, date: pr.date, imported: true });
+  for (const pr of hindsightPrs(rollup)) prEntries.push({ exerciseName: pr.exerciseName, date: pr.date });
   prEntries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const RECENT_LOGS_LIMIT = 50;
@@ -1098,9 +1098,6 @@ export default async function AthleteProfilePage(
                 <p className="font-body text-xs text-steel">PRs</p>
               </div>
             </div>
-            {importedSums.workouts > 0 && (
-              <p className="font-body text-xs text-steel mt-2">{INCLUDES_IMPORTED_TAG}</p>
-            )}
 
             {prEntries.length > 0 && (
               <div className="py-4 border-b border-steel/15">
@@ -1113,7 +1110,6 @@ export default async function AthleteProfilePage(
                       {pr.exerciseName}{" "}
                       <span className="text-steel text-xs">
                         &middot; {new Date(pr.date).toLocaleDateString("en-US", { timeZone: displayZone })}
-                        {pr.imported ? <> &middot; imported</> : null}
                       </span>
                     </p>
                   ))}
