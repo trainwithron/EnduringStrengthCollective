@@ -16,7 +16,7 @@ import {
   type TrackedField,
 } from "@/lib/exercise-fields";
 import { parseQuickEntry, quickNote } from "@/lib/quick-entry";
-import { matchExercise, type AliasEntry } from "@/lib/exercise-matching";
+import { matchExercise, sameQualifiers, type AliasEntry } from "@/lib/exercise-matching";
 import { ExerciseBuilderCard, type MovementPatternOption } from "../exercise-builder-card";
 import type { RestTempoSuggestion } from "@/lib/training-intent";
 import { TextNoteCard } from "../text-note-card";
@@ -40,7 +40,8 @@ import { isRestDayTitle } from "@/lib/empty-sweep";
 // when it's ambiguous between two or more candidates.
 function resolveQuickAddExerciseName(typedName: string, library: string[]): string {
   const match = matchExercise(typedName, library.map((name) => ({ name })), []);
-  if (match.exerciseName) return match.exerciseName;
+  // A near match is used only when it is the same movement with the same implement, side and position; what someone typed is never swapped for a different exercise.
+  if (match.exerciseName && (match.confidence !== "fuzzy" || sameQualifiers(typedName, match.exerciseName))) return match.exerciseName;
 
   const normalizedTyped = typedName.trim().toLowerCase();
   const prefixMatches = library.filter((name) => name.toLowerCase().startsWith(normalizedTyped));
