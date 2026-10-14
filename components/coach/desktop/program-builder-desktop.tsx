@@ -1,10 +1,11 @@
 "use client";
 
 import type { DemoRow } from "@/lib/exercise-demo";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { BuilderDay } from "@/lib/types";
+import { isRestDayTitle } from "@/lib/empty-sweep";
 import type { AliasEntry } from "@/lib/exercise-matching";
 import { WeekGrid } from "./week-grid";
 import { ProgramScheduleSettings } from "../program-schedule-settings";
@@ -110,6 +111,25 @@ export function ProgramBuilderDesktop({
   const [name, setName] = useState(programName);
   const [lastSavedName, setLastSavedName] = useState(programName);
   const [days, setDays] = useState<BuilderDay[]>(initialDays);
+  // A day with no exercises and no "Rest day" name (and no log, session, note, date or assignment) is not worth keeping: the ones the program is opened with go as it opens, once. Days added while
+  // building are never in that list, so nothing is swept under the coach. The server checks each day again and a brand-new program is left alone.
+  useEffect(() => {
+    const ids = initialDays.filter((d) => d.items.length === 0 && !isRestDayTitle(d.title)).map((d) => d.id);
+    if (ids.length === 0) return;
+    let cancelled = false;
+    fetch("/api/programs/sweep-empty-days", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ programId, dayIds: ids }) })
+      .then((r) => (r.ok ? r.json() : { removed: [] }))
+      .then((res: { removed?: string[] }) => {
+        const gone = new Set(res.removed ?? []);
+        if (!cancelled && gone.size > 0) setDays((prev) => prev.filter((d) => !gone.has(d.id)));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // once, as the builder opens
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [startDate, setStartDate] = useState(initialStartDate);
   const [trainingDays, setTrainingDays] = useState(initialTrainingDays);
   const [trainingIntent, setTrainingIntent] = useState(initialTrainingIntent);
