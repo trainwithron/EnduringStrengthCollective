@@ -12,6 +12,7 @@ import {
   deleteHistoricalSession,
   type HistoricalEntryGroup,
 } from "@/lib/exercise-history-import";
+import { flagUnclearSets } from "@/lib/unclear-points";
 
 function todayDateKey(): string {
   return new Date().toISOString().slice(0, 10);
@@ -83,6 +84,7 @@ export function ExerciseHistoryUploader({
       return;
     }
 
+    await flagUnclearSets(supabase, groupId, athleteId);
     setManualExercise("");
     setManualWeight("");
     setManualReps("");
@@ -138,6 +140,7 @@ export function ExerciseHistoryUploader({
     setCsvStatus("importing");
     const supabase = createBrowserClient();
     await importHistoryRows(supabase, { athleteId, groupId, rows: csvRows });
+    await flagUnclearSets(supabase, groupId, athleteId);
     setCsvRows([]);
     setCsvSkippedCount(0);
     setCsvStatus("idle");

@@ -2321,6 +2321,21 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the memberships table exists", "to_regclass('public.group_memberships') is not null"],
     ],
   },
+  {
+    n: "121",
+    slug: "0371",
+    title: "0371 Unclear data points in imported history are marked, kept, and left out of the numbers",
+    migrations: ["0371"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes in any total or graph. Imported sets that look jumbled or impossible (a weight ten times the rest, reps over 100, a weight with no reps, a last set far below the others) are marked once, for every client who has imported history. Each stays exactly as entered. The coach sees them on the client's History page and on the session, with Count it, and the import screen reports how many it found.",
+    undo: "drop function if exists public.set_unclear_point_counted(uuid, boolean);" + String.fromCharCode(10) + "drop function if exists public.flag_unclear_sets(uuid, uuid);" + String.fromCharCode(10) + "drop trigger if exists set_logs_guard_flag_insert on public.set_logs;" + String.fromCharCode(10) + "drop trigger if exists set_logs_guard_flag_update on public.set_logs;" + String.fromCharCode(10) + "drop function if exists public.guard_set_log_flag_columns();" + String.fromCharCode(10) + "drop index if exists public.set_logs_unclear_idx;" + String.fromCharCode(10) + "alter table public.set_logs drop constraint if exists set_logs_data_flag_check;" + String.fromCharCode(10) + "alter table public.set_logs drop column if exists data_flag, drop column if exists data_flag_reason;",
+    undoWhy: "Only if step 121 misbehaves. Removes the marks (every imported set is a plain set again, exactly as entered).",
+    rows: [
+      ["0371 is not already applied (no mark column yet)", "not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'set_logs' and column_name = 'data_flag')"],
+      ["the set logs table exists", "to_regclass('public.set_logs') is not null"],
+      ["the org wall check exists", "to_regprocedure('public.group_in_active_org(uuid)') is not null"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -2431,6 +2446,7 @@ const BUNDLES = [
   { id: "release-bl", name: "Release BL (four exercises added to Coach Ron's library for the FitPros history; run any time)", steps: ["106"] },
   { id: "release-bk", name: "Release BK (move Coach Ron's own training into his personal space; run AFTER he has opened Coach Ron (you) once and removed the programs he does not want)", steps: ["105"] },
   { id: "release-bw", name: "Release BW (a rest can be a range such as 60-90; run AFTER Release BV and BEFORE the code that goes with it is live)", steps: ["117"] },
+  { id: "release-ca", name: "Release CA (unclear data points in imported history are marked and kept out of the numbers; run BEFORE the code that goes with it is live)", steps: ["121"] },
   { id: "release-bz", name: "Release BZ (Needs attention: Not now for a week, and No macros for a client; run BEFORE the code that goes with it is live)", steps: ["120"] },
   { id: "release-by", name: "Release BY (the AI you can train, rules that apply only to the clients they fit, Past AI build notes for each client; run BEFORE the code that goes with it is live)", steps: ["119"] },
   { id: "release-bx", name: "Release BX (the one product shelf: where each package and Pro Shop card shows and who sees it; run BEFORE the code that goes with it is live)", steps: ["118"] },
@@ -2653,6 +2669,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0371", "to_regprocedure('public.flag_unclear_sets(uuid, uuid)') is not null"),
     m("0370", "to_regclass('public.attention_snoozes') is not null"),
     m("0369", "to_regclass('public.client_ai_notes') is not null"),
     m("0368", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_packages' and column_name = 'audience')"),

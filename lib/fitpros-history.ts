@@ -4,6 +4,9 @@
 // Rules from the coach: the client's star rating and the workout-level note are dropped; per-exercise notes are kept; a duration over 4 hours is a timer left running and is dropped;
 // a stray extra weight (more weights than reps) is dropped; truncated or odd values are listed, not guessed at; a workout that matches no program day is imported as plain history.
 
+import { findLibraryVariant, type AliasEntry } from "@/lib/exercise-matching";
+import { mergeAliases, resolveTypedAlias } from "@/lib/exercise-alias-seed";
+
 export const MAX_DURATION_SECONDS = 4 * 3600;
 export const MIN_DAY_MATCH = 0.5;
 
@@ -290,6 +293,24 @@ export function planFitprosImport(workouts: FitprosWorkout[], program: ProgramWo
       flags,
     };
   });
+}
+
+// The names an import writes, matched to the coach's own library so the same movement is one exercise in graphs and records. A line that matched the program keeps the program's name. Any other line
+// becomes the library exercise it is a spelling of ("Pull Ups" for "Pull-Up"), the same movement under another name (the built-in definitive groups and the coach's saved aliases: "Barbell Back Squat"
+// for "Back Squat"), or the library name that differs only by abbreviations ("DB" for "Dumbbell"). A different implement or variation is a different exercise ("Zercher Squat" is not "Back Squat"):
+// it stays as written and is marked not in the library. Pure.
+export function resolveNamesAgainstLibrary(plan: PlannedWorkout[], libraryNames: string[], aliases: AliasEntry[]): PlannedWorkout[] {
+  const merged = mergeAliases(aliases, libraryNames);
+  const byNormalized = new Map<string, string>();
+  for (const name of libraryNames) if (!byNormalized.has(normalizeExerciseName(name))) byNormalized.set(normalizeExerciseName(name), name);
+  return plan.map((w) => ({
+    ...w,
+    exercises: w.exercises.map((e) => {
+      if (e.programExerciseId) return { ...e, inLibrary: byNormalized.has(normalizeExerciseName(e.savedName)) };
+      const target = findLibraryVariant(e.name, libraryNames) ?? byNormalized.get(normalizeExerciseName(e.name)) ?? resolveTypedAlias(e.name, libraryNames, merged)?.exerciseName ?? null;
+      return target ? { ...e, savedName: target, inLibrary: true } : { ...e, inLibrary: false };
+    }),
+  }));
 }
 
 export function summarizePlan(plan: PlannedWorkout[]) {

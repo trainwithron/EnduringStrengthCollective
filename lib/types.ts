@@ -86,6 +86,9 @@ export interface SetLogEntry {
   // real attempt. The obstacle-unlock mechanic (lib/obstacle-unlock.ts)
   // requires this before a set's weight/reps can ever clear the goal.
   weightConfirmed?: boolean;
+  // Set on an imported set that looks jumbled or unlikely (lib/unclear-points.ts): kept as entered, left out of the numbers until the coach counts it.
+  dataFlag?: "unclear" | "accepted" | null;
+  dataFlagReason?: string | null;
 }
 
 export interface SessionExerciseEntry {

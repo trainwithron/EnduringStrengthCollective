@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { parseDuration, parseFitprosExport, planFitprosImport, weekOfDate, summarizePlan, markerTimestamp, isImportMarker, importKeys, normalizeExerciseName, type ProgramWorkoutInfo } from "@/lib/fitpros-history";
+import { parseDuration, parseFitprosExport, planFitprosImport, weekOfDate, summarizePlan, markerTimestamp, isImportMarker, importKeys, normalizeExerciseName, resolveNamesAgainstLibrary, type PlannedExercise, type PlannedWorkout, type ProgramWorkoutInfo } from "@/lib/fitpros-history";
 
 const SAMPLE = `# FitPros export
 # Format: ## workout, exercise lines
@@ -189,5 +189,39 @@ describe("Moving the program start is checked, never assumed", () => {
     expect(picker.match(/^\s+Import$/gm)?.length).toBe(1);
     expect(picker).toContain("Other (CSV or Excel)");
     expect(src("app/(coach)/groups/[groupId]/athletes/[athleteId]/history/page.tsx")).not.toContain("FitPros");
+  });
+});
+
+describe("matching imported names to the coach's library", () => {
+  const exercise = (name: string, programExerciseId: string | null = null): PlannedExercise => ({ name, savedName: name, programExerciseId, sets: [], note: null, inLibrary: null });
+  const planOf = (...exercises: PlannedExercise[]): PlannedWorkout[] => [
+    { index: 0, date: "2026-01-05", title: "", durationSeconds: null, dayIndex: null, score: 0, weekNumber: null, programWorkoutId: null, exercises, flags: [] },
+  ];
+  const library = ["Back Squat", "Pull-Up", "Barbell Bench Press", "Dumbbell Bench Press", "Romanian Deadlift"];
+  const savedNames = (names: string[], aliases: { rawName: string; exerciseName: string }[] = []) =>
+    resolveNamesAgainstLibrary(planOf(...names.map((n) => exercise(n))), library, aliases)[0].exercises.map((e) => [e.savedName, e.inLibrary]);
+
+  it("the same movement under another name becomes the library exercise, so graphs and records combine", () => {
+    expect(savedNames(["Barbell Back Squat", "Pull Ups", "Bench Press", "RDL", "DB Bench Press"])).toEqual([
+      ["Back Squat", true],
+      ["Pull-Up", true],
+      ["Barbell Bench Press", true],
+      ["Romanian Deadlift", true],
+      ["Dumbbell Bench Press", true],
+    ]);
+  });
+  it("a different implement or variation stays as written and is marked not in the library", () => {
+    expect(savedNames(["Zercher Squat", "Safety Bar Squat", "Goblet Squat"])).toEqual([
+      ["Zercher Squat", false],
+      ["Safety Bar Squat", false],
+      ["Goblet Squat", false],
+    ]);
+  });
+  it("the coach's own saved alias is used", () => {
+    expect(savedNames(["Squats (barbell)"], [{ rawName: "Squats (barbell)", exerciseName: "Back Squat" }])).toEqual([["Back Squat", true]]);
+  });
+  it("a line that matched the program keeps the program's name", () => {
+    const out = resolveNamesAgainstLibrary(planOf({ ...exercise("Bench Press", "line-1"), savedName: "Program Bench" }), library, []);
+    expect(out[0].exercises[0].savedName).toBe("Program Bench");
   });
 });

@@ -3,7 +3,7 @@
 // the program's own workout and its lines to the program's own exercises (so the day shows as done), plus duration, the per-exercise note, and set time, height and distance.
 // An import is recognised again by the second in its time stamp (lib/fitpros-history.ts), so running it twice never doubles anything and "Undo this import" removes only these sessions.
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { importKeys, isImportMarker, markerTimestamp, normalizeExerciseName, IMPORT_MARKER_FIRST_SECOND, type PlannedWorkout, type ProgramWorkoutInfo } from "@/lib/fitpros-history";
+import { importKeys, isImportMarker, markerTimestamp, resolveNamesAgainstLibrary, IMPORT_MARKER_FIRST_SECOND, type PlannedWorkout, type ProgramWorkoutInfo } from "@/lib/fitpros-history";
 
 export interface ImportProgram {
   programId: string;
@@ -55,11 +55,17 @@ export async function loadProgramForImport(supabase: SupabaseClient, groupId: st
   };
 }
 
-// Which of the plan's exercise names the coach's library already has (by the same name rules).
+// Matches the plan's exercise names to the coach's library (a spelling of a library exercise, the same movement under another name, the coach's saved aliases) and marks the ones that are not in it.
 export async function markLibrary(supabase: SupabaseClient, plan: PlannedWorkout[]): Promise<PlannedWorkout[]> {
-  const { data } = await supabase.from("exercise_library").select("name");
-  const known = new Set((data ?? []).map((r) => normalizeExerciseName(r.name as string)));
-  return plan.map((w) => ({ ...w, exercises: w.exercises.map((e) => ({ ...e, inLibrary: known.has(normalizeExerciseName(e.savedName)) })) }));
+  const [{ data: library }, { data: aliasRows }] = await Promise.all([
+    supabase.from("exercise_library").select("name"),
+    supabase.from("exercise_aliases").select("raw_name, exercise_name"),
+  ]);
+  return resolveNamesAgainstLibrary(
+    plan,
+    (library ?? []).map((r) => r.name as string),
+    (aliasRows ?? []).map((r) => ({ rawName: r.raw_name as string, exerciseName: r.exercise_name as string }))
+  );
 }
 
 export interface ImportedSession {

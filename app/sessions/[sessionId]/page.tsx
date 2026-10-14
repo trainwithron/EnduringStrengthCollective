@@ -94,7 +94,7 @@ export default async function SessionPage(
         `
       id, exercise_name, exercise_order, is_swapped, is_added, movement_pattern_id, tracked_fields, group_workout_exercise_id, athlete_note,
       group_workout_exercises ( notes, exercise_name, display_name ),
-      set_logs ( id, set_order, weight, reps, rpe, rir, tempo, time_seconds, height, distance, rest_seconds, pace, status, weight_confirmed )
+      set_logs ( id, set_order, weight, reps, rpe, rir, tempo, time_seconds, height, distance, rest_seconds, pace, status, weight_confirmed, data_flag, data_flag_reason )
     `
       )
       .eq("session_id", params.sessionId)
@@ -381,6 +381,8 @@ export default async function SessionPage(
               pace: sl.pace,
               status: sl.status,
               weightConfirmed: !!sl.weight_confirmed,
+              dataFlag: (sl.data_flag as "unclear" | "accepted" | null) ?? null,
+              dataFlagReason: (sl.data_flag_reason as string | null) ?? null,
               targetReps: target?.reps ?? null,
               targetWeight: target?.weight ?? null,
               targetRpe: target?.rpe ?? null,

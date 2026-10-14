@@ -16,6 +16,8 @@ import {
   type ImportedSession,
 } from "@/lib/fitpros-history-import";
 import type { PlannedWorkout } from "@/lib/fitpros-history";
+import { flagUnclearSets, unclearFoundLine } from "@/lib/unclear-points";
+import { existingLibraryName } from "@/lib/exercise-search";
 
 function todayKey(): string {
   const d = new Date();
@@ -75,6 +77,23 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
   const notInLibrary = plan ? Array.from(new Set(plan.flatMap((w) => w.exercises.filter((e) => e.inLibrary === false && !e.programExerciseId).map((e) => e.savedName)))) : [];
   const weekNow = effectiveStart ? weekOfDate(effectiveStart, todayKey()) : null;
 
+  // Adds one imported name to the coach's library (never a second row for a spelling of one that is there), then the plan is matched again.
+  async function addToLibrary(name: string) {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    const supabase = createBrowserClient();
+    const { data: userData } = await supabase.auth.getUser();
+    const { data: library } = await supabase.from("exercise_library").select("name");
+    const taken = existingLibraryName(name, (library ?? []).map((r) => r.name as string));
+    if (!taken && userData.user) {
+      const { error: insertError } = await supabase.from("exercise_library").insert({ created_by: userData.user.id, name: name.trim() });
+      if (insertError) setError("Couldn't add that to your library. Try again.");
+    }
+    if (plan) setPlan(await markLibrary(supabase, plan));
+    setBusy(false);
+  }
+
   async function onFile(file: File | null) {
     setMessage(null);
     setError(null);
@@ -112,9 +131,11 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
     // The plan is made again here from exactly that start date, so what is written is what was just confirmed, never a screen that is a moment out of date.
     const finalPlan = planFitprosImport(workouts, program.workouts, start, new Set(program.takenWorkoutIds));
     const result = await runFitprosImport(supabase, { athleteId, groupId, plan: finalPlan, existingKeys });
+    // Jumbled or impossible sets are marked (kept as entered, not counted) by one check in the database.
+    const unclear = result.imported > 0 ? await flagUnclearSets(supabase, groupId, athleteId) : 0;
     setBusy(false);
     const linked = finalPlan.filter((w) => w.programWorkoutId).length;
-    setMessage(`Imported ${result.imported} workout${result.imported === 1 ? "" : "s"}${result.skippedAlreadyThere ? `, ${result.skippedAlreadyThere} already there` : ""} (${linked} matched to program days, ${finalPlan.length - linked} plain history).${moved ? ` The program start is now ${start}.` : ""}${result.failed.length ? ` ${result.failed.length} did not save: ${result.failed.join("; ")}` : ""}`);
+    setMessage(`Imported ${result.imported} workout${result.imported === 1 ? "" : "s"}${result.skippedAlreadyThere ? `, ${result.skippedAlreadyThere} already there` : ""} (${linked} matched to program days, ${finalPlan.length - linked} plain history).${moved ? ` The program start is now ${start}.` : ""}${result.failed.length ? ` ${result.failed.length} did not save: ${result.failed.join("; ")}` : ""}${unclear > 0 ? ` ${unclearFoundLine(unclear)}` : ""}`);
     await reload();
     router.refresh();
   }
@@ -209,7 +230,17 @@ export function FitprosHistoryImport({ athleteId, groupId, athleteName }: { athl
 
               {notInLibrary.length > 0 && (
                 <div className="font-body text-xs text-steel">
-                  <p className="text-chalk">Not in your library (imported as plain names): {notInLibrary.join(", ")}</p>
+                  <p className="text-chalk">Not in your library (imported as the names written; the same exercise under another name was matched for you):</p>
+                  <ul className="mt-1 flex flex-wrap gap-x-4">
+                    {notInLibrary.map((name) => (
+                      <li key={name} className="flex items-center gap-2">
+                        <span>{name}</span>
+                        <button type="button" disabled={busy} onClick={() => void addToLibrary(name)} className="min-h-11 text-rust underline underline-offset-2 disabled:opacity-40">
+                          Add to library
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
               {summary.flags.length > 0 && (

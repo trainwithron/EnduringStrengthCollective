@@ -301,6 +301,14 @@
   "file": "apply-release-bw-all.sql"
  },
  {
+  "id": "release-ca",
+  "name": "Release CA (unclear data points in imported history are marked and kept out of the numbers; run BEFORE the code that goes with it is live)",
+  "steps": [
+   "121"
+  ],
+  "file": "apply-release-ca-all.sql"
+ },
+ {
   "id": "release-bz",
   "name": "Release BZ (Needs attention: Not now for a week, and No macros for a client; run BEFORE the code that goes with it is live)",
   "steps": [

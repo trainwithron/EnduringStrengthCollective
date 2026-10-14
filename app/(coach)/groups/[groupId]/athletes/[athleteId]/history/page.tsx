@@ -7,6 +7,8 @@ import { CoachDesktopShell } from "@/components/coach/coach-desktop-shell";
 import { ExerciseHistoryUploader } from "@/components/coach/exercise-history-uploader";
 import { HistoryImportAccessToggle } from "@/components/coach/history-import-access-toggle";
 import { HistoryImportPicker } from "@/components/coach/history-import-picker";
+import { UnclearPointsReview } from "@/components/coach/unclear-points-review";
+import { IMPORT_BASELINE_NOTE, IMPORT_UNITS_NOTE, listUnclearPoints } from "@/lib/unclear-points";
 
 export default async function ClientHistoryPage(
   props: {
@@ -38,7 +40,7 @@ export default async function ClientHistoryPage(
     return <NoAccess>{NOT_IN_GROUP_MESSAGE}</NoAccess>;
   }
 
-  const [{ data: group }, { data: athleteProfile }, { data: athleteMembership }, { data: libraryRows }] =
+  const [{ data: group }, { data: athleteProfile }, { data: athleteMembership }, { data: libraryRows }, unclearPoints] =
     await Promise.all([
       supabase.from("groups").select("name").eq("id", params.groupId).maybeSingle(),
       supabase.from("profiles").select("full_name").eq("id", params.athleteId).maybeSingle(),
@@ -49,6 +51,7 @@ export default async function ClientHistoryPage(
         .eq("profile_id", params.athleteId)
         .maybeSingle(),
       supabase.from("exercise_library").select("name").eq("created_by", user.id),
+      listUnclearPoints(supabase, params.groupId, params.athleteId),
     ]);
 
   const athleteName = athleteProfile?.full_name ?? "Client";
@@ -70,6 +73,10 @@ export default async function ClientHistoryPage(
           builder&apos;s training-max grounding without creating a fake logged workout or PR celebration.
         </p>
 
+        <p className="font-body text-sm text-steel mb-6 max-w-2xl">
+          {IMPORT_BASELINE_NOTE} {IMPORT_UNITS_NOTE}
+        </p>
+
         <div className="mb-8">
           <HistoryImportAccessToggle
             groupId={params.groupId}
@@ -80,6 +87,8 @@ export default async function ClientHistoryPage(
         </div>
 
         <HistoryImportPicker athleteId={params.athleteId} groupId={params.groupId} athleteName={athleteName} />
+
+        <UnclearPointsReview athleteId={params.athleteId} groupId={params.groupId} initial={unclearPoints} />
 
         <div id="history-upload" className="mt-8 scroll-mt-20">
           <ExerciseHistoryUploader

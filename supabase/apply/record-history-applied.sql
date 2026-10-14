@@ -67,6 +67,7 @@ from (
     ('2026100600331', 'purchase_grants_once', '0331_purchase_grants_once.sql', to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null),
     ('2026100600338', 'guardian_links_scoped', '0338_guardian_links_scoped.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'guardian_links' and column_name = 'expires_at')),
     ('2026100600367', 'rest_range', '0367_rest_range.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')),
+    ('2026100600371', 'unclear_data_points', '0371_unclear_data_points.sql', to_regprocedure('public.flag_unclear_sets(uuid, uuid)') is not null),
     ('2026100600370', 'attention_snooze_and_macros_off', '0370_attention_snooze_and_macros_off.sql', to_regclass('public.attention_snoozes') is not null),
     ('2026100600369', 'trainable_ai_r1', '0369_trainable_ai_r1.sql', to_regclass('public.client_ai_notes') is not null),
     ('2026100600368', 'shelf_placement_and_audience', '0368_shelf_placement_and_audience.sql', exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'coach_packages' and column_name = 'audience')),

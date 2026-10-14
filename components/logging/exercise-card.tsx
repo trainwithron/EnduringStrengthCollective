@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import type { SessionExerciseEntry, SetLogEntry } from "@/lib/types";
 import { TRACKED_FIELD_DEFS, ACTUAL_COLUMN, ACTUAL_PROP, fieldDef, type TrackedField } from "@/lib/exercise-fields";
+import { UnclearPointsNote } from "@/components/logging/unclear-points-note";
 import { ExerciseSetGrid } from "./exercise-set-grid";
 import { SetStepper } from "./set-stepper";
 import { restForSet, type RestForSet } from "@/lib/rest-time";
@@ -498,6 +499,12 @@ export function ExerciseCard({
         }}
         priorBest={exercise.priorBest}
         gamificationEnabled={gamificationEnabled ?? true}
+      />
+
+      <UnclearPointsNote
+        sets={exercise.sets}
+        canDecide={viewerId !== null && viewerId !== athleteId}
+        onFlagChange={(setId, flag) => onSetChange(setId, { dataFlag: flag })}
       />
 
       {!readOnly && (
