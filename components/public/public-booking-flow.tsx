@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { looksLikeEmail } from "@/lib/email-shape";
 import { formatInTimezone } from "@/lib/format-in-timezone";
 import type { PublicPageView } from "@/lib/public-booking-engine";
 
@@ -342,7 +343,7 @@ export function PublicBookingFlow({ slug, page }: { slug: string; page: PublicPa
                       <button
                         type="button"
                         onClick={sendCode}
-                        disabled={verifyBusy || !formToken || !/^[^s@]+@[^s@]+.[^s@]{2,}$/.test(cleanEmail)}
+                        disabled={verifyBusy || !formToken || !looksLikeEmail(cleanEmail)}
                         className="border border-steel/40 text-chalk font-body text-sm px-4 py-2 disabled:opacity-40"
                       >
                         {verifyBusy && !codeSent ? "Sending…" : codeSent === cleanEmail ? "Send the code again" : "Email me a code to confirm"}
