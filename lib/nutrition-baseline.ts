@@ -77,7 +77,7 @@ export function computeBaseline(input: BaselineInput): BaselineOutcome {
   bmr = Math.round(bmr);
   const maintenance = computeTdee(bmr, input.activity);
 
-  // Never a calorie deficit for a client under 18: they are held at maintenance and the card says why.
+  // No automatic fat-loss calorie figure for a client under 18: the starting figure stays at maintenance and the card says so plainly. The coach can type ANY calorie or macro target.
   const heldForAge = age < 18 && input.phase === "fat_loss";
   const phase: NutritionPhase = heldForAge ? "maintenance" : input.phase;
   const calories = applyGoalAdjustment(maintenance, phase);
@@ -95,7 +95,7 @@ export function computeBaseline(input: BaselineInput): BaselineOutcome {
   const parts = [
     `Starting target from their own numbers: ${formula}, a base of ${bmr.toLocaleString("en-US")} a day, ${input.activity.replace("_", " ")} activity, so about ${maintenance.toLocaleString("en-US")} to hold their weight.`,
     heldForAge
-      ? `Their goal points to fat loss, but they are under 18, so this holds them at maintenance. No deficit is suggested for anyone under 18.`
+      ? `Starting at maintenance. Set the target you decide.`
       : `Phase: ${PHASE_LABELS[phase].toLowerCase()}${phase === "maintenance" ? "" : `, ${calories > maintenance ? "plus" : "minus"} ${Math.abs(Math.round((calories / maintenance - 1) * 100))} percent`}, which is ${calories.toLocaleString("en-US")} calories.`,
     `Protein ${macros.proteinG} g (${gPerLb} g per pound).`,
     `Review it and change anything you like: nothing applies until you approve it.`,

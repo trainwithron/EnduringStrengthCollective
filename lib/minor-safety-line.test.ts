@@ -8,7 +8,7 @@ describe("what the coach is told about the under-18 rule", () => {
     expect(line).toContain("Ask Sam to fill in About you");
   });
   it("a minor in a fat-loss phase: the held cut is explained, since it writes no suggestion", () => {
-    expect(minorSafetyLine({ ageYears: 16, phase: "fat_loss", clientName: "Sam" })).toBe("Sam is under 18, so no calorie deficit is suggested: a weekly cut is held at their current calories.");
+    expect(minorSafetyLine({ ageYears: 16, phase: "fat_loss", clientName: "Sam" })).toBe("No automatic calorie suggestions for youth clients. Set the target you decide.");
   });
   it("a minor in another phase, and an adult, get nothing to read", () => {
     expect(minorSafetyLine({ ageYears: 16, phase: "hypertrophy", clientName: "Sam" })).toBeNull();
