@@ -56,13 +56,15 @@ export function ProShopList({ links }: { links: ProShopLink[] }) {
   );
 }
 
-// The client's Home: the cards the coach marked Featured, at most three, under "From your coach". Nothing is drawn when there are none. Same card as the Pro Shop page; a tap opens the link in a new tab.
-export function FeaturedShopCards({ links }: { links: ProShopLink[] }) {
+// The client's Home: the cards the coach marked Featured, at most three, under "[Coach]'s Pro Shop" ("Ron's Pro Shop"; plain "Pro Shop" when the coach has no name). Nothing is drawn when there are none. Same card as the Pro Shop page; a tap opens the link in a new tab.
+export function FeaturedShopCards({ links, coachName }: { links: ProShopLink[]; coachName?: string | null }) {
   const featured = links.filter((l) => l.featured && safeWebUrl(l.url)).slice(0, 3);
   if (featured.length === 0) return null;
+  const first = (coachName ?? "").trim().split(/\s+/)[0] ?? "";
+  const heading = first ? `${first}'s Pro Shop` : "Pro Shop";
   return (
-    <section aria-label="From your coach">
-      <h2 className="font-body text-xs uppercase tracking-wide text-steel mb-2">From your coach</h2>
+    <section aria-label={heading}>
+      <h2 className="font-body text-xs uppercase tracking-wide text-steel mb-2">{heading}</h2>
       <ShopGrid>
         {featured.map((l) => (
           <ShopCard

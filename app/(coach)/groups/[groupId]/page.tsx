@@ -866,7 +866,7 @@ export default async function GroupHubPage(
                   </Link>
                 </section>
               )}
-              {isToday && <FeaturedShopCards links={featuredShop} />}
+              {isToday && <FeaturedShopCards links={featuredShop} coachName={roster.find((m) => m.role === "coach")?.fullName ?? null} />}
               {isToday && isFirstDay && (
                 <WellnessCheckinPopup
                   inline
