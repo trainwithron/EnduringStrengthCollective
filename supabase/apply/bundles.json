@@ -301,6 +301,14 @@
   "file": "apply-release-bw-all.sql"
  },
  {
+  "id": "release-cc",
+  "name": "Release CC (the Progress tab: your card and graph choices, pinned exercises, and the daily calories a client logged; run BEFORE the code that goes with it is live)",
+  "steps": [
+   "123"
+  ],
+  "file": "apply-release-cc-all.sql"
+ },
+ {
   "id": "release-cb",
   "name": "Release CB (imported history counts in totals, graphs, estimated maxes and records; training maxes are rebuilt from the sets; run AFTER Release CA, BEFORE the code that goes with it is live)",
   "steps": [

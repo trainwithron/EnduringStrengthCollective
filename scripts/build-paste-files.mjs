@@ -2360,6 +2360,21 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the training maxes table and the completion function exist", "to_regclass('public.athlete_training_maxes') is not null and to_regprocedure('public.complete_workout_session(uuid)') is not null"],
     ],
   },
+  {
+    n: "123",
+    slug: "0373",
+    title: "0373 The Progress tab: your card and graph choices, pinned exercises, and the daily calories a client logged",
+    migrations: ["0373"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes on screen until the code that goes with it is live. Then the Progress tab shows the estimated maxes as cards, remembers your cards or list and weight or volume choice on your account, lets you pin an exercise to the front of a client's cards, and draws one graph of body weight with the calorie target and what the client logged.",
+    undo: "drop function if exists public.client_daily_intake(uuid, uuid);" + String.fromCharCode(10) + "drop table if exists public.client_progress_pins;" + String.fromCharCode(10) + "drop table if exists public.coach_progress_prefs;",
+    undoWhy: "Only if step 123 misbehaves. Removes the pins and the saved card choices (the Progress tab then uses its defaults).",
+    rows: [
+      ["0373 is not already applied (no pins table yet)", "to_regclass('public.client_progress_pins') is null"],
+      ["the food log table exists", "to_regclass('public.food_log_entries') is not null"],
+      ["the org wall check exists", "to_regprocedure('public.group_in_active_org(uuid)') is not null"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -2470,6 +2485,7 @@ const BUNDLES = [
   { id: "release-bl", name: "Release BL (four exercises added to Coach Ron's library for the FitPros history; run any time)", steps: ["106"] },
   { id: "release-bk", name: "Release BK (move Coach Ron's own training into his personal space; run AFTER he has opened Coach Ron (you) once and removed the programs he does not want)", steps: ["105"] },
   { id: "release-bw", name: "Release BW (a rest can be a range such as 60-90; run AFTER Release BV and BEFORE the code that goes with it is live)", steps: ["117"] },
+  { id: "release-cc", name: "Release CC (the Progress tab: your card and graph choices, pinned exercises, and the daily calories a client logged; run BEFORE the code that goes with it is live)", steps: ["123"] },
   { id: "release-cb", name: "Release CB (imported history counts in totals, graphs, estimated maxes and records; training maxes are rebuilt from the sets; run AFTER Release CA, BEFORE the code that goes with it is live)", steps: ["122"] },
   { id: "release-ca", name: "Release CA (unclear data points in imported history are marked and kept out of the numbers; run BEFORE the code that goes with it is live)", steps: ["121"] },
   { id: "release-bz", name: "Release BZ (Needs attention: Not now for a week, and No macros for a client; run BEFORE the code that goes with it is live)", steps: ["120"] },
@@ -2694,6 +2710,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0373", "to_regclass('public.client_progress_pins') is not null"),
     m("0372", "to_regprocedure('public.client_exercise_rollup(uuid, uuid)') is not null"),
     m("0371", "to_regprocedure('public.flag_unclear_sets(uuid, uuid)') is not null"),
     m("0370", "to_regclass('public.attention_snoozes') is not null"),
