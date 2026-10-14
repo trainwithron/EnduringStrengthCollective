@@ -60,7 +60,7 @@ export function ProShopList({ links }: { links: ProShopLink[] }) {
 export function FeaturedShopCards({ links, coachName }: { links: ProShopLink[]; coachName?: string | null }) {
   const featured = links.filter((l) => l.featured && safeWebUrl(l.url)).slice(0, 3);
   if (featured.length === 0) return null;
-  const first = (coachName ?? "").trim().split(/s+/)[0] ?? "";
+  const first = (coachName ?? "").trim().split(/\s+/)[0] ?? "";
   const heading = first ? `${first}'s Pro Shop` : "Pro Shop";
   return (
     <section aria-label={heading}>
