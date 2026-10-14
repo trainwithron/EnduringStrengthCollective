@@ -5,6 +5,7 @@ import type { DemoRow } from "@/lib/exercise-demo";
 import { useEffect, useRef, useState } from "react";
 import { createBrowserClient } from "@/lib/supabase/client";
 import { MAX_TIME_SECONDS, formatRest, parseRestInput, parseRestSpan } from "@/lib/rest-time";
+import { cellWrite } from "@/lib/cell-write";
 import { ExerciseNameInput } from "./exercise-name-input";
 import { BuilderDemoThumb } from "@/components/coach/builder-demo-thumb";
 import { builderDemoFor, type BuilderDemo } from "@/lib/builder-demo";
@@ -133,19 +134,6 @@ function targetValue(set: ExerciseSetTarget, field: TrackedField): string {
 // A rest range as the cell shows and re-reads it: "60-90" when both ends are under two minutes, otherwise "1:30-2:30".
 function restRangeText(low: number, high: number): string {
   return high < 120 ? `${Math.round(low)}-${Math.round(high)}` : `${formatRest(low)}-${formatRest(high)}`;
-}
-
-// What to save for a cell. A rest is its low end plus its high end (empty for a single time, so a range never survives a change to one time). "60-90" arrives as a range.
-function cellWrite(field: TrackedField, raw: string): { patch: Record<string, unknown>; local: Partial<ExerciseSetTarget> } {
-  if (field === "rest") {
-    const m = raw.match(/^(d+)-(d+)$/);
-    const low = m ? Number(m[1]) : raw.trim() === "" ? null : Number(raw);
-    const high = m ? Number(m[2]) : null;
-    return { patch: { target_rest_seconds: low, target_rest_max_seconds: high }, local: { targetRestSeconds: low, targetRestMaxSeconds: high } };
-  }
-  const def = fieldDef(field);
-  const value = def.kind === "number" ? (raw.trim() === "" ? null : Number(raw)) : raw.trim() || null;
-  return { patch: { [TARGET_COLUMN[field]]: value }, local: { [TARGET_PROP[field]]: value } as Partial<ExerciseSetTarget> };
 }
 
 export function ExerciseBuilderCard({

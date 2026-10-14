@@ -52,7 +52,7 @@ describe("the logger gives the timer the range", () => {
 
 describe("a range is saved and copied everywhere a rest is", () => {
   it("cells, Bulk edit, the AI day builder, Duplicate weeks, add-set and Duplicate program all carry the high end", () => {
-    expect(read("components/coach/exercise-builder-card.tsx")).toContain("target_rest_max_seconds: high");
+    expect(read("lib/cell-write.ts")).toContain("target_rest_max_seconds: high");
     expect(read("components/coach/exercise-builder-card.tsx")).toContain("target_rest_max_seconds: last?.targetRestMaxSeconds ?? null");
     expect(read("components/coach/desktop/bulk-edit-day-panel.tsx")).toContain("target_rest_max_seconds: high");
     expect(read("app/api/ai/build-day/route.ts")).toContain("target_rest_max_seconds: restSpan?.high ?? null");
@@ -60,7 +60,7 @@ describe("a range is saved and copied everywhere a rest is", () => {
     expect(read("supabase/migrations/0367_rest_range.sql")).toContain("target_rest_seconds, target_rest_max_seconds, target_pace");
   });
   it("a changed single rest clears any old high end (a range never survives a change to one time)", () => {
-    expect(read("components/coach/exercise-builder-card.tsx")).toContain("target_rest_max_seconds: high");
+    expect(read("lib/cell-write.ts")).toContain("target_rest_max_seconds: high");
     expect(read("components/coach/exercise-builder-card.tsx")).toContain("target_rest_seconds: suggestion.restSeconds, target_rest_max_seconds: null");
   });
 });
