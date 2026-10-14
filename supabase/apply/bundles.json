@@ -301,6 +301,14 @@
   "file": "apply-release-bw-all.sql"
  },
  {
+  "id": "release-ce",
+  "name": "Release CE (InBody scans from a photo of the result sheet, with the photo kept in a private bucket; run BEFORE the code that goes with it is live)",
+  "steps": [
+   "125"
+  ],
+  "file": "apply-release-ce-all.sql"
+ },
+ {
   "id": "release-cd",
   "name": "Release CD (a coach can ask a client to count a record from imported history as a real one; run BEFORE the code that goes with it is live)",
   "steps": [

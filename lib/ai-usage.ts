@@ -62,6 +62,7 @@ export type AiFeature =
   | "recipe_parse"
   | "food_log_parse"
   | "food_photo_parse"
+  | "inbody_scan_parse"
   | "meal_plan_slot"
   | "ci_chat_router"
   | "ci_chat_synthesis"
@@ -120,6 +121,7 @@ const POLICY: Record<AiFeature, FeaturePolicy> = {
   recipe_parse: { enforce: true },
   food_log_parse: { enforce: true },
   food_photo_parse: { enforce: true },
+  inbody_scan_parse: { enforce: true },
   // A normal "AI Suggest All" is one call per meal slot back to back, so
   // it can't share the 6/min bucket — its own looser burst plus the
   // monthly ceiling is what bounds it.
@@ -153,6 +155,8 @@ export interface AiCallMeta {
 export const USER_MONTHLY_CEILING: Partial<Record<AiFeature, number>> = {
   food_photo_parse: 150,
   food_log_parse: 300,
+  // Reading an InBody sheet from a photo: scans are rare (a few a month at most), so this is about stopping repeated retakes from being unlimited spend. One number to change.
+  inbody_scan_parse: 10,
 };
 export function userMonthlyCeilingFor(feature: AiFeature): number | null {
   return USER_MONTHLY_CEILING[feature] ?? null;
@@ -160,6 +164,7 @@ export function userMonthlyCeilingFor(feature: AiFeature): number | null {
 const USER_MONTHLY_MESSAGE: Partial<Record<AiFeature, string>> = {
   food_photo_parse: "You've used this month's photo logs. You can still search foods, scan a barcode or use your saved meals.",
   food_log_parse: "You've used this month's typed-meal estimates. You can still search foods, scan a barcode or use your saved meals.",
+  inbody_scan_parse: "You've used this month's InBody sheet readings. You can still type the numbers in and keep the photo.",
 };
 
 export class AiRateLimitedError extends Error {

@@ -6,6 +6,7 @@ import { TrainingMaxCards } from "@/components/coach/progress/training-max-cards
 import { BodyOverlayChart } from "@/components/coach/progress/body-overlay-chart";
 import { LoggedSearch } from "@/components/coach/progress/logged-search";
 import { MakePrCountButton } from "@/components/coach/progress/make-pr-count-button";
+import { InbodyScansSection } from "@/components/body/inbody-scans-section";
 import { coachControlFor } from "@/lib/pr-promotion";
 import { dateKeyInZone, type StatEvent } from "@/lib/progress-periods";
 import { defaultMetric, planCards, summarizeExercises, type LadderInput } from "@/lib/progress-cards";
@@ -1767,6 +1768,9 @@ export default async function AthleteProfilePage(
 
           <div data-tab="progress">
             <BodyOverlayChart weight={overlayWeight} target={calorieTrend} intake={overlayIntake} todayKey={progressToday} />
+          </div>
+          <div data-tab="progress" className="mt-8">
+            <InbodyScansSection athleteId={params.athleteId} groupId={params.groupId} viewerId={user.id} athleteName={(profile?.full_name as string | undefined)?.split(" ")[0] ?? "the client"} />
           </div>
         </div>
       </div>

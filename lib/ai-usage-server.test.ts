@@ -116,7 +116,7 @@ describe("the coach's monthly AI budget", () => {
 
 describe("per-person monthly ceilings", () => {
   it("sets generous, tunable ceilings for food photos and typed estimates only", () => {
-    expect(USER_MONTHLY_CEILING).toEqual({ food_photo_parse: 150, food_log_parse: 300 });
+    expect(USER_MONTHLY_CEILING).toEqual({ food_photo_parse: 150, food_log_parse: 300, inbody_scan_parse: 10 });
     expect(userMonthlyCeilingFor("food_photo_parse")).toBe(150);
     expect(userMonthlyCeilingFor("food_log_parse")).toBe(300);
     expect(userMonthlyCeilingFor("program_generation")).toBeNull();

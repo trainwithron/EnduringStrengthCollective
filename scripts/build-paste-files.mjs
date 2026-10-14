@@ -1783,6 +1783,8 @@ alter table public.coach_availability_windows drop column if exists session_minu
     afterwards: "Nothing changes for normal use. A coach (or anyone signed in) can no longer save a macro target, meal plan, consent record, booking, program, workout assignment, check-in, session or similar row for a person who is not in the group it is filed under. A client can only be moved between groups of the same organization. Rows that already exist are untouched.",
     undo: [
       ...TENANT_TABLES.map((t) => `drop trigger if exists ${t}_enforce_athlete_in_group on public.${t};`),
+      // tables made after this step (the InBody scans) carry the same rule: take it off wherever it is, so the function can go
+      "do $undo$ declare r record; begin for r in select c.relname, t.tgname from pg_trigger t join pg_class c on c.oid = t.tgrelid where t.tgfoid = 'public.enforce_athlete_in_group'::regproc and not t.tgisinternal loop execute format('drop trigger if exists %I on public.%I', r.tgname, r.relname); end loop; end $undo$;",
       "drop function if exists public.enforce_athlete_in_group();",
       "drop trigger if exists group_memberships_guard_org_move on public.group_memberships;",
       "drop function if exists public.guard_membership_org_move();",
@@ -2396,6 +2398,27 @@ alter table public.coach_availability_windows drop column if exists session_minu
       ["the org wall check exists", "to_regprocedure('public.group_in_active_org(uuid)') is not null"],
     ],
   },
+  {
+    n: "125",
+    slug: "0375",
+    title: "0375 InBody scans from a photo of the result sheet: the scans, a private place for the photos, and the one function that saves a scan",
+    migrations: ["0375"],
+    sees: "Success. No rows returned.",
+    afterwards: "Nothing changes on screen until the code that goes with it is live. Then a client (next to where they log body weight) or a coach can photograph an InBody sheet, check the numbers the app read from it, and save the scan; the photo is kept privately for the client and their coaches, and the scan feeds the graphs. A scan's weight becomes that day's weigh-in only when asked and never over one already logged.",
+    undo: [
+      "drop function if exists public.save_body_scan(uuid, uuid, jsonb, text, boolean);",
+      'drop policy if exists "inbody_scans_storage_select" on storage.objects;',
+      'drop policy if exists "inbody_scans_storage_insert" on storage.objects;',
+      'drop policy if exists "inbody_scans_storage_delete" on storage.objects;',
+      "drop table if exists public.body_scans;",
+    ].join(String.fromCharCode(10)),
+    undoWhy: "Only if step 125 misbehaves. Removes the scans and the function. The private photo bucket and any photos already in it are left where they are (nobody can read them without the policies).",
+    rows: [
+      ["0375 is not already applied (no scans table yet)", "to_regclass('public.body_scans') is null"],
+      ["body weight logs and the athlete-in-group rule exist", "to_regclass('public.body_weight_logs') is not null and to_regprocedure('public.enforce_athlete_in_group()') is not null"],
+      ["the org wall check exists", "to_regprocedure('public.group_in_active_org(uuid)') is not null"],
+    ],
+  },
 ];
 
 const bar = "-- ".padEnd(3) + "=".repeat(100);
@@ -2506,6 +2529,7 @@ const BUNDLES = [
   { id: "release-bl", name: "Release BL (four exercises added to Coach Ron's library for the FitPros history; run any time)", steps: ["106"] },
   { id: "release-bk", name: "Release BK (move Coach Ron's own training into his personal space; run AFTER he has opened Coach Ron (you) once and removed the programs he does not want)", steps: ["105"] },
   { id: "release-bw", name: "Release BW (a rest can be a range such as 60-90; run AFTER Release BV and BEFORE the code that goes with it is live)", steps: ["117"] },
+  { id: "release-ce", name: "Release CE (InBody scans from a photo of the result sheet, with the photo kept in a private bucket; run BEFORE the code that goes with it is live)", steps: ["125"] },
   { id: "release-cd", name: "Release CD (a coach can ask a client to count a record from imported history as a real one; run BEFORE the code that goes with it is live)", steps: ["124"] },
   { id: "release-cc", name: "Release CC (the Progress tab: your card and graph choices, pinned exercises, and the daily calories a client logged; run BEFORE the code that goes with it is live)", steps: ["123"] },
   { id: "release-cb", name: "Release CB (imported history counts in totals, graphs, estimated maxes and records; training maxes are rebuilt from the sets; run AFTER Release CA, BEFORE the code that goes with it is live)", steps: ["122"] },
@@ -2732,6 +2756,7 @@ writeFileSync(new URL("bundles.json", outDir), JSON.stringify(BUNDLES.map((b) =>
     m("0331", "to_regprocedure('public.grant_purchase_once(text, text, uuid, uuid, uuid, integer, integer, text)') is not null"),
     m("0338", has.col("guardian_links", "expires_at")),
     m("0367", "exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'group_workout_exercise_sets' and column_name = 'target_rest_max_seconds')"),
+    m("0375", "to_regclass('public.body_scans') is not null"),
     m("0374", "to_regclass('public.pr_promotions') is not null"),
     m("0373", "to_regclass('public.client_progress_pins') is not null"),
     m("0372", "to_regprocedure('public.client_exercise_rollup(uuid, uuid)') is not null"),

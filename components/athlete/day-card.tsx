@@ -4,6 +4,7 @@ import { VIEW_PROGRAM_LABEL, startLabel, weekdayName } from "@/lib/coach-log-cho
 import { Lock, Check } from "lucide-react";
 import { TodayWidget, type TodayMacros, type TodayHabit } from "./today-widget";
 import { WeightLogWidget, type WeightLogEntry } from "./weight-log-widget";
+import { InbodyEntry } from "@/components/body/inbody-entry";
 import type { DayWorkoutInfo } from "@/lib/athlete-day-schedule";
 import type { DaySession } from "@/lib/program-day-contexts";
 import { computeReadinessAverage, type WellnessCheckinValues } from "@/lib/wellness";
@@ -83,6 +84,7 @@ export function DayCard({
         <>
           <TodayWidget todayDate={dateKey} macros={macros} habits={habits} mealLine={mealLine ?? null} mealHref={`/groups/${groupId}/nutrition`} />
           <WeightLogWidget athleteId={athleteId} groupId={groupId} initialLogs={weightLogs} weightUnit={weightUnit} />
+          <InbodyEntry athleteId={athleteId} groupId={groupId} />
         </>
       ) : (
         <ReadOnlyDaySummary macros={macros} habits={habits} />
