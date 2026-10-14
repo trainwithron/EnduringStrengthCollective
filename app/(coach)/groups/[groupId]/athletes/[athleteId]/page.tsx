@@ -1,4 +1,5 @@
 import { isEmailConfigured } from "@/lib/email";
+import { mergeLoggedList } from "@/lib/logged-list";
 import { sorenessShown } from "@/lib/wellness";
 import { ClientAssessmentsSection } from "@/components/coach/desktop/client-assessments-section";
 import { ViewAsClientLink } from "@/components/coach/desktop/view-as-client-label";
@@ -150,6 +151,7 @@ export default async function AthleteProfilePage(
     displayZone,
     { data: threadRows },
     { data: coachMovementPatterns },
+    { data: importedSessions, count: importedTotal },
   ] = await Promise.all([
     supabase
       .from("group_memberships")
@@ -387,6 +389,16 @@ export default async function AthleteProfilePage(
       .order("created_at", { ascending: false })
       .limit(200),
     supabase.from("movement_patterns").select("id, name").eq("created_by", user.id).order("name"),
+    // Imported past history (the History page's uploads) is plain history: listed with the logged workouts, marked Imported. It has no workout_logs row, so it never counts in the Workouts, Volume or PRs numbers.
+    supabase
+      .from("athlete_sessions")
+      .select("id, started_at, session_exercises(count)", { count: "exact" })
+      .eq("athlete_id", params.athleteId)
+      .eq("group_id", params.groupId)
+      .eq("is_historical", true)
+      .eq("status", "completed")
+      .order("started_at", { ascending: false })
+      .limit(50),
   ]);
 
   if (membership?.role !== "coach") {
@@ -607,7 +619,12 @@ export default async function AthleteProfilePage(
   prEntries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const RECENT_LOGS_LIMIT = 50;
-  const workoutLogs = (allLogs ?? []).slice(0, RECENT_LOGS_LIMIT);
+  const loggedList = mergeLoggedList<any>(
+    (allLogs ?? []) as any[],
+    (importedSessions ?? []).map((s: any) => ({ id: s.id as string, started_at: s.started_at as string, exercises: (s.session_exercises?.[0]?.count as number | undefined) ?? 0 })),
+    RECENT_LOGS_LIMIT
+  );
+  const loggedListTotal = totalCompleted + (importedTotal ?? importedSessions?.length ?? 0);
 
   // Last-7-days habit compliance — the one piece of this that's actually
   // measurable today. Macro targets are coach-set but nothing logs what
@@ -1599,21 +1616,44 @@ export default async function AthleteProfilePage(
 
           <div data-tab="overview progress">
           <section>
-          <h2 className="font-display uppercase text-sm tracking-wide text-steel mb-2">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 mb-2">
+          <h2 className="font-display uppercase text-sm tracking-wide text-steel">
             Logged workouts
-            {totalCompleted > RECENT_LOGS_LIMIT && (
+            {loggedListTotal > RECENT_LOGS_LIMIT && (
               <span className="normal-case text-steel">
                 {" "}
-                — most recent {RECENT_LOGS_LIMIT} of {totalCompleted}
+                — most recent {RECENT_LOGS_LIMIT} of {loggedListTotal}
               </span>
             )}
           </h2>
-          {workoutLogs.length === 0 ? (
+          <Link href={`/groups/${params.groupId}/athletes/${params.athleteId}/history`} className="min-h-11 inline-flex items-center font-body text-xs text-rust underline underline-offset-2">
+            Import or add past history
+          </Link>
+          </div>
+          {loggedList.length === 0 ? (
             <p className="font-body text-sm text-steel py-2">No completed workouts yet.</p>
           ) : (
             <div className="divide-y divide-steel/15">
-              {workoutLogs.map((log: any) => (
-                <div key={log.id} className="py-3">
+              {loggedList.map(({ key, date, imported, log }) =>
+                imported ? (
+                  <div key={key} className="py-3">
+                    <Link href={`/sessions/${imported.id}`} className="block hover:bg-surface/40 transition-colors">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-body font-medium text-[15px] flex items-center gap-2">
+                          Past workout
+                          <span className="font-body text-xs text-steel border border-steel/30 px-1.5 py-0.5">Imported</span>
+                        </span>
+                        <span className="font-body text-xs text-steel shrink-0">
+                          {new Date(date).toLocaleDateString("en-US", { timeZone: displayZone })}
+                        </span>
+                      </div>
+                      <p className="font-body text-xs text-steel mt-0.5">
+                        {imported.exercises} {imported.exercises === 1 ? "exercise" : "exercises"}
+                      </p>
+                    </Link>
+                  </div>
+                ) : log ? (
+                <div key={key} className="py-3">
                   <Link
                     href={log.session_id ? `/sessions/${log.session_id}` : "#"}
                     className="block hover:bg-surface/40 transition-colors"
@@ -1644,7 +1684,8 @@ export default async function AthleteProfilePage(
                     </Link>
                   )}
                 </div>
-              ))}
+                ) : null
+              )}
             </div>
           )}
           </section>

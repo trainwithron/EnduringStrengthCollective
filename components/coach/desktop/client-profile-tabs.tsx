@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { CLIENT_PROFILE_TABS, LOADED_ON_OPEN, type ClientProfileTab } from "@/lib/client-profile-tabs";
 
@@ -56,12 +55,6 @@ export function ClientProfileTabs({ groupId, athleteId, initial = "overview", hi
           {t.label}
         </button>
       ))}
-      {/* History is its own page (exercise history, and the FitPros import): a link that reads like the tabs. */}
-      {groupId && athleteId && (
-        <Link href={`/groups/${groupId}/athletes/${athleteId}/history`} className={`${base} border-transparent text-steel hover:text-chalk inline-flex items-center`}>
-          History
-        </Link>
-      )}
     </nav>
   );
 }
