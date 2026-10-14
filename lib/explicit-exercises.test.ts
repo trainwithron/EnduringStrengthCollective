@@ -78,3 +78,19 @@ describe("a custom exercise stays a normal exercise", () => {
     expect(read("components/coach/desktop/day-card.tsx")).toContain('match.confidence !== "fuzzy" || sameQualifiers(typedName, match.exerciseName)');
   });
 });
+
+// Assistant's safety point: the model's own "coachNamed" claim must not switch the safety net off.
+describe("the model's claim alone never makes an exercise the coach's", () => {
+  it("a generic negated phrase plus an AI-marked exercise is not coach-named, so it is still scanned", () => {
+    expect(coachNamedExercise("no squats, his back", "Barbell Back Squat", true)).toBe(false);
+    expect(coachNamedExercise("no barbell back squats, his back", "Barbell Back Squat", true)).toBe(false);
+    expect(coachNamedExercise("Build a leg day. Avoid heavy deadlifts.", "Romanian Deadlift", true)).toBe(false);
+    expect(coachNamedExercise("a hip day", "Hip Thrust", true)).toBe(false);
+  });
+  it("a claim the text backs up still counts, and a leave-out in another sentence does not cancel it", () => {
+    expect(coachNamedExercise("Include dumbbell bench press on day 1.", "Dumbbell Bench Press", true)).toBe(true);
+    expect(coachNamedExercise("No jumping. Include Right Heel Lift Hemi Bridge Adductor Rock Back.", PRI, true)).toBe(true);
+    expect(coachNamedExercise("no jumping, include right heel lift hemi bridge adductor rock back", PRI, false)).toBe(false);
+    expect(coachNamedExercise("include Right Heel Lift Hemi Bridge Adductor Rock Back", PRI, false)).toBe(true);
+  });
+});

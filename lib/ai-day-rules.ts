@@ -149,21 +149,30 @@ export function longDayFlag(week: number, day: number, count: number, wanted: nu
 const NEGATORS = /\b(no|not|never|without|avoid|skip|except|exclude|excluding|don'?t|dont|remove)\b/i;
 const normWords = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
-// The coach named this exercise in their own words, and did not name it to leave it out ("no barbell back squat").
+// The coach named this exercise in their own words, and did not name it to leave it out ("no barbell back squat"). The model's own claim ("coachNamed") counts only when the coach's text really contains the
+// exercise: every word of its name is there (a plural counts), and none of those words follows a leave-out word. A claim the text does not back up is ignored, so the safety checks still apply.
+const singular = (w: string) => (w.length > 3 && w.endsWith("s") && !w.endsWith("ss") ? w.slice(0, -1) : w);
 export function coachNamedExercise(request: string, name: string, aiMarked: boolean): boolean {
   const n = normWords(name);
   if (!n) return false;
-  const text = ` ${normWords(request)} `;
-  const at = text.indexOf(` ${n} `);
-  const mentioned = at >= 0;
-  // Preceding few words: a negated mention is a request to leave it out, not to include it.
-  const negated = mentioned && NEGATORS.test(text.slice(Math.max(0, at - 40), at + 1));
-  if (negated) return false;
+  const words = n.split(" ");
+  const textWords = new Set(normWords(request).split(" ").map(singular));
+  const allThere = words.every((w) => textWords.has(singular(w)));
+  if (!allThere) return false;
+  // A leave-out word earlier in the same sentence as any word of the name (in either form) means the coach asked to avoid it.
+  for (const clause of request.split(/[.;!?\n]+/)) {
+    const c = ` ${normWords(clause)} `;
+    for (const w of words) {
+      for (const form of new Set([w, singular(w), `${singular(w)}s`])) {
+        const at = c.indexOf(` ${form} `);
+        if (at >= 0 && NEGATORS.test(c.slice(0, at + 1))) return false;
+      }
+    }
+  }
   if (aiMarked) return true;
   // A long, specific name that appears word for word is the coach's even when the model forgot to say so.
-  return mentioned && n.split(" ").length >= 3 && mentionsExercise(request, name);
+  return words.length >= 3 && mentionsExercise(request, name);
 }
-
 
 export interface ResolvedName {
   name: string;
