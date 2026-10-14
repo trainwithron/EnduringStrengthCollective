@@ -48,13 +48,16 @@ export function normalizeHeader(header: string): string {
   return (header ?? "").toLowerCase().replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
-const COUNTER_WORDS = ["no", "num", "number", "nr", "order", "index", "id", "count", "counter", "position", "pos", "seq", "sequence"];
+const COUNTER_WORDS = ["no", "num", "number", "nr", "order", "index", "id", "position", "pos", "seq", "sequence"];
 
-// A column that only numbers the rows ("Exercise #", "Exercise_#", "Exercise No", "Exercise Number", "Set #"): never the column that holds the names or the set count.
+// A column that only numbers the rows ("Exercise #", "Exercise_#", "Exercise No", "Exercise Number", "Set #"): never the column that holds the names or the set count. A header that says "of" is
+// a COUNT of something, not a row number ("Number of Sets", "No. of Sets", "# of Reps"), and "Set Count" or "Rep Count" are counts too: those are the columns we want.
 export function isCounterHeader(header: string): boolean {
   const h = normalizeHeader(header);
+  const tokens = h.split(/[^a-z0-9]+/).filter(Boolean);
+  if (tokens.includes("of")) return false;
   if (h.includes("#")) return true;
-  return h.split(/[^a-z0-9]+/).some((token) => COUNTER_WORDS.includes(token));
+  return tokens.some((token) => COUNTER_WORDS.includes(token));
 }
 
 // Best-effort auto-detection of which spreadsheet column is which. An exact header match wins ("Exercise_Name" and "exercise name" are the same). Otherwise a header that CONTAINS the alias

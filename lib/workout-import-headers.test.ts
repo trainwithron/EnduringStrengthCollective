@@ -35,6 +35,22 @@ describe("headers are compared the way a person reads them", () => {
   });
 });
 
+describe("counts are not row numbers", () => {
+  it("a header that says of, or is a count, is still the sets or reps column", () => {
+    for (const h of ["Number of Sets", "No. of Sets", "# of Sets", "Set Count", "Rep Count", "Total Reps Count", "Number of Reps"]) expect(isCounterHeader(h)).toBe(false);
+  });
+  it("and each is found as the column it names", () => {
+    expect(detectColumns(["Exercise", "Number of Sets", "Reps"])).toMatchObject({ exercise: 0, sets: 1, reps: 2 });
+    expect(detectColumns(["Exercise", "No. of Sets", "Rep Count"])).toMatchObject({ sets: 1, reps: 2 });
+    expect(detectColumns(["Exercise", "Set Count", "Total Reps Count"])).toMatchObject({ sets: 1, reps: 2 });
+    expect(detectColumns(["Exercise", "# of Sets"])).toMatchObject({ sets: 1 });
+  });
+  it("the row-number columns are still skipped", () => {
+    for (const h of ["Exercise #", "Set #", "Set Number", "Exercise No", "Exercise Index", "Exercise ID", "Exercise Order"]) expect(isCounterHeader(h)).toBe(true);
+    expect(detectColumns(["Exercise", "Set Number", "Sets"])).toMatchObject({ sets: 2 });
+  });
+});
+
 describe("finding the columns", () => {
   it("the exact header row from the Gemini program: the exercise column is Exercise_Name, not Exercise_#", () => {
     const header = ["Week", "Intensity_Phase", "Day", "Exercise_#", "Exercise_Name", "Sets", "Prescription", "Notes"];
