@@ -42,13 +42,14 @@ describe("a starting target from a worked profile", () => {
 
 describe("a client under 18 never gets a deficit", () => {
   const teen: BaselineInput = { ...base, sex: "male", weightLbs: 160, heightCm: 175, dateOfBirth: "2010-01-01" };
-  it("fat loss is held at maintenance and says why", () => {
+  it("fat loss is held at maintenance and says so plainly, without a lecture", () => {
     const r = ok(teen);
     expect(r.ageYears).toBe(16);
     expect(r.heldForAge).toBe(true);
     expect(r.phase).toBe("maintenance");
     expect(r.calories).toBe(2703);
-    expect(r.rationale).toMatch(/under 18/);
+    expect(r.rationale).toContain("No automatic calorie suggestions for youth clients. Set the target you decide.");
+    expect(r.rationale).not.toMatch(/under 18|best practice|should not|unsafe/i);
   });
   it("muscle building is allowed for a teenager, and 18 on the birthday is an adult", () => {
     const bulk = ok({ ...teen, phase: "hypertrophy" });
