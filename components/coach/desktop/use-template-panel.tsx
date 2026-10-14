@@ -7,12 +7,31 @@ import { loadAssignableClients, type AssignClient } from "@/lib/assign-clients";
 import { assignProgramToClient, duplicateProgram } from "@/lib/program-duplication";
 import { localDateKey } from "@/lib/timezone";
 import type { LadderRung, Level, Side, SlotTier } from "@/lib/slot-templates";
+import { readAiJson } from "@/lib/ai-fetch";
+import { NOTHING_FITS_MESSAGE, PICK_FAILED_MESSAGE, TEMPLATE_PICK_MAX_TEXT, YOUR_REQUEST_TAG, type TemplatePick } from "@/lib/ai-from-template";
 import { LEVELS, MAKE_FAILED_MESSAGE, NO_LADDER_MESSAGE, buildReview, dayHeading, defaultProgramName, everySlotFilled, madeMessage, type TemplateSlot } from "@/lib/use-template";
 
 const field = "h-11 w-full bg-graphite border border-steel/30 text-chalk px-2 font-body text-sm focus:outline-none focus:border-rust";
 
 // "Use this template…": pick a level (and a client if you like), look over the exercise chosen for every slot, change any, and make a normal library program with real exercises. The template is never changed.
-export function UseTemplatePanel({ programId, programName, groupId, onClose, onChanged }: { programId: string; programName: string; groupId: string; onClose: () => void; onChanged: () => void }) {
+export function UseTemplatePanel({
+  programId,
+  programName,
+  groupId,
+  onClose,
+  onChanged,
+  initialText = "",
+  initialClientId = "",
+}: {
+  programId: string;
+  programName: string;
+  groupId: string;
+  onClose: () => void;
+  onChanged: () => void;
+  // Opened from a typed request ("the 30-year-old mom of two template"): the words and the client named in them come with it.
+  initialText?: string;
+  initialClientId?: string;
+}) {
   const [slots, setSlots] = useState<TemplateSlot[] | null>(null);
   const [ladders, setLadders] = useState<Record<string, LadderRung[]>>({});
   const [clients, setClients] = useState<AssignClient[]>([]);
@@ -26,6 +45,12 @@ export function UseTemplatePanel({ programId, programName, groupId, onClose, onC
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  // "Pick for me": who it is for, the AI's picks with their reasons, and any "worth a look" notes. Nothing is saved until the coach makes the program.
+  const [aiText, setAiText] = useState(initialText);
+  const [picking, setPicking] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiPicks, setAiPicks] = useState<Record<string, TemplatePick>>({});
+  const [aiFlags, setAiFlags] = useState<string[]>([]);
 
   useEffect(() => {
     const supabase = createBrowserClient();
@@ -69,6 +94,66 @@ export function UseTemplatePanel({ programId, programName, groupId, onClose, onC
   const client = clients.find((c) => c.id === clientId) ?? null;
   const firstName = client ? client.fullName.trim().split(/\s+/)[0] : null;
   const ready = everySlotFilled(review, picks) && shownName.trim() !== "";
+
+  function selectClient(id: string) {
+    setClientId(id);
+    setStoredLevel(null);
+    const picked = clients.find((c) => c.id === id);
+    if (!picked) return;
+    void createBrowserClient()
+      .from("group_memberships")
+      .select("training_level")
+      .eq("group_id", picked.destinationGroupId)
+      .eq("profile_id", picked.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        const stored = ((data as { training_level?: Level | null } | null)?.training_level ?? null) as Level | null;
+        setStoredLevel(stored);
+        if (stored) {
+          setLevel(stored);
+          setChanged({});
+        }
+      });
+  }
+
+  // Opened with a client already named in the words: that client is chosen once the clients are loaded.
+  useEffect(() => {
+    if (initialClientId && clients.some((c) => c.id === initialClientId) && !clientId) selectClient(initialClientId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clients]);
+
+  async function pickForMe() {
+    if (picking || aiText.trim() === "") return;
+    setPicking(true);
+    setAiError(null);
+    try {
+      const response = await fetch("/api/ai/pick-template", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ programId, text: aiText, level, clientId: clientId || null }),
+      });
+      const data = await readAiJson(response);
+      if (!response.ok || !data || !Array.isArray(data.picks)) {
+        setAiError(typeof data?.error === "string" ? data.error : PICK_FAILED_MESSAGE);
+        return;
+      }
+      const next: Record<string, string> = {};
+      const byRow: Record<string, TemplatePick> = {};
+      for (const p of data.picks as TemplatePick[]) {
+        byRow[p.rowId] = p;
+        // A pick the AI made (or the coach asked for) replaces the level's default; an empty one means nothing on that ladder is safe; no choice from the AI keeps the default.
+        if (p.exercise !== null) next[p.rowId] = p.exercise;
+      }
+      setLevel(data.level as Level);
+      setChanged(next);
+      setAiPicks(byRow);
+      setAiFlags(Array.isArray(data.flags) ? (data.flags as string[]) : []);
+    } catch {
+      setAiError(PICK_FAILED_MESSAGE);
+    } finally {
+      setPicking(false);
+    }
+  }
 
   async function make() {
     if (!ready || busy) return;
@@ -169,27 +254,7 @@ export function UseTemplatePanel({ programId, programName, groupId, onClose, onC
                 For a client (optional)
                 <select
                   value={clientId}
-                  onChange={(e) => {
-                    const id = e.target.value;
-                    setClientId(id);
-                    setStoredLevel(null);
-                    const picked = clients.find((c) => c.id === id);
-                    if (!picked) return;
-                    void createBrowserClient()
-                      .from("group_memberships")
-                      .select("training_level")
-                      .eq("group_id", picked.destinationGroupId)
-                      .eq("profile_id", picked.id)
-                      .maybeSingle()
-                      .then(({ data }) => {
-                        const stored = ((data as { training_level?: Level | null } | null)?.training_level ?? null) as Level | null;
-                        setStoredLevel(stored);
-                        if (stored) {
-                          setLevel(stored);
-                          setChanged({});
-                        }
-                      });
-                  }}
+                  onChange={(e) => selectClient(e.target.value)}
                   className={`${field} mt-1`}
                 >
                   <option value="">No one yet (keep it in my library)</option>
@@ -200,6 +265,36 @@ export function UseTemplatePanel({ programId, programName, groupId, onClose, onC
                   ))}
                 </select>
               </label>
+              <div className="sm:col-span-2">
+                <label className="font-body text-xs text-steel">
+                  Who is it for? Anything to work around?
+                  <textarea
+                    value={aiText}
+                    onChange={(e) => setAiText(e.target.value)}
+                    maxLength={TEMPLATE_PICK_MAX_TEXT}
+                    rows={2}
+                    placeholder="e.g. 30-year-old mom of two, limited overhead range of motion, no jumping"
+                    className="w-full mt-1 bg-graphite border border-steel/30 text-chalk px-2 py-2 font-body text-sm focus:outline-none focus:border-rust"
+                  />
+                </label>
+                <button type="button" onClick={pickForMe} disabled={picking || aiText.trim() === ""} className="mt-2 min-h-11 px-4 border border-rust text-rust font-body text-sm disabled:opacity-40">
+                  {picking ? "Picking…" : "Pick for me"}
+                </button>
+                {aiError && (
+                  <p className="font-body text-xs text-rust mt-2" role="alert">
+                    {aiError}
+                  </p>
+                )}
+                {aiFlags.length > 0 && (
+                  <ul className="mt-2 space-y-1" aria-label="Worth a look">
+                    {aiFlags.map((f) => (
+                      <li key={f} className="font-body text-xs text-steel">
+                        Worth a look: {f}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
               <label className="font-body text-xs text-steel sm:col-span-2">
                 Program name
                 <input
@@ -220,6 +315,7 @@ export function UseTemplatePanel({ programId, programName, groupId, onClose, onC
                 const showHeading = heading !== lastHeading;
                 lastHeading = heading;
                 const value = picks[r.rowId] ?? "";
+                const ai = aiPicks[r.rowId];
                 return (
                   <div key={r.rowId}>
                     {showHeading && <p className="font-display uppercase text-xs tracking-wide text-steel pt-3 pb-1">{heading}</p>}
@@ -231,12 +327,29 @@ export function UseTemplatePanel({ programId, programName, groupId, onClose, onC
                         </p>
                       ) : (
                         <select value={value} onChange={(e) => setChanged((prev) => ({ ...prev, [r.rowId]: e.target.value }))} aria-label={`Exercise for ${r.label}`} className={`${field} mt-1`}>
+                          {value === "" && (
+                            <option value="" disabled>
+                              Choose…
+                            </option>
+                          )}
+                          {ai?.source === "request" && ai.exercise && !r.choices.some((c) => c.exerciseName === ai.exercise) && (
+                            <option value={ai.exercise}>
+                              {ai.exercise} ({YOUR_REQUEST_TAG})
+                            </option>
+                          )}
                           {r.choices.map((c) => (
                             <option key={c.exerciseName} value={c.exerciseName}>
                               {c.exerciseName}
                             </option>
                           ))}
                         </select>
+                      )}
+                      {ai && ai.source === "request" && value === ai.exercise && <p className="font-body text-xs text-rust mt-1">{YOUR_REQUEST_TAG}</p>}
+                      {ai && (ai.source === "ai" || ai.source === "request") && value === ai.exercise && ai.reason && <p className="font-body text-xs text-steel mt-1">{ai.reason}</p>}
+                      {ai && ai.source === "none" && value === "" && r.choices.length > 0 && (
+                        <p className="font-body text-xs text-rust mt-1" role="alert">
+                          {NOTHING_FITS_MESSAGE}
+                        </p>
                       )}
                       {r.fallback && <p className="font-body text-xs text-steel mt-1">{r.fallback}</p>}
                     </div>

@@ -6,6 +6,7 @@ import { readAiJson } from "@/lib/ai-fetch";
 import { BUILDER_ONE_WORKOUT_SELECT, mapWorkoutRowToBuilderDay } from "@/lib/program-builder-data";
 import { AiRunPanel } from "@/components/coach/desktop/ai-run-panel";
 import { MicButton } from "@/components/shared/mic-button";
+import { TemplateSuggestion } from "@/components/coach/desktop/template-suggestion";
 import { fixTargetFrom, parseBuildRequest, planSlots, scopeLimitFrom } from "@/lib/ai-day-request";
 import type { DaySlot } from "@/lib/ai-day-slots";
 import type { BuilderDay } from "@/lib/types";
@@ -258,6 +259,7 @@ export function AiProgramBuilderBox({
           </button>
         )}
       </div>
+      {phase === "idle" && <TemplateSuggestion text={text} />}
       {line && (
         <p className="font-body text-sm text-chalk mt-2" role="status">
           {line}
