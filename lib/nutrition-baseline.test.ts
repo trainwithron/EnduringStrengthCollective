@@ -48,7 +48,7 @@ describe("a client under 18 never gets a deficit", () => {
     expect(r.heldForAge).toBe(true);
     expect(r.phase).toBe("maintenance");
     expect(r.calories).toBe(2703);
-    expect(r.rationale).toContain("No automatic calorie suggestions for youth clients. Set the target you decide.");
+    expect(r.rationale).toContain("Starting at maintenance. Set the target you decide.");
     expect(r.rationale).not.toMatch(/under 18|best practice|should not|unsafe/i);
   });
   it("muscle building is allowed for a teenager, and 18 on the birthday is an adult", () => {

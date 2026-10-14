@@ -95,7 +95,7 @@ export function computeBaseline(input: BaselineInput): BaselineOutcome {
   const parts = [
     `Starting target from their own numbers: ${formula}, a base of ${bmr.toLocaleString("en-US")} a day, ${input.activity.replace("_", " ")} activity, so about ${maintenance.toLocaleString("en-US")} to hold their weight.`,
     heldForAge
-      ? `No automatic calorie suggestions for youth clients. Set the target you decide.`
+      ? `Starting at maintenance. Set the target you decide.`
       : `Phase: ${PHASE_LABELS[phase].toLowerCase()}${phase === "maintenance" ? "" : `, ${calories > maintenance ? "plus" : "minus"} ${Math.abs(Math.round((calories / maintenance - 1) * 100))} percent`}, which is ${calories.toLocaleString("en-US")} calories.`,
     `Protein ${macros.proteinG} g (${gPerLb} g per pound).`,
     `Review it and change anything you like: nothing applies until you approve it.`,
