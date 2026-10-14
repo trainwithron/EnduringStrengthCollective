@@ -9,10 +9,13 @@ export function CorrectClientEmail({
   groupId,
   athleteId,
   clientName,
+  currentEmail = null,
 }: {
   groupId: string;
   athleteId: string;
   clientName: string;
+  // The address on file now, shown above the button and named in the confirmation.
+  currentEmail?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
@@ -26,7 +29,7 @@ export function CorrectClientEmail({
     const first = clientName.split(" ")[0] || "them";
     if (
       !await confirmDialog({
-        message: `Change ${first}'s sign-in email to ${email.trim()}? They will sign in and reset their password with this address from now on, and we will tell them in the app.`,
+        message: `Change ${first}'s sign-in email${currentEmail ? ` from ${currentEmail}` : ""} to ${email.trim()}? They will sign in and reset their password with this address from now on, and we will tell them in the app.`,
         confirmLabel: "Change email",
       })
     ) {
@@ -54,6 +57,7 @@ export function CorrectClientEmail({
 
   return (
     <div>
+      {currentEmail && <p className="font-body text-xs text-steel mt-4">Sign-in email on file: {currentEmail}</p>}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

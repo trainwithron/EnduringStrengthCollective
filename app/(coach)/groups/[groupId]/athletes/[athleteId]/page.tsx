@@ -443,9 +443,9 @@ export default async function AthleteProfilePage(
       : null,
   });
   const coachFirstName = (viewerProfile?.full_name ?? "").split(" ")[0] || null;
-  // The client's address on the account, so a not-yet-signed-in client can be emailed their link (the coach typed it, or it came with the client).
+  // The client's address on the account: shown to the coach for a client who has signed in too (so they can see what is on file before correcting it), and used to email a not-yet-signed-in client their link.
   let signInEmailOnFile: string | null = null;
-  if (signInStatus !== "active") {
+  if (signInStatus !== "active" || !selfView) {
     const { data: signInTarget } = await createServiceRoleClient().auth.admin.getUserById(params.athleteId);
     const signInEmail = signInTarget?.user?.email ?? null;
     signInEmailOnFile = signInEmail && !isPlaceholderEmail(signInEmail) ? signInEmail : null;
@@ -974,9 +974,13 @@ export default async function AthleteProfilePage(
                   groupId={params.groupId}
                   athleteId={params.athleteId}
                   clientName={profile?.full_name ?? "Client"}
+                  currentEmail={signInEmailOnFile}
                 />
               ) : (
-                <p className="font-body text-xs text-steel mt-4">To change their email, ask {profile?.full_name ?? "the client"} to change it in their own Settings.</p>
+                <>
+                  {signInEmailOnFile && <p className="font-body text-xs text-steel mt-4">Sign-in email on file: {signInEmailOnFile}</p>}
+                  <p className="font-body text-xs text-steel mt-4">To change their email, ask {profile?.full_name ?? "the client"} to change it in their own Settings.</p>
+                </>
               )}
               <SendSignInLinkButton groupId={params.groupId} athleteId={params.athleteId} clientName={profile?.full_name ?? "this client"} />
             </>
