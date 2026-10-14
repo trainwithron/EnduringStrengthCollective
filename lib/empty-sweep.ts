@@ -22,15 +22,19 @@ export interface EmptyDayRow {
   assignments: number;
 }
 
-// A day set up to be filled in later is kept for a full day (the same as a program), so nothing is lost mid-build.
-const DAY_NEW_MS = 24 * 3600000;
-
-export function isRemovableEmptyDay(d: EmptyDayRow, now: Date): boolean {
+// An empty day has no grace period (Ron: it is too easy to add one back): it goes the next time its program is opened. "Never while the builder is open" is kept by WHEN the sweep runs, not by a timer:
+// only once, as the builder opens (the days it was opened with), so a day added while building can never be swept. The one exception is a program that is itself brand new (below).
+export function isRemovableEmptyDay(d: EmptyDayRow): boolean {
   if (d.exercises > 0 || d.notes > 0 || d.sessions > 0 || d.logs > 0 || d.assignments > 0) return false;
   if (d.scheduledDate) return false;
-  if (isRestDayTitle(d.title)) return false;
-  // A day made in the last day may be one he is about to fill: never mid-edit.
-  return now.getTime() - new Date(d.createdAt).getTime() >= DAY_NEW_MS;
+  return !isRestDayTitle(d.title);
+}
+
+// A program made in the last few minutes is still being set up (a new program opens straight into the builder with its empty days to fill): its first open sweeps nothing.
+const PROGRAM_BRAND_NEW_MS = 10 * 60000;
+export function isBrandNewProgram(createdAt: string | null | undefined, now: Date = new Date()): boolean {
+  if (!createdAt) return false;
+  return now.getTime() - new Date(createdAt).getTime() < PROGRAM_BRAND_NEW_MS;
 }
 
 export interface EmptyProgramRow {
@@ -53,26 +57,25 @@ export function isRemovableEmptyProgram(p: EmptyProgramRow, viewerId: string, no
 
 const count = (v: unknown): number => Number((v as { count?: number }[] | null)?.[0]?.count ?? 0);
 
-// The empty days of one program, removed when the coach opens it again (never while he is in it).
-export async function sweepEmptyDays(supabase: SupabaseClient, programId: string, now = new Date()): Promise<number> {
+// The empty days of one program among the ones the builder was opened with, removed as it opens. Returns the ids removed.
+export async function sweepEmptyDays(supabase: SupabaseClient, programId: string, onlyIds: string[]): Promise<string[]> {
   try {
+    if (onlyIds.length === 0) return [];
     const { data } = await supabase
       .from("workouts")
       .select("id, title, scheduled_date, created_at, group_workout_exercises(count), workout_notes(count), athlete_sessions(count), workout_logs(count), workout_assignments(count)")
-      .eq("program_id", programId);
+      .eq("program_id", programId)
+      .in("id", onlyIds);
     const ids = ((data ?? []) as any[])
       .filter((w) =>
-        isRemovableEmptyDay(
-          { id: w.id, title: w.title, scheduledDate: w.scheduled_date ?? null, createdAt: w.created_at, exercises: count(w.group_workout_exercises), notes: count(w.workout_notes), sessions: count(w.athlete_sessions), logs: count(w.workout_logs), assignments: count(w.workout_assignments) },
-          now
-        )
+        isRemovableEmptyDay({ id: w.id, title: w.title, scheduledDate: w.scheduled_date ?? null, createdAt: w.created_at, exercises: count(w.group_workout_exercises), notes: count(w.workout_notes), sessions: count(w.athlete_sessions), logs: count(w.workout_logs), assignments: count(w.workout_assignments) })
       )
       .map((w) => w.id as string);
-    if (ids.length === 0) return 0;
-    await supabase.from("workouts").delete().in("id", ids);
-    return ids.length;
+    if (ids.length === 0) return [];
+    const { error } = await supabase.from("workouts").delete().in("id", ids);
+    return error ? [] : ids;
   } catch {
-    return 0;
+    return [];
   }
 }
 

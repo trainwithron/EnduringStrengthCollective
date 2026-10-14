@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { isRemovableEmptyDay, isRemovableEmptyProgram, isRestDayTitle, type EmptyDayRow, type EmptyProgramRow } from "@/lib/empty-sweep";
+import { isBrandNewProgram, isRemovableEmptyDay, isRemovableEmptyProgram, isRestDayTitle, type EmptyDayRow, type EmptyProgramRow } from "@/lib/empty-sweep";
 
 const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8").replace(/\r\n/g, "\n");
 const now = new Date("2026-10-20T12:00:00Z");
@@ -10,22 +10,26 @@ const program = (over: Partial<EmptyProgramRow> = {}): EmptyProgramRow => ({ id:
 
 describe("an empty day is removed unless it is a rest day or something points at it", () => {
   it("removes a plain empty day", () => {
-    expect(isRemovableEmptyDay(day(), now)).toBe(true);
+    expect(isRemovableEmptyDay(day())).toBe(true);
   });
   it("keeps a rest day, a day with exercises, and a day with a log, session, note or scheduled date", () => {
-    expect(isRemovableEmptyDay(day({ title: "Rest day" }), now)).toBe(false);
-    expect(isRemovableEmptyDay(day({ title: "rest" }), now)).toBe(false);
-    expect(isRemovableEmptyDay(day({ exercises: 1 }), now)).toBe(false);
-    expect(isRemovableEmptyDay(day({ logs: 1 }), now)).toBe(false);
-    expect(isRemovableEmptyDay(day({ sessions: 2 }), now)).toBe(false);
-    expect(isRemovableEmptyDay(day({ notes: 1 }), now)).toBe(false);
-    expect(isRemovableEmptyDay(day({ assignments: 1 }), now)).toBe(false);
-    expect(isRemovableEmptyDay(day({ scheduledDate: "2026-10-21" }), now)).toBe(false);
+    expect(isRemovableEmptyDay(day({ title: "Rest day" }))).toBe(false);
+    expect(isRemovableEmptyDay(day({ title: "rest" }))).toBe(false);
+    expect(isRemovableEmptyDay(day({ exercises: 1 }))).toBe(false);
+    expect(isRemovableEmptyDay(day({ logs: 1 }))).toBe(false);
+    expect(isRemovableEmptyDay(day({ sessions: 2 }))).toBe(false);
+    expect(isRemovableEmptyDay(day({ notes: 1 }))).toBe(false);
+    expect(isRemovableEmptyDay(day({ assignments: 1 }))).toBe(false);
+    expect(isRemovableEmptyDay(day({ scheduledDate: "2026-10-21" }))).toBe(false);
   });
-  it("never removes a day made in the last 24 hours (he may be setting it up to fill in later)", () => {
-    expect(isRemovableEmptyDay(day({ createdAt: "2026-10-20T11:55:00Z" }), now)).toBe(false);
-    expect(isRemovableEmptyDay(day({ createdAt: "2026-10-19T13:00:00Z" }), now)).toBe(false);
-    expect(isRemovableEmptyDay(day({ createdAt: "2026-10-19T11:00:00Z" }), now)).toBe(true);
+  it("has no grace period: an empty day made a minute ago goes too (Ron: it is too easy to add one back)", () => {
+    expect(isRemovableEmptyDay(day({ createdAt: "2026-10-20T11:59:00Z" }))).toBe(true);
+    expect(isRemovableEmptyDay(day({ createdAt: "2026-10-19T11:00:00Z" }))).toBe(true);
+  });
+  it("a program made in the last 10 minutes is still being set up, so its first open sweeps nothing; an older one does", () => {
+    expect(isBrandNewProgram("2026-10-20T11:55:00Z", now)).toBe(true);
+    expect(isBrandNewProgram("2026-10-20T11:49:00Z", now)).toBe(false);
+    expect(isBrandNewProgram(null, now)).toBe(false);
   });
   it("knows a rest day by its name", () => {
     expect(isRestDayTitle("Rest day")).toBe(true);
@@ -50,7 +54,14 @@ describe("an empty program is removed quietly, only his own, only when nothing i
 
 describe("wiring", () => {
   it("the builder sweeps its own program's empty days when opened, and Programs sweeps the owner's empty programs", () => {
-    expect(read("app/(coach)/groups/[groupId]/programs/[programId]/page.tsx")).toContain("await sweepEmptyDays(supabase, programId);");
+    expect(read("app/(coach)/groups/[groupId]/programs/[programId]/page.tsx")).not.toContain("sweepEmptyDays");
+    const builder = read("components/coach/desktop/program-builder-desktop.tsx");
+    expect(builder).toContain("/api/programs/sweep-empty-days");
+    expect(builder).toContain("}, []);");
+    expect(builder).toContain("initialDays.filter((d) => d.items.length === 0 && !isRestDayTitle(d.title))");
+    const api = read("app/api/programs/sweep-empty-days/route.ts");
+    expect(api).toContain("isBrandNewProgram");
+    expect(api).toContain("sweepEmptyDays(supabase, programId, dayIds)");
     expect(read("app/(coach)/programs/page.tsx")).toContain("await sweepEmptyPrograms(supabase, user.id, groupIds);");
     const sweep = read("lib/empty-sweep.ts");
     expect(sweep).toContain(".eq(\"created_by\", viewerId)");
