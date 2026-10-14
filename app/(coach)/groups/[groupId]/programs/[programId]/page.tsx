@@ -283,6 +283,7 @@ async function CoachProgramBuilder({
       .select("id, from_name, to_name, evidence_count, evidence_total")
       .eq("coach_id", coachId)
       .eq("status", "suggested")
+      .eq("kind", "swap")
       .eq("asked_for_program_id", programId)
       .gte("created_at", new Date(Date.now() - 7 * 86400000).toISOString())
       .maybeSingle(),

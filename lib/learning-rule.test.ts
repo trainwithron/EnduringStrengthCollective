@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { clauseKey, derivedKeys, inferClauseKeys, ruleApplies, splitCorrection } from "@/lib/clauses";
 import { LEARN_INTRO, WHY_CHIPS, WHY_PROMPT, proposeRule, ruleKind, sameRule, withScope } from "@/lib/learning-rule";
+import { detectSwapPatterns, patternKey } from "@/lib/edit-patterns";
 import { isWriteRequest } from "@/lib/workspace-mutation";
 import { learnedBlock, learnedLines, LEARNED_HEADING } from "@/lib/learned-for-prompt";
 
@@ -152,5 +153,20 @@ describe("saving a rule is counted as a save", () => {
   it("so the other panes refresh", () => {
     expect(isWriteRequest("POST", "/api/learning/rule", "https://app.test", undefined)).toBe(true);
     expect(isWriteRequest("POST", "https://app.test/api/learning/rule", "https://app.test", undefined)).toBe(true);
+  });
+});
+
+describe("a taught rule has no from/to names and must not break the swap code", () => {
+  it("patternKey and the sign-off lookup tolerate null names", () => {
+    expect(() => patternKey(null, null)).not.toThrow();
+    expect(patternKey(null, undefined)).toBe("|");
+    const asked = new Set<string>([patternKey(null, null)]);
+    expect(detectSwapPatterns([], [], asked)).toEqual([]);
+  });
+  it("sign-off, the suggestion card, Yes/No/reason and learn-reason only ever touch swap rules", () => {
+    expect(read("app/api/ai/sign-off/route.ts")).toContain('.eq("coach_id", user.id).eq("kind", "swap")');
+    expect(read("app/(coach)/groups/[groupId]/programs/[programId]/page.tsx")).toContain('.eq("kind", "swap")');
+    expect(read("app/api/learned-rules/[ruleId]/route.ts")).toContain('rule.kind !== "swap" && body.action !== "undo"');
+    expect(read("app/api/ai/learn-reason/route.ts")).toContain('rule.kind !== "swap"');
   });
 });

@@ -30,8 +30,9 @@ export async function POST(request: Request) {
   const tooLong = aiInputTooLong("program_chat", reason);
   if (tooLong) return NextResponse.json({ error: tooLong }, { status: 400 });
 
-  const { data: rule } = await supabase.from("coach_learned_rules").select("from_name, to_name").eq("id", ruleId).eq("coach_id", user.id).maybeSingle();
+  const { data: rule } = await supabase.from("coach_learned_rules").select("kind, from_name, to_name").eq("id", ruleId).eq("coach_id", user.id).maybeSingle();
   if (!rule) return NextResponse.json({ error: "Not found." }, { status: 404 });
+  if (rule.kind !== "swap") return NextResponse.json({ error: "That one is already saved." }, { status: 409 });
 
   try {
     const text = await callClaude({

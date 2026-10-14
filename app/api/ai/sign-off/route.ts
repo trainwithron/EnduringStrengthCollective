@@ -74,7 +74,7 @@ export async function POST(request: Request) {
           .eq("coach_id", user.id)
           .eq("kind", "swap")
           .in("program_id", signoffs.map((s) => s.programId));
-        const { data: asked } = await supabase.from("coach_learned_rules").select("from_name, to_name").eq("coach_id", user.id);
+        const { data: asked } = await supabase.from("coach_learned_rules").select("from_name, to_name").eq("coach_id", user.id).eq("kind", "swap");
         const askedKeys = new Set(((asked ?? []) as { from_name: string; to_name: string }[]).map((r) => patternKey(r.from_name, r.to_name)));
         const [pattern] = detectSwapPatterns(
           signoffs,

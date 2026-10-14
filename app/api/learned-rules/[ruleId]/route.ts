@@ -17,10 +17,12 @@ export async function POST(request: Request, props: { params: Promise<{ ruleId: 
   if (!user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
 
   const body = await request.json().catch(() => ({}));
-  const { data: rule } = await supabase.from("coach_learned_rules").select("id, status, from_name, to_name, preference_id, asked_for_program_id").eq("id", ruleId).eq("coach_id", user.id).maybeSingle();
+  const { data: rule } = await supabase.from("coach_learned_rules").select("id, kind, status, from_name, to_name, preference_id, asked_for_program_id").eq("id", ruleId).eq("coach_id", user.id).maybeSingle();
   if (!rule) return NextResponse.json({ error: "Not found." }, { status: 404 });
 
   const fail = () => NextResponse.json({ error: "That didn't save. Nothing was changed." }, { status: 500 });
+  // Yes / No / a reason belong to a suggested swap (they build a preference from its two exercise names). A rule the coach taught is already confirmed; it can only be undone.
+  if (rule.kind !== "swap" && body.action !== "undo") return NextResponse.json({ error: "That one is already saved." }, { status: 409 });
   switch (body.action) {
     case "yes": {
       if (rule.status === "confirmed") return NextResponse.json({ ok: true });

@@ -26,8 +26,9 @@ export interface SwapPattern {
   total: number;
 }
 
-const k = (s: string) => s.trim().toLowerCase();
-export const patternKey = (from: string, to: string) => `${k(from)}|${k(to)}`;
+// Null-safe: a taught rule (not a swap) has no from/to names.
+const k = (s: string | null | undefined) => (s ?? "").trim().toLowerCase();
+export const patternKey = (from: string | null | undefined, to: string | null | undefined) => `${k(from)}|${k(to)}`;
 
 // `signoffs` newest first. `alreadyAsked` holds patternKey()s that were asked about before (confirmed, declined, undone or just shown): never asked twice.
 export function detectSwapPatterns(signoffs: SignoffLite[], events: SwapEventLite[], alreadyAsked: Set<string>): SwapPattern[] {
