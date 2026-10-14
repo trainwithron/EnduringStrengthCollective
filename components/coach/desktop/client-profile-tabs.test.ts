@@ -27,10 +27,9 @@ describe("the tab strip", () => {
   it("every tab is a button on this page (none leaves the profile), and the strip wraps instead of scrolling", () => {
     const html = renderToStaticMarkup(createElement(ClientProfileTabs, { groupId: "g1", athleteId: "a1", initial: "overview" }));
     expect((html.match(/<button/g) ?? []).length).toBe(8);
-    // History is the one link: its own page (exercise history and the FitPros import)
-    expect((html.match(/<a /g) ?? []).length).toBe(1);
-    expect(html).toContain('href="/groups/g1/athletes/a1/history"');
-    expect(html).toContain(">History<");
+    // History is no longer a link in the strip: it is reached from Logged workouts ("Import or add past history")
+    expect((html.match(/<a /g) ?? []).length).toBe(0);
+    expect(html).not.toContain(">History<");
     expect(html).toContain("flex-wrap");
     expect(html).not.toContain("overflow-x-auto");
     expect(html).toContain('aria-pressed="true"');
