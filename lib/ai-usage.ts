@@ -68,6 +68,7 @@ export type AiFeature =
   | "video_checkin_summary"
   | "biomech_tag_suggest"
   | "pattern_sort_suggest"
+  | "program_template"
   // system/automatic (logged, never limited)
   | "session_pattern_check"
   | "coach_briefing"
@@ -86,6 +87,7 @@ export const AI_INPUT_LIMITS: Partial<Record<AiFeature, number>> = {
   video_checkin_summary: 3000,
   biomech_tag_suggest: 120,
   pattern_sort_suggest: 1500,
+  program_template: 600,
 };
 
 // A plain message to show when the text is too long, or null when it is fine.
@@ -126,6 +128,8 @@ const POLICY: Record<AiFeature, FeaturePolicy> = {
   biomech_tag_suggest: { enforce: true },
   // Sorting the library into patterns, ten names per call; a coach sorts a few hundred names over a visit, so a looser burst than the shared bucket.
   pattern_sort_suggest: { enforce: true, burstLimit: 12, monthlyCeiling: 300 },
+  // "Pick for me" on a template: one call for the whole template, charged as one program run only after a usable answer, so this ceiling (like program generation's) only bounds failed attempts.
+  program_template: { enforce: true, monthlyCeiling: 150 },
   session_pattern_check: { enforce: false },
   coach_briefing: { enforce: false },
   spotter_cornerstone: { enforce: false },
